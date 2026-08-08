@@ -12,6 +12,7 @@ import "./with-dom.js";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { flush, registerPrimaryStage, resetWorkspaceWithTab, stubRect } from "./harness";
 import { createPaneSurface, surfaceForPane } from "../src/canvas/surface-registry";
+import { canvasPerf, resetCanvasPerf } from "../src/canvas/canvas-perf";
 
 const { happyDOM } = globalThis as unknown as { happyDOM: { setURL: (u: string) => void } };
 happyDOM.setURL("http://localhost:3000/");
@@ -72,6 +73,16 @@ const { initShellRefs } = await import("../src/store");
 
 const QUIET = { animations: 0, fonts: true, images: 0, kind: "idle" as const };
 
+/**
+ * Register `canvasEl` as an artboard of the primary pane's stage — what `renderCanvasIntoPanel`
+ * does before every real mount, and what makes `panelHostingCanvas` able to name its generation.
+ */
+function mountPanelFor(canvasEl: HTMLElement, gen = 1): void {
+  const surface = surfaceForPane("primary");
+  surface.renderGeneration = gen;
+  surface.panels.push({ canvas: canvasEl, ready: true } as never);
+}
+
 /** Mount one page host and bring it to the state a settled canvas is in. */
 async function mountReadyCanvas(gen = 1): Promise<{ canvasEl: HTMLElement; channel: FakeChannel }> {
   const canvasEl = document.createElement("div");
@@ -95,6 +106,8 @@ beforeEach(() => {
   surfaceForPane("primary").panzoomWrap = document.querySelector(".panzoom-wrap");
   surfaceForPane("primary").panX = 0;
   surfaceForPane("primary").panY = 0;
+  surfaceForPane("primary").panels.length = 0;
+  resetCanvasPerf();
 });
 
 describe("canvasIdleBlockers", () => {
@@ -144,23 +157,59 @@ describe("canvasIdleBlockers", () => {
     const tab = resetWorkspaceWithTab(undefined, { id: "page-2" });
     const canvasEl = document.createElement("div");
     document.body.append(canvasEl);
+    /* The artboard belongs to a STAGE, which is how `postPatchToHosts` resolves the generation to
+       check the patch against. A bare element is not a state the app can reach — every mount goes
+       through `renderCanvasIntoPanel(surface, panel, …)` — and a host whose stage cannot be named
+       is now skipped rather than posted a fabricated gen `0`. See the test below. */
+    mountPanelFor(canvasEl);
     await mountIframeCanvas(1, { tagName: "div" } as never, canvasEl, null, tab.id);
     const channel = channels.at(-1)!;
     channel.deliver({ kind: "ready" });
     channel.deliver({ gen: 1, kind: "renderComplete" });
     channel.deliver({ ...QUIET, gen: 1 });
 
-    expect(postPatchToHosts([], 1, "page-2")).toBe(1);
+    expect(postPatchToHosts([], "page-2")).toBe(1);
     expect(canvasIdleBlockers()).toEqual(["canvas[page-2]: 1 unacked patch(es)"]);
     channel.deliver({ gen: 1, kind: "patchComplete" });
     expect(canvasIdleBlockers()).toEqual([]);
 
     // A patch that FAILS is still a patch that finished — a counter that only went up would wedge
     // Every later idle() behind a message the host already escalated past.
-    expect(postPatchToHosts([], 1, "page-2")).toBe(1);
+    expect(postPatchToHosts([], "page-2")).toBe(1);
     expect(canvasIdleBlockers()).toEqual(["canvas[page-2]: 1 unacked patch(es)"]);
     channel.deliver({ gen: 1, kind: "patchError", message: "nope" });
     expect(canvasIdleBlockers()).toEqual([]);
+  });
+
+  /* FINDING 9. `panelHostingCanvas(host.canvasEl)?.surface.renderGeneration ?? 0`.
+     A host whose stage cannot be resolved — still `ready` and connected while its surface's panel
+     list is between mutations across one of `renderCanvasImpl`'s awaits — was posted generation
+     `0`. `0 < renderedGen` is the frame's `patch-behind-render` branch, and the `patchError` it
+     answers with was handled by resolving the surface with the SAME failing lookup, so
+     `patchEscalation` was never called. `posted` had already been incremented, so the caller did
+     not throw; `markConsumed` had already suppressed the full render. The edit vanished with no
+     counter moving — the exact failure the `patch-behind-render` line was added to end.
+
+     Against the `?? 0` spelling both assertions below are wrong: the post counts 1, and the
+     escalation counter stays at zero. */
+  test("a host whose STAGE cannot be resolved is not posted a fabricated generation", async () => {
+    const tab = resetWorkspaceWithTab(undefined, { id: "page-3" });
+    const canvasEl = document.createElement("div");
+    document.body.append(canvasEl);
+    await mountIframeCanvas(7, { tagName: "div" } as never, canvasEl, null, tab.id);
+    const channel = channels.at(-1)!;
+    channel.deliver({ kind: "ready" });
+    channel.deliver({ gen: 7, kind: "renderComplete" });
+    channel.deliver({ ...QUIET, gen: 7 });
+    const before = canvasPerf.escalations;
+
+    // No panel anywhere owns this canvas element, so no stage can name a generation for it.
+    expect(postPatchToHosts([], "page-3")).toBe(0);
+    // Nothing was posted, so nothing is outstanding — and the reason is on the record.
+    expect(canvasIdleBlockers()).toEqual([]);
+    expect(channel.posts.some((post) => post.kind === "patch")).toBe(false);
+    expect(canvasPerf.escalations).toBe(before + 1);
+    expect(canvasPerf.lastEscalationReason).toBe("host-stage-unresolved");
   });
 
   test("the frame's own report names fonts, animations and pending image retries", async () => {

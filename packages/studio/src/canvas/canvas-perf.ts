@@ -59,6 +59,28 @@ export interface CanvasPerf {
   patchedOps: number;
   /** Patch batches that escalated to a full render. */
   escalations: number;
+  /**
+   * Times a FOLLOWING pane re-resolved to a different document (§18.4's companion presets).
+   *
+   * The tripwire for the one way the follow ships slow. The `component` follow observes the
+   * selection, and the selection moves on every click — so it memoises on its ANSWER: twenty clicks
+   * inside one `<my-card>` resolve to the same definition and must cost nothing. A number that
+   * climbs with keystrokes or with clicks inside one component means the memo is being defeated,
+   * usually by traversing the reactive document instead of `toRaw`'s.
+   */
+  derivedRetargets: number;
+  /**
+   * Times a following pane RE-RESOLVED — ran `derivedTarget` and reconciled, whether or not the
+   * answer changed.
+   *
+   * The other half of the follow's cost, and the half {@link CanvasPerf.derivedRetargets} cannot
+   * see: the memo makes a repeated answer free to ACT on, and says nothing about how often the
+   * question is asked. It is asked once per effect run, and the effect's tracked inputs are meant
+   * to be the source tab's identity and its selection — nothing else. A number that climbs with
+   * keystrokes means the document was read through the reactive proxy instead of `toRaw`'s, which
+   * makes every character typed in the source pane re-walk the tree.
+   */
+  derivedResolves: number;
   lastEscalationReason: string;
   /** Duration of the most recent full canvas render, in ms (0 before the first render). */
   lastFullRenderMs: number;
@@ -69,6 +91,8 @@ export interface CanvasPerf {
 }
 
 export const canvasPerf: CanvasPerf = {
+  derivedResolves: 0,
+  derivedRetargets: 0,
   escalations: 0,
   fullRenders: 0,
   hostRenderPosts: 0,
@@ -223,6 +247,8 @@ export function resetCanvasPerf() {
   canvasPerf.skippedFullRenders = 0;
   canvasPerf.patchedOps = 0;
   canvasPerf.escalations = 0;
+  canvasPerf.derivedRetargets = 0;
+  canvasPerf.derivedResolves = 0;
   canvasPerf.lastEscalationReason = "";
   canvasPerf.lastFullRenderMs = 0;
   canvasPerf.p95FullRenderMs = 0;

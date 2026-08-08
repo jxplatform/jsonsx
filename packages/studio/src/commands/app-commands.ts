@@ -51,6 +51,7 @@ import { contentCommands } from "../content/entry-commands";
 import { newProjectCommands } from "../new-project/new-project-modal";
 import { registerSelectionCommands } from "../panels/block-action-bar";
 import { registerTabCommands } from "../workspace/workspace";
+import { derivationCommands, noopDerivationDeps } from "../workspace/pane-derive";
 import type { AnyCommand } from "./registry";
 
 /** A verb set that does nothing — the checks read declarations, never behaviour. */
@@ -66,7 +67,7 @@ const NO_OP = () => {};
  */
 function viaRegistration(): AnyCommand[] {
   const registry = createCommandRegistry({ getContext: emptyContext });
-  registerTabCommands(registry, { openFile: NO_OP });
+  registerTabCommands(registry, { openFile: NO_OP, openFileInPane: NO_OP });
   registerSelectionCommands(registry, { convertToComponent: NO_OP, navigateToComponent: NO_OP });
   return [...registry.list()];
 }
@@ -83,6 +84,7 @@ export function appCommandSet(): AnyCommand[] {
     // Level check, the chrome budget and the generated keyboard sheet alike.
     ...defaultCommands({ ...noopCommandDeps(), panelRoster: panelFocusRoster() }),
     ...viaRegistration(),
+    ...derivationCommands(noopDerivationDeps()),
     ...shellViewCommands({ inspectorTab: () => DEFAULT_INSPECTOR_TAB, setInspectorTab: NO_OP }),
     ...canvasViewCommands({ getCanvasMode: () => "design", setCanvasMode: NO_OP }),
     ...selectionCommands(),

@@ -48,7 +48,10 @@ import { DRAFT_FIELD, isDraftEntry } from "../content/draft-state";
 import { entryFields } from "../content/entry-fields";
 import { collectionOfPath } from "../content/entry-model";
 import { activeRegistry } from "../commands/active-registry";
-import type { Pane } from "../workspace/workspace";
+import { PRESET_LABELS } from "../workspace/pane-derive";
+import { tabOfPane } from "../canvas/canvas-surface";
+import { mediaDisplayName } from "./shared";
+import type { Pane, PaneDerivation } from "../workspace/workspace";
 import type { Tab } from "../tabs/tab";
 import { renderPopover, showConfirmDialog, showSaveDiscardDialog } from "../ui/layers";
 import { saveFile } from "../files/file-ops";
@@ -58,6 +61,7 @@ import { rectOf } from "../utils/geometry";
 import { resolveRegion } from "../ui/regions";
 import { commitTabBuffers, tabBufferUnsaved } from "../services/monaco-buffer";
 import type { EffectScope } from "@vue/reactivity";
+import type { TemplateResult } from "lit-html";
 
 /**
  * The primary pane's host, as handed over by the shell's bootstrap.
@@ -124,6 +128,16 @@ export function mount(host: HTMLElement) {
         void pane.id;
         void pane.tabOrder;
         void pane.activeTabId;
+        /* NO DERIVATION READS HERE, and the three that were here are the clearest example in the
+           package of a tracked input that tracks nothing. `render()` is called from inside this
+           effect, synchronously, so every value its templates read IS a dependency —
+           `derivationChipTpl` reads `derived.kind`, `derived.preset` and `derived.media` to build
+           the chip's label, and `renderPane` reads `pane.derived` to choose the branch. Three
+           `void` lines restating them could each be inverted with no test in the suite able to
+           tell, because the behaviour they claimed to buy was already bought one function down.
+           The loop reads below are a different case and stay: `render()` draws ONE pane per host,
+           so a fact about a pane it does not draw — or about a tab in another pane's strip — has
+           no reader inside this effect. */
       }
       for (const tab of workspace.tabs.values()) {
         void tab.doc.dirty;
@@ -190,7 +204,74 @@ function render() {
   }
 }
 
+/**
+ * What a lens pane's strip says: the projection, and the document it is a projection OF.
+ *
+ * Not a tab chip, and deliberately not close-able as a tab: a lens owns no document, so the ✕ here
+ * runs `pane.unsplit` — the lens's only exit, because Pin is refused for a projection of a document
+ * that already has a tab beside it (§14.1).
+ */
+function derivationChipTpl(pane: Pane, derived: PaneDerivation): TemplateResult {
+  const registry = activeRegistry();
+  /* For a LENS the first read already hops to the source pane. For an unresolved COMPANION it
+     answers null — the pane owns no tab yet — and the chip would say "no document" about a
+     derivation that knows perfectly well what it is a projection OF. */
+  const of = tabOfPane(pane.id) ?? tabOfPane(derived.sourcePaneId);
+  const label =
+    derived.kind === "lens" && derived.preset === "breakpoint"
+      ? `${PRESET_LABELS.breakpoint} ${derived.media ? mediaDisplayName(derived.media) : "Base"}`
+      : PRESET_LABELS[derived.preset];
+  return html`
+    <div
+      class=${classMap({ focused: isPaneFocused(pane.id), "tab-strip-row": true })}
+      @mousedown=${() => focusPane(pane.id)}
+    >
+      <div class="tab-strip">
+        <div class="tab-derivation" title=${`${label} · ${of?.documentPath ?? "no document"}`}>
+          <span class="tab-derivation-preset">${label}</span>
+          <span class="tab-derivation-of">${of ? tabLabel(of) : "no document"}</span>
+        </div>
+      </div>
+      <button
+        class="tab-strip-overflow"
+        title=${registry?.get("pane.unsplit")?.title ?? "Close Side Pane"}
+        @click=${() => void registry?.run("pane.unsplit")}
+      >
+        <span aria-hidden="true">✕</span>
+      </button>
+    </div>
+  `;
+}
+
 function renderPane(pane: Pane, host: HTMLElement) {
+  /* A LENS pane has no tabs and must not have an empty strip: its `tabOrder` is `[]` BY DESIGN, so
+     the branch below would blank the one row that says what the pane is. It draws a derivation chip
+     instead — the preset, what it is a projection of, and the two exits. A COMPANION owns real tabs
+     and draws them, because that is what it is. */
+  const { derived } = pane;
+  /* ONE condition, not two. This read `derived.kind === "lens" || pane.tabOrder.length === 0`, and
+     the first disjunct could be inverted with nothing in the suite able to notice — invariant D2
+     says a lens owns no tab, `applyDerivation` hands back anything it finds, and the only writer
+     that could put one there (`moveTabToPane`, through `revealOpenTab`) is reached solely by
+     `openFileInPane`, which the follow calls for COMPANIONS. So the second disjunct is already
+     total over a lens and the first chose nothing. */
+  if (derived && pane.tabOrder.length === 0) {
+    /* A COMPANION whose rule has not resolved reaches this too, and it has to. Its `tabOrder` is
+       empty for a different reason than a lens's — the document it wants is not open YET, or the
+       selection has nothing under it — and the branch below drew `nothing`: a pane with no chip,
+       no ✕ and no way out, which `paneIsEmpty` will not collapse because the derivation counts as
+       a subject. The chip is the pane's name and its exit.
+       NO `_lastActive` / `_overflowing` RESET HERE, and both were, until each was shown to be a
+       write nothing can read. `_overflowing` is measured by {@link syncOverflow} at the end of
+       every ordinary render, inside the same synchronous call, so a stale `true` carried through a
+       derivation is corrected before any frame sees it. `_lastActive` cannot survive the round trip
+       either: a tab can only come back through `insertIntoPane` and then `activateTab`, which are
+       two reactive writes and therefore two renders, and the first of them lands here with
+       `tabOrder` full and `activeTabId` still `null` — which resets the field anyway. Both were
+       written as bookkeeping and both were unfalsifiable; the branch below owns the answer. */
+    litRender(derivationChipTpl(pane, derived), host);
+    return;
+  }
   if (pane.tabOrder.length === 0) {
     _lastActive.set(pane.id, null);
     _overflowing.set(pane.id, false);

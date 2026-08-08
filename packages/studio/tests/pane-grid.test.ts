@@ -110,7 +110,7 @@ describe("reconcile", () => {
     resetWorkspaceWithTab();
     workspace.panes = [
       ...workspace.panes,
-      { activeTabId: null, id: "ghost", tabOrder: [] as string[] },
+      { activeTabId: null, derived: null, id: "ghost", tabOrder: [] as string[] },
     ];
     await flush();
     const ghost = cellForPane("ghost");
@@ -138,7 +138,7 @@ describe("reconcile", () => {
 
     workspace.panes = [
       ...workspace.panes,
-      { activeTabId: null, id: SECONDARY_PANE, tabOrder: [] as string[] },
+      { activeTabId: null, derived: null, id: SECONDARY_PANE, tabOrder: [] as string[] },
     ];
     await flush();
 

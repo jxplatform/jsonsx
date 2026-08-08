@@ -14,7 +14,11 @@ import { flush, registerPrimaryStage, resetWorkspaceWithTab, stubRect } from "./
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { JxPath } from "../src/state";
-import { surfaceForPane } from "../src/canvas/surface-registry";
+import {
+  registerCanvasSurface,
+  surfaceForPane,
+  unregisterCanvasSurface,
+} from "../src/canvas/surface-registry";
 
 type AnyRec = Record<string, any>;
 
@@ -59,7 +63,11 @@ const { initLayers } = await import("../src/ui/layers");
 // Namespace import: `canvasWrap` is a mutable binding populated by initShellRefs below.
 const store = await import("../src/store");
 const { view } = await import("../src/view");
-const { closeAllTabs } = await import("../src/workspace/workspace");
+const { PRIMARY_PANE, SECONDARY_PANE, closeAllTabs, focusPane, openTab, splitRight } =
+  await import("../src/workspace/workspace");
+const { applyDerivation, noopDerivationDeps, setPaneDerivation } =
+  await import("../src/workspace/pane-derive");
+const { surfacesShowingTab } = await import("../src/canvas/canvas-surface");
 
 document.body.innerHTML = `<div id="app">
   <div id="toolbar"></div><div id="activity-bar"></div><div id="left-panel"></div>
@@ -154,6 +162,52 @@ describe("block action bar gaps", () => {
     await raf();
     await flush();
     expect(bar()).toBeTruthy();
+  });
+
+  /* THE STAGE THE CARET IS ON, which with a derived pane is not the same as "the stage showing
+     the active tab". A lens displays the document its source pane owns, so `surfacesShowingTab`
+     answers with BOTH — and taking the first clips the bar against whichever pane comes earlier in
+     the grid. The author typing in the side pane then loses the bar whenever their caret sits
+     outside the primary's viewport, which is most of the time once the two stages have scrolled
+     apart. Two rects, one per stage, and the anchor is inside exactly one of them. */
+  test("the bar is clipped against the FOCUSED pane's stage, not the first one showing the tab", async () => {
+    const tab = setup({ children: [{ tagName: "p", textContent: "hi" }], tagName: "div" }, [
+      "children",
+      0,
+    ]);
+    openTab({ document: { tagName: "div" }, documentPath: "scratch.json", id: "scratch.json" });
+    expect(splitRight()?.id).toBe(SECONDARY_PANE);
+    setPaneDerivation(SECONDARY_PANE, {
+      diff: null,
+      kind: "lens",
+      media: null,
+      mode: "design",
+      preset: "breakpoint",
+      reason: "",
+      sourcePaneId: PRIMARY_PANE,
+      status: "ready",
+      zoom: 1,
+    });
+    applyDerivation(SECONDARY_PANE, noopDerivationDeps());
+    focusPane(SECONDARY_PANE);
+    expect(surfacesShowingTab(tab).map((s) => s.paneId)).toEqual([PRIMARY_PANE, SECONDARY_PANE]);
+
+    // A stage of its own for the lens — two live hosts is the configuration under test.
+    const sideStage = document.createElement("div");
+    document.body.append(sideStage);
+    registerCanvasSurface(SECONDARY_PANE, sideStage);
+    // The primary is scrolled somewhere else entirely; the lens is where the caret is.
+    stubRect(surfaceForPane(PRIMARY_PANE).wrap, { height: 100, left: 0, top: 0, width: 1600 });
+    stubRect(sideStage, { height: 800, left: 0, top: 100, width: 1600 });
+    host.anchor = { height: 20, left: 30, top: 400, width: 100 };
+
+    renderBlockActionBar();
+    await flush();
+
+    expect(bar()).toBeTruthy();
+    expect(bar()!.style.visibility).not.toBe("hidden");
+    unregisterCanvasSurface(SECONDARY_PANE);
+    sideStage.remove();
   });
 
   test("an anchor scrolled out of the canvas area hides the bar", async () => {

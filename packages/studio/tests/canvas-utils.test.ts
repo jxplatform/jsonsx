@@ -35,6 +35,7 @@ import {
   setFit,
   setEditZoom,
   setUserZoom,
+  stageZoom,
   updateActivePanelHeaders,
 } from "../src/canvas/canvas-utils";
 import { initShellRefs, registerRenderer } from "../src/store";
@@ -240,7 +241,7 @@ describe("canvasPanelTemplate", () => {
     workspace.panes[0]!.activeTabId = "a";
     workspace.panes = [
       ...workspace.panes,
-      { activeTabId: "b", id: SECONDARY_PANE, tabOrder: ["b"] },
+      { activeTabId: "b", derived: null, id: SECONDARY_PANE, tabOrder: ["b"] },
     ];
     workspace.activePaneId = PRIMARY_PANE;
 
@@ -958,6 +959,112 @@ describe("updateActivePanelHeaders", () => {
   });
 });
 
+// ─── A lens's geometry is its own ─────────────────────────────────────────────
+
+/*
+ * The pane-per-stage work above assumed two stages meant two TABS, and a lens breaks that: it
+ * shares the source pane's tab and every per-tab number on it. Four discriminators carry the
+ * difference — `zoomOf`, `setZoomOf`, `fitKey` and `updateActivePanelHeaders` — and only the first
+ * was tested. Deleting the other three left the whole suite green while zooming a lens rescaled
+ * the document beside it, "Fit page" in either pane re-framed both, and the lens marked the source
+ * pane's breakpoint on its own artboard.
+ */
+describe("a lens shares the tab and none of its geometry", () => {
+  /** The primary showing `a`; the secondary a lens over it, with a stage of its own. */
+  function lensBeside(preset: "code" | "breakpoint", media: string | null = null) {
+    const a = resetWorkspaceWithTab(undefined, { documentPath: "/project/a.json", id: "a" });
+    workspace.panes[0]!.tabOrder = ["a"];
+    workspace.panes[0]!.activeTabId = "a";
+    workspace.panes = [
+      ...workspace.panes,
+      { activeTabId: null, derived: null, id: SECONDARY_PANE, tabOrder: [] },
+    ];
+    workspace.panes[1]!.derived = {
+      diff: null,
+      kind: "lens",
+      media,
+      mode: preset === "code" ? "source" : "design",
+      preset,
+      reason: "",
+      sourcePaneId: PRIMARY_PANE,
+      status: "ready",
+      zoom: 1,
+    };
+    workspace.activePaneId = PRIMARY_PANE;
+    const side = standUpPaneGrid(SECONDARY_PANE);
+    const sideWrap = document.createElement("div");
+    side.wrap.append(sideWrap);
+    side.panzoomWrap = sideWrap;
+    // Both stages resolve to ONE tab — that is the hop, and the reason none of the numbers below
+    // May come from it.
+    expect(tabOfPane(SECONDARY_PANE)?.id).toBe("a");
+    return { a, side, sideWrap };
+  }
+
+  afterEach(() => {
+    surfaceForPane(SECONDARY_PANE).panels.length = 0;
+    unregisterCanvasSurface(SECONDARY_PANE);
+  });
+
+  test("the zoom pod in a lens reports the LENS's scale", () => {
+    const { a, side } = lensBeside("breakpoint", "md");
+    a.session.ui.zoom = 2;
+    (workspace.panes[1]!.derived as { zoom: number }).zoom = 0.4;
+
+    expect(stageZoom(side)).toBeCloseTo(0.4, 10);
+    expect(stageZoom(primary())).toBe(2);
+  });
+
+  test("zooming a lens does not rescale the document beside it", () => {
+    /* The WRITE, which nothing asserted while the READ was covered — so the pod reported 40% and
+       its `-` divided the desktop pane's number and applied the result to the author's own
+       document. */
+    const { a, side, sideWrap } = lensBeside("breakpoint", "md");
+    a.session.ui.zoom = 2;
+
+    setUserZoom(0.5, side);
+
+    expect((workspace.panes[1]!.derived as { zoom: number }).zoom).toBeCloseTo(0.5, 10);
+    expect(a.session.ui.zoom).toBe(2);
+    // …and it is the number the stage actually draws at.
+    applyTransform(side);
+    expect(sideWrap.style.transform).toContain("scale(0.5)");
+  });
+
+  test("the two stages declare SEPARATE fits, though they share one document", () => {
+    /* `_fits` is keyed by tab id + path, and a lens has neither of its own — so one key served
+       both stages: "Fit page" chosen in the lens re-framed the pane beside it, and every mode
+       transition in either pane re-applied the other's fit. */
+    const { side } = lensBeside("breakpoint", "md");
+    resetFits();
+
+    setFit("width", side);
+
+    expect(getFit(side)).toBe("width");
+    expect(hasDeclaredFit(side)).toBe(true);
+    expect(getFit(primary())).toBe(DEFAULT_FIT);
+    expect(hasDeclaredFit(primary())).toBe(false);
+  });
+
+  test("the lens marks ITS breakpoint's artboard header, not the shared tab's", async () => {
+    const { a, side } = lensBeside("breakpoint", "md");
+    // The tab the lens shares is on the base artboard. The lens is a lens of `md`.
+    a.session.ui.activeMedia = null;
+    const base = canvasPanelTemplate("base", "Base (320px)", false, 320);
+    const md = canvasPanelTemplate("md", "Tablet (768px)", false, 768);
+    await renderInto(base.tpl);
+    await renderInto(md.tpl);
+    side.panels.push(base.panel as never, md.panel as never);
+
+    updateActivePanelHeaders(side);
+
+    const active = (panel: { element?: Element | null }) =>
+      panel.element?.querySelector(".canvas-panel-header")?.classList.contains("active");
+    expect(active(md.panel)).toBe(true);
+    expect(active(base.panel)).toBe(false);
+  });
+});
+
 // ─── Two panes, two scales ────────────────────────────────────────────────────
 
 describe("the pan-zoom axis is per stage", () => {
@@ -983,7 +1090,7 @@ describe("the pan-zoom axis is per stage", () => {
     workspace.panes[0]!.activeTabId = "a";
     workspace.panes = [
       ...workspace.panes,
-      { activeTabId: "b", id: SECONDARY_PANE, tabOrder: ["b"] },
+      { activeTabId: "b", derived: null, id: SECONDARY_PANE, tabOrder: ["b"] },
     ];
     // The keyboard stays in the PRIMARY throughout — that is what makes the side pane "unfocused".
     workspace.activePaneId = PRIMARY_PANE;

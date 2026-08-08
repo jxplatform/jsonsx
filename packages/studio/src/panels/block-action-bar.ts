@@ -34,7 +34,7 @@ import {
   parentElementPath,
 } from "../store";
 import { activeTab } from "../workspace/workspace";
-import { stageContaining, surfaceShowingTab } from "../canvas/canvas-surface";
+import { activeCanvasSurface, stageContaining } from "../canvas/canvas-surface";
 import { primarySelection, structuralBatch } from "../tabs/selection";
 import {
   mutateDuplicateNodes,
@@ -183,9 +183,12 @@ function barPosition(anchor: {
   height: number;
 }): { left: number; top: number } | null {
   /* Clipped against the stage the CARET is on. The bar anchors to one selection in one document,
-     and the bar is one element, so "is the anchor still on screen" is a question about that pane's
-     stage — the focused pane's, which was `canvasWrap`, is the same one only by coincidence. */
-  const stage = surfaceShowingTab(activeTab.value)?.wrap;
+     and the bar is one element, so "is the anchor still on screen" is a question about ONE pane's
+     stage — and the pane is the FOCUSED one, because that is where the caret is. This asked
+     "the stage showing the active tab", which was the same answer only while a tab could be on
+     screen in one place; with a document displayed in two panes it picked whichever came first in
+     the grid, and clipped the bar against a stage the author is not typing in. */
+  const stage = activeCanvasSurface().wrap;
   if (stage) {
     const wrap = rectOf(stage);
     if (anchor.top + anchor.height < wrap.top || anchor.top > wrap.bottom) {
@@ -1021,7 +1024,9 @@ function focusToolbarItem(bar: HTMLElement, index: number): void {
 
 /** Put the keyboard back where it came from — the canvas iframe, else its wrapper. */
 function returnFocusToCanvas(): void {
-  const stage = surfaceShowingTab(activeTab.value)?.wrap;
+  // The FOCUSED pane's stage: the keyboard came from there and is going back there. Resolving it
+  // From the active tab answered with whichever pane displays that document first.
+  const stage = activeCanvasSurface().wrap;
   const iframe = stage?.querySelector<HTMLElement>("iframe.jx-canvas-iframe");
   (iframe ?? stage)?.focus();
 }

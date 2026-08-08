@@ -294,12 +294,15 @@ describe("tab commands", () => {
       openFile: (path) => {
         opened.push(path);
       },
+      openFileInPane: () => {},
     });
     return { opened, registry };
   }
 
   test("every declared placement satisfies the level × placement matrix", () => {
-    expect(checkPlacements(tabCommands({ openFile: () => {} }))).toEqual([]);
+    expect(checkPlacements(tabCommands({ openFile: () => {}, openFileInPane: () => {} }))).toEqual(
+      [],
+    );
   });
 
   test("⌃Tab and ⌃⇧Tab cycle, and are disabled with one tab open", () => {
@@ -353,6 +356,7 @@ describe("tab commands", () => {
       openFile: (path) => {
         opened.push(path);
       },
+      openFileInPane: () => {},
     }).find((record) => record.id === "document.reopenClosed")!;
     open("a");
     closeTab("a");

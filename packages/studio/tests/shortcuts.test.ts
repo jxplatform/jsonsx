@@ -558,7 +558,11 @@ describe("the old dispatch — twelve modifier chords", () => {
     expect(registry.get("canvas.zoomReset")?.keybinding).toBeUndefined();
     // The pane verbs live beside the pane model, in a registry this fixture does not compose —
     // Their records are the source of truth for the chord either way.
-    expect(paneCommands().find((c) => c.id === "pane.focusPrimary")?.keybinding).toBe("mod+0");
+    expect(
+      paneCommands({ openFile: () => {}, openFileInPane: () => {} }).find(
+        (c) => c.id === "pane.focusPrimary",
+      )?.keybinding,
+    ).toBe("mod+0");
   });
 
   test("Reset Zoom still works as a verb, from the pod and the palette", () => {

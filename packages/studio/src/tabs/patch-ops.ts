@@ -74,8 +74,15 @@ export interface TransactionRecord {
 export interface PatchConsumer {
   /** Decide whether this batch can be applied surgically in the current canvas state. */
   classify: (tab: Tab, ops: JxPatchOp[]) => { patchable: boolean; reason: string };
-  /** Mark a document root reference as surgically consumed (checked by the canvas doc-effect). */
-  markConsumed: (docRef: object) => void;
+  /**
+   * Mark a document root reference as surgically consumed, in every pane the patch will reach.
+   *
+   * `tab` is what decides those panes — one pane owns it, and a derived pane may be projecting that
+   * pane — and each pane's canvas doc-effect clears only its own mark. A single mark per reference
+   * was consumed by whichever pane's effect ran first, so the second full-rendered every patched
+   * edit while the skip counter reported one skip.
+   */
+  markConsumed: (docRef: object, tab: Tab) => void;
   /**
    * Apply the batch to all ready canvas panels. Throws on any failure (caller escalates). `record`
    * carries the value-carrying `docOps` the iframe consumer posts across the frame boundary; the

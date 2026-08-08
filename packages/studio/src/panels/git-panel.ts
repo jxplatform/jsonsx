@@ -114,6 +114,57 @@ export function platformSupportsClone() {
 }
 
 /**
+ * One file's comparison against HEAD: the committed text and the working copy.
+ *
+ * **One definition site, because there are now two callers.** This panel's row click has always
+ * made this pair of reads; `workspace/pane-derive.ts`'s Diff lens needs the same answer for the
+ * document its source pane is showing, and it must not reach `shell.git.diffState` — that slot
+ * holds whatever THIS panel last opened, which is a different file (§18.4, finding 4). A second
+ * copy of these five lines is how the panel and the lens would come to disagree about what "the
+ * diff of this file" means, which is the rule {@link initRepository} is written under too.
+ *
+ * `A` (added) has no `HEAD` copy, so its original is the empty string rather than a `gitShow` that
+ * would throw. Callers narrow to `M`/`A` before asking.
+ *
+ * @param {string} path
+ * @param {string} fileStatus
+ * @returns {Promise<GitDiffState>}
+ */
+export async function readGitDiff(path: string, fileStatus: string): Promise<GitDiffState> {
+  const plat = getPlatform();
+  const [originalContent, currentContent] = await Promise.all([
+    fileStatus === "A" ? Promise.resolve("") : plat.gitShow({ path, ref: "HEAD" }),
+    plat.readFile(path),
+  ]);
+  return { currentContent, filePath: path, fileStatus, originalContent };
+}
+
+/**
+ * The Diff lens's reader: {@link readGitDiff}, with a failure the PANE can state.
+ *
+ * A rejection here is not an error the shell should raise — the author asked to see a comparison
+ * beside their page, and "could not read it" is a sentence the derived pane draws in its own empty
+ * state. `applyDerivation` turns the `null` into exactly that.
+ *
+ * @param {string} path
+ * @param {string} fileStatus
+ * @returns {Promise<GitDiffState | null>}
+ */
+export async function loadDiffForLens(
+  path: string,
+  fileStatus: string,
+): Promise<GitDiffState | null> {
+  try {
+    return await readGitDiff(path, fileStatus);
+  } catch (error) {
+    // Reported where it can be acted on — the pane says so — rather than as a toast over a
+    // Document the author did not ask about.
+    console.warn("loadDiffForLens:", errorMessage(error));
+    return null;
+  }
+}
+
+/**
  * Start tracking this project with git.
  *
  * A function rather than an inline click handler because it is now also a command ({@link
@@ -575,22 +626,9 @@ export function renderGitPanel(ctx: {
       }
 
       try {
-        const plat = getPlatform();
         shell.git.loading = true;
 
-        const [originalContent, currentContent] = await Promise.all([
-          file.status === "A"
-            ? Promise.resolve("")
-            : plat.gitShow({ path: file.path, ref: "HEAD" }),
-          plat.readFile(file.path),
-        ]);
-
-        const diffState = {
-          currentContent,
-          filePath: file.path,
-          fileStatus: file.status,
-          originalContent,
-        };
+        const diffState = await readGitDiff(file.path, file.status);
 
         shell.git.diffState = diffState;
 

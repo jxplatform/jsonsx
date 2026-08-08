@@ -124,9 +124,14 @@ export function createLiveContext(sources: LiveContextSources): () => CommandCon
        FOCUSED pane's strip, so it could never answer 2 and answered 0 whenever no tab was open,
        while a pane with no tab is still a pane. `derived` was declared and never assigned at all.
        `services/automation.ts` publishes this whole record as `probe.state()`, so the screenshot
-       pipeline and the assistant were both reading it. */
+       pipeline and the assistant were both reading it.
+
+       `derived` is ASSIGNED now, and it means "the grid contains a derived pane" — the fact the two
+       predicates that need it actually ask. A third phase of a declared-never-assigned context key
+       is not caution; it is the `layoutSelection`-with-no-writer shape this codebase keeps
+       catching. */
     ctx.pane.count = workspace.panes.length;
-    ctx.pane.derived = false;
+    ctx.pane.derived = workspace.panes.some((pane) => pane.derived !== null);
 
     const paths = tab?.session.selection ?? [];
     const selection = primarySelection(paths);

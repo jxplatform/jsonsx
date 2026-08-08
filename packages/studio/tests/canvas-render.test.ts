@@ -18,6 +18,7 @@ import {
   activeCanvasSurface,
   registerCanvasSurface,
   surfaceForPane,
+  tabOfPane,
   unregisterCanvasSurface,
 } from "../src/canvas/canvas-surface";
 import {
@@ -36,7 +37,12 @@ import { shell } from "../src/shell";
 import { setFormats } from "../src/format/format-host";
 import { setEditZoom } from "../src/canvas/canvas-utils";
 import { MARKDOWN_FORMAT } from "./format-fixture";
+import { createCommandRegistry } from "../src/commands/registry";
+import { makeContext } from "../src/commands/context";
+import { setActiveRegistry } from "../src/commands/active-registry";
+import { derivationCommands, noopDerivationDeps } from "../src/workspace/pane-derive";
 import type { CanvasPanel } from "../src/types";
+import type { PaneDerivation } from "../src/workspace/workspace";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
 /* The panels of the FOCUSED pane's stage. Panels belong to a pane's surface now, not to the
@@ -530,6 +536,15 @@ describe("tab close/reopen lifecycle", () => {
     setMode("source");
     renderCanvas();
     await flush();
+    /* `mountSourceEditor` is a FLOATING async mount — `void mountSourceEditor(…)` around a dynamic
+       import — so "the editor exists" is not established by a fixed number of turns. Two turns is
+       normally plenty and once, on a loaded machine, was not: the test failed at the line below
+       with `createdEditors` empty. That is worth waiting for rather than tolerating, because
+       `scripts/check-lens-mutants.ts` reads a red test file as a killed mutant and would report
+       nineteen false kills off one flake. */
+    for (let turns = 0; createdEditors.length === 0 && turns < 20; turns++) {
+      await flush();
+    }
     const [editor] = createdEditors;
     const [model] = createdModels;
     expect(surfaceForPane("primary").monacoEditor).toBe(editor as never);
@@ -1755,7 +1770,12 @@ describe("stylebook mode", () => {
     right.session.ui.canvasMode = "stylebook";
     workspace.panes[0]!.tabOrder = [left.id];
     workspace.panes[0]!.activeTabId = left.id;
-    workspace.panes.push({ activeTabId: right.id, id: SECONDARY_PANE, tabOrder: [right.id] });
+    workspace.panes.push({
+      activeTabId: right.id,
+      derived: null,
+      id: SECONDARY_PANE,
+      tabOrder: [right.id],
+    });
     const secondWrap = document.createElement("div");
     document.body.append(secondWrap);
     registerCanvasSurface(SECONDARY_PANE, secondWrap);
@@ -1974,6 +1994,7 @@ describe("renderCanvas is addressed by pane", () => {
     workspace.panes[0]!.activeTabId = left.id;
     workspace.panes.push({
       activeTabId: right.id,
+      derived: null,
       id: SECONDARY_PANE,
       tabOrder: [right.id],
     });
@@ -2035,6 +2056,7 @@ describe("renderCanvas is addressed by pane", () => {
     const tab = openSyncedTab();
     workspace.panes.push({
       activeTabId: tab.id,
+      derived: null,
       id: SECONDARY_PANE,
       tabOrder: [tab.id],
     });
@@ -2050,5 +2072,405 @@ describe("renderCanvas is addressed by pane", () => {
     // `panelHostingCanvas` to answer with, nor a mode memory its next real pass would trust.
     expect(stageless.panels).toHaveLength(0);
     expect(stageless.prevCanvasMode).toBeNull();
+  });
+});
+
+// ─── A DERIVED pane's stage (§18.4) ───────────────────────────────────────────
+
+/**
+ * The three render behaviours a lens has that no other pane does, each asserted at the DOM it
+ * produces rather than at the state that produces it.
+ *
+ * The previous round shipped all three green and none of them testable: replacing the string
+ * `"lens"` with `"MUTANT"` at `canvas-render.ts:677`, `:997` and `:1219` — which deletes every
+ * lens-specific render behaviour in the package — left 275, 102 and 117 tests passing across
+ * fourteen files. The one test that named the Document Header gate asserted
+ * `hasDocumentHeader(page) === true` and `derivationOfPane(SECONDARY) === "lens"`, neither of which
+ * touches the gate, and its own comment said so.
+ *
+ * Every test below fails under that mutation, which is how they were written: the mutation was
+ * applied first and each assertion was checked red before it was checked green.
+ */
+describe("a derived pane's stage", () => {
+  /** A second pane drawing `derivation`, with a stage of its own. */
+  function standUpLens(derivation: PaneDerivation): HTMLElement {
+    workspace.panes.push({
+      activeTabId: null,
+      derived: derivation,
+      id: SECONDARY_PANE,
+      tabOrder: [],
+    });
+    const wrap = document.createElement("div");
+    document.body.append(wrap);
+    registerCanvasSurface(SECONDARY_PANE, wrap);
+    return wrap;
+  }
+
+  function lensRecord(over: Partial<Extract<PaneDerivation, { kind: "lens" }>> = {}) {
+    return {
+      diff: null,
+      kind: "lens",
+      media: null,
+      mode: "design",
+      preset: "breakpoint",
+      reason: "",
+      sourcePaneId: PRIMARY_PANE,
+      status: "ready",
+      zoom: 1,
+      ...over,
+    } as PaneDerivation;
+  }
+
+  afterEach(() => {
+    surfaceForPane(SECONDARY_PANE).panels.length = 0;
+    unregisterCanvasSurface(SECONDARY_PANE);
+  });
+
+  test("draws no Document Header card, while the pane that OWNS the tab draws one", async () => {
+    /* `canvas-render.ts:677`. The card is an editing surface over the SAME frontmatter — Title,
+       Route, SEO — and two of them side by side is two writers for one field. Under the mutation
+       the lens grows a second card. */
+    installMockPlatform();
+    mountDocHeader();
+    try {
+      const tab = openSyncedTab();
+      tab.doc.document.title = "Designing for slowness";
+      setMode("design");
+      const lensWrap = standUpLens(lensRecord());
+
+      renderCanvas(PRIMARY_PANE);
+      renderCanvas(SECONDARY_PANE);
+      await flush();
+
+      expect(stageEl().querySelector(".doc-header-host")).not.toBeNull();
+      expect(lensWrap.querySelector(".doc-header-host")).toBeNull();
+      lensWrap.remove();
+    } finally {
+      unmountDocHeader();
+    }
+  });
+
+  test("a diff lens renders ITS OWN comparison, never the app-level slot", async () => {
+    /* `canvas-render.ts:997`. `shell.git.diffState` is one slot for the whole app, so without the
+       per-pane read both stages draw whatever the Git panel last opened — and under the mutation
+       that is exactly what the lens does, because `paneDiff.kind === "MUTANT"` is never true. */
+    openSyncedTab();
+    setMode("git-diff");
+    ctx.gitDiffState = {
+      currentContent: JSON.stringify({ children: [{ tagName: "p", textContent: "SLOT" }] }),
+      filePath: "/project/somebody-elses.json",
+      originalContent: JSON.stringify({ children: [{ tagName: "p", textContent: "SLOT" }] }),
+    };
+    const lensWrap = standUpLens(
+      lensRecord({
+        diff: {
+          currentContent: JSON.stringify({ children: [{ tagName: "p", textContent: "MINE-NEW" }] }),
+          currentDoc: undefined,
+          filePath: "/project/index.json",
+          fileStatus: "M",
+          originalContent: JSON.stringify({
+            children: [{ tagName: "p", textContent: "MINE-OLD" }],
+          }),
+        } as never,
+        mode: "git-diff",
+        preset: "diff",
+      }),
+    );
+
+    renderCanvas(SECONDARY_PANE);
+    await flush();
+
+    const panels = surfaceForPane(SECONDARY_PANE).panels as unknown as CanvasPanel[];
+    expect(panels).toHaveLength(2);
+    expect(panels[0]!.canvas?.textContent).toContain("MINE-OLD");
+    expect(panels[1]!.canvas?.textContent).toContain("MINE-NEW");
+    expect(lensWrap.textContent).not.toContain("SLOT");
+    lensWrap.remove();
+  });
+
+  test("a diff lens with no comparison yet SAYS SO, and never writes the source tab's mode", async () => {
+    /* The other half of the same branch. `setCanvasMode(tab, "design")` writes the tab the pane
+       BESIDE this one owns, so a lens taking the fallback flipped the document the author was
+       editing out of whatever mode they had it in.
+       `loading`, not `unavailable`: an unavailable derivation is drawn by the stale-derivation
+       branch above the mode dispatch (below), so the only state that reaches HERE is a comparison
+       still in flight — which is the state the fallback would have fired in. */
+    const tab = openSyncedTab();
+    setMode("git-diff");
+    ctx.gitDiffState = null;
+    ctx.setCanvasMode.mockClear();
+    const lensWrap = standUpLens(
+      lensRecord({ mode: "git-diff", preset: "diff", reason: "", status: "loading" }),
+    );
+
+    renderCanvas(SECONDARY_PANE);
+    await flush();
+
+    expect(lensWrap.textContent).toContain("Loading this file's changes…");
+    expect(ctx.setCanvasMode).not.toHaveBeenCalled();
+    expect(tab.session.ui.canvasMode).toBe("git-diff");
+    lensWrap.remove();
+  });
+
+  /* FINDING 5. `renderDerivationNotice` was reachable only from inside `if (!tab)`, and a pane that
+     has already resolved a document HAS a tab — so `status: "unavailable"` and the sentence
+     explaining it were written by `applyDerivation`, tracked as a render input by
+     `panels/pane-context.ts`, and drawn nowhere. A layout companion whose page dropped its
+     `$layout` went on showing the layout; a Code lens whose source pane switched to Code beside it
+     went on mounting a second Monaco model on one URI. The previous round fixed the UNRESOLVED
+     case, which is the one that has no tab. */
+  test("a derivation that has a document and has gone stale draws the notice OVER it", async () => {
+    openSyncedTab();
+    setMode("design");
+    const lensWrap = standUpLens(
+      lensRecord({
+        mode: "source",
+        preset: "code",
+        reason: "The pane this one follows is showing Code — one document has one editor.",
+        status: "unavailable",
+      }),
+    );
+
+    renderCanvas(SECONDARY_PANE);
+    await flush();
+
+    // The pane HAS a document — `tabOfPane` hops to the source pane and finds one — and the notice
+    // Is drawn anyway, which is the whole of the finding.
+    expect(tabOfPane(SECONDARY_PANE)).not.toBeNull();
+    expect(lensWrap.textContent).toContain("one document has one editor");
+    // …and no editor was mounted over it.
+    expect(lensWrap.querySelector(".source-editor")).toBeNull();
+    lensWrap.remove();
+  });
+
+  /* …AND SAYS WHAT THE AUTHOR NEEDS, which the sentence alone does not. A COMPANION that resolved
+     once owns a real tab, so `panels/tab-strip.ts` draws a real chip with a real ✕ — and when the
+     rule then dies the strip says `base.json` while the stage says "This page has no layout.":
+
+       strip: tabs[base.json ◎ ×]   stage: NOTICE("This page has no layout.")
+
+     Both true, about different things, and nothing on screen explains why the file named in the
+     strip is not drawn or how to get it back. The previous round traded "shows a file it is no
+     longer about" for "shows nothing while the strip says it does"; naming the held document and
+     putting `pane.pin` beside it is what makes the two halves agree. A LENS passes no document —
+     it owns none, `tabOfPane` hands back the SOURCE pane's, and Pin is refused for a projection —
+     which is the discriminator this pair of tests is about. */
+  test("a stale COMPANION names the document it is still holding, and offers the way back", async () => {
+    const page = openSyncedTab();
+    setMode("design");
+    const registry = createCommandRegistry({ getContext: () => makeContext({}) });
+    registry.registerAll(derivationCommands(noopDerivationDeps()));
+    setActiveRegistry(registry);
+    const wrap = document.createElement("div");
+    document.body.append(wrap);
+    workspace.panes.push({
+      activeTabId: page.id,
+      derived: {
+        kind: "companion",
+        preset: "layout",
+        reason: "This page has no layout.",
+        resolved: page.documentPath,
+        sourcePaneId: PRIMARY_PANE,
+        status: "unavailable",
+      },
+      id: SECONDARY_PANE,
+      tabOrder: [page.id],
+    });
+    registerCanvasSurface(SECONDARY_PANE, wrap);
+    try {
+      renderCanvas(SECONDARY_PANE);
+      await flush();
+
+      expect(wrap.textContent).toContain("This page has no layout.");
+      // The document the strip is drawing a chip for, named on the stage that will not draw it.
+      expect(wrap.querySelector(".empty-state-detail")?.textContent).toContain(
+        "is still open here",
+      );
+      // …and the one verb that ends the follow and leaves the tab standing (§18.4).
+      expect(wrap.querySelector(".empty-state-action")?.textContent?.trim()).toBe(
+        "Keep This Document",
+      );
+    } finally {
+      setActiveRegistry(null);
+      wrap.remove();
+    }
+  });
+
+  test("a stale LENS names nothing — it owns no document, and Pin is refused for a projection", async () => {
+    openSyncedTab();
+    setMode("design");
+    const lensWrap = standUpLens(
+      lensRecord({
+        mode: "source",
+        preset: "code",
+        reason: "The pane this one follows is showing Code — one document has one editor.",
+        status: "unavailable",
+      }),
+    );
+
+    renderCanvas(SECONDARY_PANE);
+    await flush();
+
+    expect(lensWrap.textContent).toContain("one document has one editor");
+    expect(lensWrap.querySelector(".empty-state-detail")).toBeNull();
+    expect(lensWrap.querySelector(".empty-state-action")).toBeNull();
+    lensWrap.remove();
+  });
+
+  test("a derivation that is merely mid-resolve does NOT blank its stage", async () => {
+    /* `reason` and not just `status`: a derivation is `unavailable` for one frame before the
+       follow's rAF has run, and a stage that blanked on the status alone would flicker on every
+       retarget. */
+    openSyncedTab();
+    setMode("design");
+    const lensWrap = standUpLens(lensRecord({ media: null, reason: "", status: "unavailable" }));
+
+    renderCanvas(SECONDARY_PANE);
+    await flush();
+
+    expect(lensWrap.querySelectorAll(".canvas-panel").length).toBeGreaterThan(0);
+    lensWrap.remove();
+  });
+
+  test("a breakpoint lens draws ONE artboard — the one it names", async () => {
+    /* `canvas-render.ts:1219`. Design mode draws every declared breakpoint side by side, so a lens
+       that did not filter would be a second copy of the board it sits beside — which is precisely
+       what the mutation makes it. */
+    openSyncedTab({
+      $media: { "--": "400px", tablet: "(min-width: 768px)", wide: "(min-width: 1200px)" },
+      children: [{ tagName: "p", textContent: "Hi" }],
+      tagName: "div",
+    } as never);
+    setMode("design");
+    const lensWrap = standUpLens(lensRecord({ media: "tablet" }));
+
+    renderCanvas(PRIMARY_PANE);
+    renderCanvas(SECONDARY_PANE);
+    await flush();
+
+    // The pane that owns the tab draws the whole board: base + two breakpoints.
+    expect(stageEl().querySelectorAll(".canvas-panel")).toHaveLength(3);
+    // The lens draws exactly the artboard it names.
+    const lensHeaders = [...lensWrap.querySelectorAll(".canvas-panel-header")].map((h) =>
+      h.textContent?.trim(),
+    );
+    expect(lensHeaders).toHaveLength(1);
+    expect(lensHeaders[0]).toContain("Tablet");
+    lensWrap.remove();
+  });
+
+  /* …AND "BASE" IS AN ARTBOARD LIKE ANY OTHER. `media` is `null` for the base row, and the filter
+     is keyed on the panel's NAME — which for base is the string `"base"`, not the absence of one.
+     Read `lens.media ?? ""` instead of `lens.media ?? "base"` and the filter matches nothing, the
+     `chosen.length > 0` fallback below it fires, and a Base lens quietly draws the WHOLE design
+     board: three artboards in a pane the author asked for one. The fallback is right for a media
+     the document has stopped declaring (the test below) and wrong here, and only the base row can
+     tell the two apart. */
+  test("a BASE breakpoint lens draws one artboard too — the fallback is not its answer", async () => {
+    openSyncedTab({
+      $media: { "--": "400px", tablet: "(min-width: 768px)", wide: "(min-width: 1200px)" },
+      children: [{ tagName: "p", textContent: "Hi" }],
+      tagName: "div",
+    } as never);
+    setMode("design");
+    const lensWrap = standUpLens(lensRecord({ media: null }));
+
+    renderCanvas(PRIMARY_PANE);
+    renderCanvas(SECONDARY_PANE);
+    await flush();
+
+    expect(stageEl().querySelectorAll(".canvas-panel")).toHaveLength(3);
+    const lensHeaders = [...lensWrap.querySelectorAll(".canvas-panel-header")].map((h) =>
+      h.textContent?.trim(),
+    );
+    expect(lensHeaders).toHaveLength(1);
+    expect(lensHeaders[0]).toContain("Base");
+    lensWrap.remove();
+  });
+
+  test("a breakpoint the document has stopped declaring falls back to the whole board", async () => {
+    openSyncedTab({
+      $media: { "--": "400px", tablet: "(min-width: 768px)" },
+      children: [{ tagName: "p", textContent: "Hi" }],
+      tagName: "div",
+    } as never);
+    setMode("design");
+    const lensWrap = standUpLens(
+      lensRecord({ media: "deleted-breakpoint", status: "unavailable" }),
+    );
+
+    renderCanvas(SECONDARY_PANE);
+    await flush();
+
+    expect(lensWrap.querySelectorAll(".canvas-panel")).toHaveLength(2);
+    lensWrap.remove();
+  });
+
+  test("an unresolvable COMPANION explains itself instead of drawing a blank stage", async () => {
+    /* FINDING 7. `derived.reason` was written by `applyDerivation`, tracked as a render input by
+       `pane-context.ts` and read by nothing at all: choosing a preset whose rule does not resolve
+       gave a pane with a derivation, no tabs, no strip chip and a blank stage that `paneIsEmpty`
+       will not collapse. */
+    openSyncedTab();
+    const wrap = document.createElement("div");
+    document.body.append(wrap);
+    workspace.panes.push({
+      activeTabId: null,
+      derived: {
+        kind: "companion",
+        preset: "component",
+        reason: "Select an element inside a component to see its definition.",
+        resolved: null,
+        sourcePaneId: PRIMARY_PANE,
+        status: "unavailable",
+      },
+      id: SECONDARY_PANE,
+      tabOrder: [],
+    });
+    registerCanvasSurface(SECONDARY_PANE, wrap);
+
+    renderCanvas(SECONDARY_PANE);
+    await flush();
+
+    expect(wrap.textContent).toContain(
+      "Select an element inside a component to see its definition.",
+    );
+    // Not the welcome screen — this pane is not empty, it is waiting.
+    expect(renderWelcome).not.toHaveBeenCalledWith(wrap);
+    wrap.remove();
+  });
+
+  /* …AND WHEN THE DERIVATION HAS NO SENTENCE OF ITS OWN, the notice still has to say something.
+     `derived.reason` is `""` for every non-`unavailable` answer, which is the state a fresh
+     companion sits in for the frame between being published and its rule resolving: `loading`,
+     no tab, no sentence. The `||` fallback is the only thing between that and an empty state with
+     an empty message — a blank card in a pane the author just asked for, which reads as a broken
+     stage rather than as one that is thinking. Both halves of the expression have a reader, so
+     both need a test; the sentence half is the one above. */
+  test("a derivation with no sentence yet still says what the pane is for", async () => {
+    openSyncedTab();
+    const wrap = document.createElement("div");
+    document.body.append(wrap);
+    workspace.panes.push({
+      activeTabId: null,
+      derived: {
+        kind: "companion",
+        preset: "layout",
+        reason: "",
+        resolved: null,
+        sourcePaneId: PRIMARY_PANE,
+        status: "loading",
+      },
+      id: SECONDARY_PANE,
+      tabOrder: [],
+    });
+    registerCanvasSurface(SECONDARY_PANE, wrap);
+
+    renderCanvas(SECONDARY_PANE);
+    await flush();
+
+    expect(wrap.textContent).toContain("Looking for something to show here…");
+    expect(renderWelcome).not.toHaveBeenCalledWith(wrap);
+    wrap.remove();
   });
 });

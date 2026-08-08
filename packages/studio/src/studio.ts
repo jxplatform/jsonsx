@@ -29,10 +29,14 @@ import {
   activeTab,
   closeAllTabs,
   openTab,
+  paneById,
+  receivingPane,
   registerTabCommands,
   setWorkspaceProject,
   workspace,
 } from "./workspace/workspace";
+import { derivationCommands, installDerivationEffects } from "./workspace/pane-derive";
+import type { DerivationDeps } from "./workspace/pane-derive";
 import { effect, effectScope } from "./reactivity";
 import type { EffectScope } from "@vue/reactivity";
 
@@ -96,6 +100,7 @@ import {
   renderFilesTemplate as _renderFilesTemplate,
   findHomePage,
   loadDirectory,
+  openFileInPane,
   openFileInTab,
   openHomePage,
   registerFileTreeDnD,
@@ -142,6 +147,7 @@ import { registerDataExplorerCommands, renderDataExplorerTemplate } from "./pane
 import {
   cleanupGitPanel,
   cloneRepository,
+  loadDiffForLens,
   registerSourceControlCommands,
   renderGitPanel,
 } from "./panels/git-panel";
@@ -213,6 +219,17 @@ import type { JxMutableNode, ProjectConfig } from "@jxsuite/schema/types";
 
 void _swc;
 
+/**
+ * What the derivation's commands and follows need from the rest of Studio: an opener, and a reader
+ * for the one preset whose subject is not a document at all.
+ *
+ * `loadDiff` is here rather than in `workspace/pane-derive.ts` because that module owns no I/O —
+ * which is what lets its whole decision-making half be tested with no platform. It is the same pair
+ * of reads `panels/git-panel.ts` makes for a row click; an added file has no `HEAD` copy, so its
+ * "original" is the empty string rather than a `gitShow` that would throw.
+ */
+const derivationDeps: DerivationDeps = { loadDiff: loadDiffForLens, openFileInPane };
+
 // ─── Globals ──────────────────────────────────────────────────────────────────
 // These mutable variables are local to studio.js for now. As sections are extracted
 // Into their own modules, they will migrate to ctx in store.js.
@@ -269,7 +286,7 @@ function setCanvasMode(tab: Tab | null, mode: string) {
 
 /**
  * Drill into a component (or a layout) — as a REAL TAB, not a document swapped in under the current
- * tab's id.
+ * tab's id, and BESIDE the page rather than over it.
  *
  * The old implementation rewrote `tab.documentPath` and left `tab.id` alone, and everything
  * downstream believed the id: `openFileInTab`'s dedupe stopped matching, so re-opening the page
@@ -280,13 +297,34 @@ function setCanvasMode(tab: Tab | null, mode: string) {
  * What the drill-in keeps is the RELATIONSHIP: the new tab records the document it was opened from
  * and the strip prints it. The parent stays open, right where it was.
  *
+ * Four deliberate properties, three of them new and each with a failure behind it:
+ *
+ * 1. **To the side.** §8.2 has promised this since P3 and it never shipped — the chain ran
+ *    `openFileInTab` → `openTab` → `activePane()`, so "open the layout that wraps this page" opened
+ *    it ON TOP of the page it was teaching about.
+ * 2. **Focus stays in the page.** An assistant pane that takes the keyboard means the author's next
+ *    keystroke edits the definition instead of the document they are looking at — and a following
+ *    pane would immediately have nothing to follow.
+ * 3. **A PREVIEW tab**, because drilling in is browsing: the second drill-in takes the same slot
+ *    instead of littering the side strip, and an edit promotes it (`promoteDirtyPreviewTabs`).
+ * 4. **An ordinary tab, not a derivation.** "Edit definition" is a commitment to edit one component; a
+ *    following pane would yank to a different one on the author's next canvas click. The following
+ *    form is `pane.derive { preset: "component" }`, opted into by name.
+ *
+ * `openedFrom` is unchanged — §14.2's relationship, which nothing pops and nothing restores from.
+ *
  * @param {string} componentPath
  */
 async function navigateToComponent(componentPath: string) {
   const from = activeTab.value;
+  /* {@link receivingPane}, not `sidePane`: the pane beside this one may be a LENS, which owns no
+     tab. The open then landed in a `tabOrder` `tabOfPane` hops straight past, so the read below got
+     the SOURCE tab back, `opened.documentPath !== componentPath`, and the one relationship this
+     function exists to record (§14.2) was skipped without a sound. */
+  const target = receivingPane();
   const alreadyOpen = [...workspace.tabs.values()].some((t) => t.documentPath === componentPath);
-  await openFileInTab(componentPath);
-  const opened = activeTab.value;
+  await openFileInTab(componentPath, { focus: false, paneId: target.id, preview: true });
+  const opened = tabOfPane(target.id);
   if (!alreadyOpen && from && opened && opened.documentPath === componentPath) {
     opened.session.openedFrom = { documentPath: from.documentPath, tabId: from.id };
   }
@@ -547,11 +585,19 @@ initWelcome({
  * @param {string} paneId
  */
 function installPaneRenderEffects(paneId: string): void {
+  /* The FOLLOW, in this pane's own scope so it stops when the pane leaves the grid.
+     No preset subscribes nothing: `installDerivationEffects` declares this pane's own
+     `activeTabId` and `tabOfPane(sourcePaneId)` for EVERY derivation, and `diff` and `breakpoint`
+     are the two that add nothing beyond that — a lens follows STRUCTURALLY, through `tabOfPane`'s
+     hop, which the three effects below already read. A comment here claimed the opposite of
+     `pane-derive.ts`'s own docstring for a release; the inputs are listed once, at the effect that
+     declares them, and this line points at it rather than restating it. */
+  installDerivationEffects(paneId, derivationDeps);
   effect(() => {
     const tab = tabOfPane(paneId);
     if (tab) {
       const doc = tab.doc.document;
-      if (doc && consumePatchedDocument(doc)) {
+      if (doc && consumePatchedDocument(doc, paneId)) {
         return;
       }
     }
@@ -559,6 +605,23 @@ function installPaneRenderEffects(paneId: string): void {
   });
   effect(() => {
     const tab = tabOfPane(paneId);
+    /* A derived pane's own view axes. A preset change and a breakpoint change are render inputs
+       that live on the DERIVATION rather than on the tab, so without these a lens would keep
+       drawing whatever it was created with. Accepted cost, stated: the shared `ui.canvasMode` read
+       below means a mode flip in the source pane also re-runs the lens's ui-effect — one extra
+       full render per human mode flip, which is not a per-keystroke path. */
+    const derived = paneById(paneId)?.derived;
+    void derived?.status;
+    /* …and the SENTENCE, because the stage draws it. `canvas/canvas-render.ts` prints
+       `derived.reason` for an unavailable derivation, and `status` alone does not move when the
+       reason does: a diff lens that could not read its comparison, whose file the author then
+       saves back to HEAD, stays `unavailable` while the sentence becomes "Nothing to compare".
+       Untracked, the stage would keep the old sentence until something else repainted it. */
+    void derived?.reason;
+    if (derived?.kind === "lens") {
+      void derived.mode;
+      void derived.media;
+    }
     if (tab) {
       void tab.doc.mode;
       void tab.session.ui.canvasMode;
@@ -1169,7 +1232,12 @@ registerStudioCommands(
 );
 
 // Tab navigation (⌃Tab MRU cycling, ⌘⇧T reopen-closed) is defined beside the tab model it drives.
-registerTabCommands(commandRegistry, { openFile: openFileInTab });
+registerTabCommands(commandRegistry, { openFile: openFileInTab, openFileInPane });
+
+/* The derivation's own two verbs (§18.4), beside the `PaneDerivation` they read and write rather
+   than in `paneCommands()`. `tests/app-commands-composition.test.ts` is the guard that this line
+   and `appCommandSet()`'s entry stay in step. */
+commandRegistry.registerAll(derivationCommands(derivationDeps));
 
 /*
  * The rest of the app's contribution points, each defined beside the state it writes.

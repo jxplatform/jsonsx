@@ -454,7 +454,14 @@ describe("startCanvasIframe — patch", () => {
     expect(acks).toContainEqual({ gen: 1, kind: "patchComplete" });
   });
 
-  test("drops a patch whose generation is older than the rendered one", async () => {
+  test("ESCALATES a patch whose generation is older than the rendered one, rather than dropping it", async () => {
+    /* It used to `return` in silence, and "a newer full render already supersedes this edit" was
+       only true while the generation could have come from no stage but this frame's own. It could:
+       `postPatchToHosts` took ONE number and fanned it to every host rendering the tab, so a
+       document displayed in two panes meant the stage with the higher `renderedGen` stopped
+       applying patches with a wrong picture on screen and not one counter moving. The parent
+       resolves the generation per host now, so reaching here is a real escalation — the DOM is
+       still left alone, but the parent is told and repaints. */
     const { acks, container, pair } = await bootRendered(5);
     pair.parent.post({
       forwardOps: [{ key: "textContent", op: "set-key", path: ["children", 0], value: "Stale" }],
@@ -465,7 +472,8 @@ describe("startCanvasIframe — patch", () => {
     pair.flush();
 
     expect((container.querySelector("h1") as HTMLElement).textContent).toBe("Hi"); // Unchanged.
-    expect(acks.some((m) => m.kind === "patchComplete" || m.kind === "patchError")).toBe(false);
+    expect(acks).toContainEqual({ gen: 3, kind: "patchError", message: "patch-behind-render" });
+    expect(acks.some((m) => m.kind === "patchComplete")).toBe(false);
   });
 
   test("reports patchError when the patch is ahead of the rendered generation", async () => {

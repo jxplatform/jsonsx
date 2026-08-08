@@ -15,6 +15,7 @@
 import { PRIMARY_PANE, paneById, workspace } from "../workspace/workspace";
 import { allCanvasSurfaces, stageContaining, surfaceForPane } from "./surface-registry";
 import type { CanvasSurface } from "./surface-registry";
+import type { PaneDerivation } from "../workspace/workspace";
 import type { CanvasPanel } from "../types";
 import type { Tab } from "../tabs/tab";
 
@@ -39,35 +40,83 @@ export function activeCanvasSurface(): CanvasSurface {
 }
 
 /**
- * The tab a pane is showing, or null when it shows none.
+ * The tab a pane is DISPLAYING, or null when it shows none.
  *
  * `activeTab` answers this for the FOCUSED pane only; a render, a patch classification and an
  * escalation each need it for a named pane instead.
+ *
+ * **This one hop is the leverage of the whole derivation.** A LENS pane owns no tab — its
+ * `tabOrder` is `[]` — and displays the document its source pane owns, so the answer comes from
+ * `sourcePaneId`. Every reader that was already written pane-scoped therefore starts working on a
+ * lens pane for free: `renderCanvasImpl`, all three `installPaneRenderEffects` effects, the pane
+ * context bar, the jump bar, `tabOfContainer`, `tabOfMountedPanel` and `mountSourceEditor`'s
+ * post-await guard. That is also why the follow costs nothing: switching tabs in the source pane
+ * repaints the lens because it is the same reactive read.
+ *
+ * A COMPANION pane owns its tabs normally and takes no hop — the derivation only decides which of
+ * its own tabs is on screen.
+ *
+ * The distinction this draws is not a new one in the render path: `mountIframeCanvas(gen, doc,
+ * canvasEl, widthPx, tabId, viewTab)` has separated "where do this frame's mutations go" from
+ * "whose document path, layout toggle and canvas mode resolve it" since the git-diff override. A
+ * lens lifts that pair to the pane.
  *
  * @param {string} paneId
  * @returns {Tab | null}
  */
 export function tabOfPane(paneId: string): Tab | null {
-  const activeTabId = paneById(paneId)?.activeTabId;
+  const pane = paneById(paneId);
+  const derived = pane?.derived;
+  const activeTabId =
+    derived?.kind === "lens" ? paneById(derived.sourcePaneId)?.activeTabId : pane?.activeTabId;
   return activeTabId ? (workspace.tabs.get(activeTabId) ?? null) : null;
 }
 
 /**
- * The stage showing `tab`, or null when no pane has it on screen.
+ * The derivation a pane is drawing under, or null for an ordinary pane.
+ *
+ * Here rather than in `workspace/pane-derive.ts` (which owns the WRITERS) because every reader of
+ * it is a pane-scoped renderer already resolving through this module, and `pane-derive.ts` imports
+ * {@link tabOfPane} from here — the other direction would be a cycle.
+ *
+ * @param {string} paneId
+ * @returns {PaneDerivation | null}
+ */
+export function derivationOfPane(paneId: string): PaneDerivation | null {
+  return paneById(paneId)?.derived ?? null;
+}
+
+/**
+ * Every stage displaying `tab` — its owning pane's, plus any derived pane projecting that pane.
  *
  * This is the per-pane replacement for `isTabActive(tab)` in the patcher's gate, and it is strictly
  * more truthful: a tab is patchable because some pane is DISPLAYING it, not because it happens to
  * be the one the keyboard is in.
  *
+ * **Plural, and not kept as a singular wrapper.** `surfaceShowingTab` returned the FIRST pane whose
+ * `activeTabId` matched, which was a complete answer only while a tab could be on screen in one
+ * place. A lens pane displays the tab its source pane owns (`tabOfPane` takes the hop), so a
+ * function answering "the one pane" when there may be two is precisely the defect this workstream
+ * is about: the patcher posted one pane's `renderGeneration` to both hosts, and the host whose own
+ * generation was higher dropped the patch without a sound.
+ *
+ * Resolved through {@link tabOfPane} rather than through `pane.activeTabId`, so the lens hop is
+ * written once.
+ *
  * @param {Tab | null} tab
- * @returns {CanvasSurface | null}
+ * @returns {CanvasSurface[]}
  */
-export function surfaceShowingTab(tab: Tab | null): CanvasSurface | null {
+export function surfacesShowingTab(tab: Tab | null): CanvasSurface[] {
   if (!tab) {
-    return null;
+    return [];
   }
-  const pane = workspace.panes.find((candidate) => candidate.activeTabId === tab.id);
-  return pane ? surfaceForPane(pane.id) : null;
+  const out: CanvasSurface[] = [];
+  for (const pane of workspace.panes) {
+    if (tabOfPane(pane.id)?.id === tab.id) {
+      out.push(surfaceForPane(pane.id));
+    }
+  }
+  return out;
 }
 
 /**
@@ -128,13 +177,43 @@ export function canvasModeOfTab(tab: Tab | null): string {
 }
 
 /**
- * The effective canvas mode a pane is in.
+ * The effective canvas mode a pane is drawing in.
+ *
+ * A LENS draws the source pane's document in a mode of its OWN — that is most of what a lens is —
+ * and that mode is never written onto the tab, because the tab belongs to the pane beside it and
+ * writing there would flip the document the author is editing. The per-tab preview toggle still
+ * composes onto it, so a preview lens of an edit-mode page is still a preview.
  *
  * @param {string} paneId
  * @returns {string}
  */
 export function canvasModeOfPane(paneId: string): string {
+  const derived = derivationOfPane(paneId);
+  if (derived?.kind === "lens") {
+    const base = derived.mode;
+    const ui = tabOfPane(paneId)?.session.ui;
+    return ui?.preview && (base === "edit" || base === "design") ? "preview" : base;
+  }
   return canvasModeOfTab(tabOfPane(paneId));
+}
+
+/**
+ * The breakpoint a pane is drawing at — `null` for base.
+ *
+ * `session.ui.activeMedia` is per-TAB, so a breakpoint lens reading it would be showing the same
+ * artboard as the pane it is a lens of, which is the one thing preset 5 exists not to do. The
+ * derivation's own `media` wins for a lens; every other pane answers from its tab exactly as
+ * before.
+ *
+ * @param {string} paneId
+ * @returns {string | null}
+ */
+export function activeMediaOfPane(paneId: string): string | null {
+  const derived = derivationOfPane(paneId);
+  if (derived?.kind === "lens" && derived.preset === "breakpoint") {
+    return derived.media;
+  }
+  return tabOfPane(paneId)?.session.ui.activeMedia ?? null;
 }
 
 /**

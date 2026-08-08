@@ -18,6 +18,7 @@ import {
   activeTab,
   closeAllTabs,
   closePane,
+  focusPane,
   openTab,
   paneById,
   PRIMARY_PANE,
@@ -25,6 +26,7 @@ import {
   splitRight,
   workspace,
 } from "../src/workspace/workspace";
+import { setPaneDerivation } from "../src/workspace/pane-derive";
 import { surfaceForPane } from "../src/canvas/canvas-surface";
 import { view } from "../src/view";
 import { bufferWrites } from "../src/services/monaco-buffer";
@@ -92,7 +94,7 @@ const statusMessages: string[] = [];
 const scheduleCanvasRenderMock = mock((_paneId?: string) => {});
 const renderCanvasMock = mock(() => {});
 let consumePatchedReturn = false;
-const consumePatchedMock = mock((_doc: object) => consumePatchedReturn);
+const consumePatchedMock = mock((_doc: object, _paneId?: string) => consumePatchedReturn);
 let newProjectResult: { root: string } | null = null;
 let addRepoResult: { root: string } | null = null;
 let pickerEnabled = false;
@@ -508,7 +510,7 @@ describe("canvas mode", () => {
    the question has a static answer and `tests/pane-grid.test.ts` is where it is asked. */
 
 describe("navigateToComponent", () => {
-  test("opens the component in its own tab and leaves the parent tab intact", async () => {
+  test("opens the component BESIDE the page, as a preview tab, without taking the keyboard", async () => {
     const parent = openShellTab();
     parent.session.selection = [["children", 0]];
     await blockBarCtx.navigateToComponent("components/card.json");
@@ -517,11 +519,25 @@ describe("navigateToComponent", () => {
     expect(parent.documentPath).toBe("pages/current.json");
     expect(parent.session.selection).toEqual([["children", 0]]);
 
-    // The component is a real, separately-keyed tab.
-    expect(workspace.tabOrder).toEqual(["shell-tab", "components/card.json"]);
+    /* TO THE SIDE. §8.2 has promised this since P3 and the chain `openFileInTab → openTab →
+       activePane()` opened it in place instead — over the page it is teaching about. */
+    expect(workspace.panes.map((pane) => pane.tabOrder)).toEqual([
+      ["shell-tab"],
+      ["components/card.json"],
+    ]);
+    const side = workspace.panes[1]!;
+    expect(side.activeTabId).toBe("components/card.json");
+
+    /* AND THE FOCUS DOES NOT FOLLOW. An assistant pane that takes the keyboard means the author's
+       next keystroke edits the definition instead of the page — and a following pane would
+       immediately have nothing to follow. */
+    expect(workspace.activePaneId).toBe(PRIMARY_PANE);
+    expect(workspace.activeTabId).toBe("shell-tab");
+
     const child = workspace.tabs.get("components/card.json")!;
-    expect(workspace.activeTabId).toBe("components/card.json");
     expect(child.documentPath).toBe("components/card.json");
+    // A PREVIEW tab: drilling in is browsing, so the second drill-in takes the same slot.
+    expect(child.preview).toBe(true);
     expect((child.doc.document as any).tagName).toBe("my-card");
     expect(shell.leftTab).toBe("layers");
   });
@@ -536,15 +552,54 @@ describe("navigateToComponent", () => {
     });
   });
 
-  test("drilling into an already-open component activates it without re-parenting it", async () => {
+  test("drilling into an already-open component leaves it exactly where it is", async () => {
     openShellTab();
     await blockBarCtx.navigateToComponent("components/card.json");
     const child = workspace.tabs.get("components/card.json")!;
     activateTab("shell-tab");
     await blockBarCtx.navigateToComponent("components/card.json");
-    expect(workspace.activeTabId).toBe("components/card.json");
+    // Still one tab, still one copy of the id, still in the side pane — and the keyboard is still
+    // In the page. This is `openFileInTab`'s third dedupe branch: the tab IS its pane's active tab,
+    // So there is nothing to do and moving it would only oscillate.
     expect(workspace.tabs.get("components/card.json")).toBe(child);
-    expect(workspace.tabOrder.filter((id) => id === "components/card.json")).toHaveLength(1);
+    expect(workspace.panes[1]!.tabOrder).toEqual(["components/card.json"]);
+    expect(workspace.activePaneId).toBe(PRIMARY_PANE);
+  });
+
+  /* {@link receivingPane}, not `sidePane`. "Edit definition" is an ordinary tab, and the pane
+     beside this one may be a LENS — which owns no tab by invariant D2, so the open landed in a
+     `tabOrder` that `tabOfPane` hops straight past. The read-back below then got the SOURCE tab,
+     `opened.documentPath !== componentPath`, and the one relationship this function exists to
+     record (§14.2) was skipped without a sound; `applyDerivation` handed the tab back on its next
+     frame, so the definition ended up behind the page in the primary's strip. Both halves are
+     asserted, because the tab moving is what makes the missing `openedFrom` invisible. */
+  test("drilling in RELEASES a lens beside the page, so the definition lands in a real pane", async () => {
+    const parent = openShellTab();
+    openTab({ document: { tagName: "div" }, documentPath: "pages/side.json", id: "side-tab" });
+    splitRight();
+    focusPane(PRIMARY_PANE);
+    setPaneDerivation(SECONDARY_PANE, {
+      diff: null,
+      kind: "lens",
+      media: null,
+      mode: "source",
+      preset: "code",
+      reason: "",
+      sourcePaneId: PRIMARY_PANE,
+      status: "ready",
+      zoom: 1,
+    });
+
+    await blockBarCtx.navigateToComponent("components/card.json");
+
+    // The projection is over, and the pane it was borrowing owns the definition.
+    expect(paneById(SECONDARY_PANE)!.derived).toBeNull();
+    expect(paneById(SECONDARY_PANE)!.tabOrder).toContain("components/card.json");
+    // …and §14.2's relationship was recorded, which is the half a lens made unobservable.
+    expect(workspace.tabs.get("components/card.json")!.session.openedFrom).toEqual({
+      documentPath: parent.documentPath,
+      tabId: "shell-tab",
+    });
   });
 
   test("returns silently when the file is empty", async () => {
@@ -664,6 +719,62 @@ describe("canvas render effects", () => {
     expect(fromDocEffect).toBe(0);
   });
 
+  /* EACH PANE ASKS ABOUT ITSELF. The mark a surgical patch leaves is a `Set` of pane ids, and this
+     effect is installed once per pane — so a hard-coded id makes the side pane's doc-effect consume
+     the primary's mark: one pane skips a full render it owed, the other repeats one it did not, and
+     `skippedFullRenders` reports the same number either way. The argument IS the behaviour, and
+     `canvas-patcher.ts` is mocked here, so the argument is exactly what this can see. */
+  test("each pane's doc-effect consumes ITS OWN patch mark", async () => {
+    openShellTab();
+    openTab({ document: { tagName: "div" }, documentPath: "pages/side.json", id: "side-tab" });
+    await flush();
+    splitRight();
+    await flush();
+    consumePatchedReturn = false;
+    consumePatchedMock.mockClear();
+
+    // One document root replaced in each pane, so both doc-effects run.
+    paneById(PRIMARY_PANE)!.activeTabId = "shell-tab";
+    workspace.tabs.get("shell-tab")!.doc.document = { children: [], tagName: "b" } as never;
+    workspace.tabs.get("side-tab")!.doc.document = { children: [], tagName: "i" } as never;
+    await flush();
+
+    const asked = consumePatchedMock.mock.calls.map(([, paneId]) => paneId);
+    expect(new Set(asked)).toEqual(new Set([PRIMARY_PANE, SECONDARY_PANE]));
+  });
+
+  /* A LENS'S MODE AND MEDIA live on the derivation rather than on the tab, so the fifteen
+     `tab.session.ui.*` reads beside them see neither. Re-deriving a pane at another breakpoint
+     writes exactly these two fields and nothing else reactive that this pane draws — untracked, the
+     stage goes on drawing the artboard the lens was created with under a chip naming another. */
+  test("changing only a lens's mode and media repaints that pane", async () => {
+    openShellTab();
+    openTab({ document: { tagName: "div" }, documentPath: "pages/side.json", id: "side-tab" });
+    await flush();
+    splitRight();
+    await flush();
+    paneById(SECONDARY_PANE)!.derived = {
+      diff: null,
+      kind: "lens",
+      media: null,
+      mode: "design",
+      preset: "breakpoint",
+      reason: "",
+      sourcePaneId: PRIMARY_PANE,
+      status: "ready",
+      zoom: 1,
+    };
+    await flush();
+    scheduleCanvasRenderMock.mockClear();
+
+    const lens = paneById(SECONDARY_PANE)!.derived as { media: string | null };
+    lens.media = "tablet";
+    await flush();
+
+    expect(scheduleCanvasRenderMock.mock.calls.map(([paneId]) => paneId)).toContain(SECONDARY_PANE);
+    paneById(SECONDARY_PANE)!.derived = null;
+  });
+
   test("UI flag changes always schedule a render", async () => {
     openShellTab();
     await flush();
@@ -695,6 +806,144 @@ describe("canvas render effects", () => {
     const panes = scheduleCanvasRenderMock.mock.calls.map(([paneId]) => paneId);
     expect(panes).toContain(PRIMARY_PANE);
     expect(panes).toContain(SECONDARY_PANE);
+  });
+
+  /* A derived pane's SENTENCE is a render input, because the stage prints it.
+     `canvas/canvas-render.ts` draws `derived.reason` for an unavailable derivation, and `status`
+     alone does not move when the reason does: a diff lens whose comparison could not be read, whose
+     file the author then saves back to HEAD, stays `unavailable` while the sentence becomes
+     "Nothing to compare". The pane context bar tracked `reason` from the start; the CANVAS effect
+     did not, because until this phase nothing on a stage read it. */
+  test("changing only a derivation's reason repaints that pane", async () => {
+    openShellTab();
+    openTab({ document: { tagName: "div" }, documentPath: "pages/side.json", id: "side-tab" });
+    await flush();
+    splitRight();
+    await flush();
+    paneById(SECONDARY_PANE)!.derived = {
+      diff: null,
+      kind: "lens",
+      media: null,
+      mode: "design",
+      preset: "breakpoint",
+      reason: "Nothing to compare — this file matches HEAD.",
+      sourcePaneId: PRIMARY_PANE,
+      status: "unavailable",
+      zoom: 1,
+    };
+    await flush();
+    scheduleCanvasRenderMock.mockClear();
+
+    paneById(SECONDARY_PANE)!.derived!.reason =
+      "Could not read this file's comparison against HEAD.";
+    await flush();
+
+    expect(scheduleCanvasRenderMock.mock.calls.map(([paneId]) => paneId)).toContain(SECONDARY_PANE);
+    paneById(SECONDARY_PANE)!.derived = null;
+  });
+
+  /* …AND ITS STATUS, which is the sibling one line up and the one that decides WHICH branch of
+     `renderCanvasImpl` runs at all. `reason` picks the words; `status` picks between the notice and
+     the stage. A diff lens whose comparison lands goes `loading` → `ready` with no other reactive
+     write anywhere near this pane — the comparison lives on `derived.diff`, the tab did not move,
+     the mode did not move — so untracked, the pane goes on drawing "Loading this file's changes…"
+     over a comparison it is already holding until something unrelated repaints it. */
+  test("changing only a derivation's status repaints that pane", async () => {
+    openShellTab();
+    openTab({ document: { tagName: "div" }, documentPath: "pages/side.json", id: "side-tab" });
+    await flush();
+    splitRight();
+    await flush();
+    paneById(SECONDARY_PANE)!.derived = {
+      diff: null,
+      kind: "lens",
+      media: null,
+      mode: "git-diff",
+      preset: "diff",
+      reason: "",
+      sourcePaneId: PRIMARY_PANE,
+      status: "loading",
+      zoom: 1,
+    };
+    await flush();
+    scheduleCanvasRenderMock.mockClear();
+
+    paneById(SECONDARY_PANE)!.derived!.status = "ready";
+    await flush();
+
+    expect(scheduleCanvasRenderMock.mock.calls.map(([paneId]) => paneId)).toContain(SECONDARY_PANE);
+    paneById(SECONDARY_PANE)!.derived = null;
+  });
+
+  /* THE FOLLOW IS ACTUALLY INSTALLED, AND ITS READER IS ACTUALLY THE GIT ONE. Two lines of this
+     file's own wiring — `installDerivationEffects(paneId, derivationDeps)` inside
+     `installPaneRenderEffects`, and `loadDiff: loadDiffForLens` in the dependency set — and until
+     this test only `reachability.test.ts` could see either: delete the first and the whole §18.4
+     follow stops running, delete the second and a Diff lens asks a stub that always answers `null`.
+     `pane-derive.test.ts` proves the follow WORKS when something installs it and hands it a reader;
+     nothing proved the shell does. Both halves die here, and the assertion is the one an author
+     would make — a Diff lens on a changed file ends up holding that file's comparison.
+
+     Everything below the derivation is real: no mock of `panels/git-panel.ts`, so `loadDiffForLens`
+     runs `gitShow(HEAD)` and `readFile` against the mock platform, and `pages/a.json` is a file it
+     actually has. */
+  test("the shell installs the follow, and a Diff lens loads its own comparison through it", async () => {
+    closeAllTabs();
+    const modes = ["edit", "design", "source", "git-diff"];
+    openTab({
+      capabilities: { modes },
+      document: { children: [], tagName: "main" },
+      documentPath: "pages/a.json",
+      id: "pages/a.json",
+    });
+    openTab({
+      capabilities: { modes },
+      document: { tagName: "div" },
+      documentPath: "pages/side.json",
+      id: "side-tab",
+    });
+    await flush();
+    splitRight();
+    await flush();
+    focusPane(PRIMARY_PANE);
+    shell.git.status = {
+      ahead: 0,
+      behind: 0,
+      branch: "main",
+      files: [{ path: "pages/a.json", status: "M" }],
+      isRepo: true,
+      remotes: [],
+    } as never;
+    try {
+      setPaneDerivation(SECONDARY_PANE, {
+        diff: null,
+        kind: "lens",
+        media: null,
+        mode: "git-diff",
+        preset: "diff",
+        reason: "",
+        sourcePaneId: PRIMARY_PANE,
+        status: "loading",
+        zoom: 1,
+      });
+
+      const lens = () =>
+        paneById(SECONDARY_PANE)?.derived as {
+          diff: { filePath: string } | null;
+          status: string;
+        } | null;
+      // Nothing was driven by hand: the rAF the follow schedules is the only thing that runs.
+      await waitFor(() => lens()?.diff != null);
+
+      expect(lens()?.diff?.filePath).toBe("pages/a.json");
+      expect(lens()?.status).toBe("ready");
+    } finally {
+      const side = paneById(SECONDARY_PANE);
+      if (side) {
+        side.derived = null;
+      }
+      shell.git.status = null;
+    }
   });
 
   test("unsplit repaints the survivor, whose active tab changed under an unchanged `activeTab`", async () => {

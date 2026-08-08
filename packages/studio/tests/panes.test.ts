@@ -24,12 +24,20 @@ import {
   paneOfTab,
   promoteDirtyPreviewTabs,
   promoteTab,
+  moveTabToPane,
   setTabPinned,
+  sidePane,
   splitRight,
   tabCommands,
   tabIsLive,
   workspace,
 } from "../src/workspace/workspace";
+import {
+  applyDerivation,
+  derivationOfPane,
+  noopDerivationDeps,
+  setPaneDerivation,
+} from "../src/workspace/pane-derive";
 import { BUFFER_COMMIT, bufferWrites } from "../src/services/monaco-buffer";
 import { view } from "../src/view";
 import { editorKindOf, editorKindsOf, modeForEditorKind } from "../src/tabs/tab";
@@ -606,25 +614,31 @@ describe("activation across panes", () => {
 });
 
 describe("the pane commands", () => {
-  test("all four are declared at document level in the View category", () => {
-    // Four, not six. `pane.toggleZoom` and `pane.setZoomed` wrote `zoomedPaneId` and nothing that
-    // Draws ever read it — §18.3 hands one stage between panes, so the focused pane already fills
-    // The shell. They return with the second live host.
-    const ids = paneCommands().map((c) => c.id);
+  const paneDeps = { openFile: () => {}, openFileInPane: () => {} };
+
+  test("all five are declared at document level in the View category", () => {
+    /* FIVE, and where the other two live is the point.
+       `pane.compareWith` is here because it is a transport verb — put THAT document beside this
+       one — and it needs nothing but the pane model. `pane.derive` and `pane.pin` are NOT: they
+       are the derivation's own vocabulary and live in `workspace/pane-derive.ts`, beside the
+       `PaneDerivation` they read and write. `pane.toggleZoom` and `pane.setZoomed` are still gone:
+       they wrote `zoomedPaneId` and nothing that draws ever read it. */
+    const ids = paneCommands(paneDeps).map((c) => c.id);
     expect(ids).toEqual([
       "pane.splitRight",
+      "pane.compareWith",
       "pane.focusPrimary",
       "pane.focusSecondary",
       "pane.unsplit",
     ]);
-    for (const command of paneCommands()) {
+    for (const command of paneCommands(paneDeps)) {
       expect(command.level).toBe("document");
       expect(command.category).toBe("View");
     }
   });
 
   test(String.raw`⌘\ is the split chord and ⌘0 / ⌘⌥0 are the focus PAIR`, () => {
-    const byId = new Map(paneCommands().map((c) => [c.id, c]));
+    const byId = new Map(paneCommands(paneDeps).map((c) => [c.id, c]));
     expect(byId.get("pane.splitRight")!.keybinding).toBe("mod+\\");
     expect(byId.get("pane.focusPrimary")!.keybinding).toBe("mod+0");
     expect(byId.get("pane.focusSecondary")!.keybinding).toBe("mod+alt+0");
@@ -643,19 +657,23 @@ describe("the pane commands", () => {
   });
 
   test("the three grid commands refuse with a sentence until the grid is split", () => {
-    const registry = registryWith(paneCommands());
+    const registry = registryWith(paneCommands(paneDeps));
     open("a");
-    for (const id of ["pane.focusPrimary", "pane.focusSecondary", "pane.unsplit"]) {
+    for (const id of ["pane.focusPrimary", "pane.focusSecondary"]) {
       expect(registry.isEnabled(id)).toBe(false);
       expect(registry.disabledReason(id)).toBe("a split pane grid");
     }
+    // Unsplit says "a second pane", not "a split pane grid": a derived pane is not a SPLIT — nothing
+    // Moved into it — and Unsplit is the only exit a lens has.
+    expect(registry.isEnabled("pane.unsplit")).toBe(false);
+    expect(registry.disabledReason("pane.unsplit")).toBe("a second pane");
     open("b");
     splitRight();
     expect(registry.isEnabled("pane.unsplit")).toBe(true);
   });
 
   test("Split Right needs only a document, and says so", () => {
-    const registry = registryWith(paneCommands());
+    const registry = registryWith(paneCommands(paneDeps));
     expect(registry.isEnabled("pane.splitRight")).toBe(false);
     expect(registry.disabledReason("pane.splitRight")).toBe("an open document");
     // A Canvas-only document used to be refused BY NAME here. It is not any more.
@@ -664,7 +682,7 @@ describe("the pane commands", () => {
   });
 
   test("running them drives the model", async () => {
-    const registry = registryWith(paneCommands());
+    const registry = registryWith(paneCommands(paneDeps));
     open("a");
     open("b");
     await registry.run("pane.splitRight");
@@ -678,7 +696,7 @@ describe("the pane commands", () => {
   });
 
   test("Unsplit from the primary collapses the side pane, not the primary", async () => {
-    const registry = registryWith(paneCommands());
+    const registry = registryWith(paneCommands(paneDeps));
     open("a");
     open("b");
     splitRight();
@@ -689,7 +707,7 @@ describe("the pane commands", () => {
 });
 
 describe("the two new tab commands", () => {
-  const deps = { openFile: () => {} };
+  const deps = { openFile: () => {}, openFileInPane: () => {} };
 
   test("Pin / Unpin toggles the focused tab", async () => {
     const registry = registryWith(tabCommands(deps) as ReturnType<typeof paneCommands>);
@@ -721,6 +739,253 @@ describe("the two new tab commands", () => {
     splitRight();
     expect(activePane().tabOrder.length).toBe(1);
     expect(registry.isEnabled("document.nextTab")).toBe(true);
+  });
+});
+
+describe("openTab says WHERE and whether the keyboard follows", () => {
+  test("`paneId` lands the tab in the pane it names, not the focused one", () => {
+    open("a");
+    open("b");
+    splitRight();
+    focusPane(PRIMARY_PANE);
+    openTab({
+      document: { tagName: "div" },
+      documentPath: "c.json",
+      id: "c",
+      paneId: SECONDARY_PANE,
+    });
+    expect(paneById(SECONDARY_PANE)!.tabOrder).toEqual(["b", "c"]);
+    expect(paneById(PRIMARY_PANE)!.tabOrder).toEqual(["a"]);
+  });
+
+  test("`focus: false` writes the pane's activeTabId and NOTHING else", () => {
+    open("a");
+    open("b");
+    splitRight();
+    focusPane(PRIMARY_PANE);
+    const mruBefore = [...workspace.mruOrder];
+
+    openTab({
+      document: { tagName: "div" },
+      documentPath: "c.json",
+      focus: false,
+      id: "c",
+      paneId: SECONDARY_PANE,
+    });
+
+    // On screen there…
+    expect(paneById(SECONDARY_PANE)!.activeTabId).toBe("c");
+    // …and nothing that describes where the AUTHOR is has moved: not the focus, not the MRU order
+    // ⌃Tab walks, not the tree's cursor.
+    expect(workspace.activePaneId).toBe(PRIMARY_PANE);
+    expect(workspace.activeTabId).toBe("a");
+    expect(workspace.mruOrder).toEqual(mruBefore);
+  });
+
+  test("a `paneId` no pane carries falls back to the focused pane rather than dropping the open", () => {
+    open("a");
+    openTab({ document: { tagName: "div" }, documentPath: "c.json", id: "c", paneId: "ghost" });
+    expect(paneById(PRIMARY_PANE)!.tabOrder).toEqual(["a", "c"]);
+  });
+});
+
+describe("sidePane and moveTabToPane", () => {
+  test("sidePane creates the second pane and moves NOTHING", () => {
+    open("a");
+    const side = sidePane();
+    expect(side.id).toBe(SECONDARY_PANE);
+    expect(paneById(PRIMARY_PANE)!.tabOrder).toEqual(["a"]);
+    expect(side.tabOrder).toEqual([]);
+    // Idempotent, and from the side pane it answers with the primary.
+    expect(sidePane().id).toBe(SECONDARY_PANE);
+    focusPane(SECONDARY_PANE);
+    expect(sidePane().id).toBe(PRIMARY_PANE);
+    focusPane(PRIMARY_PANE);
+  });
+
+  test("moveTabToPane is a MOVE, is idempotent, and refuses ids that name nothing", () => {
+    open("a");
+    open("b");
+    const side = sidePane();
+    expect(moveTabToPane("b", side.id)?.id).toBe(SECONDARY_PANE);
+    expect(paneById(PRIMARY_PANE)!.tabOrder).toEqual(["a"]);
+    expect(paneById(SECONDARY_PANE)!.tabOrder).toEqual(["b"]);
+    expect(moveTabToPane("b", SECONDARY_PANE)?.id).toBe(SECONDARY_PANE);
+    expect(paneById(SECONDARY_PANE)!.tabOrder).toEqual(["b"]);
+    expect(moveTabToPane("nope", SECONDARY_PANE)).toBeNull();
+    expect(moveTabToPane("b", "ghost")).toBeNull();
+  });
+});
+
+/**
+ * The grid every finding-1/finding-3 case starts from: the primary holding two documents, the
+ * secondary a Code LENS of it.
+ *
+ * Reached the way the app reaches it — `splitRight` then `pane.derive`'s hand-back — rather than by
+ * hand, because §18.1 rule 3 removes a pane with no subject and a fixture that stood the pane up
+ * itself would be testing a state the app cannot produce.
+ *
+ * @returns The page the primary is showing.
+ */
+function lensBesideAPage() {
+  const page = open("pages/index");
+  open("scratch");
+  activateTab(page.id);
+  expect(splitRight()?.id).toBe(SECONDARY_PANE);
+  focusPane(PRIMARY_PANE);
+  setPaneDerivation(SECONDARY_PANE, {
+    diff: null,
+    kind: "lens",
+    media: null,
+    mode: "source",
+    preset: "code",
+    reason: "",
+    sourcePaneId: PRIMARY_PANE,
+    status: "ready",
+    zoom: 1,
+  });
+  // D2: the lens hands whatever it was holding back to the pane the author is in.
+  applyDerivation(SECONDARY_PANE, noopDerivationDeps());
+  focusPane(PRIMARY_PANE);
+  activateTab(page.id);
+  return page;
+}
+
+describe("pane.compareWith", () => {
+  const compared: { paneId: string; path: string }[] = [];
+  const deps = {
+    openFile: () => {},
+    openFileInPane: (paneId: string, path: string) => {
+      compared.push({ paneId, path });
+    },
+  };
+
+  test("opens THAT document beside this one, and the focus does not move", async () => {
+    compared.length = 0;
+    const registry = registryWith(paneCommands(deps));
+    open("a");
+    await registry.run("pane.compareWith", { path: "pages/other.json" });
+    expect(compared).toEqual([{ paneId: SECONDARY_PANE, path: "pages/other.json" }]);
+    // Comparing is a READ. Nothing closed, nothing unsplit, the keyboard stayed put.
+    expect(workspace.activePaneId).toBe(PRIMARY_PANE);
+    expect(workspace.tabs.has("a")).toBe(true);
+  });
+
+  test("comparing a document with itself is refused BY NAME", async () => {
+    compared.length = 0;
+    const registry = registryWith(paneCommands(deps));
+    open("a");
+    // `requires` is one sentence for the whole command and cannot express "in the other pane" —
+    // The refusal depends on the argument, so it is a run-time RangeError.
+    await expect(registry.run("pane.compareWith", { path: "a.json" })).rejects.toThrow(RangeError);
+    expect(compared).toEqual([]);
+  });
+
+  test("it needs a document, and says so", () => {
+    const registry = registryWith(paneCommands(deps));
+    expect(registry.isEnabled("pane.compareWith")).toBe(false);
+    expect(registry.disabledReason("pane.compareWith")).toBe("an open document");
+  });
+
+  /* FINDING 1. `sidePane()` answers "the pane that is not focused" and knows nothing about whether
+     that pane is a LENS — which owns no tab by invariant D2, and whose `tabOfPane` hops straight
+     past its own `tabOrder` to the source pane. So the compared document landed in a strip nothing
+     reads, on no stage, and `workspace.activeTabId` went on reporting the source. The follow could
+     not repair it either: it tracks `derived` and `tabOfPane(sourcePaneId)`, and a tab insertion
+     touches neither.
+
+     The audit's probe, verbatim:
+       secondary derived=code, tabs=["pages/compare-me.json"], shows "pages/index.json"
+       …identical after the follow's rAF. focus: primary */
+  test("comparing into a LENS releases the projection, so the document is actually shown", async () => {
+    compared.length = 0;
+    const registry = registryWith(paneCommands(deps));
+    lensBesideAPage();
+    expect(derivationOfPane(SECONDARY_PANE)?.kind).toBe("lens");
+
+    await registry.run("pane.compareWith", { path: "pages/compare-me.json" });
+
+    // The projection is gone, so the pane can own the document it was asked to show.
+    expect(derivationOfPane(SECONDARY_PANE)).toBeNull();
+    expect(compared).toEqual([{ paneId: SECONDARY_PANE, path: "pages/compare-me.json" }]);
+    // …and comparing is still a read: the keyboard did not move.
+    expect(workspace.activePaneId).toBe(PRIMARY_PANE);
+  });
+
+  /* FINDING 7, and it is the previous round's fix stopping one case short. `receivingPane` released
+     a LENS and left a COMPANION, on the reasoning that a companion owns real tabs so the new one
+     simply joins them. True of the tabs and false of everything else: the follow is still live, so
+     the next `$layout` change or layout click re-points the pane and throws the compared document
+     off screen; `tabOrder` is no longer empty, so `panels/tab-strip.ts` draws tab chips instead of
+     the derivation chip and the pane loses its name and its ✕; and `pane.pin` promotes
+     `activeTabId`, which is now the compared document rather than the layout being kept.
+
+     The audit's probe, with ⌘\ instead of Compare (the same `receivingPane` call):
+       tabs=[layouts/base.json, pages/index.json] — still following
+       `pane.pin` there promoted pages/index.json, the page the author split in, not the layout */
+  test("comparing into a COMPANION releases it too — a pane handed a document stops following", async () => {
+    compared.length = 0;
+    const registry = registryWith(paneCommands(deps));
+    open("pages/index");
+    open("scratch");
+    expect(splitRight()?.id).toBe(SECONDARY_PANE);
+    focusPane(PRIMARY_PANE);
+    setPaneDerivation(SECONDARY_PANE, {
+      kind: "companion",
+      preset: "layout",
+      reason: "",
+      resolved: "layouts/base.json",
+      sourcePaneId: PRIMARY_PANE,
+      status: "ready",
+    });
+
+    await registry.run("pane.compareWith", { path: "pages/compare-me.json" });
+
+    expect(derivationOfPane(SECONDARY_PANE)).toBeNull();
+    expect(compared).toEqual([{ paneId: SECONDARY_PANE, path: "pages/compare-me.json" }]);
+    // Nothing was closed — releasing a derivation is not a destructive act, and the document the
+    // Companion had opened is an ordinary tab of that pane now.
+    expect(workspace.tabs.has("scratch")).toBe(true);
+  });
+});
+
+/* FINDING 3. `splitRight` gained `sidePane()` and lost its guard. The audit's frames:
+
+     before: primary ["pages/index.json","scratch.json"] active index | secondary derived=code
+     after:  primary active scratch.json | secondary tabs ["pages/index.json"] derived=code
+             shows scratch.json | focus: secondary
+     after the rAF: primary ["scratch.json","pages/index.json"] | secondary tabs [] | focus: secondary
+
+   Between those two frames a pane held BOTH a derivation and a tab — D2 violated and observable.
+   After the follow's repair the author was looking at a different document, the tab they split was
+   at the back of the strip, and the keyboard was in a pane that owned nothing. */
+describe(String.raw`⌘\ with a lens beside you`, () => {
+  test("the split releases the projection and the tab lands, once, in the pane it was sent to", async () => {
+    const page = lensBesideAPage();
+    activateTab(page.id);
+    expect(paneById(SECONDARY_PANE)!.tabOrder).toEqual([]);
+
+    const landed = splitRight();
+
+    // ONE frame, no repair, no intermediate state where a lens holds a tab.
+    expect(landed?.id).toBe(SECONDARY_PANE);
+    expect(derivationOfPane(SECONDARY_PANE)).toBeNull();
+    expect(paneById(SECONDARY_PANE)!.tabOrder).toEqual([page.id]);
+    expect(paneById(SECONDARY_PANE)!.activeTabId).toBe(page.id);
+    // The keyboard is in the pane that now owns the document, which is what `⌘\` means.
+    expect(workspace.activePaneId).toBe(SECONDARY_PANE);
+    expect(workspace.activeTabId).toBe(page.id);
+    // …and the pane it left kept the other document, in the order it had.
+    expect(paneById(PRIMARY_PANE)!.tabOrder).toEqual(["scratch"]);
+
+    // The follow's frame changes nothing: there is no derivation left to enforce.
+    await new Promise<void>((done) => {
+      requestAnimationFrame(() => {
+        done();
+      });
+    });
+    expect(paneById(SECONDARY_PANE)!.tabOrder).toEqual([page.id]);
+    expect(workspace.activePaneId).toBe(SECONDARY_PANE);
   });
 });
 

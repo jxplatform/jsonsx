@@ -25,6 +25,7 @@ import {
   splitRight,
   workspace,
 } from "../src/workspace/workspace";
+import { setPaneDerivation } from "../src/workspace/pane-derive";
 import { componentRegistry } from "../src/files/components";
 import { setProjectState } from "../src/store";
 import { transactDoc, mutateRemoveNode } from "../src/tabs/transact";
@@ -143,6 +144,34 @@ describe("document and editor", () => {
     openTab({ document: { tagName: "div" }, documentPath: "b.json", id: "b" });
     splitRight();
     expect(workspace.panes.length).toBe(2);
+    expect(context().pane.count).toBe(2);
+  });
+
+  /* `ctx.pane.derived` was DECLARED and never assigned for two phases — the exact
+     `layoutSelection`-with-no-writer shape this codebase keeps catching, and worse here because
+     `services/automation.ts` publishes the whole record as `probe.state()`, so the screenshot
+     pipeline and the assistant were both reading a hard-coded `false`. Every `when: ctx.pane.derived`
+     predicate was therefore permanently off, and no test could tell that from "no derived pane". */
+  test("a derived pane in the grid is a fact the projection reports", () => {
+    resetWorkspaceWithTab({ children: [], tagName: "div" } as unknown as JxMutableNode);
+    openTab({ document: { tagName: "div" }, documentPath: "b.json", id: "b" });
+    splitRight();
+    expect(context().pane.derived).toBe(false);
+
+    setPaneDerivation(workspace.panes[1]!.id, {
+      diff: null,
+      kind: "lens",
+      media: null,
+      mode: "source",
+      preset: "code",
+      reason: "",
+      sourcePaneId: workspace.panes[0]!.id,
+      status: "ready",
+      zoom: 1,
+    });
+
+    expect(context().pane.derived).toBe(true);
+    // …and it is a fact about the GRID, not about the focused pane: the keyboard never moved.
     expect(context().pane.count).toBe(2);
   });
 

@@ -1105,13 +1105,20 @@ describe("iframe canvas patch bridge", () => {
     { key: "textContent", op: "set-key", path: ["children", 0], value: "hi" },
   ];
 
-  test("postPatchToHosts posts the forward ops to every ready host and counts them", async () => {
-    await mountReady();
+  test("postPatchToHosts posts the forward ops with the STAGE's own generation, and counts them", async () => {
+    const canvasEl = await mountReady();
     channels[0]!.posts.length = 0;
+    /* The generation is resolved from the artboard's own stage, so the artboard has to be ON one.
+       `postPatchToHosts` used to take the number as a parameter and a caller with two panes had
+       only one to give. */
+    const surface = surfaceForPane(PRIMARY_PANE);
+    surface.panels.push({ canvas: canvasEl, ready: true } as unknown as CanvasPanel);
+    surface.renderGeneration = 7;
 
-    const count = postPatchToHosts(OPS, 7, activeTab.value?.id ?? null);
+    const count = postPatchToHosts(OPS, activeTab.value?.id ?? null);
     expect(count).toBe(1);
     expect(channels[0]!.posts).toContainEqual({ forwardOps: OPS, gen: 7, kind: "patch" });
+    surface.panels.length = 0;
   });
 
   test("postPatchToHosts returns 0 when no host is ready, so the caller escalates", async () => {
@@ -1119,14 +1126,14 @@ describe("iframe canvas patch bridge", () => {
     document.body.append(canvasEl);
     await mountIframeCanvas(1, {} as never, canvasEl);
     // No `ready` delivered → the host can't apply a patch yet.
-    expect(postPatchToHosts(OPS, 1, activeTab.value?.id ?? null)).toBe(0);
+    expect(postPatchToHosts(OPS, activeTab.value?.id ?? null)).toBe(0);
     expect(channels[0]!.posts.some((p) => p.kind === "patch")).toBe(false);
   });
 
   test("postPatchToHosts drops a host whose iframe has been disconnected", async () => {
     const canvasEl = await mountReady();
     canvasEl.remove(); // Detach the canvas → the iframe is no longer connected.
-    expect(postPatchToHosts(OPS, 1, activeTab.value?.id ?? null)).toBe(0);
+    expect(postPatchToHosts(OPS, activeTab.value?.id ?? null)).toBe(0);
   });
 
   test("patchComplete re-measures the current selection", async () => {
@@ -2663,15 +2670,19 @@ describe("host tab-identity bookkeeping", () => {
   });
 
   test("postPatchToHosts skips hosts rendering another tab's document", async () => {
-    await mountReady();
+    const canvasEl = await mountReady();
     channels[0]!.posts.length = 0;
+    // On a STAGE, because the generation a patch carries is the stage's — see the finding-9 test
+    // In `canvas-idle.test.ts` for what a host with no resolvable stage is answered with now.
+    canvasPanels.push({ canvas: canvasEl, ready: true } as unknown as CanvasPanel);
     const ops: WireDocOp[] = [
       { key: "textContent", op: "set-key", path: ["children", 0], value: "x" },
     ];
-    expect(postPatchToHosts(ops, 1, "some-other-tab")).toBe(0);
+    expect(postPatchToHosts(ops, "some-other-tab")).toBe(0);
     expect(channels[0]!.posts.some((p) => p.kind === "patch")).toBe(false);
     // …while the owning tab's patches go through.
-    expect(postPatchToHosts(ops, 1, activeTab.value!.id)).toBe(1);
+    expect(postPatchToHosts(ops, activeTab.value!.id)).toBe(1);
+    canvasPanels.length = 0;
   });
 
   test("commitActiveEditSession posts endEdit to the active edit host only while editing", async () => {

@@ -38,6 +38,7 @@ import {
   countPerFile,
   describeFocusSites,
   diffAgainstAllowed,
+  FOCUS_NAMES,
   FOCUS_WRITE_RE,
   focusSitesInPaneScope,
   report,
@@ -316,7 +317,7 @@ describe("the singleton guard", () => {
     expect(await checkPaneSingletons()).toEqual([]);
   }, 30_000);
 
-  test("the fourth rule's residue is two entries, and each names what it is", () => {
+  test("the fourth rule's residue is three entries, and each names what it is", () => {
     /* Rules 1 and 2 are lists of names, rule 3 is a list of files, and each was written after a
        failure the next one walked straight past. This is the sentence all four were reaching for:
        a function that has been told which pane it is about does not get to consult the focus.
@@ -325,11 +326,31 @@ describe("the singleton guard", () => {
        working rather than the tree regressing: the bottom dock's function editor is app-level and
        its `container` is not a stage, and `renderCssVarsEditor` reaches the focus one hop away
        through `pushProjectStylesToCanvas()` — a real two-pane defect in `style/live-preview.ts`
-       that no body scan could ever have named. */
+       that no body scan could ever have named.
+
+       The THIRD arrived with the `disabledReason`/`isEnabled` widening (§18.4's preset menu asked a
+       registry — which resolves its context from the focus — about a pane it had been handed by
+       name). It is `panels/jump-bar.ts`, and it is real debt of the same shape: `segmentTpl`
+       renders every crumb's enablement from the registry, so an unfocused pane's address states the
+       FOCUSED pane's answers. No crumb is visibly wrong today; `selection.*` is the one that will
+       be, and the fix is the per-pane predicate the preset menu took, which the selection crumbs do
+       not have yet. */
     expect(ALLOWED_FOCUS_IN_PANE_SCOPE).toEqual({
       "src/panels/editors.ts": 1,
+      "src/panels/jump-bar.ts": 1,
       "src/settings/css-vars-editor.ts": 1,
     });
+  });
+
+  /* The widening itself, asserted where a reviewer can see what it now names. Rule 4 walks ONE hop
+     into a subject-less local function; it cannot follow a method on a registry VALUE, dispatched
+     by a string id to a closure registered in another module — that is type-directed whole-program
+     dataflow through a runtime map. What it CAN decide from one identifier is that the question was
+     asked at all, and asking it from a pane-scoped function is the defect whether or not the
+     particular command happens to read the focus today. */
+  test("asking a registry whether a command is enabled counts as a focus read", () => {
+    expect([...FOCUS_NAMES]).toContain("disabledReason");
+    expect([...FOCUS_NAMES]).toContain("isEnabled");
   });
 
   test("the fifth rule: only `focusPane` moves the focus, and its list is empty", async () => {

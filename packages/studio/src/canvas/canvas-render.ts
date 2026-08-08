@@ -13,6 +13,7 @@ import { getNodeAtPath, updateCanvas } from "../store";
 import { activeTab, tabIsLive, workspace } from "../workspace/workspace";
 import {
   canvasModeOfPane,
+  derivationOfPane,
   nextRenderGeneration,
   setSurfaceTeardown,
   surfaceForPane,
@@ -52,6 +53,7 @@ import {
 } from "../services/monaco-buffer";
 import { modelUriFor } from "../services/model-uri";
 import { renderWelcome } from "../panels/welcome-screen";
+import { renderEmptyState } from "../panels/empty-state";
 import {
   attachDocumentHeaderHost,
   documentHeaderHost,
@@ -91,6 +93,8 @@ import { dismissBlockActionBar, dismissLinkPopover } from "../panels/block-actio
 import { dismissContextMenu } from "../editor/context-menu";
 import { dismissSlashMenu } from "../editor/slash-menu";
 import { mediaDisplayName } from "../panels/shared";
+import { tabLabel } from "../panels/tab-strip";
+import { activeRegistry } from "../commands/active-registry";
 import { notify } from "../services/notify";
 import * as overlaysPanel from "../panels/overlays";
 
@@ -614,6 +618,50 @@ export function renderCanvas(paneId: string = workspace.activePaneId) {
   });
 }
 
+/**
+ * Say, on this stage, why a derived pane has nothing to draw.
+ *
+ * **`derived.reason` had a writer, a render-input tracker and no reader at all.** It is written by
+ * `applyDerivation`, tracked by `panels/pane-context.ts`, and `grep -rn "\.reason" src/` found
+ * nothing that printed it — so choosing Layout on a page with no layout gave a pane with a
+ * derivation, no tabs, no strip chip, no context bar and a blank stage that `paneIsEmpty` would not
+ * collapse. The sentence written for the honest empty state was dead code.
+ *
+ * Through {@link renderEmptyState} rather than a block of its own: the copy rules are inherited,
+ * and a derived pane with nothing to show is the same kind of region as any other.
+ *
+ * **`held` is the document this pane still OWNS, and it is the difference between a notice and a
+ * riddle.** A companion that resolved once has a real tab, so `panels/tab-strip.ts` draws a real
+ * chip with a real ✕ — and when the rule then dies, the strip says `base.json` while the stage says
+ * "This page has no layout." The sentence is true and it is about something else; nothing on screen
+ * says why the file named in the strip is not drawn, or how to get it back. Naming it, and putting
+ * the one verb that ends the follow beside it, is what makes the two halves agree. A LENS never
+ * passes one: it owns no document, `tabOfPane` would hand back the SOURCE pane's, and `pane.pin` is
+ * refused for a projection (§14.1).
+ *
+ * @param {CanvasSurface} surface
+ * @param {string} message
+ * @param {Tab | null} [held]
+ */
+function renderDerivationNotice(
+  surface: CanvasSurface,
+  message: string,
+  held: Tab | null = null,
+): void {
+  surface.wrap.style.display = "block";
+  const registry = activeRegistry();
+  const pin = registry?.get("pane.pin");
+  litRender(
+    renderEmptyState({
+      message,
+      ...(held && { detail: `${tabLabel(held)} is still open here.` }),
+      ...(held &&
+        pin && { actions: [{ label: pin.title, run: () => void registry?.run(pin.id) }] }),
+    }),
+    surface.wrap,
+  );
+}
+
 function renderCanvasImpl(surface: CanvasSurface) {
   /* Every read below is scoped to ONE pane. The stage, the panels it mounted and the mode it draws
      are the surface's; the document is whatever tab that pane is showing, which is `activeTab` only
@@ -636,12 +684,44 @@ function renderCanvasImpl(surface: CanvasSurface) {
     // Previously left the canvas unrenderable until a full reload).
     attachDocumentHeaderHost(surface.paneId, null);
     resetCanvasView(surface);
+    /* A DERIVED pane with nothing to draw explains itself. It is not the welcome screen and it is
+       not a blank stage: it is a standing rule that has not resolved — "Select an element inside a
+       component to see its definition" — and until this branch existed that sentence was written,
+       tracked as a render input and never printed anywhere. */
+    const derived = derivationOfPane(surface.paneId);
+    if (derived) {
+      renderDerivationNotice(surface, derived.reason || "Looking for something to show here…");
+      return;
+    }
     // Nothing is open. A dev-server root that is only a workspace/monorepo (no project.json) still
     // Populates projectState, but it is not an open project — the file tree prompts to open one and
     // The canvas must keep showing the welcome screen rather than going blank.
     if (!projectState?.isSiteProject) {
       renderWelcome(canvasWrap);
     }
+    return;
+  }
+  /* A derivation that HAS a document and has gone stale says so too.
+     The notice above lives under `if (!tab)`, and a pane that already opened something keeps its
+     tab — so a layout companion whose page dropped its `$layout`, and a Code lens whose source
+     pane switched to Code beside it, both had `status: "unavailable"` and a sentence written by
+     `applyDerivation`, tracked as a render input by `panels/pane-context.ts`, and drawn nowhere.
+     The companion went on showing a file it was no longer about; the lens mounted a SECOND Monaco
+     model on the source pane's URI, which real Monaco throws on.
+     `reason` and not just `status`, because a derivation is `unavailable` for one frame before the
+     follow has run and a stage that blanked on that would flicker on every retarget. */
+  const staleDerivation = derivationOfPane(surface.paneId);
+  if (staleDerivation?.status === "unavailable" && staleDerivation.reason) {
+    attachDocumentHeaderHost(surface.paneId, null);
+    resetCanvasView(surface);
+    /* …and for a COMPANION, what it is still holding. `tab` here is the pane's OWN document for a
+       companion and the SOURCE pane's for a lens — the hop `tabOfPane` takes — so the kind decides
+       whether there is anything to name. See {@link renderDerivationNotice}. */
+    renderDerivationNotice(
+      surface,
+      staleDerivation.reason,
+      staleDerivation.kind === "companion" ? tab : null,
+    );
     return;
   }
   const ctx = _ctx as CanvasRenderCtx;
@@ -667,8 +747,14 @@ function renderCanvasImpl(surface: CanvasSurface) {
      stage. They open in the dock's Logic tab now (P8) and the page is still on screen behind it, so
      those clauses only DETACHED the visible card: it stopped re-rendering and quietly showed
      frontmatter from before the edit. */
+  /* …and NOT in a lens. The Document Header is an editing surface — Title, Route, SEO, the raw
+     frontmatter — over a document this pane does not own, and two cards editing one document's
+     frontmatter side by side is two writers for one field. A lens is a view; the card belongs to
+     the pane that owns the tab. */
   const wantsDocHeader =
-    (canvasMode === "edit" || canvasMode === "design") && hasDocumentHeader(tab);
+    (canvasMode === "edit" || canvasMode === "design") &&
+    derivationOfPane(surface.paneId)?.kind !== "lens" &&
+    hasDocumentHeader(tab);
   if (!wantsDocHeader) {
     attachDocumentHeaderHost(surface.paneId, null);
   }
@@ -982,7 +1068,22 @@ function renderCanvasImpl(surface: CanvasSurface) {
 
   // Git diff mode — render original (left) and current (right) side-by-side on panzoom surface
   if (canvasMode === "git-diff") {
-    if (!ctx.gitDiffState) {
+    /* THIS PANE's diff. `shell.git.diffState` is one app-level slot, so with a diff lens open
+       beside a page the two stages would draw the same comparison — and changing the primary's
+       mode would clear the diff the side pane is still showing. A diff lens carries its own. */
+    const paneDiff = derivationOfPane(surface.paneId);
+    const lensDiff = paneDiff?.kind === "lens" && paneDiff.preset === "diff";
+    const gitDiffState = lensDiff ? paneDiff.diff : ctx.gitDiffState;
+    if (!gitDiffState) {
+      /* A LENS NEVER TAKES THE FALLBACK. `setCanvasMode(tab, "design")` writes the SOURCE pane's
+         tab — the one thing a lens must not do — so a diff lens whose comparison had not landed
+         yet flipped the document the author was editing out of whatever mode they had it in. Its
+         own comparison is still loading (or could not be read): say so on this stage and leave the
+         tab alone. */
+      if (lensDiff) {
+        renderDerivationNotice(surface, paneDiff.reason || "Loading this file's changes…");
+        return;
+      }
       ctx.setCanvasMode(tab, "design");
       renderCanvas(surface.paneId);
       return;
@@ -993,7 +1094,6 @@ function renderCanvasImpl(surface: CanvasSurface) {
       canvasWrap.style.overflow = "hidden";
     }
 
-    const { gitDiffState } = ctx;
     const panelWidth = 800;
 
     const { tpl: origTpl, panel: origPanel } = canvasPanelTemplate(
@@ -1196,7 +1296,20 @@ function renderCanvasImpl(surface: CanvasSurface) {
     });
   }
 
-  const panelEntries = allPanelDefs.map((def) => {
+  /* A BREAKPOINT LENS is one artboard, not a second copy of the design board.
+     Design mode already draws every declared breakpoint side by side on one panzoom surface, so
+     "the same page at two breakpoints" was never a rendering problem — it was that a tab lives in
+     one pane. The lens draws exactly the one artboard it names, filling its own pane at its own
+     zoom; the fallback to the whole set is for a media the document has since stopped declaring,
+     which `derivedTarget` also reports as `unavailable`. */
+  const lens = derivationOfPane(surface.paneId);
+  const lensMedia =
+    lens?.kind === "lens" && lens.preset === "breakpoint" ? (lens.media ?? "base") : null;
+  const chosen =
+    lensMedia === null ? allPanelDefs : allPanelDefs.filter((d) => d.name === lensMedia);
+  const panelDefs = chosen.length > 0 ? chosen : allPanelDefs;
+
+  const panelEntries = panelDefs.map((def) => {
     const label = `${def.displayName} (${def.width}px)`;
     const { tpl, panel } = canvasPanelTemplate(def.name, label, false, def.width);
     return { panel, tpl };

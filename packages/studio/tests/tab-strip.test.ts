@@ -1102,8 +1102,9 @@ describe("tab context menu", () => {
         openFile: (path: string) => {
           reopened.push(path);
         },
+        openFileInPane: () => {},
       }),
-      ...paneCommands(),
+      ...paneCommands({ openFile: () => {}, openFileInPane: () => {} }),
       ...contentCommands(),
     ]);
     setActiveRegistry(registry);

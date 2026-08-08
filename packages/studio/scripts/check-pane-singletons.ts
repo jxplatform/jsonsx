@@ -212,13 +212,32 @@ const INSTANCE_RE = /^let (active|_active|_host|_scheduler|sourceCollabCleanup)\
  * brake is now {@link namesItsSubject}: a helper is exempt when its SIGNATURE says which pane or
  * which tab it is about — which is also the reason a pane-scoped helper is charged at its own
  * definition (rule 4 already fires there) rather than at every call site.
+ *
+ * **`disabledReason` and `isEnabled` are focus reads, and that is the widening §18.4 paid for.** A
+ * registry resolves `getContext()` on every predicate evaluation, and that context is built from
+ * the FOCUSED pane — so `registry.disabledReason("pane.derive")` asks "is this enabled where the
+ * keyboard is", whatever pane the caller was handed. `panels/pane-context.ts`'s preset menu is
+ * drawn per pane and asked exactly that: the side pane's rows said "enabled" or "an open document
+ * in a pane that is not itself derived" for the same pane, decided by where the author had last
+ * clicked.
+ *
+ * Rule 4 could not see it and **could not be taught to**. The hop is not a call to a local
+ * function: it is a method on a VALUE, dispatched by a string id to a closure registered from
+ * another module — following it needs type-directed whole-program dataflow through a runtime map,
+ * which is a type checker, which is the thing this file exists because we do not have. What CAN be
+ * decided from one identifier is that the question was asked at all, and asking it from a
+ * pane-scoped function is the defect whether or not the particular command happens to read the
+ * focus today. So the NAMES join the list; the closure stays invisible and is not pretended
+ * otherwise.
  */
-const FOCUS_NAMES: ReadonlySet<string> = new Set([
+export const FOCUS_NAMES: ReadonlySet<string> = new Set([
   "activeTab",
   "activePaneId",
   "activePane",
   "activeCanvasSurface",
   "getCanvasMode",
+  "disabledReason",
+  "isEnabled",
 ]);
 
 /**
@@ -315,9 +334,19 @@ const FOCUS_SCOPE_SCAN = ["src/**/*.ts"];
  *   result to all specimen canvases — so two panes each showing a stylebook get the focused
  *   document's effective style. Real debt, in `src/style/live-preview.ts` rather than here; the fix
  *   is a per-host post and it is a workstream of its own.
+ * - **`src/panels/jump-bar.ts`** — the entry the `disabledReason`/`isEnabled` widening bought, and it
+ *   is real debt rather than a false positive. `jumpBarTemplate(paneId)` draws the address of a
+ *   NAMED pane and `segmentTpl` renders each crumb disabled-or-not from the registry, so the
+ *   unfocused pane's crumbs state the FOCUSED pane's enablement. Today no crumb is visibly wrong —
+ *   `pane.pin` scans the grid, `palette.openFiles` and `project.openRecent` are app-level — but
+ *   `selection.*` is not, and the shape is the one §18.4's preset menu shipped broken. The fix is
+ *   the same one the preset menu took: a pure per-pane predicate per verb, which for the selection
+ *   crumbs does not exist yet. It is a workstream, not a line, and it is written down here rather
+ *   than left to be rediscovered.
  */
 export const ALLOWED_FOCUS_IN_PANE_SCOPE: Readonly<Record<string, number>> = {
   "src/panels/editors.ts": 1,
+  "src/panels/jump-bar.ts": 1,
   "src/settings/css-vars-editor.ts": 1,
 };
 

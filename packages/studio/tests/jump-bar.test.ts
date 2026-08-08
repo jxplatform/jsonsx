@@ -11,13 +11,21 @@ import { nothing, render as litRender } from "lit-html";
 import { afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { closeAllTabs } from "../src/workspace/workspace";
+import {
+  PRIMARY_PANE,
+  SECONDARY_PANE,
+  closeAllTabs,
+  openTab,
+  splitRight,
+} from "../src/workspace/workspace";
+import { setPaneDerivation } from "../src/workspace/pane-derive";
 import { setProjectState } from "../src/store";
 import {
   applyJumpBarOffset,
   crumbSiblings,
   documentLabel,
   dismissJumpMenu,
+  jumpBarTemplate,
   jumpSegments,
   mountJumpBar,
   renderJumpBar,
@@ -322,6 +330,52 @@ describe("the rendered bar", () => {
     expect(kinds()).toEqual(["project", "file", "node", "node"]);
     expect(host.querySelectorAll(".jb-sep")).toHaveLength(3);
     expect(document.documentElement.style.getPropertyValue("--jump-bar-h")).toBe("24px");
+  });
+
+  /* THE BAR ASKS ABOUT ITS OWN PANE. `jumpSegments` takes the derivation as an argument — the
+     tests above prove it turns Open into Keep — and `jumpBarTemplate` is where the argument comes
+     from. Passing `null` there compiles, keeps every `jumpSegments` test green, and draws a
+     following pane's address bar as an ordinary one: Open Files where Keep This Document belongs,
+     and no way to stop the follow from the one control that is always on screen. */
+  test("a derived pane's bar reads ITS pane's derivation, not the app's", () => {
+    resetStudioState({ name: "My Site", projectRoot: "/p" });
+    resetWorkspaceWithTab({ children: [], tagName: "div" }, { documentPath: "/p/index.json" });
+    openTab({ document: { tagName: "div" }, documentPath: "/p/side.json", id: "side" });
+    expect(splitRight()?.id).toBe(SECONDARY_PANE);
+    setPaneDerivation(SECONDARY_PANE, {
+      diff: null,
+      kind: "lens",
+      media: null,
+      mode: "source",
+      preset: "code",
+      reason: "",
+      sourcePaneId: PRIMARY_PANE,
+      status: "ready",
+      zoom: 1,
+    });
+
+    const registry = buildRegistry();
+    registry.registerAll([stub("pane.pin", "Keep This Document", "document")]);
+    setActiveRegistry(registry);
+
+    const sideHost = document.createElement("div");
+    document.body.append(sideHost);
+    /* Read off the crumb's TITLE, which is `${command.title} — requires …` or `${command.title}`:
+       the verb is the observable, and the bar deliberately carries no `data-command` for a test to
+       read instead. */
+    const fileCrumbTitle = (into: HTMLElement) =>
+      [...into.querySelectorAll(".jb-crumb")]
+        .map((el) => el.getAttribute("title") ?? "")
+        .find((title) => title.includes("index.json"));
+    try {
+      litRender(jumpBarTemplate(SECONDARY_PANE), sideHost);
+      expect(fileCrumbTitle(sideHost)).toContain("Keep This Document");
+      // …and the pane that owns the document still offers Open.
+      litRender(jumpBarTemplate(PRIMARY_PANE), host);
+      expect(fileCrumbTitle(host)).not.toContain("Keep This Document");
+    } finally {
+      sideHost.remove();
+    }
   });
 
   test("the bar is one addressable region, not a CSS selector the camera has to know", () => {

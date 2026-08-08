@@ -646,7 +646,16 @@ export function startCanvasIframe(opts: {
     if (msg.kind === "patch") {
       const { gen } = msg;
       if (gen < renderedGen) {
-        // A newer full render already supersedes this edit — drop it.
+        /* BEHIND, and that is now said out loud rather than dropped.
+           "A newer full render already supersedes this edit" is only true when the generation the
+           patch carries came from the stage THIS frame is mounted on. It did not while
+           `postPatchToHosts` took a single `gen` and fanned it to every host rendering the tab: one
+           document displayed in two panes meant whichever pane had rendered more recently held the
+           higher `renderedGen` and silently stopped applying patches, with a wrong picture on screen
+           and not one counter moving. The parent resolves the generation per host now, so reaching
+           here means the frame really is behind — an escalation, which repaints exactly this pane
+           and records the reason in `__jxCanvasPerf`. */
+        channel.post({ gen, kind: "patchError", message: "patch-behind-render" });
         return;
       }
       if (gen > renderedGen || !shadowDoc || !renderCtx) {

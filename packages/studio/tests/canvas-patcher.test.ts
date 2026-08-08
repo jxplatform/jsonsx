@@ -5,9 +5,14 @@
  */
 import "./with-dom.js";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { activeCanvasSurface, surfaceForPane } from "../src/canvas/canvas-surface";
+import {
+  activeCanvasSurface,
+  surfaceForPane,
+  surfacesShowingTab,
+} from "../src/canvas/canvas-surface";
 import {
   closeAllTabs,
+  focusPane,
   openTab,
   PRIMARY_PANE,
   SECONDARY_PANE,
@@ -15,6 +20,12 @@ import {
   workspace,
 } from "../src/workspace/workspace";
 import { getPatchConsumer, setPatchConsumer } from "../src/tabs/patch-ops";
+import {
+  applyDerivation,
+  clearPaneDerivation,
+  noopDerivationDeps,
+  setPaneDerivation,
+} from "../src/workspace/pane-derive";
 import {
   applyPatchBatch,
   classifyOps,
@@ -237,12 +248,82 @@ describe("classifyOps", () => {
 });
 
 describe("consumed-document handshake", () => {
-  test("consumePatchedDocument is one-shot per marked reference", () => {
+  test("consumePatchedDocument is one-shot per marked reference, per pane", () => {
     const consumer = getPatchConsumer()!;
-    consumer.markConsumed(toRaw(tab.doc.document) as object);
-    expect(consumePatchedDocument(tab.doc.document)).toBe(true);
+    consumer.markConsumed(toRaw(tab.doc.document) as object, tab);
+    expect(consumePatchedDocument(tab.doc.document, PRIMARY_PANE)).toBe(true);
     expect(canvasPerf.skippedFullRenders).toBe(1);
-    expect(consumePatchedDocument(tab.doc.document)).toBe(false);
+    expect(consumePatchedDocument(tab.doc.document, PRIMARY_PANE)).toBe(false);
+  });
+
+  test("a mark reaching TWO panes lets both skip, and counts two skips", () => {
+    /* Fails against a `WeakSet<object>` of references: the first pane's doc-effect deletes the one
+       mark and the second full-renders every surgically patched edit, while `skippedFullRenders`
+       still reports a single skip. Both panes display the SAME tab, which is what a derived pane
+       is — reached here through `splitRight` plus a hand-placed `activeTabId`, because the
+       displaying relation is all `surfacesShowingTab` reads. */
+    const other = openTab({ document: { tagName: "div" }, documentPath: "/p/other.json", id: "o" });
+    expect(splitRight()?.id).toBe(SECONDARY_PANE);
+    workspace.panes.find((pane) => pane.id === PRIMARY_PANE)!.activeTabId = tab.id;
+    workspace.panes.find((pane) => pane.id === SECONDARY_PANE)!.activeTabId = tab.id;
+
+    const consumer = getPatchConsumer()!;
+    consumer.markConsumed(toRaw(tab.doc.document) as object, tab);
+    expect(consumePatchedDocument(tab.doc.document, PRIMARY_PANE)).toBe(true);
+    expect(consumePatchedDocument(tab.doc.document, SECONDARY_PANE)).toBe(true);
+    expect(canvasPerf.skippedFullRenders).toBe(2);
+    expect(consumePatchedDocument(tab.doc.document, PRIMARY_PANE)).toBe(false);
+    void other;
+  });
+
+  /* FINDING 2. Open Code beside a page and type: the Code view did not move.
+     `markConsumed` marked EVERY stage displaying the tab; `classifyOps` SKIPS a stage that cannot
+     patch. Two functions, one set, and they disagreed — so the lens was marked as having taken a
+     patch it never received (`postPatchToHosts` matches no host for a pane with no artboards), its
+     doc-effect returned before `scheduleCanvasRender(paneId)`, and `canvas-render.ts`'s source fast
+     path — the ONLY thing that refreshes a source-mode Monaco — never ran. `skippedFullRenders`
+     counted it as a win.
+
+     The audit's probe: `primary skips full render: true / CODE LENS skips full render: true`.
+     The second `true` is what this test forbids; the first is the two-DESIGN-pane case above, which
+     must stay. */
+  test("a CODE LENS is not marked as patched — it received no patch and owes a full render", () => {
+    const scratch = openTab({
+      document: { children: [], tagName: "div" },
+      documentPath: "/p/lens-scratch.js",
+      id: `patcher-lens-${tabCount}`,
+    });
+    expect(splitRight()?.id).toBe(SECONDARY_PANE);
+    setPaneDerivation(SECONDARY_PANE, {
+      diff: null,
+      kind: "lens",
+      media: null,
+      mode: "source",
+      preset: "code",
+      reason: "",
+      sourcePaneId: PRIMARY_PANE,
+      status: "ready",
+      zoom: 1,
+    });
+    applyDerivation(SECONDARY_PANE, noopDerivationDeps());
+    focusPane(PRIMARY_PANE);
+    // Both stages DISPLAY the tab — that is what a lens is.
+    expect(surfacesShowingTab(tab).map((s) => s.paneId)).toEqual([PRIMARY_PANE, SECONDARY_PANE]);
+
+    getPatchConsumer()!.markConsumed(toRaw(tab.doc.document) as object, tab);
+
+    /* THE LENS IS ASKED FIRST, and the order is the assertion. A mark is a `Set` of pane ids; ask
+       the pane that OWNS the mark first and the set empties, so the lens's answer is "no mark for
+       this document at all" and a membership check that ignored the pane id would give the same
+       false. Asking the lens while the mark is still live is the only order in which "this mark is
+       not yours" and "there is no mark" are different answers. */
+    expect(consumePatchedDocument(tab.doc.document, SECONDARY_PANE)).toBe(false);
+    // …and the pane that CAN patch skips its full render.
+    expect(consumePatchedDocument(tab.doc.document, PRIMARY_PANE)).toBe(true);
+    expect(canvasPerf.skippedFullRenders).toBe(1);
+
+    clearPaneDerivation(SECONDARY_PANE);
+    void scratch;
   });
 
   test("escalateToFullRender schedules the showing pane's render and records the reason", () => {
@@ -251,6 +332,25 @@ describe("consumed-document handshake", () => {
     expect(ctxCalls.lastPaneId).toBe(PRIMARY_PANE);
     expect(canvasPerf.escalations).toBe(1);
     expect(canvasPerf.lastEscalationReason).toBe("test-reason");
+  });
+
+  /* …and EVERY stage that was handed the patch, which is the other half of the same plural.
+     An escalation is a statement about a stage whose DOM no longer matches its document, and a
+     document displayed in two panes was handed the patch in both — so a loop that stopped at the
+     first leaves the second showing a picture that does not match, with nothing scheduled to fix
+     it and one escalation counted for two stale stages. */
+  test("escalateToFullRender schedules BOTH stages when two panes display the tab", () => {
+    const other = openTab({ document: { tagName: "div" }, documentPath: "/p/esc.json", id: "esc" });
+    expect(splitRight()?.id).toBe(SECONDARY_PANE);
+    workspace.panes.find((pane) => pane.id === PRIMARY_PANE)!.activeTabId = tab.id;
+    workspace.panes.find((pane) => pane.id === SECONDARY_PANE)!.activeTabId = tab.id;
+
+    escalateToFullRender("two-stage-reason", tab);
+
+    expect(ctxCalls.scheduled).toBe(2);
+    expect(ctxCalls.lastPaneId).toBe(SECONDARY_PANE);
+    expect(canvasPerf.escalations).toBe(1);
+    void other;
   });
 });
 
@@ -310,6 +410,46 @@ describe("the gate is per pane, not per app", () => {
     escalateToFullRender("boom", tab);
     expect(ctxCalls.scheduled).toBe(1);
     expect(ctxCalls.lastPaneId).toBe(PRIMARY_PANE);
+  });
+
+  test("a CODE LENS beside the page is SKIPPED, not counted as a rejection", () => {
+    /* The one that would have killed surgical patching outright. A lens draws the source pane's
+       document, so `surfacesShowingTab` names both stages — and a Code lens has no artboards and
+       is in no patchable mode. Folded into `every`, it rejects the batch as `mode-source` or
+       `no-panels`, and every keystroke in the page full-renders BOTH stages. Only when NO showing
+       stage can take the patch is the mode a rejection. */
+    const scratch = openTab({
+      document: { children: [], tagName: "div" },
+      documentPath: "/p/scratch.js",
+      id: `patcher-scratch-${tabCount}`,
+    });
+    expect(splitRight()?.id).toBe(SECONDARY_PANE);
+    setPaneDerivation(SECONDARY_PANE, {
+      diff: null,
+      kind: "lens",
+      media: null,
+      mode: "source",
+      preset: "code",
+      reason: "",
+      sourcePaneId: PRIMARY_PANE,
+      status: "ready",
+      zoom: 1,
+    });
+    applyDerivation(SECONDARY_PANE, noopDerivationDeps());
+    focusPane(PRIMARY_PANE);
+
+    // Both stages display `tab`; only the primary can patch, and that is enough.
+    expect(surfacesShowingTab(tab).map((s) => s.paneId)).toEqual([PRIMARY_PANE, SECONDARY_PANE]);
+    expect(classifyOps(tab, [{ op: "set-style", path: ["children", 0] }]).patchable).toBe(true);
+
+    // …and when the SOURCE pane cannot patch either, the mode is a rejection again.
+    tab.session.ui.canvasMode = "source";
+    expect(classifyOps(tab, [{ op: "set-style", path: ["children", 0] }]).reason).toBe(
+      "mode-source",
+    );
+    tab.session.ui.canvasMode = canvasMode;
+    clearPaneDerivation(SECONDARY_PANE);
+    void scratch;
   });
 
   test("a tab no pane is showing rejects, and its escalation schedules nothing", () => {

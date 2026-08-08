@@ -17,6 +17,7 @@
  */
 
 import { html, nothing } from "lit-html";
+import type { TemplateResult } from "lit-html";
 import { live } from "lit-html/directives/live.js";
 import { debouncedStyleCommit, getNodeAtPath, renderOnly } from "../store";
 import { isRef } from "@jxsuite/schema/guards";
@@ -27,9 +28,10 @@ import {
   mutateUpdateProperty,
   transactDoc,
 } from "../tabs/transact";
-import { activeTab } from "../workspace/workspace";
+import { activeTab, workspace } from "../workspace/workspace";
+import { deriveRefusal } from "../workspace/pane-derive";
 import { primarySelection, unifyValues } from "../tabs/selection";
-import { setLayoutSelection, shell } from "../shell";
+import { shell } from "../shell";
 import {
   argsSchema,
   booleanArg,
@@ -39,6 +41,7 @@ import {
 } from "../commands/command-args";
 import type { LayoutSelection } from "../shell";
 import type { AnyCommand, CommandRegistry } from "../commands/registry";
+import { activeRegistry } from "../commands/active-registry";
 import { componentRegistry } from "../files/components";
 import { widgetForType } from "./style-inputs";
 import { renderFieldRow, renderKvRow } from "../ui/field-row";
@@ -552,27 +555,36 @@ function isBoundAttrValue(value: unknown): boolean {
 
 // ─── Layout selection panel ─────────────────────────────────────────────────
 
-/**
- * Open the layout file the selection came from, WITH the clicked node selected.
+/*
+ * There is no `openLayoutAtNode`, and every line of it was wrong by the time it was deleted.
  *
- * `navigateToComponent` swaps the tab's document (pushing the page onto the document stack) and
- * clears the selection, so the node has to be re-selected once it resolves — otherwise "Open Layout
- * →" dropped the author into a layout file with nothing selected and left them to find the header
- * again by eye. The layout selection is released either way: the layout is now the open document,
- * so its nodes are ordinary editable content.
+ * Its docstring said `navigateToComponent` "swaps the tab's document (pushing the page onto the
+ * document stack)" — two releases stale: nothing has swapped since §14.1 landed and there is no
+ * document stack. Then it did four things, and the last three were the defect:
+ *
+ * 1. **Navigate.** Now the command's job, and the command opens the layout BESIDE the page rather
+ *    than over the page it is teaching about — §8.2's promise since P3, never shipped.
+ * 2. **`setLayoutSelection(null)`.** Its stated reason — "the layout is now the open document, so
+ *    its nodes are ordinary editable content" — stops being true the moment the layout opens beside
+ *    the page rather than replacing it. Clearing it is precisely what killed the follow on its first
+ *    frame, and it is what made the Inspector blank at the instant the layout appeared.
+ * 3. **Re-select against `activeTab`.** The focus deliberately stays in the page now, so the tab
+ *    this reached was the wrong one. The selection is carried by the derivation instead —
+ *    `pane-derive.ts`'s `DerivedTarget.select`, read from `shell.layoutSelection`'s `layoutPath`
+ *    and applied to the companion pane's tab once the open resolves. For one release that sentence
+ *    was written here and nothing implemented it: `layoutPath` had no consumer outside the canvas
+ *    hit test, `derivationFor("layout")` stored `{resolved: null}`, and the exact regression this
+ *    ledger entry describes — dropped into a layout file with nothing selected — was back while
+ *    the comment denied it.
+ *
+ *    The companion resolves `shell.layoutSelection.layoutFile` in preference to the page's own
+ *    `$layout` for the same reason the old code did: they are different answers for a nested chain,
+ *    and the one the author clicked is the one they meant.
+ * 4. **`renderOnly("rightPanel")`.** `panels/right-panel.ts:106` tracks `shell.layoutSelection`
+ *    itself and `:212` reads it, so the repaint was already subscribed — a second, imperative
+ *    subscription that only looked necessary because the function above had just cleared the state
+ *    the real one is keyed on.
  */
-async function openLayoutAtNode(
-  navigate: (path: string) => void | Promise<void>,
-  selection: LayoutSelection,
-): Promise<void> {
-  await navigate(selection.layoutFile || "layout");
-  setLayoutSelection(null);
-  const tab = activeTab.value;
-  if (tab && tab.documentPath === selection.layoutFile) {
-    tab.session.selection = [selection.layoutPath];
-  }
-  renderOnly("rightPanel");
-}
 
 /**
  * The Layout-element panel — what the inspector says when you click page chrome.
@@ -582,9 +594,32 @@ async function openLayoutAtNode(
  * canvas hit test writes it now (§8.2), and `panels/right-panel.ts` tracks it, so the panel
  * renders.
  */
-function renderLayoutSelectionPanel(ctx: {
-  navigateToComponent: (path: string) => void | Promise<void>;
-}) {
+/**
+ * The chip that opens the layout beside the page.
+ *
+ * **Drawn only where it can run**, which is why the condition lives at the call site rather than
+ * inside the handler. `canvas/iframe-host.ts` focuses the pane a layout click landed in — including
+ * a LENS, which draws layout chrome because it draws the same document — and from a derived pane
+ * `pane.derive` can only throw `an open document in a pane that is not itself derived`, into a
+ * floating `void registry.run(…)` that swallows it. A chip that does nothing when you press it is
+ * worse than no chip: the sentence above it already says where the element comes from, and in that
+ * shell the layout is either already beside you or one Unsplit away.
+ */
+function openLayoutTpl(): TemplateResult {
+  return html`<span
+    class="kv-add"
+    @click=${() => {
+      /* ONE command, addressed by id — the chip is a control, not a second definition site for
+         what "open the layout" means. It opens the layout BESIDE the page and leaves the keyboard
+         in the page, so the next click on layout chrome moves the side pane's selection instead of
+         teaching the author what a pane is. */
+      void activeRegistry()?.run("pane.derive", { preset: "layout" });
+    }}
+    >Open Layout →</span
+  >`;
+}
+
+function renderLayoutSelectionPanel() {
   const selection = shell.layoutSelection as LayoutSelection;
   const tagName = selection.tagName || "element";
   const { className } = selection;
@@ -613,11 +648,7 @@ function renderLayoutSelectionPanel(ctx: {
               This element comes from ${displayPath}, which wraps every page that uses it. Open the
               layout to edit it.
             </p>
-            <span
-              class="kv-add"
-              @click=${() => void openLayoutAtNode(ctx.navigateToComponent, selection)}
-              >Open Layout →</span
-            >
+            ${deriveRefusal(workspace.activePaneId) === null ? openLayoutTpl() : nothing}
           </div>
         </sp-accordion-item>
       </sp-accordion>
@@ -747,7 +778,7 @@ export function renderPropertiesPanelTemplate(ctx: {
 
   // Layout element selected — show read-only info with link to open layout
   if (shell.layoutSelection) {
-    return renderLayoutSelectionPanel(ctx);
+    return renderLayoutSelectionPanel();
   }
 
   const selected = primarySelection(tab.session.selection);

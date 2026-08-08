@@ -41,13 +41,25 @@
 import { html, render as litRender, nothing } from "lit-html";
 import { projectState, updateUi } from "../store";
 import { effect, effectScope } from "../reactivity";
-import { PRIMARY_PANE, workspace } from "../workspace/workspace";
+import { PRIMARY_PANE, focusPane, workspace } from "../workspace/workspace";
 import {
+  activeMediaOfPane,
   canvasModeOfPane,
   canvasModeOfTab,
+  derivationOfPane,
   surfaceForPane,
   tabOfPane,
 } from "../canvas/canvas-surface";
+import {
+  DERIVE_PRESETS,
+  PRESET_LABELS,
+  declaredMedia,
+  deriveRefusal,
+  pinRefusal,
+  presetRefusal,
+} from "../workspace/pane-derive";
+import { renderPopover } from "../ui/layers";
+import { rectOf } from "../utils/geometry";
 import { paneRegion } from "../ui/regions";
 import {
   canvasViewOf,
@@ -59,6 +71,7 @@ import {
   setEditZoom,
   setFit,
   setUserZoom,
+  stageZoom,
 } from "../canvas/canvas-utils";
 import { editorKindOf, editorKindsOf, modeForEditorKind } from "../tabs/tab";
 import { collabState } from "../collab/collab-state";
@@ -192,6 +205,18 @@ export function mount(host: HTMLElement, ctx: PaneContextCtx) {
          context and zoom, so the unfocused one has to repaint when ITS document moves — tracking
          `activeTab` alone left the side pane's bar frozen describing whatever it last drew. */
       for (const pane of workspace.panes) {
+        /* NO DERIVATION READS HERE, and the reason is one rule rather than a tally. `render()`
+           runs inside this effect and draws EVERY attached pane, so whatever a template here reads
+           is ALREADY a dependency and restating it as a `void` line chooses nothing: `derived.kind`
+           picks the bar's shape, `activeMediaOfPane` reads `kind`/`preset`/`media` for the Context
+           axis, `zoomOf` reads `derived.zoom` for the pod, and {@link zoomPodTpl} asks
+           `canvasModeOfPane`, which for a lens answers `derived.mode` and decides whether the pod
+           is drawn at all — pinned by lens-chrome's "the pod is drawn from the LENS's mode".
+           An earlier version of this comment listed `mode` among the fields no template reads,
+           which was wrong about the fact and right about the deletion. `status` and `reason` really
+           are unread here, so tracking them only repainted this bar for a change it does not draw.
+           The stage is the surface that needs those two declared, because `renderCanvasImpl` runs
+           in a rAF rather than in an effect — see `studio.ts`. */
         const tab = tabOfPane(pane.id);
         if (!tab) {
           continue;
@@ -304,6 +329,195 @@ function renderPane(paneId: string, host: HTMLElement) {
   }
 }
 
+// ─── The preset menu · the first renderer of `context/pane` ──────────────────
+
+/** The open preset menu, if any. One at a time, like every other menu in this shell. */
+let _presetMenu: { dismiss: () => void } | null = null;
+
+/** Close the preset menu, if it is open. Idempotent. */
+export function dismissPresetMenu(): void {
+  _presetMenu?.dismiss();
+  _presetMenu = null;
+}
+
+/**
+ * The `⟲` trigger, in the context bar's leading slot — the one that was empty.
+ *
+ * `.pc-spacer` existed to push the three axes right. It is where §18.4's preset menu goes because
+ * the menu is about THIS PANE and the bar is the pane's own chrome; the alternative homes (the tab
+ * strip, the jump bar) are about a document and an address respectively.
+ */
+function presetTriggerTpl(paneId: string): TemplateResult {
+  return html`<button
+    class="pc-derive-trigger"
+    aria-haspopup="menu"
+    title="Show something beside this pane"
+    @click=${(event: MouseEvent) => {
+      openPresetMenu(event, paneId);
+    }}
+  >
+    <span aria-hidden="true">⟲</span>
+  </button>`;
+}
+
+/**
+ * Open the preset menu.
+ *
+ * **There is no `pane.showDerivePresets`.** §13.5, quoted verbatim in `canvas/canvas-render.ts`:
+ * opening a menu to press an item names a CONTROL; the item is the command. Every row here runs
+ * `pane.derive`, `pane.pin` or `pane.unsplit` with its own arguments, and the screenshot manifest
+ * addresses those ids directly rather than driving this widget. Its region is
+ * `overlay.menu:derive-presets`, which `ui/layers.ts` derives from the slot key — no budget is
+ * spent.
+ */
+function openPresetMenu(event: MouseEvent, paneId: string): void {
+  event.preventDefault();
+  event.stopPropagation();
+  dismissPresetMenu();
+  const registry = activeRegistry();
+  if (!registry) {
+    return;
+  }
+  const anchor = rectOf(event.currentTarget as HTMLElement);
+  const left = Math.round(Math.min(anchor.left, window.innerWidth - 4));
+  const top = Math.round(anchor.bottom);
+  const rows = presetRows(paneId);
+  _presetMenu = renderPopover(
+    html`<sp-popover open style="position:fixed;z-index:10000;left:${left}px;top:${top}px">
+      <sp-menu role="menu" aria-label="Show beside this pane">
+        ${rows.map(
+          (row) => html`<sp-menu-item
+            role="menuitem"
+            ?disabled=${row.disabled !== null}
+            title=${row.disabled ? `requires ${row.disabled}` : row.label}
+            @click=${() => {
+              dismissPresetMenu();
+              if (row.disabled === null) {
+                /* THE PANE THE MENU IS ABOUT, before the verb that resolves the focus runs.
+                   See {@link PresetRow.pane}: all three of these commands take the focused pane as
+                   their subject, and a pointer gesture on this pane has already focused it — but a
+                   keyboard activation has not, because `panels/pane-grid.ts` focuses on
+                   pointerdown. Without this line the secondary pane's menu derived from the
+                   primary and its Unsplit closed the wrong pane, by keyboard only. */
+                focusPane(row.pane);
+                void registry.run(row.command, row.args);
+              }
+            }}
+            >${row.label}</sp-menu-item
+          >`,
+        )}
+      </sp-menu>
+    </sp-popover>`,
+    {
+      dismissOnOutsideClick: true,
+      onDismiss: () => {
+        _presetMenu = null;
+      },
+      region: "derive-presets",
+    },
+  );
+}
+
+/** One row of the preset menu: a command, its arguments, and why it cannot run when it cannot. */
+export interface PresetRow {
+  label: string;
+  command: string;
+  args: Record<string, unknown>;
+  /**
+   * The pane this row is ABOUT — the one whose ⟲ opened the menu.
+   *
+   * The previous round made the row's ANSWER a pure function of the pane and left its ACTION
+   * resolving the focus: every one of these three commands takes the focused pane as its subject
+   * (`pane.derive`'s `activePane()`/`sidePane()`, `pane.unsplit`'s `workspace.activePaneId`), so a
+   * row read off the secondary pane's menu derived from the primary. Reachable by keyboard and only
+   * by keyboard, which is why it survived a browser pass: `panels/pane-grid.ts` focuses a pane on
+   * POINTERDOWN, and a keyboard activation of a menu item fires `click` alone.
+   *
+   * Carried on the row rather than passed as a command argument. A pane id in `args` would make
+   * "which pane" a public input of `pane.derive` — a third property on a record the palette already
+   * cannot prompt for, and a value the AI tool would have to invent — to say something the focus
+   * already says. The menu moves the focus to the pane it is a menu of, which is what a pointer
+   * gesture on that pane does anyway, and all three verbs then agree with the row.
+   */
+  pane: string;
+  /** The `requires` sentence, or null when the row can run. */
+  disabled: string | null;
+}
+
+/**
+ * The rows, built from the registry and from {@link presetRefusal} — one per projection, one per
+ * declared breakpoint, then the two exits.
+ *
+ * Exported because it is the whole content of the menu and it is a pure function of the pane: the
+ * widget is untestable in a DOM with no layout, and this is not.
+ *
+ * @param {string} paneId
+ * @returns {PresetRow[]}
+ */
+export function presetRows(paneId: string): PresetRow[] {
+  const registry = activeRegistry();
+  const tab = tabOfPane(paneId);
+  const derived = derivationOfPane(paneId);
+  /* {@link deriveRefusal}, not `registry.disabledReason("pane.derive")`.
+     The registry resolves its context from the FOCUS, so a menu built for a pane it was handed by
+     name got the answer for whichever pane the keyboard happened to be in: the same pane's rows
+     read "enabled" or "an open document in a pane that is not itself derived" depending on where
+     the author had last clicked. `scripts/check-pane-singletons.ts` rule 4 could not see it — the
+     focus read was a method call on a registry value, dispatched by a string id into a closure in
+     another module. It counts `disabledReason` and `isEnabled` themselves as focus reads now,
+     which names the shape without pretending to follow the dispatch. */
+  const deriveReason = deriveRefusal(paneId);
+  const rows: PresetRow[] = [];
+  for (const preset of DERIVE_PRESETS) {
+    if (preset === "breakpoint") {
+      continue;
+    }
+    rows.push({
+      args: { preset },
+      command: "pane.derive",
+      disabled: deriveReason ?? presetRefusal(preset, paneId, null),
+      label: PRESET_LABELS[preset],
+      pane: paneId,
+    });
+  }
+  // "Same page at ⟨breakpoint⟩" — one row per breakpoint the document declares, because the item IS
+  // The command and a submenu would be a second control between the author and it.
+  for (const media of tab && !derived ? declaredMedia(tab) : []) {
+    rows.push({
+      /* BASE omits `media` rather than passing `""`. `optionalStringArg` refuses an empty string
+         by design — "present but blank" is the shape that hides a missing value — so the base row
+         has to say nothing rather than say nothing loudly. Caught by opening the menu in a real
+         browser: every row ran, and the base one threw `expected a non-empty string, got ""`. */
+      args: media === null ? { preset: "breakpoint" } : { media, preset: "breakpoint" },
+      command: "pane.derive",
+      disabled: deriveReason ?? presetRefusal("breakpoint", paneId, media),
+      label: `${PRESET_LABELS.breakpoint} ${media ? mediaDisplayName(media) : "Base"}`,
+      pane: paneId,
+    });
+  }
+  /* The two exits, and the reason only ONE of them takes a pane.
+     `pane.pin`'s subject is the grid's derived pane — the author reaches it from the palette while
+     the keyboard is in the page they are editing — and {@link pinRefusal} answers about a named
+     pane without reading the focus, so the menu can ask it about its own. `pane.unsplit`'s
+     enablement is `workspace.panes.length > 1`, a fact about the grid with no pane in it at all;
+     its `requires` is data on the record and the boolean is the same from anywhere. Its RUN is a
+     focus read, like `pane.derive`'s — which is what {@link PresetRow.pane} is for. */
+  const exits: [string, string | null][] = [
+    ["pane.pin", pinRefusal(paneId)],
+    [
+      "pane.unsplit",
+      workspace.panes.length > 1 ? null : (registry?.get("pane.unsplit")?.requires ?? null),
+    ],
+  ];
+  for (const [id, disabled] of exits) {
+    const command = registry?.get(id);
+    if (command) {
+      rows.push({ args: {}, command: id, disabled, label: command.title, pane: paneId });
+    }
+  }
+  return rows;
+}
+
 /** One labelled axis. The label is the point: five unlabelled controls is what this replaces. */
 function axisTpl(label: string, control: TemplateResult): TemplateResult {
   return html`
@@ -328,18 +542,65 @@ function axisTpl(label: string, control: TemplateResult): TemplateResult {
  */
 function paneChromeTemplate(tab: Tab, paneId: string, ctx: PaneContextCtx): TemplateResult {
   const kind = editorKindOf(tab);
+  /* A LENS suppresses the two axes that WRITE. Editor kind and Canvas view both land in
+     `ctx.setCanvasMode(tab, …)`, and that tab belongs to the pane beside this one — so a control
+     drawn in the lens would flip the document the author is editing. The lens's own mode is the
+     derivation, chosen when it was created and changed by re-deriving. The Context axis stays as
+     a static summary for the same reason (it writes `updateUi(tab, …)`), and the zoom pod stays
+     because zoom is the one view fact a lens genuinely owns. */
+  const lens = derivationOfPane(paneId)?.kind === "lens";
 
   return html`
     <div class="pc-band">
       <div class="pane-context" data-jx-region=${paneRegion(paneId, "context")}>
-        <div class="pc-spacer"></div>
-        ${editorKindTpl(tab, ctx)} ${kind === "canvas" ? viewTpl(tab, ctx) : nothing}
-        ${renderingContextTpl(tab, paneId, ctx)} ${exportTpl(tab, ctx)}
+        <div class="pc-spacer">
+          ${
+            /* …and NO ⟲ trigger in a lens. Every projection row in the menu it opens is permanently
+               disabled from there (a derived pane cannot derive again) and the breakpoint rows are
+               suppressed outright, leaving one live row — Unsplit — which the derivation chip's ✕
+               in this pane's own strip already runs. A control that can do nothing from where it is
+               drawn is the class this phase has deleted three times. A COMPANION keeps it: "Keep
+               This Document" is live there and it is genuinely about that pane. The SPACER stays
+               either way: it is what pushes the axes right, and dropping it would move the one
+               control a lens does draw. */
+            lens ? nothing : presetTriggerTpl(paneId)
+          }
+        </div>
+        ${
+          lens
+            ? renderingSummaryTpl(paneId)
+            : html`${editorKindTpl(tab, ctx)} ${kind === "canvas" ? viewTpl(tab, ctx) : nothing}
+              ${renderingContextTpl(tab, paneId, ctx)} ${exportTpl(tab, ctx)}`
+        }
       </div>
-      ${readOnlyBannerTemplate(tab)}
+      ${lens ? nothing : readOnlyBannerTemplate(tab)}
     </div>
     ${zoomPodTpl(tab, paneId)}
   `;
+}
+
+/**
+ * A lens's rendering context, stated rather than offered.
+ *
+ * Open question 1, answered "keep it, read-only": a lens drawn under different preview params than
+ * the pane it is a lens OF would be lying about what it is a lens of, so the summary has to be on
+ * screen — but the popover behind it writes the source tab's `session.ui`, which is the one thing a
+ * lens must never do.
+ */
+function renderingSummaryTpl(paneId: string): TemplateResult {
+  /* No `ctx.parseMediaEntries` here. It parsed the document's whole `$media` map, discarded the
+     result through `void sizeBreakpoints` and printed the media NAME — a parse per lens-bar render
+     for a value that was never read. `mediaDisplayName` is the only lookup this line needs. */
+  /* {@link activeMediaOfPane}, and it exists for exactly this. `session.ui.activeMedia` is per-TAB
+     and a lens shares its tab with the pane beside it, so this axis printed the breakpoint the
+     SOURCE pane was on: the stage drew the Tablet artboard and the line under it said "Base". The
+     docstring above says a lens drawn under different params "would be lying about what it is a
+     lens of" — and it lied about the one axis the preset is named after. */
+  const media = activeMediaOfPane(paneId);
+  return axisTpl(
+    "Context",
+    html`<span class="pc-static">${media ? mediaDisplayName(media) : "Base"}</span>`,
+  );
 }
 
 // ─── Axis 1 · Editor kind ────────────────────────────────────────────────────
@@ -705,14 +966,12 @@ function zoomPodTpl(tab: Tab, paneId: string): TemplateResult | typeof nothing {
   if (mode !== "design" && mode !== "stylebook" && mode !== "git-diff") {
     return nothing;
   }
-  const zoom = tab.session.ui.zoom ?? 1;
+  const zoom = stageZoom(surface);
   const chosen = fitChoiceValue(getFit(surface));
   return podTpl(
     paneId,
     html`
-      ${zoomButton("Zoom out (Ctrl+-)", "−", () =>
-        setUserZoom((tab.session.ui.zoom ?? 1) / 1.2, surface),
-      )}
+      ${zoomButton("Zoom out (Ctrl+-)", "−", () => setUserZoom(stageZoom(surface) / 1.2, surface))}
       <sp-action-button
         size="s"
         class="pc-zoom-label"
@@ -721,9 +980,7 @@ function zoomPodTpl(tab: Tab, paneId: string): TemplateResult | typeof nothing {
       >
         ${Math.round(zoom * 100)}%
       </sp-action-button>
-      ${zoomButton("Zoom in (Ctrl+=)", "+", () =>
-        setUserZoom((tab.session.ui.zoom ?? 1) * 1.2, surface),
-      )}
+      ${zoomButton("Zoom in (Ctrl+=)", "+", () => setUserZoom(stageZoom(surface) * 1.2, surface))}
       <sp-picker
         size="s"
         quiet

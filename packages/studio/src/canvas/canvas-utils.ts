@@ -14,7 +14,9 @@ import { ifDefined } from "lit-html/directives/if-defined.js";
 import { renderOnly } from "../store";
 import {
   activeCanvasSurface,
+  activeMediaOfPane,
   canvasModeOfPane,
+  derivationOfPane,
   tabOfMountedPanel,
   tabOfPane,
 } from "./canvas-surface";
@@ -64,13 +66,39 @@ function tabOfSurface(surface: CanvasSurface): Tab | null {
   return tabOfPane(surface.paneId);
 }
 
-/** A stage's own pan-zoom scale. 1 when its pane shows nothing. */
+/**
+ * A stage's own pan-zoom scale. 1 when its pane shows nothing.
+ *
+ * **`session.ui.zoom` is per-TAB, and a LENS shares its tab with the pane beside it** — so under a
+ * lens the two stages would zoom together, which is exactly what "the same page at another
+ * breakpoint" must not do. The derivation carries the lens's own scale.
+ */
 function zoomOf(surface: CanvasSurface): number {
+  const derived = derivationOfPane(surface.paneId);
+  if (derived?.kind === "lens") {
+    return derived.zoom;
+  }
   return tabOfSurface(surface)?.session.ui.zoom ?? 1;
 }
 
-/** Write a stage's own pan-zoom scale. A no-op when its pane shows nothing. */
+/**
+ * A stage's own pan-zoom scale, for the CONTROL that reports it.
+ *
+ * The zoom pod printed `tab.session.ui.zoom`, which is the source pane's number under a lens — so a
+ * breakpoint lens zoomed to 40% reported whatever the desktop pane was at, and its `-` divided the
+ * wrong figure. Every zoom verb already takes a surface; the readout has to as well.
+ */
+export function stageZoom(surface: CanvasSurface = activeCanvasSurface()): number {
+  return zoomOf(surface);
+}
+
+/** Write a stage's own pan-zoom scale. A no-op when its pane shows nothing. See {@link zoomOf}. */
 function setZoomOf(surface: CanvasSurface, zoom: number): void {
+  const derived = derivationOfPane(surface.paneId);
+  if (derived?.kind === "lens") {
+    derived.zoom = zoom;
+    return;
+  }
   const tab = tabOfSurface(surface);
   if (tab) {
     tab.session.ui.zoom = zoom;
@@ -485,7 +513,14 @@ const _fits = new Map<string, FitMode>();
  */
 function fitKey(surface: CanvasSurface): string | null {
   const tab = tabOfSurface(surface);
-  return tab ? `${tab.id}::${tab.documentPath ?? ""}` : null;
+  if (!tab) {
+    return null;
+  }
+  /* A LENS shares the tab with the pane it derives from, so the tab alone stops being a key: the
+     mobile lens and the desktop pane would declare ONE fit between them and re-frame each other on
+     every mode transition. Same reason `zoomOf` reads the derivation. */
+  const lens = derivationOfPane(surface.paneId)?.kind === "lens" ? `::${surface.paneId}` : "";
+  return `${tab.id}::${tab.documentPath ?? ""}${lens}`;
 }
 
 /** Write a stage's document's fit without applying it — the internal half of {@link setFit}. */
@@ -563,7 +598,7 @@ export function setUserZoom(zoom: number, surface: CanvasSurface = activeCanvasS
   // Second means the control repaints one interaction behind the state it is reporting.
   const next = clampPanZoom(zoom);
   declareFit(next, surface);
-  tab.session.ui.zoom = next;
+  setZoomOf(surface, next);
   applyTransform(surface);
 }
 
@@ -999,7 +1034,7 @@ export function registerCanvasViewCommands(
  * breakpoint onto the other pane's artboards.
  */
 export function updateActivePanelHeaders(surface: CanvasSurface = activeCanvasSurface()) {
-  const activeMedia = tabOfSurface(surface)?.session.ui.activeMedia ?? null;
+  const activeMedia = activeMediaOfPane(surface.paneId);
   for (const p of surface.panels) {
     const header = p.element?.querySelector(".canvas-panel-header");
     if (header) {

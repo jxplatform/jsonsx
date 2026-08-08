@@ -106,7 +106,7 @@ void mock.module("../src/packages/pull-package-sync.js", () => ({
 
 const { setProjectState } = (await import("../src/state.js")) as any;
 const { resetProjectShell, shell } = await import("../src/shell.js");
-const { cleanupGitPanel, cloneRepository, refreshGitStatus, renderGitPanel } =
+const { cleanupGitPanel, cloneRepository, loadDiffForLens, refreshGitStatus, renderGitPanel } =
   await import("../src/panels/git-panel.js");
 
 // Source control is project state now; `shell.git` is where the panel reads and writes it.
@@ -706,6 +706,40 @@ describe("file rows", () => {
     expect(String(git.error)).toContain("Failed to load diff");
     expect(String(git.error)).toContain("read fail");
     expect(git.loading).toBe(false);
+  });
+
+  /* The DIFF LENS's reader (§18.4, finding 4). It is the same `readGitDiff` the row click above
+     makes — one definition site, because a second copy is how the panel and the lens come to
+     disagree about what "the diff of this file" means — with the one difference the lens needs: a
+     failure the PANE can state, rather than an error banner over a document nobody asked about. */
+  test("loadDiffForLens reads the same pair of texts the row click does", async () => {
+    seedRepoUi();
+    await expect(loadDiffForLens("src/page.json", "M")).resolves.toEqual({
+      currentContent: "CURRENT",
+      filePath: "src/page.json",
+      fileStatus: "M",
+      originalContent: "ORIGINAL",
+    });
+    expect(calls).toContainEqual(["gitShow", { path: "src/page.json", ref: "HEAD" }]);
+  });
+
+  test("loadDiffForLens answers null when the read fails — the pane says so, not a banner", async () => {
+    seedRepoUi();
+    mockPlatform.readFile = log("readFile", async () => {
+      throw new Error("read fail");
+    });
+    const { warn } = console;
+    const warned: unknown[] = [];
+    console.warn = (...args: unknown[]) => warned.push(args[0]);
+    try {
+      await expect(loadDiffForLens("src/page.json", "M")).resolves.toBeNull();
+    } finally {
+      console.warn = warn;
+    }
+    expect(warned).toContain("loadDiffForLens:");
+    // `shell.git.error` is the SOURCE CONTROL panel's banner. A lens failing to read its own
+    // Comparison is not a source-control failure and must not raise one.
+    expect(git.error).toBeNull();
   });
 
   test("discard asks for confirmation then discards", async () => {

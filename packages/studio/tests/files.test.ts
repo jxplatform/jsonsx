@@ -7,13 +7,24 @@ import { flush, installMockPlatform } from "./harness";
 import type { MockPlatformState } from "./harness";
 import { beforeEach, describe, expect, test } from "bun:test";
 import { requireProjectState, setProjectState, projectState } from "../src/store";
-import { activeTab, closeAllTabs, openTab, workspace } from "../src/workspace/workspace";
+import {
+  PRIMARY_PANE,
+  SECONDARY_PANE,
+  activeTab,
+  closeAllTabs,
+  focusPane,
+  openTab,
+  paneById,
+  splitRight,
+  workspace,
+} from "../src/workspace/workspace";
 import { MARKDOWN_FORMAT, mockFormatAction, seedMarkdownFormat } from "./format-fixture";
 import {
   findHomePage,
   initProjectRepo,
   loadDirectory,
   loadProject,
+  openFileInPane,
   openFileInTab,
   openHomePage,
   openProject,
@@ -470,6 +481,87 @@ describe("openFileInTab", () => {
 
     expect(activeTab.value?.id).toBe("tab-a");
     expect(requireProjectState().selectedPath).toBe("pages/a.json");
+    expect(state.calls.filter(([name]) => name === "readFile")).toHaveLength(0);
+  });
+
+  test("opens into a NAMED pane, without the keyboard, as a preview tab", async () => {
+    installFsPlatform({
+      "components/card.json": JSON.stringify({ children: [], tagName: "my-card" }),
+    });
+    siteState();
+    openTab({ document: { tagName: "div" }, documentPath: "pages/a.json", id: "tab-a" });
+    openTab({ document: { tagName: "div" }, documentPath: "pages/b.json", id: "tab-b" });
+    expect(splitRight()?.id).toBe(SECONDARY_PANE);
+    focusPane(PRIMARY_PANE);
+
+    await openFileInPane(SECONDARY_PANE, "components/card.json");
+
+    // It landed in the pane that was named, not in the one the keyboard is in.
+    expect(paneById(SECONDARY_PANE)!.tabOrder).toContain("components/card.json");
+    expect(paneById(SECONDARY_PANE)!.activeTabId).toBe("components/card.json");
+    // The keyboard did NOT follow — and neither did the tree's cursor, which answers "where is the
+    // Author" and would otherwise say the author is somewhere they are not.
+    expect(workspace.activePaneId).toBe(PRIMARY_PANE);
+    expect(workspace.activeTabId).toBe("tab-a");
+    expect(requireProjectState().selectedPath).not.toBe("components/card.json");
+    // Browsing, not committing: the next side-open takes this slot.
+    expect(workspace.tabs.get("components/card.json")?.preview).toBe(true);
+  });
+
+  test("the three-way paned dedupe: activate here, MOVE from there, or leave it alone", async () => {
+    const { state } = installFsPlatform({ "pages/a.json": "{}" });
+    siteState();
+    openTab({ document: { tagName: "div" }, documentPath: "pages/a.json", id: "pages/a.json" });
+    openTab({ document: { tagName: "div" }, documentPath: "pages/b.json", id: "pages/b.json" });
+    openTab({ document: { tagName: "div" }, documentPath: "pages/c.json", id: "pages/c.json" });
+    expect(splitRight()?.id).toBe(SECONDARY_PANE);
+    focusPane(PRIMARY_PANE);
+    // Primary: [a, b] showing b · secondary: [c] showing c
+
+    // 1 · already in the requested pane → activate there, and never re-read the file.
+    await openFileInTab("pages/a.json", { paneId: PRIMARY_PANE, focus: false });
+    expect(paneById(PRIMARY_PANE)!.activeTabId).toBe("pages/a.json");
+    expect(state.calls.filter(([name]) => name === "readFile")).toHaveLength(0);
+
+    // 2 · elsewhere and NOT its pane's active tab → it MOVES. One tab is one document in one strip.
+    await openFileInTab("pages/b.json", { paneId: SECONDARY_PANE, focus: false });
+    expect(paneById(SECONDARY_PANE)!.tabOrder).toEqual(["pages/c.json", "pages/b.json"]);
+    expect(paneById(PRIMARY_PANE)!.tabOrder).toEqual(["pages/a.json"]);
+
+    /* 3 · elsewhere and IS its pane's active tab → NOTHING. You are already looking at it, and
+       moving it would oscillate the derivation that produced the request. */
+    await openFileInTab("pages/b.json", { paneId: PRIMARY_PANE, focus: false });
+    expect(paneById(SECONDARY_PANE)!.tabOrder).toEqual(["pages/c.json", "pages/b.json"]);
+    expect(paneById(PRIMARY_PANE)!.tabOrder).toEqual(["pages/a.json"]);
+    expect(workspace.activePaneId).toBe(PRIMARY_PANE);
+  });
+
+  /* CASE 1 STILL ACTIVATES, and the three-way test above cannot see it. Its case-1 tab is in the
+     requested pane but is NOT that pane's active one, so `holder.id !== wanted` and
+     `holder.activeTabId === tabId` are false together — and dropping the FIRST of them leaves case
+     1 passing anyway, because a `moveTabToPane` into the pane a tab is already in is a documented
+     no-op. The case that separates them is the tab that is ALREADY the requested pane's active
+     one: with the guard it falls straight through to `activateTab`, honouring `focus`; without it,
+     the "you are already looking at it" early return swallows the request and the keyboard never
+     arrives. That is `⌘P` onto the document the other pane is showing — the request looks
+     satisfied and the focus is in the wrong pane. */
+  test("re-opening a pane's OWN active tab still activates it, so `focus` is honoured", async () => {
+    const { state } = installFsPlatform({ "pages/a.json": "{}" });
+    siteState();
+    openTab({ document: { tagName: "div" }, documentPath: "pages/a.json", id: "pages/a.json" });
+    openTab({ document: { tagName: "div" }, documentPath: "pages/b.json", id: "pages/b.json" });
+    expect(splitRight()?.id).toBe(SECONDARY_PANE);
+    focusPane(SECONDARY_PANE);
+    // Primary: [a] showing a · secondary: [b] showing b · the keyboard is in the secondary.
+    expect(paneById(PRIMARY_PANE)!.activeTabId).toBe("pages/a.json");
+
+    await openFileInTab("pages/a.json", { paneId: PRIMARY_PANE });
+
+    expect(workspace.activePaneId).toBe(PRIMARY_PANE);
+    expect(workspace.activeTabId).toBe("pages/a.json");
+    // It did not MOVE and it was not re-read: this is a reveal, not an open.
+    expect(paneById(PRIMARY_PANE)!.tabOrder).toEqual(["pages/a.json"]);
+    expect(paneById(SECONDARY_PANE)!.tabOrder).toEqual(["pages/b.json"]);
     expect(state.calls.filter(([name]) => name === "readFile")).toHaveLength(0);
   });
 

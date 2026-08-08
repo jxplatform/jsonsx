@@ -977,6 +977,39 @@
   background: var(--hover-bg);
   color: var(--fg);
 }
+/* A LENS pane's strip: one chip naming the projection and the document it projects, where an
+   ordinary pane draws tab chips. It is not a tab and must not look like one — no close ✕ of its
+   own, because a lens owns no document to close. */
+.tab-derivation {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  /* A tab chip's VERTICAL box — `4px` top and bottom plus the 2px underline `.tab-strip-tab`
+     reserves — so the lens's one-chip row sits on the same baseline grid as the tab row in the
+     pane beside it. Horizontally it is 10px rather than a chip's 8px: this row is one chip wide
+     with nothing to sit beside, and a chip's tighter inset exists so several of them read as a
+     series.
+     The row's HEIGHT is set by its tallest child (the 12px `.tab-derivation-preset`, against a
+     chip's 11px), not by a font-size on this box — which is why the numbers above are the only
+     half of this comment a reader can check. The height itself was measured in a browser and
+     cannot be asserted here: happy-dom lays nothing out and returns 0 whether the rule is right
+     or wrong, and a 19px strip against a 28px one is the class of defect only a picture catches. */
+  padding: 4px 10px;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.tab-derivation-preset {
+  color: var(--fg);
+  font-size: var(--spectrum-font-size-75, 12px);
+}
+.tab-derivation-of {
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-50, 11px);
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
 /* Drill-in marker: this document was opened FROM another one. */
 .tab-strip-origin {
   color: var(--fg-dim);

@@ -32,6 +32,11 @@ import {
 } from "../src/workspace/workspace";
 import { canvasPerf, resetCanvasPerf } from "../src/canvas/canvas-perf";
 import { surfaceForPane } from "../src/canvas/surface-registry";
+import {
+  applyDerivation,
+  noopDerivationDeps,
+  setPaneDerivation,
+} from "../src/workspace/pane-derive";
 import { DEFAULT_PANE_SPLIT, resetShellSurfaces, shell } from "../src/shell";
 import type { CanvasPanel } from "../src/types";
 
@@ -323,6 +328,78 @@ describe("one preparation, two posts", () => {
     expect(secondary.renderGeneration).not.toBe(primary.renderGeneration);
     expect(secondary.panels.every((panel) => panel.ready)).toBe(true);
     expect(side.channel.disposed).toBeFalsy();
+  });
+});
+
+// ─── 1a · One document, two stages ────────────────────────────────────────────
+
+describe("one document on two stages", () => {
+  /**
+   * **The tripwire.** Nothing in 8000 tests had ever put one tab in two panes, and the moment
+   * anything does, the patch fan-out is wrong: `postPatchToHosts` took ONE generation — the first
+   * matching pane's — and `iframe-entry.ts` silently returned on `gen < renderedGen`, so whichever
+   * stage had rendered more recently stopped applying patches with a wrong picture on screen and
+   * not one counter moving.
+   *
+   * Two panes displaying the same tab is exactly what a LENS pane is, and it is set up here as one
+   * — through `setPaneDerivation`, so the assertion runs against the hop `tabOfPane` really takes
+   * rather than a hand-placed `activeTabId` that only looks like it.
+   */
+  test("a mutation reaches both stages, each carrying its OWN generation", async () => {
+    const { left } = await splitIntoTwoCanvasPanes();
+    // A breakpoint lens on the primary: the side pane owns no tab and draws the primary's document.
+    setPaneDerivation(SECONDARY_PANE, {
+      diff: null,
+      kind: "lens",
+      media: null,
+      mode: "design",
+      preset: "breakpoint",
+      reason: "",
+      sourcePaneId: PRIMARY_PANE,
+      status: "ready",
+      zoom: 1,
+    });
+    applyDerivation(SECONDARY_PANE, noopDerivationDeps());
+    expect(workspace.panes[1]!.tabOrder).toEqual([]);
+
+    const doc = { tagName: "div" };
+    const primary = surfaceForPane(PRIMARY_PANE);
+    const secondary = surfaceForPane(SECONDARY_PANE);
+    primary.renderGeneration = 11;
+    secondary.renderGeneration = 22;
+    const wide = await mountArtboard(PRIMARY_PANE, 11, doc, left.id);
+    const side = await mountArtboard(SECONDARY_PANE, 22, doc, left.id);
+    resetCanvasPerf();
+
+    applyPatchBatch(left, [{ op: "set-text", path: ["children", 0] }], {
+      docOps: [
+        {
+          forward: { key: "textContent", op: "set-key", path: ["children", 0], value: "X" },
+          inverse: { key: "textContent", op: "set-key", path: ["children", 0], value: "y" },
+        },
+      ],
+      fmOps: [],
+      invertible: true,
+      ops: [{ op: "set-text", path: ["children", 0] }],
+    });
+
+    expect(patches(wide.channel)).toHaveLength(1);
+    expect(patches(side.channel)).toHaveLength(1);
+    // THE claim. Each host checks the patch against the stage IT is mounted on. With one number
+    // For both, the side pane's frame saw gen 11 against a renderedGen of 22 and dropped it.
+    expect(patches(wide.channel)[0]).toMatchObject({ gen: 11 });
+    expect(patches(side.channel)[0]).toMatchObject({ gen: 22 });
+    // One mutation, however many stages drew it — and no stage rebuilt.
+    expect(canvasPerf.patchedOps).toBe(1);
+    expect(canvasPerf.escalations).toBe(0);
+    expect(canvasPerf.renderPreparations).toBe(0);
+    console.log(
+      `[two-pane hosts] one document on two stages: ${canvasPerf.patchedOps} patchedOps, ` +
+        `${patches(wide.channel).length + patches(side.channel).length} host posts ` +
+        `(gen ${patches(wide.channel)[0]!.gen as number} / ` +
+        `${patches(side.channel)[0]!.gen as number}), ` +
+        `${canvasPerf.renderPreparations} preparations, ${canvasPerf.escalations} escalations`,
+    );
   });
 });
 

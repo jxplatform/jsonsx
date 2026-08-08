@@ -6,7 +6,7 @@
  */
 
 import { getNodeAtPath, parentElementPath } from "../store";
-import { activeCanvasSurface, tabOfPane } from "./canvas-surface";
+import { activeCanvasSurface, activeMediaOfPane } from "./canvas-surface";
 import { isInlineInContext } from "../editor/inline-edit";
 import type { CanvasSurface } from "./canvas-surface";
 import type { CanvasPanel } from "../types";
@@ -43,7 +43,7 @@ export function panelOfSurface(surface: CanvasSurface): CanvasPanel | null {
   if (canvasPanels.length === 1) {
     return canvasPanels[0]!;
   }
-  const activeMedia = tabOfPane(surface.paneId)?.session.ui.activeMedia ?? null;
+  const activeMedia = activeMediaOfPane(surface.paneId);
   for (const p of canvasPanels) {
     if (activeMedia === null && (p.mediaName === "base" || p.mediaName === null)) {
       return p;

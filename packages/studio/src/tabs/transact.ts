@@ -246,7 +246,7 @@ export function transactDoc(
         ? { patchable: false, reason: "unrecorded-mutation" }
         : consumer.classify(tab, record.ops);
   if (verdict.patchable) {
-    consumer!.markConsumed(newRef);
+    consumer!.markConsumed(newRef, tab);
   }
 
   tab.doc.document = newRef;

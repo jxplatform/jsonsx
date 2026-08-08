@@ -34,7 +34,9 @@ import {
 import { combine } from "@atlaskit/pragmatic-drag-and-drop/combine";
 import {
   activateTab,
+  moveTabToPane,
   openTab,
+  paneOfTab,
   renameTab,
   replaceAllTabs,
   setWorkspaceProject,
@@ -1294,15 +1296,66 @@ async function deleteFile(
 }
 
 /**
- * Open a file from the tree into a tab. Activates existing tab if already open.
+ * What an open can say beyond the path. Every field defaults to today's answer.
+ *
+ * Deliberately one inline-typed `opts` object rather than a `paneId` parameter:
+ * `scripts/check-pane-singletons.ts` rule 4 charges any function whose parameters NAME a pane for
+ * reading the focus, one hop in — and {@link openFileInTab} legitimately falls back to the focused
+ * pane when nobody names one. {@link openFileInPane} is the named sibling for readers who want the
+ * pane in the signature; it is pane-scoped and reads no focus of its own.
+ */
+export interface OpenFileOpts {
+  /** Which pane. Defaults to the focused one. */
+  paneId?: string;
+  /** Open as a disposable preview tab (§4.3) — browsing rather than committing. */
+  preview?: boolean;
+  /** False leaves the keyboard where it is. Defaults to true. */
+  focus?: boolean;
+}
+
+/**
+ * Bring an ALREADY-OPEN tab to where the caller asked for it.
+ *
+ * Three cases, and the third is the one a following pane depends on:
+ *
+ * | the tab is…                                      | behaviour                                      |
+ * | ------------------------------------------------ | ---------------------------------------------- |
+ * | in the requested pane (or no pane was requested) | activate it there, honouring `focus`           |
+ * | elsewhere, and **not** its pane's active tab     | move it — one tab is one document in one strip |
+ * | elsewhere, and **is** its pane's active tab      | **nothing.** You are already looking at it     |
+ *
+ * The third exists because moving it would oscillate: a derivation that re-resolves to the document
+ * the author is editing would yank it out of their pane and into the assistant one, and the follow
+ * would then re-resolve against whatever landed in its place.
+ */
+function revealOpenTab(tabId: string, opts: OpenFileOpts): void {
+  const wanted = opts.paneId;
+  const holder = paneOfTab(tabId);
+  if (wanted !== undefined && holder && holder.id !== wanted) {
+    if (holder.activeTabId === tabId) {
+      return;
+    }
+    moveTabToPane(tabId, wanted);
+  }
+  activateTab(tabId, { focus: opts.focus !== false });
+}
+
+/**
+ * Open a file from the tree into a tab. Activates the existing tab if it is already open.
  *
  * @param {string} path
+ * @param {OpenFileOpts} [opts]
  */
-export async function openFileInTab(path: string) {
+export async function openFileInTab(path: string, opts: OpenFileOpts = {}) {
+  const follows = opts.focus !== false;
   for (const [id, tab] of workspace.tabs.entries()) {
     if (tab.documentPath === path) {
-      activateTab(id);
-      requireProjectState().selectedPath = path;
+      revealOpenTab(id, opts);
+      // The tree's cursor answers "where is the author", so a side-open that deliberately left the
+      // Keyboard behind must not move it.
+      if (follows) {
+        requireProjectState().selectedPath = path;
+      }
       return;
     }
   }
@@ -1355,8 +1408,13 @@ export async function openFileInTab(path: string) {
       document,
       ...(frontmatter != null && { frontmatter }),
       sourceFormat: format?.name ?? null,
+      ...(opts.paneId !== undefined && { paneId: opts.paneId }),
+      ...(opts.preview === true && { preview: true }),
+      ...(opts.focus === false && { focus: false }),
     });
-    requireProjectState().selectedPath = path;
+    if (follows) {
+      requireProjectState().selectedPath = path;
+    }
     trackRecentFile({
       name: path.split("/").pop() || path,
       path,
@@ -1369,6 +1427,20 @@ export async function openFileInTab(path: string) {
       source: "Open File",
     });
   }
+}
+
+/**
+ * Open a file into a NAMED pane, browsing rather than committing, leaving the keyboard behind.
+ *
+ * The same body as {@link openFileInTab} with the three options a side-open always wants, given a
+ * signature that says which pane in the first parameter. It is what "open it beside this" means
+ * everywhere it is asked for — drilling into a component, following a layout, `pane.compareWith`.
+ *
+ * @param {string} paneId
+ * @param {string} path
+ */
+export async function openFileInPane(paneId: string, path: string): Promise<void> {
+  await openFileInTab(path, { focus: false, paneId, preview: true });
 }
 
 /**

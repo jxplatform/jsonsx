@@ -11,7 +11,7 @@ import { postMessageChannel } from "./iframe-channel";
 import { canvasBaseOrigin } from "./canvas-origin";
 import { getPreviewNavigateHandler } from "./preview-navigate";
 import { resolveCanvasDocument } from "./canvas-live-render";
-import { canvasPerf, SPAN_PREPARE_RENDER, timeSpanAsync } from "./canvas-perf";
+import { canvasPerf, recordEscalation, SPAN_PREPARE_RENDER, timeSpanAsync } from "./canvas-perf";
 import {
   applyBlockMerge,
   applyInlineCommit,
@@ -1139,12 +1139,20 @@ export function setIframePatchEscalation(fn: (paneId: string) => void): void {
  * edit into its shadow doc. Returns how many hosts received it; the caller escalates to a full
  * render when that's zero (no host could apply the edit in place, so the suppressed full render
  * must run after all).
+ *
+ * **There is no `gen` parameter, and there cannot be one.** The generation a frame checks a patch
+ * against belongs to the STAGE that frame is mounted on, and this loop deliberately spans stages:
+ * one document displayed in two panes is two hosts with two independent `renderGeneration`s. A
+ * single number for a multi-pane fan-out is not a parameter needing a better value — it is the bug.
+ * Whichever pane had rendered more recently held the higher `renderedGen`, and `iframe-entry.ts`
+ * dropped the patch there in silence, leaving a wrong picture on screen with `__jxCanvasPerf`
+ * reporting a clean surgical apply. Each host's own generation is resolved inside the loop
+ * instead.
+ *
+ * `host` is deliberately not a pane-scoped parameter name (see `PANE_PARAM_NAMES`), and the body
+ * reads no focus: `panelHostingCanvas` resolves the stage from the host's own element.
  */
-export function postPatchToHosts(
-  forwardOps: WireDocOp[],
-  gen: number,
-  tabId: string | null,
-): number {
+export function postPatchToHosts(forwardOps: WireDocOp[], tabId: string | null): number {
   let posted = 0;
   for (const host of liveHosts) {
     if (!host.iframe.isConnected) {
@@ -1152,6 +1160,23 @@ export function postPatchToHosts(
       continue;
     }
     if (host.ready && host.tabId === tabId) {
+      /* NO FALLBACK GENERATION, and `?? 0` was the one bug this whole function exists to end.
+         A host whose stage cannot be resolved — still `ready` and connected while its surface's
+         panel list is between mutations across one of `renderCanvasImpl`'s awaits — was posted
+         gen `0`. `0 < renderedGen` is the frame's `patch-behind-render` branch, whose `patchError`
+         is handled by resolving the surface with THIS SAME failing lookup: `patchEscalation` was
+         never called. Meanwhile `posted` had been incremented, so the caller did not throw, and
+         `markConsumed` had already suppressed the full render. An edit disappeared with no counter
+         moving. A stage we cannot name is a stage we cannot patch: skip it, let `posted` fall, and
+         let the caller's `no-ready-iframe-host` escalate the whole batch. The escalation counter
+         moves HERE too, because "nothing was posted and nothing was wrong" and "nothing was posted
+         because we could not name the stage" are the two answers this must never confuse. */
+      const stage = panelHostingCanvas(host.canvasEl)?.surface;
+      if (!stage) {
+        recordEscalation("host-stage-unresolved");
+        continue;
+      }
+      const gen = stage.renderGeneration;
       // Only the host that originated this edit already has the DOM the patch describes. A
       // Split-view panel on the same document did NOT type it and must render normally.
       const echoPaths = echoOrigin?.host === host ? echoOrigin.paths : undefined;
@@ -2108,6 +2133,14 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       // The patch is no longer outstanding either way; a counter that only went up would wedge
       // Every later idle() behind a message the host already handled.
       state.pendingPatches = Math.max(0, state.pendingPatches - 1);
+      /* An UNRESOLVABLE stage escalates nothing, and that is now a complete answer rather than a
+         hole. It used to be half of finding 9: `postPatchToHosts` posted a fabricated gen `0` to a
+         host whose stage it could not name, the frame answered `patch-behind-render`, and this
+         same failing lookup swallowed the escalation while `markConsumed` had already suppressed
+         the pane's full render. The post side refuses to post at all now, so reaching here means
+         the panel list was replaced BETWEEN the post and the ack — and that replacement is itself
+         a newer full render of this stage, which is why scheduling one would rebuild a stage that
+         is not stale. See the two tests either side of this in `iframe-host.test.ts`. */
       const failed = panelHostingCanvas(state.canvasEl)?.surface;
       if (failed) {
         patchEscalation?.(failed.paneId);

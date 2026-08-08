@@ -47,7 +47,7 @@ import { html, render as litRender, nothing } from "lit-html";
 import { childList, getNodeAtPath, nodeLabel, pathsEqual, projectState } from "../store";
 import { effect, effectScope } from "../reactivity";
 import { PRIMARY_PANE, workspace } from "../workspace/workspace";
-import { tabOfPane } from "../canvas/canvas-surface";
+import { derivationOfPane, tabOfPane } from "../canvas/canvas-surface";
 import { paneRegion } from "../ui/regions";
 import { primarySelection } from "../tabs/selection";
 import { activeRegistry } from "../commands/active-registry";
@@ -57,6 +57,7 @@ import type { CommandArgs, CommandRegistry } from "../commands/registry";
 import type { FormulaEditDef, FunctionEditDef } from "../types";
 import type { JxPath } from "../state";
 import type { Tab } from "../tabs/tab";
+import type { PaneDerivation } from "../workspace/workspace";
 import type { EffectScope } from "@vue/reactivity";
 import type { TemplateResult } from "lit-html";
 
@@ -215,7 +216,10 @@ function choiceFor(document: unknown, path: JxPath, fallback: string, own: JxPat
  * puts its three fields in. Nothing here reads the registry, so a segment is produced whether or
  * not its command happens to be registered; {@link segmentTpl} is where that difference shows.
  */
-export function jumpSegments(tab: Tab | null): JumpSegment[] {
+export function jumpSegments(
+  tab: Tab | null,
+  derived: PaneDerivation | null = null,
+): JumpSegment[] {
   if (!tab) {
     return [];
   }
@@ -235,9 +239,16 @@ export function jumpSegments(tab: Tab | null): JumpSegment[] {
   // Segment per frame, each one a `document.setStackLevel` you could click back to — but nothing
   // In `src/` ever pushed a frame, so the loop had exactly one iteration in the shipped app and the
   // Address it drew was always this line. A tab holds a document; drilling in opens another tab.
+  /* In a DERIVED pane the leading verb is Keep, not Open.
+     The address is still the document — a lens draws the source pane's, a companion its own — but
+     the question an author has about a pane that is following something is "can I stop it
+     following and just keep this open". `pane.pin` answers it, and answers it with a REFUSAL for a
+     lens: `segmentTpl` already renders a crumb whose command is disabled as a disabled button with
+     `disabledReason` in the tooltip, so the sentence explaining why Code, Diff and breakpoint views
+     cannot be pinned arrives for free. */
   segments.push({
     choices: [],
-    command: "palette.openFiles",
+    command: derived ? "pane.pin" : "palette.openFiles",
     kind: "file",
     label: documentLabel(tab.documentPath),
     title: tab.documentPath ?? "Not saved to disk yet",
@@ -422,7 +433,7 @@ function segmentTpl(
 export function jumpBarTemplate(
   paneId: string = workspace.activePaneId,
 ): TemplateResult | typeof nothing {
-  const segments = jumpSegments(tabOfPane(paneId));
+  const segments = jumpSegments(tabOfPane(paneId), derivationOfPane(paneId));
   if (segments.length === 0) {
     return nothing;
   }

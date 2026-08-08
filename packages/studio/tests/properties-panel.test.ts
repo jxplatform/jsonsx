@@ -23,7 +23,16 @@ import { componentRegistry } from "../src/files/components";
 import { resetSlotModeMemory } from "../src/ui/dynamic-slot";
 import { view } from "../src/view";
 import { shell } from "../src/shell";
-import { activeTab, closeAllTabs } from "../src/workspace/workspace";
+import { setActiveRegistry } from "../src/commands/active-registry";
+import type { CommandRegistry } from "../src/commands/registry";
+import {
+  PRIMARY_PANE,
+  SECONDARY_PANE,
+  activeTab,
+  closeAllTabs,
+  focusPane,
+  workspace,
+} from "../src/workspace/workspace";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
@@ -139,40 +148,77 @@ describe("layout selection panel", () => {
     expect(section(c, "Layout Element")).not.toBeNull();
   });
 
-  test("Open Layout → opens the file AND selects the clicked node in it, then releases", async () => {
-    const tab = openDoc({ children: [], tagName: "div" });
+  test("Open Layout → runs ONE command and does not clear the layout selection", async () => {
+    /* Four assertions INVERTED, and each inversion is the point of the change.
+       `openLayoutAtNode` used to navigate, `setLayoutSelection(null)`, re-select against
+       `activeTab` and `renderOnly("rightPanel")`. It opened the layout OVER the page it was
+       teaching about, and clearing the selection is precisely what killed the follow on its first
+       frame — `shell.layoutSelection` is what the layout companion follows the NODE through. The
+       chip is a control now: it runs `pane.derive { preset: "layout" }` and decides nothing. */
+    openDoc({ children: [], tagName: "div" });
     shell.layoutSelection = headerHit;
-    // Stand in for studio.ts's navigateToComponent: it swaps the tab's document in place.
-    const navigate = async (path: string) => {
-      await Promise.resolve();
-      navCalls.push(path);
-      tab.documentPath = path;
-      tab.session.selection = [];
-    };
-    const c = await renderInto(renderPropertiesPanelTemplate({ navigateToComponent: navigate }));
+    const ran: { id: string; args: unknown }[] = [];
+    setActiveRegistry({
+      run: (id: string, args: unknown) => {
+        ran.push({ args, id });
+        return Promise.resolve();
+      },
+    } as unknown as CommandRegistry);
 
+    const c = await renderPanel();
     pointer(kvAdd(c, "Open Layout")!, "click");
     await flush();
 
-    expect(navCalls).toEqual(["layouts/base.json"]);
-    expect(tab.session.selection).toEqual([["children", 0, "children", 0]]);
-    // The layout is now the OPEN document, so its nodes are ordinary content again.
-    expect(shell.layoutSelection).toBeNull();
+    expect(ran).toEqual([{ args: { preset: "layout" }, id: "pane.derive" }]);
+    // No `navigate` call of its own — the chip does not know what opening a layout means.
+    expect(navCalls).toEqual([]);
+    // And the layout selection SURVIVES: it is the node the following pane keeps highlighting.
+    expect(shell.layoutSelection).toEqual(headerHit);
+    setActiveRegistry(null);
   });
 
-  test("navigating somewhere other than the layout leaves the selection alone", async () => {
-    const tab = openDoc({ children: [], tagName: "div" });
-    shell.layoutSelection = headerHit;
-    const navigate = async () => {
-      await Promise.resolve();
-      tab.documentPath = "components/other.json";
-      tab.session.selection = [];
-    };
-    const c = await renderInto(renderPropertiesPanelTemplate({ navigateToComponent: navigate }));
+  /* FINDING 8. `canvas/iframe-host.ts`'s `layoutHit` handler calls `focusHostPane(state)`, which
+     moves the keyboard into the pane the click landed in — including a LENS, which draws layout
+     chrome because it draws the same document. From there `pane.derive` can only refuse: its
+     enablement is `deriveRefusal(activePane().id)`, and a derived pane cannot derive again. The
+     chip was drawn anyway and its handler is `void activeRegistry()?.run(…)`, so the throw went
+     into a `void` and the author pressed a control that did nothing at all.
 
-    pointer(kvAdd(c, "Open Layout")!, "click");
-    await flush();
-    expect(tab.session.selection).toEqual([]);
+       chip drawn in a lens-focused shell = true
+       THREW CommandUnavailableError … requires an open document in a pane that is not itself
+       derived */
+  test("Open Layout → is not drawn in a shell whose focused pane is itself derived", async () => {
+    openDoc({ children: [], tagName: "div" });
+    shell.layoutSelection = headerHit;
+    expect(kvAdd(await renderPanel(), "Open Layout")).not.toBeNull();
+
+    // A lens beside the page, with the keyboard in it — which is where a click on layout chrome
+    // Drawn by that lens leaves it.
+    workspace.panes.push({ activeTabId: null, derived: null, id: SECONDARY_PANE, tabOrder: [] });
+    workspace.panes[1]!.derived = {
+      diff: null,
+      kind: "lens",
+      media: null,
+      mode: "design",
+      preset: "breakpoint",
+      reason: "",
+      sourcePaneId: PRIMARY_PANE,
+      status: "ready",
+      zoom: 1,
+    };
+    focusPane(SECONDARY_PANE);
+
+    const c = await renderPanel();
+    /* By LABEL rather than by element: `expect(<happy-dom element>).toBeUndefined()` prints the
+       element, and a happy-dom element's inspection reaches its `window` — sixty thousand lines of
+       class table for one wrong chip, which is what a reviewer would have to read past. */
+    expect([...c.querySelectorAll(".kv-add")].map((el) => el.textContent?.trim())).not.toContain(
+      "Open Layout →",
+    );
+    // The sentence explaining where the element comes from stays — that is the panel's job, and it
+    // Is true wherever the keyboard is.
+    expect(c.textContent).toContain("layouts/base.json");
+    focusPane(PRIMARY_PANE);
   });
 
   test("falls back to generic labels when the hit names no tag, class, or file", async () => {
@@ -191,9 +237,6 @@ describe("layout selection panel", () => {
     expect([...c.querySelectorAll("sp-field-label")].map((l) => l.textContent)).not.toContain(
       "Class",
     );
-    pointer(kvAdd(c, "Open Layout")!, "click");
-    await flush();
-    expect(navCalls).toEqual(["layout"]);
   });
 });
 

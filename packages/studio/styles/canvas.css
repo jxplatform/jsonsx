@@ -58,6 +58,31 @@
 }
 .pane-context .pc-spacer {
   flex: 1;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+/* §18.4's preset menu trigger, in the bar's leading slot — the one that was empty padding.
+   Sized to the 22px the strip's overflow control uses, so the two rows of pane chrome agree. */
+.pc-derive-trigger {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: none;
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-75, 12px);
+  line-height: 1;
+  cursor: pointer;
+}
+.pc-derive-trigger:hover {
+  background: var(--hover-bg);
+  color: var(--fg);
 }
 .pc-axis {
   display: flex;

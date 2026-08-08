@@ -203,6 +203,13 @@ jobs:
       # Neither is expressible in the type system — `ViewState` has an index signature and a
       # module-level `let active` is well-typed — so the guard is a ratcheting allow-list.
       - run: bun --cwd packages/studio scripts/check-pane-singletons.ts
+      # The derived pane's lens/companion discriminators (§18.4), each mutated in turn against the
+      # ONE test file expected to notice. Two review rounds of that workstream each fixed the
+      # defects they named and left as many behind, because a green suite says nothing about
+      # whether it could tell right from wrong — a measurement found seven discriminators whose
+      # inversion the whole 8000-test suite passed. A surviving mutant is red here, in the PR that
+      # removed the assertion, naming the behaviour that is now unprotected.
+      - run: bun --cwd packages/studio scripts/check-lens-mutants.ts
       - run: bun run typecheck
       # packages/desktop is EXCLUDED from the root tsconfig (electrobun ships raw .ts in its dist,
       # which the root's two strictest flags reject 165 times) so it needs its own pass — without
