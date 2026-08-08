@@ -62,61 +62,64 @@ Everything Studio can do is a command, and every command is reachable by name: p
 
 ## View
 
-| Command                        | Id                           | Shortcut | Level       | Requires                                 |
-| ------------------------------ | ---------------------------- | -------- | ----------- | ---------------------------------------- |
-| Apply Grid View                | `grid.applyView`             | —        | document    | a grid on screen                         |
-| Delete Grid View (destructive) | `grid.deleteView`            | —        | document    | a grid on screen                         |
-| Delete Layout                  | `view.deleteLayout`          | —        | application | an open project                          |
-| Focus Next Region              | `view.cycleRegion`           | `F6`     | application | —                                        |
-| Focus Previous Region          | `view.cycleRegionBack`       | `⇧F6`    | application | —                                        |
-| Focus Primary Pane             | `pane.focusPrimary`          | `⌘0`     | document    | a split pane grid                        |
-| Focus Side Pane                | `pane.focusSecondary`        | `⌘⌥0`    | document    | a split pane grid                        |
-| Include Drafts                 | `content.setIncludeDrafts`   | —        | project     | an open project                          |
-| Open Command Center            | `palette.open`               | `⌘K`     | application | —                                        |
-| Open in Browser                | `view.openInBrowser`         | `⌘⇧O`    | document    | a built page to open                     |
-| Open Selector Menu             | `style.openSelectorMenu`     | —        | selection   | the Style tab showing a selected element |
-| Preferences…                   | `app.preferences`            | `⌘,`     | application | —                                        |
-| Rename Layout                  | `view.renameLayout`          | —        | application | an open project                          |
-| Reset Grid View                | `grid.resetView`             | —        | document    | a grid on screen                         |
-| Reset Layout                   | `view.resetLayout`           | —        | application | an open project                          |
-| Run Command…                   | `palette.openCommands`       | `⌘⇧P`    | application | —                                        |
-| Save Grid View…                | `grid.saveView`              | —        | document    | a grid on screen                         |
-| Save Layout                    | `view.saveLayout`            | —        | application | an open project                          |
-| Set Canvas Mode                | `canvas.setMode`             | —        | document    | an open document                         |
-| Set Edit Zoom                  | `canvas.setEditZoom`         | —        | document    | a document in edit mode                  |
-| Set Fit                        | `canvas.setFit`              | —        | document    | an open document                         |
-| Set Style Selector             | `style.setSelector`          | —        | selection   | an element selection                     |
-| Set Theme                      | `view.setTheme`              | —        | application | —                                        |
-| Set Zoom                       | `canvas.setZoom`             | —        | document    | a document on the pan-zoom surface       |
-| Show Assistant                 | `inspector.focus.assistant`  | `⌘⇧4`    | application | —                                        |
-| Show Assistant                 | `view.setAssistant`          | —        | application | —                                        |
-| Show Bottom Dock               | `view.setBottomDock`         | —        | application | —                                        |
-| Show Bottom Dock Tab           | `view.setBottomTab`          | —        | application | —                                        |
-| Show Content                   | `inspector.focus.properties` | `⌘⇧1`    | application | —                                        |
-| Show Data                      | `panel.focus.data`           | `⌘7`     | application | an open project                          |
-| Show Files                     | `panel.focus.files`          | `⌘1`     | application | an open project                          |
-| Show Insert                    | `panel.focus.insert`         | —        | application | an open project                          |
-| Show Inspector Dock            | `view.setRightPanel`         | —        | application | —                                        |
-| Show Inspector Section         | `inspector.setSection`       | —        | document    | an open document                         |
-| Show Inspector Tab             | `view.setRightTab`           | —        | document    | an open document                         |
-| Show Logic                     | `inspector.focus.events`     | `⌘⇧3`    | application | —                                        |
-| Show Navigator Dock            | `view.setNavigator`          | —        | application | —                                        |
-| Show Navigator Panel           | `view.setActivity`           | —        | application | an open project                          |
-| Show Outline                   | `panel.focus.layers`         | `⌘5`     | application | an open project                          |
-| Show Packages                  | `panel.focus.packages`       | `⌘8`     | application | an open project                          |
-| Show Page                      | `panel.focus.page`           | `⌘6`     | application | an open project                          |
-| Show Problems                  | `panel.focus.problems`       | `⌘4`     | application | an open project                          |
-| Show Search                    | `panel.focus.search`         | `⌘2`     | application | an open project                          |
-| Show Source Control            | `panel.focus.git`            | `⌘3`     | application | an open project                          |
-| Show State                     | `panel.focus.state`          | —        | application | an open project                          |
-| Show Style                     | `inspector.focus.style`      | `⌘⇧2`    | application | —                                        |
-| Split Right                    | `pane.splitRight`            | `⌘\`     | document    | an open document                         |
-| Switch Layout                  | `view.setLayout`             | —        | application | an open project                          |
-| Toggle Bottom Dock             | `view.toggleBottomDock`      | `⌘J`     | application | —                                        |
-| Toggle Inspector Dock          | `view.toggleInspector`       | `⌘⌥B`    | application | —                                        |
-| Toggle Navigator Dock          | `view.toggleNavigator`       | `⌘B`     | application | —                                        |
-| Unsplit                        | `pane.unsplit`               | —        | document    | a split pane grid                        |
-| Zen Mode                       | `view.zen`                   | `⌘.`     | application | —                                        |
+| Command                        | Id                           | Shortcut | Level       | Requires                                                                                                                     |
+| ------------------------------ | ---------------------------- | -------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Apply Grid View                | `grid.applyView`             | —        | document    | a grid on screen                                                                                                             |
+| Close Side Pane                | `pane.unsplit`               | —        | document    | a second pane                                                                                                                |
+| Compare With…                  | `pane.compareWith`           | —        | document    | an open document                                                                                                             |
+| Delete Grid View (destructive) | `grid.deleteView`            | —        | document    | a grid on screen                                                                                                             |
+| Delete Layout                  | `view.deleteLayout`          | —        | application | an open project                                                                                                              |
+| Focus Next Region              | `view.cycleRegion`           | `F6`     | application | —                                                                                                                            |
+| Focus Previous Region          | `view.cycleRegionBack`       | `⇧F6`    | application | —                                                                                                                            |
+| Focus Primary Pane             | `pane.focusPrimary`          | `⌘0`     | document    | a split pane grid                                                                                                            |
+| Focus Side Pane                | `pane.focusSecondary`        | `⌘⌥0`    | document    | a split pane grid                                                                                                            |
+| Include Drafts                 | `content.setIncludeDrafts`   | —        | project     | an open project                                                                                                              |
+| Keep This Document             | `pane.pin`                   | —        | document    | a derived pane showing a document of its own — Code, Diff and breakpoint views project the document already open beside them |
+| Open Command Center            | `palette.open`               | `⌘K`     | application | —                                                                                                                            |
+| Open in Browser                | `view.openInBrowser`         | `⌘⇧O`    | document    | a built page to open                                                                                                         |
+| Open Selector Menu             | `style.openSelectorMenu`     | —        | selection   | the Style tab showing a selected element                                                                                     |
+| Preferences…                   | `app.preferences`            | `⌘,`     | application | —                                                                                                                            |
+| Rename Layout                  | `view.renameLayout`          | —        | application | an open project                                                                                                              |
+| Reset Grid View                | `grid.resetView`             | —        | document    | a grid on screen                                                                                                             |
+| Reset Layout                   | `view.resetLayout`           | —        | application | an open project                                                                                                              |
+| Run Command…                   | `palette.openCommands`       | `⌘⇧P`    | application | —                                                                                                                            |
+| Save Grid View…                | `grid.saveView`              | —        | document    | a grid on screen                                                                                                             |
+| Save Layout                    | `view.saveLayout`            | —        | application | an open project                                                                                                              |
+| Set Canvas Mode                | `canvas.setMode`             | —        | document    | an open document                                                                                                             |
+| Set Edit Zoom                  | `canvas.setEditZoom`         | —        | document    | a document in edit mode                                                                                                      |
+| Set Fit                        | `canvas.setFit`              | —        | document    | an open document                                                                                                             |
+| Set Style Selector             | `style.setSelector`          | —        | selection   | an element selection                                                                                                         |
+| Set Theme                      | `view.setTheme`              | —        | application | —                                                                                                                            |
+| Set Zoom                       | `canvas.setZoom`             | —        | document    | a document on the pan-zoom surface                                                                                           |
+| Show Assistant                 | `inspector.focus.assistant`  | `⌘⇧4`    | application | —                                                                                                                            |
+| Show Assistant                 | `view.setAssistant`          | —        | application | —                                                                                                                            |
+| Show Beside This…              | `pane.derive`                | —        | document    | an open document in a pane that is not itself derived                                                                        |
+| Show Bottom Dock               | `view.setBottomDock`         | —        | application | —                                                                                                                            |
+| Show Bottom Dock Tab           | `view.setBottomTab`          | —        | application | —                                                                                                                            |
+| Show Content                   | `inspector.focus.properties` | `⌘⇧1`    | application | —                                                                                                                            |
+| Show Data                      | `panel.focus.data`           | `⌘7`     | application | an open project                                                                                                              |
+| Show Files                     | `panel.focus.files`          | `⌘1`     | application | an open project                                                                                                              |
+| Show Insert                    | `panel.focus.insert`         | —        | application | an open project                                                                                                              |
+| Show Inspector Dock            | `view.setRightPanel`         | —        | application | —                                                                                                                            |
+| Show Inspector Section         | `inspector.setSection`       | —        | document    | an open document                                                                                                             |
+| Show Inspector Tab             | `view.setRightTab`           | —        | document    | an open document                                                                                                             |
+| Show Logic                     | `inspector.focus.events`     | `⌘⇧3`    | application | —                                                                                                                            |
+| Show Navigator Dock            | `view.setNavigator`          | —        | application | —                                                                                                                            |
+| Show Navigator Panel           | `view.setActivity`           | —        | application | an open project                                                                                                              |
+| Show Outline                   | `panel.focus.layers`         | `⌘5`     | application | an open project                                                                                                              |
+| Show Packages                  | `panel.focus.packages`       | `⌘8`     | application | an open project                                                                                                              |
+| Show Page                      | `panel.focus.page`           | `⌘6`     | application | an open project                                                                                                              |
+| Show Problems                  | `panel.focus.problems`       | `⌘4`     | application | an open project                                                                                                              |
+| Show Search                    | `panel.focus.search`         | `⌘2`     | application | an open project                                                                                                              |
+| Show Source Control            | `panel.focus.git`            | `⌘3`     | application | an open project                                                                                                              |
+| Show State                     | `panel.focus.state`          | —        | application | an open project                                                                                                              |
+| Show Style                     | `inspector.focus.style`      | `⌘⇧2`    | application | —                                                                                                                            |
+| Split Right                    | `pane.splitRight`            | `⌘\`     | document    | an open document                                                                                                             |
+| Switch Layout                  | `view.setLayout`             | —        | application | an open project                                                                                                              |
+| Toggle Bottom Dock             | `view.toggleBottomDock`      | `⌘J`     | application | —                                                                                                                            |
+| Toggle Inspector Dock          | `view.toggleInspector`       | `⌘⌥B`    | application | —                                                                                                                            |
+| Toggle Navigator Dock          | `view.toggleNavigator`       | `⌘B`     | application | —                                                                                                                            |
+| Zen Mode                       | `view.zen`                   | `⌘.`     | application | —                                                                                                                            |
 
 ## Document
 

@@ -2,9 +2,9 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.0-draft
+**Version:** 0.9.1-draft
 **Status:** Partial
-**Updated:** 2026-08-07
+**Updated:** 2026-08-08
 **License:** MIT
 
 ---
@@ -1582,8 +1582,8 @@ inline (§16), rather than writing and hoping.
 
 ## 18. Panes
 
-**Status:** Implemented — the pane grid, two live Canvas panes, per-pane canvas state, the jump bar
-and the dock takeovers. Derived panes (§18.4) are the part that has not shipped.
+**Status:** Implemented — the pane grid, two live Canvas panes, per-pane canvas state, the jump bar,
+the dock takeovers and derived panes.
 
 ### 18.1 A pane is where a document is shown
 
@@ -1678,16 +1678,46 @@ container was thrown away one frame earlier.
 
 ### 18.4 Derived panes
 
-**Status:** Not built. A derived pane shows a **projection of another pane's document** rather than
-a document of its own — its Code, its layout, the component definition under the selection, its diff
-against HEAD, or the same page at another breakpoint — and follows the pane it derives from until it
-is pinned, at which point it becomes an ordinary tab. The pane model, the grid and the second live
-host are all in place; what is missing is the derivation and the preset menu that offers it.
+A derived pane is chosen by a **standing rule** rather than by a document: show me the Code of
+whatever that pane is showing, or its diff, or the layout it uses, or the definition of the
+component under its selection, or the same page at one named breakpoint. The rule re-resolves when
+its inputs change, and **Pin** ends the following and leaves an ordinary tab.
+
+**A preset is one of three mechanisms, and which one is decided by the document, not by taste.**
+
+1.  **A projection** — Code and Diff. The same document in a different view, which needs a second
+    `Tab` because `session.ui` is per-tab: the two panes disagree about mode, scroll and zoom while
+    agreeing about content. So a projection shares the source's document and history _by reference_
+    and carries its own session, and its id names the lens as well as the document.
+2.  **A follow** — Layout and Component definition. These are _different documents_, and a second
+    id over one file would be two documents, two undo stacks, two collaboration rooms and a race to
+    save. §14.1 read in the other direction. So the pane opens the ordinary path-keyed tab and the
+    rule only decides _which_.
+3.  **Neither** — "the same page at ⟨breakpoint⟩" is one artboard of the design board the pane
+    already draws. It was specified as a preset and is a filter.
+
+**§14.1 holds, and is stronger for this.** A projection's id names the document _and_ the lens, and
+neither is ever reassigned: following is dispose-and-open, never mutation, which is exactly the
+discipline the rule was written after the drill-in failure to enforce. What a projection does
+endanger is the other half — _opening a file finds the tab that already has it_ — because two ids
+now reach one document. That is preserved by four exclusions stated once: a derived id is never a
+dedupe target, never a reopen record, never a collaboration key, and never counted among the
+documents a close-all would lose.
+
+**A pane may hold a derivation or tabs of its own, never both.** A projection borrows the pane, so a
+gesture that puts a document there — a split, a compare, a drill-in — releases the rule rather than
+stacking on it. The author asked for a document to be somewhere; the projection had nothing to lose.
+
+**A preset that cannot be supplied is not offered**, and one that stops resolving says so on the
+stage rather than leaving the pane blank. A pane showing a rule that has gone quiet still names the
+document it holds and offers the verb that ends the follow — the alternative is a pane with no
+chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ---
 
 ## Changelog
 
+- **0.9.1-draft** (2026-08-08) — §18.4 derived panes ship — a pane chosen by a standing rule rather than a document; a preset is a projection (Code, Diff — one document, two sessions), a follow (Layout, Component definition — genuinely different documents) or a filter (a breakpoint of the board already drawn); §14.1 holds because following is dispose-and-open, with four exclusions keeping one document to one tab; a pane holds a derivation or tabs, never both.
 - **0.9.0-draft** (2026-08-07) — §18 Panes rewritten for two live panes — the grid draws a keyed cell per pane and the stage handover is deleted; the editor-kind cap on the side pane is gone and a split is a real side-by-side; clicking into a pane focuses it; nothing drawn for a pane may resolve the focus, enforced by check-pane-singletons; §18.4 derived panes named as not built.
 - **0.8.0-draft** (2026-08-07) — Sub-documents withdrawn (§14.3) — the stack had no push, so nothing could enter it; §14.7 closing over unsaved work, and §4.2 source is batched so every exit settles first; the Bottom dock is three tabs and Diff is a pane editor kind (§16.3); §18 Panes — the two-pane cap as one predicate, one stage handed between panes, and no pane zoom until there is a grid to zoom.
 - **0.7.0-draft** (2026-08-06) — §18 Panes — the two-pane cap as one predicate, the three lifecycle rules each defect taught, what a second pane costs and what no fan-out removes, and the single stage handed between panes.
@@ -1743,4 +1773,4 @@ host are all in place; what is missing is the derivation and the preset menu tha
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.0-draft_
+_`@jxsuite/studio` Specification v0.9.1-draft_

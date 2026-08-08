@@ -92,6 +92,22 @@ The new one carries a small **↳** marker, and hovering it names the document y
 
 The two panes are independent in everything a document owns: each keeps its own view, breakpoint, colour scheme, zoom and selection, and editing in one leaves the other exactly as it was.
 
+## A pane that follows the other one
+
+A second pane does not have to hold a document you picked. The **⟲** button on its context bar offers a short list of things it can be _about_ the other pane instead:
+
+- **Code of this document** — the JSON or Markdown, live, while you edit visually.
+- **Diff vs HEAD** — what you have changed, beside the page you changed it in.
+- **Layout of this page** — the layout file the page uses, opened at the element you clicked if you came from **Open Layout →**.
+- **Component definition of the selection** — the source of whatever component you select, following you as you select others.
+- **Same page at ⟨breakpoint⟩** — one more size of the page you are already looking at.
+
+The pane then **follows**: switch documents in the first pane and the Code, the diff and the layout follow along; select a different component and the definition changes with it. Its strip shows what it is about rather than a filename — `Code · /blog` — with a **✕** that ends the following.
+
+**Pin** it (in the ⟲ menu) to stop following and keep what is on screen as an ordinary document, in an ordinary tab, with the strip and history that come with one.
+
+A preset that this document cannot supply is not offered, and it says why — **Layout** on a page that declares none, **Diff** on a file with no changes. If a rule stops resolving while you work — you remove the page's layout, or deselect the component — the pane says so and offers to keep what it has, rather than going blank.
+
 ## The jump bar
 
 Under the strip, one line names where you are — `◈ project › file › the element you have selected` — and every segment is a button that takes you to that step. A segment whose parent has other children carries a **⌄** listing them, so moving to a sibling element is a click rather than a hunt through the Outline. The full behaviour is in **[The workspace](/docs/studio/interface#the-jump-bar)**.
