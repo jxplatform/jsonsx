@@ -470,6 +470,7 @@ describe("the restricted loader's two refusals", () => {
     writeFileSync(resolve(planted, "fragment.schema.json"), JSON.stringify({ $defs: {} }));
 
     const load = restrictedSchemaLoader(dir);
+    // oxlint-disable-next-line typescript/await-thenable -- Bun types the matcher `void`; it returns a real Promise and the await is load-bearing.
     await expect(
       load(resolve(dir, "node_modules/@jxsuite/ghost/fragment.schema.json")),
     ).rejects.toThrow(/@jxsuite\/ghost\/fragment\.schema\.json.*host workspace and does not/s);
@@ -499,6 +500,7 @@ describe("the restricted loader's two refusals", () => {
     expect(existsSync(conventional)).toBe(false);
 
     const load = restrictedSchemaLoader(dir);
+    // oxlint-disable-next-line typescript/await-thenable -- Bun types the matcher `void`; it returns a real Promise and the await is load-bearing.
     await expect(load(conventional)).resolves.toEqual({
       $defs: { VendorThing: { type: "object" } },
     });
@@ -507,6 +509,7 @@ describe("the restricted loader's two refusals", () => {
   it("a specifier that resolves from neither the project nor the host names both", async () => {
     const dir = root();
     const load = restrictedSchemaLoader(dir);
+    // oxlint-disable-next-line typescript/await-thenable -- Bun types the matcher `void`; it returns a real Promise and the await is load-bearing.
     await expect(load(resolve(dir, "node_modules/absent-ext/doc.schema"))).rejects.toThrow(
       /not resolvable from the project or the host/,
     );
