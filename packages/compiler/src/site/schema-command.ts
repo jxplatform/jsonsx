@@ -181,10 +181,14 @@ function hostResolve(specifier: string, path: string): string {
  * `<root>/node_modules/<specifier>` file resolves the specifier project-first, then through the
  * host (workspace symlinks resolve transparently).
  *
+ * Exported for test: both refusals below are reachable only through a project whose `node_modules`
+ * has been arranged to provoke them, and a fixture that arranges an extension registry as well says
+ * less about the rule than a call that states the path directly.
+ *
  * @param {string} root - Absolute project root
  * @returns {SchemaJsonLoader}
  */
-function restrictedSchemaLoader(root: string): SchemaJsonLoader {
+export function restrictedSchemaLoader(root: string): SchemaJsonLoader {
   return async (path) => {
     const abs = resolve(path);
     const rel = relative(root, abs);

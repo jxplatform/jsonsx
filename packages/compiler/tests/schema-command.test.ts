@@ -24,6 +24,7 @@ import { GENERATED_SCHEMA_COMMENT } from "@jxsuite/schema/project-schemas";
 import {
   isFirstPartySchema,
   readBundledProjectSchemas,
+  restrictedSchemaLoader,
   writeProjectSchemas,
 } from "../src/site/schema-command";
 
@@ -436,5 +437,78 @@ describe("a validator does not edit what it is checking", () => {
     } finally {
       rmSync(root, { force: true, recursive: true });
     }
+  });
+});
+
+describe("the restricted loader's two refusals", () => {
+  /*
+   * Both are reachable only from a project whose `node_modules` has been arranged to provoke them,
+   * which is why the loader is exported: a fixture that also has to satisfy the extension registry
+   * says less about the rule than a call that states the offending path outright.
+   */
+  const roots: string[] = [];
+  const root = () => {
+    const dir = mkdtempSync(resolve(tmpdir(), "jx-loader-"));
+    roots.push(dir);
+    writeFileSync(resolve(dir, "package.json"), JSON.stringify({ name: "p", version: "0.0.0" }));
+    return dir;
+  };
+  afterAll(() => {
+    for (const dir of roots) {
+      rmSync(dir, { force: true, recursive: true });
+    }
+  });
+
+  it("a first-party schema the HOST cannot resolve stops the generator, and does not improvise", async () => {
+    /* The point of the first-party rule is that a project-local @jxsuite/* never answers. So when
+       the host has no such package, the honest outcome is a refusal — falling back to the copy
+       sitting right there in the project is the exact behaviour that shipped a narrowed shop
+       schema for six weeks. This plants that copy and checks it is still refused. */
+    const dir = root();
+    const planted = resolve(dir, "node_modules/@jxsuite/ghost");
+    mkdirSync(planted, { recursive: true });
+    writeFileSync(resolve(planted, "fragment.schema.json"), JSON.stringify({ $defs: {} }));
+
+    const load = restrictedSchemaLoader(dir);
+    await expect(
+      load(resolve(dir, "node_modules/@jxsuite/ghost/fragment.schema.json")),
+    ).rejects.toThrow(/@jxsuite\/ghost\/fragment\.schema\.json.*host workspace and does not/s);
+  });
+
+  it("a THIRD-party specifier with no file at its conventional path resolves through the package", async () => {
+    /* The mirror case, and the reason the first-party rule is a rule and not the whole loader: a
+       project's own extension may legitimately expose a schema through an exports map, so there is
+       nothing at `node_modules/<specifier>` to read and the specifier must be required instead. */
+    const dir = root();
+    const vendor = resolve(dir, "node_modules/vendor-ext");
+    mkdirSync(resolve(vendor, "schemas"), { recursive: true });
+    writeFileSync(
+      resolve(vendor, "package.json"),
+      JSON.stringify({
+        exports: { "./doc.schema.json": "./schemas/doc.json" },
+        name: "vendor-ext",
+        version: "0.0.0",
+      }),
+    );
+    writeFileSync(
+      resolve(vendor, "schemas/doc.json"),
+      JSON.stringify({ $defs: { VendorThing: { type: "object" } } }),
+    );
+
+    const conventional = resolve(dir, "node_modules/vendor-ext/doc.schema.json");
+    expect(existsSync(conventional)).toBe(false);
+
+    const load = restrictedSchemaLoader(dir);
+    await expect(load(conventional)).resolves.toEqual({
+      $defs: { VendorThing: { type: "object" } },
+    });
+  });
+
+  it("a specifier that resolves from neither the project nor the host names both", async () => {
+    const dir = root();
+    const load = restrictedSchemaLoader(dir);
+    await expect(load(resolve(dir, "node_modules/absent-ext/doc.schema"))).rejects.toThrow(
+      /not resolvable from the project or the host/,
+    );
   });
 });
