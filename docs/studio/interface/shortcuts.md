@@ -45,11 +45,10 @@ Every row is also a command: press :kbd[⌘K] and type the name to run it withou
 | `⌘1`    | `Ctrl+1`         | Show Files             | `panel.focus.files`          |
 | `⌘2`    | `Ctrl+2`         | Show Search            | `panel.focus.search`         |
 | `⌘3`    | `Ctrl+3`         | Show Source Control    | `panel.focus.git`            |
-| `⌘4`    | `Ctrl+4`         | Show Problems          | `panel.focus.problems`       |
-| `⌘5`    | `Ctrl+5`         | Show Outline           | `panel.focus.layers`         |
-| `⌘6`    | `Ctrl+6`         | Show Page              | `panel.focus.page`           |
-| `⌘7`    | `Ctrl+7`         | Show Data              | `panel.focus.data`           |
-| `⌘8`    | `Ctrl+8`         | Show Packages          | `panel.focus.packages`       |
+| `⌘4`    | `Ctrl+4`         | Show Outline           | `panel.focus.layers`         |
+| `⌘5`    | `Ctrl+5`         | Show Page              | `panel.focus.page`           |
+| `⌘6`    | `Ctrl+6`         | Show Data              | `panel.focus.data`           |
+| `⌘7`    | `Ctrl+7`         | Show Packages          | `panel.focus.packages`       |
 | `⌘⌥0`   | `Ctrl+Alt+0`     | Focus Side Pane        | `pane.focusSecondary`        |
 | `⌘⌥B`   | `Ctrl+Alt+B`     | Toggle Inspector Dock  | `view.toggleInspector`       |
 | `⌘B`    | `Ctrl+B`         | Toggle Navigator Dock  | `view.toggleNavigator`       |

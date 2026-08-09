@@ -176,9 +176,14 @@ function projectFieldTpl(registry: CommandRegistry | null) {
           title: deploy.title,
         })
       : nothing,
+    // `view.setBottomTab`, not `panel.focus.problems`: the latter is generated from the rail
+    // Roster, and Problems left the rail. That is the same verb Diff, Logic and Activity are
+    // Addressed by — one door per bottom tab — and it is what keeps this readout the ONLY standing
+    // Mention of problems in the chrome, which is the point of taking the rail button away.
     count > 0
       ? itemTpl(registry, {
-          command: "panel.focus.problems",
+          args: { tab: "problems" },
+          command: "view.setBottomTab",
           label: `⚠ ${count}`,
           title: `${count} problem(s)`,
         })

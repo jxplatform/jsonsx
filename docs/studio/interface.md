@@ -52,14 +52,13 @@ The vertical strip on the far left. Every button carries a **text label under it
 
 - **Files** (:kbd[⌘1]) — the project file tree. Open, rename and organize the files in your project folder. **New File…** — from the panel's toolbar, or from a folder's right-click menu — opens the [creation dialog](#creating-a-file) with `untitled.json` pre-filled and only the name part selected, so typing replaces the name and keeps the extension. Studio picks the starting content from the extension you give it. Drag files in from your desktop and they upload into whichever folder you drop them on — see [Media](/docs/studio/projects/media).
 - **Source Control** (:kbd[⌘3]) — the built-in git client. A badge counts changed files. See [Git & publish](/docs/studio/publish).
-- **Problems** (:kbd[⌘4]) — everything that needs fixing, with a badge counting it. The button is on the rail because "how many things need fixing" is a question you ask without opening anything; the list itself opens in the [Bottom dock](#bottom-dock).
 
 **Document**
 
-- **Outline** (:kbd[⌘5]) — the element structure of the open page or component, as a tree you can select and reorder. In **Project Styles** it lists the style targets instead.
-- **Page** (:kbd[⌘6]) — the page's title, description and social preview.
-- **Data** (:kbd[⌘7]) — the values, data sources and functions the document knows about, with what each one currently resolves to. See [Script & logic](/docs/studio/logic).
-- **Packages** (:kbd[⌘8]) — the components and packages the open document pulls in.
+- **Outline** (:kbd[⌘4]) — the element structure of the open page or component, as a tree you can select and reorder. In **Project Styles** it lists the style targets instead.
+- **Page** (:kbd[⌘5]) — the page's title, description and social preview.
+- **Data** (:kbd[⌘6]) — the values, data sources and functions the document knows about, with what each one currently resolves to. See [Script & logic](/docs/studio/logic).
+- **Packages** (:kbd[⌘7]) — the components and packages the open document pulls in.
 
 Clicking the button of the panel that's already open collapses the Navigator; clicking any button brings it back. A document-level panel with no document open says what it needs rather than showing an empty box.
 

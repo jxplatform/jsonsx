@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.3-draft
+**Version:** 0.9.4-draft
 **Status:** Partial
 **Updated:** 2026-08-09
 **License:** MIT
@@ -1451,11 +1451,11 @@ that with **three lifetimes, chosen by the action the outcome requires.**
 
 ### 16.1 The three tiers
 
-| Tier        | Lives                    | For                         | Where                              |
-| ----------- | ------------------------ | --------------------------- | ---------------------------------- |
-| **Toast**   | seconds, then retires    | reversible, needs no action | `overlay.toasts`, the fourth layer |
-| **Problem** | until it is fixed        | must be fixed               | Bottom dock ⑪, badge on the rail   |
-| **Inline**  | as long as the bad value | a value the user just typed | at its own control                 |
+| Tier        | Lives                    | For                         | Where                                  |
+| ----------- | ------------------------ | --------------------------- | -------------------------------------- |
+| **Toast**   | seconds, then retires    | reversible, needs no action | `overlay.toasts`, the fourth layer     |
+| **Problem** | until it is fixed        | must be fixed               | Bottom dock ⑪, count in the status bar |
+| **Inline**  | as long as the bad value | a value the user just typed | at its own control                     |
 
 `notify(severity, message, options)` is the only sanctioned entry point; `severity` is one of
 `success | info | warn | error`. The tier is **derived** from the severity — `error` defaults to a
@@ -1489,6 +1489,19 @@ at a moment, are different things and had been sharing one 24px strip.
 and never covers the canvas, which is the one region that must not disappear. Three tabs, under a
 documented cap of four: **Problems · Logic · Activity**. It opens **collapsed**: an empty Problems
 list must not spend 220px of canvas to say nothing.
+
+**No Bottom-dock tab has a rail button, Problems included.** It had one — the fourth slot in the
+rail's PROJECT group, with the count as its badge — and it was wrong on two counts. Mechanically,
+every other rail button opens a panel at the SIDE, so one that opened a dock along the BOTTOM
+needed a per-dock branch in `toggleRailPanel`, in `isRailPanelShowing` and in `focusPanel`: three
+branches so that one button of eight behaved like the other seven, and a control pointing left at
+something that appears below. And as a matter of what the shell SAYS: permanent navigation is a
+product's statement of what it is for, and a standing, first-class entry named Problems tells a
+new user to expect them before they have any. The count is not hidden — it sits in the status bar
+beside the branch and the deploy step, which is where ambient project state already lives, and it
+appears the moment the count is non-zero. Clicking it runs `view.setBottomTab { tab: "problems" }`,
+the same single door Diff, Logic and Activity are reached by. There is no `panel.focus.problems`,
+because the ⌘1–8 roster follows the rail.
 
 **Logic is why the dock exists.** The function editor and the formula workspace were canvas
 takeovers; here the page whose values they compute keeps rendering behind them. Because a takeover
@@ -1741,6 +1754,7 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ## Changelog
 
+- **0.9.4-draft** (2026-08-09) — §16.3 Problems leaves the Navigator rail — no Bottom-dock tab has a rail button, the count lives in the status bar and runs view.setBottomTab, and panel.focus.problems is gone with the ⌘1-8 roster that follows the rail; §16.1 restates where a Problem is surfaced.
 - **0.9.3-draft** (2026-08-09) — §13.5 corrects check-icons — an icon key on a record is resolved through a map, not registered as a tag, and the two spaces fail differently; the previous text asserted the opposite and licensed a fix that replaced a working hand-drawn glyph with a key nothing resolved.
 - **0.9.2-draft** (2026-08-08) — §13.5 adds scripts/check-icons.ts — an sp-icon-* tag no element registers, or a registered element Spectrum does not ship, is now a red PR; the command record's icon field described accurately as a tag name rather than a key into a map.
 - **0.9.1-draft** (2026-08-08) — §18.4 derived panes ship — a pane chosen by a standing rule rather than a document; a preset is a projection (Code, Diff — one document, two sessions), a follow (Layout, Component definition — genuinely different documents) or a filter (a breakpoint of the board already drawn); §14.1 holds because following is dispose-and-open, with four exclusions keeping one document to one tab; a pane holds a derivation or tabs, never both.
@@ -1799,4 +1813,4 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.3-draft_
+_`@jxsuite/studio` Specification v0.9.4-draft_

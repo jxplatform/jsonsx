@@ -28,7 +28,7 @@ This page is generated from the `> **Status: …**` markers in the specification
 | `site-architecture.md`    | 0.1.42-draft | Pending     | 2026-08-06 |
 | `spec.md`                 | 0.4.27-draft | Partial     | 2026-07-30 |
 | `studio-ui-guidelines.md` | 0.3.4        | Implemented | 2026-08-05 |
-| `studio.md`               | 0.9.3-draft  | Partial     | 2026-08-09 |
+| `studio.md`               | 0.9.4-draft  | Partial     | 2026-08-09 |
 
 ## Sections not yet implemented
 

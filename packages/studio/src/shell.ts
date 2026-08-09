@@ -73,10 +73,11 @@ export type DockId = "left" | "right" | "bottom";
  * undeclared id, at the one door a caller comes through, and {@link migratePanelId} is what turns a
  * stale stored id into a current one before it gets there.
  *
- * **`"problems"` is not here, and its rail button still is.** §7.2's table hosts Problems in the
- * Bottom dock with a badge on the rail, so `view.setBottomTab { tab: "problems" }` is the verb that
- * shows it and this enum would be a second, wrong door. The rail groups by LEVEL rather than by
- * dock, which is why ⌘4 and the status bar's `panel.focus.problems` item are unaffected.
+ * **`"problems"` is not here, and it has no rail button either.** It is hosted in the Bottom dock,
+ * so `view.setBottomTab { tab: "problems" }` is the verb that shows it and this enum would be a
+ * second, wrong door. That verb is now the ONLY door: the status bar's warning count runs it, and
+ * `panel.focus.problems` no longer exists, because the roster it was generated from follows the
+ * rail and Problems is off the rail.
  *
  * The records themselves live in `panels/navigator-panels.ts`, one per owning module. This list is
  * the same set written down in a module that imports no DOM, because `commands/app-commands.ts`
@@ -1031,21 +1032,6 @@ export function toggleActivityTab(tab: string): void {
     return;
   }
   setActivityTab(tab);
-}
-
-/**
- * {@link toggleActivityTab}'s Bottom dock counterpart, for the rail buttons whose panel lives there.
- *
- * The rail spans both docks now (§7.2 gives Problems a rail badge and a Bottom-dock body), and a
- * button that opened its dock but could not close it again would be the only one-way control on the
- * rail. `panels/activity-bar.ts` picks between the two by the record's `dock`.
- */
-export function toggleBottomTab(tab: string): void {
-  if (tab === shell.bottomTab && !shell.docks.bottom.collapsed) {
-    setDockCollapsed("bottom", true);
-    return;
-  }
-  setBottomTab(tab);
 }
 
 /**

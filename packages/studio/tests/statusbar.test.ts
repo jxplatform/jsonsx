@@ -58,7 +58,9 @@ function buildRegistry(ids?: readonly string[]) {
     stub("project.open", "Open Project…", "project"),
     stub("project.openRecent", "Open Recent…", "project"),
     stub("panel.focus.git", "Show Source Control", "application"),
-    stub("panel.focus.problems", "Show Problems", "application"),
+    // `view.setBottomTab`, not `panel.focus.problems` — that record is generated from the rail
+    // Roster and Problems is off the rail.
+    stub("view.setBottomTab", "Show Bottom Dock Tab", "application"),
     stub("palette.openFiles", "Go to File…", "application"),
     stub("file.save", "Save", "document"),
     stub("selection.set", "Select Element", "document"),
@@ -165,7 +167,9 @@ describe("the PROJECT field", () => {
     renderStatusbar();
     expect(items()).toContain("⚠ 2");
     (field("project")!.querySelectorAll("button")[1] as HTMLElement).click();
-    expect(ran.at(-1)!.id).toBe("panel.focus.problems");
+    // The one door the other three Bottom-dock tabs use, carrying which tab it means.
+    expect(ran.at(-1)!.id).toBe("view.setBottomTab");
+    expect(ran.at(-1)!.args).toEqual({ tab: "problems" });
   });
 
   test("the peers item is silent until a `Collaborate:` command exists to name", () => {

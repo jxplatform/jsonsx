@@ -29,10 +29,12 @@
  * once is two hosts for one record, and hosting it in the Navigator spends left-dock width on
  * something that belongs under the pane grid.
  *
- * The rail keeps its button and its badge all the same — {@link railGroups} groups by LEVEL, not by
- * dock — so ⌘4 and the status bar's `panel.focus.problems` item still address Problems. They now
- * reveal it where it lives: `panels/activity-bar.ts` routes a `dock: "bottom"` rail button through
- * `toggleBottomTab` instead of `toggleActivityTab`.
+ * **And no rail button.** It had one, in the PROJECT group, which meant a control on the far left
+ * that opened a dock along the bottom — the rail carried a per-dock branch in three places to keep
+ * that one button honest. It also made "things are wrong here" a permanent fixture of the shell,
+ * which is a poor first thing to promise someone opening the product. The warning count in the
+ * status bar is the standing signal, and it runs `view.setBottomTab { tab: "problems" }` — the same
+ * verb Diff, Logic and Activity are reached by.
  */
 
 import { html, nothing } from "lit-html";
@@ -214,6 +216,17 @@ export function registerProblemsPanel(): void {
     title: "Problems",
     level: "project",
     dock: "bottom",
+    // OFF THE RAIL, and the argument is the rail's own meaning rather than taste. Every other rail
+    // Button opens a panel at the SIDE; this one opened a dock at the BOTTOM, so the rail had to
+    // Grow a per-dock branch in three places to keep one button honest. It also made "Problems" a
+    // Standing, first-class element of the shell's furniture — a product whose permanent navigation
+    // Advertises a place to find things wrong with it. The count still reaches the user the moment
+    // There is one, from the status bar (`panels/statusbar.ts`), which is where ambient project
+    // State already lives beside the branch and the deploy step.
+    rail: false,
+    // Inert, like every other `rail: false` panel's: `PanelRecord.icon` is required and `tabIcon()`
+    // Is only ever called by a rail button. The row that used to resolve it is gone from
+    // `activity-bar.ts`, and `check-icons.ts` is what refuses to let the two drift apart.
     icon: "sp-icon-alert",
     badge: () => problemCount() || null,
     render: () => renderProblemsList(),

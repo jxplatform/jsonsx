@@ -60,12 +60,11 @@ import { inspectorTab } from "../panels/right-panel";
 import { requestClose } from "../panels/tab-strip";
 import { showDialog } from "../ui/layers";
 import { rectOf } from "../utils/geometry";
-import { DOCK_IDS, setActivityTab, setBottomTab, setDockCollapsed, shell } from "../shell";
+import { DOCK_IDS, setActivityTab, setDockCollapsed, shell } from "../shell";
 import { REGION_FOR_FOCUS, resolveRegion } from "../ui/regions";
 import { getPlatform, hasPlatform } from "../platform";
 import { notify } from "../services/notify";
 import { panelFocusRoster } from "../panels/navigator-panels";
-import { getPanel } from "../panels/panel-registry";
 import { copyNode, cutNode, pasteNode } from "./context-menu";
 
 import { keyScopeStack } from "../commands/context";
@@ -474,25 +473,13 @@ function cycleRegion(direction: 1 | -1): void {
  * common case is "take me there", and a toggle-visible binding makes that a coin flip on whichever
  * panel happened to be showing.
  *
- * The chord roster follows the RAIL, and the rail spans two docks: ⌘4 is Problems, whose body is
- * the Bottom dock's first tab (plan §7.2). So the panel's own record decides which dock is opened
- * and which region takes focus — `panels/activity-bar.ts` makes the same branch for the click. A
- * roster id with no record falls back to the Navigator, which is what `view.setActivity`'s enum
- * already guarantees for every id that can reach here.
+ * Every panel this can be handed lives in the Navigator. The roster is the rail plus the rail-less
+ * NAVIGATOR panels (`panels/navigator-panels.ts`), so a Bottom-dock record cannot reach here — the
+ * branch that used to open the Bottom dock existed for Problems alone, and Problems is off the rail
+ * and addressed by `view.setBottomTab` now. Keeping a dead branch would leave a second, silent door
+ * into a dock nothing here can name.
  */
 function focusPanel(panelId: string): void {
-  if (getPanel(panelId)?.dock === "bottom") {
-    const showing =
-      shell.bottomTab === panelId && !shell.docks.bottom.collapsed && shell.focusRegion === "dock";
-    if (showing) {
-      setDockCollapsed("bottom", true);
-      focusShellRegion("pane");
-      return;
-    }
-    setBottomTab(panelId);
-    focusShellRegion("dock");
-    return;
-  }
   const alreadyThere =
     shell.leftTab === panelId && !shell.docks.left.collapsed && shell.focusRegion === "navigator";
   if (alreadyThere) {

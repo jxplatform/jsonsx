@@ -46,9 +46,11 @@ import type { renderSignalsTemplate } from "./signals-panel";
 /**
  * The three docks that host panels.
  *
- * A panel's dock is where its BODY is drawn, and it is independent of whether the panel has a rail
- * button: Problems is `dock: "bottom"` and rail-able, so the rail button reveals it in the Bottom
- * dock (see {@link railGroups}). The Inspector has no records yet.
+ * A panel's dock is where its BODY is drawn. Every rail button opens the NAVIGATOR, so a record
+ * outside it is `rail: false` and is addressed by name instead — `view.setBottomTab` for the four
+ * Bottom-dock tabs. The two were briefly independent, for Problems alone, and the cost was a
+ * per-dock branch in three separate places plus a left-hand control that opened something along the
+ * bottom. The Inspector has no records yet.
  */
 export type PanelDock = "navigator" | "inspector" | "bottom";
 

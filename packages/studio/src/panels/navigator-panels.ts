@@ -7,11 +7,14 @@
  * Nothing here decides what a panel is called, what level it is, or what it draws — that would be
  * the second definition site the registry exists to prevent.
  *
- * **Registration order is rail order** within a level group, so the rail reads as §3.2 ② lists it:
- * PROJECT (Files ⌘1 · Search ⌘2 · Source Control ⌘3 · Problems ⌘4) above the divider, DOCUMENT
- * (Outline ⌘5 · Page ⌘6 · Data ⌘7 · Packages ⌘8) below it. The fourth PROJECT button is Problems,
- * whose record is registered by `panels/bottom-dock.ts` because the Bottom dock is where its body
- * is drawn (§7.2) — the rail groups by LEVEL, not by dock, so it lands in its slot regardless.
+ * **Registration order is rail order** within a level group: PROJECT (Files ⌘1 · Search ⌘2 · Source
+ * Control ⌘3) above the divider, DOCUMENT (Outline ⌘4 · Page ⌘5 · Data ⌘6 · Packages ⌘7) below it.
+ *
+ * **Every rail button opens the Navigator.** Problems used to hold the fourth PROJECT slot while
+ * its body was drawn in the Bottom dock, and paying for that took a per-dock branch in three
+ * separate places. A permanent button that opens something somewhere else is also a standing
+ * advertisement, in the shell's own furniture, for a place to find things wrong with the product.
+ * The count reaches the user from the status bar the moment there is one.
  *
  * **Search is declared and hidden.** It is a surface a later phase builds (P3.3's palette index),
  * and it holds a rail slot §3.2 has already spent. A `when: () => false` record is the honest way
@@ -103,14 +106,15 @@ export function navigatorPanelSet(): readonly PanelRecord[] {
  * The roster `panel.focus.*` is generated from: rail order first, then the rail-less Navigator
  * panels.
  *
- * Not `navigatorPanelSet()`, because the chords follow the RAIL and the rail now spans two docks —
- * ⌘4 is Problems, whose body is the Bottom dock's first tab. Not `railPanelSet()` either: Insert
- * and State have no rail button and no chord, and they still need a `Show …` command and a palette
- * row, which is the whole point of `rail: false` (a surface reachable by name, not by number).
+ * Not `railPanelSet()`: Insert and State have no rail button and no chord, and they still need a
+ * `Show …` command and a palette row, which is the whole point of `rail: false` (a surface
+ * reachable by name, not by number).
  *
- * The Bottom dock's other three tabs are deliberately absent. Diff, Logic and Activity are `rail:
- * false` AND hosted there, so they are addressed by `view.setBottomTab` — one verb per surface, and
- * the dock's own strip is how a human picks between them.
+ * The Bottom dock's four tabs are deliberately absent — Problems as of this change, and Diff, Logic
+ * and Activity all along. Each is `rail: false` AND hosted there, so each is addressed by
+ * `view.setBottomTab`: one verb per surface, and the dock's own strip is how a human picks between
+ * them. That is also why the filter here is by DOCK and not merely by `rail`, and why Problems
+ * leaving the rail removed `panel.focus.problems` rather than demoting it to a chordless row.
  */
 export function panelFocusRoster(): readonly PanelRecord[] {
   registerNavigatorPanels();

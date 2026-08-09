@@ -21,7 +21,6 @@ import {
   setLayoutSelection,
   shell,
   toggleActivityTab,
-  toggleBottomTab,
   toggleDock,
   unmountShell,
 } from "../src/shell";
@@ -218,28 +217,6 @@ describe("the Bottom dock is a dock", () => {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}");
     expect(saved.bottomTab).toBe("activity");
     expect(saved.bottomCollapsed).toBe(false);
-  });
-
-  test("toggleBottomTab closes the dock when the showing tab is re-picked", () => {
-    setBottomTab("problems");
-    toggleBottomTab("problems");
-    expect(shell.docks.bottom.collapsed).toBe(true);
-    expect(shell.bottomTab).toBe("problems");
-  });
-
-  test("toggleBottomTab reopens the dock when the showing tab is re-picked while closed", () => {
-    setBottomTab("problems");
-    setDockCollapsed("bottom", true);
-    toggleBottomTab("problems");
-    expect(shell.docks.bottom.collapsed).toBe(false);
-    expect(shell.bottomTab).toBe("problems");
-  });
-
-  test("toggleBottomTab switching tabs opens the dock rather than closing it", () => {
-    setBottomTab("problems");
-    toggleBottomTab("activity");
-    expect(shell.docks.bottom.collapsed).toBe(false);
-    expect(shell.bottomTab).toBe("activity");
   });
 
   test("its size is projected onto the row track, not onto a column", () => {

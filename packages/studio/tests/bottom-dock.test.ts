@@ -77,12 +77,11 @@ describe("the tab set", () => {
     expect(bottomPanelSet()[0]?.id).toBe("problems");
   });
 
-  test("Problems is the only tab with a rail button", () => {
-    expect(
-      bottomPanelSet()
-        .filter((panel) => panel.rail !== false)
-        .map((panel) => panel.id),
-    ).toEqual(["problems"]);
+  test("no tab has a rail button — the rail is the Navigator's", () => {
+    // Problems was the exception and is not any more. A rail button that opens a dock along the
+    // Bottom cost `toggleRailPanel`, `isRailPanelShowing` and `focusPanel` a branch apiece, and
+    // Made "things are wrong here" permanent furniture in the shell.
+    expect(bottomPanelSet().filter((panel) => panel.rail !== false)).toEqual([]);
   });
 
   test("Diff is not a tab of this dock, and not a tab id at all", () => {

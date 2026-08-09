@@ -230,7 +230,7 @@ describe("railGroups", () => {
     const groups = railGroups(emptyContext());
     expect(groups.map((g) => g.label)).toEqual(["Project", "Document"]);
     // Search declares `when: () => false` — registered, budgeted, not drawn.
-    expect(groups[0]?.panels.map((p) => p.id)).toEqual(["files", "git", "problems"]);
+    expect(groups[0]?.panels.map((p) => p.id)).toEqual(["files", "git"]);
     expect(groups[1]?.panels.map((p) => p.id)).toEqual(["layers", "page", "data", "packages"]);
   });
 
@@ -276,7 +276,6 @@ describe("railPanelSet", () => {
       "files",
       "search",
       "git",
-      "problems",
       "layers",
       "page",
       "data",
@@ -293,22 +292,29 @@ describe("railPanelSet", () => {
   });
 
   test("orders by level group, not by registration order", () => {
-    // Problems registers LAST (its module is the Bottom dock's), and still lands in slot four.
+    /* A SYNTHETIC panel, because the shipped set no longer proves this on its own.
+       Problems used to: it registered last, from the Bottom dock's module, and still landed in the
+       PROJECT group ahead of every DOCUMENT one. With it off the rail, registration order and rail
+       order happen to coincide, and a test that only reads the real set would pass whether or not
+       the sort existed. The property is still load-bearing — a panel is filed by its LEVEL, and the
+       module that registers it is free to be loaded whenever — so it is asserted deliberately. */
     registerNavigatorPanels();
-    expect(
-      listPanels()
-        .map((p) => p.id)
-        .indexOf("problems"),
-    ).toBeGreaterThan(
-      listPanels()
-        .map((p) => p.id)
-        .indexOf("packages"),
+    registerPanel({
+      id: "late-project-panel",
+      title: "Late",
+      level: "project",
+      dock: "navigator",
+      icon: "sp-icon-folder",
+      render: () => html``,
+    });
+    const registration = listPanels().map((p) => p.id);
+    const rail = railPanelSet().map((p) => p.id);
+    // Registered after every DOCUMENT panel…
+    expect(registration.indexOf("late-project-panel")).toBeGreaterThan(
+      registration.indexOf("packages"),
     );
-    expect(
-      railPanelSet()
-        .map((p) => p.id)
-        .indexOf("problems"),
-    ).toBe(3);
+    // …and drawn before all of them.
+    expect(rail.indexOf("late-project-panel")).toBeLessThan(rail.indexOf("layers"));
   });
 });
 
@@ -319,7 +325,7 @@ describe("railDeclarations", () => {
     // Is left to assert is the shape the budget check consumes.
     registerNavigatorPanels();
     expect(railDeclarations()).toEqual([
-      { dock: "rail/project", tabs: ["Files", "Search", "Source Control", "Problems"] },
+      { dock: "rail/project", tabs: ["Files", "Search", "Source Control"] },
       { dock: "rail/document", tabs: ["Outline", "Page", "Data", "Packages"] },
     ]);
   });
@@ -327,7 +333,9 @@ describe("railDeclarations", () => {
   test("counts hidden panels — a slot spent is a slot spent", () => {
     registerNavigatorPanels();
     const project = railDeclarations().find((d) => d.dock === "rail/project");
-    expect(project?.tabs).toEqual(["Files", "Search", "Source Control", "Problems"]);
+    // Search declares `when: () => false` and still spends a slot; Problems no longer spends one
+    // At all, because it has no rail button to spend it on.
+    expect(project?.tabs).toEqual(["Files", "Search", "Source Control"]);
   });
 
   test("stays inside the four-per-group cap", () => {

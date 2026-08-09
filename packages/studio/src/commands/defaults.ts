@@ -113,9 +113,9 @@ export interface CommandDeps {
   /**
    * The rail's panels in rail order, then the rail-less ones — the roster ⌘1–8 is generated from.
    *
-   * Not "the Navigator's panels": the rail groups by LEVEL and spans two docks, so Problems (whose
-   * body is the Bottom dock's first tab, plan §7.2) is the fourth entry and keeps ⌘4.
-   * `panels/navigator-panels.ts`'s `panelFocusRoster()` builds it.
+   * Every entry is a Navigator panel: the rail is the Navigator's, and a Bottom-dock tab is
+   * addressed by `view.setBottomTab` instead — one door per surface. `panels/navigator-panels.ts`'s
+   * `panelFocusRoster()` builds it.
    *
    * Injected rather than declared here so the panel registry stays the one place a panel is named,
    * levelled and gated. An empty roster (the no-op deps) simply yields no `panel.focus.*` records.

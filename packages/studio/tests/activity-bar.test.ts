@@ -177,13 +177,13 @@ describe("tabIcon", () => {
 // ─── renderActivityBar ────────────────────────────────────────────────────────
 
 describe("renderActivityBar", () => {
-  test("renders every rail-able panel, grouped by level and not by dock", () => {
+  test("renders every rail-able panel, grouped by level", () => {
     renderActivityBar();
-    // Problems is `dock: "bottom"` (§7.2) and still sits fourth in the PROJECT group: the rail
-    // Groups by LEVEL, so a panel's host has no say in whether it gets a button.
-    expect(railIds()).toEqual(["files", "git", "problems", "layers", "page", "data", "packages"]);
-    // …and the Bottom dock's three rail-less tabs stay off it.
-    for (const id of ["diff", "logic", "activity"]) {
+    expect(railIds()).toEqual(["files", "git", "layers", "page", "data", "packages"]);
+    // The Bottom dock's FOUR rail-less tabs stay off it. Problems joined the other three when its
+    // Button went: a rail control that opens a dock along the bottom points the wrong way, and it
+    // Cost three per-dock branches to keep honest.
+    for (const id of ["problems", "diff", "logic", "activity"]) {
       expect(railIds()).not.toContain(id);
     }
     // Elements/Insert left the rail entirely, and State gave up its slot to Data.
@@ -221,7 +221,6 @@ describe("renderActivityBar", () => {
     expect(labels).toEqual([
       "Files",
       "Source Control",
-      "Problems",
       "Outline",
       "Page",
       "Data",
@@ -309,55 +308,43 @@ describe("renderActivityBar", () => {
 
   // ── the dock branch (§7.2): a rail button reveals its panel where the panel lives ──
 
-  test("clicking Problems opens the BOTTOM dock on its tab, and leaves the Navigator alone", () => {
-    shell.leftTab = "files";
-    shell.docks.left.collapsed = false;
+  /*
+   * PROBLEMS IS NOT ON THE RAIL, and these four cases are what used to prove it was.
+   *
+   * It held the fourth PROJECT slot while its body was drawn in the Bottom dock, so the rail
+   * carried a per-dock branch in `toggleRailPanel`, another in `isRailPanelShowing` and a third in
+   * `focusPanel` — three branches to make one button of eight behave like the other seven, and a
+   * control on the far left that opened a dock along the bottom. It also made "things are wrong
+   * here" permanent furniture. The count still reaches the user from the status bar.
+   */
+  test("Problems has no rail button, and the rail no longer reaches a second dock", () => {
     shell.docks.bottom.collapsed = true;
     shell.bottomTab = "activity";
     renderActivityBar();
-    railButton("problems")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-
-    expect(shell.docks.bottom.collapsed).toBe(false);
-    expect(shell.bottomTab).toBe("problems");
-    // The Navigator is untouched — this is the whole reason the panel moved docks.
-    expect(shell.leftTab).toBe("files");
-    expect(shell.docks.left.collapsed).toBe(false);
-  });
-
-  test("clicking Problems again collapses the Bottom dock — the same gesture as ⌘1's", () => {
-    shell.docks.bottom.collapsed = false;
-    shell.bottomTab = "problems";
-    renderActivityBar();
-    railButton("problems")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-
+    expect(railButton("problems")).toBeNull();
+    expect(railIds()).not.toContain("problems");
+    // Nothing the rail can be clicked on writes the Bottom dock any more.
+    for (const id of railIds()) {
+      if (id) {
+        railButton(id)?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      }
+    }
     expect(shell.docks.bottom.collapsed).toBe(true);
+    expect(shell.bottomTab).toBe("activity");
   });
 
-  test("Problems reads pressed from the Bottom dock, not from shell.leftTab", () => {
-    shell.leftTab = "problems"; // A value the Navigator can no longer mean.
-    shell.docks.bottom.collapsed = true;
-    renderActivityBar();
-    expect(railButton("problems")?.getAttribute("aria-pressed")).toBe("false");
-
-    shell.docks.bottom.collapsed = false;
-    shell.bottomTab = "problems";
-    renderActivityBar();
-    expect(railButton("problems")?.getAttribute("aria-pressed")).toBe("true");
-    expect(railButton("problems")?.classList.contains("selected")).toBe(true);
-
-    shell.bottomTab = "activity";
-    renderActivityBar();
-    expect(railButton("problems")?.getAttribute("aria-pressed")).toBe("false");
-  });
-
-  test("the Problems badge is the problem count, off the same record the dock tab uses", async () => {
+  test("its record is still registered, and still counts — it is the BUTTON that is gone", async () => {
+    // `rail: false` is not deletion: the panel is a real Bottom-dock tab with a live badge, and
+    // `view.setBottomTab { tab: "problems" }` is how it is reached.
     const { notify, resetNotifications } = await import("../src/services/notify");
     resetNotifications();
-    renderActivityBar();
-    expect(railButton("problems")?.querySelector(".activity-badge")).toBeNull();
+    const problems = listPanels().find((panel) => panel.id === "problems");
+    expect(problems).toBeDefined();
+    expect(problems!.dock).toBe("bottom");
+    expect(problems!.rail).toBe(false);
+    expect(problems!.badge?.(emptyContext())).toBeNull();
     notify.error("could not save");
-    renderActivityBar();
-    expect(railButton("problems")?.querySelector(".activity-badge")?.textContent).toBe("1");
+    expect(problems!.badge?.(emptyContext())).toBe(1);
     resetNotifications();
   });
 

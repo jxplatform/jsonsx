@@ -1074,28 +1074,22 @@ describe("direct keys", () => {
     expect(shell.docks.left.collapsed).toBe(false);
   });
 
-  test("⌘4 reveals Problems in the BOTTOM dock, because that is where its body lives (§7.2)", () => {
-    shell.leftTab = "layers";
+  test("⌘4 is the DOCUMENT group's first panel, and no chord reaches the Bottom dock", () => {
+    /* Both of these used to be Problems. It held the fourth slot with its body in the Bottom dock,
+       so `focusPanel` carried a branch that opened a different dock than every other chord —
+       ⌘1–⌘3 and ⌘5–⌘8 moved the Navigator and ⌘4 moved the bottom. The rail is the Navigator's
+       again; the Bottom dock is reached by `view.setBottomTab`, which names the tab it means. */
+    shell.leftTab = "files";
     shell.bottomTab = "activity";
     setDockCollapsed("bottom", true);
     pressDoc("4", { ctrlKey: true });
-    expect(shell.bottomTab).toBe("problems");
-    expect(shell.docks.bottom.collapsed).toBe(false);
-    // The Navigator is not repurposed for it — the whole point of moving the panel.
     expect(shell.leftTab).toBe("layers");
-  });
-
-  test("⌘4 again collapses the Bottom dock and returns to the pane", () => {
-    // Read through a helper: a literal assignment narrows `shell.focusRegion` for the rest of the
-    // Test, and the point of the case is that the press CHANGES it.
-    const focused = (): string => shell.focusRegion;
-    setDockCollapsed("bottom", true);
-    pressDoc("4", { ctrlKey: true });
-    // Toggle-FOCUS: the second press only closes because focus is already in the dock.
-    shell.focusRegion = "dock";
-    pressDoc("4", { ctrlKey: true });
+    // The Bottom dock is untouched by every rail chord, not merely by this one.
+    for (const key of ["1", "2", "3", "4", "5", "6", "7", "8"]) {
+      pressDoc(key, { ctrlKey: true });
+    }
     expect(shell.docks.bottom.collapsed).toBe(true);
-    expect(focused()).toBe("pane");
+    expect(shell.bottomTab).toBe("activity");
   });
 
   test("⌘4 from elsewhere re-reveals rather than closing", () => {

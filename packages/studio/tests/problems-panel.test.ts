@@ -182,8 +182,10 @@ describe("the panel record", () => {
     registerProblemsPanel();
     const panel = getPanel("problems")!;
     expect(panel.dock).toBe("bottom");
-    // Rail-able all the same: the badge and ⌘4 are what §7.2 keeps on the rail.
-    expect(panel.rail).toBeUndefined();
+    // And OFF the rail, like the three tabs beside it. It had a button in the PROJECT group while
+    // Its body was drawn here, which took a per-dock branch in three places and pointed a
+    // Left-hand control at a dock along the bottom. The status bar carries the count.
+    expect(panel.rail).toBe(false);
     expect(panel.level).toBe("project");
     expect(panel.title).toBe("Problems");
     // P3 registered this id with `when: () => false`. The predicate is what P4.2 deleted.

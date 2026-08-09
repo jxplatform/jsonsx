@@ -39,10 +39,10 @@ A Problem is something that must be fixed, kept on a list until it is. Failed sa
 
 Open the list two ways, both showing the same rows:
 
-- **Problems** in the Navigator rail — :kbd[⌘4] / :kbd[Ctrl+4].
+- The **⚠ n** count in the status bar, whenever it is above zero — click it and the list opens on the problem.
 - The **Problems** tab of the Bottom dock — :kbd[⌘J] / :kbd[Ctrl+J].
 
-The rail's Problems button carries a **badge with the count**, and when the count is above zero the status bar shows a **⚠ n** you can click to jump straight there.
+The count only appears when there is something to count, so an empty project says nothing about problems at all.
 
 Each row gives you:
 

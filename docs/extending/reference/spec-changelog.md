@@ -291,6 +291,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.9.4-draft** (2026-08-09) — §16.3 Problems leaves the Navigator rail — no Bottom-dock tab has a rail button, the count lives in the status bar and runs view.setBottomTab, and panel.focus.problems is gone with the ⌘1-8 roster that follows the rail; §16.1 restates where a Problem is surfaced.
 - **0.9.3-draft** (2026-08-09) — §13.5 corrects check-icons — an icon key on a record is resolved through a map, not registered as a tag, and the two spaces fail differently; the previous text asserted the opposite and licensed a fix that replaced a working hand-drawn glyph with a key nothing resolved.
 - **0.9.2-draft** (2026-08-08) — §13.5 adds scripts/check-icons.ts — an sp-icon-* tag no element registers, or a registered element Spectrum does not ship, is now a red PR; the command record's icon field described accurately as a tag name rather than a key into a map.
 - **0.9.1-draft** (2026-08-08) — §18.4 derived panes ship — a pane chosen by a standing rule rather than a document; a preset is a projection (Code, Diff — one document, two sessions), a follow (Layout, Component definition — genuinely different documents) or a filter (a breakpoint of the board already drawn); §14.1 holds because following is dispose-and-open, with four exclusions keeping one document to one tab; a pane holds a derivation or tabs, never both.

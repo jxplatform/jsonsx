@@ -8,10 +8,10 @@
  * `registerPanel()` call in the module that owns it, and it appears here; there is nothing to
  * update in step.
  *
- * **A rail button is not the same thing as a Navigator panel.** The grouping is by LEVEL, and the
- * dock a record names is where its body is drawn — Problems is `dock: "bottom"` (plan §7.2), so its
- * button reveals the Bottom dock's first tab while sitting in the rail's PROJECT group with its
- * badge. {@link toggleRailPanel} is the one place that branch is written down.
+ * **Every rail button opens the Navigator, and the grouping is by LEVEL.** It briefly spanned two
+ * docks so Problems could keep a button while its body was drawn at the bottom; that cost a
+ * per-dock branch here, in {@link isRailPanelShowing} and in `focusPanel`, and it pointed left at
+ * something that opens below. Problems is `rail: false` now.
  *
  * The predecessor was an eight-item array literal — `{icon, label, value}` — whose `label` reached
  * the screen only as a `title` attribute. Thirteen icons in this shell had no name but a hover
@@ -22,7 +22,7 @@
 import { html, render as litRender, nothing } from "lit-html";
 import { activityBar } from "../store";
 import { effect, effectScope } from "../reactivity";
-import { shell, toggleActivityTab, toggleBottomTab } from "../shell";
+import { shell, toggleActivityTab } from "../shell";
 import { refreshGitStatus } from "./git-panel";
 import { panelContext, railGroups } from "./panel-registry";
 import { registerNavigatorPanels } from "./navigator-panels";
@@ -85,7 +85,6 @@ const gitBranchIcon = (s: string) => html`
  */
 export function tabIcon(tag: string, size?: string) {
   const m: Record<string, (s: string) => TemplateResult> = {
-    "sp-icon-alert": (s: string) => html`<sp-icon-alert slot="icon" size=${s}></sp-icon-alert>`,
     "sp-icon-box": (s: string) => html`<sp-icon-box slot="icon" size=${s}></sp-icon-box>`,
     "sp-icon-data": (s: string) => html`<sp-icon-data slot="icon" size=${s}></sp-icon-data>`,
     "sp-icon-folder": (s: string) => html`<sp-icon-folder slot="icon" size=${s}></sp-icon-folder>`,
@@ -109,27 +108,22 @@ export function tabIcon(tag: string, size?: string) {
  * @param {PanelRecord} panel
  */
 export function isRailPanelShowing(panel: PanelRecord): boolean {
-  if (panel.dock === "bottom") {
-    return !shell.docks.bottom.collapsed && shell.bottomTab === panel.id;
-  }
   return !shell.docks.left.collapsed && shell.leftTab === panel.id;
 }
 
 /**
- * Reveal (or collapse) what a rail button names, in whichever dock draws it.
+ * Reveal (or collapse) what a rail button names.
  *
- * The branch is HERE and not on the record: a panel record says where its body is drawn, and which
- * shell setter that implies is the rail's business. Both branches keep the same toggle-to-collapse
- * gesture — re-picking the panel that is already showing closes its dock — so ⌘4's button behaves
- * like ⌘1's even though one writes `shell.bottomTab` and the other `shell.leftTab`.
+ * There is no per-dock branch, because every rail button opens the Navigator. There WAS one — the
+ * rail spanned two docks so that Problems could keep a button while its body was drawn in the
+ * Bottom dock — and it cost a branch here, a branch in {@link isRailPanelShowing} and a third in
+ * `focusPanel`, all to make one button behave like the other seven. A control on the left that
+ * opens something at the bottom is also a lie about where it will take you. Problems is `rail:
+ * false` now and is addressed by `view.setBottomTab`, like the three tabs beside it.
  *
  * @param {PanelRecord} panel
  */
 export function toggleRailPanel(panel: PanelRecord): void {
-  if (panel.dock === "bottom") {
-    toggleBottomTab(panel.id);
-    return;
-  }
   toggleActivityTab(panel.id);
 }
 

@@ -432,15 +432,18 @@ describe("the direct keys (plan §5.3)", () => {
     }
   });
 
-  test("⌘4 is Problems, whose body is the Bottom dock's — the rail groups by level, not by dock", () => {
+  test("no chord addresses Problems — it is a Bottom-dock tab, reached by its own verb", () => {
     const registry = createCommandRegistry({ getContext: everythingContext, mac: true });
     registry.registerAll(appCommandSet());
-    expect(registry.keymap.resolveChord("mod+4", ["global"])?.commandId).toBe(
-      "panel.focus.problems",
-    );
-    expect(panelFocusRoster().find((panel) => panel.id === "problems")?.dock).toBe("bottom");
-    // The Navigator's own set no longer contains it, so it cannot be opened in the left dock.
+    // ⌘4 belongs to the DOCUMENT group's first panel now that the PROJECT group is three long.
+    expect(registry.keymap.resolveChord("mod+4", ["global"])?.commandId).toBe("panel.focus.layers");
+    // The roster follows the rail, so there is no `panel.focus.problems` record at all — not a
+    // Chordless one. `view.setBottomTab { tab: "problems" }` is the single door, the same one Diff,
+    // Logic and Activity use, and the status bar's warning count runs it.
+    expect(registry.get("panel.focus.problems")).toBeUndefined();
+    expect(panelFocusRoster().map((panel) => panel.id)).not.toContain("problems");
     expect(navigatorPanelSet().map((panel) => panel.id)).not.toContain("problems");
+    expect(registry.get("view.setBottomTab")).toBeDefined();
   });
 
   test("the Bottom dock's rail-less tabs get no panel.focus command of their own", () => {
