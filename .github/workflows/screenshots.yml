@@ -82,8 +82,9 @@ jobs:
       image: ghcr.io/puppeteer/puppeteer:25.4.0
       options: --user root
     env:
-      # The image ships Chrome for Testing under /root/.cache; puppeteer-core is given the path
-      # Explicitly (see scripts/screenshots/lib/browser.ts findChromium).
+      # The image ships Chrome for Testing under /root/.cache, which is NOT on PATH.
+      # `findChromium()` (scripts/screenshots/lib/browser.ts) resolves by PATH NAME, so the
+      # binary has to be handed over as CHROMIUM_BIN — see the step that resolves it below.
       PUPPETEER_SKIP_DOWNLOAD: "1"
       TZ: UTC
       LANG: C.UTF-8
@@ -167,6 +168,33 @@ jobs:
       # On nothing else. It is `continue-on-error` so the comment is still posted when it fails
       # (a broken shot is exactly when you want to see which pictures went with it); the explicit
       # Gate at the end of the job re-raises it.
+      # CHROMIUM_BIN is the contract every entry point documents (README, run.ts, thumbnails.ts)
+      # And the first candidate `findChromium()` tries. It was never set here: the env block above
+      # Claimed the path was "given explicitly" and it was not, so the lane would have died with
+      # "No chromium/chrome binary found" the moment anything upstream of it worked. It never got
+      # That far, because the `safe.directory` fault above killed it first.
+      #
+      # RESOLVED, not hardcoded: the Chrome for Testing path carries a build id that moves with the
+      # Image tag, so pinning the literal path would turn every image bump into this same silent
+      # Failure. Failing loudly beats falling back to a system browser — the lock records a
+      # Chromium major, and a capture from an unrecorded binary is a lock nobody can reproduce.
+      - name: Resolve the container's Chrome for Testing
+        shell: bash
+        run: |
+          set -euo pipefail
+          bin=$(find /root/.cache/puppeteer -type f -path '*/chrome-linux64/chrome' -perm -u+x \
+            2>/dev/null | sort | tail -n 1)
+          if [ -z "$bin" ]; then
+            echo "::error::No Chrome for Testing under /root/.cache/puppeteer. The"\
+              " ghcr.io/puppeteer/puppeteer image moved it, or the tag changed."
+            find /root/.cache -maxdepth 4 -type d 2>/dev/null | head -20
+            exit 1
+          fi
+          echo "CHROMIUM_BIN=$bin" >> "$GITHUB_ENV"
+          # Logged because the lock's runtime triple records the Chromium major: when a lock entry
+          # Changes for no visible reason, this line is what says the browser moved.
+          "$bin" --version
+
       - name: Capture
         id: capture
         continue-on-error: true
