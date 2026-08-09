@@ -862,6 +862,15 @@ export interface CanvasCommandDeps {
 }
 
 /** A document is open in a pane — every verb here writes that pane's own view state. */
+/* The pan-zoom surface, as one set rather than three spellings of it.
+   `canvas.setZoom` and `canvas.setFit` used to gate on `document.open` alone while their peers
+   `canvas.zoomIn`/`zoomOut`/`zoomReset` gate on `document.open && editor.kind === "canvas"` — so
+   driving Studio with a Library pane focused, `setZoom` and `setFit` both SUCCEEDED and wrote a
+   zoom the surface they name was not showing, in the same state where the three verbs that mean
+   the same thing refused with "requires an open document". `pane-context.ts`'s zoom pod already
+   draws itself for exactly these three modes; this is that rule, written once. */
+const PANZOOM_MODES = new Set(["design", "stylebook", "git-diff"]);
+
 const documentOpen = (ctx: { document: { open: boolean } }) => ctx.document.open;
 
 /**
@@ -957,6 +966,7 @@ export function canvasViewCommands(deps: CanvasCommandDeps): AnyCommand[] {
       group: "3_canvas",
       requires: "a document on the pan-zoom surface",
       when: documentOpen,
+      enablement: () => PANZOOM_MODES.has(deps.getCanvasMode()),
       run: (_commandCtx, args) => {
         requireTab("canvas.setZoom");
         setUserZoom(boundedNumberArg("canvas.setZoom", args, "zoom", PAN_ZOOM_MIN, PAN_ZOOM_MAX));
@@ -979,8 +989,10 @@ export function canvasViewCommands(deps: CanvasCommandDeps): AnyCommand[] {
       level: "document",
       menus: ["palette"],
       group: "3_canvas",
-      requires: "an open document",
+      // The sentence has to match the gate, or the refusal teaches the wrong thing.
+      requires: "a document on the pan-zoom surface",
       when: documentOpen,
+      enablement: () => PANZOOM_MODES.has(deps.getCanvasMode()),
       run: (_commandCtx, args) => {
         requireTab("canvas.setFit");
         setFit(fitArg("canvas.setFit", args, "fit"));

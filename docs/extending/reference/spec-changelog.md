@@ -146,6 +146,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `schema.md`
 
+- **0.3.0-draft** (2026-08-09) — §3.1 TagName gains a pattern — a tag name is a name, never an expression, because no consumer evaluates one and each failed differently and silently; SwitchNode is admitted as a child under ChildrenValue (anyOf, so a switch child may still carry its container tagName); ExternalClassDef.filter widened to a union like sort, since one flat property set is shared by every $prototype and was overriding extension classes' own declared parameters.
 - **0.2.8-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.2.7-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
 - **0.2.6-draft** (2026-07-22) — Align specs and docs with the bundled-schema validation contract (`ae861ff6`).

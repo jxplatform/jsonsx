@@ -1021,7 +1021,23 @@
               "type": "string"
             },
             "filter": {
-              "$ref": "#/$defs/v1/$defs/RefObject"
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/v1/$defs/RefObject"
+                },
+                {
+                  "description": "A single filter object, e.g. an equality shorthand.",
+                  "type": "object"
+                },
+                {
+                  "description": "Ordered filter rules, e.g. [{ field: \"Slug\", op: \"not empty\" }].",
+                  "items": {
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              ],
+              "description": "Filter configuration: a reactive $ref binding, a single filter object, or an ordered array of rules."
             },
             "headers": {
               "additionalProperties": {
@@ -6080,9 +6096,12 @@
           "oneOf": [
             {
               "items": {
-                "oneOf": [
+                "anyOf": [
                   {
                     "$ref": "#/$defs/v1/$defs/ElementDef"
+                  },
+                  {
+                    "$ref": "#/$defs/v1/$defs/SwitchNode"
                   },
                   {
                     "$ref": "#/$defs/v1/$defs/ArrayNamespace"
@@ -22774,8 +22793,9 @@
           "type": "object"
         },
         "TagName": {
-          "description": "HTML element tag name or custom element name (must contain a hyphen per Web Components spec).",
+          "description": "HTML element tag name or custom element name (must contain a hyphen per Web Components spec). A NAME, never an expression: no `${…}` position in the pipeline evaluates a tagName. Use `$switch`/`cases` to vary the element.",
           "minLength": 1,
+          "pattern": "^[a-zA-Z][a-zA-Z0-9._-]*$",
           "type": "string",
           "examples": [
             "a",

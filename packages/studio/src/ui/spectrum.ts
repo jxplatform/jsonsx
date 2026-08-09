@@ -36,7 +36,16 @@ import { FieldLabel } from "@spectrum-web-components/field-label/src/FieldLabel.
 import { Checkbox } from "@spectrum-web-components/checkbox/src/Checkbox.js";
 import { Switch as SpSwitch } from "@spectrum-web-components/switch/src/Switch.js";
 import { Divider } from "@spectrum-web-components/divider/src/Divider.js";
-import { Tooltip } from "@spectrum-web-components/tooltip/src/Tooltip.js";
+/* SIDE-EFFECT IMPORT, deliberately unlike every other row in this file.
+   Registering `sp-tooltip` ourselves from the class-only module made Studio the first definer, and
+   the package's OWN registering entry is reached later by a dynamic import (the textfield's
+   truncated-value controller) — which then calls `customElements.define` for a name we already
+   took, and throws `NotSupportedError` in the console during ordinary panel use. Our loop's
+   `customElements.get` guard cannot help: the second define is Spectrum's own call inside
+   node_modules. The tooltip package declares `sideEffects: ["./sp-*.js", …]`, so this import
+   survives bundling, and putting Spectrum's module in the static graph makes it the single definer
+   while the later dynamic import hits the module cache. */
+import "@spectrum-web-components/tooltip/sp-tooltip.js";
 import { Overlay } from "@spectrum-web-components/overlay/src/Overlay.js";
 import { OverlayTrigger } from "@spectrum-web-components/overlay/src/OverlayTrigger.js";
 import { Dialog } from "@spectrum-web-components/dialog/src/Dialog.js";
@@ -188,7 +197,6 @@ const components = [
   ["sp-checkbox", Checkbox],
   ["sp-switch", SpSwitch],
   ["sp-divider", Divider],
-  ["sp-tooltip", Tooltip],
   ["sp-overlay", Overlay],
   ["overlay-trigger", OverlayTrigger],
   ["sp-dialog", Dialog],

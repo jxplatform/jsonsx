@@ -2,9 +2,9 @@
 
 ## JSON Schema 2020-12 Meta-Schema Generator
 
-**Version:** 0.2.8-draft
+**Version:** 0.3.0-draft
 **Status:** Partial
-**Updated:** 2026-07-22
+**Updated:** 2026-08-09
 **License:** MIT
 
 ---
@@ -91,7 +91,30 @@ All 13 built-in prototypes with their specific configuration properties:
   Array-namespace forms
 - Element-level `$switch`/`cases`: the discriminant is a `StateRef`
   (`#/state/…`), and `cases` maps case values to element definitions or
-  external component refs (spec.md §14.1)
+  external component refs (spec.md §14.1). `SwitchNode` is admitted **as a
+  child**, under `ChildrenValue`'s item alternatives — which are `anyOf`, not
+  `oneOf`, because a switch child may also carry the `tagName` of its own
+  container and would otherwise match two branches and be rejected for
+  matching both. It was defined and referenced from nowhere until 2026-08-09,
+  so every document with a `$switch` child failed validation while the
+  compiler rendered it correctly.
+- **`TagName` is a name, never an expression** — `pattern`
+  `^[a-zA-Z][a-zA-Z0-9._-]*$`. No position in the pipeline evaluates a
+  `${…}` in tag position, and each consumer failed differently and silently
+  when one was written: the runtime threw `InvalidCharacterError` from
+  `createElement`, the compiler emitted a lit binding in tag position, and the
+  static renderer re-resolved the emitted HTML against the _page_ scope — where
+  a component's own `state` does not exist — so a built page collapsed to the
+  fallback branch's tag carrying the other branch's attributes. Vary an element
+  with `$switch`.
+- **`ExternalClassDef` is one flat property set shared by every state
+  `$prototype`**, so a property name it defines for a built-in constrains every
+  extension class that declares the same name. `filter` and `sort` are
+  therefore unions (reactive `$ref`, single object, ordered rule array) rather
+  than the `$ref`-only shape the built-in `Array` prototype wants: both
+  `@jxsuite/parser`'s ContentCollection and `@jxsuite/connector`'s TableQuery
+  declare `filter` as a rule array, and the narrower core shape silently
+  overrode the class's own declaration.
 
 #### CEM Annotations
 
@@ -182,6 +205,7 @@ Three JSON Schema 2020-12 documents:
 
 ## Changelog
 
+- **0.3.0-draft** (2026-08-09) — §3.1 TagName gains a pattern — a tag name is a name, never an expression, because no consumer evaluates one and each failed differently and silently; SwitchNode is admitted as a child under ChildrenValue (anyOf, so a switch child may still carry its container tagName); ExternalClassDef.filter widened to a union like sort, since one flat property set is shared by every $prototype and was overriding extension classes' own declared parameters.
 - **0.2.8-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.2.7-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
 - **0.2.6-draft** (2026-07-22) — Align specs and docs with the bundled-schema validation contract (`ae861ff6`).
@@ -198,4 +222,4 @@ Three JSON Schema 2020-12 documents:
 
 ---
 
-_`@jxsuite/schema` Specification v0.2.8-draft_
+_`@jxsuite/schema` Specification v0.3.0-draft_

@@ -606,3 +606,49 @@ describe("the harness tab shape is what these verbs expect", () => {
     expect(activeTab.value?.session.selection).toEqual([[]]);
   });
 });
+
+describe("the pan-zoom family agrees with itself", () => {
+  /*
+   * Found by driving Studio against a real site: with a Library pane focused, `canvas.setZoom` and
+   * `canvas.setFit` SUCCEEDED — writing a zoom onto a surface that was not showing — in the same
+   * state where `canvas.zoomIn`, `canvas.zoomOut` and `canvas.zoomReset` refused with "requires an
+   * open document". Five verbs over one surface, two rules, and the two that disagreed were the
+   * ones that WRITE.
+   *
+   * The rule is the mode, not merely the document: `pane-context.ts` already draws the zoom pod for
+   * exactly design / stylebook / git-diff, and these two records now ask the same question.
+   */
+  const PANZOOM = ["design", "stylebook", "git-diff"];
+  const OFF_SURFACE = ["edit", "preview", "source", "grid"];
+
+  beforeEach(() => {
+    resetWorkspaceWithTab();
+    registry = createCommandRegistry({ getContext: () => ctx });
+    registry.registerAll(canvasViewCommands(deps));
+    ctx = makeContext({ document: { open: true } });
+  });
+
+  test("both are available on every pan-zoom mode", () => {
+    for (const mode of PANZOOM) {
+      canvasMode = mode;
+      expect([mode, registry.isEnabled("canvas.setZoom")]).toEqual([mode, true]);
+      expect([mode, registry.isEnabled("canvas.setFit")]).toEqual([mode, true]);
+    }
+  });
+
+  test("and refused on every mode that has no pan-zoom surface", () => {
+    for (const mode of OFF_SURFACE) {
+      canvasMode = mode;
+      expect([mode, registry.isEnabled("canvas.setZoom")]).toEqual([mode, false]);
+      expect([mode, registry.isEnabled("canvas.setFit")]).toEqual([mode, false]);
+    }
+  });
+
+  test("the refusal sentence names the gate, rather than the one it used to have", () => {
+    canvasMode = "edit";
+    // `canvas.setFit` said "an open document" while refusing for the MODE — a sentence that sends
+    // The reader to open a document they already have open.
+    expect(registry.disabledReason("canvas.setFit")).toBe("a document on the pan-zoom surface");
+    expect(registry.disabledReason("canvas.setZoom")).toBe("a document on the pan-zoom surface");
+  });
+});

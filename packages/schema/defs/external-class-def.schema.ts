@@ -58,7 +58,26 @@ export const externalClassDefSchema = {
     description: { type: "string" },
     domain: { type: "string" },
     expires: { type: "string" },
-    filter: { $ref: "#/$defs/RefObject" },
+    /* Widened to mirror `sort` below, because this one grab-bag of properties is shared by EVERY
+       state `$prototype` with no discrimination on which prototype is in play. `filter` as a
+       reactive `$ref` is what the built-in `Array` prototype wants; `@jxsuite/parser`'s
+       ContentCollection and `@jxsuite/connector`'s TableQuery both declare their own `filter` as a
+       rule ARRAY, and the core shape silently overrode the class's own declaration — so a document
+       using a documented class parameter correctly failed `jx validate` with "must be object". */
+    filter: {
+      anyOf: [
+        { $ref: "#/$defs/RefObject" },
+        { description: "A single filter object, e.g. an equality shorthand.", type: "object" },
+        {
+          description: 'Ordered filter rules, e.g. [{ field: "Slug", op: "not empty" }].',
+          items: { type: "object" },
+          type: "array",
+        },
+      ],
+      description:
+        "Filter configuration: a reactive $ref binding, a single filter object, or an ordered " +
+        "array of rules.",
+    },
     headers: { additionalProperties: { type: "string" }, type: "object" },
     indexes: {
       items: {

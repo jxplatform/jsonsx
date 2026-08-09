@@ -23,8 +23,17 @@ export const childrenValueSchema = {
   oneOf: [
     {
       items: {
-        oneOf: [
+        /* `anyOf`, not `oneOf`, and SwitchNode is the reason for both halves of that.
+           `$defs.SwitchNode` was defined and referenced from nowhere — a node the compiler fully
+           renders (`shared.ts` renderSwitch) that no position in the schema admitted, so every
+           document with a `$switch` child failed `jx validate`. Adding the ref under `oneOf` would
+           have traded one break for another: a switch child that also carries `tagName` (its
+           container element) matches ElementDef AND SwitchNode, and "exactly one" then rejects the
+           form that works today. `anyOf` accepts both, and still rejects a child object that is
+           neither. */
+        anyOf: [
           { $ref: "#/$defs/ElementDef" },
+          { $ref: "#/$defs/SwitchNode" },
           { $ref: "#/$defs/ArrayNamespace" },
           { type: "string" },
           { type: "number" },
