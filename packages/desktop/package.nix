@@ -38,7 +38,67 @@ let
       serve = false;
     };
   };
-  tarballs = lib.filterAttrs (_: e: e.serve) bunSet;
+  # `bun install` only ever downloads the optional native sidecars whose `os`
+  # and `cpu` match the host, but bun.lock pins every platform npm publishes —
+  # Windows and macOS esbuild/sharp/oxlint/tsgo binaries included. Served
+  # unconditionally they become build inputs of `registryTree`, so `nix build`
+  # fetches hundreds of megabytes it will never hand to Bun. Filter on the same
+  # two fields Bun filters on; libc deliberately is not one of them, which is
+  # why the `linuxmusl` sharp builds stay (Bun installs those on glibc too).
+  #
+  # A package name that mentions no platform at all is always kept, and a
+  # wrongly-dropped tarball fails loudly — the shim answers its fetch with a
+  # 404 and `bun install` aborts — so the filter can never silently ship a
+  # half-installed tree.
+  osTokens = [
+    "aix"
+    "android"
+    "darwin"
+    "freebsd"
+    "linux"
+    "linuxmusl"
+    "netbsd"
+    "openbsd"
+    "openharmony"
+    "sunos"
+    "webcontainers"
+    "win32"
+  ];
+  cpuTokens = [
+    "arm"
+    "arm64"
+    "ia32"
+    "loong64"
+    "mips64el"
+    "ppc64"
+    "riscv64"
+    "s390x"
+    "wasm32"
+    "x64"
+  ];
+  hostOs = if stdenv.hostPlatform.isDarwin then "darwin" else "linux";
+  hostCpu =
+    let
+      cpu = stdenv.hostPlatform.parsed.cpu.name;
+    in
+    {
+      x86_64 = "x64";
+      aarch64 = "arm64";
+      armv7l = "arm";
+      i686 = "ia32";
+    }
+    .${cpu} or cpu;
+  forThisHost =
+    key:
+    let
+      toks = lib.splitString "-" (unscopedOf (nameOf key));
+      os = lib.intersectLists toks osTokens;
+      cpu = lib.intersectLists toks cpuTokens;
+    in
+    (os == [ ] || lib.elem hostOs os || lib.elem "${hostOs}musl" os)
+    && (cpu == [ ] || lib.elem hostCpu cpu);
+
+  tarballs = lib.filterAttrs (key: e: e.serve && forThisHost key) bunSet;
 
   # Split a "name@version" key (handles scoped names like "@scope/pkg@1.2.3").
   nameOf =
