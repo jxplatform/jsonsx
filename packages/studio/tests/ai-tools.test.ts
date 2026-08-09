@@ -486,7 +486,12 @@ describe("ai-tools — file creation", () => {
     const saved: [string, string][] = [];
     const { tab, registry } = harness(
       { tagName: "div", children: [] },
-      { saveFile: async (p, c) => void saved.push([p, c]), validate: async () => [] },
+      {
+        saveFile: async (p, c) => {
+          saved.push([p, c]);
+        },
+        validate: async () => [],
+      },
     );
     const res = await registry.execute("create_component", {
       content: { children: [], tagName: "my-card" },
@@ -531,7 +536,12 @@ describe("ai-tools — file creation", () => {
     const saved: [string, string][] = [];
     const { tab, registry } = harness(
       { tagName: "div", children: [] },
-      { saveFile: async (p, c) => void saved.push([p, c]), validate: async () => [] },
+      {
+        saveFile: async (p, c) => {
+          saved.push([p, c]);
+        },
+        validate: async () => [],
+      },
     );
     const ok = await registry.execute("create_page", {
       content: { children: [], tagName: "div" },
@@ -556,7 +566,9 @@ describe("ai-tools — file creation", () => {
     const registry = createToolRegistry();
     registerAiTools(registry, {
       getTab: () => active,
-      openDocument: async () => void (active = null),
+      openDocument: async () => {
+        active = null;
+      },
       validate: async () => [],
     });
     const res = await registry.execute("open_document", { path: "p.json" });
@@ -575,7 +587,9 @@ describe("ai-tools — write reconciliation with open tabs", () => {
       { tagName: "div", children: [] },
       {
         findOpenTab: (p) => (p === "pages/x.json" ? openTab : null),
-        saveFile: async (p) => void saved.push(p),
+        saveFile: async (p) => {
+          saved.push(p);
+        },
         validate: async () => [],
       },
     );
@@ -601,7 +615,9 @@ describe("ai-tools — write reconciliation with open tabs", () => {
       { tagName: "div", children: [] },
       {
         findOpenTab: (p) => (p === "components/c.json" ? openTab : null),
-        reloadTab: async (p) => void reloaded.push(p),
+        reloadTab: async (p) => {
+          reloaded.push(p);
+        },
         saveFile: async () => {},
         validate: async () => [],
       },

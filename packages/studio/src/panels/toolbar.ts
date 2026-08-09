@@ -537,24 +537,25 @@ function csdTpl(controls: WindowControls, mac: boolean) {
 
 // ─── The three dock toggles ───────────────────────────────────────────────────
 
-const RAIL_RIGHT_OPEN = html`<sp-icon-rail-right-open slot="icon"></sp-icon-rail-right-open>`;
-const RAIL_RIGHT_CLOSE = html`<sp-icon-rail-right-close slot="icon"></sp-icon-rail-right-close>`;
-/* MIRRORED, because Spectrum ships no left-hand pair.
-   `IconRailRightOpen`/`Close` exist; `IconRailLeftOpen`/`Close` do not — the workflow set has only
-   the plain `IconRailLeft`. These two tags were written by symmetry with the two above and could
-   never have resolved, so the Navigator's toggle rendered an unregistered custom element: empty
-   space where an icon should be, for as long as the button has existed. A right-hand rail flipped
-   on X is exactly the left-hand one, and it keeps the pair visually identical to the Inspector's,
-   which is the point of them being a pair. */
-const RAIL_LEFT_OPEN = html`<sp-icon-rail-right-close
-  class="mirror-x"
-  slot="icon"
-></sp-icon-rail-right-close>`;
-const RAIL_LEFT_CLOSE = html`<sp-icon-rail-right-open
-  class="mirror-x"
-  slot="icon"
-></sp-icon-rail-right-open>`;
-const DOCK_BOTTOM = html`<sp-icon-align-bottom slot="icon"></sp-icon-align-bottom>`;
+/* The window, with THIS dock's rail marked — one shipped glyph per region.
+
+   The pair these replace was `rail-right-open`/`close` under `scaleX(-1)`, because the left-hand
+   pair looked absent. It is not: `rail-left`, `rail-right` and `rail-bottom` are all in the
+   workflow set, and they are a better vocabulary than an arrow besides. An arrow says which way
+   something will move and nothing about what or where, which is why the Bottom dock could never
+   join the set and carried a static `align-bottom` instead.
+
+   The mirror was also worth deleting on its own terms. Spectrum's two right-hand glyphs are exact
+   mirror images OF EACH OTHER, so flipping the wrong member of the pair lands on the other
+   member's appearance — a real, crisp arrow pointing the wrong way, looking entirely deliberate.
+   It shipped crossed and nothing could see it. Three distinct glyphs cannot fail that way.
+
+   State stays where it already was and where it is already asserted: `?selected` on the button. */
+const DOCK_ICONS = {
+  bottom: html`<sp-icon-rail-bottom slot="icon"></sp-icon-rail-bottom>`,
+  left: html`<sp-icon-rail-left slot="icon"></sp-icon-rail-left>`,
+  right: html`<sp-icon-rail-right slot="icon"></sp-icon-rail-right>`,
+} as const;
 
 /**
  * ▤▥▦ — the three docks, each rendered from its own record.
@@ -567,17 +568,17 @@ function dockTogglesTpl(registry: CommandRegistry) {
   return html`
     ${tbCmd(registry, "view.toggleNavigator", {
       compact: true,
-      icon: shell.docks.left.collapsed ? RAIL_LEFT_OPEN : RAIL_LEFT_CLOSE,
+      icon: DOCK_ICONS.left,
       selected: !shell.docks.left.collapsed,
     })}
     ${tbCmd(registry, "view.toggleInspector", {
       compact: true,
-      icon: shell.docks.right.collapsed ? RAIL_RIGHT_OPEN : RAIL_RIGHT_CLOSE,
+      icon: DOCK_ICONS.right,
       selected: !shell.docks.right.collapsed,
     })}
     ${tbCmd(registry, "view.toggleBottomDock", {
       compact: true,
-      icon: DOCK_BOTTOM,
+      icon: DOCK_ICONS.bottom,
       selected: !shell.docks.bottom.collapsed,
     })}
   `;

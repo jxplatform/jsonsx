@@ -190,8 +190,12 @@ describe("shell surfaces", () => {
     resetShellSurfaces();
     const calls: string[] = [];
     const surface = {
-      mount: () => void calls.push("mount"),
-      unmount: () => void calls.push("unmount"),
+      mount: () => {
+        calls.push("mount");
+      },
+      unmount: () => {
+        calls.push("unmount");
+      },
     };
     registerShellSurface(surface);
     registerShellSurface(surface);

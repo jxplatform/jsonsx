@@ -122,7 +122,9 @@ function toolbarTpl(controller: GridController, panel: ActiveGridPanel) {
         size="s"
         variant="accent"
         ?disabled=${dirty === 0 || state.saving}
-        @click=${() => void controller.save()}
+        @click=${() => {
+          void controller.save();
+        }}
       >
         Save${dirty > 0 ? ` (${dirty})` : ""}
       </sp-button>
@@ -131,7 +133,9 @@ function toolbarTpl(controller: GridController, panel: ActiveGridPanel) {
         quiet
         title="Reload from source"
         ?disabled=${state.loading || state.saving}
-        @click=${() => void controller.refresh()}
+        @click=${() => {
+          void controller.refresh();
+        }}
       >
         Refresh
       </sp-action-button>
@@ -281,7 +285,9 @@ function openViewPopover(controller: GridController, panel: ActiveGridPanel, anc
     const { columns } = controller.state;
 
     const setSort = (spec: GridSortSpec | null) =>
-      change({ sort: spec }, () => void controller.setSort(spec));
+      change({ sort: spec }, () => {
+        void controller.setSort(spec);
+      });
 
     return html`<sp-popover
       open
@@ -330,7 +336,9 @@ function openViewPopover(controller: GridController, panel: ActiveGridPanel, anc
           <sp-button
             size="s"
             variant="accent"
-            @click=${() => void promptSaveView(controller, panel, rerender)}
+            @click=${() => {
+              void promptSaveView(controller, panel, rerender);
+            }}
           >
             ${activeName ? "Save as…" : "Save view…"}
           </sp-button>
@@ -534,12 +542,13 @@ function pagerTpl(controller: GridController) {
       quiet
       title="Previous page"
       ?disabled=${offset === 0 || state.loading}
-      @click=${() =>
+      @click=${() => {
         void controller.setQuery({
           ...state.query,
           limit,
           offset: Math.max(0, offset - limit),
-        })}
+        });
+      }}
     >
       ‹ Prev
     </sp-action-button>
@@ -549,7 +558,9 @@ function pagerTpl(controller: GridController) {
       quiet
       title="Next page"
       ?disabled=${offset + limit >= state.total || state.loading}
-      @click=${() => void controller.setQuery({ ...state.query, limit, offset: offset + limit })}
+      @click=${() => {
+        void controller.setQuery({ ...state.query, limit, offset: offset + limit });
+      }}
     >
       Next ›
     </sp-action-button>

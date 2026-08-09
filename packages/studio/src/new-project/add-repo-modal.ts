@@ -177,7 +177,9 @@ function repoRowTpl(repo: RepoInfo) {
       class="add-repo-row"
       ?disabled=${Boolean(_importing)}
       title=${repo.fullName}
-      @click=${() => void chooseRepo(repo)}
+      @click=${() => {
+        void chooseRepo(repo);
+      }}
     >
       <span class="add-repo-name">${repo.fullName}</span>
       <span class="add-repo-meta">

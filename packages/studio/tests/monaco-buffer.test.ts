@@ -203,8 +203,12 @@ describe("bufferWrites", () => {
     const buffer = fakeBuffer();
     const writes = bufferWrites(buffer);
     const ran: string[] = [];
-    writes.arm(BUFFER_COMMIT, 10, () => void ran.push("first"));
-    writes.arm(BUFFER_COMMIT, 10, () => void ran.push("second"));
+    writes.arm(BUFFER_COMMIT, 10, () => {
+      ran.push("first");
+    });
+    writes.arm(BUFFER_COMMIT, 10, () => {
+      ran.push("second");
+    });
     await sleep(40);
     expect(ran).toEqual(["second"]);
     // A fired timer leaves nothing to flush — the key is dropped before the body runs, so a
@@ -217,8 +221,12 @@ describe("bufferWrites", () => {
     const buffer = fakeBuffer();
     const writes = bufferWrites(buffer);
     const ran: string[] = [];
-    writes.arm(BUFFER_COMMIT, 10, () => void ran.push("commit"));
-    writes.arm("lint", 15, () => void ran.push("lint"));
+    writes.arm(BUFFER_COMMIT, 10, () => {
+      ran.push("commit");
+    });
+    writes.arm("lint", 15, () => {
+      ran.push("lint");
+    });
     writes.cancel();
     await sleep(40);
     expect(ran).toEqual([]);
@@ -232,7 +240,9 @@ describe("bufferWrites", () => {
     const writes = bufferWrites(buffer);
     expect(buffer._writes).toBe(writes);
     const ran: string[] = [];
-    writes.arm(BUFFER_COMMIT, 10, () => void ran.push("commit"));
+    writes.arm(BUFFER_COMMIT, 10, () => {
+      ran.push("commit");
+    });
     cancelBufferWrites(buffer);
     await sleep(40);
     expect(ran).toEqual([]);
@@ -242,8 +252,12 @@ describe("bufferWrites", () => {
     const buffer = fakeBuffer();
     const writes = bufferWrites(buffer);
     const ran: string[] = [];
-    writes.arm(BUFFER_COMMIT, 500, () => void ran.push("commit"));
-    writes.arm("lint", 750, () => void ran.push("lint"));
+    writes.arm(BUFFER_COMMIT, 500, () => {
+      ran.push("commit");
+    });
+    writes.arm("lint", 750, () => {
+      ran.push("lint");
+    });
 
     void writes.flush(BUFFER_COMMIT);
     expect(ran).toEqual(["commit"]);
@@ -271,8 +285,12 @@ describe("commitBufferWrites", () => {
     const writes = bufferWrites(buffer);
     const written: string[] = [];
     const linted: string[] = [];
-    writes.arm(BUFFER_COMMIT, 500, () => void written.push(buffer.getValue()));
-    writes.arm("lint", 750, () => void linted.push(buffer.getValue()));
+    writes.arm(BUFFER_COMMIT, 500, () => {
+      written.push(buffer.getValue());
+    });
+    writes.arm("lint", 750, () => {
+      linted.push(buffer.getValue());
+    });
 
     commitBufferWrites(buffer, "logic");
     buffer.dispose();
@@ -457,7 +475,9 @@ describe("commitBufferWrites", () => {
       throw new TypeError("undefined is not an object (evaluating 'node[key]')");
     });
     const linted: string[] = [];
-    writes.arm("lint", 10, () => void linted.push("lint"));
+    writes.arm("lint", 10, () => {
+      linted.push("lint");
+    });
 
     expect(commitBufferWrites(buffer, "logic")).toBe(false);
 
@@ -584,7 +604,9 @@ describe("commitTabBuffers", () => {
     const landed: string[] = [];
     const buffer = mountedBuffer(tabA, "typed", landed);
     const linted: string[] = [];
-    buffer._writes!.arm("lint", 10, () => void linted.push("lint"));
+    buffer._writes!.arm("lint", 10, () => {
+      linted.push("lint");
+    });
 
     await commitTabBuffers(tabA);
     await sleep(40);

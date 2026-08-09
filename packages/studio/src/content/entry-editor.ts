@@ -215,7 +215,9 @@ function notAnEntryTpl(tab: Tab) {
       </p>
       <sp-action-button
         size="s"
-        @click=${() => void activeRegistry()?.run("settings.open", { section: "content" })}
+        @click=${() => {
+          void activeRegistry()?.run("settings.open", { section: "content" });
+        }}
         >Content types…</sp-action-button
       >
     </div>

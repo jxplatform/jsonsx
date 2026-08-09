@@ -330,7 +330,9 @@ function functionPaneTemplate(editing: FunctionEditDef): TemplateResult {
         editing.type === "def" ? "function body" : "event handler",
         editing.type === "def" ? `state/${name}` : name,
         null,
-        () => void closeFunctionEditor(),
+        () => {
+          void closeFunctionEditor();
+        },
       )}
       ${functionEditorTemplate()}
     </div>

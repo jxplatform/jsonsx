@@ -944,7 +944,12 @@ function placedFileItems(entry: { path: string; type: string }): FileMenuItem[] 
     const reason = registry.disabledReason(command.id);
     items.push(
       reason === undefined
-        ? { action: () => void registry.run(command.id, args), label: command.title }
+        ? {
+            action: () => {
+              void registry.run(command.id, args);
+            },
+            label: command.title,
+          }
         : { disabled: true, label: command.title, reason },
     );
   }

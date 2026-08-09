@@ -63,13 +63,27 @@ function installRegistry(): CommandRegistry {
     defaultCommands({
       ...noopCommandDeps(),
       panelRoster: [{ id: "files", title: "Files" }],
-      saveDocument: () => void ran.push("save"),
-      undo: () => void ran.push("undo"),
-      redo: () => void ran.push("redo"),
-      openInBrowser: () => void ran.push("openInBrowser"),
-      openProject: () => void ran.push("openProject"),
-      toggleDock: (dock) => void ran.push(`toggleDock:${dock}`),
-      focusPanel: (id) => void ran.push(`focusPanel:${id}`),
+      saveDocument: () => {
+        ran.push("save");
+      },
+      undo: () => {
+        ran.push("undo");
+      },
+      redo: () => {
+        ran.push("redo");
+      },
+      openInBrowser: () => {
+        ran.push("openInBrowser");
+      },
+      openProject: () => {
+        ran.push("openProject");
+      },
+      toggleDock: (dock) => {
+        ran.push(`toggleDock:${dock}`);
+      },
+      focusPanel: (id) => {
+        ran.push(`focusPanel:${id}`);
+      },
     }),
   );
   // The bar's third dock toggle is `shell.ts`'s record now — ⌘J flips `shell.docks.bottom`, which
@@ -89,7 +103,9 @@ function installRegistry(): CommandRegistry {
     when: (candidate) => candidate.project.open,
     enablement: (candidate) => candidate.document.open,
     requires: "an open document",
-    run: () => void ran.push("gated"),
+    run: () => {
+      ran.push("gated");
+    },
   });
   setActiveRegistry(registry);
   return registry;
@@ -377,14 +393,21 @@ describe("dock toggles", () => {
    * cannot be asked here, because this file never loads `ui/spectrum.ts` and every icon would read
    * as unregistered, including the ones that work.
    */
+  /**
+   * A dock toggle's glyph, by tag.
+   *
+   * A tag name is a weak assertion when two glyphs are lookalikes — it is what let the mirrored
+   * `rail-right-*` pair ship crossed, since both spellings named a real element and only the
+   * arrow's direction differed. It is a fine assertion for `rail-left` / `rail-right` /
+   * `rail-bottom`, which are three visibly distinct shapes; the STATE is `?selected`, asserted
+   * separately on every one of them below.
+   */
   function glyph(el: Element): string {
     const icon = el.querySelector("[slot='icon']");
     if (!icon) {
       return "none";
     }
-    const tag = icon.tagName.toLowerCase();
-    const mirrored = icon.classList.contains("mirror-x") ? " (mirrored)" : "";
-    return `${tag}${mirrored}`;
+    return icon.tagName.toLowerCase();
   }
 
   test("each dock's glyph and pressed state follow the record it renders", async () => {
@@ -392,9 +415,18 @@ describe("dock toggles", () => {
     await flush();
     const navigatorToggle = btn("Toggle Navigator Dock");
     expect(navigatorToggle.hasAttribute("selected")).toBe(true);
-    // The Inspector's glyph, flipped: Spectrum has no left-hand pair, and mirroring keeps the
-    // Two dock toggles reading as one control rather than inventing a third shape.
-    expect(glyph(navigatorToggle)).toBe("sp-icon-rail-right-open (mirrored)");
+    // Three regions, three distinct shipped glyphs — including the Bottom dock, which used to
+    // Carry `align-bottom` and so named no region at all.
+    expect(glyph(navigatorToggle)).toBe("sp-icon-rail-left");
+    expect(glyph(btn("Toggle Inspector Dock"))).toBe("sp-icon-rail-right");
+    expect(glyph(btn("Toggle Bottom Dock"))).toBe("sp-icon-rail-bottom");
+    // …and no two of them are the same element, which is the property the mirrored pair lacked.
+    const shapes = [
+      glyph(navigatorToggle),
+      glyph(btn("Toggle Inspector Dock")),
+      glyph(btn("Toggle Bottom Dock")),
+    ];
+    expect(new Set(shapes).size).toBe(shapes.length);
     expect(navigatorToggle.getAttribute("title")).toBe("Toggle Navigator Dock (⌘B)");
 
     click(navigatorToggle);
@@ -414,7 +446,7 @@ describe("dock toggles", () => {
     shell.docks.bottom.collapsed = false;
     await flush();
     expect(btn("Toggle Bottom Dock").hasAttribute("selected")).toBe(true);
-    expect(root.querySelector("sp-icon-align-bottom")).not.toBeNull();
+    expect(glyph(btn("Toggle Bottom Dock"))).toBe("sp-icon-rail-bottom");
 
     // The Assistant is an Inspector tab now, and the Bottom dock does not answer for it.
     setInspectorTab("assistant");
@@ -425,8 +457,12 @@ describe("dock toggles", () => {
     shell.docks.bottom.collapsed = true;
     await flush();
     expect(btn("Toggle Bottom Dock").hasAttribute("selected")).toBe(false);
-    expect(glyph(btn("Toggle Inspector Dock"))).toBe("sp-icon-rail-right-open");
-    expect(glyph(btn("Toggle Navigator Dock"))).toBe("sp-icon-rail-right-open (mirrored)");
+    // Three docks in three different states at once: the glyph names the region, `selected` the
+    // State, and the two must not be confused for one another.
+    expect(glyph(btn("Toggle Inspector Dock"))).toBe("sp-icon-rail-right");
+    expect(btn("Toggle Inspector Dock").hasAttribute("selected")).toBe(false);
+    expect(glyph(btn("Toggle Navigator Dock"))).toBe("sp-icon-rail-left");
+    expect(btn("Toggle Navigator Dock").hasAttribute("selected")).toBe(true);
 
     toolbar.unmount();
     setInspectorTab("properties");
@@ -434,11 +470,12 @@ describe("dock toggles", () => {
     expect(btn("Toggle Bottom Dock").hasAttribute("selected")).toBe(false);
   });
 
-  test("the navigator glyph flips when the dock closes", async () => {
+  test("the navigator button reports a closed dock without changing what it names", async () => {
     shell.docks.left.collapsed = true;
     toolbar.mount(root);
     await flush();
-    expect(glyph(btn("Toggle Navigator Dock"))).toBe("sp-icon-rail-right-close (mirrored)");
+    expect(btn("Toggle Navigator Dock").hasAttribute("selected")).toBe(false);
+    expect(glyph(btn("Toggle Navigator Dock"))).toBe("sp-icon-rail-left");
   });
 });
 

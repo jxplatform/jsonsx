@@ -86,8 +86,12 @@ function installRegistry() {
     defaultCommands({
       ...noopCommandDeps(),
       panelRoster: [],
-      saveDocument: () => void ran.push("save"),
-      toggleZen: () => void ran.push("zen"),
+      saveDocument: () => {
+        ran.push("save");
+      },
+      toggleZen: () => {
+        ran.push("zen");
+      },
     }),
   );
   registry.register({
@@ -101,7 +105,9 @@ function installRegistry() {
       properties: { path: { type: "array", items: { type: ["string", "number"] } } },
       required: ["path"],
     },
-    run: (_c, args: { path: unknown }) => void ran.push(`select:${JSON.stringify(args.path)}`),
+    run: (_c, args: { path: unknown }) => {
+      ran.push(`select:${JSON.stringify(args.path)}`);
+    },
   });
   registry.register({
     id: "test.themed",
@@ -113,7 +119,9 @@ function installRegistry() {
       properties: { color: { enum: ["light", "dark"], type: "string" } },
       required: ["color"],
     },
-    run: (_c, args: { color: string }) => void ran.push(`theme:${args.color}`),
+    run: (_c, args: { color: string }) => {
+      ran.push(`theme:${args.color}`);
+    },
   });
   registry.register({
     id: "test.flag",
@@ -125,7 +133,9 @@ function installRegistry() {
       properties: { on: { type: "boolean" } },
       required: ["on"],
     },
-    run: (_c, args: { on: boolean }) => void ran.push(`flag:${String(args.on)}`),
+    run: (_c, args: { on: boolean }) => {
+      ran.push(`flag:${String(args.on)}`);
+    },
   });
   registry.register({
     id: "test.explodes",

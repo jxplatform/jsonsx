@@ -3,7 +3,7 @@ import { nothing } from "lit-html";
 import { afterEach, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
 import type { TemplateResult } from "lit-html";
 
-const { registerPanel } = await import("../src/panels/panel-registry");
+const { listPanels, registerPanel } = await import("../src/panels/panel-registry");
 
 const refreshGitStatus = mock(async () => {});
 // The rail is a rendering of the panel registry, so a mocked git-panel still has to contribute its
@@ -139,24 +139,32 @@ describe("tabIcon", () => {
     expect(small.querySelector("svg")?.getAttribute("width")).toBe("16");
   });
 
-  test("every mapped icon tag renders its element", async () => {
-    for (const tag of [
-      "sp-icon-artboard",
-      "sp-icon-box",
-      "sp-icon-brackets",
-      "sp-icon-brush",
-      "sp-icon-chat",
-      "sp-icon-data",
-      "sp-icon-event",
-      "sp-icon-file-single-web-page",
-      "sp-icon-folder",
-      "sp-icon-layers",
-      "sp-icon-properties",
-      "sp-icon-view-all-tags",
-      "sp-icon-view-grid",
-    ]) {
-      const container = await renderInto(tabIcon(tag, "s") as TemplateResult);
-      expect(container.querySelector(tag)).not.toBeNull();
+  /*
+   * DERIVED FROM THE REGISTRY, not from a list.
+   *
+   * This test used to hold a hardcoded array of the map's own keys, which proves only that a row
+   * renders what the row says — a tautology the map cannot fail. It said nothing about whether any
+   * PANEL points at a row, and that is the whole failure mode: three rail buttons (Source Control,
+   * Problems, Search) shipped pointing at keys with no row, drawing a 20px hole apiece, while this
+   * suite stayed green. It stayed green for the sharpest possible reason — the list included
+   * `sp-icon-git-branch`, whose row had been ORPHANED, so the test went on proving a glyph rendered
+   * while the shipped panel pointed somewhere else entirely.
+   *
+   * Asking the registry means a new panel with an unmapped icon fails here, in its own PR.
+   */
+  test("every registered panel's icon key resolves to a real element", async () => {
+    // `rail !== false` rather than `railGroups()`, so a panel hidden behind its own `when` is
+    // Still checked: Search is `NOT_YET_BUILT` today, and the day it is built is not the day to
+    // Discover its icon was never mapped.
+    const panels = listPanels().filter((panel) => panel.rail !== false);
+    expect(panels.length).toBeGreaterThan(0);
+    for (const panel of panels) {
+      const container = await renderInto(tabIcon(panel.icon, "m") as TemplateResult);
+      expect({ icon: panel.icon, id: panel.id, rendered: container.children.length }).toEqual({
+        icon: panel.icon,
+        id: panel.id,
+        rendered: 1,
+      });
     }
   });
 
@@ -184,6 +192,17 @@ describe("renderActivityBar", () => {
     // Search is still declared-but-unbuilt, hidden by its own `when` rather than faked with a
     // Stub button. Problems was the other one until P4.2 built it.
     expect(railIds()).not.toContain("search");
+  });
+
+  test("no rail button paints an empty icon slot", () => {
+    installPreferencesRegistry();
+    renderActivityBar();
+    const empty = [...bar().querySelectorAll(".rail-item")]
+      .filter((item) => (item.querySelector(".rail-icon")?.childElementCount ?? 0) === 0)
+      .map((item) => (item as HTMLElement).dataset.panel ?? item.textContent?.trim());
+    // `.rail-icon` is `height: 20px` with no content and no background, so a miss is not a fallback
+    // Glyph or a broken-image mark — it is twenty pixels of nothing above a label.
+    expect(empty).toEqual([]);
   });
 
   test("the two groups are named and separated by exactly one divider", () => {

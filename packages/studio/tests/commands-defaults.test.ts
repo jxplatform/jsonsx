@@ -39,22 +39,52 @@ const RAIL_PANELS: readonly RailPanel[] = [
 function recordingDeps() {
   const calls: string[] = [];
   const deps: CommandDeps = {
-    saveDocument: () => void calls.push("saveDocument"),
-    undo: () => void calls.push("undo"),
-    redo: () => void calls.push("redo"),
-    openInBrowser: () => void calls.push("openInBrowser"),
-    closeDocument: () => void calls.push("closeDocument"),
-    duplicateSelection: () => void calls.push("duplicateSelection"),
-    deleteSelection: () => void calls.push("deleteSelection"),
-    selectParent: () => void calls.push("selectParent"),
-    toggleDock: (dock: DockId) => void calls.push(`toggleDock:${dock}`),
-    toggleZen: () => void calls.push("toggleZen"),
-    openPalette: (mode: PaletteMode) => void calls.push(`openPalette:${mode}`),
-    openProject: () => void calls.push("openProject"),
+    saveDocument: () => {
+      calls.push("saveDocument");
+    },
+    undo: () => {
+      calls.push("undo");
+    },
+    redo: () => {
+      calls.push("redo");
+    },
+    openInBrowser: () => {
+      calls.push("openInBrowser");
+    },
+    closeDocument: () => {
+      calls.push("closeDocument");
+    },
+    duplicateSelection: () => {
+      calls.push("duplicateSelection");
+    },
+    deleteSelection: () => {
+      calls.push("deleteSelection");
+    },
+    selectParent: () => {
+      calls.push("selectParent");
+    },
+    toggleDock: (dock: DockId) => {
+      calls.push(`toggleDock:${dock}`);
+    },
+    toggleZen: () => {
+      calls.push("toggleZen");
+    },
+    openPalette: (mode: PaletteMode) => {
+      calls.push(`openPalette:${mode}`);
+    },
+    openProject: () => {
+      calls.push("openProject");
+    },
     panelRoster: RAIL_PANELS,
-    focusPanel: (panelId: string) => void calls.push(`focusPanel:${panelId}`),
-    focusInspectorTab: (tabId: string) => void calls.push(`focusInspectorTab:${tabId}`),
-    cycleRegion: (direction: 1 | -1) => void calls.push(`cycleRegion:${direction}`),
+    focusPanel: (panelId: string) => {
+      calls.push(`focusPanel:${panelId}`);
+    },
+    focusInspectorTab: (tabId: string) => {
+      calls.push(`focusInspectorTab:${tabId}`);
+    },
+    cycleRegion: (direction: 1 | -1) => {
+      calls.push(`cycleRegion:${direction}`);
+    },
   };
   return { calls, deps };
 }

@@ -90,7 +90,9 @@ export function mount(host: HTMLElement | null) {
       const prompt = consumePendingAgentPrompt(root);
       if (prompt) {
         // Defer past the current render so the assistant machinery is in place before the send.
-        requestAnimationFrame(() => void seedAssistantPrompt(prompt));
+        requestAnimationFrame(() => {
+          void seedAssistantPrompt(prompt);
+        });
       }
     });
   });

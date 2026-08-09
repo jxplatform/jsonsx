@@ -920,9 +920,13 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
             settle(await fetchCfConnection());
             return;
           }
-          timer = window.setTimeout(() => void poll(), 1500);
+          timer = window.setTimeout(() => {
+            void poll();
+          }, 1500);
         };
-        timer = window.setTimeout(() => void poll(), 1500);
+        timer = window.setTimeout(() => {
+          void poll();
+        }, 1500);
       });
     },
 

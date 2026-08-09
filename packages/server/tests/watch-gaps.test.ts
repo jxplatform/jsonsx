@@ -176,7 +176,9 @@ describe("createWatcher — rebuild integration", () => {
       const preReloadCalls: string[] = [];
       const logged: string[] = [];
       const origError = console.error;
-      console.error = (...args: unknown[]) => void logged.push(args.map(String).join(" "));
+      console.error = (...args: unknown[]) => {
+        logged.push(args.map(String).join(" "));
+      };
       try {
         const { handleSSE, watcher } = createWatcher(dir, [], {
           debounce: 10,
@@ -261,7 +263,9 @@ describe("createWatcher — rebuild integration", () => {
 
       const logged: unknown[][] = [];
       const origError = console.error;
-      console.error = (...args: unknown[]) => void logged.push(args);
+      console.error = (...args: unknown[]) => {
+        logged.push(args);
+      };
       try {
         // EINVAL on transient Bun test dirs is expected churn — silently ignored.
         emit("error", new Error("EINVAL: invalid argument, watch"));

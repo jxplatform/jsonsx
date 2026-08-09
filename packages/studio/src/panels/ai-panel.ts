@@ -158,7 +158,13 @@ function renderSetupNotice(): TemplateResult {
   return html`
     <div class="ai-setup-notice">
       <span>No AI provider is connected yet.</span>
-      <sp-button size="s" variant="secondary" @click=${() => void openPreferences("assistant")}>
+      <sp-button
+        size="s"
+        variant="secondary"
+        @click=${() => {
+          void openPreferences("assistant");
+        }}
+      >
         Open Preferences…
       </sp-button>
     </div>
@@ -348,7 +354,9 @@ function activeSessionTitle(): string | null {
 
 const composer = createComposer({
   isStreaming: () => assistant.chatState.status === "streaming",
-  onOpenSettings: () => void openPreferences("assistant"),
+  onOpenSettings: () => {
+    void openPreferences("assistant");
+  },
   onSend: (text) => {
     void handleAssistantSend(text);
   },
@@ -387,7 +395,9 @@ export function renderAiPanelTemplate(): TemplateResult {
         listRef: onMessagesListRef,
         messages: cs.messages,
         onRestore: handleRestore,
-        onRetry: () => void handleRetry(),
+        onRetry: () => {
+          void handleRetry();
+        },
         onScroll: onMessagesScroll,
         status: cs.status,
       })}

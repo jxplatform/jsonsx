@@ -235,7 +235,9 @@ function derivationChipTpl(pane: Pane, derived: PaneDerivation): TemplateResult 
       <button
         class="tab-strip-overflow"
         title=${registry?.get("pane.unsplit")?.title ?? "Close Side Pane"}
-        @click=${() => void registry?.run("pane.unsplit")}
+        @click=${() => {
+          void registry?.run("pane.unsplit");
+        }}
       >
         <span aria-hidden="true">✕</span>
       </button>
@@ -664,7 +666,11 @@ function placedTabItems(tab: Tab): TabMenuItem[] {
       dividerAbove,
       label: command.title,
       ...(reason === undefined
-        ? { action: () => void registry.run(command.id, args) }
+        ? {
+            action: () => {
+              void registry.run(command.id, args);
+            },
+          }
         : { disabled: true, reason }),
     });
   }

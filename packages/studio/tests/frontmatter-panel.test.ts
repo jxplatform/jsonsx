@@ -761,7 +761,9 @@ describe("the resolved-field list marks where each value came from", () => {
       category: "Project",
       level: "application",
       args: { properties: { section: { type: "string" } }, required: [], type: "object" },
-      run: (_c, args: unknown) => void ran.push({ args, id: "settings.open" }),
+      run: (_c, args: unknown) => {
+        ran.push({ args, id: "settings.open" });
+      },
     });
     setActiveRegistry(registry);
 
@@ -785,7 +787,9 @@ describe("the resolved-field list marks where each value came from", () => {
       category: "Project",
       level: "application",
       args: { properties: { section: { type: "string" } }, required: [], type: "object" },
-      run: (_c, args: unknown) => void ran.push(args),
+      run: (_c, args: unknown) => {
+        ran.push(args);
+      },
     });
     setActiveRegistry(registry);
 

@@ -85,26 +85,15 @@ const gitBranchIcon = (s: string) => html`
  */
 export function tabIcon(tag: string, size?: string) {
   const m: Record<string, (s: string) => TemplateResult> = {
-    "sp-icon-artboard": (s: string) =>
-      html`<sp-icon-artboard slot="icon" size=${s}></sp-icon-artboard>`,
+    "sp-icon-alert": (s: string) => html`<sp-icon-alert slot="icon" size=${s}></sp-icon-alert>`,
     "sp-icon-box": (s: string) => html`<sp-icon-box slot="icon" size=${s}></sp-icon-box>`,
-    "sp-icon-brackets": (s: string) =>
-      html`<sp-icon-brackets slot="icon" size=${s}></sp-icon-brackets>`,
-    "sp-icon-brush": (s: string) => html`<sp-icon-brush slot="icon" size=${s}></sp-icon-brush>`,
-    "sp-icon-chat": (s: string) => html`<sp-icon-chat slot="icon" size=${s}></sp-icon-chat>`,
     "sp-icon-data": (s: string) => html`<sp-icon-data slot="icon" size=${s}></sp-icon-data>`,
-    "sp-icon-event": (s: string) => html`<sp-icon-event slot="icon" size=${s}></sp-icon-event>`,
-    "sp-icon-file-single-web-page": (s: string) =>
-      html`<sp-icon-file-single-web-page slot="icon" size=${s}></sp-icon-file-single-web-page>`,
     "sp-icon-folder": (s: string) => html`<sp-icon-folder slot="icon" size=${s}></sp-icon-folder>`,
     "sp-icon-git-branch": gitBranchIcon,
     "sp-icon-layers": (s: string) => html`<sp-icon-layers slot="icon" size=${s}></sp-icon-layers>`,
-    "sp-icon-properties": (s: string) =>
-      html`<sp-icon-properties slot="icon" size=${s}></sp-icon-properties>`,
+    "sp-icon-search": (s: string) => html`<sp-icon-search slot="icon" size=${s}></sp-icon-search>`,
     "sp-icon-view-all-tags": (s: string) =>
       html`<sp-icon-view-all-tags slot="icon" size=${s}></sp-icon-view-all-tags>`,
-    "sp-icon-view-grid": (s: string) =>
-      html`<sp-icon-view-grid slot="icon" size=${s}></sp-icon-view-grid>`,
   };
   const fn = m[tag];
   return fn ? fn(size || "s") : nothing;

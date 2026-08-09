@@ -470,7 +470,9 @@ describe("the debug history-consistency assertion", () => {
   test("stays silent when the flag is off, and when replay agrees", () => {
     const errors: unknown[][] = [];
     const realError = console.error;
-    console.error = (...args: unknown[]) => void errors.push(args);
+    console.error = (...args: unknown[]) => {
+      errors.push(args);
+    };
     try {
       const tab = makeTab();
       transactDoc(tab, (t) => mutateInsertNode(t, [], 1, { tagName: "span" }));
@@ -493,7 +495,9 @@ describe("the debug history-consistency assertion", () => {
   test("reports divergence when the live document has drifted from its snapshot", () => {
     const errors: unknown[][] = [];
     const realError = console.error;
-    console.error = (...args: unknown[]) => void errors.push(args);
+    console.error = (...args: unknown[]) => {
+      errors.push(args);
+    };
     try {
       localStorage.setItem("jx-canvas-debug", "1");
       const tab = makeTab();

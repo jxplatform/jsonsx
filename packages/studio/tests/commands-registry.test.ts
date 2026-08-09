@@ -242,7 +242,14 @@ describe("run", () => {
   test("defaults args to an empty object so a no-arg command needs no call-site ceremony", () => {
     let received: unknown = "unset";
     const { registry } = harness();
-    registry.register(command({ id: "a.one", run: (_ctx, args) => void (received = args) }));
+    registry.register(
+      command({
+        id: "a.one",
+        run: (_ctx, args) => {
+          received = args;
+        },
+      }),
+    );
     void registry.run("a.one");
     expect(received).toEqual({});
   });
@@ -350,7 +357,9 @@ describe("handleKeyEvent", () => {
         id: "file.save",
         level: "document",
         keybinding: "mod+s",
-        run: () => void (ran = "save"),
+        run: () => {
+          ran = "save";
+        },
       }),
     );
     setContext(makeContext({ document: { open: true } }));

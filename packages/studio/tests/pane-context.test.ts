@@ -138,8 +138,9 @@ function installRegistry(ran: string[]) {
     id: "settings.open",
     level: "project",
     menus: ["palette"],
-    run: (_ctx, args) =>
-      void ran.push(`settings.open:${String((args as { section?: string }).section)}`),
+    run: (_ctx, args) => {
+      ran.push(`settings.open:${String((args as { section?: string }).section)}`);
+    },
     title: "Open Settings",
   });
   setActiveRegistry(registry);

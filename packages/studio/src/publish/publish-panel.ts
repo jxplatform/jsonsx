@@ -199,7 +199,12 @@ function credentialTpl() {
   if (platform.cfConnect) {
     return html`
       <p>Connect your Cloudflare account to publish this site.</p>
-      <sp-button ?disabled=${_busy} @click=${() => void hostedConnect()}>
+      <sp-button
+        ?disabled=${_busy}
+        @click=${() => {
+          void hostedConnect();
+        }}
+      >
         Connect Cloudflare
       </sp-button>
     `;
@@ -245,7 +250,12 @@ function credentialTpl() {
       ></sp-textfield>`,
     )}
     <div class="publish-actions">
-      <sp-button ?disabled=${_busy} @click=${(e: Event) => void saveToken(hostOf(e))}>
+      <sp-button
+        ?disabled=${_busy}
+        @click=${(e: Event) => {
+          void saveToken(hostOf(e));
+        }}
+      >
         Verify &amp; Connect
       </sp-button>
       <sp-button variant="secondary" @click=${openAccounts}>Preferences › Accounts</sp-button>
@@ -312,7 +322,12 @@ function connectFormTpl() {
         }}
       ></sp-textfield>`,
     )}
-    <sp-button ?disabled=${_busy} @click=${() => void submitConnect()}>
+    <sp-button
+      ?disabled=${_busy}
+      @click=${() => {
+        void submitConnect();
+      }}
+    >
       ${_busy ? "Connecting…" : "Create & Connect"}
     </sp-button>
   `;
@@ -344,10 +359,22 @@ function statusTpl(deploy: DeployConfig) {
     }
     <p class="publish-hint">Publishing happens automatically on every commit.</p>
     <div class="publish-actions">
-      <sp-button variant="secondary" ?disabled=${_busy} @click=${() => void loadConnection()}>
+      <sp-button
+        variant="secondary"
+        ?disabled=${_busy}
+        @click=${() => {
+          void loadConnection();
+        }}
+      >
         Refresh
       </sp-button>
-      <sp-button variant="negative" ?disabled=${_busy} @click=${() => void disconnect()}>
+      <sp-button
+        variant="negative"
+        ?disabled=${_busy}
+        @click=${() => {
+          void disconnect();
+        }}
+      >
         Disconnect
       </sp-button>
     </div>

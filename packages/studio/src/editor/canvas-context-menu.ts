@@ -37,7 +37,9 @@ export function makeCanvasContextMenuHandler(deps: {
       // MouseEvent carries the converted coords safely.
       const evt = new MouseEvent("contextmenu", { clientX, clientY });
       showContextMenu(evt, bubbled, {
-        onEditComponent: (p) => void deps.navigateToComponent(p),
+        onEditComponent: (p) => {
+          void deps.navigateToComponent(p);
+        },
       });
     },
   };

@@ -656,7 +656,16 @@ function renderDerivationNotice(
       message,
       ...(held && { detail: `${tabLabel(held)} is still open here.` }),
       ...(held &&
-        pin && { actions: [{ label: pin.title, run: () => void registry?.run(pin.id) }] }),
+        pin && {
+          actions: [
+            {
+              label: pin.title,
+              run: () => {
+                void registry?.run(pin.id);
+              },
+            },
+          ],
+        }),
     }),
     surface.wrap,
   );

@@ -58,6 +58,9 @@ import { TableRow } from "@spectrum-web-components/table/src/TableRow.js";
 import { TableCell } from "@spectrum-web-components/table/src/TableCell.js";
 
 // Icons
+import { IconRailBottom } from "@spectrum-web-components/icons-workflow/src/elements/IconRailBottom.js";
+import { IconRailLeft } from "@spectrum-web-components/icons-workflow/src/elements/IconRailLeft.js";
+import { IconRailRight } from "@spectrum-web-components/icons-workflow/src/elements/IconRailRight.js";
 import { IconFolder } from "@spectrum-web-components/icons-workflow/src/elements/IconFolder.js";
 import { IconFolderOpen } from "@spectrum-web-components/icons-workflow/src/elements/IconFolderOpen.js";
 import { IconDocument } from "@spectrum-web-components/icons-workflow/src/elements/IconDocument.js";
@@ -92,7 +95,6 @@ import { IconSettings } from "@spectrum-web-components/icons-workflow/src/elemen
 import { IconInfo } from "@spectrum-web-components/icons-workflow/src/elements/IconInfo.js";
 import { IconBack } from "@spectrum-web-components/icons-workflow/src/elements/IconBack.js";
 import { IconProperties } from "@spectrum-web-components/icons-workflow/src/elements/IconProperties.js";
-import { IconEvent } from "@spectrum-web-components/icons-workflow/src/elements/IconEvent.js";
 import { IconMore } from "@spectrum-web-components/icons-workflow/src/elements/IconMore.js";
 
 // Layout / alignment icons
@@ -107,15 +109,10 @@ import { IconTextAlignJustify } from "@spectrum-web-components/icons-workflow/sr
 import { IconAlignTop } from "@spectrum-web-components/icons-workflow/src/elements/IconAlignTop.js";
 import { IconAlignBottom } from "@spectrum-web-components/icons-workflow/src/elements/IconAlignBottom.js";
 import { IconAlert } from "@spectrum-web-components/icons-workflow/src/elements/IconAlert.js";
-import { IconDeviceDesktop } from "@spectrum-web-components/icons-workflow/src/elements/IconDeviceDesktop.js";
 import { IconPlay } from "@spectrum-web-components/icons-workflow/src/elements/IconPlay.js";
-import { IconPlug } from "@spectrum-web-components/icons-workflow/src/elements/IconPlug.js";
-import { IconPublishCheck } from "@spectrum-web-components/icons-workflow/src/elements/IconPublishCheck.js";
 import { IconSearch } from "@spectrum-web-components/icons-workflow/src/elements/IconSearch.js";
 import { IconShare } from "@spectrum-web-components/icons-workflow/src/elements/IconShare.js";
 import { IconShowMenu } from "@spectrum-web-components/icons-workflow/src/elements/IconShowMenu.js";
-import { IconBranch1 } from "@spectrum-web-components/icons-workflow/src/elements/IconBranch1.js";
-import { IconRailLeft } from "@spectrum-web-components/icons-workflow/src/elements/IconRailLeft.js";
 import { IconAlignMiddle } from "@spectrum-web-components/icons-workflow/src/elements/IconAlignMiddle.js";
 import { IconAlignLeft } from "@spectrum-web-components/icons-workflow/src/elements/IconAlignLeft.js";
 import { IconAlignRight } from "@spectrum-web-components/icons-workflow/src/elements/IconAlignRight.js";
@@ -142,8 +139,6 @@ import { IconStop } from "@spectrum-web-components/icons-workflow/src/elements/I
 import { IconHistory } from "@spectrum-web-components/icons-workflow/src/elements/IconHistory.js";
 import { IconAttach } from "@spectrum-web-components/icons-workflow/src/elements/IconAttach.js";
 import { IconViewList } from "@spectrum-web-components/icons-workflow/src/elements/IconViewList.js";
-import { IconRailRightClose } from "@spectrum-web-components/icons-workflow/src/elements/IconRailRightClose.js";
-import { IconRailRightOpen } from "@spectrum-web-components/icons-workflow/src/elements/IconRailRightOpen.js";
 import { IconRectangle } from "@spectrum-web-components/icons-workflow/src/elements/IconRectangle.js";
 
 // Inline formatting icons
@@ -214,6 +209,9 @@ const components = [
   ["sp-table-body", TableBody],
   ["sp-table-row", TableRow],
   ["sp-table-cell", TableCell],
+  ["sp-icon-rail-bottom", IconRailBottom],
+  ["sp-icon-rail-left", IconRailLeft],
+  ["sp-icon-rail-right", IconRailRight],
   ["sp-icon-folder", IconFolder],
   ["sp-icon-folder-open", IconFolderOpen],
   ["sp-icon-document", IconDocument],
@@ -248,7 +246,6 @@ const components = [
   ["sp-icon-info", IconInfo],
   ["sp-icon-back", IconBack],
   ["sp-icon-properties", IconProperties],
-  ["sp-icon-event", IconEvent],
   ["sp-icon-more", IconMore],
   ["sp-icon-arrow-right", IconArrowRight],
   ["sp-icon-arrow-left", IconArrowLeft],
@@ -261,15 +258,10 @@ const components = [
   ["sp-icon-align-top", IconAlignTop],
   ["sp-icon-align-bottom", IconAlignBottom],
   ["sp-icon-alert", IconAlert],
-  ["sp-icon-device-desktop", IconDeviceDesktop],
   ["sp-icon-play", IconPlay],
-  ["sp-icon-plug", IconPlug],
-  ["sp-icon-publish-check", IconPublishCheck],
   ["sp-icon-search", IconSearch],
   ["sp-icon-share", IconShare],
   ["sp-icon-show-menu", IconShowMenu],
-  ["sp-icon-branch-1", IconBranch1],
-  ["sp-icon-rail-left", IconRailLeft],
   ["sp-icon-align-middle", IconAlignMiddle],
   ["sp-icon-align-left", IconAlignLeft],
   ["sp-icon-align-right", IconAlignRight],
@@ -288,8 +280,6 @@ const components = [
   ["sp-icon-download", IconDownload],
   ["sp-icon-checkmark", IconCheckmark],
   ["sp-icon-view-column", IconViewColumn],
-  ["sp-icon-rail-right-close", IconRailRightClose],
-  ["sp-icon-rail-right-open", IconRailRightOpen],
   ["sp-icon-rectangle", IconRectangle],
   ["sp-icon-box", IconBox],
   ["sp-icon-visibility", IconVisibility],

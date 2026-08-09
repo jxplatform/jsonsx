@@ -390,7 +390,12 @@ function showLibraryContextMenu(event: MouseEvent, file: LibraryFile) {
   dismissLibraryContextMenu();
 
   const items: MenuItem[] = [
-    { action: () => void openFileInTab(file.path), label: "Open" },
+    {
+      action: () => {
+        void openFileInTab(file.path);
+      },
+      label: "Open",
+    },
     { label: "—" },
     { action: () => renameLibraryFile(file), label: "Rename…" },
     { action: () => duplicateLibraryFile(file), label: "Duplicate" },
@@ -678,7 +683,9 @@ function toolbarTpl(panel: ActiveLibraryPane) {
         </sp-action-button>
         <sp-popover slot="click-content" tip>
           <sp-menu
-            @change=${(e: Event) => void createLibraryEntry((e.target as HTMLSelectElement).value)}
+            @change=${(e: Event) => {
+              void createLibraryEntry((e.target as HTMLSelectElement).value);
+            }}
           >
             ${libraryNewEntries().map(
               (entry) =>
@@ -750,7 +757,14 @@ function failureBannerTpl(current: LibrarySource) {
       ${failures.length === 1 ? "directory" : "directories"} could not be read
       (${failures[0]!.dir}${failures.length > 1 ? ", …" : ""}).
     </span>
-    <sp-button size="s" variant="secondary" @click=${() => void refreshLibrary()}>Retry</sp-button>
+    <sp-button
+      size="s"
+      variant="secondary"
+      @click=${() => {
+        void refreshLibrary();
+      }}
+      >Retry</sp-button
+    >
   </div>`;
 }
 
@@ -772,7 +786,14 @@ function emptyTpl(current: LibrarySource, total: number) {
         ${current.failures().length === 1 ? "directory" : "directories"} could not be read, so this
         is not the same as an empty project.
       </p>
-      <sp-button size="s" variant="accent" @click=${() => void refreshLibrary()}>Retry</sp-button>
+      <sp-button
+        size="s"
+        variant="accent"
+        @click=${() => {
+          void refreshLibrary();
+        }}
+        >Retry</sp-button
+      >
     </div>`;
   }
   if (total === 0) {
@@ -888,7 +909,9 @@ export function renderLibraryMode(surface: CanvasSurface, tab: Tab): void {
         mountPreview(panel, element, file);
       }
     },
-    openFile: (path) => void openFileInTab(path),
+    openFile: (path) => {
+      void openFileInTab(path);
+    },
   };
 
   const onScroller = (element: Element | undefined) => {

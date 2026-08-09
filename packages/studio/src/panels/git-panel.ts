@@ -418,7 +418,9 @@ export function renderGitPanel(ctx: {
             </sp-action-button>
             <sp-action-button
               title="Pull${status?.behind ? ` (${status.behind} behind)` : ""}"
-              @click=${() => void doPull()}
+              @click=${() => {
+                void doPull();
+              }}
               ?disabled=${loading}
             >
               <sp-icon-arrow-down slot="icon" size="xs"></sp-icon-arrow-down>
@@ -990,9 +992,9 @@ export function registerGitPanel(): void {
     title: "Source Control",
     level: "project",
     dock: "navigator",
-    // `sp-icon-git-branch` is not a Spectrum icon — the workflow set has no Git family at all, so
-    // This rendered nothing. `IconBranch1` is the branching-arrow glyph and is what it meant.
-    icon: "sp-icon-branch-1",
+    // A KEY into `activity-bar.ts`'s `tabIcon()` map, not a tag: this one resolves to
+    // `gitBranchIcon`, a hand-drawn inline SVG, because the workflow set has no Git family.
+    icon: "sp-icon-git-branch",
     badge: (ctx) => ctx.git.dirtyCount || null,
     // Through `deps`, not the local binding: `studio.ts` owns the wiring (the clone action and the
     // Diff-state setter come from the bootstrap), and the Navigator has injected it all along.

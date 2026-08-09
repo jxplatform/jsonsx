@@ -2,9 +2,9 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.2-draft
+**Version:** 0.9.3-draft
 **Status:** Partial
-**Updated:** 2026-08-08
+**Updated:** 2026-08-09
 **License:** MIT
 
 ---
@@ -1108,7 +1108,7 @@ surface must print — live in [studio-ui-guidelines.md §12](studio-ui-guidelin
 | `category`    | `Category`                          | Groups palette rows: File, Edit, Selection, Insert, View, Document, Project, Source Control, Publish, Assistant, Collaborate, Help. |
 | `level`       | `Level`                             | **Required.** What the command acts on (§13.2). Checked against every declared placement.                                           |
 | `keyScope`    | `KeyScope`                          | Where the chord is live (§13.3). Defaults to `global`. Deliberately **not** the same field as `level`.                              |
-| `icon`        | `string`                            | An `sp-icon-*` tag name, which `ui/spectrum.ts` must register — see §13.5.                                                          |
+| `icon`        | `string`                            | Icon KEY, resolved through a map — never a bare tag. See §13.5.                                                                     |
 | `when`        | `(ctx) => boolean`                  | Hide entirely. Default: always visible.                                                                                             |
 | `enablement`  | `(ctx) => boolean`                  | Show but disable. Defaults to always-enabled once `when` holds.                                                                     |
 | `requires`    | `string`                            | ONE sentence — "an element selection". The disabled tooltip, the palette subtitle and the agent's refusal are all this string.      |
@@ -1215,20 +1215,33 @@ Control badge vanish when the last tab closed, and let two tabs disagree about t
 | `scripts/check-command-levels.ts` | A `menus` placement the level × placement matrix does not admit                           |
 | `scripts/check-chrome-budget.ts`  | More than five `commandbar/primary` commands, or more than four tabs in a dock            |
 | `scripts/check-shot-contract.ts`  | A script naming an id nothing declares, a `toggle*` id, or a selector where an id belongs |
-| `scripts/check-icons.ts`          | An `sp-icon-*` tag no element registers, or a registered element Spectrum does not ship   |
+| `scripts/check-icons.ts`          | An icon that reaches no DOM, in either of the two ways one can                            |
 
 All four run in CI, and `createCommandRegistry` applies the placement check again at registration so
 a violation cannot reach a running app either.
 
-**An icon is checked because nothing else can see it.** A custom element the browser has never heard
-of is an `HTMLUnknownElement`: no shadow root, no content, no warning — an empty box the size of the
-missing glyph. The tag is a string in a template, so the type checker is silent; happy-dom is as
-content to render nothing as Chrome is, so a test asserting the element is present passes. Eleven
-shipped that way, and the only two that were ever reported were reported by a person looking at the
-app. Three of the eleven named icons Spectrum does not ship at all — `sp-icon-rail-left-open` and
-`-close` were written by symmetry with the right-hand pair, which exists — so the check reads the
-import behind each registration and asks whether the module is on disk, and a left-hand rail glyph
-is the mirrored right-hand one.
+**An icon is checked because nothing else can see it — and there are TWO key spaces, which fail
+differently.** A TAG written in a template (`<sp-icon-x>`) resolves through `customElements`, and an
+element the browser has never heard of is an `HTMLUnknownElement`: no shadow root, no content, no
+warning, an empty box the size of the missing glyph. The type checker is silent (the tag is a string
+in a template), and happy-dom is as content to render nothing as Chrome is, so a test asserting the
+element is present passes. Eleven shipped that way. Three named elements Spectrum has no such thing
+as — `sp-icon-rail-left-open`/`-close`, written by symmetry with the right-hand pair, which exists.
+
+A KEY on a record (`icon: "sp-icon-x"`) is **not a tag**. It resolves through a map, and never
+reaches `customElements` at all. A panel record's key goes to `activity-bar.ts`'s `tabIcon()`, whose
+tail is `return fn ? fn(size) : nothing`: a key with no row is not a missing element, it is zero
+nodes, and registering the element does nothing because the tag is never constructed.
+
+**Conflating the two is not hypothetical.** Both spaces are spelled `sp-icon-*`, and one of the
+map's own rows — `sp-icon-git-branch` — is not a Spectrum element but a hand-drawn inline `<svg>`,
+because the workflow set ships no Git family. Reading that key as a tag says a working, pixel-perfect
+glyph is broken; "correcting" it to a real Spectrum name replaced it with a key nothing resolved, and
+a checker that asked only about registration passed the result. So keys are checked against their
+resolver, and the resolver that is enforced is the one whose miss is SILENT: `commandIcon()` falls
+back to the command's title and degrades visibly, `tabIcon()` falls back to nothing. A dead ROW is
+checked too — the orphan left behind by that regression was still being exercised by a test, which is
+how the suite went on proving a glyph rendered while the shipped panel pointed elsewhere.
 
 **The scripting surface is a rendering, and these three rules are what make that true.**
 `window.__jxAutomation` (installed only under `?automation=1`) exposes `run(id, args)`, `seed(id,
@@ -1728,6 +1741,7 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ## Changelog
 
+- **0.9.3-draft** (2026-08-09) — §13.5 corrects check-icons — an icon key on a record is resolved through a map, not registered as a tag, and the two spaces fail differently; the previous text asserted the opposite and licensed a fix that replaced a working hand-drawn glyph with a key nothing resolved.
 - **0.9.2-draft** (2026-08-08) — §13.5 adds scripts/check-icons.ts — an sp-icon-* tag no element registers, or a registered element Spectrum does not ship, is now a red PR; the command record's icon field described accurately as a tag name rather than a key into a map.
 - **0.9.1-draft** (2026-08-08) — §18.4 derived panes ship — a pane chosen by a standing rule rather than a document; a preset is a projection (Code, Diff — one document, two sessions), a follow (Layout, Component definition — genuinely different documents) or a filter (a breakpoint of the board already drawn); §14.1 holds because following is dispose-and-open, with four exclusions keeping one document to one tab; a pane holds a derivation or tabs, never both.
 - **0.9.0-draft** (2026-08-07) — §18 Panes rewritten for two live panes — the grid draws a keyed cell per pane and the stage handover is deleted; the editor-kind cap on the side pane is gone and a split is a real side-by-side; clicking into a pane focuses it; nothing drawn for a pane may resolve the focus, enforced by check-pane-singletons; §18.4 derived panes named as not built.
@@ -1785,4 +1799,4 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.2-draft_
+_`@jxsuite/studio` Specification v0.9.3-draft_

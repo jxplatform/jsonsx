@@ -275,7 +275,10 @@ function importCtxFor(rerender: () => void): ImportTabCtx {
     credsForm: credsForm(),
     form: _form,
     managedConnect: managedConnect(),
-    onDone: (result) => void finishCreated(result),
+    onDone: (result) => {
+      // See above: the discard is deliberate, and `void` as a statement is what says so.
+      void finishCreated(result);
+    },
     rerender,
     resolveDestination: () => validateParams(),
   };
