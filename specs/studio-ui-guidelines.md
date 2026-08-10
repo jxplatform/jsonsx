@@ -1,8 +1,8 @@
 # Jx Studio UI/UX Interface Guidelines
 
-**Version:** 0.3.4
+**Version:** 0.3.5
 **Status:** Implemented
-**Updated:** 2026-08-05
+**Updated:** 2026-08-10
 **Applies to:** `packages/studio/`
 
 ---
@@ -752,7 +752,40 @@ Consequences:
 - **`destructive: true` derives the danger styling**, and `group` derives menu ordering
   (`"1_clipboard"`, `"3_structure"`, `"9_danger"`); neither is re-decided per menu.
 
-### 12.4 A second list of actions is a defect
+### 12.4 One surface, one availability rule
+
+**Every command in a family that acts on the same state declares the SAME precondition.** A family
+is defined by what its `run` WRITES, not by its id namespace: five zoom verbs over one pan-zoom
+surface, three publish verbs over one deploy provider, twenty-one element verbs over one document
+tree.
+
+Six families disagreed with themselves, and in every one the loose member was the one that wrote:
+
+| Family             | The disagreement                                                                        | What the loose member did                                     |
+| ------------------ | --------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `git.*`            | `createGithubRepository` had no `enablement`; `push` required a repo                    | Created a repository on GitHub, then failed to add the remote |
+| `publish.*`        | The host-capability term appeared in one record of three                                | Pushed the branch, then failed to reach Cloudflare            |
+| Element tree       | Delete/Duplicate required a canvas editor; the movers and the menu's writes did not     | Spliced elements into `project.json` from the Outline         |
+| Dock tab selectors | `panel.focus.*` composed the panel's own `when`; the enum setters did not               | Persisted a tab whose panel is registered `when: () => false` |
+| Inspector tabs     | `view.setRightTab` required a document; the `inspector.focus.*` chords required nothing | Reported success, moved focus, did not switch the tab         |
+| `collab.*`         | Four required a document path; `showStatus` required only a tab                         | Reported on a session that cannot exist                       |
+
+Two rules over one surface is not caution. The strict member's refusal is evidence that the state
+is unsafe to write, and the loose member writes it anyway — so the disagreement converts a refusal
+that protects into a refusal that merely annoys, while the damage goes through the other door.
+
+Corollaries:
+
+- **An `enablement` never restates its own `when`.** The same rule written twice is two places to
+  drift, and the drift is invisible because both spellings look deliberate.
+- **A `requires` sentence names the gate it actually has.** `canvas.setFit` said "an open document"
+  while refusing for the MODE, which sends the reader to open a document they already have open.
+- **When a precondition depends on an ARGUMENT, refuse the argument.** `enablement` cannot see one,
+  so a setter taking an enum checks the target's own predicate inside `run` and throws a
+  `RangeError` naming the value — the shape `pane.derive` uses for a preset the document cannot
+  support.
+
+### 12.5 A second list of actions is a defect
 
 If a surface maintains its own array of `{ label, action }` records for capabilities that already
 exist, that array is the bug — not a shortcut around one. The symptom is always the same: two
@@ -814,6 +847,7 @@ that must be fixed is a Problem, and an error the user cannot act on is a toast 
 
 ## Changelog
 
+- **0.3.5** (2026-08-10) — §12 a command family over one surface declares ONE availability rule — six families disagreed with themselves, and in each the loose member was the one that wrote: git.createGithubRepository created a remote repository where its disabled peer git.push would not, publish.deploy pushed on a host with no Cloudflare API, the Outline's movers and the element menu's mutating rows spliced elements into project.json where Delete was correctly refused, view.setActivity persisted a gated-off panel, and the inspector.focus chords half-applied.
 - **0.3.4** (2026-08-05) — §9.2 history covers project documents — a settings mistake undoes like a document mistake, and a failed write leaves no entry.
 - **0.3.3** (2026-08-05) — §8.1 corrects where accumulate is authored — the canvas toggles a node into the selection too; only the marquee is absent.
 - **0.3.2** (2026-08-04) — §4.2 the set dot is the provenance chip's set-here state, in four states with the donor named; §8.1 selection is a list, with the anchor/primary rule and the one-transaction requirement.

@@ -334,3 +334,55 @@ describe("the workspace still behaves", () => {
     expect(tab.session.selection).toEqual([]);
   });
 });
+
+describe("a dock selector composes the panel's own `when`", () => {
+  /*
+   * `panel.focus.<id>` declares `when: ctx.project.open && (panel.when?.(ctx) ?? true)`; its two
+   * enum peers declared only `projectOpen` and no `when` at all. So one surface answered two ways:
+   * `panel.focus.search` was permanently unavailable — no palette row, no chord — while
+   * `view.setActivity { tab: "search" }` succeeded from the palette, `__jxAutomation` and the
+   * `show_navigator_panel` AI tool, wrote `shell.leftTab = "search"`, un-collapsed the dock and
+   * PERSISTED it. The Navigator then drew "No Navigator panel is registered as 'search'" — a
+   * sentence that is false; the panel is registered, it is gated off.
+   *
+   * `enablement` cannot see an argument, so the refusal is on the ARG, the shape `pane.derive`
+   * already uses for a preset the document cannot support.
+   */
+  const gated = (id: string) => id === "search" || id === "logic";
+  const withGate = () => {
+    ctx = makeContext({ document: { open: true }, project: { open: true } });
+    const built = createCommandRegistry({ getContext: () => ctx });
+    registerShellViewCommands(built, { ...deps, panelAvailable: (id) => !gated(id) });
+    return built;
+  };
+
+  test("a gated-off Navigator panel is refused, and nothing is persisted", async () => {
+    const built = withGate();
+    const before = shell.leftTab;
+    // Thrown SYNCHRONOUSLY: this record's `run` is not async, and `registry.run` returns
+    // `void | Promise<void>` — so the refusal arrives as a throw, not a rejection.
+    expect(() => built.run("view.setActivity", { tab: "search" })).toThrow(
+      /registered but not available/,
+    );
+    expect(shell.leftTab).toBe(before);
+  });
+
+  test("a gated-off Bottom tab is refused the same way", async () => {
+    const built = withGate();
+    const before = shell.bottomTab;
+    expect(() => built.run("view.setBottomTab", { tab: "logic" })).toThrow(
+      /registered but not available/,
+    );
+    expect(shell.bottomTab).toBe(before);
+  });
+
+  test("an available panel still shows, and an absent probe changes nothing", async () => {
+    const built = withGate();
+    await built.run("view.setActivity", { tab: "files" });
+    expect(shell.leftTab).toBe("files");
+    // No probe injected (the CI projection builds the set without one) — unchanged behaviour.
+    const bare = build();
+    await bare.run("view.setActivity", { tab: "search" });
+    expect(shell.leftTab).toBe("search");
+  });
+});

@@ -12,6 +12,7 @@
  * registration) on first use by source mode, the function editor, or the formula workspace.
  */
 import { errorMessage } from "@jxsuite/schema/parse";
+import { getPanel } from "./panels/panel-registry";
 
 import {
   initShellRefs,
@@ -1249,6 +1250,11 @@ commandRegistry.registerAll(derivationCommands(derivationDeps));
  * prevent (plan §2, principle 1).
  */
 registerShellViewCommands(commandRegistry, {
+  // The registry's own answer, so a gated-off panel cannot be persisted as a showing tab.
+  panelAvailable: (id) => {
+    const panel = getPanel(id);
+    return panel ? (panel.when?.(commandRegistry.context()) ?? true) : true;
+  },
   inspectorTab: () => rightPanelMod.inspectorTab(),
   setInspectorTab: (tab) => rightPanelMod.setInspectorTab(tab),
 });

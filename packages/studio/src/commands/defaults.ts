@@ -550,10 +550,19 @@ export function inspectorFocusCommands(deps: CommandDeps): AnyCommand[] {
       id: `inspector.focus.${tab.id}`,
       title: `Show ${tab.title}`,
       category: "View",
-      level: "application",
+      // DOCUMENT-level, like `view.setRightTab`, which writes the same field. These carried no
+      // `when`, no `enablement` and no `requires` at all, so with nothing open ⌘⇧2 reported success,
+      // Opening the right dock and moving focus there while silently NOT switching the tab —
+      // The delegate `focusInspectorTab` goes through `runIfPresent`, which checks `isEnabled` and skips.
+      // One gesture, three outcomes across the family: a loud refusal, a full write, and a
+      // Half-applied success with no message. The Inspector's tabs are per-document session state
+      // (`session.ui.rightTab`), so the document is the honest precondition.
+      level: "document",
       keybinding: `mod+shift+${index + 1}`,
       menus: ["palette"],
       group: "4_docks",
+      requires: "an open document",
+      when: (ctx: CommandContext) => ctx.document.open,
       run: () => deps.focusInspectorTab(tab.id),
     };
     return command;

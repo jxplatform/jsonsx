@@ -42,6 +42,60 @@ describe("compileElement", () => {
     expect(content).toContain("items: [1,2,3]");
   });
 
+  describe("a `${…}` state entry is a COMPUTED, the same as at runtime", () => {
+    /*
+     * The runtime has always said so — `runtime.ts`'s second state pass is
+     * `if (typeof def === "string" && def.includes("${")) state[key] = computed(…)` — and
+     * `StateEntry`'s schema description reads "string with ${} → computed". The compiler had no
+     * such branch and emitted the template as a literal, so ONE component behaved two ways: right
+     * in Studio's canvas, which runs the runtime, and wrong on the deployed site, which runs this.
+     *
+     * Found by building a real site: a `$switch` discriminant shipped as the literal text of its
+     * own expression, so the case never matched and the element silently never rendered.
+     */
+    test("it is emitted as a computed, not as an initial value", async () => {
+      const result = await compileElement({
+        children: [],
+        state: { href: "", linkKey: "${state.href ? 'link' : 'plain'}" },
+        tagName: "test-template-state",
+      });
+      const { content } = result.files[0]!;
+      expect(content).toContain(
+        "this.state.linkKey = computed(() => `${this.state.href ? 'link' : 'plain'}`)",
+      );
+      // …and NOT sitting in the initial reactive() block as its own source text.
+      expect(content).not.toContain('linkKey: "${state.href');
+    });
+
+    test("a plain string with no interpolation stays an initial value", async () => {
+      const result = await compileElement({
+        children: [],
+        state: { label: "hello" },
+        tagName: "test-plain-state",
+      });
+      const { content } = result.files[0]!;
+      expect(content).toContain('label: "hello"');
+      expect(content).not.toContain("this.state.label = computed");
+    });
+
+    test("the discriminant of a $switch resolves, which is what made this visible", async () => {
+      const result = await compileElement({
+        children: [
+          {
+            $switch: { $ref: "#/state/imageKey" },
+            cases: { set: { tagName: "img" } },
+          },
+        ],
+        state: { image: "", imageKey: "${state.image ? 'set' : ''}" },
+        tagName: "test-switch-discriminant",
+      });
+      const { content } = result.files[0]!;
+      expect(content).toContain("this.state.imageKey = computed(");
+      // The case lookup reads the computed, so a truthy `image` now selects `set`.
+      expect(content).toContain("imageKey]");
+    });
+  });
+
   test("functions become methods on state", async () => {
     const result = await compileElement({
       children: [],

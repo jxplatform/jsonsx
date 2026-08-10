@@ -203,8 +203,12 @@ export function collabCommands(): AnyCommand[] {
       level: "document",
       menus: ["palette"],
       group: "3_presence",
+      /* THE DOCUMENT PATH, like its four peers. `sessionLink` above says outright that the path IS
+         the session key, so a session cannot exist for a tab that has none — and this asked only
+         for a tab, so on an untitled document the palette showed four Collaborate rows missing and
+         this one present, reporting on a session that cannot be started. */
       requires: "an open document",
-      when: () => Boolean(tab()),
+      when: () => Boolean(tab()?.documentPath),
       run: () => {
         const active = tab();
         if (!active) {

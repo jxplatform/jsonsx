@@ -91,19 +91,19 @@ Everything Studio can do is a command, and every command is reachable by name: p
 | Set Style Selector             | `style.setSelector`          | —        | selection   | an element selection                                                                                                         |
 | Set Theme                      | `view.setTheme`              | —        | application | —                                                                                                                            |
 | Set Zoom                       | `canvas.setZoom`             | —        | document    | a document on the pan-zoom surface                                                                                           |
-| Show Assistant                 | `inspector.focus.assistant`  | `⌘⇧4`    | application | —                                                                                                                            |
+| Show Assistant                 | `inspector.focus.assistant`  | `⌘⇧4`    | document    | an open document                                                                                                             |
 | Show Assistant                 | `view.setAssistant`          | —        | application | —                                                                                                                            |
 | Show Beside This…              | `pane.derive`                | —        | document    | an open document in a pane that is not itself derived                                                                        |
 | Show Bottom Dock               | `view.setBottomDock`         | —        | application | —                                                                                                                            |
 | Show Bottom Dock Tab           | `view.setBottomTab`          | —        | application | —                                                                                                                            |
-| Show Content                   | `inspector.focus.properties` | `⌘⇧1`    | application | —                                                                                                                            |
+| Show Content                   | `inspector.focus.properties` | `⌘⇧1`    | document    | an open document                                                                                                             |
 | Show Data                      | `panel.focus.data`           | `⌘6`     | application | an open project                                                                                                              |
 | Show Files                     | `panel.focus.files`          | `⌘1`     | application | an open project                                                                                                              |
 | Show Insert                    | `panel.focus.insert`         | —        | application | an open project                                                                                                              |
 | Show Inspector Dock            | `view.setRightPanel`         | —        | application | —                                                                                                                            |
 | Show Inspector Section         | `inspector.setSection`       | —        | document    | an open document                                                                                                             |
 | Show Inspector Tab             | `view.setRightTab`           | —        | document    | an open document                                                                                                             |
-| Show Logic                     | `inspector.focus.events`     | `⌘⇧3`    | application | —                                                                                                                            |
+| Show Logic                     | `inspector.focus.events`     | `⌘⇧3`    | document    | an open document                                                                                                             |
 | Show Navigator Dock            | `view.setNavigator`          | —        | application | —                                                                                                                            |
 | Show Navigator Panel           | `view.setActivity`           | —        | application | an open project                                                                                                              |
 | Show Outline                   | `panel.focus.layers`         | `⌘4`     | application | an open project                                                                                                              |
@@ -112,7 +112,7 @@ Everything Studio can do is a command, and every command is reachable by name: p
 | Show Search                    | `panel.focus.search`         | `⌘2`     | application | an open project                                                                                                              |
 | Show Source Control            | `panel.focus.git`            | `⌘3`     | application | an open project                                                                                                              |
 | Show State                     | `panel.focus.state`          | —        | application | an open project                                                                                                              |
-| Show Style                     | `inspector.focus.style`      | `⌘⇧2`    | application | —                                                                                                                            |
+| Show Style                     | `inspector.focus.style`      | `⌘⇧2`    | document    | an open document                                                                                                             |
 | Split Right                    | `pane.splitRight`            | `⌘\`     | document    | an open document                                                                                                             |
 | Switch Layout                  | `view.setLayout`             | —        | application | an open project                                                                                                              |
 | Toggle Bottom Dock             | `view.toggleBottomDock`      | `⌘J`     | application | —                                                                                                                            |
@@ -162,18 +162,18 @@ Everything Studio can do is a command, and every command is reachable by name: p
 
 | Command                  | Id                           | Shortcut | Level       | Requires                                         |
 | ------------------------ | ---------------------------- | -------- | ----------- | ------------------------------------------------ |
-| Create GitHub Repository | `git.createGithubRepository` | —        | project     | an open project                                  |
+| Create GitHub Repository | `git.createGithubRepository` | —        | project     | a project tracked by git                         |
 | Initialize Repository    | `git.init`                   | —        | project     | an open project that git is not already tracking |
 | Push                     | `git.push`                   | —        | project     | a project tracked by git                         |
 | Sign In to GitHub        | `git.signInToGithub`         | —        | application | —                                                |
 
 ## Publish
 
-| Command                   | Id                      | Shortcut | Level   | Requires                                                        |
-| ------------------------- | ----------------------- | -------- | ------- | --------------------------------------------------------------- |
-| Deploy                    | `publish.deploy`        | —        | project | a repository with a remote and a connected deploy provider      |
-| Open Deployment Dashboard | `publish.openDashboard` | —        | project | a connected deploy provider                                     |
-| Set Up Publishing         | `publish.setUp`         | —        | project | an open project on a platform that can reach the Cloudflare API |
+| Command                   | Id                      | Shortcut | Level   | Requires                                                                                                    |
+| ------------------------- | ----------------------- | -------- | ------- | ----------------------------------------------------------------------------------------------------------- |
+| Deploy                    | `publish.deploy`        | —        | project | a repository with a remote and a connected deploy provider, on a platform that can reach the Cloudflare API |
+| Open Deployment Dashboard | `publish.openDashboard` | —        | project | a connected deploy provider, on a platform that can reach the Cloudflare API                                |
+| Set Up Publishing         | `publish.setUp`         | —        | project | an open project on a platform that can reach the Cloudflare API                                             |
 
 ## Collaborate
 

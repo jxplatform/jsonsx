@@ -146,9 +146,17 @@ export function publishCommands(): AnyCommand[] {
       level: "project",
       menus: ["commandbar/overflow", "palette"],
       group: "8_publish",
+      /* THE CAPABILITY TERM BELONGS TO THE WHOLE FAMILY, not to its first member. All three of
+         these reach Cloudflare, and only this one asked whether the host can: `currentDeploy()`
+         reads config stored IN THE PROJECT, so a repository cloned or scaffolded with a deploy
+         already configured carries it onto a host whose PAL has no `cfApi`. In that state Set Up
+         Publishing was correctly disabled while Deploy was enabled and ran — pushing the branch,
+         then failing at `latestDeployment` with "Cloudflare did not answer" after the push had
+         already gone out. The refusal that was meant to protect the family guarded one third. */
       requires: "an open project on a platform that can reach the Cloudflare API",
       when: (ctx) => ctx.project.open,
-      enablement: (ctx) => ctx.project.open && platformSupportsPublish(),
+      // `when` already asked about the project.
+      enablement: () => platformSupportsPublish(),
       aiTool: {
         description:
           "Open the publishing set-up flow, which connects this project to a Cloudflare Pages " +
@@ -167,9 +175,12 @@ export function publishCommands(): AnyCommand[] {
       level: "project",
       menus: ["commandbar/overflow", "palette"],
       group: "8_publish",
-      requires: "a repository with a remote and a connected deploy provider",
+      requires:
+        "a repository with a remote and a connected deploy provider, on a platform that can " +
+        "reach the Cloudflare API",
       when: (ctx) => ctx.project.open,
-      enablement: (ctx) => ctx.project.isRepo && currentDeploy() !== undefined,
+      enablement: (ctx) =>
+        ctx.project.isRepo && currentDeploy() !== undefined && platformSupportsPublish(),
       aiTool: {
         description:
           "Push the current branch so the connected provider builds it, then report the " +
@@ -187,9 +198,9 @@ export function publishCommands(): AnyCommand[] {
       level: "project",
       menus: ["commandbar/overflow", "palette"],
       group: "8_publish",
-      requires: "a connected deploy provider",
+      requires: "a connected deploy provider, on a platform that can reach the Cloudflare API",
       when: (ctx) => ctx.project.open,
-      enablement: () => currentDeploy() !== undefined,
+      enablement: () => currentDeploy() !== undefined && platformSupportsPublish(),
       run: () => {
         const deploy = currentDeploy();
         if (deploy) {

@@ -106,17 +106,34 @@ describe("the records", () => {
     expect(setUp.enablement!(open)).toBe(true);
   });
 
-  test("Deploy needs a repository AND a connected provider", () => {
+  test("Deploy needs a repository AND a connected provider AND a host that can reach CF", () => {
     const deploy = command("publish.deploy");
     const repo = makeContext({ project: { isRepo: true, open: true } });
+    installMockPlatform({ cfApi: async () => ({}) });
     expect(deploy.enablement!(repo)).toBe(false);
     connect();
     expect(deploy.enablement!(repo)).toBe(true);
     expect(deploy.enablement!(makeContext({ project: { open: true } }))).toBe(false);
   });
 
+  /*
+   * THE CAPABILITY BELONGS TO THE FAMILY, not to its first member. `currentDeploy()` reads config
+   * stored in the PROJECT, so a repo cloned with a deploy already configured carries it onto a host
+   * whose PAL has no `cfApi`. Set Up Publishing was correctly disabled there while Deploy ran —
+   * pushing the branch, then failing at `latestDeployment` after the push had gone out.
+   */
+  test("…and all three refuse on a host with no Cloudflare API, not just Set Up", () => {
+    installMockPlatform(); // No cfApi on this host.
+    connect();
+    const ctx = makeContext({ project: { isRepo: true, open: true } });
+    for (const id of ["publish.setUp", "publish.deploy", "publish.openDashboard"]) {
+      expect([id, command(id).enablement!(ctx)]).toEqual([id, false]);
+    }
+  });
+
   test("Open Dashboard needs only the connection, and builds Cloudflare's own URL", () => {
     const dashboard = command("publish.openDashboard");
+    installMockPlatform({ cfApi: async () => ({}) });
     expect(dashboard.enablement!(makeContext({ project: { open: true } }))).toBe(false);
     connect();
     expect(dashboard.enablement!(makeContext({ project: { open: true } }))).toBe(true);

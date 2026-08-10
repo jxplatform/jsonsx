@@ -20,6 +20,7 @@ import { initLayers } from "../src/ui/layers";
 import { activeTab, closeAllTabs, workspace } from "../src/workspace/workspace";
 import { checkPlacements } from "../src/commands/levels";
 import { createCommandRegistry } from "../src/commands/registry";
+import type { AnyCommand } from "../src/commands/registry";
 import { emptyContext } from "../src/commands/context";
 
 import type { ElementMenuTarget } from "../src/editor/context-menu";
@@ -1098,5 +1099,69 @@ describe("component rows", () => {
     rightClick(["children", 1]);
     expect(menuIds()).not.toContain("selection.editComponent");
     expect(menuIds()).not.toContain("selection.convertToComponent");
+  });
+});
+
+describe("the menu's mutating rows need a canvas, as Delete already did", () => {
+  /*
+   * The menu opens from the canvas AND from the Outline, and the Outline renders whatever the
+   * active tab's document is — with Project Settings open, `project.json` drawn as a layer tree.
+   * `selection.delete` and `selection.duplicate`, inherited from `commands/defaults.ts`, carry
+   * `editor.kind === "canvas"` and were filtered out correctly. Every row defined in this file
+   * gated on the menu's own target instead, so Cut, Paste after, Paste inside, Insert before,
+   * Insert after, Wrap, Set Title and Convert to Component rendered and ran — each splicing
+   * elements into the file that defines the project.
+   */
+  const MUTATING = [
+    "edit.cut",
+    "edit.pasteAfter",
+    "edit.pasteInside",
+    "edit.pasteStyles",
+    "selection.insertBefore",
+    "selection.insertAfter",
+    "selection.wrap",
+    "selection.setTitle",
+  ];
+
+  function menuOver(mode: string) {
+    const tab = resetWorkspaceWithTab({
+      children: [{ tagName: "p" }, { tagName: "p" }],
+      tagName: "div",
+    } as never);
+    tab.session.ui.canvasMode = mode;
+    const target = {
+      node: { tagName: "p" },
+      path: ["children", 1],
+      // A rerender hook is where Set Title draws its inline editor — a real precondition of its
+      // Own, unrelated to the rule under test.
+      rerender: () => {},
+    } as unknown as ElementMenuTarget;
+    return elementCommands(stubDeps(target, { color: "red" } as JxStyle));
+  }
+
+  const live = (records: AnyCommand[], id: string) => {
+    const record = records.find((c) => c.id === id)!;
+    const ctx = emptyContext();
+    return (record.when?.(ctx) ?? true) && (record.enablement?.(ctx) ?? true);
+  };
+
+  test("on the canvas the mutating rows are live", () => {
+    const records = menuOver("design");
+    for (const id of MUTATING) {
+      expect([id, live(records, id)]).toEqual([id, true]);
+    }
+  });
+
+  test("over a settings document every one of them is gone", () => {
+    const records = menuOver("settings");
+    for (const id of MUTATING) {
+      expect([id, live(records, id)]).toEqual([id, false]);
+    }
+  });
+
+  test("…and Copy, which mutates nothing, is still offered", () => {
+    // The rule is about WRITING. A read of the node under the cursor is fine wherever the menu
+    // Opens, and taking it away would be a second wrong answer rather than a fix.
+    expect(live(menuOver("settings"), "edit.copy")).toBe(true);
   });
 });

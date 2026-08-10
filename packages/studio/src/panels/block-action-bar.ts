@@ -351,6 +351,16 @@ function structuralTarget(path: JxPath | null = commandTargetPath()): Structural
   if (!tab || !path) {
     return null;
   }
+  /* THE SAME CONJUNCT `hasSelection` CARRIES, and for the same reason it gives. Four movers gate on
+     this function and none of them asked what editor is open, while their peers Delete and
+     Duplicate did — so with Project Settings focused the Outline row menu dropped Delete and
+     Duplicate and still rendered Move Up / Move Down / Move Into Previous / Move Out of Parent.
+     Those four `transactDoc` element splices straight into `project.json` through the transaction
+     log and then rewrite `session.selection`; the write lands and is saved. One surface, two rules,
+     and the loose ones were the mutating majority. Asked once, here, because all four share it. */
+  if (editorKindForMode(tab.session.ui.canvasMode) !== "canvas") {
+    return null;
+  }
   const index = childIndex(path);
   const parentPath = parentElementPath(path);
   if (typeof index !== "number" || !parentPath) {
@@ -614,7 +624,10 @@ export function registerSelectionCommands(
     // Bar keeps its shape.
     {
       category: "Selection",
-      enablement: (ctx) => Boolean(ctx.selection.kind) && !ctx.selection.isRoot,
+      // …and the same conjunct here: Convert to Component starts a project-level flow, so it must
+      // Not be reachable from a config node drawn as a layer tree.
+      enablement: (ctx) =>
+        Boolean(ctx.selection.kind) && !ctx.selection.isRoot && ctx.editor.kind === "canvas",
       group: "4_component",
       icon: "sp-icon-box",
       id: "selection.convertToComponent",

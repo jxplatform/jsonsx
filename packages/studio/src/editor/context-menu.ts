@@ -337,10 +337,28 @@ function isArrayNode(node: JxMutableNode): boolean {
 export function elementCommands(deps: ElementCommandDeps): AnyCommand[] {
   /** A menu is open over some node — the precondition every row in this file shares. */
   const hasTarget = () => deps.target() !== null;
+  /**
+   * The document under the menu is one whose ELEMENT TREE may be restructured.
+   *
+   * `liveContext` below already computes the honest editor kind, and its own comment says a verb
+   * reading it "would have been dead in this menu and live over a settings document, which is
+   * exactly backwards" — but no record here read it, so the menu got the backwards half. The menu
+   * opens from the canvas AND from the Outline, and the Outline renders whatever the active tab's
+   * document is: with Project Settings open that is `project.json` drawn as a layer tree. Delete
+   * and Duplicate, inherited from `commands/defaults.ts`, carry `editor.kind === "canvas"` and were
+   * correctly filtered out there — while Cut, Paste after, Paste inside, Insert before, Insert
+   * after, Wrap, Set Title and Convert to Component all rendered and ran, each transacting an
+   * element splice into the file that defines the project. One menu, one target, two rules, and the
+   * loose ones were the mutating majority.
+   */
+  const structurallyEditable = () => {
+    const tab = activeTab.value;
+    return Boolean(tab) && editorKindForMode(tab!.session.ui.canvasMode) === "canvas";
+  };
   /** The target sits in a splice coordinate, so structural verbs can address it. */
   const spliceable = () => {
     const target = deps.target();
-    return target !== null && isSpliceablePath(target.path);
+    return target !== null && isSpliceablePath(target.path) && structurallyEditable();
   };
   /** Not the repeater itself: its content is the single `map` template, not a child list. */
   const notRepeater = () => {
@@ -401,7 +419,7 @@ export function elementCommands(deps: ElementCommandDeps): AnyCommand[] {
       menus: ["context/element", "palette"],
       group: "1_clipboard",
       undo: "document",
-      when: hasTarget,
+      when: () => hasTarget() && structurallyEditable(),
       enablement: () => spliceable() && notRepeater(),
       requires: NOT_STRUCTURAL,
       run: async () => {
@@ -428,7 +446,7 @@ export function elementCommands(deps: ElementCommandDeps): AnyCommand[] {
       menus: ["context/element", "palette"],
       group: "1_clipboard",
       undo: "document",
-      when: hasTarget,
+      when: () => hasTarget() && structurallyEditable(),
       // A repeater has no child list to paste into, and the document root is addressed by the
       // Canvas itself rather than by an element menu.
       enablement: () => {
@@ -481,7 +499,7 @@ export function elementCommands(deps: ElementCommandDeps): AnyCommand[] {
       menus: ["context/element", "palette"],
       group: "2_styles",
       undo: "document",
-      when: hasTarget,
+      when: () => hasTarget() && structurallyEditable(),
       enablement: () => deps.styleClipboard() !== null,
       requires: "a copied style set",
       run: () => {

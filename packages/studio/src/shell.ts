@@ -1085,6 +1085,19 @@ export interface ShellCommandDeps {
    * screenshot that closed the assistant would silently also lose your Style tab.
    */
   inspectorTab: () => InspectorTabId;
+  /**
+   * Whether a dock tab's panel record is currently available — its own `when` holding.
+   *
+   * INJECTED rather than imported for the reason the rest of this object exists: `shell` is
+   * workspace state and must not reach into the panel registry, which reaches back. It is here
+   * because `panel.focus.<id>` composes the record's own `when` and these two enum setters did not,
+   * so one surface answered two ways. `view.setActivity { tab: "search" }` succeeded against a
+   * panel registered `when: () => false`, wrote `shell.leftTab = "search"`, un-collapsed the dock
+   * and PERSISTED it — after which the Navigator drew "No Navigator panel is registered as
+   * 'search'", a sentence that is false: it is registered, it is gated off. Defaults to available
+   * so a caller with no registry (the CI projection) is unaffected.
+   */
+  panelAvailable?: (id: string) => boolean;
 }
 
 /** The Navigator dock hosts a panel — the precondition its own verbs share. */
@@ -1128,7 +1141,16 @@ export function shellViewCommands(deps: ShellCommandDeps): AnyCommand[] {
         name: "show_navigator_panel",
       },
       run: (_ctx, args) => {
-        setActivityTab(enumArg("view.setActivity", args, "tab", NAVIGATOR_PANEL_IDS));
+        const tab = enumArg("view.setActivity", args, "tab", NAVIGATOR_PANEL_IDS);
+        // The record's own `when`, asked here because `enablement` cannot see an argument — the
+        // Same shape `pane.derive` uses to refuse a preset the document cannot support.
+        if (deps.panelAvailable && !deps.panelAvailable(tab)) {
+          throw new RangeError(
+            `command "view.setActivity" argument "tab": "${tab}" names a panel that is registered but not ` +
+              `available right now, so showing it would persist a Navigator tab nothing can draw`,
+          );
+        }
+        setActivityTab(tab);
       },
       title: "Show Navigator Panel",
     },
@@ -1228,7 +1250,16 @@ export function shellViewCommands(deps: ShellCommandDeps): AnyCommand[] {
         name: "show_bottom_tab",
       },
       run: (_ctx, args) => {
-        setBottomTab(enumArg("view.setBottomTab", args, "tab", BOTTOM_TAB_IDS));
+        const tab = enumArg("view.setBottomTab", args, "tab", BOTTOM_TAB_IDS);
+        // The record's own `when`, asked here because `enablement` cannot see an argument — the
+        // Same shape `pane.derive` uses to refuse a preset the document cannot support.
+        if (deps.panelAvailable && !deps.panelAvailable(tab)) {
+          throw new RangeError(
+            `command "view.setBottomTab" argument "tab": "${tab}" names a panel that is registered but not ` +
+              `available right now, so showing it would persist a Bottom dock tab nothing can draw`,
+          );
+        }
+        setBottomTab(tab);
       },
       title: "Show Bottom Dock Tab",
     },

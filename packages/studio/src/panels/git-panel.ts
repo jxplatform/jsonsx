@@ -902,7 +902,9 @@ export function sourceControlCommands(): AnyCommand[] {
       group: "7_scm",
       requires: "an open project that git is not already tracking",
       when: (ctx) => ctx.project.open,
-      enablement: (ctx) => ctx.project.open && !ctx.project.isRepo,
+      // `when` already asked about the project; an `enablement` that re-asks is the same rule
+      // Written twice, and the two places drift.
+      enablement: (ctx) => !ctx.project.isRepo,
       aiTool: {
         description:
           "Run git init in the project root so the project has a history and can be pushed.",
@@ -919,8 +921,17 @@ export function sourceControlCommands(): AnyCommand[] {
       level: "project",
       menus: ["commandbar/overflow", "palette"],
       group: "7_scm",
-      requires: "an open project",
+      /* THE STRICTEST OF THE THREE, because it is the one that leaves something behind on a
+         server. It declared no `enablement` at all while `git.push` — which does strictly less —
+         required a tracked repository, so on an untracked project Push was correctly disabled and
+         this was fully live from the palette, the overflow, the deploy checklist and the
+         `create_github_repository` AI tool. Its flow creates the repository on GitHub BEFORE it
+         touches the local one, so `gitAddRemote` then throws and it reports "The repository was
+         created, but the remote could not be added." The refused verb leaves nothing behind; the
+         unrefused one leaves an empty repository on the user's account. */
+      requires: "a project tracked by git",
       when: (ctx) => ctx.project.open,
+      enablement: (ctx) => ctx.project.isRepo,
       aiTool: {
         description:
           "Create a new GitHub repository for this project, add it as the origin remote, and push. " +

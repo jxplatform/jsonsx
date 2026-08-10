@@ -388,6 +388,8 @@ export function emitElementModule(
   const functionEntries: [string, JxExpressionDef | JxFunctionDef][] = [];
 
   const formulaEntries: [string, JxExpressionDef][] = [];
+  /** `"${…}"` state entries — computed, exactly as the runtime treats them. */
+  const templateEntries: [string, string][] = [];
   const callableRefs = collectCallableRefs(doc);
   for (const [key, def] of Object.entries(defs)) {
     const d = def as JxMutableNode;
@@ -415,6 +417,20 @@ export function emitElementModule(
       } else {
         functionEntries.push([key, d]);
       }
+    } else if (typeof def === "string" && def.includes("${")) {
+      /* A TEMPLATE STRING IS A COMPUTED, and the runtime has always said so — `runtime.ts`'s
+         second state pass is `if (typeof def === "string" && def.includes("${")) state[key] =
+         computed(() => evaluateTemplate(def, state))`, and `StateEntry`'s own schema description
+         reads "string with ${} → computed". This branch did not exist, so the compiler fell
+         through to `extractInitialValue` and emitted the template as a LITERAL.
+
+         The consequence is the worst shape a bug can take: the same component behaved one way in
+         Studio's canvas, which runs the runtime, and another way on the deployed site, which runs
+         this. A real site's `$switch` discriminant (`imageKey: "${state.image ? 'set' : ''}"`)
+         evaluated correctly in the editor and shipped as the literal text of its own expression,
+         so the case never matched and the image silently never rendered in production. Found by
+         building that site and reading the emitted component. */
+      templateEntries.push([key, def]);
     } else {
       // Use extractInitialValue to get the correct initial value
       const initVal = extractInitialValue(d);
@@ -494,6 +510,16 @@ export function emitElementModule(
       statePrefix: "this.state",
     });
     lines.push(`    this.state.${key} = ${emitFormulaFn(def, compiled)};`);
+  }
+
+  /* Emitted with the same `state.` → `this.state.` rewrite the inline-body path below uses, into a
+     template literal — which is what `evaluateTemplate` is, so the result is a string on both
+     sides rather than a string here and a raw value there. */
+  for (const [key, template] of templateEntries) {
+    lines.push(
+      "",
+      `    this.state.${key} = computed(() => \`${template.replaceAll("state.", "this.state.")}\`);`,
+    );
   }
 
   // Emit computed signals — $src or inline body

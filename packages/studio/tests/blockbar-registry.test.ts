@@ -513,3 +513,53 @@ describe("role=toolbar and the roving tabindex", () => {
     }
   });
 });
+
+describe("a non-canvas editor refuses the movers, as it already refused Delete", () => {
+  /*
+   * The Outline renders whatever `activeTab.value.doc.document` is, and with Project Settings open
+   * that is the project CONFIGURATION drawn as a layer tree. `hasSelection` carries
+   * `editor.kind === "canvas"` for exactly this reason and Delete/Duplicate were gated by it — but
+   * the four movers gate on `structuralTarget()`, which asked only about the path, and Convert to
+   * Component asked only about the selection kind. So the row menu dropped Delete and Duplicate and
+   * still rendered Move Up / Move Down / Move Into Previous / Move Out of Parent, each of which
+   * `transactDoc`s an element splice straight into `project.json` and saves it.
+   */
+  function registryOverMode(mode: string): CommandRegistry {
+    const tab = resetWorkspaceWithTab({
+      children: [{ tagName: "p" }, { tagName: "p" }],
+      tagName: "div",
+    } as never);
+    tab.session.selection = [["children", 1]] as never;
+    tab.session.ui.canvasMode = mode;
+    const registry = createCommandRegistry({ getContext: selectionCommandContext });
+    registerSelectionCommands(registry, {
+      convertToComponent: () => {},
+      navigateToComponent: () => {},
+    });
+    return registry;
+  }
+
+  const MOVERS = ["selection.moveUp", "selection.moveIn", "selection.moveOut"];
+
+  test("on the canvas they are live — the selection really is movable", () => {
+    const registry = registryOverMode("design");
+    expect(registry.isEnabled("selection.moveUp")).toBe(true);
+    expect(registry.isEnabled("selection.convertToComponent")).toBe(true);
+  });
+
+  test("with Project Settings open every one of them is refused", () => {
+    // `settings` → `editorKindForMode` = "config", the state in which the Outline is drawing the
+    // Project configuration object.
+    const registry = registryOverMode("settings");
+    for (const id of [...MOVERS, "selection.convertToComponent"]) {
+      expect([id, registry.isEnabled(id)]).toEqual([id, false]);
+    }
+  });
+
+  test("…and in the source editor too, which is the same non-canvas case", () => {
+    const registry = registryOverMode("source");
+    for (const id of MOVERS) {
+      expect([id, registry.isEnabled(id)]).toEqual([id, false]);
+    }
+  });
+});
