@@ -1,6 +1,6 @@
 # Jx Studio UI/UX Interface Guidelines
 
-**Version:** 0.3.5
+**Version:** 0.3.6
 **Status:** Implemented
 **Updated:** 2026-08-10
 **Applies to:** `packages/studio/`
@@ -774,6 +774,17 @@ Two rules over one surface is not caution. The strict member's refusal is eviden
 is unsafe to write, and the loose member writes it anyway — so the disagreement converts a refusal
 that protects into a refusal that merely annoys, while the damage goes through the other door.
 
+**The agent counts as a surface.** `Command.aiTool` says "the human's gate and the agent's gate
+stay one predicate", so an assistant tool that writes what a command writes is bound by the
+command's rule — and binds to it by READING the same `CommandContext`, not by recomputing the same
+test. Two predicates that agree today drift the first time either is edited. The assistant's
+`document` tier asked only whether a tab was open, so with Project Settings focused the agent was
+advertised `remove_node` and `move_node` and ran them against `project.json` while the person's
+`delete_node` was refused; `remove_node`'s own guard stops at the document root, which is weaker
+than `structurallyEditable`, so a repeater template was removable by the agent and not by the
+person. Element-tree writers now sit in a `document-tree` tier whose predicate is the registry's
+own `editor.kind === "canvas"`. Reads are not affected: the rule is about writing.
+
 Corollaries:
 
 - **An `enablement` never restates its own `when`.** The same rule written twice is two places to
@@ -847,6 +858,7 @@ that must be fixed is a Problem, and an error the user cannot act on is a toast 
 
 ## Changelog
 
+- **0.3.6** (2026-08-10) — §12.4 the agent counts as a surface — an assistant tool that writes what a command writes binds to the command's rule by reading the same CommandContext, not by recomputing it; the element-tree writers move to a document-tree tier gated on the registry's own editor.kind.
 - **0.3.5** (2026-08-10) — §12 a command family over one surface declares ONE availability rule — six families disagreed with themselves, and in each the loose member was the one that wrote: git.createGithubRepository created a remote repository where its disabled peer git.push would not, publish.deploy pushed on a host with no Cloudflare API, the Outline's movers and the element menu's mutating rows spliced elements into project.json where Delete was correctly refused, view.setActivity persisted a gated-off panel, and the inspector.focus chords half-applied.
 - **0.3.4** (2026-08-05) — §9.2 history covers project documents — a settings mistake undoes like a document mistake, and a failed write leaves no entry.
 - **0.3.3** (2026-08-05) — §8.1 corrects where accumulate is authored — the canvas toggles a node into the selection too; only the marquee is absent.

@@ -24,6 +24,11 @@ interface BuildSystemPromptOptions {
   projectRoot?: string | undefined;
   /** Whether a project is open. Defaults to `!!projectRoot` (kept explicit for tests). */
   hasProject?: boolean | undefined;
+  /**
+   * See {@link AiToolState.treeEditable}. Defaults to true so a caller with no registry — the
+   * prompt-shape tests — advertises the same list it always did.
+   */
+  treeEditable?: boolean | undefined;
   /** Project-relative file paths for the inventory section (project modes; capped). */
   fileInventory?: string[] | undefined;
 }
@@ -34,7 +39,20 @@ const FILE_INVENTORY_CAP = 100;
 // ─── Tool tiers (single source of truth for prompt AND gating) ──────────────
 
 /** Studio state a tool tier requires. Used by the gating registry AND the prompt tool list. */
-export type AiToolTier = "no-project" | "project" | "document";
+/**
+ * `document-tree` is `document` plus the condition the HUMAN's equivalent verbs already carry.
+ *
+ * `Command.aiTool`'s contract is "the human's gate and the agent's gate stay one predicate", and
+ * these two gates were not one. The registry's `selection.delete` / `duplicate` / `moveUp` require
+ * `editor.kind === "canvas"` because the Outline renders whatever the active tab's document is —
+ * with Project Settings open, `project.json` drawn as a layer tree. The assistant's tier asked only
+ * whether a tab existed, so in that exact state the agent was advertised `remove_node` and
+ * `move_node` and executed them against the file that defines the project, while the human's
+ * `delete_node` was refused. `remove_node` self-refuses only the document root (`path.length < 2`),
+ * a weaker test than `structurallyEditable`, so a repeater template or `$switch` case was removable
+ * by the agent and not by the person.
+ */
+export type AiToolTier = "no-project" | "project" | "document" | "document-tree";
 
 export interface AiToolInfo {
   name: string;
@@ -108,63 +126,79 @@ export const AI_TOOL_TIERS: AiToolInfo[] = [
   },
   {
     name: "set_property",
-    tier: "document",
+    tier: "document-tree",
     blurb:
       "set_property(path, key, value) — set or remove a property on the node at path (tagName, textContent, className, style, attributes, $props…). Pass value: null to remove.",
   },
   {
     name: "set_style",
-    tier: "document",
+    tier: "document-tree",
     blurb:
       'set_style(path, property, value) — set or remove a CSS style property (camelCase) on a node. Values as strings: "10px", "var(--color-accent)". Pass value: null to remove.',
   },
   {
     name: "set_text",
-    tier: "document",
+    tier: "document-tree",
     blurb: 'set_text(path, value) — convenient alias for set_property with key: "textContent".',
   },
   {
     name: "add_child",
-    tier: "document",
+    tier: "document-tree",
     blurb:
       "add_child(parentPath, index, node) — insert a new node into the children of parentPath at index.",
   },
   {
     name: "remove_node",
-    tier: "document",
+    tier: "document-tree",
     blurb: "remove_node(path) — remove the node at path.",
   },
   {
     name: "move_node",
-    tier: "document",
+    tier: "document-tree",
     blurb: "move_node(fromPath, toParentPath, toIndex) — move a node from one location to another.",
   },
   {
     name: "add_state",
-    tier: "document",
+    tier: "document-tree",
     blurb:
       "add_state(key, value) — add a reactive state variable under the document's 'state' object. Value can be scalar, typed, computed, function, or data source.",
   },
   {
     name: "update_state",
-    tier: "document",
+    tier: "document-tree",
     blurb: "update_state(key, value) — update or remove (value: null) an existing state variable.",
   },
 ];
+
+/** The studio facts a tier is decided by. An object because four positional booleans is a trap. */
+export interface AiToolState {
+  hasProject: boolean;
+  hasDocument: boolean;
+  /**
+   * The open document is an element tree the canvas is editing — `editor.kind === "canvas"`.
+   *
+   * Read from the COMMAND CONTEXT the human's verbs are evaluated against, not recomputed here, so
+   * the two gates are one predicate rather than two that agree until someone edits one of them.
+   */
+  treeEditable: boolean;
+}
 
 /**
  * Whether a tier's tools are active for the given studio state. Shared semantics with the gating
  * registry: bootstrap tools vanish once a project opens; project tools need a project; document
  * tools need an active document (even in single-file mode without a project).
  */
-export function tierActive(tier: AiToolTier, hasProject: boolean, hasDocument: boolean): boolean {
+export function tierActive(tier: AiToolTier, state: AiToolState): boolean {
   if (tier === "no-project") {
-    return !hasProject;
+    return !state.hasProject;
   }
   if (tier === "project") {
-    return hasProject;
+    return state.hasProject;
   }
-  return hasDocument;
+  if (tier === "document-tree") {
+    return state.hasDocument && state.treeEditable;
+  }
+  return state.hasDocument;
 }
 
 // ─── Jx Schema Reference (condensed) ────────────────────────────────────────
@@ -525,12 +559,17 @@ export function buildSystemPrompt({
   components,
   projectRoot,
   hasProject = Boolean(projectRoot),
+  treeEditable = true,
   fileInventory,
 }: BuildSystemPromptOptions = {}) {
   const hasDocument = Boolean(document);
 
   // 1. Role, state-appropriate workflow, and the tool list for the current state.
-  const toolList = AI_TOOL_TIERS.filter((t) => tierActive(t.tier, hasProject, hasDocument))
+  // The list the model is TOLD about and the list the gate will honour are the same filter, so a
+  // Refusal is never a surprise to it.
+  const toolList = AI_TOOL_TIERS.filter((t) =>
+    tierActive(t.tier, { hasDocument, hasProject, treeEditable }),
+  )
     .map((t) => `- ${t.blurb}`)
     .join("\n");
 

@@ -18,6 +18,7 @@ import { projectState } from "../store";
 import { adoptProjectConfig } from "../tabs/project-config";
 import type { Tab } from "../tabs/tab";
 import { componentRegistry } from "../files/components";
+import { activeRegistry } from "../commands/active-registry";
 import { registerAiTools } from "./ai-tools";
 import { registerProjectTools } from "./ai-project-tools";
 import { createGatedToolRegistry } from "./gated-registry";
@@ -127,12 +128,37 @@ export function createDocumentAssistant() {
     "no-project": "no project to be open (it bootstraps one)",
     project: "an open project",
     document: "an open document (use open_document first)",
+    "document-tree":
+      "an open document whose element tree the canvas is editing — Project Settings and the " +
+      "grid editors are documents, but not trees to restructure",
   } as const;
+
+  /**
+   * The HUMAN's own gate, read rather than reimplemented.
+   *
+   * `Command.aiTool` promises "the human's gate and the agent's gate stay one predicate", and the
+   * only way to keep that promise is for the agent to ask the same object: this is the
+   * `CommandContext` `selection.delete` and the movers are evaluated against. Recomputing
+   * `editor.kind` here would make two predicates that agree today and drift the first time either
+   * is edited. Falls back to permissive when no registry is installed — the assistant runs in tests
+   * that never build one, and refusing everything there would be a second wrong answer.
+   */
+  const treeEditable = () => {
+    const registry = activeRegistry();
+    // `=== "canvas"`, the human's exact test — not a looser cousin of it. Being more permissive for
+    // The agent than for the person is the divergence this is here to remove.
+    return registry ? registry.context().editor.kind === "canvas" : true;
+  };
   const availability = new Map<string, ToolAvailability>(
     AI_TOOL_TIERS.map((t) => [
       t.name,
       {
-        when: () => tierActive(t.tier, Boolean(workspace.projectRoot), Boolean(activeTab.value)),
+        when: () =>
+          tierActive(t.tier, {
+            hasDocument: Boolean(activeTab.value),
+            hasProject: Boolean(workspace.projectRoot),
+            treeEditable: treeEditable(),
+          }),
         requires: TIER_REQUIREMENTS[t.tier],
       },
     ]),
