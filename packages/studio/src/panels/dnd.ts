@@ -10,6 +10,7 @@ import {
   monitorForElements,
 } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { combine } from "@atlaskit/pragmatic-drag-and-drop/combine";
+import { displayTagName } from "@jxsuite/schema/guards";
 import { disableNativeDragPreview } from "@atlaskit/pragmatic-drag-and-drop/element/disable-native-drag-preview";
 import {
   attachInstruction,
@@ -452,7 +453,7 @@ export function applyDropInstruction(
     // Auto-import to $elements if the dropped block is a custom component
     const fragment = srcData.fragment as JxMutableNode | undefined;
     const tag = fragment?.tagName;
-    if (tag && tag.includes("-")) {
+    if (displayTagName(tag).includes("-")) {
       const comp = componentRegistry.find((c: ComponentEntry) => c.tagName === tag);
       if (comp) {
         const elements = tab.doc.document?.$elements || [];

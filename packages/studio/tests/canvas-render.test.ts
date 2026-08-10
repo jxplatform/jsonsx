@@ -11,6 +11,7 @@ import {
   standUpPaneGrid,
   stubRect,
 } from "./harness";
+import { displayTagName } from "@jxsuite/schema/guards";
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { notifyModule } from "./notify-mock";
 import { initShellRefs, setProjectState } from "../src/store";
@@ -74,7 +75,7 @@ let iframeImpl: IframeMount = async (_gen, doc, canvas) => {
   canvas.innerHTML = "";
   const root = document.createElement("div");
   for (const child of (doc.children as JxMutableNode[] | undefined) ?? []) {
-    const el = document.createElement(child.tagName ?? "span");
+    const el = document.createElement(displayTagName(child.tagName) || "span");
     if (child.textContent) {
       el.textContent = child.textContent as string;
     }
@@ -417,7 +418,7 @@ beforeEach(() => {
     canvas.innerHTML = "";
     const root = document.createElement("div");
     for (const child of (doc.children as JxMutableNode[] | undefined) ?? []) {
-      const el = document.createElement(child.tagName ?? "span");
+      const el = document.createElement(displayTagName(child.tagName) || "span");
       if (child.textContent) {
         el.textContent = child.textContent as string;
       }

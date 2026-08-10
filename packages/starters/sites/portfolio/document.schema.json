@@ -1899,7 +1899,7 @@
               "$ref": "#/$defs/v1/$defs/NumberOrRef"
             },
             "tagName": {
-              "$ref": "#/$defs/v1/$defs/TagName"
+              "$ref": "#/$defs/v1/$defs/ElementTagName"
             },
             "textContent": {
               "$ref": "#/$defs/v1/$defs/StringOrRef"
@@ -23011,6 +23011,85 @@
             "user-card"
           ]
         },
+        "TagExpression": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "description": "Two-way: `target` is the test, `value` the tag when it is truthy, `initial` the tag when it is not.",
+              "properties": {
+                "initial": {
+                  "$ref": "#/$defs/v1/$defs/TagName"
+                },
+                "operator": {
+                  "const": "?:",
+                  "type": "string"
+                },
+                "target": {
+                  "$ref": "#/$defs/v1/$defs/ExpressionOperand"
+                },
+                "value": {
+                  "$ref": "#/$defs/v1/$defs/TagName"
+                }
+              },
+              "required": [
+                "operator",
+                "target",
+                "value",
+                "initial"
+              ],
+              "title": "?: — the tag when the test holds, and the tag when it does not"
+            },
+            {
+              "additionalProperties": false,
+              "description": "Multiway: `target` is the discriminant, matched against case keys by its string form. `default` is required — an element with no tag cannot exist.",
+              "properties": {
+                "cases": {
+                  "additionalProperties": {
+                    "$ref": "#/$defs/v1/$defs/TagName"
+                  },
+                  "type": "object"
+                },
+                "default": {
+                  "$ref": "#/$defs/v1/$defs/TagName"
+                },
+                "operator": {
+                  "const": "switch",
+                  "type": "string"
+                },
+                "target": {
+                  "$ref": "#/$defs/v1/$defs/ExpressionOperand"
+                }
+              },
+              "required": [
+                "operator",
+                "target",
+                "cases",
+                "default"
+              ],
+              "title": "switch — one tag per discriminant value, with a required fallback"
+            }
+          ],
+          "description": "A tag name chosen at element creation. Every branch resolves to a `TagName`, so the candidate set is enumerable without evaluating anything."
+        },
+        "ElementTagName": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/v1/$defs/TagName"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "$expression": {
+                  "$ref": "#/$defs/v1/$defs/TagExpression"
+                }
+              },
+              "required": [
+                "$expression"
+              ],
+              "type": "object"
+            }
+          ]
+        },
         "JsonSchemaType": {
           "enum": [
             "string",
@@ -23213,9 +23292,9 @@
           "type": "array"
         },
         "$head": {
-          "description": "Page-level <head> entries. Array of element definitions for meta tags, link tags, script tags, etc. Merged with layout and site-level $head entries.",
+          "description": "Page-level <head> entries. Array of head entries for meta tags, link tags, script tags, etc. Merged with layout and site-level $head entries.",
           "items": {
-            "$ref": "#/$defs/v1/$defs/ElementDef"
+            "$ref": "#/$defs/v1/$defs/HeadEntry"
           },
           "type": "array"
         },

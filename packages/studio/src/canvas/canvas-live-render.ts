@@ -7,6 +7,7 @@
  */
 
 import { projectState, stripEventHandlers } from "../store";
+import { displayTagName } from "@jxsuite/schema/guards";
 import { canvasModeOfTab } from "./canvas-surface";
 import { toRaw } from "../reactivity";
 import {
@@ -277,7 +278,7 @@ export async function resolveCanvasDocument(
         return tags;
       }
       if (node.tagName) {
-        tags.add(node.tagName);
+        tags.add(displayTagName(node.tagName));
       }
       if (Array.isArray(node.children)) {
         for (const child of node.children) {

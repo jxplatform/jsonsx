@@ -136,3 +136,89 @@ describe("an extension class's own filter", () => {
     expect(validate(reactive).ok).toBe(true);
   });
 });
+
+describe("a tag chosen at element creation", () => {
+  /*
+   * The answer to the case the pattern above refuses. One element that is an `<a>` when a prop is
+   * set and a `<div>` when it is not, wrapping an identical subtree — written ONCE.
+   *
+   * The property under test in every case here is that the branches are `TagName`s rather than
+   * arbitrary operands: that is what keeps the candidate set readable without evaluating anything,
+   * and it is why the pattern is kept rather than relocated.
+   */
+  const conditional = (value: string, initial: string) => ({
+    $expression: { initial, operator: "?:", target: { $ref: "#/state/href" }, value },
+  });
+
+  test("the two-way form validates, and the subtree is written once", () => {
+    const { errors, ok } = validate(
+      doc([{ children: [{ tagName: "span" }], tagName: conditional("a", "div") }]),
+    );
+    expect(errors).toBe("");
+    expect(ok).toBe(true);
+  });
+
+  test("the multiway form validates", () => {
+    expect(
+      validate(
+        doc([
+          {
+            tagName: {
+              $expression: {
+                cases: { "1": "h1", "2": "h2" },
+                default: "p",
+                operator: "switch",
+                target: { $ref: "#/state/level" },
+              },
+            },
+          },
+        ]),
+      ).ok,
+    ).toBe(true);
+  });
+
+  test("EVERY branch is held to the tag pattern — that is the whole guarantee", () => {
+    const illegalArm = doc([{ tagName: conditional("A LINK", "div") }]);
+    expect(validate(illegalArm).ok).toBe(false);
+    const templateArm = doc([{ tagName: conditional("a", "${state.x}") }]);
+    expect(validate(templateArm).ok).toBe(false);
+    const badCase = {
+      $expression: {
+        cases: { "1": "not a tag" },
+        default: "p",
+        operator: "switch",
+        target: { $ref: "#/state/level" },
+      },
+    };
+    expect(validate(doc([{ tagName: badCase }])).ok).toBe(false);
+  });
+
+  test("the fallback is required — an element with no tag cannot exist", () => {
+    const noDefault = {
+      $expression: {
+        cases: { "1": "h1" },
+        operator: "switch",
+        target: { $ref: "#/state/level" },
+      },
+    };
+    expect(validate(doc([{ tagName: noDefault }])).ok).toBe(false);
+    // …and the two-way form needs both arms for the same reason.
+    const missingArm = doc([
+      { tagName: { $expression: { operator: "?:", target: {}, value: "a" } } },
+    ]);
+    expect(validate(missingArm).ok).toBe(false);
+  });
+
+  test("only these two operators — an arbitrary expression is not a tag", () => {
+    const mutating = {
+      $expression: { operator: "=", target: { $ref: "#/state/tag" }, value: "a" },
+    };
+    expect(validate(doc([{ tagName: mutating }])).ok).toBe(false);
+  });
+
+  test("the document ROOT is still a plain name", () => {
+    // The root becomes `customElements.define(…)`, an emitted file name and a CSS prefix. The
+    // Guarantee lives in the schema, not in a branch each consumer has to remember.
+    expect(validate({ children: [], tagName: conditional("x-a", "x-b") }).ok).toBe(false);
+  });
+});

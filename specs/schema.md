@@ -2,9 +2,9 @@
 
 ## JSON Schema 2020-12 Meta-Schema Generator
 
-**Version:** 0.3.0-draft
+**Version:** 0.3.1-draft
 **Status:** Partial
-**Updated:** 2026-08-09
+**Updated:** 2026-08-10
 **License:** MIT
 
 ---
@@ -99,7 +99,18 @@ All 13 built-in prototypes with their specific configuration properties:
   so every document with a `$switch` child failed validation while the
   compiler rendered it correctly.
 - **`TagName` is a name, never an expression** — `pattern`
-  `^[a-zA-Z][a-zA-Z0-9._-]*$`. No position in the pipeline evaluates a
+  `^[a-zA-Z][a-zA-Z0-9._-]*$`.
+- **`ElementTagName` = `TagName` | `{ $expression: TagExpression }`**, wired into `ElementDef`
+  alone. `TagExpression` is a closed two-branch def (`?:` and `switch`) whose every RESULT operand
+  `$ref`s `TagName` — so the pattern above is kept rather than relocated, and the candidate set is
+  readable straight out of the JSON without evaluating anything. The document root and
+  `SwitchNode`'s container keep the bare `TagName`; `HeadEntry` declares its own. `default` and
+  `initial` are required here, unlike the expression-level `switch`, because an element with no tag
+  cannot exist. Resolved once, at element creation — see spec.md §19.6.
+- **`$head` items are `HeadEntry`, not `ElementDef`.** They had been elements, which was harmless
+  only while an element's tag was a plain name: the moment one could be chosen, a head tag could be
+  too, and `head-merger.ts` splices it into the built page as `<${tag} …>`. This also un-orphaned
+  `HeadEntry`, whose only inbound `$ref` had been its own recursive `children`. No position in the pipeline evaluates a
   `${…}` in tag position, and each consumer failed differently and silently
   when one was written: the runtime threw `InvalidCharacterError` from
   `createElement`, the compiler emitted a lit binding in tag position, and the
@@ -205,6 +216,7 @@ Three JSON Schema 2020-12 documents:
 
 ## Changelog
 
+- **0.3.1-draft** (2026-08-10) — §3.1 ElementTagName admits a TagExpression on ElementDef alone — a closed two-branch def whose every result $refs TagName, so the pattern is kept and the candidates stay enumerable; $head items are pinned to HeadEntry so a head tag cannot become choosable.
 - **0.3.0-draft** (2026-08-09) — §3.1 TagName gains a pattern — a tag name is a name, never an expression, because no consumer evaluates one and each failed differently and silently; SwitchNode is admitted as a child under ChildrenValue (anyOf, so a switch child may still carry its container tagName); ExternalClassDef.filter widened to a union like sort, since one flat property set is shared by every $prototype and was overriding extension classes' own declared parameters.
 - **0.2.8-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.2.7-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
@@ -222,4 +234,4 @@ Three JSON Schema 2020-12 documents:
 
 ---
 
-_`@jxsuite/schema` Specification v0.3.0-draft_
+_`@jxsuite/schema` Specification v0.3.1-draft_

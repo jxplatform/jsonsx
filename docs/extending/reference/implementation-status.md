@@ -23,10 +23,10 @@ This page is generated from the `> **Status: …**` markers in the specification
 | `jx-markdown.md`          | 0.1.7-draft  | Partial     | 2026-07-22 |
 | `parser.md`               | 0.2.4-draft  | Partial     | 2026-07-23 |
 | `relationships.md`        | 0.1.3-draft  | Partial     | 2026-07-22 |
-| `schema.md`               | 0.3.0-draft  | Partial     | 2026-08-09 |
+| `schema.md`               | 0.3.1-draft  | Partial     | 2026-08-10 |
 | `server.md`               | 0.2.1        | Implemented | 2026-07-25 |
 | `site-architecture.md`    | 0.1.42-draft | Pending     | 2026-08-06 |
-| `spec.md`                 | 0.4.27-draft | Partial     | 2026-07-30 |
+| `spec.md`                 | 0.4.28-draft | Partial     | 2026-08-10 |
 | `studio-ui-guidelines.md` | 0.3.6        | Implemented | 2026-08-10 |
 | `studio.md`               | 0.9.4-draft  | Partial     | 2026-08-09 |
 

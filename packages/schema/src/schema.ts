@@ -26,6 +26,7 @@ import { listAll as listElements } from "@webref/elements";
 import css from "@webref/css";
 import idl from "@webref/idl";
 
+import { elementTagNameSchema, tagExpressionSchema } from "../defs/tag-expression.schema";
 import { tagNameSchema } from "../defs/tag-name.schema";
 import {
   boolOrRefSchema,
@@ -287,6 +288,8 @@ export async function generateSchema() {
         ...tagNameSchema,
         examples: [...tagExamples, "my-counter", "todo-app", "user-card"],
       },
+      TagExpression: tagExpressionSchema,
+      ElementTagName: elementTagNameSchema,
       JsonSchemaType: jsonSchemaTypeSchema,
       HeadEntry: headEntrySchema,
       ImageConfig: imageConfigSchema,
@@ -342,9 +345,16 @@ export async function generateSchema() {
       },
       $head: {
         description:
-          "Page-level <head> entries. Array of element definitions for meta tags, " +
+          "Page-level <head> entries. Array of head entries for meta tags, " +
           "link tags, script tags, etc. Merged with layout and site-level $head entries.",
-        items: { $ref: "#/$defs/ElementDef" },
+        /* `HeadEntry`, NOT `ElementDef`. These were typed as elements, which was harmless only
+           while an element's tagName was a plain name — the moment it could be chosen at creation,
+           a head tag could be too, and `head-merger.ts` splices one straight into the built page as
+           `<${tag} …>`. A head tag is static by nature (the runtime's `injectHead` builds a CSS
+           selector out of it before it ever creates anything), and `HeadEntry` already says so.
+           It had been an orphan def until now: its only inbound `$ref` was its own recursive
+           `children`. */
+        items: { $ref: "#/$defs/HeadEntry" },
         type: "array",
       },
       $id: {

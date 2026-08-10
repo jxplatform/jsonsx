@@ -20,6 +20,7 @@
  */
 
 import { html, render as litRender, nothing } from "lit-html";
+import { displayTagName } from "@jxsuite/schema/guards";
 import { styleMap } from "lit-html/directives/style-map.js";
 import { ref } from "lit-html/directives/ref.js";
 import { draggable } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
@@ -307,7 +308,8 @@ export function withCommandTarget<T>(path: JxPath, fn: () => T): T {
 /** Whether `node` is an instance of a registered project component. */
 function isComponentInstanceNode(node: JxMutableNode | null | undefined): boolean {
   const tag = node?.tagName;
-  return Boolean(tag?.includes("-") && componentRegistry.some((c) => c.tagName === tag));
+  const literal = displayTagName(tag);
+  return Boolean(literal.includes("-") && componentRegistry.some((c) => c.tagName === literal));
 }
 
 /**
@@ -331,7 +333,7 @@ export function selectionCommandContext(): CommandContext {
       count: path ? 1 : 0,
       isComponentInstance: isComponentInstanceNode(node),
       isRoot: path ? parentElementPath(path) === null : false,
-      kind: node?.tagName ?? "",
+      kind: displayTagName(node?.tagName),
     },
   });
 }
@@ -383,7 +385,7 @@ function isContainerNode(node: JxMutableNode | string | null | undefined): boole
   if (!node || typeof node !== "object") {
     return false;
   }
-  if (VOID_ELEMENTS.has((node.tagName || "div").toLowerCase())) {
+  if (VOID_ELEMENTS.has((displayTagName(node.tagName) || "div").toLowerCase())) {
     return false;
   }
   const { children } = node;
@@ -1323,7 +1325,7 @@ export function renderBlockActionBar() {
     return;
   }
 
-  const tag = (node.tagName ?? "div").toLowerCase();
+  const tag = (displayTagName(node.tagName) || "div").toLowerCase();
 
   // Inline format state, sourced from the iframe's selection snapshot.
   const { editingProp, snapshot } = getEditSnapshot();
@@ -1347,7 +1349,7 @@ export function renderBlockActionBar() {
 
   // Conversion targets for badge click
   const isComponent =
-    node.tagName?.includes("-") &&
+    displayTagName(node.tagName).includes("-") &&
     componentRegistry.some((/** @type {{ tagName: string }} */ c) => c.tagName === node.tagName);
   const children = childList(node);
   const isEmpty =

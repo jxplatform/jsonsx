@@ -17,6 +17,7 @@
  */
 
 import { parseJxPath } from "./path-mapping";
+import { displayTagName } from "@jxsuite/schema/guards";
 import { rectOf, elementAtPoint } from "../utils/geometry";
 import { getNodeAtPath, isAncestor, pathsEqual } from "../state";
 import type { DragSrcKind, DropPreview } from "./iframe-protocol";
@@ -120,7 +121,7 @@ export function computeDropInstruction(
   }
 
   const node = getNodeAtPath(shadowDoc, targetPath) as JxMutableNode | undefined;
-  const tag = (node?.tagName || "div").toLowerCase();
+  const tag = (displayTagName(node?.tagName) || "div").toLowerCase();
   const hasElementChildren =
     Array.isArray(node?.children) &&
     node.children.some((c: unknown) => c != null && typeof c === "object");

@@ -6,6 +6,7 @@
  */
 
 import { html, nothing } from "lit-html";
+import { displayTagName } from "@jxsuite/schema/guards";
 import { classMap } from "lit-html/directives/class-map.js";
 import { dynamicRouteParams } from "../page-params";
 import { projectState } from "../state";
@@ -286,7 +287,7 @@ export function defHint(_name: string, def: SignalDef | null | undefined) {
  * @param {SignalsPanelState} S
  */
 export function isCustomElementDoc(S: SignalsPanelState) {
-  return (S.document.tagName || "").includes("-");
+  return displayTagName(S.document.tagName).includes("-");
 }
 
 /**
@@ -301,7 +302,7 @@ export function collectCssParts(
 ) {
   const part = node?.attributes?.part;
   if (typeof part === "string" && part) {
-    parts.push({ name: part, tag: node?.tagName || "div" });
+    parts.push({ name: part, tag: displayTagName(node?.tagName) || "div" });
   }
   if (Array.isArray(node?.children)) {
     for (const c of node.children) {

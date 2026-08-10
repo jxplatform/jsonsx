@@ -1,4 +1,5 @@
 import type { JxElement } from "@jxsuite/schema/types";
+import { displayTagName } from "@jxsuite/schema/guards";
 
 export interface ComponentizeOptions {
   minInstances?: number;
@@ -286,7 +287,7 @@ export function componentize(
     }
 
     const baseTag = unclaimed[0]!.node.tagName ?? "div";
-    const kebabName = toKebabCase(baseTag, compIndex);
+    const kebabName = toKebabCase(displayTagName(baseTag), compIndex);
     const pascalName = toPascalCase(kebabName);
     compIndex += 1;
 

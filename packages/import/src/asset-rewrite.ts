@@ -98,7 +98,7 @@ export function rewriteAssetUrls(
 
       // Href on non-anchor elements (could be link icon, etc.)
       if (typeof attrs.href === "string") {
-        const tag = (node.tagName ?? "").toLowerCase();
+        const tag = (typeof node.tagName === "string" ? node.tagName : "").toLowerCase();
         if (tag !== "a") {
           const rewritten = rewriteUrl(attrs.href);
           if (rewritten) {

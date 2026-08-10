@@ -8,6 +8,7 @@
  */
 
 import elementsMeta from "../../data/elements-meta.json";
+import { displayTagName } from "@jxsuite/schema/guards";
 import { normalizeInlineContent, toggleInlineFormat } from "./inline-format";
 import { isEditableTag } from "./editable-tags";
 import type { EditableVerdicts } from "./editable-tags";
@@ -213,9 +214,9 @@ export function isInlineElement(node: JxMutableNode, parentNode?: JxMutableNode)
   if (!node || typeof node !== "object") {
     return false;
   }
-  const childTag = (node.tagName ?? "div").toLowerCase();
+  const childTag = (displayTagName(node.tagName) || "div").toLowerCase();
   if (parentNode) {
-    const parentTag = (parentNode.tagName ?? "div").toLowerCase();
+    const parentTag = (displayTagName(parentNode.tagName) || "div").toLowerCase();
     return isInlineInContext(childTag, parentTag);
   }
   return INLINE_TAGS.has(childTag);

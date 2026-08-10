@@ -1,6 +1,7 @@
 /// <reference lib="dom" />
 // ─── Convert to Component ─────────────────────────────────────────────────────
 import { html, render as litRender } from "lit-html";
+import { displayTagName } from "@jxsuite/schema/guards";
 import { errorMessage } from "@jxsuite/schema/parse";
 import { ref } from "lit-html/directives/ref.js";
 import { childIndex, getNodeAtPath, parentElementPath } from "../store";
@@ -118,7 +119,7 @@ function deriveDefaultName(node: JxMutableNode) {
   if (node.$id && node.$id.includes("-")) {
     return node.$id.toLowerCase();
   }
-  const tag = (node.tagName ?? "div").toLowerCase();
+  const tag = (displayTagName(node.tagName) || "div").toLowerCase();
   return tag.includes("-") ? tag : `jx-${tag}`;
 }
 

@@ -42,6 +42,84 @@ describe("compileElement", () => {
     expect(content).toContain("items: [1,2,3]");
   });
 
+  describe("a tag chosen at element creation", () => {
+    /*
+     * Lit cannot bind a tag name, and `lit-html/static.js`'s `unsafeStatic` — an HTML-injection
+     * primitive with an unbounded template cache — is deliberately avoided in this repo. So a
+     * chosen tag becomes one TEMPLATE per candidate, keyed by the discriminant: the same shape
+     * this emitter already uses for `$switch`, and the reason the schema insists every branch is a
+     * literal `TagName` rather than an arbitrary expression.
+     */
+    const conditional = {
+      $expression: {
+        initial: "div",
+        operator: "?:" as const,
+        target: { $ref: "#/state/href" },
+        value: "a",
+      },
+    };
+
+    test("the two-way form emits both branches, each with the subtree", async () => {
+      const result = await compileElement({
+        children: [
+          {
+            attributes: { href: "${state.href}" },
+            children: [{ tagName: "span" }],
+            tagName: conditional,
+          },
+        ],
+        state: { href: "" },
+        tagName: "test-chosen-tag",
+      });
+      const { content } = result.files[0]!;
+      expect(content).toContain("${s.href");
+      expect(content).toContain("<a");
+      expect(content).toContain("</a>");
+      expect(content).toContain("<div");
+      // In both branches of the bundle the SUBTREE appears; it is written once in the DOCUMENT, which
+      // The thing that was wrong. Hoisting it into a preamble const would shrink the bundle here
+      // And in every existing `$switch` — a refactor of this emitter's return shape, tracked apart.
+      expect(content.split("<span").length - 1).toBe(2);
+      expect(content).not.toContain("[object Object]");
+    });
+
+    test("the multiway form emits a keyed lookup with the fallback", async () => {
+      const result = await compileElement({
+        children: [
+          {
+            tagName: {
+              $expression: {
+                cases: { "1": "h1", "2": "h2" },
+                default: "p",
+                operator: "switch",
+                target: { $ref: "#/state/level" },
+              },
+            },
+          },
+        ],
+        state: { level: 1 },
+        tagName: "test-chosen-heading",
+      });
+      const { content } = result.files[0]!;
+      expect(content).toContain('"1": html');
+      expect(content).toContain('"2": html');
+      expect(content).toContain("<h1");
+      // The required fallback is the `??` arm, not a case key.
+      expect(content).toContain("?? html");
+      expect(content).toContain("<p");
+    });
+
+    test("a plain tag still emits a plain tag", async () => {
+      const result = await compileElement({
+        children: [{ tagName: "section" }],
+        state: {},
+        tagName: "test-plain-tag",
+      });
+      expect(result.files[0]!.content).toContain("<section");
+      expect(result.files[0]!.content).not.toContain("?? html");
+    });
+  });
+
   describe("a `${…}` state entry is a COMPUTED, the same as at runtime", () => {
     /*
      * The runtime has always said so — `runtime.ts`'s second state pass is

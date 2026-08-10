@@ -6,6 +6,7 @@
  */
 
 import type { JxMutableNode } from "@jxsuite/schema/types";
+import { displayTagName } from "@jxsuite/schema/guards";
 
 interface TokenLintFinding {
   path: string;
@@ -119,7 +120,7 @@ export function flagHardcodedTokens(
   }
 
   const tag = doc.tagName || "root";
-  walk(doc, tag);
+  walk(doc, displayTagName(tag));
   return findings;
 }
 

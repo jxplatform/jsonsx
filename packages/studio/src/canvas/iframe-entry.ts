@@ -6,6 +6,7 @@
  */
 
 import { postMessageChannel } from "./iframe-channel";
+import { displayTagName } from "@jxsuite/schema/guards";
 import {
   applyPreviewColorScheme,
   applySiteStyle,
@@ -107,7 +108,7 @@ export function fileDropHitFor(
   return {
     path,
     rect: rectFor(targetEl),
-    tagName: (node?.tagName ?? targetEl.tagName).toLowerCase(),
+    tagName: (displayTagName(node?.tagName) || targetEl.tagName).toLowerCase(),
   };
 }
 

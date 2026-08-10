@@ -12,7 +12,7 @@
  */
 
 import type { ProjectState } from "./types";
-import { isRef } from "@jxsuite/schema/guards";
+import { displayTagName, isRef } from "@jxsuite/schema/guards";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
 export type JxPath = (string | number)[];
@@ -236,7 +236,7 @@ function collectRows(
   }
 
   // Custom component instances without user-authored children are atomic in the layer tree
-  if (doc.$props && (doc.tagName || "").includes("-") && !Array.isArray(doc.children)) {
+  if (doc.$props && displayTagName(doc.tagName).includes("-") && !Array.isArray(doc.children)) {
     return;
   }
 

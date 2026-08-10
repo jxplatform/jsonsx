@@ -6,6 +6,7 @@
  */
 
 import { getNodeAtPath, parentElementPath } from "../store";
+import { displayTagName } from "@jxsuite/schema/guards";
 import { activeCanvasSurface, activeMediaOfPane } from "./canvas-surface";
 import { isInlineInContext } from "../editor/inline-edit";
 import type { CanvasSurface } from "./canvas-surface";
@@ -84,8 +85,8 @@ export function bubbleInlinePath(doc: JxMutableNode | undefined, path: JxPath) {
     if (!node || !parentNode) {
       break;
     }
-    const childTag = (node.tagName ?? "div").toLowerCase();
-    const parentTag = (parentNode.tagName ?? "div").toLowerCase();
+    const childTag = (displayTagName(node.tagName) || "div").toLowerCase();
+    const parentTag = (displayTagName(parentNode.tagName) || "div").toLowerCase();
     if (!isInlineInContext(childTag, parentTag)) {
       break;
     }

@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
 import type { CemParameter, JxMutableNode, JxStateObject } from "@jxsuite/schema/types";
-import { isFunctionDef, isJsonObject } from "@jxsuite/schema/guards";
+import { displayTagName, isFunctionDef, isJsonObject } from "@jxsuite/schema/guards";
 
 /** Collect slot elements from the document tree. Whitespace-only names count as unnamed. */
 export function collectSlots(node?: JxMutableNode | null, slots: string[] = []) {
@@ -58,7 +58,7 @@ export function exportCemManifest(
   const { defCategory, normParam, collectCssParts } = helpers;
   const doc = S.document;
   const { tagName } = doc;
-  if (!tagName || !tagName.includes("-")) {
+  if (!tagName || !displayTagName(tagName).includes("-")) {
     return;
   }
 

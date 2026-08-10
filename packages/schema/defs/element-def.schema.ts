@@ -100,7 +100,7 @@ export const elementDefSchema = {
     src: { $ref: "#/$defs/StringOrRef" },
     style: { $ref: "#/$defs/StyleObject" },
     tabIndex: { $ref: "#/$defs/NumberOrRef" },
-    tagName: { $ref: "#/$defs/TagName" },
+    tagName: { $ref: "#/$defs/ElementTagName" },
     textContent: { $ref: "#/$defs/StringOrRef" },
     title: { $ref: "#/$defs/StringOrRef" },
     type: { $ref: "#/$defs/StringOrRef" },

@@ -1,4 +1,5 @@
 import "./with-dom.js";
+import { displayTagName } from "@jxsuite/schema/guards";
 import { effect } from "../src/reactivity";
 import {
   activateTab,
@@ -106,7 +107,9 @@ describe("Workspace primitive", () => {
 
     let observedTag: string | null = null;
     const stop = effect(() => {
-      observedTag = activeTab.value?.doc.document.tagName ?? null;
+      // The document ROOT's tagName is always a literal — narrowed in `JxDocument`.
+      const tag = activeTab.value?.doc.document.tagName;
+      observedTag = tag === undefined ? null : displayTagName(tag);
     });
 
     expect(observedTag as string | null).toBe("span");

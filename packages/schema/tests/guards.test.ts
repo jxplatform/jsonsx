@@ -4,27 +4,30 @@ import {
   SCHEMA_KEYWORDS,
   bodyReturnsValue,
   childrenContainArray,
+  displayTagName,
   ensureNestedStyle,
   getEventBinding,
   getNestedStyle,
   hasSchemaKeywords,
+  hasStructuredBody,
   isClassDef,
   isEventBinding,
   isExpandedSignal,
-  hasStructuredBody,
   isExpressionDef,
   isFunctionDef,
-  isNamedFormulaDef,
   isJsonObject,
   isMappedArray,
+  isNamedFormulaDef,
   isNestedStyle,
   isNodeObject,
   isPrototypeDef,
   isRef,
   isSchemaOnlyDef,
   isServerFnDef,
+  isTagExpression,
   isTemplateString,
   paramNames,
+  tagNameCandidates,
 } from "../src/guards";
 import type { JxStyle } from "../types";
 
@@ -401,5 +404,49 @@ describe("paramNames", () => {
   test("returns [] for undefined and empty parameter lists", () => {
     expect(paramNames(UNDEF as undefined)).toEqual([]);
     expect(paramNames([])).toEqual([]);
+  });
+});
+
+describe("the tag-name helpers", () => {
+  /*
+   * ONE enumeration, shared by the runtime, three compiler targets and the studio — because four
+   * surfaces each writing their own is four chances to disagree about what an element can be, and
+   * disagreeing about that is how a `${…}` tagName shipped a page whose prerendered markup and
+   * client render used different elements.
+   */
+  const conditional = { $expression: { initial: "div", operator: "?:", target: {}, value: "a" } };
+  const multiway = {
+    $expression: { cases: { "1": "h1", "2": "h2" }, default: "p", operator: "switch", target: {} },
+  };
+
+  test("isTagExpression tells a choice from a name", () => {
+    expect(isTagExpression(conditional)).toBe(true);
+    expect(isTagExpression(multiway)).toBe(true);
+    expect(isTagExpression("div")).toBe(false);
+    expect(isTagExpression(null)).toBe(false);
+    expect(isTagExpression({ notAnExpression: 1 })).toBe(false);
+  });
+
+  test("candidates enumerate every branch, deduplicated, with the fallback", () => {
+    expect(tagNameCandidates(conditional)).toEqual(["a", "div"]);
+    expect(tagNameCandidates(multiway)).toEqual(["h1", "h2", "p"]);
+    // A name is its own single candidate, so callers can treat both forms alike.
+    expect(tagNameCandidates("section")).toEqual(["section"]);
+    expect(tagNameCandidates(null)).toEqual([]);
+    // Both arms the same is one candidate, not two.
+    expect(
+      tagNameCandidates({
+        $expression: { initial: "a", operator: "?:", target: {}, value: "a" },
+      }),
+    ).toEqual(["a"]);
+  });
+
+  test("displayTagName is honest about not knowing which", () => {
+    // The Outline draws one row per node. `a|div` says "one element, tag chosen" — showing the
+    // First candidate would have been a quieter lie, and every structural lookup in the studio
+    // (void elements, landmarks, component ids) correctly fails to match this string.
+    expect(displayTagName(conditional)).toBe("a|div");
+    expect(displayTagName("section")).toBe("section");
+    expect(displayTagName(null)).toBe("");
   });
 });

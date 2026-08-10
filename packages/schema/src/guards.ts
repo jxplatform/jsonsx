@@ -19,9 +19,10 @@ import type {
   JxPrototypeDef,
   JxRef,
   JxServerFnDef,
-  JxStatement,
   JxStateObject,
+  JxStatement,
   JxStyle,
+  JxTagExpression,
 } from "../types";
 
 // ─── JSON shape guards ──────────────────────────────────────────────────────────
@@ -240,4 +241,44 @@ export function paramNames(parameters: JxFunctionDef["parameters"]): string[] {
     return [];
   }
   return parameters.map((p) => (typeof p === "string" ? p : p.name));
+}
+
+/** Whether an element's `tagName` is a choice rather than a name. */
+export function isTagExpression(tagName: unknown): tagName is { $expression: JxTagExpression } {
+  return isJsonObject(tagName) && isJsonObject(tagName.$expression);
+}
+
+/**
+ * Every tag an element could be, without evaluating anything.
+ *
+ * ONE implementation, shared by the runtime, the three compiler targets and the studio, because
+ * four surfaces each writing their own enumeration is four chances to disagree about what an
+ * element can be — and disagreeing about that is how the `${…}` tagName shipped a page whose SSR
+ * markup and client render used different elements.
+ *
+ * A plain name yields itself, so every caller can treat the two forms alike.
+ */
+export function tagNameCandidates(tagName: unknown): string[] {
+  if (typeof tagName === "string") {
+    return [tagName];
+  }
+  if (!isTagExpression(tagName)) {
+    return [];
+  }
+  const expression = tagName.$expression;
+  if (expression.operator === "?:") {
+    return [...new Set([expression.value, expression.initial])];
+  }
+  return [...new Set([...Object.values(expression.cases), expression.default])];
+}
+
+/**
+ * The tag to show a human when the element could be several.
+ *
+ * The Outline draws one row per node and needs a label that is stable, short and honest: `a|div`
+ * says "this is one element whose tag is chosen" without pretending to know which. Rendering the
+ * first candidate would have been a quieter lie.
+ */
+export function displayTagName(tagName: unknown): string {
+  return typeof tagName === "string" ? tagName : tagNameCandidates(tagName).join("|");
 }

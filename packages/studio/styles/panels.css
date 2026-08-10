@@ -1521,3 +1521,31 @@
 .formula-workspace--code {
   overflow: hidden;
 }
+
+/* The Tag row when the tag is CHOSEN rather than typed — see properties-panel.ts renderChosenTag.
+   Laid out as a small stack so the branches read as alternatives to each other rather than as two
+   unrelated fields, and the pointer that picks between them sits above both. */
+.chosen-tag {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  width: 100%;
+}
+.chosen-tag-hint {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+.chosen-tag-branch {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr);
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+.chosen-tag-case {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}

@@ -19,7 +19,7 @@
  */
 
 import { unified } from "unified";
-import { isRef } from "@jxsuite/schema/guards";
+import { isRef, tagNameCandidates } from "@jxsuite/schema/guards";
 import remarkStringify from "remark-stringify";
 import remarkDirective from "remark-directive";
 import remarkGfm from "remark-gfm";
@@ -494,7 +494,7 @@ function convertJxNode(
     return null;
   }
 
-  const tag = el.tagName ?? "div";
+  const tag = serializableTag(el.tagName) || "div";
 
   // Not markdown-native or carries Jx-specific props → directive
   if (!allowlist.has(tag) || hasJxProps(el)) {
@@ -689,6 +689,31 @@ const JX_DOLLAR_KEYS = new Set([
   "$switch",
   "$elements",
 ]);
+
+/**
+ * The tag, for a serializer that must write ONE name.
+ *
+ * A markdown directive is named by a literal, so a tag chosen at creation cannot round-trip through
+ * this format: picking a candidate would silently rewrite the author's document into one branch of
+ * it, which is the failure the tag-name pattern was added to stop. Content documents do not carry
+ * chosen tags today — the construct is an element-document (component) feature — so this refuses
+ * rather than guesses, and says which candidates it saw.
+ *
+ * @param {unknown} tagName
+ * @returns {string} The literal tag, or "" when none is declared
+ */
+function serializableTag(tagName: unknown): string {
+  if (typeof tagName === "string") {
+    return tagName;
+  }
+  if (tagName == null) {
+    return "";
+  }
+  throw new Error(
+    `Markdown cannot express a tag chosen at creation (candidates: ` +
+      `${tagNameCandidates(tagName).join(", ")}). Keep this element in a JSON component.`,
+  );
+}
 
 /**
  * `$prototype` element types that serialize as a directive named after the prototype (no tagName),
@@ -898,7 +923,7 @@ function nodeToMdast(
     return expandArray(node, ctx, scope);
   }
 
-  const tag = node.tagName ?? "div";
+  const tag = serializableTag(node.tagName) || "div";
   const text = resolveText(node.textContent, ctx, scope);
 
   // InnerHTML — convert HTML content to mdast

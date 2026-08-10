@@ -1324,3 +1324,66 @@ describe("debounced edits", () => {
     expect((docNow().children as JxMutableNode[])[0]!.$props!.count).toBe("5");
   });
 });
+
+describe("the Tag row when the tag is CHOSEN", () => {
+  /*
+   * `tagName` may be a name or a choice between names. The row used to be one hardcoded textfield,
+   * which for a choice would have rendered `[object Object]` and — the part that matters — the
+   * first keystroke would have replaced the whole expression with whatever was typed, destroying
+   * the author's branches silently.
+   */
+  const chosen = {
+    $expression: {
+      initial: "div",
+      operator: "?:" as const,
+      target: { $ref: "#/state/href" },
+      value: "a",
+    },
+  };
+
+  test("no bare textfield is offered, and the branches and pointer are shown", async () => {
+    openDoc({ children: [{ children: [], tagName: chosen }], tagName: "x-card" }, ["children", 0]);
+    const c = await renderPanel();
+    const row = c.querySelector('[data-prop="tagName"]')!;
+    // The control that would have clobbered it is not the one rendered…
+    expect(row.querySelector(".chosen-tag")).not.toBeNull();
+    expect(row.textContent).not.toContain("[object Object]");
+    // …and the row says what the element can be, and what decides.
+    expect(row.textContent).toContain("#/state/href");
+    const branches = [...row.querySelectorAll(".chosen-tag-branch sp-textfield")] as unknown as {
+      value: string;
+    }[];
+    expect(branches.map((b) => b.value)).toEqual(["a", "div"]);
+  });
+
+  test("editing a branch keeps the choice — it does not collapse to a name", async () => {
+    openDoc({ children: [{ children: [], tagName: chosen }], tagName: "x-card" }, ["children", 0]);
+    const c = await renderPanel();
+    const first = c.querySelector(".chosen-tag-branch sp-textfield") as HTMLInputElement;
+    first.value = "button";
+    first.dispatchEvent(new Event("input", { bubbles: true }));
+    await new Promise((r) => {
+      setTimeout(r, 450);
+    });
+
+    const tagName = (docNow().children as JxMutableNode[])[0]!.tagName as {
+      $expression: { operator: string; value: string; initial: string };
+    };
+    expect(tagName.$expression.operator).toBe("?:");
+    expect(tagName.$expression.value).toBe("button");
+    expect(tagName.$expression.initial).toBe("div");
+  });
+
+  test("an ordinary tag still gets the plain field", async () => {
+    openDoc({ children: [{ children: [], tagName: "section" }], tagName: "x-card" }, [
+      "children",
+      0,
+    ]);
+    const c = await renderPanel();
+    const row = c.querySelector('[data-prop="tagName"]')!;
+    expect(row.querySelector(".chosen-tag")).toBeNull();
+    expect((row.querySelector("sp-textfield") as unknown as { value: string }).value).toBe(
+      "section",
+    );
+  });
+});

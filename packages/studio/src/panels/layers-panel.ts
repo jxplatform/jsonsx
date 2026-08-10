@@ -28,6 +28,7 @@
  */
 
 import { html, render as litRender, nothing } from "lit-html";
+import { displayTagName } from "@jxsuite/schema/guards";
 import { classMap } from "lit-html/directives/class-map.js";
 import { ifDefined } from "lit-html/directives/if-defined.js";
 import { ref } from "lit-html/directives/ref.js";
@@ -164,7 +165,7 @@ export function outlineLabel(node: JxMutableNode): string {
   if (cls) {
     return `.${truncate(cls)}`;
   }
-  const landmark = LANDMARK_NAMES[(node.tagName ?? "").toLowerCase()];
+  const landmark = LANDMARK_NAMES[displayTagName(node.tagName).toLowerCase()];
   if (landmark) {
     return landmark;
   }
@@ -573,7 +574,7 @@ export function startLayerTitleEdit(path: JxPath, rerender: () => void) {
   input.className = "layer-title-input";
   input.value = node.$title || "";
   const { $title: _, ...nodeWithoutTitle } = node;
-  input.placeholder = outlineLabel(nodeWithoutTitle) || (node.tagName ?? "div");
+  input.placeholder = outlineLabel(nodeWithoutTitle) || displayTagName(node.tagName) || "div";
   label.after(input);
   input.focus();
   input.select();
@@ -709,7 +710,8 @@ export function renderLayersTemplate(ctx: {
     // Array nodes can't accept dropped children (their content is the single map template), so they
     // Block the make-child drop instruction like void elements do.
     const isVoidEl =
-      VOID_ELEMENTS.has((jxNode.tagName || "div").toLowerCase()) || nodeType === "map";
+      VOID_ELEMENTS.has((displayTagName(jxNode.tagName) || "div").toLowerCase()) ||
+      nodeType === "map";
 
     /** @type {string} */
     let badgeClass;

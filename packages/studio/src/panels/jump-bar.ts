@@ -44,6 +44,7 @@
  */
 
 import { html, render as litRender, nothing } from "lit-html";
+import { displayTagName } from "@jxsuite/schema/guards";
 import { childList, getNodeAtPath, nodeLabel, pathsEqual, projectState } from "../store";
 import { effect, effectScope } from "../reactivity";
 import { PRIMARY_PANE, workspace } from "../workspace/workspace";
@@ -142,7 +143,7 @@ export function selectionCrumbs(document: unknown, selection: JxPath): Selection
     const label =
       node?.$prototype === "Array"
         ? "Repeater"
-        : node?.tagName ||
+        : displayTagName(node?.tagName) ||
           (typeof fallbackTag === "string" ? fallbackTag : "") ||
           (seg === "cases" ? String(selection[i + 1]) : `[${selection[i + 1]}]`);
     crumbs.push({ label, path });

@@ -20,7 +20,7 @@ import { html, nothing } from "lit-html";
 import type { TemplateResult } from "lit-html";
 import { live } from "lit-html/directives/live.js";
 import { debouncedStyleCommit, getNodeAtPath, renderOnly } from "../store";
-import { isRef } from "@jxsuite/schema/guards";
+import { displayTagName, isRef, isTagExpression } from "@jxsuite/schema/guards";
 import type { DirEntry, JsonValue } from "../types";
 import {
   mutateUpdateAttribute,
@@ -75,6 +75,7 @@ import type {
   JxPrototypeDef,
   JxStateDefinition,
   JxStateObject,
+  JxTagExpression,
 } from "@jxsuite/schema/types";
 import type { SignalOption } from "../ui/dynamic-slot";
 import type { JxPath } from "../state";
@@ -761,6 +762,61 @@ function showLogicTab(): void {
 // ─── Main entry point ───────────────────────────────────────────────────────
 
 /**
+ * The Tag row when the tag is CHOSEN rather than typed.
+ *
+ * Read-only on purpose, for now. The branches and the pointer that picks between them are shown —
+ * so the row answers "what can this element be, and what decides" without the author opening the
+ * JSON — and each branch is editable as a name, which is the edit people actually make. Changing
+ * the DISCRIMINANT is an expression edit and belongs to the formula builder; until this row grows
+ * one, the honest thing is to show the pointer plainly rather than fake a control that cannot
+ * express what is there.
+ *
+ * The hint is the row's own, not the shared expression hint, because this is the one `$expression`
+ * position in Jx that is not live: the tag is decided when the element is created.
+ *
+ * @param {JxTagExpression} expression The choice declared on this element.
+ * @param {JxPath} path The node being edited.
+ */
+function renderChosenTag(expression: JxTagExpression, path: JxPath) {
+  const setBranch = (key: "value" | "initial" | "default", next: string) => {
+    transactDoc(activeTab.value, (t) =>
+      mutateUpdateProperty(t, path, "tagName", {
+        $expression: { ...expression, [key]: next },
+      }),
+    );
+  };
+  const branchField = (label: string, value: string, key: "value" | "initial" | "default") => html`
+    <label class="chosen-tag-branch">
+      <span>${label}</span>
+      <sp-textfield
+        size="s"
+        .value=${live(value)}
+        autocomplete="off"
+        list="tag-names"
+        @input=${debouncedStyleCommit(`prop:tagName:${key}`, 400, (e: Event) => {
+          setBranch(key, (e.target as HTMLInputElement).value);
+        })}
+      ></sp-textfield>
+    </label>
+  `;
+  const target = isRef(expression.target) ? expression.target.$ref : "an expression";
+  return html`
+    <div class="chosen-tag">
+      <p class="chosen-tag-hint">Chosen from <code>${target}</code> when the element is created.</p>
+      ${
+        expression.operator === "?:"
+          ? html`${branchField("When set", expression.value, "value")}
+            ${branchField("Otherwise", expression.initial, "initial")}`
+          : html`${Object.entries(expression.cases).map(
+              ([key, tag]) => html`<p class="chosen-tag-case"><code>${key}</code> → ${tag}</p>`,
+            )}
+            ${branchField("Otherwise", expression.default, "default")}`
+      }
+    </div>
+  `;
+}
+
+/**
  * The Content tab — lit-html template with accordion sections.
  *
  * @param {{ navigateToComponent: (path: string) => void }} ctx
@@ -805,8 +861,9 @@ export function renderPropertiesPanelTemplate(ctx: {
   // Every existing call site's behaviour unchanged.
   const targets: JxPath[] = tab.session.selection.length > 0 ? tab.session.selection : [path];
   const doc = tab.doc.document;
-  const isCustomInstance = (node.tagName || "").includes("-");
-  const tagName = node.tagName || "div";
+  const isCustomInstance = displayTagName(node.tagName).includes("-");
+  const chosenTag = isTagExpression(node.tagName) ? node.tagName.$expression : null;
+  const tagName = displayTagName(node.tagName) || "div";
   const attrs = node.attributes || {};
 
   const mapSignals = mapSignalsFor(path);
@@ -886,7 +943,7 @@ export function renderPropertiesPanelTemplate(ctx: {
   // ── Collect applicable attributes from html-meta ──
   const applicableAttrs = {} as Record<string, HtmlMetaEntry>;
   for (const [attr, entry] of Object.entries(htmlMeta.$defs) as [string, HtmlMetaEntry][]) {
-    if (!entry.$elements || entry.$elements.includes(tagName)) {
+    if (!entry.$elements || entry.$elements.includes(displayTagName(tagName))) {
       // The $attr field aliases a $defs key to a different attribute name.
       // This lets the same attribute (e.g. "name") carry per-element metadata.
       applicableAttrs[entry.$attr ?? attr] = entry;
@@ -983,27 +1040,37 @@ export function renderPropertiesPanelTemplate(ctx: {
     >
       <div class="style-section-body">
         ${renderFieldRow({
-          hasValue: false,
+          hasValue: chosenTag !== null,
           label: "Tag",
           prop: "tagName",
-          widget: html`
-            <sp-textfield
-              size="s"
-              .value=${live(tagName)}
-              autocomplete="off"
-              list="tag-names"
-              @input=${debouncedStyleCommit("prop:tagName", 400, (e: Event) => {
-                transactDoc(activeTab.value, (t) =>
-                  mutateUpdateProperty(
-                    t,
-                    path,
-                    "tagName",
-                    (e.target as HTMLInputElement).value || undefined,
-                  ),
-                );
-              })}
-            ></sp-textfield>
-          `,
+          /* A CHOSEN TAG IS NOT TYPEABLE, so the plain field is not offered for one.
+             `tagName` may be a name or a choice between names. Binding the object into a textfield
+             would have shown `[object Object]` and — the part that matters — the first keystroke
+             would have replaced the whole expression with whatever was typed, destroying the
+             author's branches with no undo prompt and no error. So the two shapes get two controls:
+             a name is typed, and a choice is shown as its branches with the pointer that picks
+             between them. */
+          widget:
+            chosenTag === null
+              ? html`
+                  <sp-textfield
+                    size="s"
+                    .value=${live(tagName)}
+                    autocomplete="off"
+                    list="tag-names"
+                    @input=${debouncedStyleCommit("prop:tagName", 400, (e: Event) => {
+                      transactDoc(activeTab.value, (t) =>
+                        mutateUpdateProperty(
+                          t,
+                          path,
+                          "tagName",
+                          (e.target as HTMLInputElement).value || undefined,
+                        ),
+                      );
+                    })}
+                  ></sp-textfield>
+                `
+              : renderChosenTag(chosenTag, path),
         })}
         ${renderFieldRow({
           hasValue: Boolean(node.$id),
@@ -1081,8 +1148,8 @@ export function renderPropertiesPanelTemplate(ctx: {
   // Be reused, so the question does not arise.
   const usagesT = isCustomInstance
     ? renderUsagesSection(
-        tagName,
-        componentRegistry.find((c) => c.tagName === tagName)?.path ?? null,
+        displayTagName(tagName),
+        componentRegistry.find((c) => c.tagName === displayTagName(tagName))?.path ?? null,
       )
     : nothing;
 

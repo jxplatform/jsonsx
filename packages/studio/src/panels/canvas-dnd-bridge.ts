@@ -25,6 +25,7 @@
  */
 
 import { monitorForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
+import { displayTagName } from "@jxsuite/schema/guards";
 import {
   beginDragSession,
   clearDropIndicator,
@@ -129,11 +130,11 @@ export function ghostLabel(
 ): string {
   if (src.type === "block") {
     const fragment = data.fragment as JxMutableNode | undefined;
-    return fragment?.tagName ?? "block";
+    return displayTagName(fragment?.tagName) || "block";
   }
   const doc = tab?.doc.document as JxMutableNode | undefined;
   const node = doc ? (getNodeAtPath(doc, src.path) as JxMutableNode | undefined) : undefined;
-  return node?.tagName ?? "node";
+  return displayTagName(node?.tagName) || "node";
 }
 
 /**

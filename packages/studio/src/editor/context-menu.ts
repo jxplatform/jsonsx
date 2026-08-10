@@ -21,6 +21,7 @@
  * is left here is positioning, popover rendering, and the menu keyboard contract.
  */
 import { html, nothing } from "lit-html";
+import { displayTagName } from "@jxsuite/schema/guards";
 import { jsonClone } from "../utils/studio-utils";
 import { ref } from "lit-html/directives/ref.js";
 import { htmlToJx } from "@jxsuite/markup/html-to-jx";
@@ -372,7 +373,7 @@ export function elementCommands(deps: ElementCommandDeps): AnyCommand[] {
     if (!target?.onEditComponent || !tagName) {
       return null;
     }
-    return deps.componentPathFor(tagName);
+    return deps.componentPathFor(displayTagName(tagName));
   };
 
   const NOT_STRUCTURAL =
@@ -665,6 +666,9 @@ const liveDeps: ElementCommandDeps = {
 function liveContext(): CommandContext {
   const target = _target;
   const tab = activeTab.value;
+  // One read, two consumers — a chosen tag reads as `a|div`, which matches no component id.
+  const targetTag = displayTagName(target?.node.tagName);
+
   return makeContext({
     // The menu's context has to carry capabilities too, now that it renders a record gated on one:
     // `makeContext` defaults every capability to false, which would hide Find Usages on every host.
@@ -679,10 +683,10 @@ function liveContext(): CommandContext {
     editor: { kind: tab ? editorKindForMode(tab.session.ui.canvasMode) : "none" },
     selection: {
       count: target ? 1 : 0,
-      isComponentInstance: Boolean(target && liveDeps.componentPathFor(target.node.tagName ?? "")),
+      isComponentInstance: Boolean(target && liveDeps.componentPathFor(targetTag)),
       isRepeater: target ? isArrayNode(target.node) : false,
       isRoot: target ? !isSpliceablePath(target.path) : false,
-      kind: target?.node.tagName ?? "",
+      kind: targetTag,
     },
   });
 }
