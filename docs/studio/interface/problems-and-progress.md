@@ -120,7 +120,7 @@ If a panel is showing a yellow **New changes — applied when you finish editing
 
 ## What the status bar does instead
 
-The status bar along the bottom carries **ambient state only** — three fields in scope order: your project, then the document, then the selection. It's the project name and branch, the document's path and save state. Every item is clickable and runs a command.
+The status bar along the bottom carries **ambient state only** — three fields in scope order: your project, then the document, then the selection. It's the project name and branch, how many people are editing alongside you, the document's path and save state. Every item is clickable and runs a command: the peer count opens what's happening in this document, the problem count opens the list.
 
 The selection field carries what an address can't state: **3 selected** when more than one element is picked, or the style rule the Style panel is editing. Where you are — the element and the chain above it — is the [jump bar](/docs/studio/interface#the-jump-bar)'s job, one line above the pane, and it names the _primary_ element, the one the Inspector and the block action bar are pointed at. The count is what stops that address reading as though it described everything you have selected.
 

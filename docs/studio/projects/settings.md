@@ -22,7 +22,7 @@ code:
 
 Everything that applies to your whole site rather than one page — the name, the favicon, the fonts, the design tokens, the packages — lives in your project's configuration. In Studio that configuration is **a document**: it opens as a tab in the pane, with its sections listed down the left, and you edit, undo and save it exactly as you would a page.
 
-Open it by pressing :kbd[⌘K] and running **Open Settings**, or by picking **Open Settings** from the **⬢ menu** in the Command Bar. Click a section on the left to move between them; the section you were last on is where you land next time.
+Open it with :kbd[⌘⇧,], or press :kbd[⌘K] and run **Open Settings**, or pick **Open Settings** from the **⬢ menu** in the Command Bar. (:kbd[⌘,] is the other half of the pair — **Preferences**, which configures the app rather than this project.) Click a section on the left to move between them; the section you were last on is where you land next time.
 
 ![Project settings open on the Overview section, with the section list on the left](../../images/settings-document.png)
 
