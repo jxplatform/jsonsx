@@ -1368,3 +1368,81 @@ describe("the Tag row is a bindable slot like any other", () => {
     expect(capsForPosition("elementTag")).toEqual(["literal", "expression"]);
   });
 });
+
+describe("editing a component definition is not editing an instance of it", () => {
+  /*
+   * A component's own root tag has a hyphen, so the old test — "the tag contains a dash" — said
+   * yes to both. Open the component itself and the panel drew the INSTANCE form over the
+   * definition: fields writing `$props` onto the definition's own root, and a "from the component"
+   * badge whose click opened the document already in front of you.
+   *
+   * The distinguishing fact is whose document this is.
+   */
+  function openAs(documentPath: string) {
+    componentRegistry.length = 0;
+    componentRegistry.push({
+      path: "components/my-card.json",
+      props: [{ default: "Untitled", name: "title", type: "string" }],
+      source: "project",
+      tagName: "my-card",
+    } as never);
+    const tab = resetWorkspaceWithTab({
+      children: [],
+      state: { title: { default: "Untitled", type: "string" } },
+      tagName: "my-card",
+    } as never);
+    tab.documentPath = documentPath;
+    tab.session.selection = [[]] as never;
+    return tab;
+  }
+
+  test("the definition shows DEFAULTS, and offers no jump to itself", async () => {
+    openAs("components/my-card.json");
+    const c = await renderPanel();
+    expect(section(c, "Component Defaults")).not.toBeNull();
+    expect(section(c, "Component Settings")).toBeNull();
+    // "→ Edit definition" from inside the definition is a link to here.
+    expect(c.textContent).not.toContain("Edit definition");
+    // …and the donor badge cannot say "from the component" when it IS the component.
+    expect(c.textContent).not.toContain("the component default");
+  });
+
+  test("an instance keeps the settings form, the donor and the jump", async () => {
+    componentRegistry.length = 0;
+    componentRegistry.push({
+      path: "components/my-card.json",
+      props: [{ default: "Untitled", name: "title", type: "string" }],
+      source: "project",
+      tagName: "my-card",
+    } as never);
+    const tab = resetWorkspaceWithTab({
+      children: [{ children: [], tagName: "my-card" }],
+      tagName: "div",
+    } as never);
+    tab.documentPath = "pages/index.json";
+    tab.session.selection = [["children", 0]] as never;
+    const c = await renderPanel();
+    expect(section(c, "Component Settings")).not.toBeNull();
+    expect(section(c, "Component Defaults")).toBeNull();
+    expect(c.textContent).toContain("Edit definition");
+  });
+
+  test("a default typed in the definition lands on the state entry, not on $props", async () => {
+    const tab = openAs("components/my-card.json");
+    const c = await renderPanel();
+    const field = section(c, "Component Defaults")!.querySelector(
+      "sp-textfield",
+    ) as HTMLInputElement;
+    field.value = "A card";
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+    await new Promise((r) => {
+      setTimeout(r, 450);
+    });
+    const doc = tab.doc.document as JxMutableNode & {
+      state?: Record<string, { default?: unknown }>;
+      $props?: Record<string, unknown>;
+    };
+    expect(doc.state?.title?.default).toBe("A card");
+    expect(doc.$props).toBeUndefined();
+  });
+});

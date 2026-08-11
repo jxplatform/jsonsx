@@ -33,6 +33,8 @@ Props are the knobs an instance can turn — the card's title, its image, whethe
 
 On an instance, the [Content tab](/docs/studio/design/properties) shows a **Component Settings** section with a fitting control per prop — checkbox, number field, dropdown, media or color picker. Each prop can also be _bound_: click the **value source** chip beside its label and pick **From data…** for a signal, or **Mixed text** for a value that mixes text and data, so the instance follows live data instead of a fixed setting. It is the same three-rung choice, spelled the same way, that every other bindable row in Studio offers — see **[Formulas and expressions](/docs/studio/logic/formulas)**.
 
+With the component's own definition open, the same section becomes **Component Defaults**: the values here are the ones the component ships, so a page that sets nothing gets these. There's no _from the component_ badge and no **→ Edit definition** link, because you're already there.
+
 Each prop row also says where its value came from, in the same four-state chip the [Style tab](/docs/studio/design/style-inspector) uses — the same question asked of a second cascade:
 
 - A prop you have filled in on this instance carries an accent **set here** dot; click it to clear the prop and hand it back to the component.

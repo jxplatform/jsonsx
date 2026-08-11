@@ -24,6 +24,7 @@ import { displayTagName, isRef, isTagExpression } from "@jxsuite/schema/guards";
 import type { DirEntry, JsonValue } from "../types";
 import {
   mutateUpdateAttribute,
+  mutateUpdateDef,
   mutateUpdateProp,
   mutateUpdateProperty,
   transactDoc,
@@ -165,7 +166,8 @@ function renderComponentPropsFieldsTemplate(
   navigateToComponent: (path: string) => void,
 ) {
   const tab = activeTab.value;
-  const comp = componentRegistry.find((c) => c.tagName === node.tagName);
+  const comp = componentRegistry.find((c) => c.tagName === displayTagName(node.tagName));
+  const definitionOfThis = isComponentDefinitionOpen(node);
   if (!comp || !comp.props) {
     return renderEmptyState({
       compact: true,
@@ -173,19 +175,29 @@ function renderComponentPropsFieldsTemplate(
     });
   }
   const isNpm = comp.source === "npm";
-  const currentVals = isNpm ? node.attributes || {} : node.$props || {};
-  const updateFn = isNpm
+  /* In the definition the "value" of a setting is its DECLARED DEFAULT — the state entry's
+     `default` — not a per-instance override, so the row reads and writes there instead. */
+  const stateEntries = (tab?.doc.document.state ?? {}) as Record<string, { default?: JsonValue }>;
+  const currentVals: Record<string, unknown> = definitionOfThis
+    ? Object.fromEntries(comp.props.map((prop) => [prop.name, stateEntries[prop.name]?.default]))
+    : isNpm
+      ? node.attributes || {}
+      : node.$props || {};
+  const updateFn = definitionOfThis
     ? (name: string, v?: JsonValue) =>
-        transactDoc(activeTab.value, (t) =>
-          mutateUpdateAttribute(
-            t,
-            path,
-            name,
-            v === "" ? undefined : (v as JxAttributeValue | undefined),
-          ),
-        )
-    : (name: string, v?: JsonValue) =>
-        transactDoc(activeTab.value, (t) => mutateUpdateProp(t, path, name, v));
+        transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { default: v }))
+    : isNpm
+      ? (name: string, v?: JsonValue) =>
+          transactDoc(activeTab.value, (t) =>
+            mutateUpdateAttribute(
+              t,
+              path,
+              name,
+              v === "" ? undefined : (v as JxAttributeValue | undefined),
+            ),
+          )
+      : (name: string, v?: JsonValue) =>
+          transactDoc(activeTab.value, (t) => mutateUpdateProp(t, path, name, v));
 
   const defs = tab!.doc.document.state || {};
   const signalNames = bindableSignalNames(tab!.doc.document);
@@ -270,8 +282,13 @@ function renderComponentPropsFieldsTemplate(
         labelExtra: slot.modeButton,
         prop: prop.name,
         provenance: componentPropProvenance(prop, rawValue, hasVal, {
+          // No donor and no jump in the definition: the value IS the component's default, and
+          // "→ the component definition" would open the document already in front of you.
+          isDefinition: definitionOfThis,
           onClear: () => updateFn(prop.name),
-          openDefinition: comp.path ? () => navigateToComponent(comp.path!) : undefined,
+          ...(definitionOfThis || !comp.path
+            ? {}
+            : { openDefinition: () => navigateToComponent(comp.path!) }),
         }),
         widget: slot.widget,
       });
@@ -280,18 +297,36 @@ function renderComponentPropsFieldsTemplate(
       comp.props.length === 0
         ? renderEmptyState({
             compact: true,
-            message: "This component has no settings to fill in yet.",
+            message: definitionOfThis
+              ? "This component declares no settings yet. Add a state entry with a default to " +
+                "give whoever places it something to fill in."
+              : "This component has no settings to fill in yet.",
           })
         : nothing
     }
     ${
-      comp.path
+      // A link to the definition, from inside the definition, is a link to here.
+      comp.path && !definitionOfThis
         ? html`<span class="kv-add" @click=${() => navigateToComponent(comp.path!)}
             >→ Edit definition</span
           >`
         : nothing
     }
   `;
+}
+
+/**
+ * Is the selected node an INSTANCE of a component, or the definition of one?
+ *
+ * A component's own root tag has a hyphen, so "the tag contains a dash" answers yes to both — and
+ * that is what put the instance form in front of someone editing the component itself. The
+ * distinguishing fact is whose document this is: if the component's definition path IS the open
+ * file, there is no instance, no override and no donor to jump to.
+ */
+export function isComponentDefinitionOpen(node: JxMutableNode): boolean {
+  const comp = componentRegistry.find((c) => c.tagName === displayTagName(node.tagName));
+  const open = activeTab.value?.documentPath;
+  return comp?.path !== undefined && open !== undefined && comp.path === open;
 }
 
 /**
@@ -305,7 +340,12 @@ function componentPropProvenance(
   prop: { name: string; default?: unknown; description?: string },
   rawValue: unknown,
   hasVal: boolean,
-  actions: { onClear: () => void; openDefinition?: (() => void) | undefined },
+  actions: {
+    onClear: () => void;
+    openDefinition?: (() => void) | undefined;
+    /** Editing the component itself, where there is no instance and therefore no donor. */
+    isDefinition?: boolean;
+  },
 ): FieldProvenance {
   if (hasVal && slotMode(rawValue) !== "literal") {
     return { donor: bindingDonor(rawValue), state: "bound", title: `Bound — ${prop.name}` };
@@ -313,7 +353,10 @@ function componentPropProvenance(
   if (hasVal) {
     return { onClick: actions.onClear, state: "set", title: `Clear ${prop.name}` };
   }
-  if (prop.default !== undefined) {
+  /* INHERITED is a statement about somewhere ELSE, so it cannot be true here. In the definition an
+     unset field means this component ships no default for that setting — which is `default`, the
+     state that draws nothing, not a badge pointing at itself. */
+  if (prop.default !== undefined && !actions.isDefinition) {
     return {
       donor: "the component default",
       state: "inherited",
@@ -1092,9 +1135,13 @@ export function renderPropertiesPanelTemplate(ctx: {
     </sp-accordion-item>
   `;
 
+  const editingDefinition = isCustomInstance && isComponentDefinitionOpen(node);
   const compPropsT = isCustomInstance
     ? html`
-        <sp-accordion-item label="Component Settings" open>
+        <sp-accordion-item
+          label=${editingDefinition ? "Component Defaults" : "Component Settings"}
+          open
+        >
           <div class="style-section-body">
             ${renderComponentPropsFieldsTemplate(node, path, mapSignals, ctx.navigateToComponent)}
           </div>
