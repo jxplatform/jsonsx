@@ -2,9 +2,9 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.4-draft
+**Version:** 0.9.5-draft
 **Status:** Partial
-**Updated:** 2026-08-09
+**Updated:** 2026-08-11
 **License:** MIT
 
 ---
@@ -638,6 +638,19 @@ Three rules the ladder must keep:
     not legal and reachable on none.
 3.  **Switching rungs remembers the representation it left**, so a switch is never destructive, and
     typing a `${…}` literal does not swap the widget underneath the author mid-keystroke.
+4.  **A position may seed its own rung.** The generic `Formula` seed is a bare `??` node, which is a
+    sensible start almost everywhere and an INVALID document wherever the schema narrows which
+    operators the position takes — clicking the chip would write something that fails its own
+    validator. A position that narrows supplies the seed instead.
+
+**An element's `tagName` is one of these positions**, and is the ladder's own argument made twice
+over. Its rungs derive to **Fixed value** and **Formula** and no `Mixed text`: `TagName` carries a
+`pattern`, so the derivation refuses a template rung — and a `${…}` in tag position is precisely
+what that pattern exists to reject (`specs/schema.md` §3.1). It also narrows the operators to `?:`
+and `switch`, which is what rule 4 is for. Before it joined the ladder the row was a hand-written
+control, and it did both things rule 2 warns about: it rendered `[object Object]` for a value it did
+not expect, and its one text input would have replaced an author's whole expression on the first
+keystroke.
 
 ### 6.7 Provenance, and multiple selection
 
@@ -1754,6 +1767,7 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ## Changelog
 
+- **0.9.5-draft** (2026-08-11) — §6.6 the value-source ladder gains a fourth rule — a position whose schema narrows which operators it admits seeds its own Formula rung, because the generic bare-?? seed is an invalid document there; an element's tagName joins the ladder, deriving to Fixed value + Formula with no template rung because TagName carries a pattern.
 - **0.9.4-draft** (2026-08-09) — §16.3 Problems leaves the Navigator rail — no Bottom-dock tab has a rail button, the count lives in the status bar and runs view.setBottomTab, and panel.focus.problems is gone with the ⌘1-8 roster that follows the rail; §16.1 restates where a Problem is surfaced.
 - **0.9.3-draft** (2026-08-09) — §13.5 corrects check-icons — an icon key on a record is resolved through a map, not registered as a tag, and the two spaces fail differently; the previous text asserted the opposite and licensed a fix that replaced a working hand-drawn glyph with a key nothing resolved.
 - **0.9.2-draft** (2026-08-08) — §13.5 adds scripts/check-icons.ts — an sp-icon-* tag no element registers, or a registered element Spectrum does not ship, is now a red PR; the command record's icon field described accurately as a tag name rather than a key into a map.
@@ -1813,4 +1827,4 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.4-draft_
+_`@jxsuite/studio` Specification v0.9.5-draft_

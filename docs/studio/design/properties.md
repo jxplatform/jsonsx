@@ -20,7 +20,7 @@ Each tab renders under a header naming the tab and what it is pointed at — the
 
 Every element starts with the same basics:
 
-- **Tag** — the element's type. Change it to turn a `div` into a `section`, a `p` into an `h2`. If the tag is **chosen** rather than fixed — one element that is an `a` when it has somewhere to go and a `div` when it doesn't — this row shows the alternatives and what decides between them, and each alternative is editable. See [Choosing an element's tag](/docs/framework/concepts/expressions#choosing-an-elements-tag).
+- **Tag** — the element's type. Change it to turn a `div` into a `section`, a `p` into an `h2`. Like other fields, it carries a **value-source** chip: switch it from **Fixed value** to **Formula** and the element becomes an `a` when it has somewhere to go and a `div` when it doesn't, wrapping the same content either way — built in the same operator editor you use everywhere else. There is no _Mixed text_ option here, because a tag is a name and not something you assemble from other text. The tag is settled when the element is created; see [Choosing an element's tag](/docs/framework/concepts/expressions#choosing-an-elements-tag).
 - **ID** and **Class** — the element's identifier and CSS classes.
 - **Text Content** — the element's text, shown when it has no child elements.
 - **Hidden** — a checkbox that removes the element from the rendered page without deleting it.

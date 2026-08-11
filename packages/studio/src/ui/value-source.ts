@@ -32,6 +32,7 @@ import {
   arrayNamespaceSchema,
   attributesObjectSchema,
   elementPropertyValueSchema,
+  elementTagNameSchema,
   expressionEntrySchema,
   functionDefSchema,
   propsObjectSchema,
@@ -39,6 +40,7 @@ import {
   stringOrRefSchema,
   styleObjectSchema,
   switchDefSchema,
+  tagNameSchema,
 } from "@jxsuite/schema/defs";
 import { isFunctionDef, isRef, isTemplateString } from "@jxsuite/schema/guards";
 
@@ -244,6 +246,22 @@ export function deriveSlotCaps(schema: unknown): SlotMode[] {
 // ─── Named positions ────────────────────────────────────────────────────────
 
 /**
+ * `ElementTagName`, with `TagName` INLINED so the walk can see it.
+ *
+ * The shipped def points at `#/$defs/TagName`, and this walker resolves no pointer into the core
+ * schema — `deriveSlotCapsDetailed` reports it as unresolved, and the position derived to Formula
+ * alone, silently losing the Fixed-value rung. Substituting the def keeps one source of truth for
+ * the branches while giving the derivation something it can actually walk.
+ *
+ * Note what the pattern buys here for free: `isFreeStringSchema` refuses a constrained string, so
+ * no `template` rung is offered — and a `${…}` in tag position is exactly what that pattern exists
+ * to reject.
+ */
+const ELEMENT_TAG_SCHEMA = {
+  anyOf: [tagNameSchema, ...elementTagNameSchema.anyOf.slice(1)],
+} as const;
+
+/**
  * The document positions a bindable slot can occupy. A panel names the position it is editing; the
  * rungs follow from the schema, so a panel can no longer offer a rung the compiler would reject —
  * nor withhold one it would accept.
@@ -267,6 +285,14 @@ export const SLOT_POSITION_SCHEMAS = {
   styleProperty: styleObjectSchema.additionalProperties,
   /** A `$switch` discriminant — `SwitchDef`, which is a `$ref` and nothing else. */
   switchDiscriminant: switchDefSchema,
+  /**
+   * An element's `tagName` — `ElementTagName`: a literal name, or a `TagExpression` choosing
+   * between names. The rungs derive to Fixed value + Formula, which is the whole point of naming
+   * the position rather than hand-rolling a control: the `TagName` branch carries a `pattern`, so
+   * `isFreeStringSchema` correctly refuses to offer a template rung here — a `${…}` in tag position
+   * is exactly what the pattern exists to reject.
+   */
+  elementTag: ELEMENT_TAG_SCHEMA,
   /** A declared string-valued element property (`textContent`, `href`, …) — `StringOrRef`. */
   textProperty: stringOrRefSchema,
 } as const;

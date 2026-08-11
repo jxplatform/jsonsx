@@ -308,7 +308,10 @@ export function nodeLabel(node: JxMutableNode | null) {
     const name = node.attributes?.name;
     return typeof name === "string" && name.trim() ? `slot: ${name.trim()}` : "slot";
   }
-  const tag = node.tagName ?? "div";
+  /* `displayTagName`, because a tag may be CHOSEN rather than written: this label reached the
+     Outline row, the Inspector's header and the jump bar, and a raw read rendered `[object Object]`
+     in all three. `a|div` is the honest answer — one element, tag decided at creation. */
+  const tag = displayTagName(node.tagName) || "div";
   const suffix = node.$switch ? " ⇆" : "";
   if (typeof node.textContent === "string" && node.textContent.length > 0) {
     return `${tag} — ${node.textContent.slice(0, 24)}${suffix}`;

@@ -75,7 +75,6 @@ import type {
   JxPrototypeDef,
   JxStateDefinition,
   JxStateObject,
-  JxTagExpression,
 } from "@jxsuite/schema/types";
 import type { SignalOption } from "../ui/dynamic-slot";
 import type { JxPath } from "../state";
@@ -762,61 +761,6 @@ function showLogicTab(): void {
 // ─── Main entry point ───────────────────────────────────────────────────────
 
 /**
- * The Tag row when the tag is CHOSEN rather than typed.
- *
- * Read-only on purpose, for now. The branches and the pointer that picks between them are shown —
- * so the row answers "what can this element be, and what decides" without the author opening the
- * JSON — and each branch is editable as a name, which is the edit people actually make. Changing
- * the DISCRIMINANT is an expression edit and belongs to the formula builder; until this row grows
- * one, the honest thing is to show the pointer plainly rather than fake a control that cannot
- * express what is there.
- *
- * The hint is the row's own, not the shared expression hint, because this is the one `$expression`
- * position in Jx that is not live: the tag is decided when the element is created.
- *
- * @param {JxTagExpression} expression The choice declared on this element.
- * @param {JxPath} path The node being edited.
- */
-function renderChosenTag(expression: JxTagExpression, path: JxPath) {
-  const setBranch = (key: "value" | "initial" | "default", next: string) => {
-    transactDoc(activeTab.value, (t) =>
-      mutateUpdateProperty(t, path, "tagName", {
-        $expression: { ...expression, [key]: next },
-      }),
-    );
-  };
-  const branchField = (label: string, value: string, key: "value" | "initial" | "default") => html`
-    <label class="chosen-tag-branch">
-      <span>${label}</span>
-      <sp-textfield
-        size="s"
-        .value=${live(value)}
-        autocomplete="off"
-        list="tag-names"
-        @input=${debouncedStyleCommit(`prop:tagName:${key}`, 400, (e: Event) => {
-          setBranch(key, (e.target as HTMLInputElement).value);
-        })}
-      ></sp-textfield>
-    </label>
-  `;
-  const target = isRef(expression.target) ? expression.target.$ref : "an expression";
-  return html`
-    <div class="chosen-tag">
-      <p class="chosen-tag-hint">Chosen from <code>${target}</code> when the element is created.</p>
-      ${
-        expression.operator === "?:"
-          ? html`${branchField("When set", expression.value, "value")}
-            ${branchField("Otherwise", expression.initial, "initial")}`
-          : html`${Object.entries(expression.cases).map(
-              ([key, tag]) => html`<p class="chosen-tag-case"><code>${key}</code> → ${tag}</p>`,
-            )}
-            ${branchField("Otherwise", expression.default, "default")}`
-      }
-    </div>
-  `;
-}
-
-/**
  * The Content tab — lit-html template with accordion sections.
  *
  * @param {{ navigateToComponent: (path: string) => void }} ctx
@@ -1039,39 +983,53 @@ export function renderPropertiesPanelTemplate(ctx: {
       @sp-accordion-item-toggle=${() => toggleSection("__element")}
     >
       <div class="style-section-body">
-        ${renderFieldRow({
-          hasValue: chosenTag !== null,
-          label: "Tag",
-          prop: "tagName",
-          /* A CHOSEN TAG IS NOT TYPEABLE, so the plain field is not offered for one.
-             `tagName` may be a name or a choice between names. Binding the object into a textfield
-             would have shown `[object Object]` and — the part that matters — the first keystroke
-             would have replaced the whole expression with whatever was typed, destroying the
-             author's branches with no undo prompt and no error. So the two shapes get two controls:
-             a name is typed, and a choice is shown as its branches with the pointer that picks
-             between them. */
-          widget:
-            chosenTag === null
-              ? html`
-                  <sp-textfield
-                    size="s"
-                    .value=${live(tagName)}
-                    autocomplete="off"
-                    list="tag-names"
-                    @input=${debouncedStyleCommit("prop:tagName", 400, (e: Event) => {
-                      transactDoc(activeTab.value, (t) =>
-                        mutateUpdateProperty(
-                          t,
-                          path,
-                          "tagName",
-                          (e.target as HTMLInputElement).value || undefined,
-                        ),
-                      );
-                    })}
-                  ></sp-textfield>
-                `
-              : renderChosenTag(chosenTag, path),
-        })}
+        ${(() => {
+          /* THE SHARED SLOT, not a hand-rolled control.
+             `tagName` is a bindable position like any other — a literal name or a `TagExpression`
+             — so it gets the same Value Source chip and the same expression editor as `href`, a
+             style declaration or an event handler. The rungs are DERIVED from
+             `SLOT_POSITION_SCHEMAS.elementTag`, which is why only Fixed value and Formula are
+             offered: `TagName` carries a pattern, so `isFreeStringSchema` refuses a template rung,
+             and a `${…}` in tag position is precisely what that pattern exists to reject.
+
+             The seed is ours because the generic one is `{ operator: "??" }`, which a
+             `TagExpression` does not admit — clicking the chip would otherwise write a document
+             that fails its own validator. */
+          const tagSlot = renderDynamicSlot({
+            caps: "elementTag",
+            fieldKey: `${path.join(".")}:tagName`,
+            onChange: (next) => {
+              transactDoc(activeTab.value, (t) =>
+                mutateUpdateProperty(t, path, "tagName", next ?? undefined),
+              );
+            },
+            seedFor: (mode) =>
+              mode === "expression"
+                ? {
+                    $expression: {
+                      initial: tagName,
+                      operator: "?:",
+                      target: null,
+                      value: tagName,
+                    },
+                  }
+                : undefined,
+            staticWidget: spTextField("prop:tagName", tagName, (v: string) => {
+              transactDoc(activeTab.value, (t) =>
+                mutateUpdateProperty(t, path, "tagName", v || undefined),
+              );
+            }),
+            stateDefs: bindableSignalNames(activeTab.value!.doc.document),
+            value: node.tagName as JsonValue | undefined,
+          });
+          return renderFieldRow({
+            hasValue: chosenTag !== null,
+            label: "Tag",
+            labelExtra: tagSlot.modeButton,
+            prop: "tagName",
+            widget: tagSlot.widget,
+          });
+        })()}
         ${renderFieldRow({
           hasValue: Boolean(node.$id),
           label: "ID",

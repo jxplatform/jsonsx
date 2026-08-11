@@ -136,6 +136,10 @@ describe("capsForPosition", () => {
     attribute: ["literal", "ref", "template"],
     componentProp: ["literal", "ref", "template"],
     elementProperty: ["literal", "ref", "template"],
+    /* No `template` rung, and that is the pattern earning its keep rather than an omission: a
+       `TagName` is a constrained string, so `isFreeStringSchema` refuses it — and a `${…}` in tag
+       position is exactly what the pattern was added to reject. */
+    elementTag: ["literal", "expression"],
     eventHandler: ["ref", "expression", "function"],
     repeaterFilter: ["ref"],
     repeaterItems: ["literal", "ref"],

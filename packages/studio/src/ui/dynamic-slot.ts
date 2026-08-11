@@ -156,6 +156,16 @@ export interface DynamicSlotOpts {
   preview?: EditorPreview | null;
   /** Static value restored when de-escalating to literal mode. */
   literalDefault?: JsonValue;
+  /**
+   * A position-specific seed for a rung, overriding the generic one.
+   *
+   * The generic expression seed is `{ operator: "??" }`, which is a sensible starting point almost
+   * everywhere and an INVALID document in a position whose schema narrows which operators it takes.
+   * An element's `tagName` is the first such position — a `TagExpression` is `?:` or `switch` and
+   * nothing else — so a generic seed would drop a document that fails its own validator the moment
+   * the chip is clicked. Return `undefined` to accept the generic seed.
+   */
+  seedFor?: (mode: SlotMode) => JsonValue | undefined;
 }
 
 function defaultForSlotMode(mode: SlotMode, opts: DynamicSlotOpts): JsonValue | undefined {
@@ -338,7 +348,7 @@ function renderModeChip(mode: SlotMode, caps: SlotMode[], opts: DynamicSlotOpts)
         mode,
         next,
         cloneValue(opts.value as JsonValue | undefined),
-        defaultForSlotMode(next, opts),
+        opts.seedFor?.(next) ?? defaultForSlotMode(next, opts),
       ),
     );
   };

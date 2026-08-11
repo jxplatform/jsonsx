@@ -296,6 +296,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.9.5-draft** (2026-08-11) — §6.6 the value-source ladder gains a fourth rule — a position whose schema narrows which operators it admits seeds its own Formula rung, because the generic bare-?? seed is an invalid document there; an element's tagName joins the ladder, deriving to Fixed value + Formula with no template rung because TagName carries a pattern.
 - **0.9.4-draft** (2026-08-09) — §16.3 Problems leaves the Navigator rail — no Bottom-dock tab has a rail button, the count lives in the status bar and runs view.setBottomTab, and panel.focus.problems is gone with the ⌘1-8 roster that follows the rail; §16.1 restates where a Problem is surfaced.
 - **0.9.3-draft** (2026-08-09) — §13.5 corrects check-icons — an icon key on a record is resolved through a map, not registered as a tag, and the two spaces fail differently; the previous text asserted the opposite and licensed a fix that replaced a working hand-drawn glyph with a key nothing resolved.
 - **0.9.2-draft** (2026-08-08) — §13.5 adds scripts/check-icons.ts — an sp-icon-* tag no element registers, or a registered element Spectrum does not ship, is now a red PR; the command record's icon field described accurately as a tag name rather than a key into a map.

@@ -14,6 +14,7 @@ import {
   resetStudioState,
   resetWorkspaceWithTab,
 } from "./harness";
+import { capsForPosition } from "../src/ui/value-source";
 import { beforeEach, describe, expect, test } from "bun:test";
 import {
   invalidatePageRouteCache,
@@ -1325,12 +1326,12 @@ describe("debounced edits", () => {
   });
 });
 
-describe("the Tag row when the tag is CHOSEN", () => {
+describe("the Tag row is a bindable slot like any other", () => {
   /*
-   * `tagName` may be a name or a choice between names. The row used to be one hardcoded textfield,
-   * which for a choice would have rendered `[object Object]` and — the part that matters — the
-   * first keystroke would have replaced the whole expression with whatever was typed, destroying
-   * the author's branches silently.
+   * `tagName` may be a literal name or a `TagExpression` choosing between names. It was one
+   * hardcoded textfield, which for a choice rendered `[object Object]` and let the first keystroke
+   * replace the whole expression with whatever was typed. It is now the shared Value Source slot —
+   * the same chip and the same expression editor as `href`, a style declaration or a handler.
    */
   const chosen = {
     $expression: {
@@ -1340,50 +1341,30 @@ describe("the Tag row when the tag is CHOSEN", () => {
       value: "a",
     },
   };
+  const tagRow = (c: HTMLElement) => c.querySelector('[data-prop="tagName"]')!;
 
-  test("no bare textfield is offered, and the branches and pointer are shown", async () => {
-    openDoc({ children: [{ children: [], tagName: chosen }], tagName: "x-card" }, ["children", 0]);
-    const c = await renderPanel();
-    const row = c.querySelector('[data-prop="tagName"]')!;
-    // The control that would have clobbered it is not the one rendered…
-    expect(row.querySelector(".chosen-tag")).not.toBeNull();
-    expect(row.textContent).not.toContain("[object Object]");
-    // …and the row says what the element can be, and what decides.
-    expect(row.textContent).toContain("#/state/href");
-    const branches = [...row.querySelectorAll(".chosen-tag-branch sp-textfield")] as unknown as {
-      value: string;
-    }[];
-    expect(branches.map((b) => b.value)).toEqual(["a", "div"]);
-  });
-
-  test("editing a branch keeps the choice — it does not collapse to a name", async () => {
-    openDoc({ children: [{ children: [], tagName: chosen }], tagName: "x-card" }, ["children", 0]);
-    const c = await renderPanel();
-    const first = c.querySelector(".chosen-tag-branch sp-textfield") as HTMLInputElement;
-    first.value = "button";
-    first.dispatchEvent(new Event("input", { bubbles: true }));
-    await new Promise((r) => {
-      setTimeout(r, 450);
-    });
-
-    const tagName = (docNow().children as JxMutableNode[])[0]!.tagName as {
-      $expression: { operator: string; value: string; initial: string };
-    };
-    expect(tagName.$expression.operator).toBe("?:");
-    expect(tagName.$expression.value).toBe("button");
-    expect(tagName.$expression.initial).toBe("div");
-  });
-
-  test("an ordinary tag still gets the plain field", async () => {
+  test("a fixed tag shows Fixed value and a typeable field", async () => {
     openDoc({ children: [{ children: [], tagName: "section" }], tagName: "x-card" }, [
       "children",
       0,
     ]);
-    const c = await renderPanel();
-    const row = c.querySelector('[data-prop="tagName"]')!;
-    expect(row.querySelector(".chosen-tag")).toBeNull();
+    const row = tagRow(await renderPanel());
+    expect(row.querySelector(".dynamic-slot-mode")!.textContent!.trim()).toBe("Fixed value");
     expect((row.querySelector("sp-textfield") as unknown as { value: string }).value).toBe(
       "section",
     );
+  });
+
+  test("a chosen tag shows Formula, and never renders the object into a field", async () => {
+    openDoc({ children: [{ children: [], tagName: chosen }], tagName: "x-card" }, ["children", 0]);
+    const row = tagRow(await renderPanel());
+    expect(row.querySelector(".dynamic-slot-mode")!.textContent!.trim()).toBe("Formula");
+    expect(row.textContent).not.toContain("[object Object]");
+  });
+
+  test("the rungs are the two the schema permits — no template rung", async () => {
+    // Derived from `SLOT_POSITION_SCHEMAS.elementTag`, not hand-listed. A `${…}` in tag position is
+    // What the `TagName` pattern exists to reject, so the rung is correctly absent.
+    expect(capsForPosition("elementTag")).toEqual(["literal", "expression"]);
   });
 });
