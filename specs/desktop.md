@@ -2,9 +2,9 @@
 
 ## Platform Abstraction, Project Loading, and Component Scoping
 
-**Version:** 0.3.6-draft
+**Version:** 0.3.7-draft
 **Status:** Pending
-**Updated:** 2026-08-03
+**Updated:** 2026-08-11
 **License:** MIT
 
 ---
@@ -818,6 +818,7 @@ Ensure desktop app matches dev-mode capabilities:
 
 ## Changelog
 
+- **0.3.7-draft** (2026-08-11) — Name the pane context bar's resolving-with popover rather than the tab bar, which P8 deleted.
 - **0.3.6-draft** (2026-08-03) — §3.1/§5.1: findReferences? PAL member and the GET /__studio/references route — the read side of the rename refactor's walker.
 - **0.3.5-draft** (2026-08-02) — searchFiles, gitShow and openExternal RPC handlers registered on both launchers; styles/ staged into the packaged app.
 - **0.3.4-draft** (2026-07-31) — List the cfConnect? PAL member in the Publish/identity family — it ships in StudioPlatform and backs the hosted Cloudflare OAuth flow, but the table omitted it.
@@ -843,4 +844,4 @@ Ensure desktop app matches dev-mode capabilities:
 
 ---
 
-_Jx Studio Desktop Architecture Specification v0.3.6-draft_
+_Jx Studio Desktop Architecture Specification v0.3.7-draft_
