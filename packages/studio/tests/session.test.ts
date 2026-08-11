@@ -201,6 +201,44 @@ describe("restoreSession", () => {
     expect(tab.session.ui.canvasMode).toBe("source");
   });
 
+  test("every stored view setting is restored, one field at a time", async () => {
+    // Each field is its own `!== undefined` branch, because a stored `false` or `0` is a CHOICE and
+    // A truthiness check would silently drop "preview off" and "no breakpoint".
+    await restoreSession(
+      session({
+        ui: {
+          "pages/a.md": {
+            activeMedia: "md",
+            editZoom: 1.25,
+            preview: false,
+            previewColorScheme: "dark",
+            showLayout: false,
+            zoom: 0.5,
+          },
+        },
+      }),
+      { ensureSecondPane: () => {}, openFile: opener() },
+    );
+    const { ui } = [...workspace.tabs.values()].find(
+      (t) => t.documentPath === "pages/a.md",
+    )!.session;
+    expect({
+      activeMedia: ui.activeMedia,
+      editZoom: ui.editZoom,
+      preview: ui.preview,
+      previewColorScheme: ui.previewColorScheme,
+      showLayout: ui.showLayout,
+      zoom: ui.zoom,
+    }).toEqual({
+      activeMedia: "md",
+      editZoom: 1.25,
+      preview: false,
+      previewColorScheme: "dark",
+      showLayout: false,
+      zoom: 0.5,
+    });
+  });
+
   test("a mode the document does not support is dropped, not forced", async () => {
     // `capabilities.modes` is the document's own answer. A stored mode the tab cannot draw would
     // Otherwise restore as a blank canvas — and the record is `localStorage`, so it may name a mode

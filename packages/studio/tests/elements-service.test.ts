@@ -63,6 +63,12 @@ describe("already imported?", () => {
     expect(hasElement(elements, local("vendor/card.json"), null)).toBe(true);
   });
 
+  test("a component nameable neither way is never 'already imported'", () => {
+    expect(
+      hasElement(["@acme/ui", { $ref: "a.json" }], { tagName: "x-ghost" } as never, null),
+    ).toBe(false);
+  });
+
   test("`./a.json` and `a.json` are the same file", () => {
     expect(hasElement([{ $ref: "a.json" }], local("a.json"), null)).toBe(true);
     expect(hasElement([{ $ref: "././a.json" }], local("a.json"), null)).toBe(true);
