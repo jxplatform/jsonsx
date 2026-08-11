@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.17-draft
+**Version:** 0.9.18-draft
 **Status:** Partial
 **Updated:** 2026-08-11
 **License:** MIT
@@ -1231,19 +1231,23 @@ held (`services/monaco-lazy`) and registered when an editor is first created.
 
 ---
 
-## 12. Pending Features
+## 12. Content-Management Feature Status
 
-| Feature                      | Description                                                    | Status                                                                                                                                                                            |
-| ---------------------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| CSS custom properties panel  | Declare `--custom-property` interfaces for CEM                 | **Pending**                                                                                                                                                                       |
-| CSS parts panel              | Declare `::part()` styling hooks for CEM                       | **Pending**                                                                                                                                                                       |
-| Full CEM document export     | Generate complete Custom Elements Manifest JSON                | **Pending**                                                                                                                                                                       |
-| Component library management | Browse, install, and manage component packages                 | **Pending**                                                                                                                                                                       |
-| Content collection browser   | Table/card/calendar views for content entries                  | **Pending**                                                                                                                                                                       |
-| Content entry editor         | Schema-driven forms for Markdown frontmatter, JSON, CSV        | **Pending**                                                                                                                                                                       |
-| Media browser                | Grid/list view of project media with upload and usage tracking | **Partial** — upload ships on four surfaces (§9.3); usage tracking is still pending                                                                                               |
-| SEO panel                    | Title/description/OG preview with schema.org editor            | **Partial** — `Search appearance` ships the merged-head previews, resolved fields, counters and warnings (site-architecture §8.6); the schema.org/JSON-LD editor is still pending |
-| Redirect editor              | CRUD table for site redirect rules                             | **Pending**                                                                                                                                                                       |
+Six of these nine rows were still marked **Pending** long after they shipped — the table was written
+when §11 was a plan and never re-read against the code. Each status below names the module that
+answers for it, so the next reader can check rather than trust.
+
+| Feature                      | Description                                                    | Status                                                                                                                                                                                                                                                                             |
+| ---------------------------- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CSS custom properties panel  | Declare `--custom-property` interfaces for CEM                 | **Partial** — the Logic tab's **CSS Properties** section lists the `--*` entries of the component's root `style`, read-only (`renderStaticKvRow`). Declaring one means authoring a style value; there is no interface form                                                         |
+| CSS parts panel              | Declare `::part()` styling hooks for CEM                       | **Partial** — same shape: the Logic tab's **CSS Parts** section lists the parts collected from the tree, read-only. The tree is the declaration                                                                                                                                    |
+| Full CEM document export     | Generate complete Custom Elements Manifest JSON                | **Pending** — `services/cem-export.ts` builds a complete CEM 2.1.0 manifest, `cssProperties` and `cssParts` included, and **nothing invokes it**. `tests/reachability.test.ts` carries the ledger entry: no menu offers it, and it still takes the deleted flat state shape        |
+| Component library management | Browse, install, and manage component packages                 | **Implemented** — the Packages panel adds and removes npm packages (`platform.addPackage` / `removePackage`) and cherry-picks components per document through the one `$elements` service (§11.2)                                                                                  |
+| Content collection browser   | Table/card/calendar views for content entries                  | **Implemented** — the Library ships five layouts, not three: `table`, `cards`, `media`, `calendar`, `board` (`browse/library-model.ts`)                                                                                                                                            |
+| Content entry editor         | Schema-driven forms for Markdown frontmatter, JSON, CSV        | **Implemented** — `src/content/` ships schema-driven forms for directory-backed collections (`.md`, `.json`). A CSV-backed collection is a single FILE, so it has no per-entry form by design and opens in Grid mode instead (`grid/sources/csv-file-source.ts`)                   |
+| Media browser                | Grid/list view of project media with upload and usage tracking | **Partial** — the grid view and upload ship on four surfaces (§9.3), and usage IS computed, keyed on the authored ref (`files/media-usage.ts`). But its only reader is the delete confirmation: no column, panel or field says what an image is used by until you try to remove it |
+| SEO panel                    | Title/description/OG preview with schema.org editor            | **Partial** — `Search appearance` ships the merged-head previews, resolved fields, counters and warnings (site-architecture §8.6); the schema.org/JSON-LD editor is still pending                                                                                                  |
+| Redirect editor              | CRUD table for site redirect rules                             | **Implemented** — `grid/redirects-grid.ts`, a `GridSource` over `project.json`'s redirects with chain, loop and shadowed-rule validation, each reported as a Problem naming the rule (§11.4, §16)                                                                                  |
 
 See the [Site Architecture Specification](site-architecture.md) for full design details on content management UI.
 
@@ -1949,6 +1953,7 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ## Changelog
 
+- **0.9.18-draft** (2026-08-11) — §12's status table re-read against the code: collection browser, entry editor, component library management and the redirect editor were shipped and still marked Pending; the CSS properties/parts panels are read-only reflections, not declaration forms; the CEM exporter is complete and unreachable; media usage is computed but only the delete confirmation reads it.
 - **0.9.17-draft** (2026-08-11) — SEO panel status is Partial — Search appearance ships the previews, counters and warnings; the schema.org editor is still pending.
 - **0.9.16-draft** (2026-08-11) — The resolving-with values move into their own popover, and each becomes a command (canvas.setTestProp / setRouteParam).
 - **0.9.15-draft** (2026-08-11) — The size switcher resizes the Edit column to the chosen breakpoint, and each rendering-context verb repaints the pane it wrote.
@@ -2021,4 +2026,4 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.17-draft_
+_`@jxsuite/studio` Specification v0.9.18-draft_
