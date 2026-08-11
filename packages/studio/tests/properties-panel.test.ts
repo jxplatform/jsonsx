@@ -51,6 +51,43 @@ function openDoc(doc: Record<string, unknown>, selection: (string | number)[] | 
   return tab;
 }
 
+describe("drafts belong to a node, not to a field name", () => {
+  /*
+   * `ui/field-input.ts`'s draft map is module-global and these three rows keyed it by field name
+   * alone (`"prop:className"`), so every element shared one slot per field. Type a class name,
+   * click a sibling before blurring, and the sibling's Class row showed your text — and blurring it
+   * there committed to the WRONG element. Plan §11.4: "drafts keyed by node path (today all
+   * elements share one draft slot per field)".
+   */
+  test("a draft on one element does not appear on the next", async () => {
+    const doc = {
+      children: [
+        { className: "first", tagName: "p" },
+        { className: "second", tagName: "p" },
+      ],
+      tagName: "div",
+    };
+    const tab = openDoc(doc, ["children", 0]);
+    let c = await renderPanel();
+    const classField = (root: Element) =>
+      root.querySelector('[data-prop="className"] sp-textfield') as HTMLElement & {
+        value: string;
+      };
+
+    // Type into the first element's Class row WITHOUT blurring — a live draft.
+    const field = classField(c);
+    field.value = "half-typed";
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+    await flush();
+
+    tab.session.selection = [["children", 1]];
+    c = await renderPanel();
+    expect(classField(c).value).toBe("second");
+    // …and the first element is untouched on disk.
+    expect((docNow().children as Record<string, unknown>[])[0]!.className).toBe("first");
+  });
+});
+
 function docNow(): JxMutableNode {
   return activeTab.value!.doc.document as JxMutableNode;
 }

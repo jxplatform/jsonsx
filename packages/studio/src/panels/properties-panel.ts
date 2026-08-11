@@ -1060,6 +1060,18 @@ export function renderPropertiesPanelTemplate(ctx: {
   });
 
   /**
+   * A draft key for one field ON THIS NODE.
+   *
+   * The three Element rows used constant keys — `"prop:tagName"`, `"prop:$id"`, `"prop:className"`
+   * — and `ui/field-input.ts`'s draft map is module-global, so every element shared one draft slot
+   * per field. Type a class name, click a sibling before blurring, and the sibling's Class row
+   * showed the text you had typed for the first one; blur it there and the commit landed on the
+   * WRONG element. Plan §11.4 asks for "drafts keyed by node path (today all elements share one
+   * draft slot per field)".
+   */
+  const fieldKey = (name: string) => `prop:${path.join("/")}:${name}`;
+
+  /**
    * The set-here chip for a document property, with the tooltip in the label's own words.
    *
    * The derived tooltip would read "Clear textContent"; the label above it reads "Text Content".
@@ -1110,7 +1122,7 @@ export function renderPropertiesPanelTemplate(ctx: {
                     },
                   }
                 : undefined,
-            staticWidget: spTextField("prop:tagName", tagName, (v: string) => {
+            staticWidget: spTextField(fieldKey("tagName"), tagName, (v: string) => {
               transactDoc(activeTab.value, (t) =>
                 mutateUpdateProperty(t, path, "tagName", v || undefined),
               );
@@ -1131,7 +1143,7 @@ export function renderPropertiesPanelTemplate(ctx: {
           label: "ID",
           prop: "$id",
           ...(node.$id ? { provenance: propertyChip("$id", "ID") } : {}),
-          widget: spTextField("prop:$id", String(node.$id || ""), (v: string) =>
+          widget: spTextField(fieldKey("$id"), String(node.$id || ""), (v: string) =>
             transactDoc(activeTab.value, (t) =>
               mutateUpdateProperty(t, path, "$id", v || undefined),
             ),
@@ -1142,7 +1154,7 @@ export function renderPropertiesPanelTemplate(ctx: {
           label: "Class",
           prop: "className",
           ...(node.className ? { provenance: propertyChip("className", "class") } : {}),
-          widget: spTextField("prop:className", String(node.className || ""), (v: string) =>
+          widget: spTextField(fieldKey("className"), String(node.className || ""), (v: string) =>
             transactDoc(activeTab.value, (t) =>
               mutateUpdateProperty(t, path, "className", v || undefined),
             ),

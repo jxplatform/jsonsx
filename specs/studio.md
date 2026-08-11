@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.11-draft
+**Version:** 0.9.12-draft
 **Status:** Partial
 **Updated:** 2026-08-11
 **License:** MIT
@@ -504,6 +504,11 @@ Each prop's value source is chosen from the shared ladder (§6.6) rather than a 
 prop row carries a provenance chip (§6.7) distinguishing a value set here from the component's own
 default — the same vocabulary the Style tab uses, because it is the same question asked of a second
 cascade.
+
+**A draft belongs to a node.** The in-progress text of a field that has not been committed yet is
+keyed by node path AND field name. Keyed by field name alone — as the Element rows were — every
+element shared one draft slot per field: typing a class name, clicking a sibling before blurring,
+and blurring there committed your text to the wrong element.
 
 **An event name is typed, not picked.** The Logic tab's event rows use the same
 `jx-value-selector` combobox: the ten common `on*` names are SUGGESTIONS, and any handler name may
@@ -1880,6 +1885,7 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ## Changelog
 
+- **0.9.12-draft** (2026-08-11) — A field's uncommitted draft is keyed by node path, not by field name alone.
 - **0.9.11-draft** (2026-08-11) — Event names are a free-form combobox, and a bound provenance chip opens its source on every tab.
 - **0.9.10-draft** (2026-08-11) — §14.8 — a project reopens with the documents, panes and view settings it was left with.
 - **0.9.9-draft** (2026-08-11) — The rendering context's three axes are commands (canvas.setBreakpoint / setColorScheme / setLayoutVisible), and an empty-canvas right-click keeps the browser's menu.
@@ -1946,4 +1952,4 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.11-draft_
+_`@jxsuite/studio` Specification v0.9.12-draft_
