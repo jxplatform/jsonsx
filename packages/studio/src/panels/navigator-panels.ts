@@ -46,7 +46,7 @@ const NOT_YET_BUILT = () => false;
 export function registerNavigatorPanels(): void {
   // Keyed on Files rather than on `listPanels("navigator")`, because the Bottom dock composes
   // Itself independently (`bottomPanelSet()` calls `registerBottomPanels()` directly) and either
-  // Order has to leave this function still registering the Navigator's own nine.
+  // Order has to leave this function still registering the Navigator's own eight.
   if (getPanel("files")) {
     return;
   }
