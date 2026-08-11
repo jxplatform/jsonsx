@@ -65,7 +65,10 @@ function nodeToHtml(node: JxNode | string): string {
   if (typeof node === "string") {
     return node;
   }
-  const tag = node.tagName || "div";
+  /* A chosen tag cannot be serialised to one HTML string, so the copy takes the branch the
+     candidates list first — clipboard HTML is a lossy export by nature (it drops bindings too),
+     and emitting `<[object Object]>` would be worse than lossy. */
+  const tag = displayTagName(node.tagName).split("|")[0] || "div";
   let attrs = "";
   if (node.attributes) {
     for (const [k, v] of Object.entries(node.attributes)) {

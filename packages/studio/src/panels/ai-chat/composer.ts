@@ -15,6 +15,7 @@
  */
 
 import { html, nothing } from "lit-html";
+import { displayTagName } from "@jxsuite/schema/guards";
 import type { TemplateResult } from "lit-html";
 import { live } from "lit-html/directives/live.js";
 import { ref } from "lit-html/directives/ref.js";
@@ -141,10 +142,14 @@ export function createComposer(opts: ComposerOptions): Composer {
     const selection = primarySelection(tab?.session.selection);
     let selectionChip: ContextChip | null = null;
     if (tab && selection) {
+      /* No `tagName?: string` in this cast any more. It overrode the widened type — a tag may be
+         a name or a choice between names — so the compiler could not see that this chip would
+         render `[object Object]` for a chosen one. A cast that narrows a field back to what it
+         used to be is a hole the type system cannot report. */
       const node = getNodeAtPath(tab.doc.document as JxMutableNode, selection) as
-        | (JxMutableNode & { tagName?: string; textContent?: string })
+        | (JxMutableNode & { textContent?: string })
         | undefined;
-      const tag = node?.tagName || "element";
+      const tag = displayTagName(node?.tagName) || "element";
       const text = typeof node?.textContent === "string" ? node.textContent.slice(0, 40) : "";
       selectionChip = {
         detail: `Selected element at ${JSON.stringify(selection)}: <${tag}>${text ? ` "${text}"` : ""}`,

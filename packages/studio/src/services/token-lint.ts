@@ -113,7 +113,7 @@ export function flagHardcodedTokens(
       for (let i = 0; i < el.children.length; i++) {
         const child = el.children[i];
         if (child && typeof child === "object") {
-          walk(child, `${pathPrefix} > ${child.tagName || `[${i}]`}`);
+          walk(child, `${pathPrefix} > ${displayTagName(child.tagName) || `[${i}]`}`);
         }
       }
     }

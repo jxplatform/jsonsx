@@ -28,7 +28,7 @@
  */
 
 import { html, render as litRender, nothing } from "lit-html";
-import { displayTagName } from "@jxsuite/schema/guards";
+import { displayTagName, isTagExpression, tagNameCandidates } from "@jxsuite/schema/guards";
 import { classMap } from "lit-html/directives/class-map.js";
 import { ifDefined } from "lit-html/directives/if-defined.js";
 import { ref } from "lit-html/directives/ref.js";
@@ -741,8 +741,14 @@ export function renderLayersTemplate(ctx: {
           : "Default slot";
     } else {
       badgeClass = "layer-tag";
-      badgeText = jxNode.tagName || "div";
-      badgeTitle = undefined;
+      /* The ROW BADGE, which is the one place the tag is shown as itself rather than folded into a
+         label — so it is the one that rendered `[object Object]` for a chosen tag after the other
+         reads were fixed. `outlineLabel` never returns a tag (it prefers a title, an id, text, a
+         class, a landmark), which is why fixing `nodeLabel` did not reach here. */
+      badgeText = displayTagName(jxNode.tagName) || "div";
+      badgeTitle = isTagExpression(jxNode.tagName)
+        ? `Tag chosen when the element is created: ${tagNameCandidates(jxNode.tagName).join(" or ")}`
+        : undefined;
     }
 
     /** @type {string} */

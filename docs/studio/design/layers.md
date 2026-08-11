@@ -21,7 +21,7 @@ The panel's header names it and the level it works at — **OUTLINE · document*
 
 Each row shows a badge and a name. The badge tells you what the row is:
 
-- The element's type — `div`, `h2`, `img`, and so on.
+- The element's type — `div`, `h2`, `img`, and so on. An element whose [tag is chosen](/docs/framework/concepts/expressions#choosing-an-elements-tag) rather than fixed reads as both, `a|div` — one row, one element, the tag settled when it's created. Hover it to see which is which.
 - **↻** — a [repeating list](/docs/studio/design/repeaters), an element that renders one copy per item.
 - **⇄** — a condition, an element that shows one of several cases; each case appears as a child row named after the case.
 - **▣** — a slot, the placeholder where a component or layout receives content. Hover it to see the slot's name.

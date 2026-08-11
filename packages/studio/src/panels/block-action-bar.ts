@@ -1399,7 +1399,7 @@ export function renderBlockActionBar() {
               ? (e: MouseEvent) => onTagBadgeClick(e, convertTargets, selection)
               : nothing
           }
-          >${isRepeater ? nodeLabel(node) : node.$id || (node.tagName ?? "div")}${
+          >${isRepeater ? nodeLabel(node) : node.$id || displayTagName(node.tagName) || "div"}${
             editingProp ? ` · ${editingProp}` : ""
           }</span
         >
