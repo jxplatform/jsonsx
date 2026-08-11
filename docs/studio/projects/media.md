@@ -38,9 +38,9 @@ Dropping onto a component that takes a single image — a card with a cover pict
 
 ## Upload from an image field
 
-Wherever Studio asks for an image or file — an image's **Content** tab, a frontmatter field, the Icon and social-image fields in the **Document Header** card's SEO block — the field has an **Upload** button beside the browse button. Click it, pick a file, and Studio adds it to the project and fills the field in for you.
+Wherever Studio asks for an image or file — an image's **Content** tab, a frontmatter field, the Icon and social-image fields in **[Search appearance](/docs/studio/editing/frontmatter)** — the field has an **Upload** button beside the browse button. Click it, pick a file, and Studio adds it to the project and fills the field in for you.
 
-The browse button opens the picker: a search box over the media already in `public/`, matched on name or path, with a thumbnail for every image.
+The browse button opens the picker: a search box over the media already in `public/`, matched on name or path, with a thumbnail for every image. It opens above whatever surface it was called from, so it works the same in a panel and in a window like Search appearance.
 
 ![The media picker popover open over an image field, showing the search field and thumbnail list](../../images/media-picker.png)
 

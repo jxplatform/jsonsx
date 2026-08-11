@@ -1153,10 +1153,11 @@ export function buildHeadDoc(doc: JxMutableNode, fm: Record<string, unknown>): J
  *
  * **`tab` is a parameter for the same reason {@link renderFmField}'s is.** It resolved
  * `activeTab.value` itself, and the Document Header card calls it for the CONTENT branch of every
- * mutation it makes — Title, Clear title, the whole SEO block, the Layout picker. The card is drawn
- * per pane, so on a markdown page the card in one pane retitled the document in the other. The
- * comment beside the card's JSON branch has claimed since P8 that this was fixed; the fix reached
- * the JSON branch only, and this is the half that was left.
+ * mutation it makes — Title, Clear title, the Layout picker — as does Search appearance, which is
+ * where the head fields went and which takes its tab the same way. The card is drawn per pane, so
+ * on a markdown page the card in one pane retitled the document in the other. The comment beside
+ * the card's JSON branch has claimed since P8 that this was fixed; the fix reached the JSON branch
+ * only, and this is the half that was left.
  *
  * @param {Tab | null} tab The document to commit into.
  * @param {() => void} rerender

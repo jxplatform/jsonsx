@@ -51,7 +51,7 @@ import type { Tab } from "../tabs/tab";
 import type { AnyCommand, CommandRegistry } from "../commands/registry";
 import type { TemplateResult } from "lit-html";
 
-// ─── The SEO block ────────────────────────────────────────────────────────────
+// ─── The body ─────────────────────────────────────────────────────────────────
 
 /*
  * Two rendered previews, a resolved-field list and a warning list, over the MERGED head — and no

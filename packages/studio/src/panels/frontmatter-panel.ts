@@ -18,8 +18,8 @@
  *
  * What it renders instead: **any** document with frontmatter or `$head`, in every named layout and
  * in both authoring views of the stage — Title, Route, the layout picker, the
- * schema-and-frontmatter field list, a collapsible SEO block and a "Raw head tags" disclosure.
- * `hasDocumentHeader` is the whole predicate, and it is a fact about the DOCUMENT.
+ * schema-and-frontmatter field list, the door to Search appearance and a "Raw head tags"
+ * disclosure. `hasDocumentHeader` is the whole predicate, and it is a fact about the DOCUMENT.
  *
  * **One reserved-key policy, one `collectFmFields` call.** The two field sets this card merges used
  * to disagree: this module passed an empty reserved set and `head-panel.ts` passed `{title}`, so

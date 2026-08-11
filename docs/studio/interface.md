@@ -90,7 +90,7 @@ If the write itself fails, the reason arrives as a **Problem** in the [Bottom do
 
 The middle of the window is the **pane grid**: one editor pane, or two side by side with a divider you can drag (:kbd[⌘\] splits, :kbd[⌘⌥0] focuses the second one). A pane renders one document in one editor — **Canvas**, **Code**, **Grid**, **Diff**, **Entry**, **Library** or **Project Styles** — and carries its own strip of open documents, its own jump bar and its own context bar, so everything around a document describes the pane it is in. Both panes can be a live canvas, and clicking into one is what points the Inspector, the Outline and the keyboard at it. See **[Documents and panes](/docs/studio/interface/tabs)**.
 
-A Canvas pane renders the open file live. Panning, zooming, selection and direct manipulation are covered in **[The canvas](/docs/studio/interface/canvas)**. A page's **Document Header** — title, route, layout picker and the SEO block — is drawn at the top of the artefact itself, inside the stage, because it is part of the document rather than a view of it.
+A Canvas pane renders the open file live. Panning, zooming, selection and direct manipulation are covered in **[The canvas](/docs/studio/interface/canvas)**. A page's **Document Header** — title, route, layout picker and the way in to Search appearance — is drawn at the top of the artefact itself, inside the stage, because it is part of the document rather than a view of it.
 
 ## The jump bar
 
