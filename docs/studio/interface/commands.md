@@ -30,35 +30,43 @@ Everything Studio can do is a command, and every command is reachable by name: p
 
 ## Edit
 
-| Command | Id          | Shortcut      | Level    | Requires         |
-| ------- | ----------- | ------------- | -------- | ---------------- |
-| Redo    | `edit.redo` | `⌘⇧Z` or `⌘Y` | document | a change to redo |
-| Undo    | `edit.undo` | `⌘Z`          | document | a change to undo |
+| Command      | Id                 | Shortcut      | Level     | Requires                                                                  |
+| ------------ | ------------------ | ------------- | --------- | ------------------------------------------------------------------------- |
+| Copy styles  | `edit.copyStyles`  | —             | selection | styles on the selected element                                            |
+| Paste after  | `edit.pasteAfter`  | —             | selection | an element with a sibling position — not the page root or a repeater item |
+| Paste inside | `edit.pasteInside` | —             | selection | a container element that is not a repeater                                |
+| Paste styles | `edit.pasteStyles` | —             | selection | a copied style set                                                        |
+| Redo         | `edit.redo`        | `⌘⇧Z` or `⌘Y` | document  | a change to redo                                                          |
+| Undo         | `edit.undo`        | `⌘Z`          | document  | a change to undo                                                          |
 
 ## Selection
 
-| Command                   | Id                             | Shortcut                | Level     | Requires                                                          |
-| ------------------------- | ------------------------------ | ----------------------- | --------- | ----------------------------------------------------------------- |
-| Convert to Component      | `selection.convertToComponent` | —                       | selection | an element that is not the document root                          |
-| Delete (destructive)      | `selection.delete`             | `Delete` or `Backspace` | selection | an element selection that is not the document root                |
-| Duplicate                 | `selection.duplicate`          | `⌘D`                    | selection | an element that has a sibling position                            |
-| Edit Component            | `selection.editComponent`      | —                       | selection | a component instance                                              |
-| Find Usages               | `selection.findUsages`         | —                       | selection | a component instance, on a backend that can search the project    |
-| Go to Symbol in Document… | `palette.openNodes`            | —                       | document  | an open document                                                  |
-| Move Down                 | `selection.moveDown`           | —                       | selection | an element with a sibling below it                                |
-| Move Into Previous        | `selection.moveIn`             | —                       | selection | a container directly above the element                            |
-| Move Out of Parent        | `selection.moveOut`            | —                       | selection | an element nested inside another                                  |
-| Move Up                   | `selection.moveUp`             | —                       | selection | an element with a sibling above it                                |
-| Repeat...                 | `selection.repeat`             | —                       | selection | an element with a sibling position that is not already a repeater |
-| Select Element            | `selection.set`                | —                       | document  | an open document                                                  |
-| Select Elements           | `selection.setPaths`           | —                       | document  | an open document                                                  |
-| Select Parent             | `selection.selectParent`       | `Esc` or `←`            | selection | an element selection                                              |
+| Command                   | Id                             | Shortcut                | Level     | Requires                                                                  |
+| ------------------------- | ------------------------------ | ----------------------- | --------- | ------------------------------------------------------------------------- |
+| Convert to Component      | `selection.convertToComponent` | —                       | selection | an element that is not the document root                                  |
+| Delete (destructive)      | `selection.delete`             | `Delete` or `Backspace` | selection | an element selection that is not the document root                        |
+| Duplicate                 | `selection.duplicate`          | `⌘D`                    | selection | an element that has a sibling position                                    |
+| Edit Component            | `selection.editComponent`      | —                       | selection | a component instance                                                      |
+| Find Usages               | `selection.findUsages`         | —                       | selection | a component instance, on a backend that can search the project            |
+| Go to Symbol in Document… | `palette.openNodes`            | —                       | document  | an open document                                                          |
+| Move Down                 | `selection.moveDown`           | —                       | selection | an element with a sibling below it                                        |
+| Move Into Previous        | `selection.moveIn`             | —                       | selection | a container directly above the element                                    |
+| Move Out of Parent        | `selection.moveOut`            | —                       | selection | an element nested inside another                                          |
+| Move Up                   | `selection.moveUp`             | —                       | selection | an element with a sibling above it                                        |
+| Repeat...                 | `selection.repeat`             | —                       | selection | an element with a sibling position that is not already a repeater         |
+| Select Element            | `selection.set`                | —                       | document  | an open document                                                          |
+| Select Elements           | `selection.setPaths`           | —                       | document  | an open document                                                          |
+| Select Parent             | `selection.selectParent`       | `Esc` or `←`            | selection | an element selection                                                      |
+| Set Title                 | `selection.setTitle`           | —                       | selection | an element with a sibling position — not the page root or a repeater item |
+| Wrap in Div               | `selection.wrap`               | —                       | selection | an element with a sibling position — not the page root or a repeater item |
 
 ## Insert
 
-| Command     | Id            | Shortcut | Level     | Requires                        |
-| ----------- | ------------- | -------- | --------- | ------------------------------- |
-| Insert Data | `insert.data` | —        | selection | a live text caret in the canvas |
+| Command       | Id                       | Shortcut | Level     | Requires                                                                  |
+| ------------- | ------------------------ | -------- | --------- | ------------------------------------------------------------------------- |
+| Insert after  | `selection.insertAfter`  | —        | selection | an element with a sibling position — not the page root or a repeater item |
+| Insert before | `selection.insertBefore` | —        | selection | an element with a sibling position — not the page root or a repeater item |
+| Insert Data   | `insert.data`            | —        | selection | a live text caret in the canvas                                           |
 
 ## View
 
@@ -153,7 +161,7 @@ Everything Studio can do is a command, and every command is reachable by name: p
 | Open Library            | `library.open`          | —        | project     | an open project                             |
 | Open Project…           | `project.open`          | `⌘O`     | project     | —                                           |
 | Open Recent…            | `project.openRecent`    | —        | project     | —                                           |
-| Open Settings           | `settings.open`         | —        | project     | an open project                             |
+| Open Settings           | `settings.open`         | `⌘⇧,`    | project     | an open project                             |
 | Validate Redirects      | `redirects.validate`    | —        | project     | an open project                             |
 
 ## Source Control

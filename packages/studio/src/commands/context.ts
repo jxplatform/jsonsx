@@ -232,6 +232,25 @@ export type CommandContextPatch = {
  * This is the honest cold-start state, which makes it the right default for the `when` predicates
  * to be tested against — a command that is enabled here has said so deliberately.
  */
+/**
+ * The three selection predicates every node-editing verb is gated on.
+ *
+ * Here rather than in one verb module because two of them define records: `editor/shortcuts.ts`'s
+ * chord table and `editor/context-menu.ts`'s element family. Importing one from the other made a
+ * cycle (`shortcuts` already imports `copyNode`/`cutNode` from `context-menu`), and re-declaring
+ * them is how "an element selection" comes to mean two different things in two menus.
+ */
+
+/** The editor showing a document TREE. Every verb that addresses a node needs this. */
+export const inCanvas = (ctx: CommandContext) => ctx.editor.kind === "canvas";
+
+/** Something is selected — including the document root, which is a selection of one. */
+export const hasSelection = (ctx: CommandContext) => inCanvas(ctx) && ctx.selection.count > 0;
+
+/** A selection that is not the document element, i.e. a node with a parent to act relative to. */
+export const hasElementSelection = (ctx: CommandContext) =>
+  hasSelection(ctx) && !ctx.selection.isRoot;
+
 export function emptyContext(): CommandContext {
   return {
     project: { open: false, isSite: false, isRepo: false },

@@ -121,7 +121,7 @@ describe("canvasSlashHandler", () => {
 
 describe("makeCanvasContextMenuHandler", () => {
   test("show bubbles an inline path to its block and opens the menu at the coords", async () => {
-    const handler = makeCanvasContextMenuHandler({ navigateToComponent: () => {} });
+    const handler = makeCanvasContextMenuHandler();
     // Right-click resolved to the <strong> INSIDE the <p> — the menu must act on the <p>.
     handler.show({ clientX: 77, clientY: 88, path: ["children", 0, "children", 0] });
     await flush();
@@ -133,27 +133,18 @@ describe("makeCanvasContextMenuHandler", () => {
   });
 
   test("a null path (empty canvas area) is a no-op", async () => {
-    const handler = makeCanvasContextMenuHandler({ navigateToComponent: () => {} });
+    const handler = makeCanvasContextMenuHandler();
     handler.show({ clientX: 5, clientY: 5, path: null });
     await flush();
     expect(document.querySelector("#layer-popover sp-popover")).toBeNull();
   });
 
-  test("Edit Component routes through navigateToComponent; dismiss closes the menu", async () => {
-    const visited: string[] = [];
-    componentRegistry.push({ path: "components/widget.json", tagName: "x-widget" } as never);
-    const handler = makeCanvasContextMenuHandler({
-      navigateToComponent: (p) => {
-        visited.push(p);
-      },
-    });
-    handler.show({ clientX: 10, clientY: 10, path: ["children", 1] });
-    await flush();
-    const edit = menuItems().find((el) => el.textContent!.includes("Edit Component"));
-    expect(edit).toBeTruthy();
-    edit!.click();
-    expect(visited).toEqual(["components/widget.json"]);
-
+  test("dismiss closes the menu", async () => {
+    // "Edit Component" used to be routed through a `navigateToComponent` dep this factory took and
+    // Threaded in as a per-target hook. The verb is `panels/block-action-bar.ts`'s single record
+    // Now, navigating through the same function studio.ts was passing to both hosts, so there is no
+    // Dep here to assert — and no way for a host to forget it and lose the row.
+    const handler = makeCanvasContextMenuHandler();
     handler.show({ clientX: 10, clientY: 10, path: ["children", 0] });
     await flush();
     expect(document.querySelector("#layer-popover sp-popover")).toBeTruthy();

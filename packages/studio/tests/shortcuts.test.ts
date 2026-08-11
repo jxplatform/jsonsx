@@ -22,6 +22,7 @@ import {
 } from "./harness";
 import { beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
 import { notifyModule } from "./notify-mock";
+import type { CommandContext } from "../src/commands/context";
 import type { InspectorTabId } from "../src/shell";
 import { surfaceForPane } from "../src/canvas/surface-registry";
 import { paneCommands } from "../src/workspace/workspace";
@@ -39,7 +40,51 @@ const pasteNode = mock(async () => {});
 // In the Outline panel, which imports them. Replacing a module means answering for all its exports.
 const showContextMenu = mock(() => {});
 const dismissContextMenu = mock(() => {});
+/* Copy and Cut are DEFINED in `context-menu.ts` now, beside the `copyNode`/`cutNode` they call —
+   they were defined there and in the chord table both, with the same ids and chords, until the two
+   registries met. Replacing a module means answering for all its exports, so the family is stubbed
+   with records that call the stubs above: same ids, same chords, same scope, so the chord-table
+   assertions below still describe the shipped table, and `tests/context-menu.test.ts` owns the
+   assertions about the real records' predicates. */
+const clipboardCommands = () => [
+  {
+    category: "Edit",
+    group: "1_clipboard",
+    id: "edit.copy",
+    keybinding: "mod+c",
+    keyScope: "canvas",
+    level: "selection",
+    menus: ["context/element", "palette"],
+    requires: "an element selection",
+    run: () => {
+      void copyNode();
+    },
+    title: "Copy",
+    undo: "none",
+    when: (ctx: CommandContext) => ctx.editor.kind === "canvas" && ctx.selection.count > 0,
+  },
+  {
+    category: "Edit",
+    destructive: true,
+    enablement: (ctx: CommandContext) =>
+      ctx.editor.kind === "canvas" && ctx.selection.count > 0 && !ctx.selection.isRoot,
+    group: "1_clipboard",
+    id: "edit.cut",
+    keybinding: "mod+x",
+    keyScope: "canvas",
+    level: "selection",
+    menus: ["context/element", "palette"],
+    requires: "an element selection that is not the document root",
+    run: () => {
+      void cutNode();
+    },
+    title: "Cut",
+    undo: "document",
+    when: (ctx: CommandContext) => ctx.editor.kind === "canvas" && ctx.selection.count > 0,
+  },
+];
 void mock.module("../src/editor/context-menu.js", () => ({
+  clipboardCommands,
   copyNode,
   cutNode,
   dismissContextMenu,

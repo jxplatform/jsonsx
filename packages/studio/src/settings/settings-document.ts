@@ -310,6 +310,9 @@ export function settingsCommands(): AnyCommand[] {
       category: "Project",
       id: "settings.open",
       level: "project",
+      // ⌘⇧, — the other half of §5.3's `⌘, / ⌘⇧,` pair. `app.preferences` shipped with its chord
+      // And this one did not, so the two halves of "settings" were a keystroke and a palette search.
+      keybinding: "mod+shift+,",
       menus: ["commandbar/overflow", "palette"],
       group: "7_settings",
       requires: "an open project",

@@ -38,15 +38,22 @@ import {
   transactDoc,
 } from "../tabs/transact";
 import { notify } from "../services/notify";
-import { convertToComponent } from "./convert-to-component";
 import { componentRegistry } from "../files/components";
 import { renderPopover } from "../ui/layers";
 import { rectOf } from "../utils/geometry";
 import { createCommandRegistry } from "../commands/registry";
+import { registerSelectionCommands } from "../panels/block-action-bar";
+import { convertToComponent } from "./convert-to-component";
+import { activeRegistry } from "../commands/active-registry";
 import { defaultCommands, noopCommandDeps } from "../commands/defaults";
 import { inspectorCommands } from "../panels/properties-panel";
 import { usagesSupported } from "../services/references";
-import { editorKindForMode, makeContext } from "../commands/context";
+import {
+  editorKindForMode,
+  hasElementSelection,
+  hasSelection,
+  makeContext,
+} from "../commands/context";
 
 import type { AnyCommand, CommandRegistry } from "../commands/registry";
 import type { CommandContext } from "../commands/context";
@@ -302,8 +309,9 @@ export function pasteStyles() {
 export interface ElementMenuTarget {
   path: JxPath;
   node: JxMutableNode;
-  /** Navigate to a component's own document. Absent when the host cannot open one. */
-  onEditComponent?: ((path: string) => void) | undefined;
+  /* `onEditComponent` was here, read only by this file's own `selection.editComponent`. That verb
+     is `block-action-bar.ts`'s now, and it navigates through the same `navigateToComponent` both
+     hosts were already passing in — so the per-target hook was one more way to say one thing. */
   /** Re-render the surface that opened the menu — the outline's inline title editor needs it. */
   rerender?: (() => void) | undefined;
 }
@@ -369,57 +377,26 @@ export function elementCommands(deps: ElementCommandDeps): AnyCommand[] {
     const target = deps.target();
     return target !== null && !isArrayNode(target.node);
   };
-  /** The component document behind the target's tag, when there is one and it can be opened. */
-  const editableComponent = () => {
-    const target = deps.target();
-    const tagName = target?.node.tagName;
-    if (!target?.onEditComponent || !tagName) {
-      return null;
-    }
-    return deps.componentPathFor(displayTagName(tagName));
-  };
-
   const NOT_STRUCTURAL =
     "an element with a sibling position — not the page root or a repeater item";
 
   return [
-    // ── Clipboard ──
-    {
-      id: "edit.copy",
-      title: "Copy",
-      category: "Edit",
-      level: "selection",
-      keyScope: "canvas",
-      keybinding: "mod+c",
-      menus: ["context/element", "palette"],
-      group: "1_clipboard",
-      undo: "none",
-      when: hasTarget,
-      requires: "an element to copy",
-      run: () => copyNode(),
-    },
-    {
-      id: "edit.cut",
-      title: "Cut",
-      category: "Edit",
-      level: "selection",
-      keyScope: "canvas",
-      keybinding: "mod+x",
-      menus: ["context/element", "palette"],
-      group: "1_clipboard",
-      undo: "document",
-      when: hasTarget,
-      enablement: spliceable,
-      requires: NOT_STRUCTURAL,
-      run: () => cutNode(),
-    },
+    /* COPY AND CUT LIVE IN `editor/shortcuts.ts`, which owns the chord table.
+       Two records with this id existed — same title, same `mod+c`, both calling the `copyNode()`
+       exported from THIS file — because the menu's registry and the app's never met. They meet now,
+       and the menu inherits them by `menus: ["context/element"]` like Duplicate and Delete. */
     {
       id: "edit.pasteAfter",
       title: "Paste after",
       category: "Edit",
       level: "selection",
       keyScope: "canvas",
-      keybinding: "mod+v",
+      /* NO CHORD. ⌘V is `edit.paste`'s (`editor/shortcuts.ts`), and `pasteNode()` — the function it
+         runs — already inserts after the selection when there is one. This record claimed the same
+         chord in the same scope, which the keymap refuses; the two registries never met, so the
+         conflict was latent until the element family joined the app's. The row is kept because it
+         is the specific verb with the specific refusal sentence, but the key belongs to the general
+         one, and printing a chord this record does not own would be a lie in the menu. */
       menus: ["context/element", "palette"],
       group: "1_clipboard",
       undo: "document",
@@ -588,41 +565,10 @@ export function elementCommands(deps: ElementCommandDeps): AnyCommand[] {
         startLayerTitleEdit(target.path, target.rerender);
       },
     },
-    {
-      id: "selection.editComponent",
-      title: "Edit Component",
-      category: "Selection",
-      level: "selection",
-      menus: ["context/element", "palette"],
-      group: "4_identity",
-      undo: "none",
-      when: () => editableComponent() !== null,
-      requires: "a component instance",
-      run: () => {
-        const target = deps.target();
-        const path = editableComponent();
-        if (target?.onEditComponent && path) {
-          target.onEditComponent(path);
-        }
-      },
-    },
-    {
-      id: "selection.convertToComponent",
-      title: "Convert to Component",
-      category: "Selection",
-      level: "selection",
-      menus: ["context/element", "palette"],
-      group: "4_identity",
-      undo: "project",
-      when: () => {
-        const target = deps.target();
-        const tagName = target?.node.tagName;
-        return Boolean(tagName) && deps.componentPathFor(tagName as string) === null;
-      },
-      enablement: spliceable,
-      requires: NOT_STRUCTURAL,
-      run: () => convertToComponent(),
-    },
+    /* EDIT COMPONENT AND CONVERT TO COMPONENT LIVE IN `panels/block-action-bar.ts`, beside the
+       block bar's other selection verbs, and are inherited here by `menus`. Both were defined twice
+       with different `when` predicates, so the menu row and the block-bar button could disagree
+       about whether the same selection was a component instance. */
   ];
 }
 
@@ -638,6 +584,56 @@ function insertSiblingParagraph(target: ElementMenuTarget | null, offset: number
   );
 }
 
+/**
+ * Copy and Cut — the two clipboard verbs, defined ONCE, beside the functions they call.
+ *
+ * They were defined twice: here, as part of the element menu's family, and in
+ * `editor/shortcuts.ts`'s chord table — same ids, same chords, both calling the `copyNode()` and
+ * `cutNode()` exported from this file. The two registries never met, so the duplicate ids were a
+ * debt rather than a crash; composing the element family into the app registry collected it.
+ *
+ * `edit.cut` is VISIBLE on the document root and disabled there with its `requires` sentence,
+ * rather than hidden — a greyed row that explains itself teaches, an absent one does not.
+ */
+export function clipboardCommands(): AnyCommand[] {
+  return [
+    {
+      category: "Edit",
+      group: "1_clipboard",
+      id: "edit.copy",
+      keybinding: "mod+c",
+      keyScope: "canvas",
+      level: "selection",
+      menus: ["context/element", "palette"],
+      requires: "an element selection",
+      run: () => {
+        void copyNode();
+      },
+      title: "Copy",
+      undo: "none",
+      when: hasSelection,
+    },
+    {
+      category: "Edit",
+      destructive: true,
+      enablement: hasElementSelection,
+      group: "1_clipboard",
+      id: "edit.cut",
+      keybinding: "mod+x",
+      keyScope: "canvas",
+      level: "selection",
+      menus: ["context/element", "palette"],
+      requires: "an element selection that is not the document root",
+      run: () => {
+        void cutNode();
+      },
+      title: "Cut",
+      undo: "document",
+      when: hasSelection,
+    },
+  ];
+}
+
 /** Define the element menu's commands on `registry`. Throws on a duplicate id or chord clash. */
 export function registerElementCommands(registry: CommandRegistry, deps: ElementCommandDeps): void {
   registry.registerAll(elementCommands(deps));
@@ -648,6 +644,48 @@ export function registerElementCommands(registry: CommandRegistry, deps: Element
 /** The node the currently open menu addresses. */
 let _target: ElementMenuTarget | null = null;
 
+/**
+ * How the FALLBACK registry opens a component document.
+ *
+ * Set by `setContextMenuNavigate` from the bootstrap. In the running app `contextMenuRegistry()`
+ * returns the app's registry and this is never read; it exists so the fallback the tests and the
+ * pre-bootstrap window use is not a registry with a lying no-op in it.
+ */
+let _navigate: ((path: string) => void | Promise<void>) | null = null;
+
+/** Publish how the fallback registry opens a component document. */
+export function setContextMenuNavigate(
+  navigate: ((path: string) => void | Promise<void>) | null,
+): void {
+  _navigate = navigate;
+}
+
+/**
+ * The node these verbs act on: the open menu's target, or — when no menu is open — the SELECTION.
+ *
+ * The fallback is what makes these eight records reachable from anywhere but a right-click. Every
+ * one of them declares `menus: ["context/element", "palette"]` and the palette never listed one,
+ * because `target()` returned `null` outside the menu and each record's `when` reads it. "Paste
+ * Style" and "Convert to Component" were pointer-only verbs advertising themselves as palette
+ * entries, in a plan whose first principle is that a capability has exactly one definition site and
+ * every surface projects it.
+ *
+ * A right-click already writes the selection it targets (see `openElementMenu`), so the two agree
+ * by construction rather than by coincidence.
+ */
+function commandTarget(): ElementMenuTarget | null {
+  if (_target) {
+    return _target;
+  }
+  const tab = activeTab.value;
+  const path = primarySelection(tab?.session.selection);
+  if (!tab || !path) {
+    return null;
+  }
+  const node = getNodeAtPath(tab.doc.document, path) as JxMutableNode | undefined;
+  return node ? { node, path } : null;
+}
+
 /** Deps bound to the live modules. */
 const liveDeps: ElementCommandDeps = {
   componentPathFor: (tagName) =>
@@ -655,8 +693,19 @@ const liveDeps: ElementCommandDeps = {
     // What decides whether it does.
     (tagName.includes("-") && componentRegistry.find((c) => c.tagName === tagName)?.path) || null,
   styleClipboard: () => workspace.styleClipboard,
-  target: () => _target,
+  target: commandTarget,
 };
+
+/**
+ * The eight element records, bound to the live modules, for the APP registry.
+ *
+ * `contextMenuRegistry()` below still builds its own — the menu needs a context whose selection
+ * facts describe the right-clicked node rather than the app's ambient one — but the records are
+ * these, so the palette row and the menu row are one definition rather than two that drift.
+ */
+export function liveElementCommands(): AnyCommand[] {
+  return elementCommands(liveDeps);
+}
 
 /**
  * The facts the predicates read, derived from the open menu's target.
@@ -667,7 +716,7 @@ const liveDeps: ElementCommandDeps = {
  * splice a template at NaN (see {@link isSpliceablePath}).
  */
 function liveContext(): CommandContext {
-  const target = _target;
+  const target = commandTarget();
   const tab = activeTab.value;
   // One read, two consumers — a chosen tag reads as `a|div`, which matches no component id.
   const targetTag = displayTagName(target?.node.tagName);
@@ -705,6 +754,24 @@ let _registry: CommandRegistry | null = null;
  * supplies real implementations for exactly the verbs it renders.
  */
 export function contextMenuRegistry(): CommandRegistry {
+  /*
+   * THE APP'S REGISTRY, when there is one — §5.5's "the file keeps positioning and popover
+   * rendering only".
+   *
+   * The private registry below existed because the menu's context had to describe the RIGHT-CLICKED
+   * node while the app's described the ambient selection. Those are the same node now:
+   * `openElementMenu` writes the selection it targets before opening, and `commandTarget()` reads
+   * the selection when no menu is open. So the divergence the second registry was built to survive
+   * no longer exists, and keeping it meant the menu rendered a different `edit.copy` from the one
+   * ⌘C runs.
+   *
+   * It also means the menu renders every `context/element` record in the app — including ones
+   * contributed after this file loads — instead of the four families it happened to import.
+   */
+  const app = activeRegistry();
+  if (app) {
+    return app;
+  }
   if (_registry) {
     return _registry;
   }
@@ -738,6 +805,19 @@ export function contextMenuRegistry(): CommandRegistry {
   registry.registerAll(
     inspectorCommands().filter((command) => (command.menus ?? []).includes("context/element")),
   );
+  /* The clipboard pair and the two component verbs, from the modules that own them. Each was
+     DEFINED a second time in this file until composing the element family into the app registry
+     turned the duplicate ids into a hard failure — which is what a "debt with a name" becomes when
+     the thing it was waiting for arrives. */
+  registry.registerAll(clipboardCommands());
+  registerSelectionCommands(registry, {
+    convertToComponent: () => convertToComponent(),
+    // The same seam `panels/block-action-bar.ts`'s own fallback uses: the host that opened the menu
+    // Supplies navigation, and in the real app this whole registry is bypassed for the app's.
+    navigateToComponent: (path) => {
+      void _navigate?.(path);
+    },
+  });
   registerElementCommands(registry, liveDeps);
   _registry = registry;
   return registry;
@@ -917,7 +997,6 @@ function rowTemplate(row: MenuRow, index: number) {
  * @param {MouseEvent} e
  * @param {JxPath} path
  * @param {{
- *   onEditComponent?: (path: string) => void;
  *   rerender?: () => void;
  *   placement?: Placement;
  * }} [opts]
@@ -926,7 +1005,6 @@ export function showContextMenu(
   e: MouseEvent,
   path: JxPath,
   opts: {
-    onEditComponent?: (path: string) => void;
     rerender?: () => void;
     /** Which registry placement to render. The canvas and the outline are both element menus. */
     placement?: Placement;
@@ -951,7 +1029,7 @@ export function showContextMenu(
   if (!isSelected(tab.session.selection, path)) {
     tab.session.selection = [path];
   }
-  _target = { node, onEditComponent: opts.onEditComponent, path, rerender: opts.rerender };
+  _target = { node, path, rerender: opts.rerender };
   _rows = buildRows(opts.placement ?? "context/element");
   if (_rows.length === 0) {
     _target = null;

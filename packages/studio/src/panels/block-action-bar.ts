@@ -634,7 +634,9 @@ export function registerSelectionCommands(
       icon: "sp-icon-box",
       id: "selection.convertToComponent",
       level: "selection",
-      menus: ["blockbar"],
+      // Three surfaces, ONE record. `editor/context-menu.ts` carried a second `convertToComponent`
+      // With the same title and a different `when`, invisible to every registry but its own popover.
+      menus: ["blockbar", "context/element", "palette"],
       requires: "an element that is not the document root",
       // Deliberately NOT awaited: `convertToComponent()` resolves when the human answers the name
       // Dialog, and a command whose promise waits on a person is a command nothing automated can
@@ -652,7 +654,7 @@ export function registerSelectionCommands(
       icon: "sp-icon-edit",
       id: "selection.editComponent",
       level: "selection",
-      menus: ["blockbar"],
+      menus: ["blockbar", "context/element", "palette"],
       requires: "a component instance",
       run: () => {
         const node = componentOfTarget();

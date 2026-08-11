@@ -296,6 +296,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.9.8-draft** (2026-08-11) — Project Settings carries ⌘⇧,, the other half of the pair §5.3 declares.
 - **0.9.7-draft** (2026-08-11) — Data rows: truncation markers are controls, Refresh reports the render rather than a timer, and an entry that cannot hold a value keeps its definition summary.
 - **0.9.6-draft** (2026-08-11) — The Activity Bar names the panels that ship, in their two rail groups; the Data panel is one list of definitions and the values they resolve to (§5.6), taking over the State panel's editor.
 - **0.9.5-draft** (2026-08-11) — §6.6 the value-source ladder gains a fourth rule — a position whose schema narrows which operators it admits seeds its own Formula rung, because the generic bare-?? seed is an invalid document there; an element's tagName joins the ladder, deriving to Fixed value + Formula with no template rung because TagName carries a pattern.

@@ -188,12 +188,20 @@ function projectFieldTpl(registry: CommandRegistry | null) {
           title: `${count} problem(s)`,
         })
       : nothing,
-    // No `collab.*` command is registered yet — the `Collaborate:` family lands with P4.8 — so this
-    // Item is invisible today and appears the day it is, with no edit to this file.
+    /* `collab.showStatus` — "what is happening in this document?" — because that is the question a
+       peer count raises.
+
+       This said `collab.share` and carried a comment promising the item would "appear the day the
+       `Collaborate:` family lands, with no edit to this file". The family landed, under five ids,
+       and `share` was renamed `collab.setEnabled` on the way (the set*-not-toggle* rule). `itemTpl`
+       renders `nothing` for an id the registry does not have, so the readout was permanently blank
+       and the comment said it was fine. An id is not a stable interface between two files unless
+       something checks it, which is what `tests/statusbar.test.ts` now does. */
     peers > 0
       ? itemTpl(registry, {
-          command: "collab.share",
+          command: "collab.showStatus",
           label: `${peers} peer${peers === 1 ? "" : "s"}`,
+          title: `${peers} peer${peers === 1 ? "" : "s"} in this document`,
         })
       : nothing,
   ]);

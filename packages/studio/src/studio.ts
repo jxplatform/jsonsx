@@ -202,6 +202,7 @@ import {
 } from "./new-project/add-repo-modal";
 import { openNewProjectModal, registerNewProjectCommands } from "./new-project/new-project-modal";
 import { invalidatePageRouteCache, registerInspectorCommands } from "./panels/properties-panel";
+import { liveElementCommands, setContextMenuNavigate } from "./editor/context-menu";
 import { registerStyleCommands } from "./panels/style-panel";
 import { registerGridCommands } from "./grid/grid-open";
 import { registerSettingsCommands } from "./settings/settings-document";
@@ -444,7 +445,7 @@ setMediaChangedHandler(async (dir) => {
 // The in-iframe "/" trigger drives the parent-realm Spectrum slash menu across the bridge.
 setCanvasSlashHandler(canvasSlashHandler);
 // Canvas right-clicks show the parent-realm Jx element context menu across the bridge.
-setCanvasContextMenuHandler(makeCanvasContextMenuHandler({ navigateToComponent }));
+setCanvasContextMenuHandler(makeCanvasContextMenuHandler());
 // Stylebook hits decode to a TAG in the host and route here (null = clicked chrome/empty space).
 setStylebookHitHandler((tag, media) => {
   if (tag) {
@@ -1267,6 +1268,16 @@ registerShellViewCommands(commandRegistry, {
 registerCanvasViewCommands(commandRegistry, { getCanvasMode, setCanvasMode });
 registerSelectionSetCommand(commandRegistry);
 registerInspectorCommands(commandRegistry);
+/* The element menu's eight verbs, in the APP registry rather than only in the popover's own. They
+   have always declared `menus: ["context/element", "palette"]`; the palette has never listed one,
+   because the only registry holding them was the one `editor/context-menu.ts` builds for itself.
+   Their target falls back to the selection when no menu is open (`commandTarget`), which is what
+   makes "Paste Style" a keyboard-reachable verb rather than a right-click-only one. */
+commandRegistry.registerAll(liveElementCommands());
+/* …and the navigation seam for the popover's FALLBACK registry, which it uses only in the window
+   before this line runs (`contextMenuRegistry()` returns the app's registry once one exists). A
+   fallback holding a no-op where navigation belongs is a registry that lies. */
+setContextMenuNavigate(navigateToComponent);
 registerDataExplorerCommands(commandRegistry, { renderLeftPanel });
 registerSignalsCommands(commandRegistry);
 registerFormulaEditorCommands(commandRegistry);

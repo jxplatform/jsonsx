@@ -34,6 +34,7 @@ import { canvasViewCommands } from "../canvas/canvas-utils";
 import { selectionCommands } from "../canvas/canvas-render";
 import { inspectorCommands } from "../panels/properties-panel";
 import { dataExplorerCommands } from "../panels/data-explorer";
+import { liveElementCommands } from "../editor/context-menu";
 import { signalsCommands } from "../panels/signals-panel";
 import { formulaEditorCommands } from "../panels/formula-workspace";
 import { styleCommands } from "../panels/style-panel";
@@ -89,6 +90,12 @@ export function appCommandSet(): AnyCommand[] {
     ...canvasViewCommands({ getCanvasMode: () => "design", setCanvasMode: NO_OP }),
     ...selectionCommands(),
     ...inspectorCommands(),
+    // The element menu's eight verbs. Every one declares `menus: ["context/element", "palette"]`
+    // And none reached the palette, because they were registered ONLY into the private registry
+    // `editor/context-menu.ts` builds for its popover — a registry whose own docstring said it
+    // Existed "until a bootstrap composes every contribution point into a single app-wide
+    // Registry". This is that bootstrap; it has existed since P2.
+    ...liveElementCommands(),
     ...dataExplorerCommands({ renderLeftPanel: NO_OP }),
     ...signalsCommands(),
     ...formulaEditorCommands(),

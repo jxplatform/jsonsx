@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.7-draft
+**Version:** 0.9.8-draft
 **Status:** Partial
 **Updated:** 2026-08-11
 **License:** MIT
@@ -1478,9 +1478,9 @@ invisible to a green suite, and both are one question asked too late.
 **Status:** Partial — Appearance, Assistant, Accounts and a read-only Keyboard sheet ship; Editor
 behaviour, rebinding and Updates/About are pending.
 
-`project.json` configures a **project** and is edited as a project document. **Preferences** (`⌘,`,
-command id `app.preferences`) configures the **application** and follows the author between
-projects. The two are different surfaces because they have different lifetimes; conflating them is
+`project.json` configures a **project** and is edited as a project document (`⌘⇧,`, command id
+`settings.open`). **Preferences** (`⌘,`, command id `app.preferences`) configures the
+**application** and follows the author between projects. The two are different surfaces because they have different lifetimes; conflating them is
 why Studio had nowhere to put the chrome theme, the provider key, or the credentials it holds.
 
 Preferences is a focus-managed dialog over the overlay contract in `studio-ui-guidelines.md` §8.7.
@@ -1826,6 +1826,7 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ## Changelog
 
+- **0.9.8-draft** (2026-08-11) — Project Settings carries ⌘⇧,, the other half of the pair §5.3 declares.
 - **0.9.7-draft** (2026-08-11) — Data rows: truncation markers are controls, Refresh reports the render rather than a timer, and an entry that cannot hold a value keeps its definition summary.
 - **0.9.6-draft** (2026-08-11) — The Activity Bar names the panels that ship, in their two rail groups; the Data panel is one list of definitions and the values they resolve to (§5.6), taking over the State panel's editor.
 - **0.9.5-draft** (2026-08-11) — §6.6 the value-source ladder gains a fourth rule — a position whose schema narrows which operators it admits seeds its own Formula rung, because the generic bare-?? seed is an invalid document there; an element's tagName joins the ladder, deriving to Fixed value + Formula with no template rung because TagName carries a pattern.
@@ -1888,4 +1889,4 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.7-draft_
+_`@jxsuite/studio` Specification v0.9.8-draft_

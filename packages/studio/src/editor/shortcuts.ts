@@ -65,9 +65,9 @@ import { REGION_FOR_FOCUS, resolveRegion } from "../ui/regions";
 import { getPlatform, hasPlatform } from "../platform";
 import { notify } from "../services/notify";
 import { panelFocusRoster } from "../panels/navigator-panels";
-import { copyNode, cutNode, pasteNode } from "./context-menu";
+import { clipboardCommands, pasteNode } from "./context-menu";
 
-import { keyScopeStack } from "../commands/context";
+import { hasElementSelection, hasSelection, inCanvas, keyScopeStack } from "../commands/context";
 import { defaultCommands } from "../commands/defaults";
 import { setActiveRegistry } from "../commands/active-registry";
 import { CommandUnavailableError } from "../commands/registry";
@@ -120,16 +120,11 @@ export interface StudioCommandHooks {
  * root of `project.json`. Every verb below addresses a NODE IN A DOCUMENT TREE, and the editor
  * showing one is the Canvas.
  */
-const inCanvas = (ctx: CommandContext) => ctx.editor.kind === "canvas";
+/* `inCanvas`, `hasSelection` and `hasElementSelection` are `commands/context.ts`'s now — the
+   element menu gates on the same three, and one of the two modules had to stop declaring them. */
 
 /** A document is open, on the canvas. */
 const inDocument = (ctx: CommandContext) => ctx.document.open && inCanvas(ctx);
-
-/** Something is selected — including the document root, which is a selection of one. */
-const hasSelection = (ctx: CommandContext) => inCanvas(ctx) && ctx.selection.count > 0;
-
-/** A selection that is not the document element, i.e. a node with a parent to act relative to. */
-const hasElementSelection = (ctx: CommandContext) => hasSelection(ctx) && !ctx.selection.isRoot;
 
 // ─── Selection verbs ──────────────────────────────────────────────────────────
 
@@ -575,37 +570,9 @@ function canvasCommands(pointer: () => ShortcutPointerContext): AnyCommand[] {
   };
   const redraw = () => pointer().applyTransform();
   return [
-    {
-      category: "Edit",
-      group: "1_clipboard",
-      id: "edit.copy",
-      keybinding: "mod+c",
-      keyScope: "canvas",
-      level: "selection",
-      requires: "an element selection",
-      run: () => {
-        void copyNode();
-      },
-      title: "Copy",
-      undo: "none",
-      when: hasSelection,
-    },
-    {
-      category: "Edit",
-      destructive: true,
-      group: "1_clipboard",
-      id: "edit.cut",
-      keybinding: "mod+x",
-      keyScope: "canvas",
-      level: "selection",
-      requires: "an element selection that is not the document root",
-      run: () => {
-        void cutNode();
-      },
-      title: "Cut",
-      undo: "document",
-      when: hasElementSelection,
-    },
+    // Copy and Cut are `editor/context-menu.ts`'s, beside the `copyNode`/`cutNode` this file
+    // Already imports from there — one import direction, and no cycle.
+    ...clipboardCommands(),
     {
       category: "Edit",
       group: "1_clipboard",
@@ -739,8 +706,11 @@ function canvasCommands(pointer: () => ShortcutPointerContext): AnyCommand[] {
  * | `edit.paste`              | `edit.pasteAfter` / `edit.pasteInside`      | theirs, once one of them covers "paste into the root with nothing selected", which ⌘V does today                                                 |
  * | `selection.insertSibling` | `selection.insertAfter` (unbound, no chord) | theirs, once it SELECTS the inserted node — the canvas re-enters inline edit off that selection, and Enter-to-add-a-paragraph is dead without it |
  *
- * Until then the two registries are separate objects, so the duplicate ids are not a runtime
- * conflict; they are a debt with a name.
+ * PAID, for the four that were literal duplicates. `edit.copy` and `edit.cut` are defined here and
+ * nowhere else (the menu inherits them by `menus`), and `selection.editComponent` /
+ * `selection.convertToComponent` are defined once in `panels/block-action-bar.ts`. The remaining
+ * rows above are DIFFERENT verbs that happen to be spelled alike, and each names its own
+ * resolution.
  */
 export function registerStudioCommands(
   registry: CommandRegistry,

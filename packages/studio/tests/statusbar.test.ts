@@ -20,6 +20,7 @@ import {
   viewLabel,
 } from "../src/panels/statusbar";
 import { resetProjectShell, shell } from "../src/shell";
+import { readFileSync } from "node:fs";
 import { setActiveRegistry } from "../src/commands/active-registry";
 import { createCommandRegistry } from "../src/commands/registry";
 import { makeContext } from "../src/commands/context";
@@ -64,6 +65,7 @@ function buildRegistry(ids?: readonly string[]) {
     stub("palette.openFiles", "Go to File…", "application"),
     stub("file.save", "Save", "document"),
     stub("selection.set", "Select Element", "document"),
+    stub("collab.showStatus", "Collaborate: What is happening in this document?", "document"),
   ];
   registry.registerAll(ids ? all.filter((c) => ids.includes(c.id)) : all);
   return registry;
@@ -172,13 +174,41 @@ describe("the PROJECT field", () => {
     expect(ran.at(-1)!.args).toEqual({ tab: "problems" });
   });
 
-  test("the peers item is silent until a `Collaborate:` command exists to name", () => {
+  test("the peers item counts them, and opens what is happening in this document", () => {
     resetStudioState({ name: "My Site", projectRoot: "/p" });
     const tab = resetWorkspaceWithTab();
     collabState(tab).peers = [{ color: "#f00", name: "Ada" }] as never;
     renderStatusbar();
-    // The registry has no `collab.share`, so the item renders nothing rather than a dead label.
+    expect(items()).toContain("1 peer");
+    const buttons = [...field("project")!.querySelectorAll("button")];
+    (buttons.at(-1) as HTMLElement).click();
+    expect(ran.at(-1)!.id).toBe("collab.showStatus");
+  });
+
+  test("it stays silent with nobody there", () => {
+    resetStudioState({ name: "My Site", projectRoot: "/p" });
+    resetWorkspaceWithTab();
+    renderStatusbar();
     expect(items().some((t) => t?.includes("peer"))).toBe(false);
+  });
+
+  /*
+   * The gate that was missing, and the reason this readout was blank for two phases.
+   *
+   * The item named `collab.share`. The `Collaborate:` family then shipped under five ids, with
+   * `share` renamed `collab.setEnabled` on the way, and `itemTpl` renders `nothing` for an id the
+   * registry does not have — so the peer count silently stopped existing, while a comment in the
+   * file promised it would appear "with no edit to this file". Every test above builds a STUB
+   * registry, so none of them could see it: they prove the bar renders what it is given, not that
+   * what it names exists.
+   */
+  test("every command the bar names is one the real app declares", async () => {
+    const { appCommandSet } = await import("../src/commands/app-commands");
+    const declared = new Set(appCommandSet().map((c) => c.id));
+    const source = readFileSync(new URL("../src/panels/statusbar.ts", import.meta.url), "utf8");
+    const named = [...source.matchAll(/command:\s*"([\w.]+)"/g)].map((m) => m[1] as string);
+    expect(named.length).toBeGreaterThan(3);
+    expect(named.filter((id) => !declared.has(id))).toEqual([]);
   });
 });
 

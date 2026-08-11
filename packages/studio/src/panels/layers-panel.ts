@@ -807,7 +807,6 @@ export function renderLayersTemplate(ctx: {
             isStructural
               ? (e: MouseEvent) =>
                   showContextMenu(e, path, {
-                    onEditComponent: ctx.navigateToComponent,
                     rerender: ctx.rerender,
                   })
               : nothing

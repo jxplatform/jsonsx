@@ -15,10 +15,30 @@ import { checkPlacements } from "../src/commands/levels";
 import { checkChromeBudget, dockTabs } from "../src/commands/budget";
 import { railDeclarations } from "../src/panels/panel-registry";
 import { emptyContext } from "../src/commands/context";
+import { createCommandRegistry } from "../src/commands/registry";
 
 const COMMANDS = appCommandSet();
 
 describe("the set", () => {
+  /*
+   * REGISTER IT. The docstring above has claimed "no duplicate ids, no chord conflicts" since this
+   * file was written, and nothing asserted it: every test here reads the ARRAY, and both invariants
+   * live in `registry.register`, which nothing called.
+   *
+   * They were latent for as long as the app had two registries — `editor/context-menu.ts` built its
+   * own for the popover, so its `edit.copy` and the chord table's `edit.copy` never met, and its
+   * `edit.pasteAfter` could claim ⌘V while `edit.paste` already held it in the same scope.
+   * Composing that family into the app registry turned both into a boot crash, and this is the test
+   * that would have said so first.
+   */
+  test("registers — which is where duplicate ids and chord conflicts are refused", () => {
+    for (const mac of [true, false]) {
+      const registry = createCommandRegistry({ getContext: emptyContext, mac });
+      expect(() => registry.registerAll(appCommandSet())).not.toThrow();
+      expect(registry.list().length).toBe(COMMANDS.length);
+    }
+  });
+
   test("covers every contribution point the bootstrap composes", () => {
     const namespaces = new Set(COMMANDS.map((c) => c.id.split(".")[0]));
     expect([...namespaces].toSorted()).toEqual([

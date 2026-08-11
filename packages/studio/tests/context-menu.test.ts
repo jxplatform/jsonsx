@@ -44,6 +44,7 @@ void mock.module("../src/editor/convert-to-repeater.js", () => ({ convertToRepea
 void mock.module("../src/editor/convert-to-component.js", () => ({ convertToComponent }));
 
 const {
+  clipboardCommands,
   contextMenuRegistry,
   copyNode,
   copyStyles,
@@ -537,6 +538,26 @@ describe("element command records", () => {
     }
   });
 
+  test("the clipboard pair is defined here, and this is the shape shortcuts.test.ts doubles", () => {
+    // `tests/shortcuts.test.ts` must replace this whole module to stub `copyNode`, so it hands the
+    // Chord table a double of these two records. This is the assertion that keeps the double
+    // Honest: change an id, a chord or a scope here and it fails, naming both sides.
+    expect(clipboardCommands().map((c) => [c.id, c.keybinding, c.keyScope, c.level])).toEqual([
+      ["edit.copy", "mod+c", "canvas", "selection"],
+      ["edit.cut", "mod+x", "canvas", "selection"],
+    ]);
+  });
+
+  test("Cut is offered on the document root and disabled there, rather than hidden", () => {
+    const root = { ...emptyContext(), selection: { ...emptyContext().selection } };
+    root.editor = { ...root.editor, kind: "canvas" };
+    root.selection = { ...root.selection, count: 1, isRoot: true };
+    const cut = clipboardCommands().find((c) => c.id === "edit.cut")!;
+    expect(cut.when!(root)).toBe(true);
+    expect(cut.enablement!(root)).toBe(false);
+    expect(cut.requires).toContain("not the document root");
+  });
+
   test("registerElementCommands defines them once — a second pass is a duplicate id", () => {
     const registry = createCommandRegistry({ getContext: emptyContext, mac: false });
     registerElementCommands(registry, stubDeps());
@@ -547,20 +568,26 @@ describe("element command records", () => {
   test("the chord index is the record's, formatted for the platform", () => {
     const registry = createCommandRegistry({ getContext: emptyContext, mac: true });
     registerElementCommands(registry, stubDeps());
-    expect(registry.keymap.formatBinding("edit.copy")).toBe("⌘C");
-    expect(registry.keymap.formatBinding("edit.pasteAfter")).toBe("⌘V");
+    // NOTHING in this family claims a chord any more. `edit.pasteAfter` held ⌘V, which
+    // `editor/shortcuts.ts`'s `edit.paste` already owns in the same scope — latent while the two
+    // Registries never met, a boot crash the moment they did, and `pasteNode()` does the same
+    // Thing either way. The row stays; the key belongs to the general verb.
+    expect(registry.keymap.formatBinding("edit.pasteAfter")).toBeUndefined();
     expect(registry.keymap.formatBinding("edit.copyStyles")).toBeUndefined();
+    expect(elementCommands(stubDeps()).filter((c) => c.keybinding)).toEqual([]);
   });
 
   test("structural verbs refuse a target with no splice coordinate", () => {
+    // `edit.cut` used to be the example here; it is `editor/shortcuts.ts`'s single record now, and
+    // The rule it demonstrated belongs to every verb that needs a sibling position.
     const ctx = emptyContext();
     const onTemplate = elementCommands(stubDeps(stubTarget(["children", 0, "map"])));
-    const cut = onTemplate.find((c) => c.id === "edit.cut")!;
-    expect(cut.when!(ctx)).toBe(true);
-    expect(cut.enablement!(ctx)).toBe(false);
+    const insert = onTemplate.find((c) => c.id === "selection.insertAfter")!;
+    expect(insert.when!(ctx)).toBe(true);
+    expect(insert.enablement!(ctx)).toBe(false);
 
     const onChild = elementCommands(stubDeps(stubTarget(["children", 0])));
-    expect(onChild.find((c) => c.id === "edit.cut")!.enablement!(ctx)).toBe(true);
+    expect(onChild.find((c) => c.id === "selection.insertAfter")!.enablement!(ctx)).toBe(true);
   });
 
   test("Paste inside and Paste after refuse a repeater's absent child list", () => {
@@ -794,8 +821,10 @@ describe("showContextMenu", () => {
   test("an unknown placement renders nothing and leaves no target behind", () => {
     rightClick(["children", 0], { placement: "context/file" });
     expect(menuItems().length).toBe(0);
-    // The registry must not still think a menu is open over the node.
-    expect(contextMenuRegistry().isVisible("edit.copy")).toBe(false);
+    // A verb needing the MENU's target is gone. `edit.copy` is not asserted here any more: its
+    // Target falls back to the selection, so it is correctly still available — that fallback is
+    // What makes these records reachable from the palette at all.
+    expect(contextMenuRegistry().isVisible("selection.setTitle")).toBe(false);
   });
 });
 
@@ -1079,26 +1108,27 @@ describe("component rows", () => {
     });
   });
 
-  test("registered components get Edit Component instead of Convert to Component", async () => {
-    let edited: string | null = null;
-    rightClick(["children", 0], { onEditComponent: (p) => (edited = p) });
+  test("registered components get Edit Component instead of Convert to Component", () => {
+    rightClick(["children", 0]);
     expect(menuIds()).toContain("selection.editComponent");
     expect(menuIds()).not.toContain("selection.convertToComponent");
-    itemById("selection.editComponent").click();
-    await flush();
-    expect(edited).toBe("components/card.json" as never);
   });
 
-  test("components without an onEditComponent hook get neither row", () => {
+  test("…and get it from EVERY host, not just one that remembered a hook", () => {
+    // The row used to be gated on a per-target `onEditComponent` callback each host passed in, so
+    // A component right-clicked from a host that did not pass one showed neither Edit nor Convert:
+    // The one selection where both rows were hidden was a component instance.
     rightClick(["children", 0]);
-    expect(menuIds()).not.toContain("selection.editComponent");
-    expect(menuIds()).not.toContain("selection.convertToComponent");
+    expect(menuIds()).toContain("selection.editComponent");
   });
 
-  test("nodes without a tagName get neither row", () => {
+  test("a node with no tagName cannot be converted, and the row says so", () => {
+    // Both verbs are `panels/block-action-bar.ts`'s single records now. Convert renders DISABLED
+    // Rather than vanishing, which is the same choice Cut makes on the document root: a greyed row
+    // Carrying its `requires` sentence teaches, and an absent row teaches nothing.
     rightClick(["children", 1]);
     expect(menuIds()).not.toContain("selection.editComponent");
-    expect(menuIds()).not.toContain("selection.convertToComponent");
+    expect(isDisabled("selection.convertToComponent")).toBe(true);
   });
 });
 
@@ -1113,7 +1143,6 @@ describe("the menu's mutating rows need a canvas, as Delete already did", () => 
    * elements into the file that defines the project.
    */
   const MUTATING = [
-    "edit.cut",
     "edit.pasteAfter",
     "edit.pasteInside",
     "edit.pasteStyles",
@@ -1159,9 +1188,14 @@ describe("the menu's mutating rows need a canvas, as Delete already did", () => 
     }
   });
 
-  test("…and Copy, which mutates nothing, is still offered", () => {
+  test("…and Copy Styles, which mutates nothing, is still offered", () => {
     // The rule is about WRITING. A read of the node under the cursor is fine wherever the menu
-    // Opens, and taking it away would be a second wrong answer rather than a fix.
-    expect(live(menuOver("settings"), "edit.copy")).toBe(true);
+    // Opens, and taking it away would be a second wrong answer rather than a fix. (`edit.copy`
+    // Made this point until it became `editor/shortcuts.ts`'s record, where `keyScope: "canvas"`
+    // States the same rule one level up.)
+    const record = menuOver("settings").find((c) => c.id === "edit.copyStyles")!;
+    // `when` alone: the rule under test is the CANVAS gate, and this verb's `enablement` asks a
+    // Second, unrelated question — whether the node has any styles to copy.
+    expect(record.when!(emptyContext())).toBe(true);
   });
 });
