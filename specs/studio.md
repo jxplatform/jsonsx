@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.14-draft
+**Version:** 0.9.15-draft
 **Status:** Partial
 **Updated:** 2026-08-11
 **License:** MIT
@@ -549,7 +549,21 @@ itself: `canvas.setBreakpoint { media, pane? }`, `canvas.setColorScheme { scheme
 `canvas.setLayoutVisible { visible, pane? }`. `pane` defaults to the focused pane and exists because
 the bar is drawn once per pane — the side bar's controls address the side pane's document, and a
 verb that could only reach the focused one would be narrower than the control it stands behind.
-`setBreakpoint` refuses a key the document cannot render under, listing the ones it can.
+`setBreakpoint` refuses a key the document cannot render under, listing the ones it can, and each
+verb repaints **the pane it wrote** — resolving the pane twice (once to write, once to render) is
+how the side bar came to change one stage and repaint the other.
+
+**Choosing a size resizes the canvas, in every mode that draws one.** Design already draws every
+declared breakpoint side by side, so there the choice marks which artboard is active. Edit draws ONE
+column, and that column is as wide as the chosen breakpoint — the same artboard width Design gives
+it, so the same page at `md` is the same page in both modes. The iframe is really that wide, so the
+document's own media queries evaluate against it and the content reflows; it is not a scaled
+picture of a narrower page. A stored breakpoint the document no longer declares falls back to the
+base width rather than sizing the column from a query that does not exist.
+
+A control that selects a rendering context has to change the rendering. It wrote
+`session.ui.activeMedia`, Design used it, and Edit ignored it — so in the mode where the switcher is
+most useful it was a control over a label.
 
 These are SETTERS. §5.3's keymap declares `⌘⌥↑`/`⌘⌥↓` and `⌘⌥⇧S` to _cycle_ the size and scheme
 axes; a chord carries no argument, so those need `next`/`prev` records of their own — each a delta,
@@ -1912,6 +1926,7 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ## Changelog
 
+- **0.9.15-draft** (2026-08-11) — The size switcher resizes the Edit column to the chosen breakpoint, and each rendering-context verb repaints the pane it wrote.
 - **0.9.14-draft** (2026-08-11) — §9.1.3 — one service decides what belongs in $elements, for all four writers of it.
 - **0.9.13-draft** (2026-08-11) — The Library has four doors including ⌘⇧E (§9.1.2), and the assistant's context budget is rendered.
 - **0.9.12-draft** (2026-08-11) — A field's uncommitted draft is keyed by node path, not by field name alone.
@@ -1981,4 +1996,4 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.14-draft_
+_`@jxsuite/studio` Specification v0.9.15-draft_

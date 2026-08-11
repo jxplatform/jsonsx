@@ -532,6 +532,65 @@ describe("tab close/reopen lifecycle", () => {
     expect(compColumn.classList.contains("is-component")).toBe(true);
   });
 
+  test("the edit column is as wide as the breakpoint the size switcher chose", async () => {
+    /*
+     * It was always `$media["--"]`, so the Context bar's size switcher did nothing in Edit: it
+     * wrote `session.ui.activeMedia`, Design used it to highlight one of the artboards it already
+     * draws side by side, and Edit — which draws ONE column — ignored it. A control that changes
+     * the rendering context has to change the rendering.
+     *
+     * The width is the artboard width Design gives that breakpoint, so the same page at `md` is the
+     * same page in both modes, and the iframe is really that wide — the document's own media
+     * queries evaluate against it rather than the content being scaled.
+     */
+    const tab = openSyncedTab({
+      $media: { "--": "900px", md: "(min-width: 768px)", sm: "(max-width: 480px)" },
+      children: [{ tagName: "p", textContent: "Hi" }],
+      tagName: "div",
+    } as never);
+    setMode("edit");
+    const columnWidth = () =>
+      (stageEl().querySelector(".content-edit-column") as HTMLElement).style.maxWidth;
+
+    renderCanvas();
+    await flush();
+    expect(columnWidth()).toBe("900px");
+
+    tab.session.ui.activeMedia = "md";
+    renderCanvas();
+    await flush();
+    expect(columnWidth()).toBe("768px");
+
+    // A max-width breakpoint is its own width too — the artboard Design would draw.
+    tab.session.ui.activeMedia = "sm";
+    renderCanvas();
+    await flush();
+    expect(columnWidth()).toBe("480px");
+
+    // Base is the document's own width again, not the last breakpoint's.
+    tab.session.ui.activeMedia = null;
+    renderCanvas();
+    await flush();
+    expect(columnWidth()).toBe("900px");
+  });
+
+  test("a breakpoint the document no longer declares falls back to the base width", async () => {
+    // `activeMedia` outlives the `$media` entry that justified it — a renamed breakpoint, or a
+    // Restored session (§14.8). The column must not be sized from a query that does not exist.
+    const tab = openSyncedTab({
+      $media: { "--": "900px" },
+      children: [{ tagName: "p", textContent: "Hi" }],
+      tagName: "div",
+    } as never);
+    tab.session.ui.activeMedia = "ghost";
+    setMode("edit");
+    renderCanvas();
+    await flush();
+    expect((stageEl().querySelector(".content-edit-column") as HTMLElement).style.maxWidth).toBe(
+      "900px",
+    );
+  });
+
   test("closing all tabs while in source mode disposes the monaco editor", async () => {
     openSyncedTab();
     setMode("source");

@@ -23,6 +23,8 @@ Styling always targets one breakpoint at a time. Two controls choose it, and the
 
 Pick **Base** to edit the styles that apply everywhere; pick a breakpoint to edit that screen size's overrides. Whichever you use, the [Style tab](/docs/studio/design/style-inspector)'s Target Line states the answer — `⌖ h1 · @Tablet` — so the breakpoint you're editing is on screen beside the fields you're editing it with.
 
+**In Edit mode the choice resizes the page.** Design shows every breakpoint at once, so there the Size group marks which panel is active. Edit shows one column, and the column becomes as wide as the breakpoint you picked — the same width Design gives that panel. The page is genuinely that narrow, so your own media queries fire and the layout reflows; it isn't a scaled-down picture. Writing at **Sm** and writing at **Base** are two real views of the same document.
+
 ## How the cascade works
 
 Base is the design; breakpoints are exceptions to it:

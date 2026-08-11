@@ -12,6 +12,7 @@ import { loadedMonaco, loadMonaco, mountStillWanted } from "../services/monaco-l
 import { getNodeAtPath, updateCanvas } from "../store";
 import { activeTab, tabIsLive, workspace } from "../workspace/workspace";
 import {
+  activeMediaOfPane,
   canvasModeOfPane,
   derivationOfPane,
   nextRenderGeneration,
@@ -1196,7 +1197,23 @@ function renderCanvasImpl(surface: CanvasSurface) {
       canvasWrap.style.overflow = "hidden";
     }
 
-    const { baseWidth } = parseMediaEntries(getEffectiveMedia(S.document.$media));
+    /*
+     * THE COLUMN IS AS WIDE AS THE CHOSEN BREAKPOINT.
+     *
+     * It was always `baseWidth`, so the Context bar's size switcher did nothing here: it wrote
+     * `session.ui.activeMedia`, Design used that to highlight one of the artboards it already draws
+     * side by side, and Edit — which draws ONE column — ignored it. A control that changes the
+     * rendering context has to change the rendering, or it is a control over a label.
+     *
+     * The width is the artboard width Design would give that breakpoint, so the same page at `md`
+     * is the same page in both modes; the iframe is that wide, so the document's own media queries
+     * evaluate against it and the content reflows for real rather than being scaled.
+     */
+    const { baseWidth, sizeBreakpoints: editBreakpoints } = parseMediaEntries(
+      getEffectiveMedia(S.document.$media),
+    );
+    const editMedia = activeMediaOfPane(surface.paneId);
+    const columnWidth = editBreakpoints.find((bp) => bp.name === editMedia)?.width ?? baseWidth;
     const { tpl: panelTpl, panel } = canvasPanelTemplate(null, null, true);
     // A component-definition doc (root tag is a custom element) is a fragment, not a page: it should
     // Hug its content rather than have the column fill+stretch to the viewport (dead scroll space).
@@ -1210,7 +1227,7 @@ function renderCanvasImpl(surface: CanvasSurface) {
           panel.scrollContainer = (el as HTMLElement) || null;
         })}
       >
-        <div class=${columnClass} style="max-width:${baseWidth}px">
+        <div class=${columnClass} style="max-width:${columnWidth}px">
           ${wantsDocHeader ? docHeaderSlot("in-column", surface.paneId) : nothing}${panelTpl}
         </div>
       </div>

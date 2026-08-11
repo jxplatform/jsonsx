@@ -1306,7 +1306,11 @@ registerShellViewCommands(commandRegistry, {
   inspectorTab: () => rightPanelMod.inspectorTab(),
   setInspectorTab: (tab) => rightPanelMod.setInspectorTab(tab),
 });
-registerCanvasViewCommands(commandRegistry, { getCanvasMode, setCanvasMode });
+registerCanvasViewCommands(commandRegistry, {
+  getCanvasMode,
+  renderPane: renderCanvas,
+  setCanvasMode,
+});
 registerSelectionSetCommand(commandRegistry);
 registerInspectorCommands(commandRegistry);
 /* The element menu's eight verbs, in the APP registry rather than only in the popover's own. They

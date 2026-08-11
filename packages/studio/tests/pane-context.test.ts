@@ -155,7 +155,11 @@ function installRegistry(ran: string[]) {
     mac: true,
   });
   registry.registerAll(
-    canvasViewCommands({ getCanvasMode: () => "design", setCanvasMode: () => {} }).filter((c) =>
+    canvasViewCommands({
+      getCanvasMode: () => "design",
+      renderPane: () => {},
+      setCanvasMode: () => {},
+    }).filter((c) =>
       ["canvas.setBreakpoint", "canvas.setColorScheme", "canvas.setLayoutVisible"].includes(c.id),
     ),
   );

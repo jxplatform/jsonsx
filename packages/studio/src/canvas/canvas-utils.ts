@@ -21,7 +21,7 @@ import {
   tabOfPane,
 } from "./canvas-surface";
 import type { CanvasSurface } from "./canvas-surface";
-import { activeTab } from "../workspace/workspace";
+import { activeTab, workspace } from "../workspace/workspace";
 import {
   findCanvasElement,
   getActivePanel,
@@ -865,6 +865,15 @@ export interface CanvasCommandDeps {
   getCanvasMode: () => string;
   /** Write the BASE mode (`ui.canvasMode`) of the tab it is given — `studio.ts`'s `setCanvasMode`. */
   setCanvasMode: (tab: Tab | null, mode: string) => void;
+  /**
+   * Repaint ONE pane's stage — `studio.ts`'s `renderCanvas`, taking the pane.
+   *
+   * Injected rather than imported: `canvas-render.ts` imports this module, so reaching back for
+   * `renderCanvas` would close a cycle. It takes the pane id because the rendering-context verbs
+   * do: `renderOnly("canvas")` resolves the FOCUSED pane, so the side bar's size switcher wrote the
+   * side pane's tab and repainted the primary, leaving the stage it changed showing the old width.
+   */
+  renderPane: (paneId: string) => void;
 }
 
 /** A document is open in a pane — every verb here writes that pane's own view state. */
@@ -936,6 +945,18 @@ export function canvasViewCommands(deps: CanvasCommandDeps): AnyCommand[] {
   const paneArg = {
     pane: stringProperty("Which pane to render this way. Defaults to the focused one."),
   };
+
+  /**
+   * Repaint the pane a rendering-context verb just wrote — not the focused one.
+   *
+   * `renderOnly("canvas")` calls `renderCanvas()` with no pane, which resolves the FOCUSED one.
+   * These verbs take a `pane` precisely because the side bar addresses the side pane, so the two
+   * resolutions disagree exactly when it matters.
+   */
+  function repaint(args: CommandArgValues): void {
+    const { pane } = args as { pane?: unknown };
+    deps.renderPane(typeof pane === "string" ? pane : workspace.activePaneId);
+  }
 
   return [
     {
@@ -1116,7 +1137,7 @@ export function canvasViewCommands(deps: CanvasCommandDeps): AnyCommand[] {
           );
         }
         tab.session.ui.activeMedia = media;
-        renderOnly("canvas");
+        repaint(args);
       },
       title: "Set Breakpoint",
     },
@@ -1140,7 +1161,7 @@ export function canvasViewCommands(deps: CanvasCommandDeps): AnyCommand[] {
           "scheme",
           COLOR_SCHEMES,
         ) as "auto" | "dark" | "light";
-        renderOnly("canvas");
+        repaint(args);
       },
       title: "Set Color Scheme",
     },
@@ -1159,7 +1180,7 @@ export function canvasViewCommands(deps: CanvasCommandDeps): AnyCommand[] {
       run: (_commandCtx, args) => {
         const tab = contextTab("canvas.setLayoutVisible", args);
         tab.session.ui.showLayout = booleanArg("canvas.setLayoutVisible", args, "visible");
-        renderOnly("canvas");
+        repaint(args);
       },
       title: "Show Layout Elements",
     },

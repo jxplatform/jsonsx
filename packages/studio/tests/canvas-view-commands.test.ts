@@ -16,7 +16,9 @@ import { checkPlacements } from "../src/commands/levels";
 import {
   activeTab,
   closeAllTabs,
+  focusPane,
   openTab,
+  PRIMARY_PANE,
   SECONDARY_PANE,
   splitRight,
   workspace,
@@ -139,7 +141,13 @@ const setCanvasMode = mock((tab: Tab | null, mode: string) => {
     tab.session.ui.canvasMode = mode;
   }
 });
-const deps = { getCanvasMode: () => canvasMode, setCanvasMode };
+/** Which pane each rendering-context verb repainted — the fact the side bar depends on. */
+const renderedPanes: string[] = [];
+const deps = {
+  getCanvasMode: () => canvasMode,
+  renderPane: (paneId: string) => renderedPanes.push(paneId),
+  setCanvasMode,
+};
 
 let ctx: CommandContext = makeContext();
 let registry: CommandRegistry;
@@ -163,6 +171,7 @@ beforeEach(() => {
   canvasMode = "design";
   setCanvasMode.mockClear();
   resetFits();
+  renderedPanes.length = 0;
   surfaceForPane("primary").panzoomWrap = null;
   ctx = makeContext({ document: { open: true } });
   registry = createCommandRegistry({ getContext: () => ctx });
@@ -203,6 +212,53 @@ describe("the records themselves", () => {
     };
     expect(schema.properties.mode.enum).toEqual([...CANVAS_MODES]);
     expect(schema.properties.mode.enum).toContain("preview");
+  });
+});
+
+describe("the rendering-context verbs repaint the pane they WROTE", () => {
+  /*
+   * They wrote a named pane's tab and then called `renderOnly("canvas")`, which resolves the
+   * FOCUSED pane. The side bar addresses the side pane, so its size switcher changed one stage and
+   * repainted the other — leaving the stage it had changed showing the old width.
+   */
+  /** A document with a breakpoint, in the focused pane. */
+  const withMedia = () => {
+    const tab = openWith(["edit", "design"]);
+    (tab.doc.document as Record<string, unknown>).$media = { md: "(min-width: 768px)" };
+    return tab;
+  };
+
+  /**
+   * …and moved to the SIDE pane, with the keyboard left in the primary.
+   *
+   * `splitRight()` moves the active tab, so this is the arrangement the bug needed: the pane being
+   * addressed is not the pane with the focus.
+   */
+  const sideHoldsIt = () => {
+    withMedia();
+    splitRight();
+    focusPane(PRIMARY_PANE);
+  };
+
+  test("the named pane, when one is named", () => {
+    sideHoldsIt();
+    void registry.run("canvas.setBreakpoint", { media: "md", pane: SECONDARY_PANE });
+    expect(renderedPanes).toEqual([SECONDARY_PANE]);
+    expect(workspace.activePaneId).toBe(PRIMARY_PANE);
+  });
+
+  test("the focused pane, when none is", () => {
+    withMedia();
+    void registry.run("canvas.setColorScheme", { scheme: "dark" });
+    expect(renderedPanes).toEqual([workspace.activePaneId]);
+  });
+
+  test("…and all three do it", () => {
+    sideHoldsIt();
+    void registry.run("canvas.setBreakpoint", { media: null, pane: SECONDARY_PANE });
+    void registry.run("canvas.setColorScheme", { pane: SECONDARY_PANE, scheme: "light" });
+    void registry.run("canvas.setLayoutVisible", { pane: SECONDARY_PANE, visible: false });
+    expect(renderedPanes).toEqual([SECONDARY_PANE, SECONDARY_PANE, SECONDARY_PANE]);
   });
 });
 

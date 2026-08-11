@@ -87,7 +87,11 @@ export function appCommandSet(): AnyCommand[] {
     ...viaRegistration(),
     ...derivationCommands(noopDerivationDeps()),
     ...shellViewCommands({ inspectorTab: () => DEFAULT_INSPECTOR_TAB, setInspectorTab: NO_OP }),
-    ...canvasViewCommands({ getCanvasMode: () => "design", setCanvasMode: NO_OP }),
+    ...canvasViewCommands({
+      getCanvasMode: () => "design",
+      renderPane: NO_OP,
+      setCanvasMode: NO_OP,
+    }),
     ...selectionCommands(),
     ...inspectorCommands(),
     // The element menu's eight verbs. Every one declares `menus: ["context/element", "palette"]`
