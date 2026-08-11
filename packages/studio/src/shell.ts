@@ -25,6 +25,8 @@ import { effect, effectScope, reactive } from "./reactivity";
 import { applyStartupProfile } from "./services/profile";
 import { stampShellRegions } from "./ui/regions";
 import { workspace } from "./workspace/workspace";
+import { captureSession, readSession } from "./workspace/session";
+import type { PersistedSession } from "./workspace/session";
 import {
   argsSchema,
   booleanArg,
@@ -630,10 +632,12 @@ export function persistDocks(): void {
 
 // ─── Named layouts (§3.2 ①b) ──────────────────────────────────────────────────
 
-/** What a project's namespaced record holds today. Session state (§4.4) grows into this shape. */
+/** What a project's namespaced record holds: its named layouts, and the session it was left in. */
 interface PersistedProject {
   layouts?: unknown;
   activeLayout?: unknown;
+  /** §4.4's session — open documents per pane, the active one, and each one's view settings. */
+  session?: unknown;
 }
 
 /** The project whose layouts are loaded, or `undefined` before the first sync. */
@@ -656,6 +660,20 @@ function isLayoutPreset(value: unknown): value is LayoutPreset {
   );
 }
 
+/** The raw record for `root`, or `{}` for absent, corrupt or hand-edited storage. */
+function rawPersistedProject(root: string | null): PersistedProject {
+  if (!root) {
+    return {};
+  }
+  try {
+    return JSON.parse(
+      localStorage.getItem(`${PROJECT_STORAGE_PREFIX}${root}`) || "{}",
+    ) as PersistedProject;
+  } catch {
+    return {};
+  }
+}
+
 /** Read a project's namespaced record, tolerating absent, corrupt and hand-edited storage. */
 function readPersistedProject(root: string | null): {
   layouts: LayoutPreset[];
@@ -665,14 +683,7 @@ function readPersistedProject(root: string | null): {
   if (!root) {
     return fresh;
   }
-  let parsed: PersistedProject;
-  try {
-    parsed = JSON.parse(
-      localStorage.getItem(`${PROJECT_STORAGE_PREFIX}${root}`) || "{}",
-    ) as PersistedProject;
-  } catch {
-    return fresh;
-  }
+  const parsed = rawPersistedProject(root);
   const layouts = Array.isArray(parsed.layouts) ? parsed.layouts.filter(isLayoutPreset) : [];
   if (layouts.length === 0) {
     return fresh;
@@ -684,12 +695,54 @@ function readPersistedProject(root: string | null): {
 }
 
 /**
+ * The session `root` was last left in, or `null` when there is none to restore.
+ *
+ * Separate from {@link readPersistedProject} because the two are read at different moments: the
+ * layouts load reactively the instant the project root changes, and the session is read once, by
+ * the open sequence, at the point where it would otherwise open the home page.
+ */
+export function persistedSession(root: string | null): PersistedSession | null {
+  return readSession(rawPersistedProject(root).session);
+}
+
+/**
+ * The project whose session has been READ, and may therefore be overwritten.
+ *
+ * Without this the feature ate itself. Opening a project sets `workspace.projectRoot`, which fires
+ * the persist effect below while the workspace is still empty — so `captureSession()` returned
+ * `{panes: []}` and wrote it over the record the open sequence was about to read, three lines
+ * later. The stored session was always destroyed a moment before it was wanted.
+ *
+ * So a session is only written for a root that has already been restored from. Until then the
+ * stored one is carried forward verbatim, and a project that fails halfway through opening leaves
+ * the record it could not use intact.
+ */
+let _sessionRoot: string | null = null;
+
+/** Declare that `root`'s session has been read, so this window may now write over it. */
+export function markSessionRestored(root: string | null): void {
+  _sessionRoot = root;
+}
+
+/**
  * Write the project's namespaced record. One key, one writer, one shape.
  *
  * The dock record's two-writer bug (`persistWidths` vs `applyPanelCollapse`, both on
  * {@link DOCK_STORAGE_KEY}) is the reason this is a single function that serialises the whole
  * record rather than a merge at each call site.
  */
+/**
+ * Write the session on the way out — the moment the whole feature exists for.
+ *
+ * The effect above tracks the session's SHAPE. The view settings ride along on the next shape
+ * change, so a zoom or a breakpoint chosen after the last tab was opened would otherwise be the one
+ * thing a relaunch forgot. `beforeunload` cannot await, and this does not need to: one synchronous
+ * `localStorage` write.
+ */
+export function flushSession(): void {
+  persistProjectShell();
+}
+
 export function persistProjectShell(): void {
   const root = workspace.projectRoot;
   if (!root) {
@@ -701,6 +754,8 @@ export function persistProjectShell(): void {
       JSON.stringify({
         activeLayout: shell.layout,
         layouts: shell.layouts,
+        // Only for a project whose session has been read — see {@link markSessionRestored}.
+        session: root === _sessionRoot ? captureSession() : rawPersistedProject(root).session,
       } satisfies PersistedProject),
     );
   } catch {
@@ -950,6 +1005,31 @@ export function mountShell(): void {
     effect(() => {
       syncProjectLayouts(workspace.projectRoot);
     });
+    /*
+     * §4.4's session, written whenever its SHAPE changes.
+     *
+     * The reads below are the tracking list: which panes exist, what is in each strip and in what
+     * order, which tab is active, and where the keyboard is. Every one of them is a deliberate act
+     * by the author, and there are few enough of them per session that a `localStorage` write each
+     * time costs nothing measurable.
+     *
+     * Per-tab view settings are captured at write time rather than tracked. Zoom moves on every
+     * wheel tick, and an effect that persisted the record sixty times a second to remember a scale
+     * would be a worse bug than forgetting the scale — so a mode change or a new tab carries the
+     * zoom along with it, and `flushSession()` on the way out catches the rest.
+     */
+    effect(() => {
+      const root = workspace.projectRoot;
+      void workspace.activePaneId;
+      for (const pane of workspace.panes) {
+        void pane.id;
+        void pane.activeTabId;
+        void pane.tabOrder.join("\u0000");
+      }
+      if (root) {
+        persistProjectShell();
+      }
+    });
   });
 }
 
@@ -1064,6 +1144,9 @@ export function resetProjectShell(): void {
   Object.assign(shell.stylebook, freshStylebook());
   shell.settingsTab = "stylebook";
   shell.layoutSelection = null;
+  // …and which project's session may be written, so the one being opened cannot be overwritten
+  // Before it has been read.
+  _sessionRoot = null;
   // Forget which project's layouts are loaded, so the next `syncProjectLayouts()` reloads even if
   // The same root is opened again. The docks and the active rail panel stay: they describe the
   // Workspace, and re-applying a layout on project open would discard the widths you just dragged.

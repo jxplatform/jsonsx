@@ -42,6 +42,8 @@ import { effect, effectScope } from "./reactivity";
 import type { EffectScope } from "@vue/reactivity";
 
 import {
+  flushSession,
+  markSessionRestored,
   mountShell,
   registerShellViewCommands,
   resetProjectShell,
@@ -103,7 +105,7 @@ import {
   loadDirectory,
   openFileInPane,
   openFileInTab,
-  openHomePage,
+  openLastSessionOrHome,
   registerFileTreeDnD,
   reloadCleanTab,
   setupTreeKeyboard,
@@ -493,6 +495,9 @@ export function hasUnsavedTabs(): boolean {
 }
 
 window.addEventListener("beforeunload", (e: BeforeUnloadEvent) => {
+  // The session, so a relaunch reopens what was open (§4.4). Before the prompt, not after: the
+  // Author may cancel the close, and the record is the same either way.
+  flushSession();
   if (hasUnsavedTabs()) {
     e.preventDefault();
     // Legacy browsers require a truthy returnValue to trigger the native confirm prompt.
@@ -917,8 +922,39 @@ if (_projectParam) {
           void maybePromptJxsuiteUpdate(siteCtx.sitePath);
         }
 
+        /*
+         * THE SESSION — unless the URL named a document.
+         *
+         * A named document is an instruction and wins, whether it came from `?file=` or from a
+         * `?project=` that pointed INTO the project. A bare `?project=<dir>` is "open this
+         * project", and what that means is the documents it was last left with (§4.4) — the
+         * `project.json → home page` redirect below is the answer this replaces.
+         *
+         * This branch opens inline and never went near `openHomePage`, so it was the one door of
+         * four the session work would have missed, and it is the door a browser reload comes
+         * through.
+         *
+         * It returns when something LANDED — a restored session, or the home page
+         * `openLastSessionOrHome` falls back to. A project with neither (no session, no
+         * `pages/index.*`) falls through to the inline open below, which is what opens
+         * `project.json` itself for a project that has nothing else to show.
+         */
+        const named =
+          _urlParams.get("file") ||
+          (siteCtx.fileRelPath && !siteCtx.fileRelPath.endsWith("project.json")
+            ? siteCtx.fileRelPath
+            : null);
+        if (!named) {
+          await openLastSessionOrHome();
+          if (activeTab.value) {
+            render();
+            renderLeftPanel();
+            return;
+          }
+        }
+
         // Read and open the file
-        fileRelPath = _urlParams.get("file") || siteCtx.fileRelPath || _projectParam;
+        fileRelPath = named ?? siteCtx.fileRelPath ?? _projectParam;
 
         // When opening project.json, default to home page instead (listing-based, no 404 probes).
         if (fileRelPath === "project.json" || fileRelPath.endsWith("/project.json")) {
@@ -960,6 +996,11 @@ if (_projectParam) {
           render();
           // Opening a file is stated by the tab strip and the status bar's DOCUMENT field.
         }
+        /* This window may now write its session (§4.4). The `?file=` branch above opens inline and
+           never reaches `openLastSessionOrHome`, which is the other place that says this — so
+           without it a window opened at a named file would restore other windows' sessions and
+           never record its own. */
+        markSessionRestored(workspace.projectRoot);
       } catch (error) {
         notify.error(`Could not open ${fileRelPath || "the project"}.`, {
           detail: errorMessage(error),
@@ -1156,7 +1197,7 @@ async function openRecentProject(root: string) {
     // The project's name is now permanent state in the status bar's PROJECT field.
 
     activity.step("Open the home page");
-    await openHomePage();
+    await openLastSessionOrHome();
     ensureFsSync();
     activity.done(`Opened ${requireProjectState().name}`);
     void maybePromptJxsuiteUpdate(root);

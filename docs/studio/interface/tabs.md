@@ -74,6 +74,14 @@ New documents open in their natural editor — Markdown in **Edit**, spreadsheet
 **Your project's configuration is one of these documents.** `project.json` opens in the strip like any file, and **Open Settings** shows it in its settings editor. That means the settings you change there are edits: an unsaved dot, :kbd[⌘Z] to take one back, :kbd[⌘S] to write it. Reaching it from the Files tree and reaching it from **Open Settings** land on the same document, so there is only ever one history and one unsaved state for it.
 :::
 
+## Reopening a project
+
+**A project comes back the way you left it.** Reopen one and the documents you had open reopen with it — in strip order, in both panes if you were split, with the one you were working on active and the keyboard where you left it. Each document returns in its own editor and view, at the zoom, breakpoint and color scheme you had chosen for it.
+
+If a file was renamed, moved or deleted while you were away, that one is skipped and the rest still open. If none of them survive, the project opens on its home page as it always did.
+
+Naming a document in the URL still wins: `?file=` opens that file, and Studio leaves the session alone.
+
 ## Drilling into a component
 
 Opening a component from the canvas, the Outline tree or the Inspector's **Edit component** action gives it **its own place in the strip**. The page you came from stays open, still on the element you had selected, so you can flip between the two with a click or :kbd[⌃Tab].

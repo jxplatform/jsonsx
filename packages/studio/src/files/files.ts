@@ -37,6 +37,7 @@ import {
   moveTabToPane,
   openTab,
   paneOfTab,
+  receivingPane,
   renameTab,
   replaceAllTabs,
   setWorkspaceProject,
@@ -56,7 +57,8 @@ import {
   refreshExtensionUi,
   refreshFormats,
 } from "../format/format-host";
-import { resetProjectShell, setActivityTab } from "../shell";
+import { markSessionRestored, persistedSession, resetProjectShell, setActivityTab } from "../shell";
+import { restoreSession } from "../workspace/session";
 import { cleanupGitPanel } from "../panels/git-panel";
 import { addRecentProject, trackRecentFile } from "../recent-projects";
 import type { TemplateResult } from "lit-html";
@@ -128,7 +130,7 @@ export async function loadProject() {
       await ensureDependenciesInstalled();
       await loadDirectory(".");
       await loadComponentRegistry();
-      await openHomePage();
+      await openLastSessionOrHome();
       void maybePromptJxsuiteUpdate(meta.root);
     }
     // If not a site project (monorepo) — show welcome prompt, don't load tree
@@ -211,7 +213,7 @@ export async function openProject({ renderLeftPanel }: { renderLeftPanel: () => 
     renderLeftPanel();
     // The project's name is permanent state in the status bar's PROJECT field now.
 
-    await openHomePage();
+    await openLastSessionOrHome();
     void maybePromptJxsuiteUpdate(requireProjectState().projectRoot);
   } catch (error) {
     notify.error("Could not open the project.", {
@@ -288,6 +290,51 @@ export async function openHomePage() {
   if (home) {
     await openFileInTab(home);
   }
+}
+
+/**
+ * Reopen the documents this project was last left with, or its home page if there are none.
+ *
+ * Plan §4.4, and P3's "Newly possible": **the session survives a relaunch.** Every one of the three
+ * ways into a project — the `?project=` bootstrap, the PAL picker and a recent-project open — ended
+ * at `openHomePage()`, so nine open documents, a split and the mode you were in were lost each
+ * time. The per-project record's own interface said "session state grows into this shape".
+ *
+ * ONE function for all three, because the three used to be three calls to `openHomePage` and this
+ * is exactly the kind of behaviour that lands on two of them.
+ *
+ * A path that no longer resolves is skipped, and a session that restores NOTHING falls through to
+ * the home page rather than leaving an empty window: files move, and a stale record must not cost
+ * you the one page a project can always show.
+ *
+ * @returns Whether a SESSION was restored — `false` means the home page was opened instead.
+ */
+export async function openLastSessionOrHome(): Promise<boolean> {
+  // `workspace.projectRoot`, and NOT a root passed in: that is the key `persistProjectShell` writes
+  // Under, and the three callers each know the project by a slightly different name — `meta.root`,
+  // `projectState.projectRoot`, the recent-list entry. One reader of one field cannot disagree with
+  // The writer; three callers passing three spellings silently restore nothing.
+  const session = persistedSession(workspace.projectRoot);
+  // Read first, THEN allow writes: the persist effect fires the moment `workspace.projectRoot` is
+  // Set, and an empty workspace captured at that instant would overwrite the very record this line
+  // Reads. See `markSessionRestored`.
+  markSessionRestored(workspace.projectRoot);
+  if (session) {
+    const opened = await restoreSession(session, {
+      ensureSecondPane: () => {
+        receivingPane();
+      },
+      openFile: (path, paneId) => openFileInTab(path, { focus: false, paneId }),
+    });
+    if (opened > 0) {
+      return true;
+    }
+  }
+  await openHomePage();
+  // Whether a SESSION was restored, which is not the same as whether anything opened: the
+  // `?project=` boot needs to know if it should still run its own inline open, and a home page is
+  // Not an answer to that question.
+  return false;
 }
 
 // ─── File tree templates ──────────────────────────────────────────────────────

@@ -38,8 +38,12 @@ void mock.module("../src/workspace/workspace.js", () => ({
   // `store.ts` registers the primary pane's canvas stage at `initShellRefs`, and
   // `canvas/canvas-surface.ts` resolves a pane through `paneById` — both reached transitively
   // From this panel's imports, neither called by it.
+  // `shell.ts` persists the session (§4.4) through `workspace/session.ts`, which reads the pane
+  // Grid and moves the focus on restore. Reached transitively; never called by this panel.
+  focusPane: () => {},
   paneById: () => {},
   PRIMARY_PANE: "primary",
+  SECONDARY_PANE: "secondary",
   renameTab: () => {},
   // `shell.ts` reads the project root from this store to load that project's named layouts, so
   // The stand-in has to carry it — an absent export is a module-resolution error, not a null.

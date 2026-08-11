@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.9-draft
+**Version:** 0.9.10-draft
 **Status:** Partial
 **Updated:** 2026-08-11
 **License:** MIT
@@ -1485,6 +1485,36 @@ repainted — a debounce armed over a disposed editor reads `""` from it, and a 
 the buffer from the document discards whatever is being typed. Both were data loss, both were
 invisible to a green suite, and both are one question asked too late.
 
+### 14.8 The session survives a relaunch
+
+**A project reopens with the documents it was left with.** Stored per project root in that
+project's namespaced record beside its named layouts: each pane's documents in strip order, which
+one was active, which pane had the keyboard, and per document the settings a person deliberately
+chose — canvas mode, the preview flag, both zooms, and the rendering context.
+
+**Paths, not tab ids.** A tab id is minted per open and means nothing across a reload; the path is
+the identity the workspace already dedupes on. Selection, hover, clipboard and undo history are not
+stored: they are derived or transient, and restoring a selection into a document that changed on
+disk would point at a node that may not exist.
+
+**Every read is untrusted input** — the record is `localStorage`, hand-editable and older than the
+version reading it. A pane id the grid does not have, a mode this build does not draw, a value of
+the wrong type: each is dropped on its own, and a record that is not a session restores nothing.
+
+Three refusals define the behaviour at the edges:
+
+- A path that **no longer resolves** is skipped, and the rest of the session still opens. Losing
+  eight documents because one was renamed would be worse than the problem this solves.
+- A session that restores **nothing** falls through to the home page. What counts as restored is
+  what the workspace holds afterwards, not what the opener returned: opening a missing file raises
+  a Problem and returns normally, so counting calls reported success and opened an empty window.
+- A window may only **write** a session for a project whose session it has already read. Setting
+  the project root is what starts the restore, and the same write would otherwise capture the empty
+  workspace of that instant and destroy the record a moment before it was wanted.
+
+A URL that NAMES a document — `?file=`, or a `?project=` pointing into the project — is an
+instruction and wins. A bare `?project=<dir>` means "open this project", and that means the session.
+
 ## 15. Application Preferences
 
 **Status:** Partial — Appearance, Assistant, Accounts and a read-only Keyboard sheet ship; Editor
@@ -1838,6 +1868,7 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ## Changelog
 
+- **0.9.10-draft** (2026-08-11) — §14.8 — a project reopens with the documents, panes and view settings it was left with.
 - **0.9.9-draft** (2026-08-11) — The rendering context's three axes are commands (canvas.setBreakpoint / setColorScheme / setLayoutVisible), and an empty-canvas right-click keeps the browser's menu.
 - **0.9.8-draft** (2026-08-11) — Project Settings carries ⌘⇧,, the other half of the pair §5.3 declares.
 - **0.9.7-draft** (2026-08-11) — Data rows: truncation markers are controls, Refresh reports the render rather than a timer, and an entry that cannot hold a value keeps its definition summary.
@@ -1902,4 +1933,4 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.9-draft_
+_`@jxsuite/studio` Specification v0.9.10-draft_
