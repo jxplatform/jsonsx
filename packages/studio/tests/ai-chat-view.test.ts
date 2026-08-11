@@ -85,9 +85,64 @@ describe("helpers", () => {
 });
 
 describe("renderChatHeader", () => {
+  /*
+   * `services/context-manager.ts` has computed the token count and the warning flag on every turn
+   * since it was written, and `chat-state.ts` has stored them, and NOTHING read either. Plan §11.6:
+   * "Context budget manager → tokenCount / contextWarning actually rendered". A conversation was
+   * silently trimmed, the assistant forgot what you told it ten turns ago, and the two numbers that
+   * would have explained why sat in the store.
+   */
+  test("the context budget is shown, compactly, and warns when it is past half", async () => {
+    const quiet = await renderInto(
+      renderChatHeader({
+        onNewChat: () => {},
+        onShowSessions: () => {},
+        overBudget: false,
+        streaming: false,
+        title: null,
+        tokens: 18_400,
+      }),
+    );
+    const badge = quiet.querySelector(".ai-tokens")!;
+    expect(badge.textContent).toBe("18.4k");
+    expect(badge.classList.contains("ai-tokens--warn")).toBe(false);
+    expect(badge.getAttribute("title")).toContain("18,400 tokens");
+
+    const loud = await renderInto(
+      renderChatHeader({
+        onNewChat: () => {},
+        onShowSessions: () => {},
+        overBudget: true,
+        streaming: false,
+        title: null,
+        tokens: 96_000,
+      }),
+    );
+    const warned = loud.querySelector(".ai-tokens")!;
+    expect(warned.classList.contains("ai-tokens--warn")).toBe(true);
+    // The badge has to say what happens next, not just that a number is large.
+    expect(warned.getAttribute("title")).toContain("oldest turns are dropped");
+  });
+
+  test("a fresh chat shows no budget at all — zero is not a fact worth a badge", async () => {
+    const el = await renderInto(
+      renderChatHeader({
+        onNewChat: () => {},
+        onShowSessions: () => {},
+        overBudget: false,
+        streaming: false,
+        title: null,
+        tokens: 0,
+      }),
+    );
+    expect(el.querySelector(".ai-tokens")).toBeNull();
+  });
+
   test("shows the session title, or New chat for unsaved chats", async () => {
     const withTitle = await renderInto(
       renderChatHeader({
+        overBudget: false,
+        tokens: 0,
         onNewChat: () => {},
         onShowSessions: () => {},
         streaming: false,
@@ -99,6 +154,8 @@ describe("renderChatHeader", () => {
 
     const fresh = await renderInto(
       renderChatHeader({
+        overBudget: false,
+        tokens: 0,
         onNewChat: () => {},
         onShowSessions: () => {},
         streaming: true,
@@ -113,7 +170,14 @@ describe("renderChatHeader", () => {
     const onShowSessions = mock(() => {});
     const onNewChat = mock(() => {});
     const el = await renderInto(
-      renderChatHeader({ onNewChat, onShowSessions, streaming: false, title: null }),
+      renderChatHeader({
+        onNewChat,
+        onShowSessions,
+        overBudget: false,
+        streaming: false,
+        title: null,
+        tokens: 0,
+      }),
     );
     pointer(el.querySelector("sp-action-button[title='Chat history']")!, "click");
     pointer(el.querySelector("sp-action-button[title='New chat']")!, "click");

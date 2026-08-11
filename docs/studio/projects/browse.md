@@ -12,7 +12,7 @@ code:
 
 # The Library
 
-The Library is your project seen whole: every page, layout, component, content entry and asset, in one place, with live previews. Press :kbd[⌘K] and run **Open Library** — or pick it from the **⬢ menu** in the Command Bar.
+The Library is your project seen whole: every page, layout, component, content entry and asset, in one place, with live previews. Press :kbd[⌘⇧E] — or :kbd[⌘K] and run **Open Library**, or pick it from the **⬢ menu** in the Command Bar, or right-click in the Files tree.
 
 It opens as a document tab like any other, which is the useful part. It sits in the strip beside the page you were working on, one click away for the rest of the session, and :kbd[⌘\] moves it into a second pane so you can browse the project with a page still live beside it.
 

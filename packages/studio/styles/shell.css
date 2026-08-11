@@ -446,6 +446,19 @@
   white-space: nowrap;
   font-weight: 600;
 }
+/* The conversation's share of the model's context. Quiet until it matters: past half the window
+   the assistant starts dropping the oldest turns, and this is the only thing that says so. */
+.ai-tokens {
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-dim);
+  padding: 0 4px;
+  border-radius: var(--radius);
+}
+.ai-tokens--warn {
+  color: var(--warning, #d98b28);
+  background: color-mix(in srgb, var(--warning, #d98b28) 14%, transparent);
+}
 .ai-header-spacer {
   flex: 1;
 }

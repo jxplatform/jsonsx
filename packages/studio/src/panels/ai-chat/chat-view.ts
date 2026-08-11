@@ -110,9 +110,25 @@ export interface ChatHeaderOptions {
   streaming: boolean;
   onShowSessions: () => void;
   onNewChat: () => void;
+  /**
+   * The conversation's estimated token count, and whether it is over the warning line.
+   *
+   * `services/context-manager.ts` has computed both on every turn since it was written, and
+   * `chat-state.ts` has stored them — with NO READER anywhere. Plan §11.6: "Context budget manager
+   * → tokenCount / contextWarning actually rendered". So a conversation was silently trimmed, the
+   * assistant forgot what you told it ten turns ago, and the two numbers that would have explained
+   * why sat in the store.
+   */
+  tokens: number;
+  overBudget: boolean;
 }
 
-/** The chat header: history button, session title, streaming spinner, New Chat. */
+/** Compact token count: 18400 → "18.4k". A four-digit number in a 28px header is noise. */
+function tokenLabel(tokens: number): string {
+  return tokens >= 1000 ? `${(tokens / 1000).toFixed(1)}k` : String(tokens);
+}
+
+/** The chat header: history button, session title, the context budget, spinner, New Chat. */
 export function renderChatHeader(opts: ChatHeaderOptions): TemplateResult {
   return html`
     <div class="ai-chat-header">
@@ -121,6 +137,20 @@ export function renderChatHeader(opts: ChatHeaderOptions): TemplateResult {
       </sp-action-button>
       <span class="ai-chat-title">${opts.title ?? "New chat"}</span>
       <span class="ai-header-spacer"></span>
+      ${
+        opts.tokens > 0
+          ? html`<span
+              class=${opts.overBudget ? "ai-tokens ai-tokens--warn" : "ai-tokens"}
+              title=${
+                opts.overBudget
+                  ? `About ${opts.tokens.toLocaleString()} tokens — past half the model's context. ` +
+                    `The oldest turns are dropped as this grows; start a new chat to keep them.`
+                  : `About ${opts.tokens.toLocaleString()} tokens of the model's context in use`
+              }
+              >${tokenLabel(opts.tokens)}</span
+            >`
+          : nothing
+      }
       ${
         opts.streaming
           ? html`<sp-progress-circle size="s" indeterminate></sp-progress-circle>`

@@ -296,6 +296,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.9.13-draft** (2026-08-11) — The Library has four doors including ⌘⇧E (§9.1.2), and the assistant's context budget is rendered.
 - **0.9.12-draft** (2026-08-11) — A field's uncommitted draft is keyed by node path, not by field name alone.
 - **0.9.11-draft** (2026-08-11) — Event names are a free-form combobox, and a bound provenance chip opens its source on every tab.
 - **0.9.10-draft** (2026-08-11) — §14.8 — a project reopens with the documents, panes and view settings it was left with.

@@ -31,6 +31,12 @@ The row under the message box holds the composer's controls:
 - **API key & endpoint** (gear) — reopen the **Assistant settings** dialog.
 - **Send** — becomes **Stop** while the assistant is replying; click it to halt the reply and any further actions.
 
+## How much the assistant is holding
+
+The chat header shows how much of the model's context the conversation is using — `18.4k` for about eighteen thousand tokens. It appears once there's something to count and stays quiet until it matters.
+
+Past **half** the model's window it turns amber. That is the point at which the assistant starts dropping the oldest turns to make room, so a long conversation quietly forgets what you told it near the beginning. When you see amber and the assistant seems to have lost the thread, start a new chat: the reply that follows will have your whole message rather than the tail of it.
+
 ## Attach context
 
 The paperclip menu offers two attachments, each shown as a removable chip above the message box:

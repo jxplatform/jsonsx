@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.12-draft
+**Version:** 0.9.13-draft
 **Status:** Partial
 **Updated:** 2026-08-11
 **License:** MIT
@@ -1006,6 +1006,13 @@ The same query backs the inspector's **Used on N pages** line for a selected com
 the `selection.findUsages` command; all three read one cache, invalidated by the filesystem rather
 than by a timer, so they cannot disagree.
 
+### 9.1.2 The Library
+
+Every page, layout, component, content entry and asset in one browsable tab, with live previews.
+Reached by `⌘⇧E`, by name from the palette, from the Command Bar's overflow, and from the Files
+tree's context menu — four doors, because it is the content surface for a site with a collection and
+a palette search is not a door a reader finds.
+
 ### 9.2 Server Integration
 
 All file operations go through the Platform Abstraction Layer, which maps to `@jxsuite/server` Studio API endpoints:
@@ -1885,6 +1892,7 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ## Changelog
 
+- **0.9.13-draft** (2026-08-11) — The Library has four doors including ⌘⇧E (§9.1.2), and the assistant's context budget is rendered.
 - **0.9.12-draft** (2026-08-11) — A field's uncommitted draft is keyed by node path, not by field name alone.
 - **0.9.11-draft** (2026-08-11) — Event names are a free-form combobox, and a bound provenance chip opens its source on every tab.
 - **0.9.10-draft** (2026-08-11) — §14.8 — a project reopens with the documents, panes and view settings it was left with.
@@ -1952,4 +1960,4 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.12-draft_
+_`@jxsuite/studio` Specification v0.9.13-draft_

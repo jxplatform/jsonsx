@@ -39,8 +39,11 @@ export function libraryCommands(): AnyCommand[] {
     {
       category: "Project",
       id: "library.open",
+      // ⌘⇧E — §9.1's "File: Browse Library (⌘⇧E)". The Library is the content surface for a site
+      // With a collection, and it was reachable only by palette search and one overflow menu item.
+      keybinding: "mod+shift+e",
       level: "project",
-      menus: ["commandbar/overflow", "palette"],
+      menus: ["commandbar/overflow", "palette", "context/file"],
       group: "1_file",
       requires: "an open project",
       when: (ctx) => ctx.project.open,

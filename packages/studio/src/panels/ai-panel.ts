@@ -387,8 +387,10 @@ export function renderAiPanelTemplate(): TemplateResult {
       ${renderChatHeader({
         onNewChat: newChat,
         onShowSessions: showSessions,
+        overBudget: cs.contextWarning,
         streaming: cs.status === "streaming",
         title: activeSessionTitle(),
+        tokens: cs.tokenCount,
       })}
       ${renderMessageList({
         error: cs.error,
