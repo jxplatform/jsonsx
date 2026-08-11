@@ -33,9 +33,11 @@ Entries are grouped into collapsible sections with counts — **State**, **Compu
 
 The resolved summary reads as `Array(12)` for a list and how many items it holds, `{5}` for an object and how many fields, `string` / `number` / `boolean` for a plain value's type, or `pending` for no value yet — a data source that hasn't finished resolving, or failed to. Before the canvas has rendered anything there is nothing to report, so the row shows the definition instead: a Request's method and URL, a storage entry's key, the first line of a function.
 
+Functions and expressions that assign never show a value, because they don't hold one — they are things the page _does_. Those rows keep their definition summary.
+
 Click a row to open it; click again to close it. Several rows can be open at once — comparing two entries means seeing both — and what you left open is remembered per tab.
 
-An open row shows the entry's editor and, under it, **Resolved to**: the live value as a tree. Nested objects and lists unfold a few levels deep, long lists show their first items with a "… N more" tail, and long strings are shortened — enough to verify shape and content without drowning in data.
+An open row shows the entry's editor and, under it, **Resolved to**: the live value as a tree. Long strings are shortened, and lists, objects and deep nesting are capped — but every cap ends in a **"… N more"** button. Click it to show fifty more of that list, that object, or that many levels deeper; each marker remembers its own limit, so opening one long array doesn't lengthen every other one.
 
 A file with nothing declared yet says so and offers **Add a value**, which creates the first entry for you.
 
@@ -97,7 +99,7 @@ Everything in this panel is written to the `state` object of the open file's JSO
 
 ## Refresh
 
-The values are a snapshot from the canvas render. Click **Refresh** in the panel's toolbar to re-render the canvas and read them again — useful after editing a data source, or when you want to re-fire a fetch.
+The values are a snapshot from the canvas render. Click **Refresh** in the panel's toolbar to re-render the canvas and read them again — useful after editing a data source, or when you want to re-fire a fetch. The button says **Refreshing…** until the canvas actually reports back, so a slow fetch looks slow rather than looking like a button that did nothing.
 
 :::doc-note
 While you are editing, **Fetch from a URL** sources do not call out to the network on their own — they sit empty until you ask. Editing the page re-renders the canvas many times, and re-running every fetch each time would be slow and would hammer the API. Click **Refresh** to fetch for real, or switch on the **preview** toggle, where data behaves exactly as it will on the built site.

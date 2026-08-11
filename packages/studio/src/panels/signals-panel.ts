@@ -21,7 +21,11 @@ import {
 } from "../tabs/transact";
 import { renderFieldRow } from "../ui/field-row";
 import { rawTextArea, spTextField } from "../ui/field-input";
-import { expressionHint, renderExpressionEditor } from "../ui/expression-editor";
+import {
+  expressionHint,
+  isActionExpression,
+  renderExpressionEditor,
+} from "../ui/expression-editor";
 import { renderEmptyState } from "./empty-state";
 import {
   dataTypeLabel,
@@ -492,9 +496,17 @@ function addTemplateDef(type: string, S: SignalsPanelState, ctx: SignalsPanelCtx
  * it. An entry the canvas ran and did not produce is "pending", which is a fact about the value; a
  * panel opened before the canvas has rendered knows nothing about any of them, and guessing
  * "pending" for the whole list there would be a fact about the panel dressed up as one about data.
+ *
+ * ENTRIES THAT CANNOT HOLD A VALUE never get the column. A function and an assignment expression
+ * are things the page DOES, not things it knows, and they are absent from the resolved scope for
+ * exactly that reason — so the value column called all eight of a component's `setFilter` handlers
+ * "pending", which reads as "still loading" for something that will never load.
  */
 function summary(name: string, def: SignalDef, live: unknown, resolved: boolean) {
-  if (!resolved) {
+  const holdsNoValue =
+    defCategory(def) === "function" ||
+    (def.$expression != null && isActionExpression(def.$expression));
+  if (!resolved || holdsNoValue) {
     const hint = defHint(name, def);
     return html`<span class="signal-hint" title=${hint}>${hint}</span>`;
   }
@@ -513,6 +525,9 @@ export function renderSignalsTemplate(S: SignalsPanelState, ctx: SignalsPanelCtx
   // Panel anyway.
   const liveScope = (S.canvas?.scope ?? null) as Record<string, unknown> | null;
   const scope = liveScope ?? {};
+  // A Refresh is out and the canvas has not answered. Read off the tab, so it survives the repaints
+  // Between the press and the `dataScope` that ends it.
+  const refreshing = S.canvas?.refreshing === true;
 
   // Warm the extensions payload so manifest state classes appear in the add picker (the panel
   // Re-renders constantly; loadExtensions memoizes, so this is a one-time fetch per project).
@@ -589,7 +604,7 @@ export function renderSignalsTemplate(S: SignalsPanelState, ctx: SignalsPanelCtx
                       <div class="signal-live">
                         <span class="signal-live-label">Resolved to</span>
                         <div class="data-tree">
-                          ${renderDataTreeTemplate(unwrapSignal(live), 0)}
+                          ${renderDataTreeTemplate(unwrapSignal(live), 0, 5, name)}
                         </div>
                       </div>
                     </div>`
@@ -610,13 +625,23 @@ export function renderSignalsTemplate(S: SignalsPanelState, ctx: SignalsPanelCtx
                 quiet
                 size="s"
                 class="data-refresh-btn"
+                ?disabled=${refreshing}
                 @click=${() => {
                   ctx.refreshData?.();
-                  setTimeout(() => ctx.renderLeftPanel(), 200);
+                  ctx.renderLeftPanel();
                 }}
               >
-                <sp-icon-refresh slot="icon"></sp-icon-refresh>
-                Refresh
+                ${
+                  refreshing
+                    ? html`<sp-progress-circle
+                        slot="icon"
+                        indeterminate
+                        size="s"
+                        label="Refreshing"
+                      ></sp-progress-circle>`
+                    : html`<sp-icon-refresh slot="icon"></sp-icon-refresh>`
+                }
+                ${refreshing ? "Refreshing…" : "Refresh"}
               </sp-action-button>
             </div>`
           : nothing

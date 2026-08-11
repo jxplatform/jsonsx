@@ -37,6 +37,18 @@ const BINARY_OPS = new Set([
   "??",
 ]);
 const ASSIGN_OPS = new Set(["=", "+=", "-=", "*=", "/="]);
+
+/**
+ * Does this expression node DO something rather than compute something?
+ *
+ * An assignment writes a target and yields nothing worth reading; a `+` or a `filter` yields a
+ * value. The Data panel needs the distinction to know whether a row has a value column at all —
+ * labelling `setBeds0` "pending" reads as "still loading" for a thing that will never load.
+ */
+export function isActionExpression(node: unknown): boolean {
+  const op = (node as { operator?: unknown } | null | undefined)?.operator;
+  return typeof op === "string" && ASSIGN_OPS.has(op);
+}
 const NO_ARG_OPS = new Set(["pop", "shift"]);
 const ONE_ARG_OPS = new Set(["push", "unshift"]);
 

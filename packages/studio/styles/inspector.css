@@ -675,6 +675,25 @@ jx-styled-combobox sp-picker {
   color: var(--fg-dim);
   flex-shrink: 0;
 }
+/* A truncation marker is a control, not a caption — it shows more of what the panel already has.
+   Styled as the text it replaced so the tree does not sprout buttons, but focusable and hoverable
+   so it reads as pressable. */
+.data-more {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.data-more:hover,
+.data-more:focus-visible {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
 /* The resolved value, under the fields that define it. The rule above it is the seam between
    "what this is" and "what it became" — the two halves that used to be two panels. */
 .signal-live {

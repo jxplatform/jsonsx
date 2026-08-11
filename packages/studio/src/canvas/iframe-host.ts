@@ -2002,6 +2002,13 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
     case "renderError": {
       // The render never landed — its pending identity must not be adopted by a later ack.
       state.pendingTabIds.delete(msg.gen);
+      // …and no `dataScope` will follow it, so a Refresh waiting on one must stop waiting. Without
+      // This the button spins forever on the one failure it most needs to report.
+      const failed = hostTab(state);
+      if (failed) {
+        failed.session.canvas.refreshing = false;
+        renderOnly("leftPanel");
+      }
       // …and the author is told. `msg.message` was read NOWHERE: the canvas would go blank or stale
       // And the one string that said why was deleted with the pending id. Keyed on the host, so a
       // Render loop that fails every generation is one problem rather than sixty.
@@ -2027,6 +2034,9 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       const scoped = hostTab(state);
       if (scoped) {
         scoped.session.canvas.scope = msg.scope;
+        // The answer a pending Refresh was waiting for. Clearing it HERE rather than on a timer is
+        // The whole point: a fetch that takes two seconds keeps saying so for two seconds.
+        scoped.session.canvas.refreshing = false;
       }
       renderOnly("leftPanel");
       return;

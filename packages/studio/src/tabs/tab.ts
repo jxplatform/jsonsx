@@ -59,6 +59,13 @@ export interface TabUi {
    * question, both shared across every open document.
    */
   dataRows: Record<string, boolean>;
+  /**
+   * How far each truncation marker in a Data row's value tree has been opened, keyed by tree path.
+   *
+   * PER TAB, for the reason `dataRows` is: the paths are entry names, and a module-global record
+   * would have applied "show 50 more of `listings`" to a different document's `listings`.
+   */
+  dataLimits: Record<string, number>;
   inspectorSections: Record<string, boolean>;
   styleShorthands: Record<string, boolean>;
   styleFilter: string;
@@ -159,6 +166,16 @@ export interface Tab {
     ui: TabUi;
     canvas: {
       status: string;
+      /**
+       * A Refresh is out and the snapshot below has not come back yet.
+       *
+       * The button used to guess: fire the re-render, then `setTimeout(…, 200)` and repaint,
+       * because nothing told the panel when the values had actually changed. A fetch slower than
+       * 200ms repainted the OLD values and looked like a Refresh that did nothing. The iframe posts
+       * `dataScope` when the render resolves, so the honest answer is to say "refreshing" until it
+       * arrives and let the arrival be the repaint.
+       */
+      refreshing: boolean;
       // A serializable snapshot of the iframe's resolved `$defs` (data-source values), posted over
       // The bridge as a `dataScope` message and read by the data-explorer panel. Plain data now —
       // The old live `EffectScope` (with `.stop()`) moved into the iframe realm with buildScope.
@@ -201,6 +218,7 @@ function createDefaultUi(canvasMode: string, preview = false) {
     styleFilter: "",
     styleSections: {},
     dataRows: {},
+    dataLimits: {},
     styleShorthands: {},
     zoom: 1,
   };
@@ -281,6 +299,7 @@ export function createTab({
     scope,
     session: reactive({
       canvas: {
+        refreshing: false,
         error: null,
         livePreviews: null,
         pendingInlineEdit: null,

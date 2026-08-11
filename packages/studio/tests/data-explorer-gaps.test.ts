@@ -7,7 +7,7 @@
  * `renderDataExplorerTemplate` drive that instead. What is left in this module is the machinery
  * those rows read, which is what this file exercises.
  */
-import { flush, renderInto, resetWorkspaceWithTab } from "./harness";
+import { renderInto, resetWorkspaceWithTab } from "./harness";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { render } from "lit-html";
 import { renderDataTreeTemplate, resetDataRowExpansion } from "../src/panels/data-explorer";
@@ -79,6 +79,32 @@ describe("the resolved-value column", () => {
   test("marks null values as pending style", () => {
     const { container } = mountData({ nil: {} }, { nil: null });
     expect(container.querySelector(".data-type")?.classList.contains("data-pending")).toBe(true);
+  });
+
+  test("an entry that cannot HOLD a value never gets the column", () => {
+    // A function and an assignment expression are things the page DOES. They are absent from the
+    // Resolved scope for that reason, and the column called every one of them "pending" — which
+    // Reads as "still loading" for something that will never load.
+    const { container } = mountData(
+      {
+        held: { default: 1, type: "number" },
+        runIt: { $prototype: "Function", body: "return 1;" },
+        setIt: { $expression: { operator: "=", target: { $ref: "#/state/held" }, value: 2 } },
+        sum: { $expression: { operator: "+", target: { $ref: "#/state/held" }, value: 2 } },
+      },
+      { held: 1, sum: 3 },
+    );
+    const slotFor = (name: string) => {
+      const row = [...container.querySelectorAll(".signal-row")].find(
+        (r) => r.querySelector(".signal-name")?.textContent === name,
+      );
+      return row?.querySelector(".data-type") ? "value" : "hint";
+    };
+    expect(slotFor("held")).toBe("value");
+    // …and a formula expression DOES hold one, so it keeps the column.
+    expect(slotFor("sum")).toBe("value");
+    expect(slotFor("runIt")).toBe("hint");
+    expect(slotFor("setIt")).toBe("hint");
   });
 
   test("with NO scope at all the row says how the entry is defined instead", () => {
@@ -155,23 +181,108 @@ describe("expansion", () => {
 });
 
 describe("the Refresh button", () => {
-  test("re-fetches through refreshData, then re-renders the panel", async () => {
+  test("re-fetches through refreshData, then re-renders the panel", () => {
     const { container } = mountData({ a: {} }, {});
     (container.querySelector(".data-refresh-btn") as HTMLElement).click();
     // RefreshData, not a plain repaint: automatic `Request` entries stay gated in edit/design, and
     // Re-firing them is exactly what this button promises.
     expect(refreshData).toHaveBeenCalledTimes(1);
-    expect(renderLeftPanel).not.toHaveBeenCalled();
-    await new Promise((resolve) => {
-      setTimeout(resolve, 220);
-    });
-    await flush();
     expect(renderLeftPanel).toHaveBeenCalledTimes(1);
+  });
+
+  test("says it is refreshing until the canvas answers, not for 200ms", () => {
+    // It used to repaint on a `setTimeout(…, 200)`: a fetch slower than that repainted the OLD
+    // Values and read as a Refresh that did nothing. `session.canvas.refreshing` is set by the verb
+    // And cleared by the iframe's `dataScope` reply, so the button is honest for as long as it
+    // Takes.
+    const { container, ctx } = mountData({ a: {} }, {});
+    const btn = () => container.querySelector(".data-refresh-btn") as HTMLElement;
+    expect(btn().textContent?.trim()).toBe("Refresh");
+    expect(btn().hasAttribute("disabled")).toBe(false);
+
+    activeTab.value!.session.canvas.refreshing = true;
+    ctx.renderLeftPanel();
+    expect(btn().textContent).toContain("Refreshing");
+    expect(btn().querySelector("sp-progress-circle")).not.toBeNull();
+    expect(btn().hasAttribute("disabled")).toBe(true);
+
+    activeTab.value!.session.canvas.refreshing = false;
+    ctx.renderLeftPanel();
+    expect(btn().textContent?.trim()).toBe("Refresh");
+    expect(btn().querySelector("sp-progress-circle")).toBeNull();
   });
 
   test("is not drawn over a document with no data — there is nothing to re-fetch", () => {
     const { container } = mountData({}, {});
     expect(container.querySelector(".data-refresh-btn")).toBeNull();
+  });
+});
+
+describe("truncation markers", () => {
+  const rowFor = (el: HTMLElement, name: string) =>
+    [...el.querySelectorAll(".signal-row")].find(
+      (r) => r.querySelector(".signal-name")?.textContent === name,
+    ) as HTMLElement;
+
+  /** A row open over a list longer than the 20-item cap. */
+  function longList(n = 60) {
+    const { container, ctx } = mountData(
+      { rows: {} },
+      { rows: Array.from({ length: n }, (_, i) => i) },
+    );
+    rowFor(container, "rows").click();
+    return { container, ctx };
+  }
+
+  test("a capped list ends in a marker that is a BUTTON, not a caption", () => {
+    // "… 40 more" used to be inert text: the panel saying it has the answer and will not show it,
+    // In the one panel a reader opens BECAUSE item 40 is the surprising one.
+    const { container } = longList();
+    expect(container.querySelectorAll(".data-branch").length).toBe(20);
+    const more = container.querySelector(".data-more") as HTMLButtonElement;
+    expect(more.tagName).toBe("BUTTON");
+    expect(more.textContent?.trim()).toBe("… 40 more");
+  });
+
+  test("pressing it shows fifty more, and again shows the rest", () => {
+    const { container, ctx } = longList();
+    (container.querySelector(".data-more") as HTMLElement).click();
+    ctx.renderLeftPanel();
+    expect(container.querySelectorAll(".data-branch").length).toBe(60);
+    expect(container.querySelector(".data-more")).toBeNull();
+  });
+
+  test("the raised limit is per marker and per tab", () => {
+    const { container, ctx } = longList();
+    (container.querySelector(".data-more") as HTMLElement).click();
+    ctx.renderLeftPanel();
+    expect(container.querySelectorAll(".data-branch").length).toBe(60);
+
+    // A different document with the same entry NAME does not inherit the reading position — the
+    // Failure mode the row-expansion Set had before it moved onto the tab.
+    const second = mountData({ rows: {} }, { rows: Array.from({ length: 60 }, (_, i) => i) });
+    rowFor(second.container, "rows").click();
+    expect(second.container.querySelectorAll(".data-branch").length).toBe(20);
+  });
+
+  test("a capped OBJECT gets one too, at its own cap", () => {
+    const big: Record<string, number> = {};
+    for (let i = 0; i < 40; i++) {
+      big[`k${i}`] = i;
+    }
+    const { container, ctx } = mountData({ obj: {} }, { obj: big });
+    rowFor(container, "obj").click();
+    expect(container.querySelectorAll(".data-branch").length).toBe(30);
+    (container.querySelector(".data-more") as HTMLElement).click();
+    ctx.renderLeftPanel();
+    expect(container.querySelectorAll(".data-branch").length).toBe(40);
+  });
+
+  test("with no tab open, raising a limit is a no-op rather than a crash", async () => {
+    const { closeAllTabs } = await import("../src/workspace/workspace");
+    const { raiseDataLimit } = await import("../src/panels/data-explorer");
+    closeAllTabs();
+    expect(() => raiseDataLimit("ghost", "items")).not.toThrow();
   });
 });
 

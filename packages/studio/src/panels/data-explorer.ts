@@ -4,6 +4,7 @@
 import { html, nothing } from "lit-html";
 import type { TemplateResult } from "lit-html";
 import { activeTab } from "../workspace/workspace";
+import { renderOnly } from "../store";
 import { booleanArg, stringArg, stringProperty } from "../commands/command-args";
 import { registerPanel } from "./panel-registry";
 import type { AnyCommand, CommandRegistry } from "../commands/registry";
@@ -21,6 +22,72 @@ function rowsUi(): Record<string, boolean> | null {
     return null;
   }
   return (ui.dataRows ??= {});
+}
+
+/*
+ * ── The truncation markers, which are now BUTTONS ────────────────────────────
+ *
+ * The tree caps arrays at 20, objects at 30 and depth at 5, and printed "… 5 more" as inert text.
+ * That is the panel telling you it has the answer and will not show it — the exact case a user
+ * opens this panel for is the fetch that returned something unexpected at item 40. Plan §11.2:
+ * "truncation markers gain real expand actions."
+ *
+ * Raising a limit is remembered per marker rather than globally, so opening one long array does not
+ * re-render every other one at full length, and it never lowers: a step is a step.
+ */
+const MORE_STEP = 50;
+
+/** The focused tab's raised-limit record, created on first write. */
+function limitsUi(): Record<string, number> | null {
+  const ui = activeTab.value?.session.ui;
+  if (!ui) {
+    return null;
+  }
+  return (ui.dataLimits ??= {});
+}
+
+/** The cap for one marker: the default, plus whatever the reader has asked for. */
+function capFor(path: string, kind: "items" | "keys" | "depth", base: number): number {
+  return base + (limitsUi()?.[`${path}\u0000${kind}`] ?? 0);
+}
+
+/** Raise one marker's limit by a step. Exported for the tests. */
+export function raiseDataLimit(path: string, kind: "items" | "keys" | "depth"): void {
+  const limits = limitsUi();
+  if (!limits) {
+    return;
+  }
+  const key = `${path}\u0000${kind}`;
+  limits[key] = (limits[key] ?? 0) + MORE_STEP;
+}
+
+/**
+ * One truncation marker: a button that shows more of what is already in hand.
+ *
+ * It repaints through `renderOnly("leftPanel")` rather than a callback, because this renderer is
+ * called from three places and threading a repaint through all of them to reach one `<button>`
+ * would put a required callback on a pure formatter.
+ */
+function moreTemplate(
+  path: string,
+  kind: "items" | "keys" | "depth",
+  indent: string,
+  label: string,
+  after?: () => string,
+) {
+  return html`<button
+    type="button"
+    class="data-leaf data-ellipsis data-more"
+    style="padding-left:${indent}"
+    title=${after?.() ?? `Show ${MORE_STEP} more`}
+    @click=${(e: Event) => {
+      e.stopPropagation();
+      raiseDataLimit(path, kind);
+      renderOnly("leftPanel");
+    }}
+  >
+    ${label}
+  </button>`;
 }
 
 /** Unwrap a Vue ref (has .value and .__v_isRef) to get the underlying value. */
@@ -65,11 +132,12 @@ export function renderDataTreeTemplate(
   value: unknown,
   depth: number,
   maxDepth = 5,
+  path = "",
 ): TemplateResult {
   const indent = `${(depth + 1) * 12}px`;
 
-  if (depth > maxDepth) {
-    return html`<div class="data-leaf data-ellipsis" style="padding-left:${indent}">…</div>`;
+  if (depth > capFor(path, "depth", maxDepth)) {
+    return moreTemplate(path, "depth", indent, "…", () => `Show ${MORE_STEP} more levels`);
   }
 
   if (value === null || value === undefined) {
@@ -89,7 +157,7 @@ export function renderDataTreeTemplate(
   }
 
   if (Array.isArray(value)) {
-    const cap = 20;
+    const cap = capFor(path, "items", 20);
     const items: TemplateResult[] = value.slice(0, cap).map((item, i) => {
       if (item === null || item === undefined || typeof item !== "object") {
         const valText =
@@ -109,14 +177,12 @@ export function renderDataTreeTemplate(
           <span class="data-key">[${i}] </span
           ><span class="data-value data-object-label">${label}</span>
         </div>
-        ${renderDataTreeTemplate(item, depth + 1, maxDepth)}
+        ${renderDataTreeTemplate(item, depth + 1, maxDepth, `${path}/${i}`)}
       `;
     });
     return html`${items}${
       value.length > cap
-        ? html`<div class="data-leaf data-ellipsis" style="padding-left:${indent}">
-            … ${value.length - cap} more
-          </div>`
+        ? moreTemplate(path, "items", indent, `… ${value.length - cap} more`)
         : nothing
     }`;
   }
@@ -124,7 +190,7 @@ export function renderDataTreeTemplate(
   // Object
   const obj = value as Record<string, unknown>;
   const keys = Object.keys(obj);
-  const cap = 30;
+  const cap = capFor(path, "keys", 30);
   const items: TemplateResult[] = keys.slice(0, cap).map((key) => {
     const v = obj[key];
     if (v === null || v === undefined || typeof v !== "object") {
@@ -141,15 +207,11 @@ export function renderDataTreeTemplate(
         <span class="data-key">${key}: </span
         ><span class="data-value data-object-label">${label}</span>
       </div>
-      ${renderDataTreeTemplate(v, depth + 1, maxDepth)}
+      ${renderDataTreeTemplate(v, depth + 1, maxDepth, `${path}/${key}`)}
     `;
   });
   return html`${items}${
-    keys.length > cap
-      ? html`<div class="data-leaf data-ellipsis" style="padding-left:${indent}">
-          … ${keys.length - cap} more
-        </div>`
-      : nothing
+    keys.length > cap ? moreTemplate(path, "keys", indent, `… ${keys.length - cap} more`) : nothing
   }`;
 }
 
@@ -178,11 +240,12 @@ export function expandedDataRows(): string[] {
   return Object.keys(rowsUi() ?? {});
 }
 
-/** Drop every expansion on the focused tab — a fresh document, and the tests. */
+/** Drop every expansion AND every raised limit on the focused tab — a fresh document, and tests. */
 export function resetDataRowExpansion(): void {
   const ui = activeTab.value?.session.ui;
   if (ui) {
     ui.dataRows = {};
+    ui.dataLimits = {};
   }
 }
 

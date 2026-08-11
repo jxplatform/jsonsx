@@ -724,6 +724,13 @@ leftPanelMod.mount({
     // Refreshes nothing.
     const paneId = workspace.activePaneId;
     allowAutoRequestsOnNextRender(paneId);
+    // Say so BEFORE the render, and let the iframe's `dataScope` reply be what stops saying it.
+    // The button used to fire and repaint 200ms later on a timer, which reported "done" over the
+    // Old values for anything slower than that — a Refresh that visibly did nothing.
+    const tab = activeTab.value;
+    if (tab) {
+      tab.session.canvas.refreshing = true;
+    }
     renderCanvas(paneId);
   },
   renderFilesTemplate,

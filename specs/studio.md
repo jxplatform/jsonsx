@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.6-draft
+**Version:** 0.9.7-draft
 **Status:** Partial
 **Updated:** 2026-08-11
 **License:** MIT
@@ -430,10 +430,28 @@ because a panel opened before the canvas has rendered knows nothing about any en
 the whole list "pending" there would be a fact about the panel dressed up as a fact about the data.
 A 240px Navigator does not fit both summaries beside the name without eliding all three.
 
+**An entry that cannot hold a value never gets the value slot.** A function, and an expression whose
+operator is an assignment, are things the page _does_; they are absent from the resolved scope for
+that reason, and labelling them `pending` reads as "still loading" for something that will never
+load. Those rows keep their definition hint permanently.
+
 Expanding a row opens the entry's editor — name, type, prototype fields, expression or function
 body — with the resolved value rendered underneath it as a tree. Expansion is recorded per tab
 (`ui.dataRows`), and any number of rows may be open at once: comparing two entries means seeing
 both, and coming back to a tab means finding it as you left it.
+
+**Every truncation marker in the tree is a control.** The tree caps arrays at 20 entries, objects at
+30 keys and nesting at 5 levels; each cap ends in a button that raises that one marker's limit by
+50, recorded per tab alongside the expansions (`ui.dataLimits`). Inert "… 40 more" text is the panel
+saying it has the answer and will not show it, in the surface a reader opens _because_ item 40 is
+the surprising one. A limit never lowers itself, and raising one does not lengthen any other list.
+
+**Refresh reports the render it started, not a timer.** Automatic `Request` entries are suppressed
+while authoring — a full render re-resolves every entry, so editing would refetch constantly — so
+re-firing them is a verb. The button arms the fetches, marks the tab refreshing, and stays that way
+until the canvas posts the resolved scope (or fails to render). Repainting on a fixed delay instead
+reported "done" over the old values for anything slower than the delay, which is a Refresh that
+visibly did nothing.
 
 **Renaming is collision-checked, and every refusal says so.** An empty name or a name the document
 already defines leaves the document untouched and prints the reason under the field
@@ -1808,6 +1826,7 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ## Changelog
 
+- **0.9.7-draft** (2026-08-11) — Data rows: truncation markers are controls, Refresh reports the render rather than a timer, and an entry that cannot hold a value keeps its definition summary.
 - **0.9.6-draft** (2026-08-11) — The Activity Bar names the panels that ship, in their two rail groups; the Data panel is one list of definitions and the values they resolve to (§5.6), taking over the State panel's editor.
 - **0.9.5-draft** (2026-08-11) — §6.6 the value-source ladder gains a fourth rule — a position whose schema narrows which operators it admits seeds its own Formula rung, because the generic bare-?? seed is an invalid document there; an element's tagName joins the ladder, deriving to Fixed value + Formula with no template rung because TagName carries a pattern.
 - **0.9.4-draft** (2026-08-09) — §16.3 Problems leaves the Navigator rail — no Bottom-dock tab has a rail button, the count lives in the status bar and runs view.setBottomTab, and panel.focus.problems is gone with the ⌘1-8 roster that follows the rail; §16.1 restates where a Problem is surfaced.
@@ -1869,4 +1888,4 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.6-draft_
+_`@jxsuite/studio` Specification v0.9.7-draft_
