@@ -296,6 +296,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.9.14-draft** (2026-08-11) — §9.1.3 — one service decides what belongs in $elements, for all four writers of it.
 - **0.9.13-draft** (2026-08-11) — The Library has four doors including ⌘⇧E (§9.1.2), and the assistant's context budget is rendered.
 - **0.9.12-draft** (2026-08-11) — A field's uncommitted draft is keyed by node path, not by field name alone.
 - **0.9.11-draft** (2026-08-11) — Event names are a free-form combobox, and a bound provenance chip opens its source on every tab.

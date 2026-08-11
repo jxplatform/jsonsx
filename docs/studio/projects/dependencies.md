@@ -25,6 +25,8 @@ The panel follows whatever document is focused — its header says so, reading *
 
 With a document open, the **Components** section lists what it already imports. Use the **Add component…** picker to import another component from your project — it becomes available to place in that document. The × beside an entry removes the import. A document that imports nothing yet says what the section is for, and tells you if the project has no components to offer at all.
 
+Dragging a component onto the canvas imports it for you, so the picker, the checkboxes and the drag all end at the same list — importing the same component twice never adds a second entry, and two components that happen to share a file name are never mistaken for each other.
+
 If you mostly build by placing cards from the [Insert palette](/docs/studio/design/elements), you rarely open this list — it's the same wiring, made visible.
 
 ## Add an npm package

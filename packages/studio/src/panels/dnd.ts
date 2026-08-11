@@ -30,17 +30,15 @@ import { mutateInsertNode, mutateMoveNode, transact, transactDoc } from "../tabs
 import { primarySelection } from "../tabs/selection";
 import { activeTab } from "../workspace/workspace";
 import { view } from "../view";
-import {
-  buildComponentInstance,
-  componentRegistry,
-  computeRelativePath,
-} from "../files/components";
+import { buildComponentInstance, componentRegistry } from "../files/components";
+import { enableElement } from "../files/elements";
+import type { ElementsEntry } from "../files/elements";
 import { renderComponentPreview } from "./component-preview";
 import { defaultDef, unsafeTags } from "./shared";
 import { elementAtPoint } from "../utils/geometry";
 import type { JxPath } from "../state";
 import type { Tab } from "../tabs/tab";
-import type { JxMutableNode } from "@jxsuite/schema/types";
+import type { JxElement, JxMutableNode } from "@jxsuite/schema/types";
 import type { ComponentEntry } from "../files/components.js";
 
 interface DragCanDragArgs {
@@ -450,49 +448,24 @@ export function applyDropInstruction(
       }
     }
 
-    // Auto-import to $elements if the dropped block is a custom component
+    /* Auto-import to `$elements` if the dropped block is a custom component.
+       Through the ONE service (`files/elements.ts`), which is the whole point of it: this call site
+       had its own duplicate rule and matched a local component by `ref.endsWith(basename)`, so
+       dropping `./components/card.json` into a page that already imported `./vendor/card.json`
+       counted as already imported and produced an element the page could not resolve. */
     const fragment = srcData.fragment as JxMutableNode | undefined;
     const tag = fragment?.tagName;
     if (displayTagName(tag).includes("-")) {
       const comp = componentRegistry.find((c: ComponentEntry) => c.tagName === tag);
-      if (comp) {
-        const elements = tab.doc.document?.$elements || [];
-        if (comp.source === "npm") {
-          const specifier = comp.modulePath ? `${comp.package}/${comp.modulePath}` : comp.package;
-          if (!specifier) {
-            return;
-          }
-          const alreadyImported = elements.some(
-            (e: JxMutableNode | string | { $ref: string }) => e === specifier || e === comp.package,
-          );
-          if (!alreadyImported) {
-            transact(tab, (d: JxMutableNode) => {
-              if (!d.$elements) {
-                d.$elements = [];
-              }
-              d.$elements.push(specifier);
-            });
-          }
-        } else {
-          const alreadyImported = elements.some((e: JxMutableNode | string | { $ref: string }) => {
-            const ref = typeof e === "object" && e !== null ? e.$ref : undefined;
-            const compPath = comp.path;
-            return (
-              ref &&
-              compPath &&
-              (ref === `./${compPath}` || ref.endsWith(compPath.split("/").pop() as string))
-            );
-          });
-          if (!alreadyImported && comp.path) {
-            const relPath = computeRelativePath(tab?.documentPath ?? null, comp.path);
-            transact(tab, (d: JxMutableNode) => {
-              if (!d.$elements) {
-                d.$elements = [];
-              }
-              d.$elements.push({ $ref: relPath });
-            });
-          }
-        }
+      const before = (tab.doc.document?.$elements ?? []) as ElementsEntry[];
+      const after = comp ? enableElement(before, comp, tab.documentPath ?? null) : before;
+      // Only when the list actually GREW. A component the registry cannot name — an npm entry with
+      // No package, a local one with no path — returns the list unchanged, and writing that back
+      // Would put an empty `$elements: []` on a document that had none.
+      if (after.length !== before.length) {
+        transact(tab, (d: JxMutableNode) => {
+          d.$elements = after as (string | JxElement)[];
+        });
       }
     }
   }

@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.13-draft
+**Version:** 0.9.14-draft
 **Status:** Partial
 **Updated:** 2026-08-11
 **License:** MIT
@@ -1013,6 +1013,26 @@ Reached by `⌘⇧E`, by name from the palette, from the Command Bar's overflow,
 tree's context menu — four doors, because it is the content surface for a site with a collection and
 a palette search is not a door a reader finds.
 
+### 9.1.3 Importing a component
+
+A document's `$elements` — and the project's — is written through **one service**: `hasElement`
+answers whether a component is already imported, `enableElement` and `disableElement` return the new
+list, and every surface that changes it goes through them. Four surfaces did it their own way, and
+they disagreed:
+
+- A local component was matched by its FILE NAME by the canvas drop, so a page importing
+  `../shared/card.json` counted `./components/card.json` as already imported and the drop produced
+  an element the page could not resolve. Paths are compared resolved.
+- The "Add component…" picker checked nothing and appended a duplicate `$ref` per use.
+- Only the cherry-pick checkbox knew that a whole-package entry (`@acme/ui`) satisfies a subpath one
+  (`@acme/ui/card`), and only it dropped the package entry when a subpath import superseded it.
+- Uninstalling a package removed its `@acme/ui/…` entries and left `@acme/ui` behind, importing a
+  package that was gone.
+
+The functions are pure and return the list. The two levels persist differently and should: a
+document's `$elements` goes through `transact` and is undoable, the project's through
+`updateSiteConfig` and is not. What they must not differ on is which entries the list holds.
+
 ### 9.2 Server Integration
 
 All file operations go through the Platform Abstraction Layer, which maps to `@jxsuite/server` Studio API endpoints:
@@ -1892,6 +1912,7 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ## Changelog
 
+- **0.9.14-draft** (2026-08-11) — §9.1.3 — one service decides what belongs in $elements, for all four writers of it.
 - **0.9.13-draft** (2026-08-11) — The Library has four doors including ⌘⇧E (§9.1.2), and the assistant's context budget is rendered.
 - **0.9.12-draft** (2026-08-11) — A field's uncommitted draft is keyed by node path, not by field name alone.
 - **0.9.11-draft** (2026-08-11) — Event names are a free-form combobox, and a bound provenance chip opens its source on every tab.
@@ -1960,4 +1981,4 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.13-draft_
+_`@jxsuite/studio` Specification v0.9.14-draft_
