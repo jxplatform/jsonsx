@@ -57,6 +57,8 @@ Forcing a scheme while the size is **Base** points your edits at that scheme's o
 
 :::doc-note
 **Definition and selection are separate.** Settings › Contexts is the only place a context is created, renamed or deleted. The context bar's **Context** popover only _chooses_ among what is defined there, and the Style tab's Target Line only _states_ what was chosen — clicking its breakpoint segment takes you to Settings › Contexts rather than offering a third list to disagree with.
+
+Every choice in that popover is also a command, so you can make it without reaching for the mouse: press :kbd[⌘K] and run **Set Breakpoint**, **Set Color Scheme** or **Show Layout Elements**. Each one asks for the value it needs, and Set Breakpoint lists the breakpoints this page can actually render under if you name one it can't.
 :::
 
 :::doc-note
