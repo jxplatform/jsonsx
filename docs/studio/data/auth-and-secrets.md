@@ -84,7 +84,7 @@ Without the auth extension these rules simply deny — the door fails closed, ne
 
 ### Sign-in pages
 
-There are no ready-made sign-in components to drop in. You build the pages yourself, from ordinary elements plus two sources the extension adds to the **+ Add…** picker in the **[State panel](/docs/studio/logic/state)**, alongside every other **[data source](/docs/studio/logic/data-sources)**.
+There are no ready-made sign-in components to drop in. You build the pages yourself, from ordinary elements plus two sources the extension adds to the **+ Add…** picker in the **[Data panel](/docs/studio/logic/data)**, alongside every other **[data source](/docs/studio/logic/data-sources)**.
 
 **Session** — who is signed in, kept up to date as that changes. It gives you the signed-in user's **id**, their whole **user** record (email, name, and anything else the account carries), and their **role** when they have one — or nothing at all when no one is signed in. Bind a greeting to the email, and hide the "Sign in" link when a session exists.
 
@@ -131,7 +131,7 @@ The wiring is two state entries and one property on the form. The **[Events](/do
 }
 ```
 
-`Session` resolves to `{ userId, role?, user }` or `null`, so `${state.session?.userId}` and `${state.session?.role === 'admin'}` are the expressions to reach for. `AuthActions` resolves to a map of the four handlers, which is why the reference is `#/state/auth/signInEmail`. Both belong to the browser — `"timing": "client"` is what the State panel writes for them, and it keeps the build from trying to resolve a session that can't exist yet. Both also accept an optional `baseUrl`; without one they talk to the site's own `/_jx/auth`.
+`Session` resolves to `{ userId, role?, user }` or `null`, so `${state.session?.userId}` and `${state.session?.role === 'admin'}` are the expressions to reach for. `AuthActions` resolves to a map of the four handlers, which is why the reference is `#/state/auth/signInEmail`. Both belong to the browser — `"timing": "client"` is what the Data panel writes for them, and it keeps the build from trying to resolve a session that can't exist yet. Both also accept an optional `baseUrl`; without one they talk to the site's own `/_jx/auth`.
 :::
 
 ### Social sign-in

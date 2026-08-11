@@ -35,7 +35,7 @@ The sections are contributed by the `@jxsuite/connector` extension, listed in th
 2. **Define tables and push** — build each table's fields in the visual schema builder, then **Push Schema** creates the real tables. A dry-run plan always shows you what will happen first, and pushes only ever _add_ — they never drop or rewrite what exists.
 3. **Browse in the grid** — insert, edit, and delete rows in a paged spreadsheet view.
 
-Pages then use the data through the **[State panel](/docs/studio/logic/state)**: the connector provides table query and table action sources that list, filter, and write rows — they appear in the **+ Add…** picker like any other **[data source](/docs/studio/logic/data-sources)**, and a form's submit event can point straight at a table insert.
+Pages then use the data through the **[Data panel](/docs/studio/logic/data)**: the connector provides table query and table action sources that list, filter, and write rows — they appear in the **+ Add…** picker like any other **[data source](/docs/studio/logic/data-sources)**, and a form's submit event can point straight at a table insert.
 
 ## Local and deployed
 

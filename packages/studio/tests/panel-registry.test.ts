@@ -146,7 +146,7 @@ describe("panel placement matrix", () => {
 // ─── the composed set ─────────────────────────────────────────────────────────
 
 describe("the Navigator's panel set", () => {
-  test("registers nine records, in rail order — and Problems is not one of them", () => {
+  test("registers eight records, in rail order — and Problems is not one of them", () => {
     expect(navigatorPanelSet().map((p) => p.id)).toEqual([
       "files",
       "search",
@@ -156,7 +156,6 @@ describe("the Navigator's panel set", () => {
       "data",
       "packages",
       "insert",
-      "state",
     ]);
   });
 
@@ -169,7 +168,7 @@ describe("the Navigator's panel set", () => {
   test("registerNavigatorPanels is idempotent — the app mounts once, a suite mounts per case", () => {
     registerNavigatorPanels();
     registerNavigatorPanels();
-    expect(listPanels("navigator")).toHaveLength(9);
+    expect(listPanels("navigator")).toHaveLength(8);
     // …and it composes the Bottom dock's tabs in the same pass, still exactly once each. There is
     // No `diff` among them: it was a reserved id with no record behind it, so it could only ever
     // Select a hidden tab.
@@ -234,13 +233,20 @@ describe("railGroups", () => {
     expect(groups[1]?.panels.map((p) => p.id)).toEqual(["layers", "page", "data", "packages"]);
   });
 
-  test("Insert and State are off the rail but still reachable records", () => {
+  test("Insert is off the rail but still a reachable record", () => {
     registerNavigatorPanels();
     const railed = railGroups(emptyContext()).flatMap((g) => g.panels.map((p) => p.id));
     expect(railed).not.toContain("insert");
-    expect(railed).not.toContain("state");
     expect(getPanel("insert")).toBeDefined();
-    expect(getPanel("state")).toBeDefined();
+  });
+
+  test("State is not a record at all — its editor is part of Data", () => {
+    // It used to be registered `rail: false` pending plan §11.2's merge, which left the ONE way to
+    // Declare a state variable behind a palette search. Data renders that editor now, so there is
+    // No second record to find, and a stored `state` id migrates rather than 404s.
+    registerNavigatorPanels();
+    expect(getPanel("state")).toBeUndefined();
+    expect(getPanel("data")).toBeDefined();
   });
 
   test("an empty group is dropped so no divider is drawn against nothing", () => {

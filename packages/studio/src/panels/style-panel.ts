@@ -732,8 +732,8 @@ function provenanceOf(prop: string, ctx: ProvenanceCtx): FieldProvenance {
         ...(signal && ctx.signals.includes(signal)
           ? {
               onClick: () => {
-                runCommand("view.setActivity", { tab: "state" });
-                runCommand("state.selectSignal", { name: signal });
+                runCommand("view.setActivity", { tab: "data" });
+                runCommand("data.expandRow", { name: signal });
               },
             }
           : {}),

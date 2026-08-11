@@ -23,7 +23,7 @@ With a document active, the assistant edits the page the way you would, one chan
 - restyle elements property by property — the same styles you'd set in the **[style inspector](/docs/studio/design/style-inspector)**,
 - change element properties: tags, classes, attributes, component options,
 - add new elements, move them, and remove them,
-- add or update the page's state entries — the same ones the **[State panel](/docs/studio/logic/state)** shows.
+- add or update the page's state entries — the same ones the **[Data panel](/docs/studio/logic/data)** shows.
 
 These abilities follow the canvas. Project Settings and the grid editors are documents too, but they aren't element trees to restructure — with one of those in front of you the assistant can still read and answer, and the editing tools step back, exactly as **Delete** and **Duplicate** do for you in the Outline. It is one rule, not two: the assistant is held to the same condition you are.
 
@@ -60,4 +60,4 @@ A simple habit: if you'd want to press undo afterwards, open the page before you
 
 - The chat itself — composer, history, reviewing edits: **[The AI sidebar](/docs/studio/ai/chat)**
 - What the assistant can do in every state, and provider setup: **[AI assistant](/docs/studio/ai)**
-- The state entries it adds are explained in the **[State panel](/docs/studio/logic/state)**
+- The state entries it adds are explained in the **[Data panel](/docs/studio/logic/data)**

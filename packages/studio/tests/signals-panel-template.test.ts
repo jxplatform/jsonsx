@@ -92,9 +92,13 @@ async function expand(h: Mounted, name: string): Promise<HTMLElement> {
   }
   row = findRow(h.container, name);
   expect(row?.classList.contains("expanded")).toBe(true);
-  const editor = h.container.querySelector(".signal-editor");
-  if (!editor) {
-    throw new Error("no editor rendered");
+  // THIS row's editor — its next sibling. Rows stay open now (`ui.dataRows` is a set, per tab), so
+  // `querySelector(".signal-editor")` returns whichever row was expanded first, and every field
+  // Assertion after the second `expand()` would read the wrong entry's editor and still pass or
+  // Fail for the wrong reason.
+  const editor = row?.nextElementSibling;
+  if (!editor?.classList.contains("signal-editor")) {
+    throw new Error(`no editor rendered for ${name}`);
   }
   return editor as HTMLElement;
 }
@@ -365,12 +369,45 @@ describe("state signal editor", () => {
     expect(docState().$renamed).toEqual({ default: "v" } as never);
   });
 
-  test("rename to an existing name is rejected", async () => {
+  test("rename to an existing name is rejected, AND says so", async () => {
+    // The rejection used to be a silent `return`: the document kept `$a`, the field showed `$b`,
+    // And the only way to learn which had won was to look at the canvas. Plan §11.2 asks for a
+    // "collision-checked rename with a visible error" and only the check had shipped.
     const h = setup({ $a: { default: 1 }, $b: { default: 2 } });
-    const editor = await expand(h, "$a");
+    let editor = await expand(h, "$a");
     commitValue(fieldEl(editor, "Name", "sp-textfield"), "$b");
     expect(docState().$a).toEqual({ default: 1 } as never);
     expect(docState().$b).toEqual({ default: 2 } as never);
+
+    editor = await expand(h, "$a");
+    const alert = editor.querySelector('[data-prop="Name"] [role="alert"]');
+    expect(alert?.textContent?.trim()).toBe('"$b" is already defined by this document.');
+  });
+
+  test("an empty name is refused with its own message", async () => {
+    const h = setup({ $a: { default: 1 } });
+    let editor = await expand(h, "$a");
+    commitValue(fieldEl(editor, "Name", "sp-textfield"), "   ");
+    expect(docState().$a).toEqual({ default: 1 } as never);
+    editor = await expand(h, "$a");
+    expect(editor.querySelector('[data-prop="Name"] [role="alert"]')?.textContent?.trim()).toBe(
+      "A name is required.",
+    );
+  });
+
+  test("an accepted rename clears the error and keeps the row open under the new name", async () => {
+    const h = setup({ $a: { default: 1 }, $b: { default: 2 } });
+    let editor = await expand(h, "$a");
+    commitValue(fieldEl(editor, "Name", "sp-textfield"), "$b");
+    editor = await expand(h, "$a");
+    commitValue(fieldEl(editor, "Name", "sp-textfield"), "$c");
+    await flush(1);
+    expect(docState().$c).toEqual({ default: 1 } as never);
+    // The editor followed the rename rather than collapsing out from under the cursor…
+    const renamed = findRow(h.container, "$c");
+    expect(renamed?.classList.contains("expanded")).toBe(true);
+    // …and the refusal it replaced is gone.
+    expect(renamed?.nextElementSibling?.querySelector('[role="alert"]')).toBeNull();
   });
 
   test("type picker updates the def", async () => {

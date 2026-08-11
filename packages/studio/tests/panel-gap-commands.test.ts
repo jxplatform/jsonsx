@@ -41,8 +41,7 @@ const {
   registerDataExplorerCommands,
   resetDataRowExpansion,
 } = await import("../src/panels/data-explorer");
-const { registerSignalsCommands, selectedSignal, selectSignal, signalsCommands } =
-  await import("../src/panels/signals-panel");
+const { registerSignalsCommands, signalsCommands } = await import("../src/panels/signals-panel");
 const { formulaEditorCommands, registerFormulaEditorCommands } =
   await import("../src/panels/formula-workspace");
 const { registerStyleCommands, renderStylePanelTemplate, resetSelectorMenu, styleCommands } =
@@ -74,7 +73,7 @@ function allRecords(): AnyCommand[] {
   return [
     ...inspectorCommands(),
     ...dataExplorerCommands({ renderLeftPanel }),
-    ...signalsCommands({ renderLeftPanel }),
+    ...signalsCommands(),
     ...formulaEditorCommands(),
     ...styleCommands(),
   ];
@@ -84,12 +83,11 @@ beforeEach(() => {
   renderLeftPanel.mockClear();
   resetDataRowExpansion();
   resetSelectorMenu();
-  selectSignal(null);
   ctx = makeContext({ document: { open: true }, selection: { count: 1 } });
   registry = createCommandRegistry({ getContext: () => ctx });
   registerInspectorCommands(registry);
   registerDataExplorerCommands(registry, { renderLeftPanel });
-  registerSignalsCommands(registry, { renderLeftPanel });
+  registerSignalsCommands(registry);
   registerFormulaEditorCommands(registry);
   registerStyleCommands(registry);
   openDoc();
@@ -105,7 +103,6 @@ describe("the records themselves", () => {
       "inspector.setSection",
       "selection.findUsages",
       "data.expandRow",
-      "state.selectSignal",
       "formula.openWorkspace",
       "formula.editDef",
       "formula.editEvent",
@@ -196,26 +193,16 @@ describe("data.expandRow", () => {
   });
 });
 
-describe("state.selectSignal", () => {
-  test("expands the named entry's editor", () => {
-    void registry.run("state.selectSignal", { name: "toggle0" });
-    expect(selectedSignal()).toBe("toggle0");
-    expect(renderLeftPanel).toHaveBeenCalled();
-  });
-
-  test("refuses an entry the document does not define", () => {
-    expect(() => registry.run("state.selectSignal", { name: "ghost" })).toThrow(
-      '"ghost" is not a state entry this document defines — it defines: count, toggle0',
-    );
-    expect(selectedSignal()).toBeNull();
-  });
-});
+/* `state.selectSignal` is gone — `data.expandRow` above IS the row verb.
+   Two panels listing the same names had two verbs for opening one of them: one that opened exactly
+   one editor and one that opened any number of value trees. Merging the panels merged the verbs,
+   and the survivor names the state it ends in. */
 
 describe("formula.openWorkspace", () => {
-  test("defaults its target to the selected entry — the button it replaces lives in that editor", () => {
+  test("defaults its target to the one open row — the button it replaces lives in that editor", () => {
     setDockCollapsed("bottom", true);
     setBottomTab("problems");
-    void registry.run("state.selectSignal", { name: "toggle0" });
+    void registry.run("data.expandRow", { name: "toggle0" });
     void registry.run("formula.openWorkspace");
     expect(activeTab.value?.session.ui.editingFormula).toEqual({
       defName: "toggle0",
@@ -224,7 +211,7 @@ describe("formula.openWorkspace", () => {
     // It reveals the Logic dock tab, exactly as `formula.editDef` does. It used to call
     // `renderCanvas` instead: a full repaint of a surgically patched canvas, for a takeover the
     // Canvas stopped performing in P8, fired by a verb that changes nothing the canvas draws. The
-    // Dep went with it — `SignalsCommandDeps` is `renderLeftPanel` alone now.
+    // Dep went with it, and then so did the whole bag: nothing this verb does needs its host.
     expect(shell.docks.bottom.collapsed).toBe(false);
     expect(shell.bottomTab).toBe("logic");
   });
@@ -239,8 +226,19 @@ describe("formula.openWorkspace", () => {
 
   test("refuses with no target at all", () => {
     expect(() => registry.run("formula.openWorkspace")).toThrow(
-      'command "formula.openWorkspace" needs a target: pass "defName", or select a state entry ' +
-        "first with state.selectSignal",
+      'command "formula.openWorkspace" needs a target: pass "defName", or open a state entry\'s ' +
+        "row first with data.expandRow",
+    );
+  });
+
+  test("refuses an AMBIGUOUS target, naming the rows that are open", () => {
+    // Several rows open is the normal state of the merged panel, so "the selected one" has to ask
+    // Rather than pick whichever key `Object.keys` happens to enumerate first.
+    void registry.run("data.expandRow", { name: "toggle0" });
+    void registry.run("data.expandRow", { name: "count" });
+    expect(() => registry.run("formula.openWorkspace")).toThrow(
+      'command "formula.openWorkspace" needs a target: 2 Data rows are open (toggle0, count), ' +
+        'so pass "defName"',
     );
   });
 
@@ -257,10 +255,17 @@ describe("formula.openWorkspace", () => {
     );
   });
 
-  test("with no tab open the target cannot be resolved", () => {
-    selectSignal("toggle0");
+  test("with no tab open there is no open row either, so it asks for a name", () => {
+    void registry.run("data.expandRow", { name: "toggle0" });
     closeAllTabs();
-    expect(() => registry.run("formula.openWorkspace")).toThrow(
+    // The expansion lived on the tab, so closing it took the default target with it — where a
+    // Module-global would have offered `toggle0` against a document that no longer exists.
+    expect(() => registry.run("formula.openWorkspace")).toThrow('pass "defName"');
+  });
+
+  test("…and an explicit name over no document is refused by the document, not by the row", () => {
+    closeAllTabs();
+    expect(() => registry.run("formula.openWorkspace", { defName: "toggle0" })).toThrow(
       "is not a state entry this document defines",
     );
   });

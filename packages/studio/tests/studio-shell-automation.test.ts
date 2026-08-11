@@ -74,7 +74,6 @@ describe("the hook installed, over the composed registry", () => {
       "library.open",
       "project.new",
       "settings.open",
-      "state.selectSignal",
       "style.setSelector",
       "view.setActivity",
       "view.setNavigator",
@@ -159,8 +158,7 @@ describe("run() reaches the implementations", () => {
 
   test("an undeclared panel id refuses through the hook, naming the declared set", async () => {
     expect(await refusal("view.setActivity", { tab: "head" })).toContain(
-      "is not declared — declared: " +
-        "files, search, git, layers, page, data, packages, insert, state",
+      "is not declared — declared: files, search, git, layers, page, data, packages, insert",
     );
   });
 
@@ -170,9 +168,18 @@ describe("run() reaches the implementations", () => {
 });
 
 describe("the Data panel the commands drive", () => {
-  test("view.setActivity data renders the panel, and Refresh re-fires the fetches", async () => {
+  test("view.setActivity data renders the definitions, the values and Refresh", async () => {
+    activeTab.value!.doc.document.state = { count: { default: 0, type: "number" } } as never;
     await api().run("view.setActivity", { tab: "data" });
     await flush();
+    // ONE panel: the definition row, and what the canvas resolved it to. `state` and `data` were
+    // Two tabs listing the same names, and the one holding the editor had no rail button.
+    const row = document.querySelector<HTMLElement>("#left-panel .signal-row");
+    expect(row?.querySelector(".signal-name")?.textContent).toBe("count");
+    // No canvas has rendered in this fixture, so the row shows how the entry is DEFINED. It starts
+    // Showing what the entry became the moment a scope arrives — one slot, and the value wins it.
+    expect(row?.querySelector(".signal-hint")).not.toBeNull();
+    expect(row?.querySelector(".data-type")).toBeNull();
     const refresh = document.querySelector<HTMLElement>("#left-panel .data-refresh-btn");
     expect(refresh).not.toBeNull();
     // `refreshData` is the one bootstrap callback the Data panel owns: a canvas re-render that

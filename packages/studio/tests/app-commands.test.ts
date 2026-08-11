@@ -60,7 +60,6 @@ describe("the set", () => {
       "redirects",
       "selection",
       "settings",
-      "state",
       "style",
       "view",
     ]);
@@ -170,7 +169,6 @@ describe("the ids the screenshot manifest names now have records", () => {
     "project.new",
     "selection.set",
     "settings.open",
-    "state.selectSignal",
     "style.openSelectorMenu",
     "view.setActivity",
     "view.setAssistant",

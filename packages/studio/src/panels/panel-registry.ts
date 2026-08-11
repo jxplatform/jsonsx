@@ -37,7 +37,6 @@ import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { JxPath } from "../state";
 import type { Tab, TabUi } from "../tabs/tab";
 import type { nothing, TemplateResult } from "lit-html";
-import type { renderDataExplorerTemplate } from "./data-explorer";
 import type { renderGitPanel } from "./git-panel";
 import type { renderHeadTemplate } from "./head-panel";
 import type { renderImportsTemplate } from "./imports-panel";
@@ -70,7 +69,6 @@ export interface NavigatorPanelDeps {
   renderImportsTemplate: typeof renderImportsTemplate;
   renderFilesTemplate: () => TemplateResult;
   renderSignalsTemplate: typeof renderSignalsTemplate;
-  renderDataExplorerTemplate: typeof renderDataExplorerTemplate;
   renderHeadTemplate: typeof renderHeadTemplate;
   renderGitPanel: typeof renderGitPanel;
   renderCanvas: () => void;

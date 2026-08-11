@@ -49,7 +49,7 @@ Click **Add Event**. Studio creates a binding on the first free event name and p
 
 ### Three ways to respond
 
-**Existing function — call something you already declared.** A picker lists the functions declared in the **[State panel](/docs/studio/logic/state)**; pick one and the event runs it. This is the tidiest option when the same behavior is used in more than one place.
+**Existing function — call something you already declared.** A picker lists the functions declared in the **[Data panel](/docs/studio/logic/data)**; pick one and the event runs it. This is the tidiest option when the same behavior is used in more than one place.
 
 **Expression — an inline formula.** The event runs a single formula, edited right in the tab with live value badges — ideal for one-step reactions like `$count += 1` or `$menuOpen = true`. Inside a repeater template it previews against the first item, so the badges show real values. The **open below** icon moves it into the **[formula workspace](/docs/studio/logic/formula-workspace)** in the Bottom dock, where the page keeps rendering behind it.
 
@@ -86,7 +86,7 @@ On the root of a component file, three read-only sections state what a page may 
 - **CSS Properties** — the `--custom-properties` set on the component's root, which a page may override.
 - **CSS Parts** — the `part` names a page may style inside the component's shadow tree.
 
-All three are declared elsewhere — in the **[State panel](/docs/studio/logic/state)** and in the component's own styles; this tab is where you read them back.
+All three are declared elsewhere — in the **[Data panel](/docs/studio/logic/data)** and in the component's own styles; this tab is where you read them back.
 
 :::doc-note
 A binding is stored on the element itself, as an `onclick` (etc.) key in the file's JSON — a `$ref` to a function, an `$expression`, or an inline function definition. The handler model is documented in **[Reactivity](/docs/framework/concepts/reactivity)**.
@@ -94,6 +94,6 @@ A binding is stored on the element itself, as an `onclick` (etc.) key in the fil
 
 ## Next
 
-- Declare the functions your events call in the **[State panel](/docs/studio/logic/state)**
-- Watch state change as events fire, in the **[Data explorer](/docs/studio/logic/data-explorer)**
+- Declare the functions your events call in the **[Data panel](/docs/studio/logic/data)**
+- Watch state change as events fire, in the **[Data panel](/docs/studio/logic/data)**
 - Multi-step handlers read best as **[Statements](/docs/studio/logic/statements)**

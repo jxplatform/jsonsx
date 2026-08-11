@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.5-draft
+**Version:** 0.9.6-draft
 **Status:** Partial
 **Updated:** 2026-08-11
 **License:** MIT
@@ -286,18 +286,29 @@ inline actions, and prop-bound text is a single plain string.
 
 ### 5.1 Activity Bar
 
-Vertical tab strip for switching panel views:
+Vertical tab strip for switching panel views, drawn from the panel registry in two labelled
+groups. A panel's `level` decides its group, so the rail says what a panel writes to before you open
+it: **Project** panels change the project, **Document** panels change the open document.
 
-| Tab            | Icon       | Panel                   |
-| -------------- | ---------- | ----------------------- |
-| Files          | folder     | Project file tree       |
-| Layers         | layers     | Document structure tree |
-| Components     | box        | Component library       |
-| Elements       | view-grid  | HTML element palette    |
-| State          | brackets   | State definitions       |
-| Data           | data       | Data connections        |
-| Head           | web-page   | Page meta and head      |
-| Source Control | git-branch | Git source control      |
+| Group    | Tab            | Id         | Icon            | Panel                                      |
+| -------- | -------------- | ---------- | --------------- | ------------------------------------------ |
+| Project  | Files          | `files`    | `folder`        | Project file tree                          |
+| Project  | Source Control | `git`      | `git-branch`    | Git source control                         |
+| Document | Outline        | `layers`   | `layers`        | Document structure tree                    |
+| Document | Page           | `page`     | `view-all-tags` | Page meta, head entries and route params   |
+| Document | Data           | `data`     | `data`          | State definitions AND what they resolve to |
+| Document | Packages       | `packages` | `box`           | Imported components and packages           |
+
+Two more panels are registered `rail: false` — **Search** (`search`, project level) and **Insert**
+(`insert`, document level, the HTML element palette and the project's component library). They have
+records, regions and `panel.focus.<id>` commands like any other panel; what they give up is a rail
+button, because the group is a glance and a glance does not scale.
+
+**A rail-less panel is a panel you have to already know about.** That is an acceptable price for a
+surface with another door — Insert is reachable from the canvas and the palette — and not an
+acceptable one for a surface that is the only way to do something. The State panel was rail-less for
+one release and its editor was the only place a state variable or a component property could be
+declared; the answer was to merge it into Data (§5.6), not to leave it findable by search.
 
 ### 5.2 Layers Panel
 
@@ -324,6 +335,11 @@ Only applicable buttons render for each row's position in the tree. Clicking a m
 **Text Node Rows** — Bare string children appear as display-only rows with a "text" badge and truncated preview (max 40 characters). These rows do not support selection, drag, or action buttons.
 
 ### 5.3 Elements Panel
+
+**§5.3 and §5.4 are one panel — Insert (`insert`).** They were two rail tabs listing two kinds of
+thing you drag onto the canvas, and the question a user has ("what can I put here?") does not
+distinguish them. The sections stay separate because the two catalogues have different sources and
+different rules; the surface does not.
 
 HTML element palette organized by category using Spectrum accordions (`sp-accordion` with `allow-multiple`). Each element displays as a full-width card with:
 
@@ -403,6 +419,31 @@ Status is fetched on tab activation and after every git operation. A 30-second p
 All git operations are exposed as PAL methods (`gitStatus()`, `gitCommit(message)`, `gitPush()`, etc.) so the desktop platform can implement them via native RPC instead of HTTP.
 
 ---
+
+### 5.6 Data Panel
+
+One list of the open document's state entries: **how each is defined, and what it resolved to.**
+
+Each row carries the category badge, the entry name and one summary slot. The slot shows the
+definition hint until the canvas reports a scope, and what the entry resolved to once it has —
+because a panel opened before the canvas has rendered knows nothing about any entry, and labelling
+the whole list "pending" there would be a fact about the panel dressed up as a fact about the data.
+A 240px Navigator does not fit both summaries beside the name without eliding all three.
+
+Expanding a row opens the entry's editor — name, type, prototype fields, expression or function
+body — with the resolved value rendered underneath it as a tree. Expansion is recorded per tab
+(`ui.dataRows`), and any number of rows may be open at once: comparing two entries means seeing
+both, and coming back to a tab means finding it as you left it.
+
+**Renaming is collision-checked, and every refusal says so.** An empty name or a name the document
+already defines leaves the document untouched and prints the reason under the field
+(`role="alert"`); an accepted rename carries the open row with it, so the editor being typed in is
+still the one on screen when the list repaints. A silent refusal here is worse than none: the field
+shows the new name, the document keeps the old one, and only the canvas can say which won.
+
+`data.expandRow` is the row verb — `{ name }` to open, `{ name, expanded: false }` to close, and a
+refusal listing the entries the document defines when the name is not one of them. It replaced a
+second verb that opened exactly one editor, from the second panel that listed the same names.
 
 ## 6. Inspector (Right Panel)
 
@@ -1767,6 +1808,7 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ## Changelog
 
+- **0.9.6-draft** (2026-08-11) — The Activity Bar names the panels that ship, in their two rail groups; the Data panel is one list of definitions and the values they resolve to (§5.6), taking over the State panel's editor.
 - **0.9.5-draft** (2026-08-11) — §6.6 the value-source ladder gains a fourth rule — a position whose schema narrows which operators it admits seeds its own Formula rung, because the generic bare-?? seed is an invalid document there; an element's tagName joins the ladder, deriving to Fixed value + Formula with no template rung because TagName carries a pattern.
 - **0.9.4-draft** (2026-08-09) — §16.3 Problems leaves the Navigator rail — no Bottom-dock tab has a rail button, the count lives in the status bar and runs view.setBottomTab, and panel.focus.problems is gone with the ⌘1-8 roster that follows the rail; §16.1 restates where a Problem is surfaced.
 - **0.9.3-draft** (2026-08-09) — §13.5 corrects check-icons — an icon key on a record is resolved through a map, not registered as a tag, and the two spaces fail differently; the previous text asserted the opposite and licensed a fix that replaced a working hand-drawn glyph with a key nothing resolved.
@@ -1827,4 +1869,4 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.5-draft_
+_`@jxsuite/studio` Specification v0.9.6-draft_

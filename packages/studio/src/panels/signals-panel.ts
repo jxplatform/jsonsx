@@ -23,9 +23,16 @@ import { renderFieldRow } from "../ui/field-row";
 import { rawTextArea, spTextField } from "../ui/field-input";
 import { expressionHint, renderExpressionEditor } from "../ui/expression-editor";
 import { renderEmptyState } from "./empty-state";
+import {
+  dataTypeLabel,
+  expandedDataRows,
+  isDataRowExpanded,
+  renderDataTreeTemplate,
+  setDataRowExpanded,
+  unwrapSignal,
+} from "./data-explorer";
 import { openLogicTarget } from "./formula-workspace";
 import { bindableSignalNames } from "./properties-panel";
-import { registerPanel } from "./panel-registry";
 import { renderStatementEditor } from "./statement-editor";
 import { NAVIGATOR_STATEMENTS_REGION } from "../ui/regions";
 import { livePreviewExpression } from "../services/live-preview";
@@ -44,7 +51,7 @@ import type {
 } from "@jxsuite/schema/types";
 import { fetchPluginSchema, pluginSchemaCache } from "../services/code-services";
 import { getExtensions, loadExtensions } from "../format/format-host";
-import { argsSchema, optionalStringArg, stringArg, stringProperty } from "../commands/command-args";
+import { optionalStringArg, stringProperty } from "../commands/command-args";
 import type { TemplateResult } from "lit-html";
 import type { AnyCommand, CommandRegistry } from "../commands/registry";
 
@@ -53,7 +60,7 @@ interface SignalsPanelState {
   ui?: TabUi | Record<string, unknown>;
   mode?: string;
   selection?: (string | number)[][];
-  canvas?: Record<string, unknown>;
+  canvas?: Record<string, unknown> | null;
   _collapsedSignalCats?: Set<string>;
   documentPath?: string | null | undefined;
 }
@@ -69,6 +76,14 @@ interface SignalsPanelState {
  */
 interface SignalsPanelCtx {
   renderLeftPanel: () => void;
+  /**
+   * Re-fire automatic `Request` entries and repaint (the Refresh button).
+   *
+   * Edit and design suppress automatic fetches — a full render re-resolves every state entry, so
+   * authoring would refetch constantly — which is why watching a fetched value needs a verb and not
+   * just a repaint.
+   */
+  refreshData?: () => void;
 }
 
 export interface SignalDef {
@@ -103,8 +118,14 @@ export interface SignalDef {
 
 // ─── Module-local state ─────────────────────────────────────────────────────
 
-/** Expanded signal editor state (persists across renders). */
-let expandedSignal: string | null = null;
+/**
+ * The rename that was refused, and why — cleared by the next accepted one.
+ *
+ * A collision used to be a silent no-op: the field kept the typed name, the document kept the old
+ * one, and nothing said which had won. Plan §11.2 asks for "collision-checked rename with a visible
+ * error", and half of that had shipped.
+ */
+let renameError: { name: string; message: string } | null = null;
 
 /** Track which functions have the advanced param editor open. */
 const advancedParamOpen = new Set();
@@ -381,12 +402,23 @@ export function resolveDefaultForCanvas(
 
 // ─── Simple field row ────────────────────────────────────────────────────────
 
-/** Simple field row for signal editors — vertical stacked layout. */
-export function signalFieldRow(label: string, value: string, onChange: (value: string) => void) {
+/**
+ * Simple field row for signal editors — vertical stacked layout.
+ *
+ * `error` paints the row invalid and prints the message in a `role="alert"` line, which is how a
+ * refused rename says so instead of silently keeping the old name.
+ */
+export function signalFieldRow(
+  label: string,
+  value: string,
+  onChange: (value: string) => void,
+  error?: string | undefined,
+) {
   return renderFieldRow({
     prop: label,
     label,
     hasValue: false,
+    ...(error === undefined ? {} : { error }),
     // CommitMode "blur": signal fields (rename, src, etc.) commit on blur/Enter only — a debounced
     // Mid-typing commit would, e.g., rename the signal on every keystroke pause.
     widget: spTextField(
@@ -439,7 +471,7 @@ function addTemplateDef(type: string, S: SignalsPanelState, ctx: SignalsPanelCtx
   transactDoc(activeTab.value, (t) =>
     mutateAddDef(t, n, structuredClone(template) as Record<string, JsonValue>),
   );
-  selectSignal(n);
+  setDataRowExpanded(n, true);
   ctx.renderLeftPanel();
 }
 
@@ -447,9 +479,40 @@ function addTemplateDef(type: string, S: SignalsPanelState, ctx: SignalsPanelCtx
  * @param {SignalsPanelState} S
  * @param {SignalsPanelCtx} ctx
  */
+/**
+ * ONE summary slot per row, and the resolved value wins it as soon as there is one.
+ *
+ * The row wants to say four things about an entry — its category, its name, how it is defined and
+ * what it became — and a 240px Navigator fits three. Eliding both summaries to make room produced
+ * "recentproje… C… Array(3)": two truncated descriptions and a truncated identity. So the
+ * definition hint holds the slot until the canvas resolves a value and then steps aside for it, and
+ * the full definition is one click down in fields — which is what the hint was abbreviating.
+ *
+ * The switch is whether the canvas has reported a scope AT ALL, not whether this entry appears in
+ * it. An entry the canvas ran and did not produce is "pending", which is a fact about the value; a
+ * panel opened before the canvas has rendered knows nothing about any of them, and guessing
+ * "pending" for the whole list there would be a fact about the panel dressed up as one about data.
+ */
+function summary(name: string, def: SignalDef, live: unknown, resolved: boolean) {
+  if (!resolved) {
+    const hint = defHint(name, def);
+    return html`<span class="signal-hint" title=${hint}>${hint}</span>`;
+  }
+  return html`<span
+    class=${classMap({ "data-pending": unwrapSignal(live) === null, "data-type": true })}
+    title="What this resolved to on the canvas"
+    >${dataTypeLabel(live)}</span
+  >`;
+}
+
 export function renderSignalsTemplate(S: SignalsPanelState, ctx: SignalsPanelCtx) {
   const defs = S.document.state || {};
   const entries = Object.entries(defs);
+  // What the canvas actually resolved these to. `S.canvas` is the session's canvas record, so this
+  // Costs a property read — the panel already had the scope in hand and rendered it in a second
+  // Panel anyway.
+  const liveScope = (S.canvas?.scope ?? null) as Record<string, unknown> | null;
+  const scope = liveScope ?? {};
 
   // Warm the extensions payload so manifest state classes appear in the add picker (the panel
   // Re-renders constantly; loadExtensions memoizes, so this is a one-time fetch per project).
@@ -494,18 +557,19 @@ export function renderSignalsTemplate(S: SignalsPanelState, ctx: SignalsPanelCtx
           }}
         >
           ${items.map(([name, def]) => {
-            const isExpanded: boolean = expandedSignal === name;
+            const isExpanded: boolean = isDataRowExpanded(name);
+            const live = scope[name];
             return html`
               <div
                 class=${classMap({ expanded: isExpanded, "signal-row": true })}
                 @click=${() => {
-                  selectSignal(isExpanded ? null : name);
+                  setDataRowExpanded(name, !isExpanded);
                   ctx.renderLeftPanel();
                 }}
               >
                 <span class="signal-badge ${defCategory(def)}">${defBadgeLabel(def)}</span>
                 <span class="signal-name">${name}</span>
-                <span class="signal-hint">${defHint(name, def)}</span>
+                ${summary(name, def, live, liveScope !== null)}
                 <sp-action-button
                   quiet
                   size="xs"
@@ -522,6 +586,12 @@ export function renderSignalsTemplate(S: SignalsPanelState, ctx: SignalsPanelCtx
                 isExpanded
                   ? html`<div class="signal-editor">
                       ${renderSignalEditorTemplate(S, name, def, ctx)}
+                      <div class="signal-live">
+                        <span class="signal-live-label">Resolved to</span>
+                        <div class="data-tree">
+                          ${renderDataTreeTemplate(unwrapSignal(live), 0)}
+                        </div>
+                      </div>
                     </div>`
                   : nothing
               }
@@ -533,6 +603,24 @@ export function renderSignalsTemplate(S: SignalsPanelState, ctx: SignalsPanelCtx
 
   return html`
     <div class="signals-panel">
+      ${
+        ctx.refreshData && entries.length > 0
+          ? html`<div class="data-explorer-toolbar">
+              <sp-action-button
+                quiet
+                size="s"
+                class="data-refresh-btn"
+                @click=${() => {
+                  ctx.refreshData?.();
+                  setTimeout(() => ctx.renderLeftPanel(), 200);
+                }}
+              >
+                <sp-icon-refresh slot="icon"></sp-icon-refresh>
+                Refresh
+              </sp-action-button>
+            </div>`
+          : nothing
+      }
       <sp-accordion allow-multiple size="s"> ${catTemplates} </sp-accordion>
       ${
         entries.length === 0
@@ -573,7 +661,7 @@ export function renderSignalsTemplate(S: SignalsPanelState, ctx: SignalsPanelCtx
                   ...cls?.stateDefaults,
                 } as Record<string, JsonValue>),
               );
-              selectSignal(n);
+              setDataRowExpanded(n, true);
               ctx.renderLeftPanel();
               return;
             }
@@ -598,7 +686,7 @@ export function renderSignalsTemplate(S: SignalsPanelState, ctx: SignalsPanelCtx
                   },
                 ),
               );
-              selectSignal(n);
+              setDataRowExpanded(n, true);
               if (src) {
                 void fetchPluginSchema(
                   { $prototype: protoName, $src: src },
@@ -705,13 +793,39 @@ function renderSignalEditorTemplate(
       }),
     });
 
-  // Name field (common to all)
-  const nameField = signalFieldRow("Name", name, (v: string) => {
-    if (v && v !== name && !(S.document.state && S.document.state[v])) {
-      selectSignal(v);
-      transactDoc(activeTab.value, (t) => mutateRenameDef(t, name, v));
-    }
-  });
+  /*
+   * Name field (common to all).
+   *
+   * Every refusal SAYS SO. A collision silently kept the old name while the field showed the new
+   * one, so the panel and the document disagreed and only the canvas could tell you which had won —
+   * and an empty name did the same. The expansion follows the rename so the editor you are typing
+   * in is still the one on screen afterwards.
+   */
+  const nameField = signalFieldRow(
+    "Name",
+    name,
+    (v: string) => {
+      const next = v.trim();
+      if (next === name) {
+        renameError = null;
+        return;
+      }
+      if (!next) {
+        renameError = { message: "A name is required.", name };
+      } else if (S.document.state?.[next]) {
+        renameError = { message: `"${next}" is already defined by this document.`, name };
+      } else {
+        renameError = null;
+        // The expansion follows the rename, so the editor you are typing in is still the one on
+        // Screen when the row list repaints under the new name.
+        setDataRowExpanded(name, false);
+        setDataRowExpanded(next, true);
+        transactDoc(activeTab.value, (t) => mutateRenameDef(t, name, next));
+      }
+      ctx.renderLeftPanel();
+    },
+    renameError?.name === name ? renameError.message : undefined,
+  );
 
   let fields: TemplateResult | typeof nothing = nothing;
 
@@ -1544,44 +1658,33 @@ export function renderExternalPrototypeEditorTemplate(
 
 // ─── Commands ─────────────────────────────────────────────────────────────────
 
-/** Which signal's editor is expanded, or `null`. Exported for the command's idempotence and tests. */
-export function selectedSignal(): string | null {
-  return expandedSignal;
-}
-
-/**
- * Expand one signal's editor (or collapse all with `null`).
- *
- * One writer for a field seven call sites used to assign directly, which is what makes
- * `state.selectSignal` and the row's own click the same action rather than two that agree by
- * coincidence.
- */
-export function selectSignal(name: string | null): void {
-  expandedSignal = name;
-}
+/* THE ROW VERB IS `data.expandRow` — one gesture, one command.
+   `state.selectSignal` opened exactly one editor and `data.expandRow` opened any number of value
+   trees, on the same rows, from two panels. Merging the panels merged the verbs, and the survivor
+   is the one that names the state it ends in (`{expanded: false}` collapses, running it twice
+   photographs the same picture) rather than the one whose only argument was a new selection. */
 
 /** The state entries the open document defines. */
 function definedSignalNames(): string[] {
   return Object.keys(activeTab.value?.doc.document?.state ?? {});
 }
 
-/** What the State panel's verbs need that this module does not own. */
-export interface SignalsCommandDeps {
-  /** Repaint the Navigator — `left-panel.ts`'s `render`. */
-  renderLeftPanel: () => void;
-}
+/* THE VERB NEEDS NOTHING FROM ITS HOST ANY MORE.
+   `SignalsCommandDeps` carried `renderLeftPanel` for `state.selectSignal`, which is gone; the one
+   verb left reveals its own surface through `openLogicTarget`. A dep with no reader is an
+   invitation to write the wrong thing through it, which is why the parameter went with it. */
 
 /**
- * The State panel's verbs — select a signal, and open its formula in the Bottom dock.
+ * Open a state entry's formula in the Bottom dock.
  *
- * Both used to be XPath presses matching the row's RENDERED NAME, which plan §13's R1 forbids
+ * It used to be an XPath press matching the row's RENDERED NAME, which plan §13's R1 forbids
  * outright: a panel that starts eliding long names, or grouping differently, breaks a shot by
  * improving the app. The document defines these names, so the document is what validates them.
  *
- * `formula.openWorkspace` defaults its target to the selected signal — the button it replaces is
- * rendered inside that signal's own editor, so "the one that is open" is what a reader means. It
- * REFUSES a signal with no `$expression`: the workspace edits an expression tree, and opening it
- * over a plain state entry used to paint an empty canvas takeover.
+ * It defaults its target to the one open Data row — the button it replaces is rendered inside that
+ * entry's own editor, so "the one that is open" is what a reader means, and with several open it
+ * asks rather than guesses. It REFUSES a signal with no `$expression`: the workspace edits an
+ * expression tree, and opening it over a plain state entry used to paint an empty canvas takeover.
  *
  * It goes through `openLogicTarget` rather than the canvas repaint it used to fire, for the same
  * reason the panel BUTTONS do. A command is the palette's and the automation's door:
@@ -1589,10 +1692,9 @@ export interface SignalsCommandDeps {
  * a verb that merely arms a dock the user has collapsed would report success while showing nothing.
  * The reveal is idempotent.
  *
- * @param {SignalsCommandDeps} deps
  * @returns {AnyCommand[]}
  */
-export function signalsCommands(deps: SignalsCommandDeps): AnyCommand[] {
+export function signalsCommands(): AnyCommand[] {
   /** The named entry, or a refusal listing what the document does define. */
   function requireDef(commandId: string, name: string): SignalDef {
     const defs = (activeTab.value?.doc.document?.state ?? {}) as Record<string, SignalDef>;
@@ -1608,25 +1710,6 @@ export function signalsCommands(deps: SignalsCommandDeps): AnyCommand[] {
   }
 
   return [
-    {
-      args: argsSchema({
-        name: stringProperty("The state entry's name, as the document defines it."),
-      }),
-      category: "Document",
-      id: "state.selectSignal",
-      level: "document",
-      menus: ["palette"],
-      group: "5_data",
-      requires: "an open document that defines state",
-      when: (ctx) => ctx.document.open,
-      run: (_commandCtx, args) => {
-        const name = stringArg("state.selectSignal", args, "name");
-        requireDef("state.selectSignal", name);
-        selectSignal(name);
-        deps.renderLeftPanel();
-      },
-      title: "Select State Entry",
-    },
     {
       args: {
         additionalProperties: false,
@@ -1647,11 +1730,18 @@ export function signalsCommands(deps: SignalsCommandDeps): AnyCommand[] {
       when: (ctx) => ctx.document.open,
       run: (_commandCtx, args) => {
         const named = optionalStringArg("formula.openWorkspace", args, "defName");
-        const defName = named ?? expandedSignal;
+        // With no argument the target is the one open row — and only if there is exactly one.
+        // Multiple rows open is now the normal state of this panel, so "the selected one" has to
+        // Refuse an ambiguous answer rather than pick the first key it happens to enumerate.
+        const open = expandedDataRows();
+        const defName = named ?? (open.length === 1 ? open[0]! : null);
         if (defName === null) {
           throw new RangeError(
-            `command "formula.openWorkspace" needs a target: pass "defName", or select a state ` +
-              `entry first with state.selectSignal`,
+            open.length > 1
+              ? `command "formula.openWorkspace" needs a target: ${open.length} Data rows are ` +
+                  `open (${open.join(", ")}), so pass "defName"`
+              : `command "formula.openWorkspace" needs a target: pass "defName", or open a state ` +
+                  `entry's row first with data.expandRow`,
           );
         }
         const def = requireDef("formula.openWorkspace", defName);
@@ -1674,32 +1764,15 @@ export function signalsCommands(deps: SignalsCommandDeps): AnyCommand[] {
  * Register the State panel's verbs.
  *
  * @param {CommandRegistry} registry
- * @param {SignalsCommandDeps} deps
  */
-export function registerSignalsCommands(registry: CommandRegistry, deps: SignalsCommandDeps): void {
-  registry.registerAll(signalsCommands(deps));
+export function registerSignalsCommands(registry: CommandRegistry): void {
+  registry.registerAll(signalsCommands());
 }
 
-/**
- * Contribute the State panel — **off the rail** (`rail: false`).
- *
- * `level: "document"`: it writes the open document's `state` block. §3.2's DOCUMENT group is
- * Outline · Page · Data · Packages, and §11.2 folds this panel's editing into Data ("definitions +
- * live values in one row"). That merge is not this change, so the record keeps its id, its region
- * and its command reachability and gives up the rail button rather than pushing the group to five.
- */
-export function registerStatePanel(): void {
-  registerPanel({
-    id: "state",
-    title: "State",
-    level: "document",
-    dock: "navigator",
-    icon: "sp-icon-brackets",
-    rail: false,
-    requiresDocument: "Open a page to give it data — values it can read, compute or fetch.",
-    render: (ctx) =>
-      ctx.deps.renderSignalsTemplate(ctx.doc as SignalsPanelState, {
-        renderLeftPanel: ctx.rerender,
-      }),
-  });
-}
+/* THE STATE PANEL IS GONE, AND ITS EDITOR IS IN DATA — `panels/data-explorer.ts`.
+   It was registered here `rail: false`, waiting for plan §11.2's merge into Data, and the merge did
+   not follow: the button was removed and the editor was left reachable only by typing "State" into
+   the palette. Declaring a state variable — or a component property, which is a state entry with a
+   default — is not an advanced move to hide behind a search box, so `renderSignalsTemplate` is now
+   rendered by the Data panel and there is no second record. A stored `leftTab: "state"` migrates to
+   `data` in `shell.ts`. */

@@ -114,12 +114,12 @@ You should see one plausible-looking post card on the canvas. Style it as much o
 
 The page needs the posts as data it can render:
 
-1. Press :kbd[⌘K], run **Show State**, then click the **+ Add…** picker.
+1. Press :kbd[⌘7] for the **Data** panel, then click the **+ Add…** picker.
 2. Pick **ContentCollection** — it's listed with the sources your project's imports and extensions provide.
 3. Rename the new entry to `posts` (type the name and press :kbd[Enter]).
 4. Set **contentType** to `posts`, and add a **sort** rule on the `date` field with order `desc`, so the newest post lists first.
 
-![The State panel editing a ContentCollection entry with contentType posts and a date sort rule](../images/blog-collection-state.png)
+![The Data panel editing a ContentCollection entry with contentType posts and a date sort rule](../images/blog-collection-state.png)
 
 Open the **Data** panel (:kbd[⌘7]) and you should see `posts` worth `Array(3)` — your three entries, live. Filters, limits, and the other sources are covered in **[Data sources](/docs/studio/logic/data-sources)**.
 

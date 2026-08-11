@@ -144,7 +144,7 @@ import { autoSyncProjectOnOpen } from "./packages/pull-package-sync";
 import { html, render as litRender } from "lit-html";
 
 import webdata from "../data/webdata.json";
-import { registerDataExplorerCommands, renderDataExplorerTemplate } from "./panels/data-explorer";
+import { registerDataExplorerCommands } from "./panels/data-explorer";
 import {
   cleanupGitPanel,
   cloneRepository,
@@ -726,7 +726,6 @@ leftPanelMod.mount({
     allowAutoRequestsOnNextRender(paneId);
     renderCanvas(paneId);
   },
-  renderDataExplorerTemplate,
   renderFilesTemplate,
   renderGitPanel,
   renderHeadTemplate,
@@ -1262,7 +1261,7 @@ registerCanvasViewCommands(commandRegistry, { getCanvasMode, setCanvasMode });
 registerSelectionSetCommand(commandRegistry);
 registerInspectorCommands(commandRegistry);
 registerDataExplorerCommands(commandRegistry, { renderLeftPanel });
-registerSignalsCommands(commandRegistry, { renderLeftPanel });
+registerSignalsCommands(commandRegistry);
 registerFormulaEditorCommands(commandRegistry);
 registerGridCommands(commandRegistry);
 registerSettingsCommands(commandRegistry);

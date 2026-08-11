@@ -55,14 +55,14 @@ You should now see a button labeled **Add one** with an empty paragraph after it
 
 The component needs somewhere to keep its number. That's a state entry:
 
-1. Press :kbd[⌘K] and run **Show State**.
+1. Press :kbd[⌘7] for the **Data** panel.
 2. Click the **+ Add…** picker at the bottom of the panel and choose **Value**. The new entry appears with a placeholder name and its editor open.
 3. Rename it first: type `count` into the **Name** field and press :kbd[Enter].
 4. Set **Type** to `integer`, then type `0` into **Default**. A new entry starts with an empty default, and an empty string is not something you can add one to.
 
-![Jx Studio State panel listing a component's state and functions](../images/state-panel.png)
+![Jx Studio Data panel listing a component's state and functions](../images/state-panel.png)
 
-The panel now shows a **State** section with one row: an **S** badge and the name `count`. Everything the panel can hold — computed values, data sources, functions — is covered in **[State panel](/docs/studio/logic/state)**.
+The panel now shows a **State** section with one row: an **S** badge and the name `count`. Everything the panel can hold — computed values, data sources, functions — is covered in **[Data panel](/docs/studio/logic/data)**.
 
 ## 6. Bind the text to the count
 
@@ -96,13 +96,13 @@ Pick **Preview** in the **View** control on the context bar. The paragraph now s
 
 You should see the number climb with every click. That's the whole reactive loop: the event writes to `count`, and everything bound to `count` updates by itself.
 
-## 9. Watch the value in the Data explorer
+## 9. Watch the value resolve
 
-Click **Data** in the **Document** group of the Navigator rail, or press :kbd[⌘7]. It lists the same entries as the State panel, but with what each one is worth _right now_ — your `count` row shows the current number. Stay in Preview, click **Add one**, and watch the row change; **Refresh** re-renders the canvas and reads the values again.
+Click **Data** in the **Document** group of the Navigator rail, or press :kbd[⌘7]. It lists the same entries as the Data panel, but with what each one is worth _right now_ — your `count` row shows the current number. Stay in Preview, click **Add one**, and watch the row change; **Refresh** re-renders the canvas and reads the values again.
 
 ![The Data panel with the count entry showing its live value](../images/counter-data-explorer.png)
 
-When a page ever looks wrong, this panel is where you find out what it actually sees — see **[Data explorer](/docs/studio/logic/data-explorer)**.
+When a page ever looks wrong, this panel is where you find out what it actually sees — see **[the Data panel](/docs/studio/logic/data)**.
 
 ## 10. Try a test value
 
@@ -129,7 +129,7 @@ A working, reusable component — and every piece of the interactive toolkit in 
 - A **state entry** (`count`) — the component's memory, and automatically its prop.
 - A **template binding** (`${state.count}`) — text that follows the value wherever it goes.
 - An **event expression** (`count += 1`, assembled from an operator and two operands) — behavior without a line of code.
-- **Preview**, the **Data explorer**, and **test values** — three ways to watch it run.
+- **Preview**, the **Data** panel's resolved values, and **test values** — three ways to watch it run.
 
 :::doc-note
 Everything landed in one plain file, `components/counter-card.json`: the entry in its `state` object, the paragraph's text as a `${}` template, and the button's `onclick` as an `$expression`. The formats are documented in **[State](/docs/framework/concepts/state)** and **[Reactivity](/docs/framework/concepts/reactivity)**.

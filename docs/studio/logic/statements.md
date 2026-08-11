@@ -15,7 +15,7 @@ Statements are function bodies built as a vertical list of visual steps instead 
 
 Anywhere a function body appears, a **Statements** / **Code** toggle picks the representation:
 
-- A **Function** entry's **Body** in the **[State panel](/docs/studio/logic/state)**.
+- A **Function** entry's **Body** in the **[Data panel](/docs/studio/logic/data)**.
 - An **Inline code** event handler in the Inspector's **[Logic tab](/docs/studio/logic/events)** (:kbd[⌘⇧3]).
 
 **Statements** is the structured editor described here; **Code** is a JavaScript text body — see **[Code editing](/docs/studio/logic/code)**.
@@ -56,7 +56,7 @@ A **Switch** card matches one value against several cases:
 
 ## Dispatch an event
 
-A **Dispatch event** card sends a custom event from a component — the counterpart of the **Emits** list on a function in the State panel:
+A **Dispatch event** card sends a custom event from a component — the counterpart of the **Emits** list on a function in the Data panel:
 
 - **Event** — the event's name. In a component whose functions declare emitted events, this is a combo box offering the declared names.
 - **Detail** — the data to send along, as an operand (a state value, a literal, or a formula).

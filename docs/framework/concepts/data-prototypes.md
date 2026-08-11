@@ -8,7 +8,7 @@ spec:
 
 # Data prototypes
 
-> **Studio writes this format for you.** The source editors in the State panel ([Data sources](/docs/studio/logic/data-sources)) generate these entries field by field — this page documents the underlying model.
+> **Studio writes this format for you.** The source editors in the Data panel ([Data sources](/docs/studio/logic/data-sources)) generate these entries field by field — this page documents the underlying model.
 
 A `$prototype` entry declares where a state value comes from instead of what it is. The prototype names a class — a built-in Web-API wrapper, a content loader, or your own — and the entry's remaining keys are its configuration. The resolved value is reactive: when the source changes, everything bound to it updates.
 
@@ -126,4 +126,4 @@ The scope builder injects any import-mapped `$src`, constructs the class with th
 - [Lists](/docs/framework/concepts/lists) — iterating over a source's resolved array
 - [Reactivity](/docs/framework/concepts/reactivity) — how resolved values propagate
 - [Data sources in Studio](/docs/studio/logic/data-sources) — every field, source by source
-- [Data explorer in Studio](/docs/studio/logic/data-explorer) — inspecting resolved values live
+- [The Data panel in Studio](/docs/studio/logic/data) — inspecting resolved values live

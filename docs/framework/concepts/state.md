@@ -7,7 +7,7 @@ spec:
 
 # State
 
-> **Studio writes this format for you.** Every entry you create in the [State panel](/docs/studio/logic/state) — values, computed entries, data sources, functions — is saved as one of the shapes on this page.
+> **Studio writes this format for you.** Every entry you create in the [Data panel](/docs/studio/logic/data) — values, computed entries, data sources, functions — is saved as one of the shapes on this page.
 
 `state` is the root-level object holding everything a document knows at runtime: mutable values, derived values, functions, and data sources. Every entry is reactive by default — change a value and everything bound to it updates. The **shape** of each entry determines what it is; no extra flags are needed in the common case.
 
@@ -19,7 +19,7 @@ spec:
 }
 ```
 
-![Jx Studio State panel listing a component's state and functions](../../images/state-panel.png)
+![Jx Studio Data panel listing a component's state and functions](../../images/state-panel.png)
 
 ## Shape 1 — naked values
 
@@ -141,4 +141,4 @@ At load time the runtime walks `state` once, classifying each entry by inspectio
 - [Expressions](/docs/framework/concepts/expressions) — the declarative Shape 5
 - [Functions](/docs/framework/concepts/functions) — Function entries, sidecars, and statements
 - [Data prototypes](/docs/framework/concepts/data-prototypes) — Request, LocalStorage, collections
-- [State panel](/docs/studio/logic/state) — the Studio surface that writes these entries
+- [Data panel](/docs/studio/logic/data) — the Studio surface that writes these entries

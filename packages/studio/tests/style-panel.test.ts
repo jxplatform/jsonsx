@@ -558,7 +558,10 @@ describe("provenance chips", () => {
     expect(bound.classList.contains("provenance-chip--bound")).toBe(true);
     expect(bound.textContent).toContain("brand");
     click(bound);
-    expect(runMock).toHaveBeenCalledWith("state.selectSignal", { name: "brand" });
+    // The Data panel, and the row for that entry — both verbs, because the chip's promise is "show
+    // Me where this comes from" and the rail tab alone leaves you looking at a collapsed list.
+    expect(runMock).toHaveBeenCalledWith("view.setActivity", { tab: "data" });
+    expect(runMock).toHaveBeenCalledWith("data.expandRow", { name: "brand" });
   });
 
   test("an unset property carries no chip at all — absence is the ghost", async () => {

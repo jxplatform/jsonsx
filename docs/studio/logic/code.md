@@ -29,7 +29,7 @@ What you get:
 
 - **Formatting on open** — the body is pretty-printed before you start.
 - **Live linting** — problems are underlined as you type, with the message on hover.
-- **Completions** — type `state.` to see every entry from the **[State panel](/docs/studio/logic/state)** (your values, data sources, and functions), and `window.` for the standard library (`Math`, `JSON`, …). Named formulas carry their descriptions into the suggestions.
+- **Completions** — type `state.` to see every entry from the **[Data panel](/docs/studio/logic/data)** (your values, data sources, and functions), and `window.` for the standard library (`Math`, `JSON`, …). Named formulas carry their descriptions into the suggestions.
 - **Automatic write-back** — edits flow into the document as you type; there is no separate apply step. Save the file as usual when you're done.
 - **Your last keystrokes are never the ones that get lost.** Write-back is batched, so at any instant the editor can be a moment ahead of the document — and every way out of it settles that first. Switching to Problems, collapsing the dock, moving to another document, opening a different formula, closing the editor: each one lands what you typed. Closing the tab or quitting counts that text as unsaved and asks you about it, even when nothing else in the document has changed.
 
@@ -39,7 +39,7 @@ Inside a body, `state` holds your entries (`state.$count += 1` is the code twin 
 
 ## Sidecar files
 
-A function body normally lives inside the component's JSON. When one grows large enough to deserve its own file, it can live in a separate `.js` file instead: the function entry then shows **Source** (the file's path) and **Export** (which function to use from it) in the State panel, in place of a body. The format is documented in **[Components](/docs/framework/concepts/components)**.
+A function body normally lives inside the component's JSON. When one grows large enough to deserve its own file, it can live in a separate `.js` file instead: the function entry then shows **Source** (the file's path) and **Export** (which function to use from it) in the Data panel, in place of a body. The format is documented in **[Components](/docs/framework/concepts/components)**.
 
 ## Code mode: the whole file as source
 

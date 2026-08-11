@@ -166,7 +166,7 @@
       "steps": [
         {
           "args": {
-            "tab": "state"
+            "tab": "data"
           },
           "cmd": "view.setActivity"
         },
@@ -255,7 +255,7 @@
       "steps": [
         {
           "args": {
-            "tab": "state"
+            "tab": "data"
           },
           "cmd": "view.setActivity"
         }
@@ -572,7 +572,7 @@
     },
     {
       "name": "data-explorer-shot",
-      "docs": ["studio/logic/data-explorer"],
+      "docs": ["studio/logic/data"],
       "open": {
         "project": "packages/starters/sites/real-estate",
         "file": "components/re-listings-filter.json",
@@ -584,6 +584,12 @@
             "tab": "data"
           },
           "cmd": "view.setActivity"
+        },
+        {
+          "args": {
+            "name": "listings"
+          },
+          "cmd": "data.expandRow"
         }
       ],
       "expect": [
@@ -864,7 +870,7 @@
       "steps": [
         {
           "args": {
-            "tab": "state"
+            "tab": "data"
           },
           "cmd": "view.setActivity"
         },
@@ -878,7 +884,7 @@
           "args": {
             "name": "toggle0"
           },
-          "cmd": "state.selectSignal"
+          "cmd": "data.expandRow"
         },
         {
           "cmd": "formula.openWorkspace"
@@ -905,7 +911,7 @@
       "steps": [
         {
           "args": {
-            "tab": "state"
+            "tab": "data"
           },
           "cmd": "view.setActivity"
         },
@@ -913,7 +919,7 @@
           "args": {
             "name": "submitRsvp"
           },
-          "cmd": "state.selectSignal"
+          "cmd": "data.expandRow"
         }
       ],
       "expect": [
@@ -1311,7 +1317,7 @@
       "steps": [
         {
           "args": {
-            "tab": "state"
+            "tab": "data"
           },
           "cmd": "view.setActivity"
         },
@@ -1625,7 +1631,7 @@
       "steps": [
         {
           "args": {
-            "tab": "state"
+            "tab": "data"
           },
           "cmd": "view.setActivity"
         },
@@ -1633,12 +1639,12 @@
           "args": {
             "name": "posts"
           },
-          "cmd": "state.selectSignal"
+          "cmd": "data.expandRow"
         }
       ],
       "expect": [
         {
-          "region": "navigator/panel:state"
+          "region": "navigator/panel:data"
         }
       ],
       "capture": [
@@ -1725,7 +1731,7 @@
       "steps": [
         {
           "args": {
-            "tab": "state"
+            "tab": "data"
           },
           "cmd": "view.setActivity"
         },
@@ -2147,7 +2153,7 @@
       "steps": [
         {
           "args": {
-            "tab": "state"
+            "tab": "data"
           },
           "cmd": "view.setActivity"
         },
@@ -2155,7 +2161,7 @@
           "args": {
             "name": "allPosts"
           },
-          "cmd": "state.selectSignal"
+          "cmd": "data.expandRow"
         }
       ],
       "capture": [

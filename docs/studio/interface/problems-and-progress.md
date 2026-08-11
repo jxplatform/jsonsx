@@ -67,7 +67,7 @@ Its tab strip is **Problems** and **Activity**, with **Logic** between them when
 
 ## Logic
 
-**Logic** holds the two editors that compute values: the **[formula workspace](/docs/studio/logic/formula-workspace)** for a structured `$expression`, and the **[function editor](/docs/studio/logic/code)** for a JavaScript body. Open either one — from the State panel, or from an event binding in the Inspector's Logic tab — and the dock reveals itself on this tab.
+**Logic** holds the two editors that compute values: the **[formula workspace](/docs/studio/logic/formula-workspace)** for a structured `$expression`, and the **[function editor](/docs/studio/logic/code)** for a JavaScript body. Open either one — from the Data panel, or from an event binding in the Inspector's Logic tab — and the dock reveals itself on this tab.
 
 Being a dock tab rather than a full-screen surface is the whole point: **the page stays on the stage while you author its logic**, so the value you are computing and the element that shows it are on screen together. The rest follows from that:
 

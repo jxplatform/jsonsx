@@ -93,7 +93,6 @@ export const NAVIGATOR_PANEL_IDS = [
   "data",
   "packages",
   "insert",
-  "state",
 ] as const;
 
 export type NavigatorPanelId = (typeof NAVIGATOR_PANEL_IDS)[number];
@@ -110,6 +109,11 @@ const RENAMED_PANEL_IDS: Readonly<Record<string, NavigatorPanelId>> = {
   blocks: "insert",
   head: "page",
   imports: "packages",
+  /* Not a rename — a MERGE. The State editor is part of the Data panel now (plan §11.2), so a
+     stored `leftTab: "state"` names a real place and lands on it, rather than returning `null` and
+     booting into the default the way `problems` does. Defining a value and watching it resolve are
+     one task; they were two panels. */
+  state: "data",
 };
 
 /** The panel the Navigator wakes up on when nothing usable is stored. */

@@ -231,12 +231,7 @@ const KNOWN_UNREACHABLE: Record<string, Record<string, string>> = {
       "(register the selection commands AND honour `commandTargetPath`) is why it is a seam",
   },
   "panels/chat-panel.ts": { unmount: PANEL_TEARDOWN },
-  "panels/data-explorer.ts": {
-    isDataRowExpanded:
-      "the expansion predicate behind the row-expand command's idempotence. The command reads the " +
-      "set directly",
-    resetDataRowExpansion: TEST_RESET,
-  },
+  "panels/data-explorer.ts": { resetDataRowExpansion: TEST_RESET },
   "panels/data-grid.ts": {
     isDataGridAvailable:
       "a one-line re-export of `dataSurfaceAvailable()`; callers ask the underlying predicate",
@@ -275,9 +270,6 @@ const KNOWN_UNREACHABLE: Record<string, Record<string, string>> = {
       "ref. The canvas resolves refs through the live iframe scope now " +
       "(`services/live-preview.ts`), which cannot disagree with the render; this is the " +
       "parent-side fallback nothing falls back to",
-    selectedSignal:
-      "which signal editor is expanded, for the command's idempotence. The command reads the " +
-      "module variable directly",
   },
   "panels/statusbar.ts": { forgetSavedTimes: TEST_RESET },
   "panels/style-panel.ts": {

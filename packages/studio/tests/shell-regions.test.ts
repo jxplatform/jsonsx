@@ -110,7 +110,6 @@ function leftCtx(overrides: Record<string, unknown> = {}) {
     registerFileTreeDnD: mock(() => {}),
     registerLayersDnD: mock(() => {}),
     renderCanvas: mock(() => {}),
-    renderDataExplorerTemplate: mock(() => html`<div id="data-rendered"></div>`),
     renderFilesTemplate: mock(() => html`<div class="file-tree"></div>`),
     renderGitPanel: mock(
       () => html`<div class="git-commit-area" data-jx-region="navigator/panel:git/commit"></div>`,
@@ -128,7 +127,7 @@ function leftCtx(overrides: Record<string, unknown> = {}) {
 
 describe("navigator/panel:<id>", () => {
   /** Every panel the left panel routes to — the ids that come free from one stamp. */
-  const PANELS = ["files", "git", "insert", "layers", "packages", "state", "data", "page"];
+  const PANELS = ["files", "git", "insert", "layers", "packages", "data", "page"];
 
   for (const panel of PANELS) {
     test(`"${panel}" is addressable without anyone authoring its id`, async () => {

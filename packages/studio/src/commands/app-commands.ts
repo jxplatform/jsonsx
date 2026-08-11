@@ -90,7 +90,7 @@ export function appCommandSet(): AnyCommand[] {
     ...selectionCommands(),
     ...inspectorCommands(),
     ...dataExplorerCommands({ renderLeftPanel: NO_OP }),
-    ...signalsCommands({ renderLeftPanel: NO_OP }),
+    ...signalsCommands(),
     ...formulaEditorCommands(),
     ...gridCommands(),
     ...settingsCommands(),

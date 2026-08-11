@@ -50,6 +50,15 @@ export interface TabUi {
    */
   previewColorScheme: "auto" | "light" | "dark";
   styleSections: Record<string, boolean>;
+  /**
+   * Which Data rows have their editor and value open, by state-entry name.
+   *
+   * PER TAB, and a set rather than a single name: comparing two entries means seeing both at once,
+   * and coming back to a tab means finding it as you left it. It was one module-global string
+   * (`expandedSignal`) plus one module-global Set (`expandedDataKeys`) — two answers to one
+   * question, both shared across every open document.
+   */
+  dataRows: Record<string, boolean>;
   inspectorSections: Record<string, boolean>;
   styleShorthands: Record<string, boolean>;
   styleFilter: string;
@@ -191,6 +200,7 @@ function createDefaultUi(canvasMode: string, preview = false) {
     showLayout: true,
     styleFilter: "",
     styleSections: {},
+    dataRows: {},
     styleShorthands: {},
     zoom: 1,
   };

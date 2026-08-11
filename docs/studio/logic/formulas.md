@@ -31,7 +31,7 @@ Studio remembers what you had at each source for the rest of your session, so sw
 
 ![A Content tab value row with its value source chip beside the label](../../images/field-mode-button.png)
 
-Formulas also appear as their own state entries (_+ Add… > Expression_ in the State panel) and as event handlers (the **Expression** mode on the **[Logic tab](/docs/studio/logic/events)**).
+Formulas also appear as their own state entries (_+ Add… > Expression_ in the Data panel) and as event handlers (the **Expression** mode on the **[Logic tab](/docs/studio/logic/events)**).
 
 ## The formula editor
 
@@ -40,7 +40,7 @@ A formula is a tree of small operations, and the editor edits one operation at a
 - **Operator** — what this step does. The picker groups the whole vocabulary: assignment, arithmetic, comparison, logical, conditional, array methods, pure string/array/number methods, aggregates (`map`, `filter`, `reduce`), and `call` for invoking a named formula. The complete list, with what each operator means, is the **[operator reference](/docs/framework/reference/operators)**.
 - **Target** and **Value** — the operands. Each carries its own **Value source** picker, using the same names as everywhere else: **Fixed value** (a typed-in string, number, boolean, or null), **From data…** (a state value), or **Formula** — a nested formula of its own, drawn indented beneath its parent. Operands that can only be a signal — a `map`'s or `filter`'s target — show the signal picker alone, with no choice to make.
 
-A **From data…** operand on a page that holds no values yet has nothing to pick from, so instead of an empty picker the row explains what a binding is and points you at the **[State panel](/docs/studio/logic/state)** to declare one.
+A **From data…** operand on a page that holds no values yet has nothing to pick from, so instead of an empty picker the row explains what a binding is and points you at the **[Data panel](/docs/studio/logic/data)** to declare one.
 
 Operators bring their own rows: the conditional shows **If** / **Then** / **Else**; `switch` shows an **On** row plus one row per case and a default, with **+ Add case** to grow it; `call` shows a **Callee** and one argument row per parameter.
 
@@ -64,12 +64,12 @@ You don't have to assemble everything operator by operator. The brackets button 
 Picking an entry replaces the current step with that operation, ready for you to fill in its operands.
 
 :::doc-note
-Library formulas are **copied in**, not linked: picking one writes its full definition into your file's state as a named formula, and the inserted step just calls it. Your project stays self-contained — there is no runtime dependency on the catalog, and you can open the copy in the State panel to inspect or edit it.
+Library formulas are **copied in**, not linked: picking one writes its full definition into your file's state as a named formula, and the inserted step just calls it. Your project stays self-contained — there is no runtime dependency on the catalog, and you can open the copy in the Data panel to inspect or edit it.
 :::
 
 ## Named formulas
 
-An **Expression** entry in the State panel is a formula with a name. Once it declares parameters, it becomes callable from any other formula via the `call` operator — the palette lists it under **Formulas**, and its argument rows are labeled with the parameter names. Library formulas arrive with their parameters declared; to add parameters to a formula of your own, edit its entry in **[Code mode](/docs/studio/logic/code)**. That's how you build a vocabulary: define `discountedPrice` once, call it everywhere.
+An **Expression** entry in the Data panel is a formula with a name. Once it declares parameters, it becomes callable from any other formula via the `call` operator — the palette lists it under **Formulas**, and its argument rows are labeled with the parameter names. Library formulas arrive with their parameters declared; to add parameters to a formula of your own, edit its entry in **[Code mode](/docs/studio/logic/code)**. That's how you build a vocabulary: define `discountedPrice` once, call it everywhere.
 
 ## Next
 

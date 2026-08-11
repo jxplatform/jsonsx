@@ -14,7 +14,7 @@ code:
 
 # Data sources
 
-A data source is a state entry whose value comes from somewhere — a URL, the browser's storage, a form, your project's content, a database table — instead of being typed in. You add one from the **[State panel](/docs/studio/logic/state)**'s **+ Add…** picker, and from then on it behaves like any other value: bind it, compute from it, show it. Sources are reactive — when the underlying data changes, everything built on it updates. The model behind that is **[Reactivity](/docs/framework/concepts/reactivity)**.
+A data source is a state entry whose value comes from somewhere — a URL, the browser's storage, a form, your project's content, a database table — instead of being typed in. You add one from the **[Data panel](/docs/studio/logic/data)**'s **+ Add…** picker, and from then on it behaves like any other value: bind it, compute from it, show it. Sources are reactive — when the underlying data changes, everything built on it updates. The model behind that is **[Reactivity](/docs/framework/concepts/reactivity)**.
 
 Each source's editor shows just the fields that source needs.
 
@@ -22,13 +22,13 @@ Each source's editor shows just the fields that source needs.
 
 **Fetch from a URL** loads data over HTTP — a JSON API, most typically.
 
-![The State panel editing a Request source's URL, method, and timing](../../images/data-source-request.png)
+![The Data panel editing a Request source's URL, method, and timing](../../images/data-source-request.png)
 
 - **URL** — where to fetch from.
 - **Method** — `GET`, `POST`, `PUT`, `DELETE`, or `PATCH`.
 - **Timing** — `client` fetches in the visitor's browser; `server` runs the request on the server instead — useful when an API can't be called from a browser.
 
-While the request is in flight the entry reads as `pending` in the **[Data explorer](/docs/studio/logic/data-explorer)**; the resolved response then flows wherever the entry is used.
+While the request is in flight the entry reads as `pending` in the **[Data panel](/docs/studio/logic/data)**; the resolved response then flows wherever the entry is used.
 
 ## LocalStorage and SessionStorage — remember in the browser
 
@@ -104,6 +104,6 @@ Every source is stored as a small JSON object in the file's `state` — a `$prot
 
 ## Next
 
-- Watch a source resolve, live, in the **[Data explorer](/docs/studio/logic/data-explorer)**
+- Watch a source resolve, live, in the **[Data panel](/docs/studio/logic/data)**
 - Compute over fetched data with **[Formulas and expressions](/docs/studio/logic/formulas)**
 - Content types themselves are managed in **[Content types](/docs/studio/projects/content-types)**

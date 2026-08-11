@@ -55,13 +55,13 @@ The project case adds a warning band under the line: it names how many elements 
 
 Every field label carries a chip that answers one question: _why does this box say what it says?_
 
-| Chip                       | Meaning                                                                               | Click                                                     |
-| -------------------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| **accent dot**             | set here — this value lives on this element, at this coordinate                       | clears it                                                 |
-| **from Base** (amber)      | inherited — and the chip names the donor: another breakpoint, or **from site tokens** | jumps to the donor                                        |
-| _nothing_                  | not set; the property falls back to the browser default                               | —                                                         |
-| **a signal name** (violet) | bound — the value is a `${…}` expression reading that signal                          | opens the signal in **[State](/docs/studio/logic/state)** |
-| **mixed (6)**              | the selected elements disagree about this property                                    | clears it on all of them                                  |
+| Chip                       | Meaning                                                                               | Click                                                    |
+| -------------------------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| **accent dot**             | set here — this value lives on this element, at this coordinate                       | clears it                                                |
+| **from Base** (amber)      | inherited — and the chip names the donor: another breakpoint, or **from site tokens** | jumps to the donor                                       |
+| _nothing_                  | not set; the property falls back to the browser default                               | —                                                        |
+| **a signal name** (violet) | bound — the value is a `${…}` expression reading that signal                          | opens the signal in **[State](/docs/studio/logic/data)** |
+| **mixed (6)**              | the selected elements disagree about this property                                    | clears it on all of them                                 |
 
 An inherited chip always names where the value came from, so "something is showing through" becomes "Base sets this to 16px — go and look". The value itself still shows as a dimmed placeholder in the field, so you can see what you'd be overriding. The one inherited chip that doesn't take you anywhere is **from site tokens**: that value lives in the project's site-wide style rather than in the open file, and the Style tab has no page to open for it — edit it in **[Design tokens](/docs/studio/design/tokens)** instead.
 

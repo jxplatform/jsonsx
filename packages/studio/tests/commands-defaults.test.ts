@@ -452,9 +452,12 @@ describe("the direct keys (plan §5.3)", () => {
     for (const id of ["diff", "logic", "activity"]) {
       expect(registry.get(`panel.focus.${id}`)).toBeUndefined();
     }
-    // …and the two rail-less NAVIGATOR panels still do, because that is what `rail: false` buys.
+    // …and the one rail-less NAVIGATOR panel still does, because that is what `rail: false` buys.
+    // `state` used to be the second, and it was the whole reason it could go missing: rail-less but
+    // Palette-reachable reads as "reachable" right up until someone has to guess the word. Its
+    // Editor is part of Data now, which has a rail button.
     expect(registry.get("panel.focus.insert")?.title).toBe("Show Insert");
-    expect(registry.get("panel.focus.state")?.title).toBe("Show State");
+    expect(registry.get("panel.focus.state")).toBeUndefined();
   });
 
   test("panel focus hides with no project, and says what it needs", () => {

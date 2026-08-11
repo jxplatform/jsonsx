@@ -15,10 +15,10 @@ import type { JxMutableNode } from "@jxsuite/schema/types";
 type AnyFn = (...args: any[]) => any;
 
 let ctx: Record<string, any>;
-let captured: { head: any; imports: any; signals: any[]; data: any[]; git: any[] };
+let captured: { head: any; imports: any; signals: any[]; git: any[] };
 
 function makeCtx(overrides: Record<string, unknown> = {}) {
-  captured = { data: [], git: [], head: null, imports: null, signals: [] };
+  captured = { git: [], head: null, imports: null, signals: [] };
   return {
     cloneRepository: mock(() => {}),
     defaultDef: (tag: string) => ({ tagName: tag }),
@@ -31,10 +31,6 @@ function makeCtx(overrides: Record<string, unknown> = {}) {
     registerFileTreeDnD: mock(() => {}),
     registerLayersDnD: mock(() => {}),
     renderCanvas: mock(() => {}),
-    renderDataExplorerTemplate: mock((...args: unknown[]) => {
-      captured.data = args;
-      return html`<div id="data-rendered"></div>`;
-    }),
     renderFilesTemplate: mock(() => html`<div class="file-tree" id="files-rendered"></div>`),
     renderGitPanel: mock((...args: unknown[]) => {
       captured.git = args;
@@ -199,34 +195,34 @@ describe("left panel — document tabs", () => {
     expect(activeTab.value!.doc.document.title).toBe("Mutated");
   });
 
-  test("state tab passes a state snapshot to renderSignalsTemplate", async () => {
-    shell.leftTab = "state";
+  test("the data tab renders the ONE template, over the whole tab", async () => {
+    // `state` and `data` were two tabs calling two templates with two slices of the same tab —
+    // `renderSignalsTemplate` got a snapshot, `renderDataExplorerTemplate` got `document.state` and
+    // `canvas.scope` separately. One panel takes the tab record itself, so the definitions and the
+    // Values it resolved to cannot come from different reads.
+    activeTab.value!.doc.document.state = { count: 1 } as never;
+    activeTab.value!.session.canvas.scope = { count: 1 };
+    shell.leftTab = "data";
     await mountWith();
     expect(leftPanel.querySelector("#signals-rendered")).not.toBeNull();
     const [snapshot, deps] = captured.signals as [Record<string, unknown>, Record<string, AnyFn>];
     expect(snapshot.document).toBe(activeTab.value!.doc.document);
     expect(snapshot.selection).toBe(activeTab.value!.session.selection);
-    // A repaint, and nothing else. `renderCanvas` and `updateSession` were threaded through here
-    // Until nothing in the panel read either — see `SignalsPanelCtx`.
-    expect(typeof deps.renderLeftPanel).toBe("function");
-    expect(Object.keys(deps)).toEqual(["renderLeftPanel"]);
+    expect((snapshot.canvas as Record<string, unknown>).scope).toBe(
+      activeTab.value!.session.canvas.scope,
+    );
+    // A repaint and a refetch. `renderCanvas` and `updateSession` were threaded through here until
+    // Nothing in the panel read either — see `SignalsPanelCtx`.
+    expect(Object.keys(deps).toSorted()).toEqual(["refreshData", "renderLeftPanel"]);
   });
 
-  test("data tab passes document state and canvas scope", async () => {
-    activeTab.value!.doc.document.state = { count: 1 } as never;
-    activeTab.value!.session.canvas.scope = { stop: () => {} };
-    shell.leftTab = "data";
+  test("there is no `state` tab left to render", async () => {
+    shell.leftTab = "state";
     await mountWith();
-    expect(leftPanel.querySelector("#data-rendered")).not.toBeNull();
-    expect(captured.data[0]).toEqual({ count: 1 });
-    expect(captured.data[1]).toBe(activeTab.value!.session.canvas.scope);
-  });
-
-  test("data tab defaults to empty state and null scope", async () => {
-    shell.leftTab = "data";
-    await mountWith();
-    expect(captured.data[0]).toEqual({});
-    expect(captured.data[1]).toBeNull();
+    const body = leftPanel.querySelector(".panel-body") as HTMLElement;
+    expect(body.querySelector(".empty-state-message")?.textContent).toBe(
+      'No Navigator panel is registered as "state".',
+    );
   });
 
   test("an id the registry does not declare says so instead of painting a blank body", async () => {
@@ -256,7 +252,7 @@ describe("left panel — document tabs", () => {
   test("every document tab has its own no-document sentence", async () => {
     closeAllTabs();
     const seen = new Set<string>();
-    for (const tabName of ["layers", "packages", "state", "data", "page"]) {
+    for (const tabName of ["layers", "packages", "data", "page"]) {
       shell.leftTab = tabName;
       await mountWith();
       const message = leftPanel.querySelector(".empty-state-message")?.textContent ?? "";
@@ -264,7 +260,7 @@ describe("left panel — document tabs", () => {
       seen.add(message);
       unmount();
     }
-    expect(seen.size).toBe(5);
+    expect(seen.size).toBe(4);
   });
 });
 

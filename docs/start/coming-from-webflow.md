@@ -67,7 +67,7 @@ Collections cover the content you author. Data that arrives while the site is ru
 
 ## Interactions, honestly
 
-Behavior in Jx comes from three surfaces working together: **[State](/docs/studio/logic/state)** declares what a page knows, the Inspector's **Logic** tab (:kbd[⌘⇧3]) binds **[events](/docs/studio/logic/events)** to clicks, typing, and submits, and **[formulas](/docs/studio/logic/formulas)** compute values live. Logic is also where a `$switch` picks between variants and where a repeater is pointed at its list, so everything about how one element behaves is in one place. Toggles, tabs, filtered lists, form behavior — the logic side of interactions — is covered, often more directly than a timeline can express it.
+Behavior in Jx comes from three surfaces working together: **[State](/docs/studio/logic/data)** declares what a page knows, the Inspector's **Logic** tab (:kbd[⌘⇧3]) binds **[events](/docs/studio/logic/events)** to clicks, typing, and submits, and **[formulas](/docs/studio/logic/formulas)** compute values live. Logic is also where a `$switch` picks between variants and where a repeater is pointed at its list, so everything about how one element behaves is in one place. Toggles, tabs, filtered lists, form behavior — the logic side of interactions — is covered, often more directly than a timeline can express it.
 
 What Jx doesn't have is Webflow's scroll-driven animation timeline. Hover and focus effects with CSS transitions come through [States and selectors](/docs/studio/design/states-and-selectors), but choreographed scroll animation isn't a built-in surface today.
 

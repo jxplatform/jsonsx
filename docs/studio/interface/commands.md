@@ -111,7 +111,6 @@ Everything Studio can do is a command, and every command is reachable by name: p
 | Show Page                      | `panel.focus.page`           | `⌘5`     | application | an open project                                                                                                              |
 | Show Search                    | `panel.focus.search`         | `⌘2`     | application | an open project                                                                                                              |
 | Show Source Control            | `panel.focus.git`            | `⌘3`     | application | an open project                                                                                                              |
-| Show State                     | `panel.focus.state`          | —        | application | an open project                                                                                                              |
 | Show Style                     | `inspector.focus.style`      | `⌘⇧2`    | document    | an open document                                                                                                             |
 | Split Right                    | `pane.splitRight`            | `⌘\`     | document    | an open document                                                                                                             |
 | Switch Layout                  | `view.setLayout`             | —        | application | an open project                                                                                                              |
@@ -134,7 +133,6 @@ Everything Studio can do is a command, and every command is reachable by name: p
 | Pin / Unpin Document   | `document.togglePinned` | —                  | document | an open document                                  |
 | Previous Tab           | `document.previousTab`  | `⌃⇧Tab` or `⌘⇧Tab` | document | a second open document                            |
 | Reopen Closed Document | `document.reopenClosed` | `⌘⇧T`              | document | a document closed in this session                 |
-| Select State Entry     | `state.selectSignal`    | —                  | document | an open document that defines state               |
 | Set Document Pinned    | `document.setPinned`    | —                  | document | an open document                                  |
 | Set Draft              | `content.setDraft`      | —                  | document | a content entry open                              |
 

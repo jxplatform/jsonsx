@@ -78,5 +78,5 @@ Requests travel through Studio's own local proxy straight to the endpoint you co
 ## Next
 
 - Create a project for the assistant to work in: **[New Project](/docs/studio/projects/create)**
-- The state entries it can add for you are explained in the **[State panel](/docs/studio/logic/state)**
+- The state entries it can add for you are explained in the **[Data panel](/docs/studio/logic/data)**
 - Working the same project from outside Studio — with a coding agent, or in CI: **[Working with agents](/docs/framework/agents)**

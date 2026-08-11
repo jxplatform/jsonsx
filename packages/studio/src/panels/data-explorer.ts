@@ -2,17 +2,26 @@
 // ─── Data Explorer ──────────────────────────────────────────────────────────
 
 import { html, nothing } from "lit-html";
-import { classMap } from "lit-html/directives/class-map.js";
 import type { TemplateResult } from "lit-html";
-import { setActivityTab } from "../shell";
 import { activeTab } from "../workspace/workspace";
 import { booleanArg, stringArg, stringProperty } from "../commands/command-args";
-import { renderEmptyState } from "./empty-state";
 import { registerPanel } from "./panel-registry";
 import type { AnyCommand, CommandRegistry } from "../commands/registry";
 
-/** Expanded data entries set — persists across renders. */
-const expandedDataKeys = new Set<string>();
+/**
+ * The focused tab's expansion record, created on first write.
+ *
+ * `ui.dataRows` rather than a module Set: expansion is a property of the document you are reading,
+ * and a module-global one followed you to the next tab and showed rows open that that document does
+ * not define.
+ */
+function rowsUi(): Record<string, boolean> | null {
+  const ui = activeTab.value?.session.ui;
+  if (!ui) {
+    return null;
+  }
+  return (ui.dataRows ??= {});
+}
 
 /** Unwrap a Vue ref (has .value and .__v_isRef) to get the underlying value. */
 export function unwrapSignal(value: unknown) {
@@ -40,109 +49,13 @@ export function dataTypeLabel(value: unknown) {
   return typeof v;
 }
 
-/**
- * Render the data explorer tab showing live resolved values.
- *
- * @param {Record<string, unknown>} state - S.document.state (the $defs definitions)
- * @param {Record<string, unknown> | null} liveScope - Cached live scope from runtime rendering
- * @param {{
- *   renderCanvas: () => void;
- *   refreshData: () => void;
- *   renderLeftPanel: () => void;
- *   defCategory: (def: unknown) => string;
- *   defBadgeLabel: (def: unknown) => string;
- * }} callbacks
- * @returns {import("lit-html").TemplateResult}
- */
-export function renderDataExplorerTemplate(
-  state: Record<string, unknown>,
-  liveScope: Record<string, unknown> | null,
-  callbacks: {
-    renderCanvas: () => void;
-    /** Re-render the canvas AND let automatic `Request` entries fetch (the Refresh button). */
-    refreshData: () => void;
-    renderLeftPanel: () => void;
-    defCategory: (def: unknown) => string;
-    defBadgeLabel: (def: unknown) => string;
-  },
-) {
-  const { refreshData, renderLeftPanel, defCategory, defBadgeLabel } = callbacks;
-
-  const defs = state || {};
-  const entries = Object.entries(defs);
-  const scope = liveScope || {};
-
-  return html`
-    <div class="data-explorer-toolbar">
-      <sp-action-button
-        quiet
-        size="s"
-        class="data-refresh-btn"
-        @click=${() => {
-          // Edit/design suppress automatic `Request` fetches (a full render re-resolves every state
-          // Entry, so authoring would refetch constantly). Re-firing them on demand is exactly what
-          // This button is for, which is why it goes through refreshData rather than renderCanvas.
-          refreshData();
-          setTimeout(() => renderLeftPanel(), 200);
-        }}
-      >
-        <sp-icon-refresh slot="icon"></sp-icon-refresh>
-        Refresh
-      </sp-action-button>
-    </div>
-    ${
-      entries.length === 0
-        ? renderEmptyState({
-            actions: [
-              {
-                label: "Define data",
-                run: () => {
-                  // The definitions live one rail tab over; this is the panel that fills this one.
-                  setActivityTab("state");
-                },
-              },
-            ],
-            message: "Every value this page defines shows up here with what it resolved to.",
-          })
-        : entries.map(([name, def]) => {
-            const value = scope[name];
-            const unwrapped = unwrapSignal(value);
-            const isExpanded = expandedDataKeys.has(name);
-            return html`
-              <div class="data-row">
-                <div
-                  class=${classMap({
-                    "data-row-header": true,
-                    expanded: isExpanded,
-                  })}
-                  @click=${() => {
-                    // One writer: the row's click and `data.expandRow` land in the same function.
-                    setDataRowExpanded(name, !isExpanded);
-                    renderLeftPanel();
-                  }}
-                >
-                  <span class="signal-badge ${defCategory(def)}">${defBadgeLabel(def)}</span>
-                  <span class="data-name">${name}</span>
-                  <span
-                    class=${classMap({
-                      "data-pending": unwrapped === null,
-                      "data-type": true,
-                    })}
-                    >${dataTypeLabel(value)}</span
-                  >
-                </div>
-                ${
-                  isExpanded
-                    ? html`<div class="data-tree">${renderDataTreeTemplate(unwrapped, 0)}</div>`
-                    : nothing
-                }
-              </div>
-            `;
-          })
-    }
-  `;
-}
-
+/* THE VALUE LIST IS GONE, AND ITS ROWS ARE THE DEFINITION ROWS — `panels/signals-panel.ts`.
+   It listed every state entry with its badge and what it resolved to, one rail tab away from a
+   panel listing every state entry with its badge and how it is defined: the same names twice, and
+   you read one to understand the other. Plan §11.2 asks for "definitions + live values in one row",
+   so the definition row now carries the resolved type and expands to the value tree, and what is
+   left here is the tree renderer, the type label and the row-expansion record the merged rows read.
+   `renderDataTreeTemplate` is unchanged — it was never the redundant half. */
 /**
  * Recursively render a JSON value as a tree view (Lit template).
  *
@@ -244,21 +157,33 @@ export function renderDataTreeTemplate(
 
 /** Expand (or collapse) one data row's value tree. Idempotent — expanding twice is expanding once. */
 export function setDataRowExpanded(name: string, expanded: boolean): void {
+  const rows = rowsUi();
+  if (!rows) {
+    return;
+  }
   if (expanded) {
-    expandedDataKeys.add(name);
+    rows[name] = true;
   } else {
-    expandedDataKeys.delete(name);
+    delete rows[name];
   }
 }
 
 /** Whether a data row is currently expanded. Exported for the tests and the command's idempotence. */
 export function isDataRowExpanded(name: string): boolean {
-  return expandedDataKeys.has(name);
+  return rowsUi()?.[name] === true;
 }
 
-/** Drop every expansion — a fresh document, and the tests. */
+/** The expanded rows, in no particular order — `formula.openWorkspace` asks when it has no target. */
+export function expandedDataRows(): string[] {
+  return Object.keys(rowsUi() ?? {});
+}
+
+/** Drop every expansion on the focused tab — a fresh document, and the tests. */
 export function resetDataRowExpansion(): void {
-  expandedDataKeys.clear();
+  const ui = activeTab.value?.session.ui;
+  if (ui) {
+    ui.dataRows = {};
+  }
 }
 
 /** The state entry names the open document defines — what a row can be named by. */
@@ -348,11 +273,19 @@ export function registerDataExplorerCommands(
 }
 
 /**
- * Contribute the Data panel.
+ * Contribute the Data panel — the DEFINITIONS and the values they resolve to, in one place.
  *
- * `level: "document"` — the definitions it shows and the values it resolves belong to the open
- * document. §11.2 folds the State panel's editing in here ("definitions + live values in one row");
- * until it does, this record owns the DOCUMENT group's Data slot and `state` sits off-rail.
+ * `level: "document"`, because both belong to the open document.
+ *
+ * **This is where the State editor lives now.** Plan §11.2 always said so ("State panel + inline
+ * editor → Navigator › Data"), but the two halves shipped apart: the rail button was taken away to
+ * keep the DOCUMENT group at four, the merge was deferred, and the editor was left reachable only
+ * by typing its name into the palette. So the one surface for declaring a state variable — or a
+ * component property, which is a state entry with a default — became unfindable, which is a
+ * capability lost rather than a control moved.
+ *
+ * Defining and watching are the same task interrupted: you add an entry, then look at what it
+ * resolved to. Two panels made that two panels.
  */
 export function registerDataPanel(): void {
   registerPanel({
@@ -361,18 +294,13 @@ export function registerDataPanel(): void {
     level: "document",
     dock: "navigator",
     icon: "sp-icon-data",
-    requiresDocument: "Open a page to watch its data resolve while you edit.",
+    requiresDocument: "Open a page to give it data — values it can read, compute or fetch.",
     render: (ctx) =>
-      ctx.deps.renderDataExplorerTemplate(
-        ctx.doc?.document.state ?? {},
-        (ctx.doc?.canvas?.scope ?? null) as Record<string, unknown> | null,
-        {
-          defBadgeLabel: ctx.deps.defBadgeLabel,
-          defCategory: ctx.deps.defCategory,
-          refreshData: ctx.deps.refreshData,
-          renderCanvas: ctx.deps.renderCanvas,
-          renderLeftPanel: ctx.rerender,
-        },
-      ),
+      // `ctx.doc!` — `requiresDocument` means the registry renders the empty state instead of
+      // Calling this, the same assertion `head-panel.ts` makes for the same reason.
+      ctx.deps.renderSignalsTemplate(ctx.doc!, {
+        refreshData: ctx.deps.refreshData,
+        renderLeftPanel: ctx.rerender,
+      }),
   });
 }

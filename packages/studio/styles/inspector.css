@@ -598,8 +598,13 @@ jx-styled-combobox sp-picker {
   background: color-mix(in srgb, var(--handler) 25%, transparent);
   color: var(--handler);
 }
+/* The NAME is what you came for, so it is the last thing to be elided. It used to sit at `flex: 1`
+   beside a hint pinned at `flex-shrink: 0`, so a long-prototype row rendered as `re… ContentCollect…`
+   — the summary intact and the identity gone. */
 .signal-name {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 8em;
+  white-space: nowrap;
   font-family: var(--font-mono);
   font-size: var(--spectrum-font-size-50, 11px);
   overflow: hidden;
@@ -608,8 +613,10 @@ jx-styled-combobox sp-picker {
 .signal-hint {
   font-size: 10px;
   color: var(--fg-dim);
-  flex-shrink: 0;
-  max-width: 80px;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 64px;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -660,41 +667,28 @@ jx-styled-combobox sp-picker {
 .data-refresh-btn:hover {
   border-color: var(--accent);
 }
-.data-row {
-  border-bottom: 1px solid var(--border);
-}
-.data-row-header {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  cursor: pointer;
-  user-select: none;
-}
-.data-row-header:hover {
-  background: var(--hover-bg);
-}
-.data-row-header::before {
-  content: "\25B6";
-  font-size: 8px;
-  color: var(--fg-dim);
-  transition: transform 0.15s;
-}
-.data-row-header.expanded::before {
-  transform: rotate(90deg);
-}
-.data-name {
-  flex: 1;
-  font-family: var(--font-mono, monospace);
-  font-size: var(--spectrum-font-size-50, 11px);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+/* The Data panel's own row list is gone — the definition rows carry the resolved value now
+   (plan §11.2). `.data-row`, `.data-row-header` and `.data-name` went with it; what is left here
+   dresses the value INSIDE a `.signal-editor`. */
 .data-type {
   font-size: 10px;
   color: var(--fg-dim);
   flex-shrink: 0;
+}
+/* The resolved value, under the fields that define it. The rule above it is the seam between
+   "what this is" and "what it became" — the two halves that used to be two panels. */
+.signal-live {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+.signal-live-label {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-dim);
+  margin-bottom: 2px;
 }
 .data-tree {
   padding: 2px 0;

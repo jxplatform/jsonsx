@@ -59,7 +59,7 @@ Beside the label of every bindable row sits a **value source** chip naming, in p
 
 Those four names are the same everywhere a value can be produced from something else — the Content tab, the [Style tab](/docs/studio/design/style-inspector), the [Logic tab](/docs/studio/logic/events) and the operands inside a formula all say them the same way. Which of them a given row offers follows what the document format accepts in that position: an attribute, a component setting or the text content take **Fixed value**, **From data…** or **Mixed text**. A row with only one possible source shows its name and nothing to click.
 
-Studio remembers what you had at each source for the rest of the session, so switching away and back restores your value rather than resetting it — and typing a `${` into a fixed value doesn't swap the widget out from under your cursor. **From data…** is dropped from the picker when the document has nothing to point at yet; the signals it offers come from the document's state, so declare them first in the **[State panel](/docs/studio/logic/state)**.
+Studio remembers what you had at each source for the rest of the session, so switching away and back restores your value rather than resetting it — and typing a `${` into a fixed value doesn't swap the widget out from under your cursor. **From data…** is dropped from the picker when the document has nothing to point at yet; the signals it offers come from the document's state, so declare them first in the **[Data panel](/docs/studio/logic/data)**.
 
 ## Component settings
 

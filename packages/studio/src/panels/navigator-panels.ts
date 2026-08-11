@@ -31,7 +31,6 @@ import { registerPagePanel } from "./head-panel";
 import { registerPackagesPanel } from "./imports-panel";
 import { registerBottomPanels } from "./bottom-dock";
 import { registerLayersPanel } from "./layers-panel";
-import { registerStatePanel } from "./signals-panel";
 import { getPanel, listPanels, railPanelSet, registerPanel, resetPanels } from "./panel-registry";
 import type { PanelRecord } from "./panel-registry";
 
@@ -73,7 +72,6 @@ export function registerNavigatorPanels(): void {
 
   // ── Off-rail: reachable by command and palette, no rail button ──────────────
   registerInsertPanel();
-  registerStatePanel();
 
   // ── The Bottom dock's tabs (§3.2 ⑪): Problems · Diff · Logic · Activity ──────
   // Composed here, in the one place panel records are gathered, so the shell has ONE composition

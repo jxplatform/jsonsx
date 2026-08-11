@@ -112,9 +112,9 @@ describe("view.setActivity", () => {
   });
 
   test("is idempotent — running it twice does not collapse the dock", () => {
-    void registry.run("view.setActivity", { tab: "state" });
-    void registry.run("view.setActivity", { tab: "state" });
-    expect(shell.leftTab).toBe("state");
+    void registry.run("view.setActivity", { tab: "data" });
+    void registry.run("view.setActivity", { tab: "data" });
+    expect(shell.leftTab).toBe("data");
     expect(shell.docks.left.collapsed).toBe(false);
   });
 
@@ -123,7 +123,7 @@ describe("view.setActivity", () => {
     // Stale script or an older session still carries.
     expect(() => registry.run("view.setActivity", { tab: "head" })).toThrow(
       'command "view.setActivity" argument "tab": "head" is not declared — declared: ' +
-        "files, search, git, layers, page, data, packages, insert, state",
+        "files, search, git, layers, page, data, packages, insert",
     );
     expect(shell.leftTab).toBe("layers");
   });
@@ -316,7 +316,7 @@ describe("the enums do not drift from what the shell renders", () => {
     // Registry and this enum agree, which is asserted in `tests/panel-registry.test.ts`; here we
     // Only check that the rail really has stopped keeping its own list.
     expect(declaredValues("../src/panels/activity-bar.ts")).toEqual([]);
-    expect(NAVIGATOR_PANEL_IDS.length).toBe(9);
+    expect(NAVIGATOR_PANEL_IDS.length).toBe(8);
   });
 
   test("the Inspector renders exactly INSPECTOR_TAB_IDS", () => {
