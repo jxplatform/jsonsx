@@ -758,6 +758,43 @@ describe("component prop provenance", () => {
     expect(bound.textContent!.trim()).toBe("username");
   });
 
+  test("…and the chip OPENS it — §6.2 says a bound chip's click opens the source", async () => {
+    /*
+     * The Style tab's bound chip has jumped to the Data panel since P5. The Content tab's two bound
+     * branches returned a `donor` and a `title` and no `onClick`, so `renderProvenanceChip` drew a
+     * handler-less span: the same promise, in the same table, kept on one tab and printed on the
+     * other.
+     */
+    registerDefaulted();
+    const tab = openDoc(cardDoc({ title: { $ref: "#/state/username" } }), ["children", 0]);
+    (tab.doc.document as unknown as Record<string, unknown>).state = { username: { default: "" } };
+    const ran: { id: string; args: unknown }[] = [];
+    setActiveRegistry({
+      run: (id: string, args: unknown) => {
+        ran.push({ args, id });
+        return Promise.resolve();
+      },
+    } as unknown as CommandRegistry);
+
+    pointer(chip(await renderPanel(), "title")!, "click");
+    await flush();
+    expect(ran).toEqual([
+      { args: { tab: "data" }, id: "view.setActivity" },
+      { args: { name: "username" }, id: "data.expandRow" },
+    ]);
+    setActiveRegistry(null);
+  });
+
+  test("a chip whose donor this document does not define does not pretend to jump", async () => {
+    // A `$ref` left over from a rename points at nothing. A chip that opened the Data panel and
+    // Expanded a row that is not there would be a worse answer than one that only names it.
+    registerDefaulted();
+    openDoc(cardDoc({ title: { $ref: "#/state/ghost" } }), ["children", 0]);
+    const bound = chip(await renderPanel(), "title")!;
+    expect(bound.classList.contains("provenance-chip--bound")).toBe(true);
+    expect(bound.tagName).not.toBe("BUTTON");
+  });
+
   test("a $ref that points nowhere says so rather than naming an empty pointer", async () => {
     registerDefaulted();
     openDoc(cardDoc({ title: { $ref: "" } }), ["children", 0]);

@@ -149,6 +149,59 @@ function bindingDonor(value: unknown): string {
   return typeof value === "string" ? "a template" : "a formula";
 }
 
+/**
+ * The state entry a bound value reads, when the chip can name one — a `$ref` or a `${…}` template.
+ *
+ * §6.2's table says a bound chip "click opens the source", and on the Content tab it did not: both
+ * bound branches returned a `donor` and a `title` and no `onClick`, so `renderProvenanceChip` drew
+ * a handler-less span. The Style tab's chip has jumped to the Data panel since P5; the same promise
+ * on the other tab was a label. Same regex as `style-panel.ts`'s `templateSignalOf`, because both
+ * spellings of a template (`${x}` and `${state.x}`) name the same entry.
+ */
+function boundSignalOf(value: unknown): string | null {
+  if (isRef(value)) {
+    const ref = value.$ref;
+    return ref.startsWith("#/state/") ? (ref.slice(8).split("/")[0] ?? null) : null;
+  }
+  if (typeof value !== "string") {
+    return null;
+  }
+  return /\$\{\s*(?:state\.)?([A-Za-z_$][\w$]*)/.exec(value)?.[1] ?? null;
+}
+
+/**
+ * Reveal the state entry a bound field reads: the Data panel, and that entry's row.
+ *
+ * Both verbs, because the rail tab alone leaves you looking at a collapsed list — the same pair the
+ * Style tab's chip runs.
+ */
+function revealSignal(name: string): void {
+  const registry = activeRegistry();
+  void registry?.run("view.setActivity", { tab: "data" });
+  void registry?.run("data.expandRow", { name });
+}
+
+/**
+ * The bound chip, naming its donor and — when the donor is a state entry — opening it.
+ *
+ * The entry list is read here rather than threaded through both callers' signatures: the two
+ * provenance functions differ in everything else, and the question "does this document define
+ * `title`?" has one answer that neither of them should have to be handed.
+ */
+function boundProvenance(value: unknown, title: string): FieldProvenance {
+  const signal = boundSignalOf(value);
+  const document = activeTab.value?.doc.document;
+  const known = signal && document ? bindableSignalNames(document).includes(signal) : false;
+  return {
+    donor: bindingDonor(value),
+    state: "bound",
+    title,
+    // Only when the document actually defines it: a chip that jumps to a row that is not there
+    // Would be a worse answer than a chip that does not jump.
+    ...(known && signal ? { onClick: () => revealSignal(signal) } : {}),
+  };
+}
+
 // ─── Sub-templates ──────────────────────────────────────────────────────────
 
 /**
@@ -348,7 +401,7 @@ function componentPropProvenance(
   },
 ): FieldProvenance {
   if (hasVal && slotMode(rawValue) !== "literal") {
-    return { donor: bindingDonor(rawValue), state: "bound", title: `Bound — ${prop.name}` };
+    return boundProvenance(rawValue, `Bound — ${prop.name}`);
   }
   if (hasVal) {
     return { onClick: actions.onClear, state: "set", title: `Clear ${prop.name}` };
@@ -1243,7 +1296,7 @@ function attributeProvenance(
     return { donor: String(mixedCount), onClick: onClear, state: "mixed" };
   }
   if (hasVal && (isRef(value) || (typeof value === "string" && value.includes("${")))) {
-    return { donor: bindingDonor(value), state: "bound", title: `Bound — ${attr}` };
+    return boundProvenance(value, `Bound — ${attr}`);
   }
   return hasVal ? { onClick: onClear, state: "set", title: `Clear ${attr}` } : { state: "default" };
 }

@@ -43,7 +43,7 @@ Studio has no gesture for creating a condition node yet. Add one in **[Code mode
 
 Click **Add Event**. Studio creates a binding on the first free event name and points it at your file's first function — or, if the file has no functions yet, starts an inline handler instead. Each binding row then carries:
 
-- The **event name** — `onclick`, `oninput`, `onchange`, `onsubmit`, `onkeydown`, `onkeyup`, `onfocus`, `onblur`, `onmouseenter`, or `onmouseleave`. Changing it moves the binding rather than making a second one.
+- The **event name** — a field you can type into, with the ten most common suggested: `onclick`, `oninput`, `onchange`, `onsubmit`, `onkeydown`, `onkeyup`, `onfocus`, `onblur`, `onmouseenter`, `onmouseleave`. Any handler name works, so `ondragover`, `onpointerdown`, `onwheel` and the custom events your own components emit are all bindable here. A name that is not an `on…` handler is refused. Changing the name moves the binding rather than making a second one.
 - The **mode** — one of the three ways to respond, below.
 - An accent dot and a trash button, either of which removes the binding.
 

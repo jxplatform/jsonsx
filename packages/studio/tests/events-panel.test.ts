@@ -55,6 +55,13 @@ function picker(container: HTMLElement, cls: string, index = 0) {
   return container.querySelectorAll(`sp-picker.${cls}`)[index] as HTMLElement & { value: string };
 }
 
+/** The event NAME field, which is a free-form combobox rather than a ten-item picker. */
+function nameField(container: HTMLElement, index = 0) {
+  return container.querySelectorAll("jx-value-selector.event-name")[index] as HTMLElement & {
+    value: string;
+  };
+}
+
 function changeValue(el: HTMLElement & { value: string }, value: string) {
   el.value = value;
   el.dispatchEvent(new Event("change", { bubbles: true }));
@@ -142,7 +149,7 @@ describe("Logic tab — editing bindings", () => {
 
   test("renaming an event moves the binding to the new key", async () => {
     const container = await renderInto(renderLogicPanelTemplate(notCustom));
-    changeValue(picker(container, "event-name"), "onkeydown");
+    changeValue(nameField(container), "onkeydown");
     const node = selectedNode();
     expect(node.onchange).toBeUndefined();
     expect(node.onkeydown).toEqual({ $ref: "#/state/handleClick" });
@@ -150,9 +157,31 @@ describe("Logic tab — editing bindings", () => {
 
   test("renaming to the same key is a no-op", async () => {
     const container = await renderInto(renderLogicPanelTemplate(notCustom));
-    changeValue(picker(container, "event-name"), "onchange");
+    changeValue(nameField(container), "onchange");
     const node = selectedNode();
     expect(node.onchange).toEqual({ $ref: "#/state/handleClick" });
+  });
+
+  test("an event NOT in the suggestion list can be typed — the whole point of the field", async () => {
+    // Ten names in a closed `sp-picker` meant `ondragover`, `onpointerdown`, `onwheel` and every
+    // Custom event a component emits were unbindable from the Inspector. Plan §6.5 asks for "a
+    // Free-form combobox instead of a hard-coded list of ten", and `ui/value-selector.ts` was
+    // Written for this field and never wired to it.
+    const container = await renderInto(renderLogicPanelTemplate(notCustom));
+    changeValue(nameField(container), "onpointerdown");
+    const node = selectedNode();
+    expect(node.onchange).toBeUndefined();
+    expect(node.onpointerdown).toEqual({ $ref: "#/state/handleClick" });
+  });
+
+  test("…and a name that is not an event handler is refused", async () => {
+    // Free-form is not unchecked: the field no longer has a list constraining it, so it states the
+    // Shape itself rather than writing `class` or `Hello there` onto the element as a binding.
+    const container = await renderInto(renderLogicPanelTemplate(notCustom));
+    for (const bad of ["class", "Hello there", "on", "click"]) {
+      changeValue(nameField(container), bad);
+      expect(selectedNode().onchange).toEqual({ $ref: "#/state/handleClick" });
+    }
   });
 
   test("switching mode to Formula replaces value with expression def", async () => {

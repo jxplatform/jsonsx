@@ -32,7 +32,7 @@ Every row's label carries a **provenance chip** that answers one question before
 - **Set here** — an accent dot. This element carries the value itself; click the dot to clear it.
 - **Inherited** — amber, and it names its donor. A component prop left alone on the instance reads _from the component default_, and clicking it opens the component that defines it.
 - **Default** — nothing at all. An unset row with nothing behind it draws no chip, because a badge on every empty row is noise.
-- **Bound** — violet, naming the signal or formula the value comes from.
+- **Bound** — violet, naming the signal or formula the value comes from. Click it to open that entry in the [Data panel](/docs/studio/logic/data), with its row already expanded. A binding whose entry this page no longer defines still names it, but does not offer the jump.
 
 Section headings carry a dot of their own when anything inside them is set, so a collapsed section still tells you whether it has something to say.
 

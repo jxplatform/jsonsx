@@ -72,6 +72,15 @@ import type {
   JxPrototypeDef,
 } from "@jxsuite/schema/types";
 
+/**
+ * The events worth SUGGESTING — not the events an element may have.
+ *
+ * These ten were a closed `sp-picker`, so `ondragover`, `onpointerdown`, `onwheel`, `onpaste` and
+ * every custom event a component emits were unbindable from the Inspector: the plan's §6.5 asks for
+ * "a free-form combobox instead of a hard-coded list of ten", and `ui/value-selector.ts`'s own
+ * docstring names this field as the reason it exists ("what lets a control like the event-name
+ * field stop being a list of ten"). The widget was written and never wired.
+ */
 export const EVENT_NAMES = [
   "onclick",
   "oninput",
@@ -84,6 +93,19 @@ export const EVENT_NAMES = [
   "onmouseenter",
   "onmouseleave",
 ];
+
+/** {@link EVENT_NAMES} as the combobox's option list, plus whatever this element already declares. */
+function eventNameOptions(declared: readonly string[]): { label: string; value: string }[] {
+  const seen = new Set<string>();
+  const out: { label: string; value: string }[] = [];
+  for (const name of [...declared, ...EVENT_NAMES]) {
+    if (!seen.has(name)) {
+      seen.add(name);
+      out.push({ label: name, value: name });
+    }
+  }
+  return out;
+}
 
 /**
  * The rungs an `on*` handler permits, derived from the schema (`RefObject | ExpressionEntry |
@@ -437,13 +459,16 @@ function renderEventsBody(
           return html`
             <div class="event-binding">
               <div class="event-row">
-                <sp-picker
+                <jx-value-selector
                   size="s"
                   class="event-name"
-                  .value=${live(evKey)}
+                  .value=${evKey}
+                  .options=${eventNameOptions(Object.keys(node).filter((k) => k.startsWith("on")))}
                   @change=${(e: Event) => {
-                    const newKey = (e.target as HTMLInputElement).value;
-                    if (newKey && newKey !== evKey) {
+                    const newKey = (e.target as HTMLInputElement).value.trim();
+                    // A NAME, not a menu choice: the field is free-form now, so it has to refuse
+                    // What it cannot bind rather than trusting a list it no longer constrains.
+                    if (newKey && newKey !== evKey && /^on[a-z][\da-z-]*$/i.test(newKey)) {
                       // Renaming the key moves the binding on every selected element, in one step.
                       transactDoc(activeTab.value, (t) => {
                         for (const target of targets) {
@@ -461,10 +486,8 @@ function renderEventsBody(
                     }
                   }}
                 >
-                  ${[evKey, ...EVENT_NAMES.filter((n) => n !== evKey)].map(
-                    (n) => html`<sp-menu-item value=${n}>${n}</sp-menu-item>`,
-                  )}
-                </sp-picker>
+                  ></jx-value-selector
+                >
                 <sp-picker
                   size="s"
                   class="event-mode"

@@ -296,6 +296,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.9.11-draft** (2026-08-11) — Event names are a free-form combobox, and a bound provenance chip opens its source on every tab.
 - **0.9.10-draft** (2026-08-11) — §14.8 — a project reopens with the documents, panes and view settings it was left with.
 - **0.9.9-draft** (2026-08-11) — The rendering context's three axes are commands (canvas.setBreakpoint / setColorScheme / setLayoutVisible), and an empty-canvas right-click keeps the browser's menu.
 - **0.9.8-draft** (2026-08-11) — Project Settings carries ⌘⇧,, the other half of the pair §5.3 declares.

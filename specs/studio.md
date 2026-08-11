@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.10-draft
+**Version:** 0.9.11-draft
 **Status:** Partial
 **Updated:** 2026-08-11
 **License:** MIT
@@ -505,6 +505,12 @@ prop row carries a provenance chip (§6.7) distinguishing a value set here from 
 default — the same vocabulary the Style tab uses, because it is the same question asked of a second
 cascade.
 
+**An event name is typed, not picked.** The Logic tab's event rows use the same
+`jx-value-selector` combobox: the ten common `on*` names are SUGGESTIONS, and any handler name may
+be entered — a closed list of ten made `ondragover`, `onpointerdown`, `onwheel` and every custom
+event a component emits unbindable from the Inspector. The field is free-form, not unchecked: a name
+that is not an `on*` handler is refused, because the list that used to constrain it is gone.
+
 ### 6.2 Style Sidebar (Metadata-Driven)
 
 **The Target Line states the compound target before you type.** A style edit is addressed by a tuple
@@ -732,7 +738,13 @@ keystroke.
 | **Set here**  | click clears it                                                                                            |
 | **Inherited** | names the donor — "from Base", "from site tokens", "from the component default" — and clicking jumps there |
 | **Default**   | renders nothing; absence is the ghost state                                                                |
-| **Bound**     | names the signal or formula, and clicking opens it                                                         |
+| **Bound**     | names the signal or formula, and clicking opens it — the Data panel, and that entry's row                  |
+
+**Bound means every tab.** The Style tab's chip has opened its source since P5; the Content tab's
+two bound branches returned a donor and a title and no handler, so the same row of this table was
+kept on one tab and merely printed on the other. A chip only offers the jump when the document
+actually defines the entry: a `$ref` left over from a rename names its donor and does nothing else,
+because opening a row that is not there is a worse answer than not opening one.
 
 The inheritance walk already knew the donor and discarded it, leaving inherited values rendered as
 an input placeholder — visually identical to the CSS initial value. Collapsed section headers carry
@@ -1868,6 +1880,7 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ## Changelog
 
+- **0.9.11-draft** (2026-08-11) — Event names are a free-form combobox, and a bound provenance chip opens its source on every tab.
 - **0.9.10-draft** (2026-08-11) — §14.8 — a project reopens with the documents, panes and view settings it was left with.
 - **0.9.9-draft** (2026-08-11) — The rendering context's three axes are commands (canvas.setBreakpoint / setColorScheme / setLayoutVisible), and an empty-canvas right-click keeps the browser's menu.
 - **0.9.8-draft** (2026-08-11) — Project Settings carries ⌘⇧,, the other half of the pair §5.3 declares.
@@ -1933,4 +1946,4 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.10-draft_
+_`@jxsuite/studio` Specification v0.9.11-draft_
