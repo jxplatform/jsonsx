@@ -751,7 +751,16 @@ jx-styled-combobox sp-picker {
   color: var(--fg-dim);
   font-style: italic;
 }
+/* PENDING IS A RESTING STATE, not progress. While you are editing, an automatic `Request` is
+   deliberately not fetched — so a value that has not arrived is dim and STILL, and the pulse is
+   kept for the one moment something is actually in flight. An animation that never stops is a
+   spinner for a thing that is not loading, and it is why `probe.idle()` could never call this panel
+   quiet: the screenshot lane timed out on "2 animation(s) running" in a panel at rest. */
 .data-pending {
+  opacity: 0.55;
+}
+.signals-panel.is-refreshing .data-pending {
+  opacity: 1;
   animation: pulse 1.5s ease-in-out infinite;
 }
 @keyframes pulse {

@@ -426,3 +426,18 @@ describe("the layout verbs", () => {
     expect(() => registry.run("view.setLayout", { layout: "nope" })).toThrow(/no layout/);
   });
 });
+
+describe("what the built-in presets actually arrange", () => {
+  test("Write collapses the Inspector — that IS the preset", () => {
+    /*
+     * §3.1's arithmetic: 1600 − 56 rail − 240 navigator ≈ 1284px of page, 80%, against Design's
+     * 974. It shipped with `right: { collapsed: false, size: 280 }` — Design's number — which made
+     * Write a Design with a different panel selected.
+     */
+    const write = layoutById("write")!;
+    expect(write.docks.right.collapsed).toBe(true);
+    expect(write.navigatorPanel).toBe("files");
+    // …and Design keeps its Inspector, because that is the tab you are in it for.
+    expect(layoutById("design")!.docks.right.collapsed).toBe(false);
+  });
+});

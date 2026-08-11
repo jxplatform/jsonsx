@@ -617,7 +617,7 @@ export function renderSignalsTemplate(S: SignalsPanelState, ctx: SignalsPanelCtx
     );
 
   return html`
-    <div class="signals-panel">
+    <div class=${classMap({ "is-refreshing": refreshing, "signals-panel": true })}>
       ${
         ctx.refreshData && entries.length > 0
           ? html`<div class="data-explorer-toolbar">

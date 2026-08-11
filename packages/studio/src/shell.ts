@@ -495,7 +495,17 @@ function builtInLayouts(): LayoutPreset[] {
       docks: {
         bottom: { collapsed: true, size: 220 },
         left: { collapsed: false, size: 240 },
-        right: { collapsed: false, size: 280 },
+        /* WRITE COLLAPSES THE INSPECTOR. §3.1's arithmetic is the whole point of this preset:
+           1600px − 56 rail − 240 navigator ≈ **1284px of page, 80%**, against Design's 974. It
+           shipped with the Inspector open at 280px, which is Design's number and makes Write a
+           Design with a different panel selected.
+
+           It does NOT re-open on selection. The plan's sentence reads "until something is
+           selected", and clicking a paragraph to put a caret in it IS a selection — a dock that
+           opened every time you clicked into prose would take the 80% back on the first keystroke.
+           `⌘⇧1`–`⌘⇧4` expand it (`focusInspectorTab` sets `collapsed: false` before it focuses), so
+           the Inspector is one chord away whenever it is wanted. */
+        right: { collapsed: true, size: 280 },
       },
       id: "write",
       inspectorTab: "properties",

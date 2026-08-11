@@ -81,6 +81,22 @@ describe("the resolved-value column", () => {
     expect(container.querySelector(".data-type")?.classList.contains("data-pending")).toBe(true);
   });
 
+  test("pending only PULSES while a refresh is in flight", () => {
+    /*
+     * While you are editing, an automatic `Request` is deliberately not fetched, so `pending` is a
+     * resting state and an endless pulse is a spinner for something that is not loading. It is also
+     * why `probe.idle()` could never call this panel quiet: the screenshot lane timed out on
+     * "2 animation(s) running" over a panel that had finished.
+     */
+    const { container, ctx } = mountData({ nil: {} }, { nil: null });
+    const panel = () => container.querySelector(".signals-panel")!;
+    expect(panel().classList.contains("is-refreshing")).toBe(false);
+
+    activeTab.value!.session.canvas.refreshing = true;
+    ctx.renderLeftPanel();
+    expect(panel().classList.contains("is-refreshing")).toBe(true);
+  });
+
   test("an entry that cannot HOLD a value never gets the column", () => {
     // A function and an assignment expression are things the page DOES. They are absent from the
     // Resolved scope for that reason, and the column called every one of them "pending" — which
