@@ -50,7 +50,7 @@ By default an instance renders exactly what the component defines. A **slot** is
 
 ## Preview with test props
 
-A component file open on its own renders with its defaults — but defaults are often empty. The context bar's **resolving with** cluster shows one small field per prop; type a value to see the component render with it, live on the canvas at every breakpoint. Numbers, `true`/`false`, and lists in JSON form are understood as such; anything else counts as text.
+A component file open on its own renders with its defaults — but defaults are often empty. Open the context bar's **resolving with** popover and you get one field per prop, stacked; type a value to see the component render with it, live on the canvas at every breakpoint. Numbers, `true`/`false`, and lists in JSON form are understood as such; anything else counts as text. Each field is also a command — :kbd[⌘K] → **Set Test Value** — so you can set one by name without reaching for the popover.
 
 Test values are a preview lens only — they're never saved into the component, and clearing a field returns the prop to its default. They pair with the **Preview** toggle described in **[Modes and preview](/docs/studio/interface/modes)**.
 

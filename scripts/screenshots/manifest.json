@@ -1450,9 +1450,14 @@
           "cmd": "canvas.setMode"
         },
         {
-          "input": "type",
-          "region": "pane.primary/prop:count",
-          "text": "100\n"
+          "args": {
+            "name": "count",
+            "value": 100
+          },
+          "cmd": "canvas.setTestProp"
+        },
+        {
+          "cmd": "canvas.setResolvingOpen"
         }
       ],
       "capture": [

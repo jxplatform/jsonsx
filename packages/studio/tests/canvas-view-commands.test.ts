@@ -143,10 +143,13 @@ const setCanvasMode = mock((tab: Tab | null, mode: string) => {
 });
 /** Which pane each rendering-context verb repainted — the fact the side bar depends on. */
 const renderedPanes: string[] = [];
+/** Which pane each rendering-context verb opened or closed the resolving popover for. */
+const resolvingOpened: [string, boolean][] = [];
 const deps = {
   getCanvasMode: () => canvasMode,
   renderPane: (paneId: string) => renderedPanes.push(paneId),
   setCanvasMode,
+  setResolvingOpen: (paneId: string, open: boolean) => resolvingOpened.push([paneId, open]),
 };
 
 let ctx: CommandContext = makeContext();
@@ -199,6 +202,14 @@ describe("the records themselves", () => {
       "canvas.setBreakpoint",
       "canvas.setColorScheme",
       "canvas.setLayoutVisible",
+      // The route params and component test props live in a popover now, and a transient surface
+      // Opens by command rather than by clicking (§13.2) — otherwise the shot that types a test
+      // Value would need a CSS selector to reach it.
+      "canvas.setResolvingOpen",
+      // The values themselves are verbs too. They wrote `session.ui` inline while every control in
+      // The popover beside them ran a command — the defect `runContextCommand`'s docstring names.
+      "canvas.setTestProp",
+      "canvas.setRouteParam",
       "selection.set",
       "selection.setPaths",
       "insert.data",

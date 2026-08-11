@@ -155,7 +155,7 @@ You should see the single card expand into three, newest first, each filled in f
 
 ## Give each post its own page
 
-The listing links nowhere yet, and that's deliberate: one page per post is the job of a _dynamic page_ — a single page file with a parameter in its name (like `[slug]`) that the build expands into one page per entry of the collection. That wiring lives in the page's own format rather than a Studio panel today; **[Routing](/docs/framework/site/routing)** shows the exact file, and **[Content collections](/docs/framework/site/content-collections)** covers looking up "the entry this URL names". Once a dynamic page exists, Studio meets you halfway: opening it shows a picker per URL parameter on the context bar, under **resolving with**, so the canvas previews a real post instead of a placeholder.
+The listing links nowhere yet, and that's deliberate: one page per post is the job of a _dynamic page_ — a single page file with a parameter in its name (like `[slug]`) that the build expands into one page per entry of the collection. That wiring lives in the page's own format rather than a Studio panel today; **[Routing](/docs/framework/site/routing)** shows the exact file, and **[Content collections](/docs/framework/site/content-collections)** covers looking up "the entry this URL names". Once a dynamic page exists, Studio meets you halfway: opening it puts a picker per URL parameter in the context bar's **resolving with** popover, so the canvas previews a real post instead of a placeholder.
 
 ## What you built
 

@@ -105,21 +105,13 @@
 .pc-context-trigger {
   font-variant-numeric: tabular-nums;
 }
-/* The document data a render resolves against, beside the context it resolves in. */
-.pc-resolving {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  min-width: 0;
-}
-.pc-resolving-label {
-  font-size: var(--spectrum-font-size-50, 11px);
-  color: var(--fg-dim);
-  white-space: nowrap;
-}
-.pc-resolving sp-picker.pc-param,
-.pc-resolving sp-textfield.pc-prop {
-  max-width: 140px;
+/* The document data a render resolves against, behind its own trigger beside the context one.
+   `.pc-resolving` and `.pc-resolving-label` are gone with the inline strip: the phrase "resolving
+   with" is the popover's group label now, so `.pc-ctx-label` styles it and there is one place a
+   group heading in this bar is described. */
+.pc-resolving-trigger {
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
 }
 /* The editor-kind dropdown and the view segments both sit on a 28px band: cap them so a long
    document name in the breadcrumb cannot push an axis off the end of the bar. */
@@ -155,8 +147,12 @@
   letter-spacing: 0.04em;
   color: var(--fg-dim);
 }
+/* The fields, stacked. They were a row on the bar capped at 140px; in the popover each takes the
+   full column so a route value or a JSON test prop is readable while you type it. */
 .pc-ctx-group sp-picker.pc-param,
 .pc-ctx-group sp-textfield.pc-prop {
+  display: block;
+  width: 100%;
   max-width: 100%;
 }
 .pc-context-popover {

@@ -83,11 +83,12 @@ Installed format extensions can add their own file types with their own lists, s
 
 **Preview** is the third value of the **View** control, beside Edit and Design — one control, three values, so the bar can never show you Design while the canvas is previewing. Pick it and the canvas shows the page with its real data resolved: dynamic text filled in, repeated lists expanded, exactly what a visitor gets.
 
-What it resolves _with_ comes from the **Context** control beside it:
+What it resolves _with_ comes from the two controls beside it. The **Context** popover holds what the page renders _in_ — its breakpoint, colour scheme, feature queries, and a **Show layout elements** switch for pages that use a layout. The **resolving with** popover holds what it renders _from_, one field per line:
 
 - For pages with dynamic addresses (a product page, a blog post), a picker per URL parameter so you choose which real record to preview.
-- For components, a small field per component option so you can try test values.
-- For pages that use a layout, a **Show layout elements** switch, inside the Context popover, that hides or shows what the layout contributes.
+- For components, a field per component option so you can try test values.
+
+Its button says how many you have set, so you can tell at a glance whether the canvas is showing defaults.
 
 **Preview does not edit.** While it is on, clicking the page selects nothing, no outlines are drawn,
 the insertion **+** and the canvas menu give way to your browser's own, nothing can be dropped in,

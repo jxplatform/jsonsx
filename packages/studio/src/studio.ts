@@ -1310,6 +1310,7 @@ registerCanvasViewCommands(commandRegistry, {
   getCanvasMode,
   renderPane: renderCanvas,
   setCanvasMode,
+  setResolvingOpen: paneContext.setResolvingOpen,
 });
 registerSelectionSetCommand(commandRegistry);
 registerInspectorCommands(commandRegistry);

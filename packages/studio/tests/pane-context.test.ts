@@ -38,7 +38,7 @@ const {
 const { getFit, hasDeclaredFit, resetFits } = await import("../src/canvas/canvas-utils");
 const { createCommandRegistry } = await import("../src/commands/registry");
 const { makeContext } = await import("../src/commands/context");
-const { setActiveRegistry } = await import("../src/commands/active-registry");
+const { activeRegistry, setActiveRegistry } = await import("../src/commands/active-registry");
 const { canvasViewCommands } = await import("../src/canvas/canvas-utils");
 const { collabState } = await import("../src/collab/collab-state");
 
@@ -159,8 +159,16 @@ function installRegistry(ran: string[]) {
       getCanvasMode: () => "design",
       renderPane: () => {},
       setCanvasMode: () => {},
+      setResolvingOpen: paneContext.setResolvingOpen,
     }).filter((c) =>
-      ["canvas.setBreakpoint", "canvas.setColorScheme", "canvas.setLayoutVisible"].includes(c.id),
+      [
+        "canvas.setBreakpoint",
+        "canvas.setColorScheme",
+        "canvas.setLayoutVisible",
+        "canvas.setResolvingOpen",
+        "canvas.setRouteParam",
+        "canvas.setTestProp",
+      ].includes(c.id),
     ),
   );
   registry.register({
@@ -180,6 +188,7 @@ function installRegistry(ran: string[]) {
 let root: HTMLElement;
 
 beforeEach(() => {
+  paneContext.resetResolvingOpen();
   closeAllTabs();
   resetStudioState();
   installMockPlatform();
@@ -632,7 +641,14 @@ describe("resolving with", () => {
     expect(tab.session.ui.previewParams).toEqual({ sku: "beta" });
   });
 
-  test("the values sit on the bar, not behind a click, and say what they are", async () => {
+  test("the values live in a popover headed 'resolving with', in a vertical stack", async () => {
+    /*
+     * They were a row of fields OPEN on the bar, and the argument for that was the screenshot
+     * contract: behind a click, typing a test prop costs a second gesture and the manifest's input
+     * budget may only ratchet down. The answer is not n text fields on a 28px band that also
+     * carries the editor, the view and the rendering context — it is that a transient surface opens
+     * by COMMAND (§13.2), so the shot spends a `cmd` step and the input budget is untouched.
+     */
     resetStudioState({ isSiteProject: true });
     resetWorkspaceWithTab(
       { $paths: { param: "sku", values: ["alpha"] }, children: [], tagName: "div" } as never,
@@ -642,11 +658,55 @@ describe("resolving with", () => {
     await flush();
 
     const picker = root.querySelector("sp-picker.pc-param") as HTMLElement;
-    expect(picker.closest(".pane-context")).not.toBeNull();
-    // Not inside the popover: reaching it must not cost a gesture. The screenshot manifest types
-    // Into `pane.primary/prop:count` in one step, and its input budget only ratchets down.
-    expect(picker.closest("sp-popover")).toBeNull();
-    expect(root.querySelector(".pc-resolving-label")?.textContent?.trim()).toBe("resolving with");
+    expect(picker.closest("sp-popover")).not.toBeNull();
+    // The phrase is the popover's group heading, and the fields stack under it.
+    const group = picker.closest(".pc-ctx-group") as HTMLElement;
+    expect(group.querySelector(".pc-ctx-label")?.textContent?.trim()).toBe("resolving with");
+    // …and the bar itself carries only the trigger.
+    expect(root.querySelector(".pc-resolving-trigger")).not.toBeNull();
+  });
+
+  test("the trigger says how many values are set, so the chevron reads before it opens", async () => {
+    resetStudioState({ isSiteProject: true });
+    const tab = resetWorkspaceWithTab(
+      {
+        $paths: { param: "sku", values: ["alpha", "beta"] },
+        children: [],
+        tagName: "div",
+      } as never,
+      { documentPath: "pages/products/[sku].json", id: "count-param" },
+    );
+    paneContext.mount(root, makeCtx());
+    await flush();
+    const trigger = () => root.querySelector(".pc-resolving-trigger")!.textContent!.trim();
+    expect(trigger()).toBe("Defaults ⌄");
+
+    tab.session.ui.previewParams = { sku: "beta" };
+    paneContext.render();
+    await flush();
+    expect(trigger()).toBe("1 set ⌄");
+  });
+
+  test("canvas.setResolvingOpen is the door the camera and the keyboard use", async () => {
+    // A transient surface opens by command, not by clicking — otherwise the one shot that types a
+    // Test value would need a CSS selector, which the shot contract forbids outright.
+    resetStudioState({ isSiteProject: true });
+    resetWorkspaceWithTab(
+      { $paths: { param: "sku", values: ["alpha"] }, children: [], tagName: "div" } as never,
+      { documentPath: "pages/products/[sku].json", id: "cmd-param" },
+    );
+    paneContext.mount(root, makeCtx());
+    await flush();
+    expect(paneContext.isResolvingOpen(PRIMARY_PANE)).toBe(false);
+
+    void activeRegistry()!.run("canvas.setResolvingOpen", {});
+    await flush();
+    expect(paneContext.isResolvingOpen(PRIMARY_PANE)).toBe(true);
+    // Idempotent, and `{ open: false }` closes through the same record rather than a second id.
+    void activeRegistry()!.run("canvas.setResolvingOpen", {});
+    expect(paneContext.isResolvingOpen(PRIMARY_PANE)).toBe(true);
+    void activeRegistry()!.run("canvas.setResolvingOpen", { open: false });
+    expect(paneContext.isResolvingOpen(PRIMARY_PANE)).toBe(false);
   });
 
   test("no pickers for a page without params", async () => {

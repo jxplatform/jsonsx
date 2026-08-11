@@ -106,13 +106,14 @@ When a page ever looks wrong, this panel is where you find out what it actually 
 
 ## 10. Try a test value
 
-Because `count` is a plain state value on a component, it's also one of the component's _props_ — an option a page can set when it uses the card. The context bar's **resolving with** cluster shows a small field named after each prop:
+Because `count` is a plain state value on a component, it's also one of the component's _props_ — an option a page can set when it uses the card.
 
-1. Type `100` into the **count** field on the context bar.
-2. The canvas re-renders with the count starting at 100, at every breakpoint.
-3. Clear the field to return to the default of `0`.
+1. On the context bar, click **Defaults ⌄** — the popover headed **resolving with** holds one field per prop.
+2. Type `100` into the **count** field.
+3. The canvas re-renders with the count starting at 100, at every breakpoint, and the button now reads **1 set**.
+4. Clear the field to return to the default of `0`.
 
-![The context bar's count field holding a test value, the canvas rendering with it](../images/counter-test-prop.png)
+![The resolving-with popover holding a test value, the canvas rendering with it](../images/counter-test-prop.png)
 
 Test values are a preview lens only — they're never saved into the component. Props and test values are covered in **[Working with components](/docs/studio/design/components)**.
 

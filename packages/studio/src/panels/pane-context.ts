@@ -17,11 +17,15 @@
  *   being a toggle on a different bar with different visual grammar that silently composed with a
  *   base mode the switcher still showed as selected.
  * - **Rendering context** — `md ⌄ Light ⌄`, folding the size breakpoint, the colour scheme, the
- *   feature queries and the layout show/hide switch into one popover, with the document data a
- *   render resolves against — route params, component test props — labelled "resolving with" beside
- *   it. Per §2 principle 5 this control **only selects**; its footer is "Manage contexts…", which
- *   routes to the definition site — Project Settings › Contexts (`settings/contexts-section.ts`),
- *   the one place a breakpoint, a colour scheme or a feature query is defined.
+ *   feature queries and the layout show/hide switch into one popover. Per §2 principle 5 this
+ *   control **only selects**; its footer is "Manage contexts…", which routes to the definition site
+ *   — Project Settings › Contexts (`settings/contexts-section.ts`), the one place a breakpoint, a
+ *   colour scheme or a feature query is defined.
+ * - **Resolving with** — the document DATA a render resolves against: a page's route params, a
+ *   component's test props. Its own popover beside the context one, headed "resolving with", with
+ *   the fields in a vertical stack. A SECOND popover rather than a fourth group in the first,
+ *   because these are values you type and everything in the rendering-context popover is something
+ *   you pick — and because a row of text fields is what made the 28px band unreadable.
  *
  * **The bar is not a grid row.** It renders inside the pane's own cell (`#pane-chrome`, stacked
  * over `#canvas-wrap`), because a per-pane surface cannot be a row of the application grid — the
@@ -39,6 +43,7 @@
  */
 
 import { html, render as litRender, nothing } from "lit-html";
+import { ref } from "lit-html/directives/ref.js";
 import { projectState, updateUi } from "../store";
 import { effect, effectScope } from "../reactivity";
 import { PRIMARY_PANE, focusPane, workspace } from "../workspace/workspace";
@@ -702,12 +707,18 @@ function renderingContextTpl(tab: Tab, paneId: string, ctx: PaneContextCtx): Tem
   const schemeLabel = SCHEMES.find(([value]) => value === scheme)?.[1] ?? "Auto";
   const summary = schemeQueries.length > 0 ? `${sizeLabel} · ${schemeLabel}` : sizeLabel;
   const hasLayout = isPageDoc(tab) && Boolean(getEffectiveLayoutPath(tab.doc.document?.$layout));
-  const resolving = isPageDoc(tab) ? paramPickersTpl(tab) : propFieldsTpl(tab, paneId);
+  const resolving = isPageDoc(tab) ? paramPickersTpl(tab, paneId) : propFieldsTpl(tab, paneId);
+  /* How many of those fields carry a value. The trigger has to say something true at a glance, the
+     way the Context trigger says `Base · Auto` — a chevron with no reading is a control you have to
+     open in order to learn whether it was worth opening. */
+  const resolvingSet = isPageDoc(tab)
+    ? Object.values(ui.previewParams ?? {}).filter((v) => v !== "" && v !== undefined).length
+    : Object.keys(ui.previewProps ?? {}).length;
 
   return axisTpl(
     "Context",
     html`
-      ${resolvingTpl(resolving)}
+      ${resolvingTpl(paneId, resolving, resolvingSet)}
       <overlay-trigger placement="bottom-end" triggered-by="click">
         <sp-action-button
           slot="trigger"
@@ -816,25 +827,95 @@ function renderingContextTpl(tab: Tab, paneId: string, ctx: PaneContextCtx): Tem
 }
 
 /**
- * `resolving with count 3` — the document DATA a render resolves against, on the bar.
+ * The document DATA a render resolves against — route params, component test props — in a popover.
  *
- * §4.2 folds these in behind the words "resolving with…", and the label is where that lands. The
- * VALUES stay on the bar rather than inside the popover, and the reason is the screenshot contract
- * doing its job as a design instrument (§13.1): behind a click, the one first-hour flow the docs
- * teach — typing a test prop on `start/first-component` — needs a second gesture to reach, and the
- * manifest's input budget may only ratchet down. A control that costs a picture an extra click
- * costs every reader one too.
+ * §4.2 folds these in behind the words "resolving with…", and this is where that lands: the phrase
+ * is the popover's header and the fields are a vertical stack under it, the same shape as the
+ * rendering-context popover beside it.
+ *
+ * They used to sit OPEN on the bar, and the argument for that was the screenshot contract (§13.1):
+ * behind a click, the one first-hour flow the docs teach — typing a test prop on
+ * `start/first-component` — costs a second gesture, and the manifest's input budget may only
+ * ratchet down. The answer is not to keep n text fields on a 28px band that also carries the
+ * editor, the view and the rendering context; it is that a transient surface opens by COMMAND (plan
+ * §13.2), so the shot spends a `cmd` step rather than a selector and the input budget is untouched.
+ * `canvas.setResolvingOpen` is that command, and it is the same door the pointer uses.
+ *
+ * @param {string} paneId
+ * @param {TemplateResult | typeof nothing} body
+ * @param {number} setCount — how many fields carry a value, for the trigger's summary
  */
-function resolvingTpl(body: TemplateResult | typeof nothing): TemplateResult | typeof nothing {
+function resolvingTpl(
+  paneId: string,
+  body: TemplateResult | typeof nothing,
+  setCount: number,
+): TemplateResult | typeof nothing {
   if (body === nothing) {
     return nothing;
   }
   return html`
-    <span class="pc-resolving">
-      <span class="pc-resolving-label">resolving with</span>
-      ${body}
-    </span>
+    <overlay-trigger
+      placement="bottom-end"
+      triggered-by="click"
+      ${ref((el: Element | undefined) => {
+        if (el) {
+          _resolvingTrigger.set(paneId, el as HTMLElement & { open?: string | undefined });
+        }
+      })}
+    >
+      <sp-action-button
+        slot="trigger"
+        size="s"
+        quiet
+        class="pc-resolving-trigger"
+        title="The values this document is being rendered with"
+      >
+        ${setCount > 0 ? `${setCount} set` : "Defaults"} ⌄
+      </sp-action-button>
+      <sp-popover slot="click-content" tip class="pc-context-popover">
+        <div class="pc-ctx">${groupTpl("resolving with", body as TemplateResult)}</div>
+      </sp-popover>
+    </overlay-trigger>
   `;
+}
+
+/**
+ * Each pane's "resolving with" `overlay-trigger`, which IS the open state.
+ *
+ * No parallel `Set`. The overlay owns whether it is showing — it opens on a pointer click without
+ * telling anyone first — so a second record of the same fact could only ever be the stale one. The
+ * element's `open` property is what the pointer writes and what the command writes, and reading it
+ * back is how anything else asks.
+ */
+const _resolvingTrigger = new Map<string, HTMLElement & { open?: string | undefined }>();
+
+/** Whether this pane's resolving popover is open. Exported for the tests. */
+export function isResolvingOpen(paneId: string): boolean {
+  return _resolvingTrigger.get(paneId)?.open === "click";
+}
+
+/**
+ * Open or close it.
+ *
+ * A named end state rather than a toggle, so `canvas.setResolvingOpen { open: false }` means the
+ * same thing twice and a screenshot can photograph it (§13's R1).
+ *
+ * It writes the element and does NOT re-render the bar. `overlay-trigger` moves the popover into an
+ * overlay portal while it is open and restores it on close; re-rendering this template in the
+ * middle of that leaves the moved copy painted over the canvas with no way to dismiss it. The
+ * overlay owns its own visibility — the only thing the bar redraws for is the trigger's summary,
+ * and that changes when a VALUE changes, which already renders.
+ */
+export function setResolvingOpen(paneId: string, open: boolean): void {
+  const trigger = _resolvingTrigger.get(paneId);
+  if (trigger && isResolvingOpen(paneId) !== open) {
+    trigger.open = open ? "click" : undefined;
+  }
+}
+
+/** Forget the held triggers — a fresh window, and the tests. */
+export function resetResolvingOpen(): void {
+  _resolvingTrigger.clear();
 }
 
 /** One labelled group inside the rendering-context popover. */
@@ -1134,7 +1215,7 @@ function autoSelectParams(tab: Tab, values: ParamValues) {
  * @param {Tab} tab
  * @returns {TemplateResult | typeof nothing}
  */
-function paramPickersTpl(tab: Tab): TemplateResult | typeof nothing {
+function paramPickersTpl(tab: Tab, paneId: string): TemplateResult | typeof nothing {
   const values = paramValuesFor(tab);
   const names = new Set(dynamicRouteParams(tab.documentPath));
   for (const name of Object.keys(values ?? {})) {
@@ -1156,7 +1237,8 @@ function paramPickersTpl(tab: Tab): TemplateResult | typeof nothing {
           value=${previewParams?.[name] ?? ""}
           @change=${(e: Event) => {
             const { value } = e.target as HTMLInputElement;
-            updateUi(tab, "previewParams", { ...tab.session.ui.previewParams, [name]: value });
+            // Through the registry, like every control in the popover beside this one.
+            runContextCommand(paneId, "canvas.setRouteParam", { name, value });
           }}
         >
           ${(values?.[name] ?? []).map(
@@ -1216,13 +1298,12 @@ function propFieldsTpl(tab: Tab, paneId: string): TemplateResult | typeof nothin
           .value=${display(previewProps?.[name])}
           @change=${(e: Event) => {
             const raw = (e.target as HTMLInputElement).value;
-            const next = { ...tab.session.ui.previewProps };
-            if (raw === "") {
-              delete next[name];
-            } else {
-              next[name] = parsePropValue(raw);
-            }
-            updateUi(tab, "previewProps", Object.keys(next).length > 0 ? next : null);
+            // The command owns the write; this control owns only the parse, because "what a typed
+            // String means" is a fact about a text field and not about the value.
+            runContextCommand(paneId, "canvas.setTestProp", {
+              name,
+              value: raw === "" ? null : parsePropValue(raw),
+            });
           }}
         ></sp-textfield>
       `,

@@ -250,7 +250,10 @@ const KNOWN_UNREACHABLE: Record<string, Record<string, string>> = {
   "panels/left-panel.ts": { unmount: PANEL_TEARDOWN },
   "panels/navigator-panels.ts": { resetNavigatorPanels: TEST_RESET },
   "panels/overlays.ts": { unmount: PANEL_TEARDOWN },
-  "panels/pane-context.ts": { unmount: PANEL_TEARDOWN },
+  "panels/pane-context.ts": {
+    resetResolvingOpen: TEST_RESET,
+    unmount: PANEL_TEARDOWN,
+  },
   "panels/panel-registry.ts": {
     resetPanels: TEST_RESET,
     unregisterPanel:

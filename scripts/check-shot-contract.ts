@@ -115,6 +115,11 @@ export const CONTRACT_VERSION = 1;
  *   (`element.insertData`, `media.browse`) plus `tab-strip-shot`, which types into a real editor
  *   because the dirty flag is EARNED, not asserted. Each falls out as its record lands.
  *
+ *   **14 → 13 when "resolving with" became a popover.** `counter-test-prop` typed into
+ *   `pane.primary/prop:count`, which a popover puts behind a gesture — so the value got a record
+ *   (`canvas.setTestProp`) and the shot names it. The change that could have cost a step paid one
+ *   back, because the fields moving out of reach is exactly what forced the capability to be named.
+ *
  *   **19 → 14 in P6.2**, the ratchet moving the way it is meant to: `settings.selectEntry` was the
  *   five of them, and it did not become a record of its own — `settings.open` grew an `entry`
  *   argument, because a map-layout section's entry is a KEY in that section and naming it is naming
@@ -131,6 +136,9 @@ export const CONTRACT_VERSION = 1;
  * - `nonDerivedRegions` DISTINCT region ids no registry stamps for free — the hand-stamped leaves
  *   §13.3 budgets for (`navigator/panel:git/commit`, `navigator/statements`, the settings entry
  *   rows…). Contract 0 counted 17 CSS selectors here.
+ *
+ *   **11 → 10 when "resolving with" became a popover**, and `pane.primary/prop:count` is the one that
+ *   left: a test value is set by `canvas.setTestProp` now, so no shot addresses the field.
  *
  *   **12 → 11 with the second pane**, and the media-picker's browse button is the one that left. It
  *   was hand-stamped `inspector/field:<prop>/browse`, and the stamp was a claim about location the
@@ -150,8 +158,8 @@ export const CONTRACT_BUDGET = {
   regionSelectors: 0,
   clipSelectors: 0,
   argSelectors: 0,
-  inputSteps: 14,
-  nonDerivedRegions: 11,
+  inputSteps: 13,
+  nonDerivedRegions: 10,
   unstable: 2,
 } as const;
 
@@ -344,7 +352,7 @@ export function suggestFor(id: string, known: Iterable<string>): string {
 
 /** A JSON Schema keyword subset — everything a command's `args` schema realistically declares. */
 interface ArgsSchema {
-  type?: string;
+  type?: string | readonly string[];
   properties?: Record<string, ArgsSchema>;
   required?: readonly string[];
   additionalProperties?: boolean;
@@ -380,7 +388,15 @@ function show(value: unknown): string {
   return typeof value === "string" ? `"${value}"` : JSON.stringify(value);
 }
 
-function typeMatches(expected: string, value: unknown): boolean {
+function typeMatches(expected: string | readonly string[], value: unknown): boolean {
+  /* JSON Schema's `type` may be a UNION, and two shipped commands declare one — `canvas.setBreakpoint`'s
+     `media` is `["string", "null"]` and `canvas.setTestProp`'s `value` is the whole JSON ladder. This
+     compared an array to a string, so any union type failed every value; no shot named one of those
+     commands, so the check was wrong in a way nothing could observe. Reading the union is not a
+     loosening — an arg still has to match one of the types the app declares. */
+  if (Array.isArray(expected)) {
+    return expected.some((option) => typeMatches(option, value));
+  }
   if (expected === "integer") {
     return typeof value === "number" && Number.isInteger(value);
   }

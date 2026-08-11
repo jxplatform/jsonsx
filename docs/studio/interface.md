@@ -38,7 +38,7 @@ From left to right:
 
 In the desktop app, the window's minimize, maximize and close controls also live in this row.
 
-**Open in Browser** (:kbd[⇧⌘O] on macOS, :kbd[Ctrl+Shift+O] on Windows/Linux) opens the built version of the page you're editing, at its real route, in your own browser — the fastest way to check the actual page rather than the canvas's approximation of it. It is always there: when the open file has no route it's disabled and its tooltip says why — a component isn't a page, a `[slug]` route needs a value picked on the pane context bar first, and a project that doesn't build a site has nothing to serve.
+**Open in Browser** (:kbd[⇧⌘O] on macOS, :kbd[Ctrl+Shift+O] on Windows/Linux) opens the built version of the page you're editing, at its real route, in your own browser — the fastest way to check the actual page rather than the canvas's approximation of it. It is always there: when the open file has no route it's disabled and its tooltip says why — a component isn't a page, a `[slug]` route needs a value picked in the pane context bar's **resolving with** popover first, and a project that doesn't build a site has nothing to serve.
 
 :::doc-tip
 A layout reconfigures the workspace; it never takes anything away. Every panel stays on the rail, on its shortcut and in the palette after any layout is applied.

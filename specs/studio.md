@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.15-draft
+**Version:** 0.9.16-draft
 **Status:** Partial
 **Updated:** 2026-08-11
 **License:** MIT
@@ -564,6 +564,29 @@ base width rather than sizing the column from a query that does not exist.
 A control that selects a rendering context has to change the rendering. It wrote
 `session.ui.activeMedia`, Design used it, and Edit ignored it — so in the mode where the switcher is
 most useful it was a control over a label.
+
+#### resolving with
+
+The document DATA a render resolves against — a page's route params, a component's test props —
+sits in its own popover beside the rendering-context one, headed **resolving with**, one field per
+line. Its trigger counts the values that are set (`2 set`, else `Defaults`), because a chevron with
+no reading is a control you must open to learn whether it was worth opening.
+
+A SECOND popover rather than a fourth group in the first: everything in the rendering-context
+popover is something you PICK from what the project defines, and these are values you TYPE. §2
+principle 5 draws that line — that control only selects.
+
+They were a row of fields open on the bar, on a 28px band that also carries the editor, the view and
+the rendering context. Moving them behind a click costs a gesture, which the screenshot contract
+(§13.1) is right to weigh — and the answer is that a transient surface opens by COMMAND (§13.2), so
+the camera spends a `cmd` step rather than a selector.
+
+**Each field is a command too.** `canvas.setTestProp { name, value, pane? }` and
+`canvas.setRouteParam { name, value, pane? }`, each refusing a name the document does not declare.
+These two wrote `session.ui` inline while every control beside them ran a verb; behind a click that
+would have been a value reachable only by opening a popover and typing. Naming them moved the shot
+that types a test value off `input` entirely — `inputSteps` 14 → 13 and `nonDerivedRegions` 11 → 10,
+both budgets ratcheting down in the change that could have cost them.
 
 These are SETTERS. §5.3's keymap declares `⌘⌥↑`/`⌘⌥↓` and `⌘⌥⇧S` to _cycle_ the size and scheme
 axes; a chord carries no argument, so those need `next`/`prev` records of their own — each a delta,
@@ -1926,6 +1949,7 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ## Changelog
 
+- **0.9.16-draft** (2026-08-11) — The resolving-with values move into their own popover, and each becomes a command (canvas.setTestProp / setRouteParam).
 - **0.9.15-draft** (2026-08-11) — The size switcher resizes the Edit column to the chosen breakpoint, and each rendering-context verb repaints the pane it wrote.
 - **0.9.14-draft** (2026-08-11) — §9.1.3 — one service decides what belongs in $elements, for all four writers of it.
 - **0.9.13-draft** (2026-08-11) — The Library has four doors including ⌘⇧E (§9.1.2), and the assistant's context budget is rendered.
@@ -1996,4 +2020,4 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.15-draft_
+_`@jxsuite/studio` Specification v0.9.16-draft_

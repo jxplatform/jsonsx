@@ -91,6 +91,7 @@ export function appCommandSet(): AnyCommand[] {
       getCanvasMode: () => "design",
       renderPane: NO_OP,
       setCanvasMode: NO_OP,
+      setResolvingOpen: NO_OP,
     }),
     ...selectionCommands(),
     ...inspectorCommands(),

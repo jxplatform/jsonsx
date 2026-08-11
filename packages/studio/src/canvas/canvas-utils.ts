@@ -5,7 +5,7 @@
  */
 
 import { html, nothing } from "lit-html";
-import type { CanvasPanel } from "../types";
+import type { CanvasPanel, JsonValue } from "../types";
 import { ref } from "lit-html/directives/ref.js";
 import { classMap } from "lit-html/directives/class-map.js";
 import { styleMap } from "lit-html/directives/style-map.js";
@@ -30,6 +30,7 @@ import {
 } from "./canvas-helpers";
 import { rectOf } from "../utils/geometry";
 import { getEffectiveMedia } from "../site-context";
+import { dynamicRouteParams } from "../page-params";
 import {
   argsSchema,
   booleanArg,
@@ -865,6 +866,8 @@ export interface CanvasCommandDeps {
   getCanvasMode: () => string;
   /** Write the BASE mode (`ui.canvasMode`) of the tab it is given — `studio.ts`'s `setCanvasMode`. */
   setCanvasMode: (tab: Tab | null, mode: string) => void;
+  /** Open or close a pane's resolving-with popover — `pane-context.ts`'s `setResolvingOpen`. */
+  setResolvingOpen: (paneId: string, open: boolean) => void;
   /**
    * Repaint ONE pane's stage — `studio.ts`'s `renderCanvas`, taking the pane.
    *
@@ -1183,6 +1186,145 @@ export function canvasViewCommands(deps: CanvasCommandDeps): AnyCommand[] {
         repaint(args);
       },
       title: "Show Layout Elements",
+    },
+    {
+      args: {
+        additionalProperties: false,
+        properties: {
+          ...paneArg,
+          open: {
+            default: true,
+            description: "True to open the resolving-with popover, false to close it.",
+            type: "boolean",
+          },
+        },
+        required: [],
+        type: "object",
+      },
+      category: "View",
+      id: "canvas.setResolvingOpen",
+      level: "document",
+      menus: ["palette"],
+      group: "3_canvas",
+      requires: "an open document",
+      when: documentOpen,
+      /*
+       * The route params and component test props live in a popover now, and a transient surface
+       * opens by COMMAND rather than by clicking (plan §13.2) — otherwise the one shot that types a
+       * test value would need a CSS selector to reach it, which §13's contract forbids outright.
+       * The pointer and the camera use the same door.
+       */
+      run: (_commandCtx, args) => {
+        // Resolve the tab first, so a pane with no document refuses before anything opens.
+        contextTab("canvas.setResolvingOpen", args);
+        const { open, pane } = args as { open?: unknown; pane?: unknown };
+        // `open` defaults to true and is never COERCED: `{ open: "no" }` would otherwise read as a
+        // Close, the class of silent wrong answer this setter family exists to stop.
+        deps.setResolvingOpen(
+          typeof pane === "string" ? pane : workspace.activePaneId,
+          open === undefined || booleanArg("canvas.setResolvingOpen", args, "open"),
+        );
+      },
+      title: "Show Resolving Values",
+    },
+    /*
+     * ── The values a render resolves WITH ─────────────────────────────────────────────────────
+     *
+     * The two controls in that popover wrote `session.ui` through `updateUi` directly, while every
+     * control in the rendering-context popover beside them runs a command — and `runContextCommand`
+     * says why in as many words: "the popover WAS the capability, and the palette, the assistant and
+     * `__jxAutomation` had no name for it." Moving these behind a click without naming them would
+     * have reintroduced that, one layer deeper: a value you can now only reach by opening a popover
+     * and typing.
+     *
+     * The screenshot budget agrees. `counter-test-prop` typed into `pane.primary/prop:count`; with
+     * a verb it spends a `cmd` instead, so `inputSteps` falls 14 → 13 and the region leaves the
+     * manifest, dropping `nonDerivedRegions` 11 → 10. Both budgets may only ratchet down, and this
+     * ratchets both.
+     */
+    {
+      args: {
+        additionalProperties: false,
+        properties: {
+          ...paneArg,
+          name: stringProperty("The prop's name, as the component's state declares it."),
+          value: {
+            description:
+              "The test value — any JSON. Null clears it and the prop returns to its default.",
+            type: ["string", "number", "boolean", "array", "object", "null"],
+          },
+        },
+        required: ["name"],
+        type: "object",
+      },
+      category: "View",
+      id: "canvas.setTestProp",
+      level: "document",
+      menus: ["palette"],
+      group: "3_canvas",
+      requires: "an open component document",
+      when: documentOpen,
+      run: (_commandCtx, args) => {
+        const tab = contextTab("canvas.setTestProp", args);
+        const name = stringArg("canvas.setTestProp", args, "name");
+        // REFUSES a prop the component does not declare, rather than seeding a value nothing reads
+        // — the rule `data.expandRow` and `canvas.setBreakpoint` both apply to their own names.
+        const declared = Object.keys(
+          (tab.doc.document?.state as Record<string, unknown> | undefined) ?? {},
+        );
+        if (!declared.includes(name)) {
+          throw new RangeError(
+            `command "canvas.setTestProp" argument "name": "${name}" is not a prop this component ` +
+              `declares — it declares: ${declared.length > 0 ? declared.join(", ") : "nothing"}`,
+          );
+        }
+        const { value } = args as { value?: unknown };
+        const next = { ...tab.session.ui.previewProps };
+        if (value === null || value === undefined) {
+          delete next[name];
+        } else {
+          next[name] = value as JsonValue;
+        }
+        tab.session.ui.previewProps = Object.keys(next).length > 0 ? next : null;
+        repaint(args);
+      },
+      title: "Set Test Value",
+    },
+    {
+      args: {
+        additionalProperties: false,
+        properties: {
+          ...paneArg,
+          name: stringProperty("The route parameter's name, without brackets."),
+          value: stringProperty("The value to preview the route with. Empty clears it."),
+        },
+        required: ["name", "value"],
+        type: "object",
+      },
+      category: "View",
+      id: "canvas.setRouteParam",
+      level: "document",
+      menus: ["palette"],
+      group: "3_canvas",
+      requires: "an open page with a dynamic route",
+      when: documentOpen,
+      run: (_commandCtx, args) => {
+        const tab = contextTab("canvas.setRouteParam", args);
+        const name = stringArg("canvas.setRouteParam", args, "name");
+        const declared = dynamicRouteParams(tab.documentPath);
+        if (!declared.includes(name)) {
+          throw new RangeError(
+            `command "canvas.setRouteParam" argument "name": "${name}" is not a parameter of this ` +
+              `route — it has: ${declared.length > 0 ? declared.join(", ") : "none"}`,
+          );
+        }
+        tab.session.ui.previewParams = {
+          ...tab.session.ui.previewParams,
+          [name]: stringArg("canvas.setRouteParam", args, "value"),
+        };
+        repaint(args);
+      },
+      title: "Set Route Parameter",
     },
   ];
 }
