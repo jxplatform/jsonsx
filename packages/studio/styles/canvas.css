@@ -299,6 +299,16 @@
   flex-direction: column;
   gap: 2px;
 }
+/* The card's door to Search appearance. It sits where the SEO disclosure used to, above Raw head
+   tags — same place in the reading order, one line instead of a block that could grow taller than
+   the document it describes. */
+.doc-header-seo {
+  display: flex;
+  padding: 2px 0;
+}
+.doc-header-seo-btn {
+  font-size: var(--spectrum-font-size-50, 11px);
+}
 .doc-header-disclosure > summary {
   padding: 4px 0;
   font-size: var(--spectrum-font-size-50, 11px);

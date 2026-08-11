@@ -840,6 +840,21 @@
       "shot": "selector-menu-shot",
       "width": 560
     },
+    "docs/images/seo-modal.png": {
+      "bytes": 266356,
+      "capturedAt": "2026-08-11T23:27:45Z",
+      "capturedBy": "screenshots@local",
+      "definition": "5f4e7f6672bde116b3c1c64a10ecf28e21b97cf6b68b528c95c8660e07b3d96f",
+      "height": 2112,
+      "runtime": {
+        "chromium": "151",
+        "fontset": "fc:1b695f444a2f",
+        "os": "nixos-26.11"
+      },
+      "sha256": "bc4b03c82321e5bc77940437c2b3c99ed9b74376f247908da418fd564ef3d9aa",
+      "shot": "seo-modal",
+      "width": 1536
+    },
     "docs/images/settings-document.png": {
       "bytes": 284678,
       "capturedAt": "2026-08-11T13:30:43Z",

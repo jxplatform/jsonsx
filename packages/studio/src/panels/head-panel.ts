@@ -13,6 +13,7 @@ import { renderMediaPicker } from "../ui/media-picker";
 import { projectState, renderOnly } from "../store";
 import type { DirEntry, JsonValue } from "../types";
 import { activeTab } from "../workspace/workspace";
+import { activeRegistry } from "../commands/active-registry";
 import { renderEmptyState } from "./empty-state";
 import { registerPanel } from "./panel-registry";
 import { mutateUpdateFrontmatter, transact } from "../tabs/transact";
@@ -56,7 +57,7 @@ async function loadLayoutEntries() {
     layoutEntries = [];
   }
   renderOnly("leftPanel");
-  renderOnly("frontmatterPanel");
+  renderOnly("frontmatterPanel", "seoModal");
 }
 
 /**
@@ -626,7 +627,11 @@ async function loadLayoutHead(path: string): Promise<void> {
   _layoutHeadPending = null;
   _layoutHeadPath = path;
   _layoutHead = doc?.$head ?? [];
-  renderOnly("frontmatterPanel");
+  // THREE surfaces show the merged head now, and the layout layer arrives asynchronously: the
+  // Document Header card, and Search appearance, which is where the previews went. A modal left
+  // Off this list renders the page's own head with the layout layer missing — which reads as
+  // "you have no description" on a page that inherits one.
+  renderOnly("frontmatterPanel", "seoModal");
 }
 
 /**
@@ -802,6 +807,20 @@ export function renderHeadTemplate({
       <div class="imports-section">
         <div class="imports-section-header">
           <span class="imports-section-title">Page</span>
+          <!-- The SECOND door to Search appearance; the Document Header card has the other. Two
+               moments, one capability — both run document.openSeo, so neither surface owns it and
+               the palette has it by name. -->
+          <sp-action-button
+            quiet
+            size="xs"
+            class="head-seo-btn"
+            title="Preview how this page appears in search and when shared"
+            @click=${() => {
+              void activeRegistry()?.run("document.openSeo");
+            }}
+          >
+            Search appearance…
+          </sp-action-button>
         </div>
         <div class="head-section-body">
           ${renderFieldRow({

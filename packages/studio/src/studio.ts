@@ -205,6 +205,7 @@ import {
 import { openNewProjectModal, registerNewProjectCommands } from "./new-project/new-project-modal";
 import { invalidatePageRouteCache, registerInspectorCommands } from "./panels/properties-panel";
 import { liveElementCommands, setContextMenuNavigate } from "./editor/context-menu";
+import { registerSeoCommands, renderSeoModal } from "./panels/seo-modal";
 import { registerStyleCommands } from "./panels/style-panel";
 import { registerGridCommands } from "./grid/grid-open";
 import { registerSettingsCommands } from "./settings/settings-document";
@@ -758,6 +759,7 @@ registerRenderer("leftPanel", () => leftPanelMod.render());
 registerRenderer("canvas", () => renderCanvas());
 registerRenderer("rightPanel", () => rightPanelMod.render());
 registerRenderer("frontmatterPanel", () => frontmatterPanelMod.render());
+registerRenderer("seoModal", renderSeoModal);
 registerRenderer("chatPanel", () => chatPanelMod.render());
 registerRenderer("overlays", () => overlaysPanel.render());
 renderStatusbar();
@@ -1314,6 +1316,9 @@ registerCanvasViewCommands(commandRegistry, {
 });
 registerSelectionSetCommand(commandRegistry);
 registerInspectorCommands(commandRegistry);
+/* Search appearance, behind one record with two buttons: the Document Header card's and the Page
+   panel's. A surface that IS the capability is one the palette cannot reach. */
+registerSeoCommands(commandRegistry);
 /* The element menu's eight verbs, in the APP registry rather than only in the popover's own. They
    have always declared `menus: ["context/element", "palette"]`; the palette has never listed one,
    because the only registry holding them was the one `editor/context-menu.ts` builds for itself.

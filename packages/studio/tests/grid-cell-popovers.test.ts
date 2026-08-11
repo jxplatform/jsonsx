@@ -12,6 +12,8 @@ void mock.module("../src/ui/layers.js", () => ({
   getLayerSlot: () => document.createElement("div"),
   initLayers: () => {},
   openModal: () => ({ close: () => {}, update: () => {} }),
+  // The media picker asks which layer its anchor sits in; these fields are in a panel.
+  popoverLayerFor: () => "popover",
   renderPopover: (template: TemplateResult) => {
     const host = document.createElement("div");
     document.body.append(host);

@@ -147,6 +147,7 @@ Everything Studio can do is a command, and every command is reachable by name: p
 | Pin / Unpin Document   | `document.togglePinned` | —                  | document | an open document                                  |
 | Previous Tab           | `document.previousTab`  | `⌃⇧Tab` or `⌘⇧Tab` | document | a second open document                            |
 | Reopen Closed Document | `document.reopenClosed` | `⌘⇧T`              | document | a document closed in this session                 |
+| Search Appearance      | `document.openSeo`      | —                  | document | an open document                                  |
 | Set Document Pinned    | `document.setPinned`    | —                  | document | an open document                                  |
 | Set Draft              | `content.setDraft`      | —                  | document | a content entry open                              |
 

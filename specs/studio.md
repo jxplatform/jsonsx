@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.16-draft
+**Version:** 0.9.17-draft
 **Status:** Partial
 **Updated:** 2026-08-11
 **License:** MIT
@@ -1233,17 +1233,17 @@ held (`services/monaco-lazy`) and registered when an editor is first created.
 
 ## 12. Pending Features
 
-| Feature                      | Description                                                    | Status                                                                              |
-| ---------------------------- | -------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| CSS custom properties panel  | Declare `--custom-property` interfaces for CEM                 | **Pending**                                                                         |
-| CSS parts panel              | Declare `::part()` styling hooks for CEM                       | **Pending**                                                                         |
-| Full CEM document export     | Generate complete Custom Elements Manifest JSON                | **Pending**                                                                         |
-| Component library management | Browse, install, and manage component packages                 | **Pending**                                                                         |
-| Content collection browser   | Table/card/calendar views for content entries                  | **Pending**                                                                         |
-| Content entry editor         | Schema-driven forms for Markdown frontmatter, JSON, CSV        | **Pending**                                                                         |
-| Media browser                | Grid/list view of project media with upload and usage tracking | **Partial** — upload ships on four surfaces (§9.3); usage tracking is still pending |
-| SEO panel                    | Title/description/OG preview with schema.org editor            | **Pending**                                                                         |
-| Redirect editor              | CRUD table for site redirect rules                             | **Pending**                                                                         |
+| Feature                      | Description                                                    | Status                                                                                                                                                                            |
+| ---------------------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CSS custom properties panel  | Declare `--custom-property` interfaces for CEM                 | **Pending**                                                                                                                                                                       |
+| CSS parts panel              | Declare `::part()` styling hooks for CEM                       | **Pending**                                                                                                                                                                       |
+| Full CEM document export     | Generate complete Custom Elements Manifest JSON                | **Pending**                                                                                                                                                                       |
+| Component library management | Browse, install, and manage component packages                 | **Pending**                                                                                                                                                                       |
+| Content collection browser   | Table/card/calendar views for content entries                  | **Pending**                                                                                                                                                                       |
+| Content entry editor         | Schema-driven forms for Markdown frontmatter, JSON, CSV        | **Pending**                                                                                                                                                                       |
+| Media browser                | Grid/list view of project media with upload and usage tracking | **Partial** — upload ships on four surfaces (§9.3); usage tracking is still pending                                                                                               |
+| SEO panel                    | Title/description/OG preview with schema.org editor            | **Partial** — `Search appearance` ships the merged-head previews, resolved fields, counters and warnings (site-architecture §8.6); the schema.org/JSON-LD editor is still pending |
+| Redirect editor              | CRUD table for site redirect rules                             | **Pending**                                                                                                                                                                       |
 
 See the [Site Architecture Specification](site-architecture.md) for full design details on content management UI.
 
@@ -1949,6 +1949,7 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ## Changelog
 
+- **0.9.17-draft** (2026-08-11) — SEO panel status is Partial — Search appearance ships the previews, counters and warnings; the schema.org editor is still pending.
 - **0.9.16-draft** (2026-08-11) — The resolving-with values move into their own popover, and each becomes a command (canvas.setTestProp / setRouteParam).
 - **0.9.15-draft** (2026-08-11) — The size switcher resizes the Edit column to the chosen breakpoint, and each rendering-context verb repaints the pane it wrote.
 - **0.9.14-draft** (2026-08-11) — §9.1.3 — one service decides what belongs in $elements, for all four writers of it.
@@ -2020,4 +2021,4 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.16-draft_
+_`@jxsuite/studio` Specification v0.9.17-draft_

@@ -571,6 +571,36 @@
       ]
     },
     {
+      "name": "seo-modal",
+      "docs": ["studio/editing/frontmatter"],
+      "open": {
+        "project": "packages/starters/sites/blog",
+        "file": "content/posts/designing-for-slowness.md",
+        "view": "edit",
+        "viewport": {
+          "width": 1440,
+          "height": 1100
+        }
+      },
+      "steps": [
+        {
+          "cmd": "document.openSeo"
+        }
+      ],
+      "expect": [
+        {
+          "region": "overlay.dialog:seo"
+        }
+      ],
+      "capture": [
+        {
+          "image": "seo-modal",
+          "of": "overlay.dialog:seo",
+          "padding": 24
+        }
+      ]
+    },
+    {
       "name": "data-explorer-shot",
       "docs": ["studio/logic/data"],
       "open": {

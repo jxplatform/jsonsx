@@ -2,9 +2,9 @@
 
 ## File-Based Routing, Content Collections, Layouts, and Static Site Generation
 
-**Version:** 0.1.42-draft
+**Version:** 0.1.43-draft
 **Status:** Pending
-**Updated:** 2026-08-06
+**Updated:** 2026-08-11
 **License:** MIT
 
 ---
@@ -1009,8 +1009,11 @@ The compiler serializes the `textContent` object to a JSON string within the `<s
 
 ### 8.6 Studio SEO Panel
 
-> **Status: Implemented.** The previews live in the Document Header card rather than an inspector
-> tab, because they describe the document rather than a selection.
+> **Status: Implemented.** The previews live in a **modal**, `Search appearance`, rather than an
+> inspector tab: they describe the document rather than a selection, and a rendered SERP row is a
+> picture you study at width, not a field you fill in beside four others. They began as a
+> disclosure inside the Document Header card and outgrew it — the card's job is the handful of
+> values you type while writing.
 
 **The preview shows the MERGED `$head`** (§8.3), not the page's own entries — a page appends to the
 site's head rather than replacing it, so a preview of the page's half would misreport every title
@@ -1020,13 +1023,24 @@ provenance vocabulary the inspector uses for style and props.
 **There is no score.** Counters and named warnings only. A number out of 100 invites optimising the
 number, and the number is not the thing.
 
-The Document Header card shows, for any page or content entry:
+**Two doors and a command.** The surface is opened by `document.openSeo` — a document-level command
+in the palette, with an `aiTool` projection — and projected onto two buttons: one at the foot of the
+Document Header card, one beside the Page panel's `Page` heading. Neither surface owns it. Two
+buttons because they are two moments: while writing the page, and while working on its head
+material.
+
+For any page or content entry it shows:
 
 - **Title preview:** Shows how the title will appear in Google search results (truncated to ~60 chars)
 - **Description preview:** Shows the meta description (truncated to ~155 chars)
 - **OG preview:** Renders a social media card preview (Facebook/Twitter)
 - **Schema.org editor:** Form-based JSON-LD editor for structured data
 - **Warnings:** Missing title, missing description, description too long, missing OG image
+
+The editable fields sit **below** the previews and the warnings, grouped by the preview each group
+feeds — `Search result` (description, viewport, icon) and `Social card` (the Open Graph four).
+Ungrouped they collide: Open Graph carries its own `Title`, `Description` and `Image`, so one flat
+column gave `Description` two meanings. Every field commits live, and the previews redraw with it.
 
 ---
 
@@ -1821,6 +1835,7 @@ This spec builds on existing Jx primitives wherever possible:
 
 ## Changelog
 
+- **0.1.43-draft** (2026-08-11) — Studio SEO previews move from a Document Header disclosure into the Search appearance modal (document.openSeo), reachable from the card, the Page panel and the palette; fields grouped by the preview each feeds.
 - **0.1.42-draft** (2026-08-06) — §7.2 the Library and its window contract, §7.5 the CRUD table corrected — rename, delete and CSV editing already shipped and were listed Pending, §7.6 the draft pill, §8.6 merged-$head previews with no score, §9.4 usage keyed on the authored ref, §11.4 redirects as a GridSource with chain, loop and shadow validation.
 - **0.1.41-draft** (2026-08-05) — §3.2 names the consequence of the cascade — every property reaches every route, which is why Studio states the blast radius and edits the file under undo.
 - **0.1.40-draft** (2026-07-30) — A page uses a component when its tag appears in the prerendered HTML or in one of the page's island modules (§12.4).

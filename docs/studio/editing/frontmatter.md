@@ -6,6 +6,7 @@ spec:
 code:
   - packages/studio/src/panels/head-panel.ts
   - packages/studio/src/panels/frontmatter-panel.ts
+  - packages/studio/src/panels/seo-modal.ts
   - packages/studio/src/panels/frontmatter-fields.ts
   - packages/studio/src/panels/provenance.ts
 ---
@@ -64,11 +65,17 @@ Its bar names what the document is — the collection it belongs to, or **Docume
 
 ![The Document Header card above a post open in Edit view](../../images/properties-bar.png)
 
-Two disclosures close the card: **SEO**, and **Raw head tags** — every head entry no form owns, listed read-only, so a tag you can't see can't surprise you. The Page panel remains the place to add and remove those.
+Closing the card are a **Search appearance…** button and one disclosure, **Raw head tags** — every head entry no form owns, listed read-only, so a tag you can't see can't surprise you. The Page panel remains the place to add and remove those.
 
-## The SEO block
+## Search appearance
 
-Open **SEO** and the first thing the card shows is not a form but two pictures of the finished page: a **Search result** preview — breadcrumb, title, description — and a **Social card** preview with its image, domain, headline and summary. Below them is the resolved-field list, then the warnings, and only then the controls that change any of it.
+**Search appearance** is a window of its own, and there are three ways in: the button at the foot of the Document Header card, the one beside the Page panel's **Page** heading, and the command palette. All three open the same thing over the document you're working on.
+
+The first thing it shows is not a form but two pictures of the finished page: a **Search result** preview — breadcrumb, title, description — and a **Social card** preview with its image, domain, headline and summary. Below them is the resolved-field list, then the warnings, and only then the controls that change any of it.
+
+![Search appearance, open over a post: the search-result and social-card previews, the resolved fields, the warnings, and the fields that change them](../../images/seo-modal.png)
+
+Every field commits as you type, and the previews above redraw with it — which is the reason it is a window rather than a panel: the previews want the width, and a search result rendered a third of a column wide is not a preview of anything.
 
 :::doc-note
 **The previews show the merged head, not just what this page declares.** A page's metadata is layered: the project's own `$head`, then the layout's, then the page's, with the later layer winning key by key. The title follows the same idea — the page's own title, or the project name, or `Jx Site` if nothing supplies one. What the previews draw is the result, which is what a search engine or a chat app will actually see.
@@ -80,7 +87,7 @@ One row per value that reaches the browser — Title, Description, Social title,
 
 A value this page sets shows the ordinary set dot. A value it inherits is marked **inherited** and names its donor: _from Base_ for a layout, _from Site head_ or _from Site name_ for the project, _from the build_ for a value the build supplies on your behalf. The two chips that lead somewhere are clickable and open the setting in Project Settings; the layout and build chips are plain text, because the card has no verb for them.
 
-That marking is the whole point of the block. A page inheriting its description from the site is not a page missing a description, and until the preview said which was which, the two looked identical.
+That marking is the whole point. A page inheriting its description from the site is not a page missing a description, and until the preview said which was which, the two looked identical.
 
 ### The warnings
 
@@ -93,7 +100,7 @@ A named list, in plain language, of things that are wrong or absent — and it i
 - Project Settings names no site URL, so the build emits no canonical link and no `og:url`.
 - A `<title>` element inside `$head` is discarded — the build writes the title from the document's own title property.
 
-When there is nothing to say, the block says that too: _Nothing to flag — every previewed field resolves to a value._
+When there is nothing to say, it says that too: _Nothing to flag — every previewed field resolves to a value._
 
 :::doc-tip
 **There is no score.** Counters and named warnings only. A single number out of a hundred adds unrelated facts together into a verdict, and the verdict is what ends up being optimized; a count beside a limit and a named consequence tell you the same thing without ranking anything.
@@ -101,7 +108,9 @@ When there is nothing to say, the block says that too: _Nothing to flag — ever
 
 ### The fields themselves
 
-Under the warnings are the controls: **Description** and **Viewport**, the **Icon** picker, and the four OpenGraph fields. They edit exactly what the Page panel's Page and OpenGraph sections edit — the same values, from wherever you happen to be working.
+Under the warnings are the controls, in two groups named after the preview each one feeds. **Search result** holds **Description**, **Viewport** and the **Icon** picker; **Social card** holds the four OpenGraph fields. They're grouped because they collide: Open Graph has its own Title, Description and Image, and in one flat column "Description" named two different fields.
+
+These edit exactly what the Page panel's Page and OpenGraph sections edit — the same values, from wherever you happen to be working.
 
 :::doc-note
 On disk, all of this lives at the top of the page's own file, in a small labeled block above the content — the frontmatter. That's why metadata travels with the page: copy the file and everything comes along, and any text editor can read it.

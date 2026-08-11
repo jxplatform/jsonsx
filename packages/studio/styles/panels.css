@@ -508,6 +508,13 @@
 .imports-section {
   margin-bottom: 12px;
 }
+/* The Page panel's door to Search appearance — pushed to the right edge of the section header, so
+   the section still reads as a heading and the button as its affordance. */
+.head-seo-btn {
+  margin-left: auto;
+  text-transform: none;
+  letter-spacing: normal;
+}
 .imports-section-header {
   display: flex;
   align-items: center;

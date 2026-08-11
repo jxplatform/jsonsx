@@ -47,31 +47,18 @@ import { spTextField } from "../ui/field-input";
 import { transact } from "../tabs/transact";
 import { pageRoute } from "./tab-strip";
 import {
-  OG_FIELDS,
-  PAGE_FIELDS,
   RESERVED_FM_KEYS,
   applyContentMutation,
   buildHeadDoc,
   entryLabel,
   entryValue,
-  findLinkEntry,
   isPageDocument,
   isManagedEntry,
   renderLayoutPickerRow,
-  renderMetaFieldRow,
-  seoField,
-  seoPreviewFor,
-  upsertLink,
 } from "./head-panel";
-import { renderMediaPicker } from "../ui/media-picker";
 import { isGoogleFontEntry, isGoogleFontPreconnect } from "../utils/google-fonts";
-import { renderProvenanceChip } from "./provenance";
 import { activeRegistry } from "../commands/active-registry";
-import { loopbackAssetSrc } from "../canvas/canvas-origin";
-import { previewAssetSrc } from "../canvas/content-assets";
 
-import type { SeoField, SeoPreview } from "./head-panel";
-import type { FieldProvenance } from "./provenance";
 import type { JxHeadEntry, JxMutableNode } from "@jxsuite/schema/types";
 import type { Tab } from "../tabs/tab";
 import type { PanelScheduler } from "./panel-scheduler";
@@ -89,7 +76,6 @@ const _hosts = new Map<string, { el: HTMLElement; scheduler: PanelScheduler }>()
 let _scope: { stop: () => void; run: <T>(fn: () => T) => T | undefined } | null = null;
 
 /** Per-document disclosure state, keyed by tab id — not stored on the document. */
-const _seoOpen = new Set<string>();
 const _rawOpen = new Set<string>();
 
 /**
@@ -169,7 +155,6 @@ export function unmount() {
     scheduler.unbind();
   }
   _hosts.clear();
-  _seoOpen.clear();
   _rawOpen.clear();
 }
 
@@ -327,9 +312,33 @@ export function documentHeaderTemplate(tab: Tab, paneId: string): TemplateResult
         ${isPageDocument(tab) ? renderLayoutPickerRow(headDoc, applyMutation) : nothing}
         ${fields.map((f) => renderFmField(tab, f.field, f.entry, f.value, requiredFields))}
       </div>
-      ${disclosure(tab.id, _seoOpen, "SEO", seoBody(tab, headDoc, head, applyMutation))}
-      ${disclosure(tab.id, _rawOpen, "Raw head tags", rawHeadBody(head))}
+      ${seoButtonRow()} ${disclosure(tab.id, _rawOpen, "Raw head tags", rawHeadBody(head))}
     </section>
+  `;
+}
+
+/**
+ * The door to Search appearance (`panels/seo-modal.ts`).
+ *
+ * A row rather than a disclosure, because what is behind it is a surface and not more of this card.
+ * It runs the COMMAND rather than calling `openSeoModal` — the Page panel offers the same door and
+ * neither of them should own it.
+ */
+function seoButtonRow(): TemplateResult {
+  return html`
+    <div class="doc-header-seo">
+      <sp-action-button
+        quiet
+        size="s"
+        class="doc-header-seo-btn"
+        @click=${() => {
+          void activeRegistry()?.run("document.openSeo");
+        }}
+      >
+        <sp-icon-search slot="icon"></sp-icon-search>
+        Search appearance…
+      </sp-action-button>
+    </div>
   `;
 }
 
@@ -366,199 +375,12 @@ function disclosure(
   `;
 }
 
-// ─── The SEO block ────────────────────────────────────────────────────────────
-
-/*
- * Two rendered previews, a resolved-field list and a warning list, over the MERGED head — and no
- * score. A number out of a hundred aggregates unrelated facts into a verdict, and a verdict is
- * what gets optimised; a count beside a limit and a named consequence say the same thing without
- * ranking anything (plan §9.2, §14).
- *
- * The previews are pictures of what the build emits, so a value the page did not author is marked
- * as inherited with the donor NAMED — the third cascade to use `panels/provenance.ts`'s vocabulary
- * after the style cascade and component props, and deliberately not a fourth vocabulary. It is the
- * whole reason the block can say "no description reaches this page" without saying it to a page
- * that inherits one from the site.
- */
-
-/**
- * A resolved field's provenance chip, in the shared vocabulary.
- *
- * The two chips that can go somewhere do: a value from the site's own `$head` opens Project
- * Settings › Site head, and one from the site `name` opens Overview. The layout and build donors
- * get a `<span>` rather than a `<button>`, because the card has no verb for "open that layout" and
- * a control that looks pressable and does nothing is the defect §6.2 exists to remove.
- *
- * @param {SeoField} field
- * @returns {FieldProvenance}
- */
-function seoProvenance(field: SeoField): FieldProvenance {
-  const open = (section: string) => () => {
-    void activeRegistry()?.run("settings.open", { section });
-  };
-  switch (field.source) {
-    case "page": {
-      return { state: "set", title: `${field.label} is set on this page` };
-    }
-    case "layout": {
-      const donor = field.donor ?? "the layout";
-      return {
-        donor,
-        state: "inherited",
-        title: `${field.label} comes from the ${donor} layout — this page does not set it`,
-      };
-    }
-    case "site": {
-      const fromName = field.donor === "Site name";
-      return {
-        donor: field.donor ?? "the site",
-        onClick: open(fromName ? "overview" : "head"),
-        state: "inherited",
-        title: `${field.label} comes from ${fromName ? "the project's name" : "the site-level $head"} — click to open it`,
-      };
-    }
-    case "build": {
-      return {
-        donor: "the build",
-        state: "inherited",
-        title: `Nothing declares ${field.label}, so the build supplies “${field.value}”`,
-      };
-    }
-    default: {
-      return { state: "default" };
-    }
-  }
-}
-
-/** A previewed line of text, or the placeholder that says nothing supplies it. */
-function previewText(field: SeoField): TemplateResult {
-  const text = field.value.trim();
-  return text
-    ? html`<span>${text}</span>`
-    : html`<span class="seo-unset">No ${field.label.toLowerCase()}</span>`;
-}
-
-/** The mock search result: the breadcrumb the canonical produces, the title, the description. */
-function serpCard(preview: SeoPreview): TemplateResult {
-  return html`
-    <figure class="seo-card seo-card--serp" aria-label="Search result preview">
-      <figcaption class="seo-card-label">Search result</figcaption>
-      <div class="seo-serp-url">${preview.url.crumb}</div>
-      <div class="seo-serp-title">${seoField(preview, "title").value}</div>
-      <div class="seo-serp-desc">${previewText(seoField(preview, "description"))}</div>
-    </figure>
-  `;
-}
-
-/**
- * The mock social card.
- *
- * The image is resolved the same way every other image in the studio chrome is —
- * `loopbackAssetSrc(previewAssetSrc(…))` — so a content-relative `./images/hero.jpg` previews at
- * its asset-mount URL while the authored ref stays exactly as written.
- */
-function socialCard(preview: SeoPreview): TemplateResult {
-  const image = seoField(preview, "og:image").value.trim();
-  return html`
-    <figure class="seo-card seo-card--social" aria-label="Social card preview">
-      <figcaption class="seo-card-label">Social card</figcaption>
-      <div class="seo-social-media">
-        ${
-          image
-            ? html`<img src=${loopbackAssetSrc(previewAssetSrc(image))} alt="" />`
-            : html`<span class="seo-unset">No image</span>`
-        }
-      </div>
-      <div class="seo-social-text">
-        <span class="seo-social-domain"
-          >${preview.url.host || html`<span class="seo-unset">No site URL</span>`}</span
-        >
-        <span class="seo-social-title">${previewText(seoField(preview, "og:title"))}</span>
-        <span class="seo-social-desc">${previewText(seoField(preview, "og:description"))}</span>
-      </div>
-    </figure>
-  `;
-}
-
-/** One row per resolved field: what reaches the browser, how long it is, and where it came from. */
-function seoFieldList(preview: SeoPreview): TemplateResult {
-  return html`
-    <ul class="seo-fields">
-      ${preview.fields.map((field) => {
-        const over = field.limit !== null && field.value.length > field.limit;
-        return html`
-          <li class="seo-field" data-seo-field=${field.key}>
-            <span class="seo-field-label">${field.label}</span>
-            <span class="seo-field-value" title=${field.value}>${previewText(field)}</span>
-            ${
-              field.limit === null
-                ? nothing
-                : html`<span
-                    class=${over ? "seo-field-count seo-field-count--over" : "seo-field-count"}
-                    >${field.value.length}/${field.limit}</span
-                  >`
-            }
-            ${renderProvenanceChip(field.key, seoProvenance(field))}
-          </li>
-        `;
-      })}
-    </ul>
-  `;
-}
-
-/** The named warnings. A list, never a total — see the note at the top of this section. */
-function seoWarningList(preview: SeoPreview): TemplateResult {
-  if (preview.warnings.length === 0) {
-    return html`<p class="doc-header-empty">
-      Nothing to flag — every previewed field resolves to a value.
-    </p>`;
-  }
-  return html`
-    <ul class="seo-warnings">
-      ${preview.warnings.map(
-        (warning) => html`
-          <li class="seo-warning" data-seo-warning=${warning.id}>
-            <code class="seo-warning-field">${warning.field}</code>
-            <span>${warning.message}</span>
-          </li>
-        `,
-      )}
-    </ul>
-  `;
-}
-
-/**
- * The previews, the resolved fields, then the controls that change them.
- *
- * That order on purpose: what it looks like, what is wrong with it, and only then the form. The
- * form was all this block used to be, and a form cannot tell you that the description you are about
- * to write is already coming from the site.
- */
-function seoBody(
-  tab: Tab,
-  headDoc: JxMutableNode,
-  head: JxHeadEntry[],
-  applyMutation: (fn: (doc: JxMutableNode) => void) => void,
-): TemplateResult {
-  const iconHref = String(findLinkEntry(head, "icon")?.attributes?.href ?? "");
-  // The card's tab, so the SERP row shows this document's route and this document's layout layer.
-  const preview = seoPreviewFor(tab, headDoc);
-  return html`
-    <div class="seo-previews">${serpCard(preview)} ${socialCard(preview)}</div>
-    ${seoFieldList(preview)} ${seoWarningList(preview)}
-    ${PAGE_FIELDS.map((field) => renderMetaFieldRow(field, head, applyMutation))}
-    ${renderFieldRow({
-      hasValue: Boolean(iconHref),
-      label: "Icon",
-      onClear: () => applyMutation((d) => upsertLink(d, "icon", "")),
-      prop: "icon",
-      widget: renderMediaPicker("icon", iconHref, (v: string) => {
-        applyMutation((d) => upsertLink(d, "icon", v || ""));
-      }),
-    })}
-    ${OG_FIELDS.map((field) => renderMetaFieldRow(field, head, applyMutation))}
-  `;
-}
+/* THE SEO BLOCK IS A MODAL — `panels/seo-modal.ts`.
+   Two rendered previews, a resolved-field list, a warning list, the page and Open Graph meta rows
+   and an icon picker, all disclosed inside a card whose job is the four or five fields you fill in
+   while writing. A previewed SERP result is not a field; it is a picture you study, and studying it
+   in a strip above the canvas made the card taller than the document it describes. The card keeps
+   Title — the one head value you type while writing — and offers the door. */
 
 /**
  * The `$head` entries no structured control owns, listed read-only.

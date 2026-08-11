@@ -23,7 +23,8 @@ import { live } from "lit-html/directives/live.js";
 import { ref } from "lit-html/directives/ref.js";
 import { getPlatform } from "../platform";
 import { debouncedStyleCommit, renderOnly } from "../store";
-import { getLayerSlot } from "./layers";
+import { getLayerSlot, popoverLayerFor } from "./layers";
+import type { LayerKind } from "./layers";
 import { rectOf } from "../utils/geometry";
 import { loopbackAssetSrc } from "../canvas/canvas-origin";
 import { previewAssetSrc } from "../canvas/content-assets";
@@ -125,6 +126,32 @@ let _popoverOnCommit: ((val: string) => void) | null = null;
 
 /** @type {HTMLElement | null} */
 let _popoverAnchorEl: HTMLElement | null = null;
+/**
+ * Which layer the open popover is living in.
+ *
+ * Chosen from the anchor at open time and then REMEMBERED, because `getLayerSlot` keys its slots by
+ * `${layer}:${id}`: dismissing through a different layer than the one that opened would clear an
+ * empty slot and leave the real popover on screen.
+ */
+let _popoverLayer: LayerKind = "popover";
+
+/** The open popover's slot — the one place that names the layer and the id together. */
+function popoverSlot(): HTMLElement {
+  return getLayerSlot(_popoverLayer, "media-picker");
+}
+
+/**
+ * The popover's z-index, which depends on the company it is keeping.
+ *
+ * In `#layer-popover` it has the layer to itself and 30 is enough — that is what it has always
+ * been, and every panel-hosted picker keeps rendering identically. Sharing a layer with a modal
+ * body is different: those declare `z-index: 1000` (`.seo-modal`, `.about-modal`, `.settings-modal`
+ * — the house shape), so a picker anchored inside one is a later sibling that still paints beneath
+ * it. Beating that number is the whole point of moving layers in the first place.
+ */
+function popoverZIndex(): number {
+  return _popoverLayer === "popover" ? 30 : 1001;
+}
 
 /** @type {HTMLInputElement | null} */
 let _popoverFilterEl: HTMLInputElement | null = null;
@@ -138,7 +165,7 @@ function dismissMediaPickerPopover() {
   _popoverFilterEl = null;
   document.removeEventListener("keydown", onPopoverKeydown, true);
   document.removeEventListener("mousedown", onPopoverOutsideClick, true);
-  litRender(nothing, getLayerSlot("popover", "media-picker"));
+  litRender(nothing, popoverSlot());
 }
 
 /** @param {KeyboardEvent} e */
@@ -152,7 +179,7 @@ function onPopoverKeydown(e: KeyboardEvent) {
 
 /** @param {MouseEvent} e */
 function onPopoverOutsideClick(e: MouseEvent) {
-  const host = getLayerSlot("popover", "media-picker");
+  const host = popoverSlot();
   if (!host.contains(e.target as Node)) {
     dismissMediaPickerPopover();
   }
@@ -183,7 +210,7 @@ function noteImageSize(file: string, target: EventTarget | null) {
 }
 
 function renderMediaPickerPopover() {
-  const host = getLayerSlot("popover", "media-picker");
+  const host = popoverSlot();
   const rect = _popoverAnchorEl ? rectOf(_popoverAnchorEl) : undefined;
   if (!rect) {
     return;
@@ -222,7 +249,7 @@ function renderMediaPickerPopover() {
         ${ref((el) => {
           _popoverEl = (el as HTMLElement | undefined) || null;
         })}
-        style="position:fixed;left:${left}px;top:${top}px;z-index:30;max-height:360px;overflow-y:auto;min-width:240px"
+        style="position:fixed;left:${left}px;top:${top}px;z-index:${popoverZIndex()};max-height:360px;overflow-y:auto;min-width:240px"
       >
         <input
           class="media-picker-filter"
@@ -326,6 +353,8 @@ function showMediaPickerPopover(anchorEl: HTMLElement, onCommit: (val: string) =
   dismissMediaPickerPopover();
   _popoverOnCommit = onCommit;
   _popoverAnchorEl = anchorEl;
+  // Before the first render, so every later `popoverSlot()` agrees with where it was drawn.
+  _popoverLayer = popoverLayerFor(anchorEl);
   _popoverFilter = "";
   renderMediaPickerPopover();
   document.addEventListener("keydown", onPopoverKeydown, true);

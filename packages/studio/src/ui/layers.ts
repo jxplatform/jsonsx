@@ -205,7 +205,10 @@ export function showDialog<T>(
   return new Promise((resolve) => {
     const { release, slot } = openOverlaySlot({
       kind: "dialog",
-      layer: _dialogLayer,
+      // `layerHost`, not the raw binding: it is the one that falls back to `<body>`, and reading
+      // The binding directly threw before `initLayers()` had run — which is any test that stands up
+      // A shell without the four layer hosts, and the boot window before layers are bound.
+      layer: layerHost("dialog"),
       regionId: opts.region,
       onEscape(e, host) {
         const wrapper = host.querySelector("sp-dialog-wrapper");
@@ -512,7 +515,7 @@ export interface ModalOptions {
 export function openModal(template: TemplateResult, opts: ModalOptions) {
   const { release, slot } = openOverlaySlot({
     kind: "modal",
-    layer: _modalLayer,
+    layer: layerHost("modal"),
     onEscape(e) {
       if (opts.dismissible === false) {
         return;
@@ -619,6 +622,26 @@ const _namedSlots = new Map<string, HTMLElement>();
  * @param {string} id
  * @returns {HTMLElement}
  */
+/**
+ * The layer a transient popover must use to appear ABOVE the surface that opened it.
+ *
+ * The four layer hosts are sibling stacking contexts (`index.html`): popover 1000, modal 2000,
+ * dialog 3000, toast 4000. So a popover anchored to a control INSIDE a modal — the media picker's
+ * Browse button in Search appearance, say — renders into a layer that paints entirely beneath the
+ * modal body, and the author clicks Browse and sees nothing happen. Putting it in the modal's own
+ * layer makes it a later sibling of the modal body instead, which is exactly the relationship it
+ * should have: above the surface that opened it, below any dialog.
+ *
+ * @param {Element | null} anchor The control the popover is anchored to.
+ * @returns {LayerKind}
+ */
+export function popoverLayerFor(anchor: Element | null): LayerKind {
+  if (anchor?.closest("#layer-dialog")) {
+    return "dialog";
+  }
+  return anchor?.closest("#layer-modal") ? "modal" : "popover";
+}
+
 export function getLayerSlot(layer: LayerKind, id: string) {
   const key = `${layer}:${id}`;
   let slot = _namedSlots.get(key);

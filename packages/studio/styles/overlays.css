@@ -542,6 +542,69 @@
   overflow-y: auto;
   padding: 20px;
 }
+
+/* ─── Search appearance ───────────────────────────────────────────────────────
+   Wider than .about-modal because the two preview cards are side by side, and a SERP snippet
+   narrower than a SERP snippet is not a preview of anything. Below ~700px they wrap (the .seo-card
+   flex-basis in panels.css does that) and the modal is simply a tall column. */
+.seo-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(720px, calc(100vw - 48px));
+  max-height: calc(100vh - 80px);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--spectrum-corner-radius-200, 8px);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+/* Which document this is about. Between the title and the close button, and it truncates rather
+   than pushing the button off — a long path must not cost you the way out. */
+.seo-modal-doc {
+  flex: 1;
+  min-width: 0;
+  margin-left: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--fg-dim);
+  direction: rtl;
+  text-align: left;
+}
+.seo-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px 16px;
+}
+/* The form, split by the card each half feeds — Open Graph has its own Title/Description/Image. */
+.seo-modal-group {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.seo-modal-group-title {
+  margin: 0 0 2px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-dim);
+}
+.seo-modal-group-note {
+  margin: 0 0 8px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+}
+/* The previews sit at the top of a scroll container, so they need no top padding of their own. */
+.seo-modal-body .seo-previews {
+  padding-top: 0;
+}
 .about-meta {
   margin: 0 0 16px;
   display: flex;

@@ -1,7 +1,11 @@
 /**
  * The Document Header card — the three deleted gates (collection, canvas mode, document mode), the
  * ONE reserved-key policy (`title` has a named row and never doubles as a generic property), the
- * Route line, the SEO and Raw-head disclosures, the commit paths, and reactive re-render.
+ * Route line, the Raw-head disclosure, the door to Search appearance, the commit paths, and
+ * reactive re-render.
+ *
+ * The SEO block left: it is a modal now (`tests/seo-modal.test.ts`), reachable from this card and
+ * from the Page panel. What stays here is the BUTTON — that the card offers the door at all.
  *
  * The card has no host of its own any more: `#frontmatter-panel` is deleted and the STAGE hands one
  * over. These tests play the stage's part with `attachDocumentHeaderHost`; `canvas-render.test.ts`
@@ -439,23 +443,47 @@ describe("route and disclosures", () => {
     expect(host().querySelector(".doc-header-route")).toBeNull();
   });
 
-  test("SEO and Raw head tags are both disclosed, closed by default", async () => {
+  test("Raw head tags is the card's ONE disclosure now, closed by default", async () => {
     setupContentTab({ title: "Hello" });
     await mountAndFlush();
-    expect(summaries()).toEqual(["SEO", "Raw head tags"]);
+    // Was ["SEO", "Raw head tags"]. The SEO block grew previews, a resolved-field list and eight
+    // Form rows inside a card whose job is the four fields you fill in while writing, so it left.
+    expect(summaries()).toEqual(["Raw head tags"]);
     for (const d of host().querySelectorAll("details")) {
       expect((d as HTMLDetailsElement).open).toBe(false);
     }
   });
 
-  test("the SEO block edits $head meta through the frontmatter round-trip", async () => {
-    const tab = setupContentTab({ title: "Hello" });
+  test("the card offers the door to Search appearance, and it runs the command", async () => {
+    const ran: string[] = [];
+    const registry = createCommandRegistry({ getContext: () => emptyContext() });
+    registry.register({
+      category: "Document",
+      id: "document.openSeo",
+      level: "document",
+      run: () => {
+        ran.push("document.openSeo");
+      },
+      title: "Search Appearance",
+    });
+    setActiveRegistry(registry);
+    setupContentTab({ title: "Hello" });
     await mountAndFlush();
-    fireChange(row("description").querySelector("sp-textfield")!, "A summary");
-    const head = tab.doc.content.frontmatter.$head as any[];
-    expect(head).toEqual([
-      { attributes: { content: "A summary", name: "description" }, tagName: "meta" },
-    ]);
+    const button = host().querySelector(".doc-header-seo-btn") as HTMLElement;
+    expect(button.textContent?.trim()).toBe("Search appearance…");
+    button.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    // The command, not a local open() — so the palette and the Page panel reach the same modal.
+    expect(ran).toEqual(["document.openSeo"]);
+    setActiveRegistry(null);
+  });
+
+  test("with no registry the door renders and clicking it is inert", async () => {
+    setActiveRegistry(null);
+    setupContentTab({ title: "Hello" });
+    await mountAndFlush();
+    (host().querySelector(".doc-header-seo-btn") as HTMLElement).dispatchEvent(
+      new MouseEvent("click", { bubbles: true }),
+    );
   });
 
   test("Raw head tags lists what no structured control owns, and says so when empty", async () => {
@@ -594,305 +622,5 @@ describe("the other commit path and the disclosure state", () => {
     setShell(false); // The stage redrew without a header slot; the host is now null
     render();
     await flush(4);
-  });
-});
-
-describe("the SEO block's favicon row", () => {
-  test("committing a path writes a link entry; the clear dot removes it", async () => {
-    const tab = setupContentTab({ title: "Hello" });
-    await mountAndFlush();
-    const field = row("icon").querySelector("sp-textfield")!;
-    (field as any).value = "/favicon.png";
-    field.dispatchEvent(new Event("input", { bubbles: true }));
-    // The media field commits on a debounce.
-    await new Promise((resolve) => {
-      setTimeout(resolve, 450);
-    });
-    await flush(4);
-    expect(tab.doc.content.frontmatter.$head).toEqual([
-      { attributes: { href: "/favicon.png", rel: "icon" }, tagName: "link" },
-    ]);
-
-    render();
-    await flush(4);
-    row("icon")
-      .querySelector(".set-dot")!
-      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(tab.doc.content.frontmatter.$head).toBeUndefined();
-  });
-});
-
-// ─── The SEO block ────────────────────────────────────────────────────────────
-
-/**
- * The rendered half: two previews of the MERGED head, the resolved-field list with its counters and
- * provenance chips, and the named warnings. The merge itself is asserted in `head-panel.test.ts`;
- * these are about what the card SHOWS, and about the one property the plan states as a prohibition
- * — nothing here renders a score.
- */
-
-function openSeo(): HTMLElement {
-  const details = [...host().querySelectorAll("details")].find(
-    (d) => d.querySelector("summary")?.textContent?.trim() === "SEO",
-  );
-  if (!details) {
-    throw new Error("no SEO disclosure");
-  }
-  return details as HTMLElement;
-}
-
-function seoRow(key: string): HTMLElement {
-  const el = host().querySelector(`[data-seo-field="${key}"]`);
-  if (!el) {
-    throw new Error(`no SEO field row: ${key}`);
-  }
-  return el as HTMLElement;
-}
-
-function seoWarningIds(): string[] {
-  return [...host().querySelectorAll("[data-seo-warning]")].map(
-    (el) => (el as HTMLElement).dataset.seoWarning!,
-  );
-}
-
-/** A site page whose layout and project config both contribute head material. */
-function setupSeoPage(
-  frontmatter: Record<string, unknown>,
-  config: Record<string, unknown> = {},
-): void {
-  installMockPlatform(
-    {},
-    {
-      "layouts/base.json": JSON.stringify({
-        $head: [
-          { attributes: { content: "the layout's summary", name: "description" }, tagName: "meta" },
-        ],
-        tagName: "div",
-      }),
-    },
-  );
-  resetStudioState({
-    isSiteProject: true,
-    projectConfig: {
-      defaults: { layout: "./layouts/base.json" },
-      name: "Acme",
-      url: "https://acme.test",
-      ...config,
-    },
-  });
-  const tab = resetWorkspaceWithTab(undefined, {
-    documentPath: "pages/about.json",
-    id: "seo-tab",
-  }) as any;
-  tab.doc.mode = "content";
-  tab.doc.content.frontmatter = frontmatter;
-}
-
-describe("the SEO block previews the merged head", () => {
-  test("the search-result card prints the canonical breadcrumb, the title and the description", async () => {
-    setupSeoPage({ title: "About Us" });
-    await mountAndFlush();
-    await flush(4);
-    const serp = openSeo().querySelector(".seo-card--serp")!;
-    expect(serp.querySelector(".seo-serp-url")?.textContent).toBe("acme.test › about");
-    expect(serp.querySelector(".seo-serp-title")?.textContent).toBe("About Us");
-    expect(serp.querySelector(".seo-serp-desc")?.textContent?.trim()).toBe("the layout's summary");
-  });
-
-  test("the social card shows the og:image, and says so plainly when there is none", async () => {
-    setupSeoPage({ title: "About Us" });
-    await mountAndFlush();
-    await flush(4);
-    const social = openSeo().querySelector(".seo-card--social")!;
-    expect(social.querySelector(".seo-social-domain")?.textContent).toBe("acme.test");
-    expect(social.querySelector(".seo-social-media .seo-unset")?.textContent).toBe("No image");
-    expect(social.querySelector(".seo-social-title .seo-unset")?.textContent).toBe(
-      "No social title",
-    );
-
-    setupSeoPage({
-      $head: [{ attributes: { content: "/card.png", property: "og:image" }, tagName: "meta" }],
-      title: "About Us",
-    });
-    render();
-    await flush(4);
-    const img = host().querySelector(".seo-social-media img") as HTMLImageElement;
-    expect(img.getAttribute("src")).toBe("/card.png");
-  });
-
-  test("a document with no route and no site URL previews without inventing one", async () => {
-    setupContentTab({ title: "Post" }, { documentPath: "posts/hello.json" });
-    await mountAndFlush();
-    expect(host().querySelector(".seo-serp-url")?.textContent).toBe("/");
-    expect(host().querySelector(".seo-social-domain .seo-unset")?.textContent).toBe("No site URL");
-    expect(seoWarningIds()).toContain("site-url-missing");
-  });
-});
-
-describe("the resolved-field list marks where each value came from", () => {
-  test("a page-authored value is a set dot; a layout value names the layout it came from", async () => {
-    setupSeoPage({ title: "About Us" });
-    await mountAndFlush();
-    await flush(4);
-
-    const title = seoRow("title").querySelector(".provenance-chip")!;
-    expect(title.classList.contains("provenance-chip--set")).toBe(true);
-    expect(title.tagName).toBe("SPAN"); // Read-only: the chip has nowhere to go.
-
-    const description = seoRow("description").querySelector(".provenance-chip")!;
-    expect(description.classList.contains("provenance-chip--inherited")).toBe(true);
-    expect(description.textContent?.trim()).toBe("from Base");
-  });
-
-  test("an unset field shows no chip at all — absence IS the ghost", async () => {
-    setupSeoPage({ title: "About Us" });
-    await mountAndFlush();
-    await flush(4);
-    expect(seoRow("og:type").querySelector(".provenance-chip")).toBeNull();
-    expect(seoRow("og:type").querySelector(".seo-unset")?.textContent).toBe("No social type");
-  });
-
-  test("a title inherited from the project name jumps to the setting that defines it", async () => {
-    const ran: { id: string; args: unknown }[] = [];
-    const registry = createCommandRegistry({ getContext: () => emptyContext() });
-    registry.register({
-      id: "settings.open",
-      title: "Open Settings",
-      category: "Project",
-      level: "application",
-      args: { properties: { section: { type: "string" } }, required: [], type: "object" },
-      run: (_c, args: unknown) => {
-        ran.push({ args, id: "settings.open" });
-      },
-    });
-    setActiveRegistry(registry);
-
-    setupSeoPage({ subtitle: "no title here" });
-    await mountAndFlush();
-    await flush(4);
-    const chip = seoRow("title").querySelector(".provenance-chip") as HTMLButtonElement;
-    expect(chip.tagName).toBe("BUTTON");
-    expect(chip.textContent?.trim()).toBe("from Site name");
-    chip.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(ran).toEqual([{ args: { section: "overview" }, id: "settings.open" }]);
-    setActiveRegistry(null);
-  });
-
-  test("a value from the site's own $head jumps to Site head instead", async () => {
-    const ran: unknown[] = [];
-    const registry = createCommandRegistry({ getContext: () => emptyContext() });
-    registry.register({
-      id: "settings.open",
-      title: "Open Settings",
-      category: "Project",
-      level: "application",
-      args: { properties: { section: { type: "string" } }, required: [], type: "object" },
-      run: (_c, args: unknown) => {
-        ran.push(args);
-      },
-    });
-    setActiveRegistry(registry);
-
-    setupSeoPage(
-      { title: "About Us" },
-      {
-        $head: [{ attributes: { content: "/site.png", property: "og:image" }, tagName: "meta" }],
-      },
-    );
-    await mountAndFlush();
-    await flush(4);
-    const chip = seoRow("og:image").querySelector(".provenance-chip") as HTMLButtonElement;
-    expect(chip.textContent?.trim()).toBe("from Site head");
-    chip.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(ran).toEqual([{ section: "head" }]);
-    setActiveRegistry(null);
-  });
-
-  test("with no registry the chip still renders and clicking it is inert", async () => {
-    setActiveRegistry(null);
-    setupSeoPage({ subtitle: "no title here" });
-    await mountAndFlush();
-    await flush(4);
-    const chip = seoRow("title").querySelector(".provenance-chip") as HTMLButtonElement;
-    chip.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(chip.textContent?.trim()).toBe("from Site name");
-  });
-});
-
-describe("counters and warnings, and the absence of a score", () => {
-  test("counted fields print length over budget; uncounted ones print nothing", async () => {
-    setupSeoPage({ title: "About Us" });
-    await mountAndFlush();
-    await flush(4);
-    expect(seoRow("title").querySelector(".seo-field-count")?.textContent).toBe("8/60");
-    expect(seoRow("description").querySelector(".seo-field-count")?.textContent).toBe("20/160");
-    expect(seoRow("og:image").querySelector(".seo-field-count")).toBeNull();
-    expect(host().querySelectorAll(".seo-field-count--over").length).toBe(0);
-  });
-
-  test("over budget is marked on the counter and named in the list — never summed", async () => {
-    setupSeoPage({ title: "T".repeat(61) });
-    await mountAndFlush();
-    await flush(4);
-    expect(seoRow("title").querySelector(".seo-field-count--over")?.textContent).toBe("61/60");
-    expect(seoWarningIds()).toContain("title-long");
-    // The prohibition, asserted: no element in the card carries a total or a grade.
-    const text = host().textContent ?? "";
-    expect(text).not.toMatch(/\b\d{1,3}\s*\/\s*100\b/);
-    expect(text.toLowerCase()).not.toContain("score");
-  });
-
-  test("a page that inherits its description is never told it has none", async () => {
-    setupSeoPage({ title: "About Us" });
-    await mountAndFlush();
-    await flush(4);
-    expect(seoWarningIds()).not.toContain("description-missing");
-    expect(seoRow("description").textContent).toContain("the layout's summary");
-  });
-
-  test("each named warning renders once, with the head key it is about", async () => {
-    setupSeoPage({ title: "About Us" });
-    await mountAndFlush();
-    await flush(4);
-    expect(seoWarningIds()).toEqual([
-      "og-title-missing",
-      "og-description-missing",
-      "og-image-missing",
-    ]);
-    const first = host().querySelector(".seo-warning")!;
-    expect(first.querySelector(".seo-warning-field")?.textContent).toBe("og:title");
-  });
-
-  test("a fully-described page says so rather than printing an empty list", async () => {
-    setupSeoPage({
-      $head: [
-        { attributes: { content: "Card", property: "og:title" }, tagName: "meta" },
-        { attributes: { content: "Summary", property: "og:description" }, tagName: "meta" },
-        { attributes: { content: "/card.png", property: "og:image" }, tagName: "meta" },
-      ],
-      title: "About Us",
-    });
-    await mountAndFlush();
-    await flush(4);
-    expect(host().querySelector(".seo-warnings")).toBeNull();
-    expect(openSeo().querySelector(".doc-header-empty")?.textContent?.trim()).toBe(
-      "Nothing to flag — every previewed field resolves to a value.",
-    );
-  });
-
-  test("the editable fields still sit below the previews, and still commit", async () => {
-    setupSeoPage({ title: "About Us" });
-    await mountAndFlush();
-    await flush(4);
-    const seo = openSeo();
-    const order = [
-      ...seo.querySelectorAll('.seo-previews, .seo-fields, [data-prop="description"]'),
-    ].map((el) => (el as HTMLElement).dataset.prop ?? el.className);
-    expect(order).toEqual(["seo-previews", "seo-fields", "description"]);
-    const descriptionRow = seo.querySelector('[data-prop="description"]')!;
-    fireChange(descriptionRow.querySelector("sp-textfield")!, "Written here");
-    await flush(4);
-    expect(seoRow("description").querySelector(".provenance-chip--set")).toBeTruthy();
-    expect(seoRow("description").textContent).toContain("Written here");
   });
 });

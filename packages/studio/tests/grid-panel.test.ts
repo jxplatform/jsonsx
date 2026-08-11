@@ -14,6 +14,9 @@ void mock.module("../src/ui/layers.js", () => ({
   getLayerSlot: () => document.createElement("div"),
   initLayers: () => {},
   openModal: () => ({ close: () => {}, update: () => {} }),
+  // The media picker asks which layer its anchor sits in before it draws. The grid's fields are in
+  // A panel, so the real answer here is the one the real function gives: the popover layer.
+  popoverLayerFor: () => "popover",
   renderPopover: (template: unknown) => {
     const host = document.createElement("div");
     host.className = "test-popover-host";

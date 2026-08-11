@@ -15,6 +15,7 @@ import { allCanvasSurfaces, unregisterCanvasSurface } from "../src/canvas/surfac
 import {
   PRIMARY_PANE,
   SECONDARY_PANE,
+  activeTab,
   closeAllTabs,
   openTab,
   splitRight,
@@ -22,6 +23,7 @@ import {
 import * as paneGrid from "../src/panels/pane-grid";
 import * as paneContext from "../src/panels/pane-context";
 import * as frontmatter from "../src/panels/frontmatter-panel";
+import { closeSeoModal, openSeoModal } from "../src/panels/seo-modal";
 import { renderFieldRow } from "../src/ui/field-row";
 import { invalidateMediaCache, renderMediaPicker } from "../src/ui/media-picker";
 import { resetShellSurfaces } from "../src/shell";
@@ -219,29 +221,39 @@ describe("uniqueness with two stages standing", () => {
     }
   });
 
-  test("the Document Header's media pickers claim no `inspector/…` id", async () => {
+  test("no media picker outside the Inspector claims an `inspector/…` id", async () => {
     /* `ui/media-picker.ts` stamped `inspector/field:<prop>/browse` on its Browse button, and the
-       Document Header card draws that picker for Icon and og:image inside each pane's STAGE. Two
+       Document Header card drew that picker for Icon and og:image inside each pane's STAGE. Two
        panes, two cards, four buttons — and `resolveRegion` takes the LAST, so the id answered with
        the SIDE pane's control, for a field that is not in the Inspector at all. `paneRegion` was
        never going to reach it: an `inspector/…` id on an element outside the Inspector is a wrong
-       id, not a wrongly-scoped one. */
+       id, not a wrongly-scoped one.
+
+       Both pickers have since moved into Search appearance, which halves the original hazard by
+       construction — the modal is a singleton, so there is no per-pane duplicate to shadow the
+       Inspector's control. It does NOT remove it: the modal still draws pickers, and a picker that
+       stamps an Inspector id is wrong from wherever it is drawn. So this asserts the property, not
+       the old geometry: whatever pickers exist outside `#right-panel`, none is stamped. */
     await twoRealPanes();
-    const cards = [...document.querySelectorAll(".doc-header")];
-    expect(cards).toHaveLength(2);
-    const browseButtons = [...document.querySelectorAll(".pane-stage .media-picker-browse")];
-    expect(browseButtons.length).toBeGreaterThanOrEqual(4);
-    // Not one of them carries a region id, and none of them answers to the Inspector's.
+    expect([...document.querySelectorAll(".doc-header")]).toHaveLength(2);
+    // The card's own pickers are gone; the ones that were there are in the modal now.
+    expect(document.querySelectorAll(".pane-stage .media-picker-browse")).toHaveLength(0);
+
+    openSeoModal(activeTab.value!);
+    await flush(4);
+    const browseButtons = [...document.querySelectorAll(".seo-modal .media-picker-browse")];
+    expect(browseButtons.length).toBeGreaterThanOrEqual(2); // Icon and og:image.
     for (const button of browseButtons) {
       expect(button.getAttribute(REGION_ATTR)).toBeNull();
     }
     expect(listRegions().filter((id) => id.startsWith("inspector/field:"))).toEqual([]);
     expect(resolveRegion("inspector/field:icon/browse")).toBeNull();
     console.log(
-      `[pane regions] ${browseButtons.length} Document Header Browse control(s) across 2 panes, ` +
-        `0 of them stamped; resolveRegion("inspector/field:icon/browse") = ` +
+      `[pane regions] ${browseButtons.length} Search-appearance Browse control(s), 0 stamped; ` +
+        `resolveRegion("inspector/field:icon/browse") = ` +
         `${String(resolveRegion("inspector/field:icon/browse"))}`,
     );
+    closeSeoModal();
   });
 
   test("`inspector/field:<prop>/browse` is DERIVED, and finds the Inspector's own control", async () => {
