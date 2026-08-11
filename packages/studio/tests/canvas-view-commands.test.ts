@@ -183,6 +183,13 @@ describe("the records themselves", () => {
       "canvas.setZoom",
       "canvas.setFit",
       "canvas.setEditZoom",
+      // The rendering context's three axes (§4.2 control ③). The Context popover wrote
+      // `session.ui` through `updateUi` directly, so none of the three was a command — not in the
+      // Palette, not scriptable, not bindable. Setters, not cycles: a chord carries no argument, so
+      // The `⌘⌥↑`/`⌘⌥⇧S` cycles §5.3 declares need `next`/`prev` records of their own.
+      "canvas.setBreakpoint",
+      "canvas.setColorScheme",
+      "canvas.setLayoutVisible",
       "selection.set",
       "selection.setPaths",
       "insert.data",

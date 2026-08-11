@@ -296,6 +296,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.9.9-draft** (2026-08-11) — The rendering context's three axes are commands (canvas.setBreakpoint / setColorScheme / setLayoutVisible), and an empty-canvas right-click keeps the browser's menu.
 - **0.9.8-draft** (2026-08-11) — Project Settings carries ⌘⇧,, the other half of the pair §5.3 declares.
 - **0.9.7-draft** (2026-08-11) — Data rows: truncation markers are controls, Refresh reports the render rather than a timer, and an entry that cannot hold a value keeps its definition summary.
 - **0.9.6-draft** (2026-08-11) — The Activity Bar names the panels that ship, in their two rail groups; the Data panel is one list of definitions and the values they resolve to (§5.6), taking over the State panel's editor.

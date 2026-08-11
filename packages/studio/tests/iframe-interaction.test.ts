@@ -326,7 +326,14 @@ describe("contextmenu forwarding", () => {
     stop();
   });
 
-  test("right-click on empty space still suppresses the browser menu (path null)", () => {
+  test("right-click on empty space keeps the BROWSER's menu — plan §10's dead zone", () => {
+    /*
+     * It used to `preventDefault()` before looking for a hit, "legacy parity" with a handler that
+     * did the same, and then post `path: null` — which `showContextMenu` returns early on. So the
+     * margin around the artboard suppressed the browser menu and drew nothing in its place: the
+     * one region where a right-click did nothing at all, and the one where a reader reaches for
+     * View Source.
+     */
     const { channel, posts } = fakeChannel();
     const lonely = document.createElement("div");
     document.body.append(lonely);
@@ -335,8 +342,8 @@ describe("contextmenu forwarding", () => {
     const e = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
     lonely.dispatchEvent(e);
 
-    expect(e.defaultPrevented).toBe(true);
-    expect(posts.find((p) => p.kind === "contextMenu")).toMatchObject({ path: null });
+    expect(e.defaultPrevented).toBe(false);
+    expect(posts.find((p) => p.kind === "contextMenu")).toBeUndefined();
     stop();
   });
 

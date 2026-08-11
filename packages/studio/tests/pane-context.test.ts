@@ -39,6 +39,7 @@ const { getFit, hasDeclaredFit, resetFits } = await import("../src/canvas/canvas
 const { createCommandRegistry } = await import("../src/commands/registry");
 const { makeContext } = await import("../src/commands/context");
 const { setActiveRegistry } = await import("../src/commands/active-registry");
+const { canvasViewCommands } = await import("../src/canvas/canvas-utils");
 const { collabState } = await import("../src/collab/collab-state");
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -94,14 +95,25 @@ function ctxInMode(mode: string, overrides: Partial<Ctx> = {}): Ctx {
   return makeCtx(overrides);
 }
 
-function openTestTab(): Tab {
+function openTestTab(media?: Record<string, string>): Tab {
   const tab = resetWorkspaceWithTab(
-    { children: [{ tagName: "p", textContent: "Hi" }], tagName: "div" },
+    {
+      children: [{ tagName: "p", textContent: "Hi" }],
+      tagName: "div",
+      ...(media ? { $media: media } : {}),
+    } as never,
     { documentPath: "/project/index.json", id: "pane-context-tab" },
   );
   tab.capabilities.modes = ["edit", "design", "preview", "source"];
   return tab;
 }
+
+/** The document behind {@link withScheme}: `parseMediaEntries` is a stub, `$media` is the truth. */
+const SCHEME_MEDIA = {
+  "--dark-mode": "(prefers-color-scheme: dark)",
+  "--reduced-motion": "(prefers-reduced-motion: reduce)",
+  md: "(min-width: 768px)",
+};
 
 /** Every button in the chrome, by trimmed text. */
 function buttons(): HTMLElement[] {
@@ -129,9 +141,24 @@ function axes(): string[] {
   return [...root.querySelectorAll(".pc-axis-label")].map((el) => el.textContent?.trim() ?? "");
 }
 
-/** A registry holding only what the chrome reaches for, so a click is observable. */
+/**
+ * A registry holding what the chrome reaches for, so a click is observable.
+ *
+ * The three rendering-context axes are REAL records — `canvasViewCommands` — because the popover's
+ * controls run them now rather than writing `session.ui` directly. Stubbing them would leave the
+ * assertions below testing that a click calls a spy, when what they need to prove is that it
+ * changes the tab.
+ */
 function installRegistry(ran: string[]) {
-  const registry = createCommandRegistry({ getContext: () => makeContext(), mac: true });
+  const registry = createCommandRegistry({
+    getContext: () => makeContext({ document: { open: true } }),
+    mac: true,
+  });
+  registry.registerAll(
+    canvasViewCommands({ getCanvasMode: () => "design", setCanvasMode: () => {} }).filter((c) =>
+      ["canvas.setBreakpoint", "canvas.setColorScheme", "canvas.setLayoutVisible"].includes(c.id),
+    ),
+  );
   registry.register({
     category: "Project",
     group: "7_settings",
@@ -153,6 +180,10 @@ beforeEach(() => {
   resetStudioState();
   installMockPlatform();
   resetFits();
+  // The bar's controls RUN COMMANDS now, so every test needs the registry — not only the two that
+  // Were watching `settings.open`. Without one, a click is a silent no-op and an assertion about
+  // `session.ui` reads the value the test set up.
+  installRegistry([]);
   root = document.createElement("div");
   document.body.append(root);
 });
@@ -460,7 +491,10 @@ describe("rendering context", () => {
   });
 
   test("the size segment writes activeMedia — the field a panel header writes", async () => {
-    const tab = openTestTab();
+    // The document declares `md` as well as the ctx stub offering it: `canvas.setBreakpoint`
+    // Refuses a key the document cannot render under, and a fixture where the control offers one
+    // The app would refuse is a fixture testing a shape the app does not have.
+    const tab = openTestTab(SCHEME_MEDIA);
     paneContext.mount(root, withScheme());
     await flush();
 
@@ -844,10 +878,16 @@ describe("two bars, two panes", () => {
 
   /** One tab per pane, both bars attached. `[primaryTab, sideTab]`; focus lands on the side. */
   async function twoBars(ctx: Ctx): Promise<[Tab, Tab]> {
-    const home = openTestTab();
+    const home = openTestTab(SCHEME_MEDIA);
     const away = openTab({
       capabilities: { modes: ["edit", "design", "preview", "source"] },
-      document: { children: [{ tagName: "p", textContent: "Away" }], tagName: "div" },
+      // `$media` on BOTH: `canvas.setBreakpoint` reads the document it is addressing, which for the
+      // Side bar is the side pane's — and that is exactly the fact this describe block exists for.
+      document: {
+        $media: SCHEME_MEDIA,
+        children: [{ tagName: "p", textContent: "Away" }],
+        tagName: "div",
+      } as never,
       documentPath: "/project/away.json",
       id: "pane-context-away",
     });

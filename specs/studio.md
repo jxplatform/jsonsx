@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.8-draft
+**Version:** 0.9.9-draft
 **Status:** Partial
 **Updated:** 2026-08-11
 **License:** MIT
@@ -532,6 +532,18 @@ The Target Line **replaces** the breakpoint tab strip, the selector picker and t
 The breakpoint and scheme axes are selected on the pane context bar (§3.2 ⑦), whose definition site
 is Project Settings › Contexts (§16); the Style tab does not own a third selector and therefore
 cannot disagree with the one the canvas is rendering under.
+
+**Each axis is a command**, so the popover is one projection of it rather than the capability
+itself: `canvas.setBreakpoint { media, pane? }`, `canvas.setColorScheme { scheme, pane? }` and
+`canvas.setLayoutVisible { visible, pane? }`. `pane` defaults to the focused pane and exists because
+the bar is drawn once per pane — the side bar's controls address the side pane's document, and a
+verb that could only reach the focused one would be narrower than the control it stands behind.
+`setBreakpoint` refuses a key the document cannot render under, listing the ones it can.
+
+These are SETTERS. §5.3's keymap declares `⌘⌥↑`/`⌘⌥↓` and `⌘⌥⇧S` to _cycle_ the size and scheme
+axes; a chord carries no argument, so those need `next`/`prev` records of their own — each a delta,
+which §13's R1 forbids a screenshot from naming. Naming the state you end in works from every
+surface, and the cycle chords are a separate decision.
 
 Organized, metadata-driven style sections. Metadata loaded from `css-meta.json` (JSON Schema definitions for each CSS property).
 
@@ -1826,6 +1838,7 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ## Changelog
 
+- **0.9.9-draft** (2026-08-11) — The rendering context's three axes are commands (canvas.setBreakpoint / setColorScheme / setLayoutVisible), and an empty-canvas right-click keeps the browser's menu.
 - **0.9.8-draft** (2026-08-11) — Project Settings carries ⌘⇧,, the other half of the pair §5.3 declares.
 - **0.9.7-draft** (2026-08-11) — Data rows: truncation markers are controls, Refresh reports the render rather than a timer, and an entry that cannot hold a value keeps its definition summary.
 - **0.9.6-draft** (2026-08-11) — The Activity Bar names the panels that ship, in their two rail groups; the Data panel is one list of definitions and the values they resolve to (§5.6), taking over the State panel's editor.
@@ -1889,4 +1902,4 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.8-draft_
+_`@jxsuite/studio` Specification v0.9.9-draft_

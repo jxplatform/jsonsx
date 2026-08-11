@@ -82,7 +82,9 @@ Right-click any element for the full action list: **Copy**, **Cut**, **Duplicate
 
 Right-clicking an element that is already part of a [multiple selection](/docs/studio/design/layers#select-several-at-once) keeps that selection rather than collapsing it to the element you aimed at; right-clicking anything else selects it alone. **Cut** then removes the whole selection in one undo step, putting the element you aimed at on the clipboard. The other rows address that one element: to duplicate or delete a whole selection, use :kbd[⌘D] and :kbd[Delete], or the block action bar.
 
-The structural rows are commands as well as menu items, so **Repeat...**, **Duplicate** and **Delete** can be run by name from the [command palette](/docs/studio/interface/quick-access) — with the same wording, and the same reason when they are unavailable. See **[Commands](/docs/studio/interface/commands)**.
+**Every** row is a command as well as a menu item, so all of them can be run by name from the [command palette](/docs/studio/interface/quick-access) — with the same wording, and the same reason when they are unavailable. A row that can't apply to what you have selected is greyed with that reason rather than hidden: **Cut** on the page root says it needs an element that isn't the root. See **[Commands](/docs/studio/interface/commands)**.
+
+Right-clicking **empty space** around the page gives you the browser's own menu, not this one — there is nothing there to act on, and that margin is where you reach for View Source or Inspect.
 
 ## Editing text
 

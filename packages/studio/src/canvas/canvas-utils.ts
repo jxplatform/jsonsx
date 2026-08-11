@@ -29,15 +29,21 @@ import {
   panelOfSurface,
 } from "./canvas-helpers";
 import { rectOf } from "../utils/geometry";
+import { getEffectiveMedia } from "../site-context";
 import {
   argsSchema,
+  booleanArg,
+  booleanProperty,
   boundedNumberArg,
   enumArg,
   enumProperty,
   numberProperty,
+  stringArg,
+  stringProperty,
 } from "../commands/command-args";
 import type { TemplateResult } from "lit-html";
 import type { AnyCommand, CommandRegistry } from "../commands/registry";
+import type { CommandArgValues } from "../commands/command-args";
 import type { Tab } from "../tabs/tab";
 
 /*
@@ -873,6 +879,9 @@ const PANZOOM_MODES = new Set(["design", "stylebook", "git-diff"]);
 
 const documentOpen = (ctx: { document: { open: boolean } }) => ctx.document.open;
 
+/** The three values `session.ui.previewColorScheme` may hold (spec §9.5). */
+const COLOR_SCHEMES = ["auto", "light", "dark"] as const;
+
 /**
  * The canvas view verbs — `setMode`, `setZoom`, `setEditZoom`.
  *
@@ -900,6 +909,33 @@ export function canvasViewCommands(deps: CanvasCommandDeps): AnyCommand[] {
     }
     return tab;
   }
+
+  /**
+   * The tab a rendering-context verb addresses: the named pane's, or the focused one's.
+   *
+   * The bar is drawn once PER PANE (§18), and the side pane's controls have always written the side
+   * pane's tab — so a verb that could only reach the focused one would be a narrower capability
+   * than the control it replaced, which is the opposite of the point.
+   */
+  function contextTab(commandId: string, args: CommandArgValues) {
+    const { pane } = args as { pane?: unknown };
+    if (pane === undefined) {
+      return requireTab(commandId);
+    }
+    const paneId = stringArg(commandId, args, "pane");
+    const tab = tabOfPane(paneId);
+    if (!tab) {
+      throw new RangeError(
+        `command "${commandId}" argument "pane": "${paneId}" has no open document`,
+      );
+    }
+    return tab;
+  }
+
+  /** The optional pane selector every rendering-context verb accepts. */
+  const paneArg = {
+    pane: stringProperty("Which pane to render this way. Defaults to the focused one."),
+  };
 
   return [
     {
@@ -1021,6 +1057,111 @@ export function canvasViewCommands(deps: CanvasCommandDeps): AnyCommand[] {
         );
       },
       title: "Set Edit Zoom",
+    },
+    /*
+     * ── The rendering context (§4.2's control ③) ──────────────────────────────────────────────
+     *
+     * Three setters for the three axes the Context popover offers. The popover wrote
+     * `session.ui.activeMedia` / `previewColorScheme` / `showLayout` through `updateUi` directly, so
+     * none of them was a command: not in the palette, not scriptable, not addressable by the
+     * assistant, and not bindable — in a design whose first principle is that a capability exists
+     * as a `Command` record and every surface projects it.
+     *
+     * SETTERS, not cycles. §5.3's keymap declares `⌘⌥↑`/`⌘⌥↓` and `⌘⌥⇧S` to cycle the size and
+     * scheme axes, and a chord carries no argument, so those chords need `next`/`prev` records of
+     * their own — a delta each, which is what §13's R1 forbids a screenshot from naming. Naming the
+     * state you end in works from every surface; the chords are a separate decision and are not
+     * made here.
+     */
+    {
+      args: {
+        additionalProperties: false,
+        properties: {
+          ...paneArg,
+          media: {
+            description:
+              "A breakpoint key the document renders under, or null for the base rendering.",
+            type: ["string", "null"],
+          },
+        },
+        required: ["media"],
+        type: "object",
+      },
+      category: "View",
+      id: "canvas.setBreakpoint",
+      level: "document",
+      menus: ["palette"],
+      group: "3_canvas",
+      requires: "an open document",
+      when: documentOpen,
+      run: (_commandCtx, args) => {
+        const tab = contextTab("canvas.setBreakpoint", args);
+        const { media } = args as { media?: unknown };
+        if (media !== null && typeof media !== "string") {
+          throw new RangeError(
+            `command "canvas.setBreakpoint" argument "media": expected a breakpoint key or null`,
+          );
+        }
+        /* REFUSES a key the document cannot render under, rather than rendering at a breakpoint
+           that does not exist — the rule `data.expandRow` applies to a state entry's name.
+           `getEffectiveMedia` and not `document.$media`: the popover offers the SITE's breakpoints
+           too, and a command that refused what the control offers would be worse than no command. */
+        const declared = Object.keys(
+          getEffectiveMedia(tab.doc.document?.$media as Record<string, string> | undefined),
+        );
+        if (media !== null && !declared.includes(media)) {
+          throw new RangeError(
+            `command "canvas.setBreakpoint" argument "media": "${media}" is not a breakpoint this ` +
+              `document defines — it defines: ${declared.length > 0 ? declared.join(", ") : "nothing"}`,
+          );
+        }
+        tab.session.ui.activeMedia = media;
+        renderOnly("canvas");
+      },
+      title: "Set Breakpoint",
+    },
+    {
+      args: argsSchema({
+        ...paneArg,
+        scheme: enumProperty(COLOR_SCHEMES, "Which color scheme the canvas renders in."),
+      }),
+      category: "View",
+      id: "canvas.setColorScheme",
+      level: "document",
+      menus: ["palette"],
+      group: "3_canvas",
+      requires: "an open document",
+      when: documentOpen,
+      run: (_commandCtx, args) => {
+        const tab = contextTab("canvas.setColorScheme", args);
+        tab.session.ui.previewColorScheme = enumArg(
+          "canvas.setColorScheme",
+          args,
+          "scheme",
+          COLOR_SCHEMES,
+        ) as "auto" | "dark" | "light";
+        renderOnly("canvas");
+      },
+      title: "Set Color Scheme",
+    },
+    {
+      args: argsSchema({
+        ...paneArg,
+        visible: booleanProperty("True to draw the page's layout elements, false to hide them."),
+      }),
+      category: "View",
+      id: "canvas.setLayoutVisible",
+      level: "document",
+      menus: ["palette"],
+      group: "3_canvas",
+      requires: "an open document",
+      when: documentOpen,
+      run: (_commandCtx, args) => {
+        const tab = contextTab("canvas.setLayoutVisible", args);
+        tab.session.ui.showLayout = booleanArg("canvas.setLayoutVisible", args, "visible");
+        renderOnly("canvas");
+      },
+      title: "Show Layout Elements",
     },
   ];
 }

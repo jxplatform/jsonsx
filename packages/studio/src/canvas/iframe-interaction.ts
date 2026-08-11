@@ -301,13 +301,25 @@ export function startInteraction(
     if (active && e.target instanceof Node && active.contains(e.target)) {
       return;
     }
-    // Suppress the browser menu everywhere else (legacy parity — the deleted panel-events handler
-    // PreventDefaulted even with no element hit) and let the parent show the Jx element menu.
-    e.preventDefault();
     const hit = nearestHit(e.target);
+    /*
+     * NO ELEMENT UNDER THE POINTER — keep the browser's menu.
+     *
+     * This called `preventDefault()` before looking, "legacy parity" with a handler that did the
+     * same. The parent then posts `path: null`, `showContextMenu` returns early on it, and the
+     * result is a right-click that suppresses the browser menu and shows nothing in its place:
+     * plan §10's dead zone, named there as the thing to fix. The margin around the artboard is
+     * exactly where a reader reaches for View Source or Inspect.
+     */
+    if (!hit) {
+      return;
+    }
+    // An element IS under the pointer, so the Jx element menu is the right answer and the browser's
+    // Would be a worse one.
+    e.preventDefault();
     channel.post({
       kind: "contextMenu",
-      path: hit ? hit.path : null,
+      path: hit.path,
       x: me.clientX,
       y: me.clientY,
     });

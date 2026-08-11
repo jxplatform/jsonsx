@@ -720,7 +720,7 @@ function renderingContextTpl(tab: Tab, paneId: string, ctx: PaneContextCtx): Tem
         </sp-action-button>
         <sp-popover slot="click-content" tip class="pc-context-popover">
           <div class="pc-ctx">
-            ${sizeGroupTpl(tab, sizeBreakpoints, activeMedia)}
+            ${sizeGroupTpl(paneId, sizeBreakpoints, activeMedia)}
             ${
               schemeQueries.length > 0
                 ? groupTpl(
@@ -735,7 +735,10 @@ function renderingContextTpl(tab: Tab, paneId: string, ctx: PaneContextCtx): Tem
                               aria-checked=${scheme === value ? "true" : "false"}
                               title=${title}
                               ?selected=${scheme === value}
-                              @click=${() => updateUi(tab, "previewColorScheme", value)}
+                              @click=${() =>
+                                runContextCommand(paneId, "canvas.setColorScheme", {
+                                  scheme: value,
+                                })}
                             >
                               ${label}
                             </sp-action-button>
@@ -785,7 +788,9 @@ function renderingContextTpl(tab: Tab, paneId: string, ctx: PaneContextCtx): Tem
                         class="pc-layout-switch"
                         ?checked=${ui.showLayout !== false}
                         @change=${() =>
-                          updateUi(tab, "showLayout", tab.session.ui.showLayout === false)}
+                          runContextCommand(paneId, "canvas.setLayoutVisible", {
+                            visible: tab.session.ui.showLayout === false,
+                          })}
                       >
                         Show layout elements
                       </sp-switch>
@@ -848,8 +853,23 @@ function groupTpl(label: string, body: TemplateResult): TemplateResult {
  * It writes `ui.activeMedia`, the same field a canvas panel header click writes — one axis, one
  * field, two ways in. `null` is the base, which is why the list is not simply the breakpoints.
  */
+/**
+ * Run a rendering-context verb through the registry.
+ *
+ * These four controls wrote `session.ui` directly through `updateUi`, which is why none of the
+ * three axes was a command: the popover WAS the capability, and the palette, the assistant and
+ * `__jxAutomation` had no name for it. Going through the registry makes the control and the verb
+ * one thing (§2, principle 1) and gets the breakpoint refusal for free.
+ */
+function runContextCommand(paneId: string, id: string, args: Record<string, unknown>): void {
+  // THIS pane, named. The bar is drawn once per pane and the side bar's controls write the side
+  // Pane's tab; a verb defaulting to the focused pane would have made the side bar edit the
+  // Foreground document the moment its control became a command.
+  void activeRegistry()?.run(id, { ...args, pane: paneId });
+}
+
 function sizeGroupTpl(
-  tab: Tab,
+  paneId: string,
   breakpoints: { name: string; width: number }[],
   activeMedia: string | null,
 ): TemplateResult {
@@ -863,7 +883,7 @@ function sizeGroupTpl(
           aria-checked=${activeMedia === null ? "true" : "false"}
           title="The base rendering, with no breakpoint applied"
           ?selected=${activeMedia === null}
-          @click=${() => updateUi(tab, "activeMedia", null)}
+          @click=${() => runContextCommand(paneId, "canvas.setBreakpoint", { media: null })}
         >
           Base
         </sp-action-button>
@@ -875,7 +895,7 @@ function sizeGroupTpl(
               aria-checked=${activeMedia === name ? "true" : "false"}
               title=${`${mediaDisplayName(name)} — ${width}px`}
               ?selected=${activeMedia === name}
-              @click=${() => updateUi(tab, "activeMedia", name)}
+              @click=${() => runContextCommand(paneId, "canvas.setBreakpoint", { media: name })}
             >
               ${mediaDisplayName(name)}
             </sp-action-button>
