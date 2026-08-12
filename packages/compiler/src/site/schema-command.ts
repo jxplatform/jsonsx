@@ -170,7 +170,9 @@ function hostResolve(specifier: string, path: string): string {
   } catch (error) {
     throw new Error(
       `Schema ref "${path}" names the first-party schema "${specifier}", which must resolve from ` +
-        `the host workspace and does not`,
+        `the host workspace and does not. The project's own copy is deliberately not consulted, so ` +
+        `the host install is missing "${specifier.split("/").slice(0, 2).join("/")}" — check that ` +
+        `the package ships with this build`,
       { cause: error },
     );
   }

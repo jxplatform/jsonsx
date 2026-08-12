@@ -211,9 +211,22 @@ stdenv.mkDerivation {
     cp -r node_modules $out/lib/jx-studio/
     cp -r packages $out/lib/jx-studio/packages
 
+    # `extensions/` is RUNTIME, not dev-only. @jxsuite/{parser,auth,connector,search}
+    # live there and node_modules/@jxsuite/parser is a symlink to
+    # ../../extensions/parser; `packages/desktop` declares it as a dependency.
+    # Copying only `packages` left that link dangling, the prune below then
+    # deleted it, and the schema loader — which by design refuses to read a
+    # first-party @jxsuite/* schema from the PROJECT's node_modules — had
+    # nowhere left to read the parser's project fragment from. Every project
+    # declaring any extension lost its per-project Monaco schemas with a stack
+    # trace in the log.
+    cp -r extensions $out/lib/jx-studio/extensions
+
     # bun links every workspace member into node_modules, including ones the
-    # desktop app doesn't ship (examples, sites/*). We only copy `packages`, so
-    # prune the now-dangling workspace symlinks rather than haul in dev-only code.
+    # desktop app doesn't ship (examples, sites/*). We copy `packages` and
+    # `extensions`, so prune what is left dangling rather than haul in dev-only
+    # code. Anything a shipped package DEPENDS ON must be copied above first:
+    # this line deletes, it does not warn.
     find $out/lib/jx-studio/node_modules -xtype l -delete
 
     makeWrapper ${bun}/bin/bun $out/bin/jx-studio \

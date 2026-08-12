@@ -474,8 +474,20 @@ export function createProjectSession(initialRoot: string | null) {
     try {
       return await readBundledProjectSchemas(projectRoot);
     } catch (error) {
-      // Editor degradation: the studio keeps its bundled core schemas.
-      console.error("[desktop] fetchProjectSchemas failed:", error);
+      /*
+       * Editor degradation, and it is worth saying WHICH: Studio keeps its bundled core schemas,
+       * so `project.json` and documents still validate against the core — what is lost is the
+       * per-project extras each enabled extension contributes.
+       *
+       * One line, not a stack. The failure that actually reaches users here is a host missing an
+       * extension package, and its two-deep `cause` chain printed a screenful that named the
+       * consequence nowhere. The stack stays available behind the cause.
+       */
+      const detail = error instanceof Error ? error.message : String(error);
+      console.error(
+        `[desktop] per-project schemas unavailable — Studio falls back to the bundled core ` +
+          `schemas, so extension-contributed fields will not autocomplete or validate. ${detail}`,
+      );
       return {};
     }
   }
