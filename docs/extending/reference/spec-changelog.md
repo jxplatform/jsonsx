@@ -180,6 +180,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `site-architecture.md`
 
+- **0.1.44-draft** (2026-08-12) — Header status corrected from Pending to Partial — all seven marked sections were Implemented while the header claimed nothing was; §9.4's marker and its own Still-planned list contradicted each other (metadata and the delete warning ship; browsable usage does not); §12.3 and §13 marked Pending, having no dependency graph and no reader of the i18n config respectively.
 - **0.1.43-draft** (2026-08-11) — Studio SEO previews move from a Document Header disclosure into the Search appearance modal (document.openSeo), reachable from the card, the Page panel and the palette; fields grouped by the preview each feeds.
 - **0.1.42-draft** (2026-08-06) — §7.2 the Library and its window contract, §7.5 the CRUD table corrected — rename, delete and CSV editing already shipped and were listed Pending, §7.6 the draft pill, §8.6 merged-$head previews with no score, §9.4 usage keyed on the authored ref, §11.4 redirects as a GridSource with chain, loop and shadow validation.
 - **0.1.41-draft** (2026-08-05) — §3.2 names the consequence of the cascade — every property reaches every route, which is why Studio states the blast radius and edits the file under undo.

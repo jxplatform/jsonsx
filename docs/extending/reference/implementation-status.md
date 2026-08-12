@@ -25,7 +25,7 @@ This page is generated from the `> **Status: …**` markers in the specification
 | `relationships.md`        | 0.1.3-draft  | Partial     | 2026-07-22 |
 | `schema.md`               | 0.3.1-draft  | Partial     | 2026-08-10 |
 | `server.md`               | 0.2.1        | Implemented | 2026-07-25 |
-| `site-architecture.md`    | 0.1.43-draft | Pending     | 2026-08-11 |
+| `site-architecture.md`    | 0.1.44-draft | Partial     | 2026-08-12 |
 | `spec.md`                 | 0.4.28-draft | Partial     | 2026-08-10 |
 | `studio-ui-guidelines.md` | 0.3.6        | Implemented | 2026-08-10 |
 | `studio.md`               | 0.9.18-draft | Partial     | 2026-08-11 |
@@ -34,6 +34,8 @@ This page is generated from the `> **Status: …**` markers in the specification
 
 ### Partial
 
+- `ai.md` §2 — Provider Contract
+- `site-architecture.md` §9.4 — Studio Media Browser
 - `spec.md` §5.6 — Private State (`#` prefix)
 - `spec.md` §11.4 — Server Timing — RPC Function Boundary
 - `spec.md` §16.8 — CEM-Compatible Annotations
@@ -41,10 +43,12 @@ This page is generated from the `> **Status: …**` markers in the specification
 ### Pending
 
 - `desktop.md` §4.3 — Single File Mode
+- `site-architecture.md` §12.3 — Incremental Builds
+- `site-architecture.md` §13 — Internationalization
 
 ### Future
 
-- `desktop.md` §9.3 — Nix Package
+- `desktop.md` §10 — SaaS / Cloud Mode
 
 ### Removed
 

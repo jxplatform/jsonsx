@@ -2,9 +2,9 @@
 
 ## File-Based Routing, Content Collections, Layouts, and Static Site Generation
 
-**Version:** 0.1.43-draft
-**Status:** Pending
-**Updated:** 2026-08-11
+**Version:** 0.1.44-draft
+**Status:** Partial
+**Updated:** 2026-08-12
 **License:** MIT
 
 ---
@@ -1211,8 +1211,10 @@ Only statically referenced files are copied into the build. A `src` computed at 
 
 ### 9.4 Studio Media Browser
 
-> **Status: Implemented.** Upload, browsing, metadata and usage all ship. The full Studio-side
-> contract is `studio.md` §9.3 — this section states only what it means for the media on disk.
+> **Status: Partial.** Upload, browsing, metadata and the referenced-file warning ship. Usage is
+> COMPUTED but not browsable — see the list at the end of this section, which contradicted this
+> marker for as long as both existed. The full Studio-side contract is `studio.md` §9.3 — this
+> section states only what it means for the media on disk.
 
 **Usage is keyed on the AUTHORED reference, not the resolved one.** A content-relative `./images/`
 reference previews at its asset-mount URL while the source keeps the authored form, so keying on
@@ -1235,12 +1237,19 @@ Shipped:
 - **Grid/list view** of all media in the project (thumbnail grid as default, table as alternative)
 - **Upload** — drag-and-drop or a file picker, on all four surfaces above
 - **Preview** — thumbnails for images, in both the picker and the Manage view
+- **Metadata** — dimensions and file size, as a row caption in the media picker
+  (`files/media-meta.ts`: `1200 × 800 · 84 KB`). Both halves come from work already done — the size
+  from the directory listing that built the list, the pixels from the thumbnail once the browser has
+  decoded it — so a caption never costs a second download
+- **Delete** — the confirmation states the reference count, computed on the authored ref, and says
+  **unknown** rather than zero when a lane cannot be counted (`files/file-ops.ts`)
 
 Still planned:
 
-- **Metadata** — file size, dimensions, format shown
-- **Usage tracking** — shows which content entries and components reference each file
-- **Delete** — warns if the file is referenced by content or components
+- **Usage tracking as a SURFACE.** The query ships (`files/media-usage.ts`) and is correct; what is
+  missing is a reader other than the delete confirmation. No column, panel or field answers "which
+  pages use this image?" until you try to remove it — so the answer arrives at the one moment the
+  author has already decided.
 
 ---
 
@@ -1502,6 +1511,11 @@ jx db push               # Sync the data section's tables to their connections (
 
 ### 12.3 Incremental Builds
 
+> **Status: Pending.** No dependency graph exists. `jx build` and the dev server's pre-reload
+> rebuild are both FULL builds, so the paragraph below describes an intended design rather than
+> shipped behaviour. It is fast enough that nothing has forced the issue yet; the cost is that it
+> scales with the project rather than with the edit.
+
 The build system tracks dependencies between files. When a content entry changes, only pages that reference that collection are recompiled. When a layout changes, all pages using that layout are recompiled. When `project.json` changes, everything is recompiled.
 
 ### 12.4 Asset Pipeline
@@ -1516,6 +1530,12 @@ Static assets are emitted per component, with page styles inlined:
 ---
 
 ## 13. Internationalization
+
+> **Status: Pending.** `project-schema.json` declares the `i18n` object, so a `project.json` may
+> carry `defaultLocale`, `locales` and `routing` and will validate — and **nothing reads any of
+> them.** No router, no build step and no Studio surface consults the key. A locale-prefixed
+> directory works today only because `pages/en/about.json` is an ordinary route that happens to
+> begin with `en`; none of the behaviour this section specifies follows from the config.
 
 ### 13.1 Locale-Based Routing
 
@@ -1835,6 +1855,7 @@ This spec builds on existing Jx primitives wherever possible:
 
 ## Changelog
 
+- **0.1.44-draft** (2026-08-12) — Header status corrected from Pending to Partial — all seven marked sections were Implemented while the header claimed nothing was; §9.4's marker and its own Still-planned list contradicted each other (metadata and the delete warning ship; browsable usage does not); §12.3 and §13 marked Pending, having no dependency graph and no reader of the i18n config respectively.
 - **0.1.43-draft** (2026-08-11) — Studio SEO previews move from a Document Header disclosure into the Search appearance modal (document.openSeo), reachable from the card, the Page panel and the palette; fields grouped by the preview each feeds.
 - **0.1.42-draft** (2026-08-06) — §7.2 the Library and its window contract, §7.5 the CRUD table corrected — rename, delete and CSV editing already shipped and were listed Pending, §7.6 the draft pill, §8.6 merged-$head previews with no score, §9.4 usage keyed on the authored ref, §11.4 redirects as a GridSource with chain, loop and shadow validation.
 - **0.1.41-draft** (2026-08-05) — §3.2 names the consequence of the cascade — every property reaches every route, which is why Studio states the blast radius and edits the file under undo.
