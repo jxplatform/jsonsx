@@ -6,10 +6,9 @@ import { initLayers } from "../src/ui/layers";
 import type { GitStatusResult, StudioPlatform } from "../src/types";
 
 const applyCalls: unknown[][] = [];
-let checkResult: {
-  target: string;
-  outdated: { name: string; current: string; dev: boolean }[];
-} | null = null;
+/* `checkJxsuiteUpdate` returns the outdated list itself now — one entry per package, each carrying
+   its OWN newest published version, because the packages no longer share a release cadence. */
+let checkResult: { name: string; current: string; latest: string; dev: boolean }[] = [];
 
 void mock.module("../src/packages/jxsuite-update", () => ({
   applyJxsuiteUpdate: async (...args: unknown[]) => {
@@ -41,7 +40,7 @@ beforeAll(() => {
 beforeEach(() => {
   applyCalls.length = 0;
   statusMessages.length = 0;
-  checkResult = null;
+  checkResult = [];
 });
 
 afterEach(() => {
@@ -178,10 +177,7 @@ describe("pullWithPackageSync — preemptive", () => {
       },
       { "bun.lock": "lock-local", "package.json": PKG_AUTOMATED },
     );
-    checkResult = {
-      outdated: [{ current: "^0.19.0", dev: false, name: "@jxsuite/runtime" }],
-      target: "0.30.1",
-    };
+    checkResult = [{ current: "^0.19.0", dev: false, latest: "1.3.2", name: "@jxsuite/runtime" }];
 
     await pullWithPackageSync();
 
@@ -269,10 +265,7 @@ describe("pullWithPackageSync — preemptive", () => {
       },
       { "bun.lock": "lock-local", "package.json": PKG_AUTOMATED },
     );
-    checkResult = {
-      outdated: [{ current: "^0.19.0", dev: false, name: "@jxsuite/runtime" }],
-      target: "0.30.1",
-    };
+    checkResult = [{ current: "^0.19.0", dev: false, latest: "1.3.2", name: "@jxsuite/runtime" }];
 
     const error = await rejectionOf(pullWithPackageSync());
     expect(error.message).toBe("network died mid-pull");

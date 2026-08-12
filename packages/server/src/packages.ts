@@ -134,14 +134,25 @@ export async function removePackage(root: string, name: string): Promise<Package
   return runBun(["remove", name], root);
 }
 
-/** Fetch the newest published version for a package from the npm registry, or null on any failure. */
+/**
+ * Fetch the newest published version for a package from the npm registry, or null on any failure.
+ *
+ * **`application/json`, not the abbreviated `install-v1` format.** That format is defined for the
+ * PACKUMENT endpoint (`/<name>`), and asking for it on the version endpoint (`/<name>/latest`)
+ * returns an EMPTY BODY for most packages — verified against `@jxsuite/schema`, `@jxsuite/parser`
+ * and `lit`, while `wrangler` happens to answer normally. An empty body fails `res.json()`, the
+ * catch below turns that into `null`, and a null reads as "nothing newer" — so this silently
+ * under-reported outdated dependencies for everything it was asked about, and looked like a quiet
+ * registry rather than a broken request. The injected-fetch tests could not see it: they return a
+ * body regardless of the header.
+ */
 export async function fetchLatestVersion(
   name: string,
   fetchImpl: FetchLike = fetch,
 ): Promise<string | null> {
   try {
     const res = await fetchImpl(`https://registry.npmjs.org/${name}/latest`, {
-      headers: { accept: "application/vnd.npm.install-v1+json" },
+      headers: { accept: "application/json" },
     });
     if (!res.ok) {
       return null;

@@ -251,7 +251,9 @@ describe("dependencies editor gaps", () => {
 describe("jxsuite-update dismissal storage", () => {
   test("the prompt still shows when localStorage access throws (never remembered)", async () => {
     installMockPlatform({
-      listPackages: async () => [{ name: "@jxsuite/runtime", version: "^0.1.0" }],
+      outdatedPackages: async () => [
+        { current: "^0.1.0", latest: "0.4.0", name: "@jxsuite/runtime" },
+      ],
       setPackageVersions: async () => ({ ok: true }),
     });
     const original = Object.getOwnPropertyDescriptor(globalThis, "localStorage");

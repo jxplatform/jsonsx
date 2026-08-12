@@ -98,6 +98,26 @@ describe("fetchLatestVersion", () => {
     expect(await fetchLatestVersion("pkg", f)).toBe("1.2.3");
   });
 
+  test("asks for a format the VERSION endpoint actually serves", async () => {
+    /*
+     * It asked for `application/vnd.npm.install-v1+json`, which is the abbreviated PACKUMENT
+     * format. On `/<name>/latest` the registry answers that with an empty body for most packages —
+     * `@jxsuite/schema`, `@jxsuite/parser` and `lit` all return nothing, while `wrangler` happens to
+     * answer normally. `res.json()` then throws, the catch turns it into `null`, and `null` reads
+     * as "nothing newer": every outdated dependency went unreported and it looked like a quiet
+     * registry rather than a broken request.
+     *
+     * A fetch-injecting test cannot see that — it answers whatever the header says. So this pins
+     * the DECISION instead, with the reason, which is the part a future edit would otherwise undo.
+     */
+    let seen: HeadersInit | undefined;
+    await fetchLatestVersion("pkg", async (_url, init) => {
+      seen = init?.headers;
+      return Response.json({ version: "1.2.3" }, { status: 200 });
+    });
+    expect((seen as Record<string, string>).accept).toBe("application/json");
+  });
+
   test("returns null on non-ok and on throw", async () => {
     const notOk = async () => new Response("no", { status: 404 });
     expect(await fetchLatestVersion("pkg", notOk)).toBeNull();

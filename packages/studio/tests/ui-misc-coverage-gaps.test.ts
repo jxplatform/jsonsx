@@ -186,20 +186,28 @@ describe("value-selector textfield click containment", () => {
 // ─── Jxsuite update bailouts ─────────────────────────────────────────────────
 
 describe("jxsuite-update bailouts", () => {
-  test("dev builds (non-semver VERSION) never report updates", async () => {
+  test("a dev build still checks — the target is the registry, not this build's version", async () => {
+    /*
+     * This USED to bail: the target was `VERSION`, and a dev build's "dev" is not a semver, so no
+     * project ever got an update prompt from a dev build. The target is each package's own newest
+     * publish now, which a dev build can ask for exactly like a released one. The test build's
+     * VERSION is still "dev"; the check no longer cares.
+     */
     installMockPlatform({
-      listPackages: async () => [{ name: "@jxsuite/runtime", version: "^0.1.0" }],
+      outdatedPackages: async () => [
+        { current: "^0.1.0", latest: "0.4.0", name: "@jxsuite/runtime" },
+      ],
     });
-    // The test build's VERSION is "dev" — not comparable, so the check bails immediately.
-    expect(await checkJxsuiteUpdate()).toBeNull();
+    expect(await checkJxsuiteUpdate()).toEqual([
+      { current: "^0.1.0", dev: false, latest: "0.4.0", name: "@jxsuite/runtime" },
+    ]);
   });
 
   test("applyJxsuiteUpdate without setPackageVersions is a silent no-op", async () => {
     installMockPlatform();
-    await applyJxsuiteUpdate(
-      [{ current: "^0.1.0", dev: false, name: "@jxsuite/runtime" }],
-      "0.30.0",
-    );
+    await applyJxsuiteUpdate([
+      { current: "^0.1.0", dev: false, latest: "0.4.0", name: "@jxsuite/runtime" },
+    ]);
     expect(document.querySelector(".progress-modal")).toBeNull();
   });
 });

@@ -192,15 +192,15 @@ async function applyDiscard(plan: PackagePullPlan): Promise<void> {
  */
 async function syncPackagesAfterPull(): Promise<void> {
   const platform = getPlatform();
-  let check: Awaited<ReturnType<typeof checkJxsuiteUpdate>> = null;
+  let outdated: Awaited<ReturnType<typeof checkJxsuiteUpdate>> = [];
   try {
-    check = await checkJxsuiteUpdate();
+    outdated = await checkJxsuiteUpdate();
   } catch {
-    check = null;
+    outdated = [];
   }
-  if (check && platform.setPackageVersions) {
+  if (outdated.length > 0 && platform.setPackageVersions) {
     // No re-prompt: the discarded local changes came from an update the user already accepted.
-    await applyJxsuiteUpdate(check.outdated, check.target);
+    await applyJxsuiteUpdate(outdated);
     return;
   }
   if (!platform.installDependencies) {
