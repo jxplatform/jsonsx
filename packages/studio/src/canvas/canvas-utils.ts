@@ -790,12 +790,21 @@ export type CanvasMode = (typeof CANVAS_MODES)[number];
 const PREVIEWABLE_BASE_MODES = new Set(["edit", "design"]);
 
 // ─── §4.2 axis 2 — the Canvas view ───────────────────────────────────────────
-// `Edit │ Design │ Preview` is ONE control with three VALUES, not two base modes plus a toggle on a
-// Different bar. The composition rule below is the whole reason it can be: `preview` was never a
-// Base mode — it is a flag that composes with one — so a switcher that showed "Design" selected
-// While the pane was previewing was reporting a state the app was not in (§4.4).
+// `Edit │ Design` is a radio and `Preview` is a TOGGLE beside it, because that is what the storage
+// Has always been: `preview` is not a base mode, it is a flag that composes with one.
+//
+// This was argued the other way, and the argument is worth keeping because it is half right. One
+// Three-value control, it said, because a switcher showing "Design" selected while the pane was
+// Previewing reports a state the app is not in. But the app IS in Design — with preview composed
+// Over it — and a three-value radio could only ever show one of the two facts. It picked the
+// Composed one and hid the base, so while previewing nothing said what you were previewing or what
+// Leaving would return you to. A pressed toggle beside a marked radio shows both, which is the
+// State, and neither half is silent.
 
-/** The three values of the Canvas view axis, in the order the segmented control lists them. */
+/**
+ * Every value of the Canvas view axis. `preview` composes with the other two rather than replacing
+ * them.
+ */
 export const CANVAS_VIEWS = ["edit", "design", "preview"] as const;
 
 export type CanvasView = (typeof CANVAS_VIEWS)[number];
@@ -806,19 +815,13 @@ interface ViewableTab {
   session: { ui: { canvasMode: string; preview?: boolean } };
 }
 
-/**
- * The view this pane is in, or `null` when its editor is not the Canvas at all.
- *
- * The EFFECTIVE view, so the control can never disagree with the canvas: previewing over an `edit`
- * base reads `"preview"`, not `"edit"`.
+/*
+ * `canvasViewOf` lived here: it collapsed the base and the preview flag into ONE effective view, so
+ * a three-value radio could mark exactly one of Edit/Design/Preview. Splitting that radio into a
+ * two-value base plus a preview toggle took its last caller — the two halves are read separately
+ * now, by `canvasBaseViewOf` and `previewStateOf` below. `canvasModeOfPane` still composes the two
+ * for the RENDERER, which does want one answer.
  */
-export function canvasViewOf(tab: ViewableTab): CanvasView | null {
-  const base = tab.session.ui.canvasMode;
-  if (!PREVIEWABLE_BASE_MODES.has(base)) {
-    return null;
-  }
-  return tab.session.ui.preview === true ? "preview" : (base as CanvasView);
-}
 
 /**
  * The views this document supports, in axis order — the control's entries.
@@ -828,6 +831,39 @@ export function canvasViewOf(tab: ViewableTab): CanvasView | null {
  */
 export function canvasViewsFor(tab: ViewableTab): CanvasView[] {
   return CANVAS_VIEWS.filter((value) => tab.capabilities.modes.includes(value));
+}
+
+/**
+ * The BASE views a document supports — the radio's entries. Preview is not among them.
+ *
+ * Preview was the third value of a three-way radio, which made it read as a mode you leave Design
+ * to enter: while previewing, the control could not tell you which mode you would come back to. It
+ * has always been stored as a per-tab flag over an edit/design base, so the radio was describing
+ * the storage inaccurately. Split so the two axes are drawn as what they are.
+ */
+export function canvasBaseViewsFor(tab: ViewableTab): CanvasView[] {
+  return canvasViewsFor(tab).filter((value) => value !== "preview");
+}
+
+/** The base view the tab returns to — what the radio marks while preview is on. */
+export function canvasBaseViewOf(tab: ViewableTab): CanvasView | null {
+  const base = tab.session.ui.canvasMode;
+  return PREVIEWABLE_BASE_MODES.has(base) ? (base as CanvasView) : null;
+}
+
+/**
+ * Whether this document can be previewed at all, and whether it is being.
+ *
+ * `available` is a fact about the DOCUMENT (its declared modes) and about the base it is currently
+ * in — `source` composes with no preview, so the toggle is not offered there.
+ */
+export function previewStateOf(tab: ViewableTab): { available: boolean; on: boolean } {
+  return {
+    available:
+      tab.capabilities.modes.includes("preview") &&
+      PREVIEWABLE_BASE_MODES.has(tab.session.ui.canvasMode),
+    on: tab.session.ui.preview === true,
+  };
 }
 
 /**

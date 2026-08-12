@@ -25,6 +25,8 @@ Pick **Base** to edit the styles that apply everywhere; pick a breakpoint to edi
 
 **In Edit mode the choice resizes the page.** Design shows every breakpoint at once, so there the Size group marks which panel is active. Edit shows one column, and the column becomes as wide as the breakpoint you picked — the same width Design gives that panel. The page is genuinely that narrow, so your own media queries fire and the layout reflows; it isn't a scaled-down picture. Writing at **Sm** and writing at **Base** are two real views of the same document.
 
+**Preview follows it too**, at that same width, so switching Preview on doesn't jump you back to a full-width page. With no breakpoint chosen, Preview fills the pane.
+
 ## How the cascade works
 
 Base is the design; breakpoints are exceptions to it:

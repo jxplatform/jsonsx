@@ -121,6 +121,20 @@
 .pc-view {
   flex-shrink: 0;
 }
+/* The preview toggle is not a third radio, and must not read as one: it says the canvas is inert.
+   Pressed, it takes the accent so "editing is off" is legible from across the room; unpressed it is
+   as quiet as any other action button. The margin separates the two axes the eye is being asked to
+   read as separate. */
+.pc-preview-toggle {
+  flex-shrink: 0;
+  margin-inline-start: 6px;
+}
+.pc-preview-toggle[selected] {
+  --spectrum-actionbutton-background-color-default: var(--accent);
+  --spectrum-actionbutton-content-color-default: var(--bg);
+  background: var(--accent);
+  color: var(--bg);
+}
 .pc-export {
   flex-shrink: 0;
 }
@@ -457,10 +471,13 @@
    stage and the iframe needs a definite height for the frame's `height:100%`
    to resolve against, and the artboard chrome (border, page surface) is
    dropped: this is the page, not a specimen of it. */
+/* Centred, because the stage is now as wide as the chosen breakpoint rather than the pane: a 640px
+   preview pinned to the left edge of a 1400px pane reads as a broken layout rather than a phone. */
 .preview-stage {
   display: flex;
   width: 100%;
   height: 100%;
+  margin: 0 auto;
 }
 .preview-stage .canvas-panel {
   flex: 1;

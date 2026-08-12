@@ -218,6 +218,22 @@ export function syncEditModeCss(doc: Document, mode: CanvasMode): void {
 }
 
 /**
+ * Flag the canvas document as a preview shell, so `canvas.html`'s preview rules apply.
+ *
+ * The document's default box is built for EDITING: `html, body { overflow: hidden }`, because the
+ * host grows the iframe to its content height there and the parent canvas is what pans. Preview
+ * inverts that — the frame stays at the pane's height and the document scrolls itself — and until
+ * this existed nothing turned the clipping off, so preview showed the first screenful of every page
+ * and no more. An attribute rather than an injected stylesheet: the rules it switches live beside
+ * the ones they override, which is where a reader looks for them.
+ *
+ * Called on every render because one iframe is reused across modes.
+ */
+export function syncPreviewShell(doc: Document, mode: CanvasMode): void {
+  doc.documentElement.toggleAttribute("data-jx-preview", mode === "preview");
+}
+
+/**
  * Whether a canvas mode gets a live caret. Design and edit are the interactive modes; preview must
  * look and behave like the shipped page, and stylebook specimens are not documents.
  */
@@ -593,6 +609,7 @@ export async function renderResolvedDocument(opts: {
   applySiteStyle(opts.siteStyle, (opts.doc as { $media?: Record<string, string> }).$media ?? {});
   injectHead(opts.doc);
   syncEditModeCss(opts.container.ownerDocument, opts.mode);
+  syncPreviewShell(opts.container.ownerDocument, opts.mode);
   syncStylebookCss(opts.container.ownerDocument, opts.mode);
   // Seed the runtime's root $media before buildScope so a COMPONENT with its own `@--name` blocks
   // But no own `$media` resolves the breakpoint to its real query (the iframe path calls buildScope

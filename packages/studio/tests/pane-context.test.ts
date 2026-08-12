@@ -406,31 +406,76 @@ describe("editor kind", () => {
 // ─── Axis 2 · Canvas view ─────────────────────────────────────────────────────
 
 describe("canvas view", () => {
-  test("is one radio group of three values, with the effective one checked", async () => {
-    const tab = openTestTab();
+  test("is a two-value radio plus a SEPARATE preview toggle", async () => {
+    /*
+     * This asserted the opposite — three values in one radio group, and "nothing in the axis is a
+     * toggle: a value cannot silently compose with another value". But preview does compose, and
+     * always did: it is stored as `ui.preview` over an edit/design base, `PREVIEWABLE_BASE_MODES`
+     * names which bases it composes with, and `canvasModeOfPane` folds the two together. The radio
+     * was describing its own storage inaccurately, and the cost was legible: while previewing, it
+     * could not say which mode you were previewing or which one you would come back to.
+     */
+    openTestTab();
     paneContext.mount(root, makeCtx());
     await flush();
 
     const group = root.querySelector(".pc-view") as HTMLElement;
     const segs = [...group.querySelectorAll("sp-action-button")];
-    expect(segs.map((s) => s.textContent?.trim())).toEqual(["Edit", "Design", "Preview"]);
-    expect(segs.map((s) => s.getAttribute("aria-checked"))).toEqual(["true", "false", "false"]);
-    // Nothing in the axis is a toggle: a value cannot silently compose with another value.
-    expect(group.querySelector("sp-action-button[toggles]")).toBeNull();
+    expect(segs.map((s) => s.textContent?.trim())).toEqual(["Edit", "Design"]);
+    expect(segs.map((s) => s.getAttribute("aria-checked"))).toEqual(["true", "false"]);
 
-    tab.session.ui.preview = true;
-    await flush();
-    const after = [...root.querySelectorAll(".pc-view sp-action-button")];
-    expect(after.map((s) => s.getAttribute("aria-checked"))).toEqual(["false", "false", "true"]);
+    const toggle = root.querySelector(".pc-preview-toggle") as HTMLElement;
+    expect(toggle.textContent?.trim()).toBe("Preview");
+    expect(toggle.hasAttribute("toggles")).toBe(true);
+    expect(toggle.getAttribute("aria-pressed")).toBe("false");
   });
 
-  test("Preview sets the flag; Design clears it on the way past", async () => {
+  test("previewing leaves the BASE marked — the state the radio could not express", async () => {
+    const tab = openTestTab();
+    tab.session.ui.canvasMode = "design";
+    tab.session.ui.preview = true;
+    paneContext.mount(root, makeCtx());
+    await flush();
+
+    const segs = [...root.querySelectorAll(".pc-view sp-action-button")];
+    expect(segs.map((s) => s.getAttribute("aria-checked"))).toEqual(["false", "true"]);
+    const toggle = root.querySelector(".pc-preview-toggle") as HTMLElement;
+    expect(toggle.getAttribute("aria-pressed")).toBe("true");
+    // And it says where "off" goes, rather than leaving the author to guess.
+    expect(toggle.getAttribute("title")).toContain("Design");
+  });
+
+  test("the toggle sets the flag and clears it, over either base", async () => {
     const tab = openTestTab();
     const ctx = makeCtx();
     paneContext.mount(root, ctx);
     await flush();
 
-    pointer(btn("Preview"), "click");
+    const toggle = () => root.querySelector(".pc-preview-toggle") as HTMLElement;
+    pointer(toggle(), "click");
+    await flush();
+    expect(tab.session.ui.preview).toBe(true);
+    expect(tab.session.ui.canvasMode).toBe("edit"); // The base is untouched.
+
+    pointer(toggle(), "click");
+    await flush();
+    expect(tab.session.ui.preview).toBe(false);
+
+    pointer(btn("Design"), "click");
+    await flush();
+    pointer(toggle(), "click");
+    await flush();
+    expect(tab.session.ui.preview).toBe(true);
+    expect(ctx.setCanvasMode).toHaveBeenCalledWith(tab, "design");
+  });
+
+  test("Design clears the flag on the way past", async () => {
+    const tab = openTestTab();
+    const ctx = makeCtx();
+    paneContext.mount(root, ctx);
+    await flush();
+
+    pointer(root.querySelector(".pc-preview-toggle") as HTMLElement, "click");
     await flush();
     expect(tab.session.ui.preview).toBe(true);
 
@@ -438,6 +483,17 @@ describe("canvas view", () => {
     await flush();
     expect(tab.session.ui.preview).toBe(false);
     expect(ctx.setCanvasMode).toHaveBeenCalledWith(tab, "design");
+  });
+
+  test("no toggle for a document that does not declare preview", async () => {
+    const tab = openTestTab();
+    tab.capabilities.modes = ["edit", "design"];
+    paneContext.mount(root, makeCtx());
+    await flush();
+    expect(root.querySelector(".pc-preview-toggle")).toBeNull();
+    expect(
+      [...root.querySelectorAll(".pc-view sp-action-button")].map((s) => s.textContent?.trim()),
+    ).toEqual(["Edit", "Design"]);
   });
 
   test("offers only the views the document declares", async () => {
@@ -448,6 +504,8 @@ describe("canvas view", () => {
     expect(
       [...root.querySelectorAll(".pc-view sp-action-button")].map((s) => s.textContent?.trim()),
     ).toEqual(["Edit"]);
+    // `source` is in the list but composes with no preview, so the toggle is not offered either.
+    expect(root.querySelector(".pc-preview-toggle")).toBeNull();
   });
 
   test("is absent entirely when the editor is not the Canvas", async () => {

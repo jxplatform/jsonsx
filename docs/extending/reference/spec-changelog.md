@@ -299,6 +299,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.9.19-draft** (2026-08-12) — Preview is a toggle over an edit/design base in the View control rather than a third radio value; it honours the chosen breakpoint like Edit and Design; and canvas.html's clip is lifted in preview so the pane-height frame can actually scroll its document.
 - **0.9.18-draft** (2026-08-11) — §12's status table re-read against the code: collection browser, entry editor, component library management and the redirect editor were shipped and still marked Pending; the CSS properties/parts panels are read-only reflections, not declaration forms; the CEM exporter is complete and unreachable; media usage is computed but only the delete confirmation reads it.
 - **0.9.17-draft** (2026-08-11) — SEO panel status is Partial — Search appearance ships the previews, counters and warnings; the schema.org editor is still pending.
 - **0.9.16-draft** (2026-08-11) — The resolving-with values move into their own popover, and each becomes a command (canvas.setTestProp / setRouteParam).

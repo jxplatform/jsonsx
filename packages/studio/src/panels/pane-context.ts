@@ -12,10 +12,10 @@
  *   host ({@link hostableKindsOf}), so the control can never contain a permanently dead entry. A
  *   document with one kind renders the name as text rather than as a dropdown that cannot go
  *   anywhere.
- * - **Canvas view** — `Edit │ Design │ Preview` as ONE segmented control with three values
- *   ({@link canvasViewsFor}), and none at all in a pane that may not host the Canvas. Preview stops
- *   being a toggle on a different bar with different visual grammar that silently composed with a
- *   base mode the switcher still showed as selected.
+ * - **Canvas view** — `Edit │ Design` as a radio ({@link canvasBaseViewsFor}) with a **Preview**
+ *   toggle beside it ({@link previewStateOf}), and none at all in a pane that may not host the
+ *   Canvas. The two are drawn apart because they are two axes: preview is a flag over an edit or
+ *   design base, so the radio marks the base throughout and the toggle says whether it is on.
  * - **Rendering context** — `md ⌄ Light ⌄`, folding the size breakpoint, the colour scheme, the
  *   feature queries and the layout show/hide switch into one popover. Per §2 principle 5 this
  *   control **only selects**; its footer is "Manage contexts…", which routes to the definition site
@@ -67,11 +67,12 @@ import { renderPopover } from "../ui/layers";
 import { rectOf } from "../utils/geometry";
 import { paneRegion } from "../ui/regions";
 import {
-  canvasViewOf,
-  canvasViewsFor,
   fitToScreen,
   getFit,
   resetZoom,
+  canvasBaseViewOf,
+  canvasBaseViewsFor,
+  previewStateOf,
   setCanvasView,
   setEditZoom,
   setFit,
@@ -654,11 +655,20 @@ function editorKindTpl(tab: Tab, ctx: PaneContextCtx): TemplateResult {
 function viewTpl(tab: Tab, ctx: PaneContextCtx): TemplateResult | typeof nothing {
   // Every pane draws a live Canvas, so this is no longer narrowed by WHERE the tab is — only by
   // What the document declares. A document with no Canvas view still draws no view group.
-  const views = canvasViewsFor(tab);
+  const views = canvasBaseViewsFor(tab);
   if (views.length === 0) {
     return nothing;
   }
-  const current = canvasViewOf(tab);
+  const current = canvasBaseViewOf(tab);
+  const preview = previewStateOf(tab);
+  /*
+   * TWO CONTROLS, because they are two axes.
+   *
+   * `Edit │ Design │ Preview` was one three-way radio, and it lied about the state it was showing:
+   * preview is stored as a flag OVER an edit/design base, so while it was on the radio could not
+   * say which mode you were previewing — or which one Escape would return you to. Now the radio
+   * marks the base the whole time and the toggle sits beside it, pressed.
+   */
   return axisTpl(
     "View",
     html`
@@ -678,6 +688,33 @@ function viewTpl(tab: Tab, ctx: PaneContextCtx): TemplateResult | typeof nothing
           `,
         )}
       </sp-action-group>
+      ${
+        preview.available
+          ? html`
+              <sp-action-button
+                size="s"
+                class="pc-preview-toggle"
+                toggles
+                ?selected=${preview.on}
+                aria-pressed=${preview.on ? "true" : "false"}
+                title=${
+                  preview.on
+                    ? `Stop previewing — back to ${CANVAS_VIEW_LABELS[current ?? "edit"]}`
+                    : "Preview: the page as it ships, with editing off"
+                }
+                @click=${() => {
+                  setCanvasView(
+                    tab,
+                    preview.on ? (current ?? "edit") : "preview",
+                    ctx.setCanvasMode,
+                  );
+                }}
+              >
+                ${CANVAS_VIEW_LABELS.preview}
+              </sp-action-button>
+            `
+          : nothing
+      }
     `,
   );
 }

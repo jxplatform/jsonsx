@@ -14,7 +14,7 @@ code:
 
 # Modes and views
 
-Two controls on the [context bar](/docs/studio/interface/tabs) decide how the open file is presented, and they answer different questions. **Editor** is _which editor_ — **Canvas**, **Grid**, **Code**, **Diff**, **Entry**, **Library** or **Project Styles** — and it lists only the editors this file supports, so there is nothing in it to be disabled. **View** is _which view of the canvas_ — **Edit**, **Design** or **Preview** — and it appears only while the Canvas editor is open. A view is a lens, not a different app: the same file underneath, shown the way that suits the job. Every open file remembers both as you switch between tabs.
+Two controls on the [context bar](/docs/studio/interface/tabs) decide how the open file is presented, and they answer different questions. **Editor** is _which editor_ — **Canvas**, **Grid**, **Code**, **Diff**, **Entry**, **Library** or **Project Styles** — and it lists only the editors this file supports, so there is nothing in it to be disabled. **View** is _which view of the canvas_ — **Edit** or **Design**, with **Preview** as a toggle beside them — and it appears only while the Canvas editor is open. A view is a lens, not a different app: the same file underneath, shown the way that suits the job. Every open file remembers both as you switch between tabs.
 
 Those seven names come from one list in Studio, which is why the pane's context bar and the status bar can never print different words for the same editor.
 
@@ -81,7 +81,7 @@ Installed format extensions can add their own file types with their own lists, s
 
 ## Preview
 
-**Preview** is the third value of the **View** control, beside Edit and Design — one control, three values, so the bar can never show you Design while the canvas is previewing. Pick it and the canvas shows the page with its real data resolved: dynamic text filled in, repeated lists expanded, exactly what a visitor gets.
+**Preview** is a **toggle** beside the View control, not a third view. It applies to Edit and to Design alike: the base stays selected while you preview, so the bar always says which mode you are previewing and which one switching Preview off returns you to. Turn it on and the canvas shows the page with its real data resolved: dynamic text filled in, repeated lists expanded, exactly what a visitor gets.
 
 What it resolves _with_ comes from the two controls beside it. The **Context** popover holds what the page renders _in_ — its breakpoint, colour scheme, feature queries, and a **Show layout elements** switch for pages that use a layout. The **resolving with** popover holds what it renders _from_, one field per line:
 
@@ -101,7 +101,11 @@ that animate as they come into view actually do, and anything that reacts to scr
 way it will for a visitor. There is no zoom control in Preview for the same reason: it is showing
 you the page at its real size.
 
-Pick **Edit** or **Design** to go back to editing.
+**And at the size you picked.** Preview is as wide as the breakpoint chosen in the **Context**
+popover — the same width Edit gives its column and Design gives that artboard — so the same page at
+`md` is the same page whichever view the toggle is over. With no breakpoint chosen it fills the pane.
+
+Switch **Preview** off to go back to editing, in whichever view you were in.
 
 **Clicking a link in Preview opens that page in a new browser tab**, rather than replacing the canvas. Links within the same page — the ones that jump to a heading — still scroll where you would expect.
 

@@ -2,9 +2,9 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.18-draft
+**Version:** 0.9.19-draft
 **Status:** Partial
-**Updated:** 2026-08-11
+**Updated:** 2026-08-12
 **License:** MIT
 
 ---
@@ -167,13 +167,13 @@ The mapping is render-only: the tab's source document keeps the authored relativ
 
 ### 4.2 Modes
 
-| Mode      | Description                                         |
-| --------- | --------------------------------------------------- |
-| Design    | Fluid document editing, with structural overlays    |
-| Content   | Fluid document editing, for format-backed documents |
-| Stylebook | Design token management and component gallery       |
-| Preview   | Clean preview without editing chrome                |
-| Source    | Raw JSON/code view                                  |
+| Mode      | Description                                                         |
+| --------- | ------------------------------------------------------------------- |
+| Design    | Fluid document editing, with structural overlays                    |
+| Content   | Fluid document editing, for format-backed documents                 |
+| Stylebook | Design token management and component gallery                       |
+| Preview   | Clean preview without editing chrome — a TOGGLE, not a peer (below) |
+| Source    | Raw JSON/code view                                                  |
 
 Design and Content are both **editable modes** and behave identically for text: the canvas carries a
 live caret (§8.2). They differ only in what the document is — Content mode opens a format-backed
@@ -193,7 +193,27 @@ canvas iframe to its full content height so the parent overlay can reach every n
 transform in place of scrolling; both are incompatible with fidelity, because a frame that is as
 tall as its document never scrolls, so `position: sticky`, scroll-driven animation and
 `IntersectionObserver` reveals can never fire. Preview therefore mounts ONE frame at the pane's own
-size, which scrolls its own document. It has no zoom control and no pan.
+height, which scrolls its own document. It has no zoom control and no pan.
+
+**The frame must actually be allowed to scroll**, which is a property of the canvas DOCUMENT and not
+only of the frame. `canvas.html` clips `html, body` because every editable mode needs it — the frame
+is content-height there and the parent is what pans — so preview lifts the clip and sizes the query
+container to the real viewport (`syncPreviewShell`). Without that, a pane-height frame around a
+clipped document showed the first screenful of every page and offered no way down: the frame was a
+viewport and the document refused to be longer than it.
+
+**Preview is a TOGGLE over an edit/design base, and the surface says so.** It has always been stored
+that way — a per-tab flag composed with `ui.canvasMode`, which is why `canvasModeOfPane` folds the
+two into one effective mode for the renderer. The View control nevertheless drew all three as one
+radio, so while previewing it could not report which mode was underneath or which one leaving would
+return to. It is a two-value radio (`Edit │ Design`) with a pressed toggle beside it; the base stays
+marked throughout. Arriving at a base still clears the flag, so "Design" means Design from any state.
+
+**Preview honours the chosen breakpoint**, at the width Edit gives its column and Design gives that
+artboard, so the same page at `md` is the same page whichever base the toggle is over. It ignored
+the size switcher entirely and filled the pane at every size — the same defect as the Edit column's,
+and the same rule decides it: a control that changes the rendering context has to change the
+rendering, or it is a control over a label. With no breakpoint chosen it fills the pane.
 
 **Source is batched, so every way out of it settles first.** Parsing the buffer back into the
 document is debounced, which means at any instant the editor may hold text the document has not
@@ -1953,6 +1973,7 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ## Changelog
 
+- **0.9.19-draft** (2026-08-12) — Preview is a toggle over an edit/design base in the View control rather than a third radio value; it honours the chosen breakpoint like Edit and Design; and canvas.html's clip is lifted in preview so the pane-height frame can actually scroll its document.
 - **0.9.18-draft** (2026-08-11) — §12's status table re-read against the code: collection browser, entry editor, component library management and the redirect editor were shipped and still marked Pending; the CSS properties/parts panels are read-only reflections, not declaration forms; the CEM exporter is complete and unreachable; media usage is computed but only the delete confirmation reads it.
 - **0.9.17-draft** (2026-08-11) — SEO panel status is Partial — Search appearance ships the previews, counters and warnings; the schema.org editor is still pending.
 - **0.9.16-draft** (2026-08-11) — The resolving-with values move into their own popover, and each becomes a command (canvas.setTestProp / setRouteParam).
@@ -2026,4 +2047,4 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.18-draft_
+_`@jxsuite/studio` Specification v0.9.19-draft_

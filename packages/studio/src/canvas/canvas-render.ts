@@ -1003,8 +1003,29 @@ function renderCanvasImpl(surface: CanvasSurface) {
       canvasWrap.style.display = "block";
       canvasWrap.style.overflow = "hidden";
     }
+    /*
+     * PREVIEW IS AS WIDE AS THE CHOSEN BREAKPOINT, for the reason Edit is (see that branch).
+     *
+     * It filled the pane at every size: `--sm` selected, 640px in Edit, 924px here. The size
+     * switcher is one per-pane setting and preview is the mode whose entire job is showing the page
+     * as it will be seen — a control that changes the rendering context has to change the
+     * rendering. Same expression as Edit's column, so the same page at `md` is the same page
+     * whichever of the two the toggle is over.
+     *
+     * The HEIGHT is untouched: the frame stays the pane's height and the document scrolls itself,
+     * which is what makes sticky, scroll-driven animation and IntersectionObserver fire here.
+     */
+    const { baseWidth: previewBase, sizeBreakpoints: previewBreakpoints } = parseMediaEntries(
+      getEffectiveMedia(S.document.$media),
+    );
+    const previewMedia = activeMediaOfPane(surface.paneId);
+    const previewWidth =
+      previewBreakpoints.find((bp) => bp.name === previewMedia)?.width ?? previewBase;
     const { tpl: panelTpl, panel } = canvasPanelTemplate(null, null, true);
-    litRender(html`<div class="preview-stage">${panelTpl}</div>`, canvasWrap);
+    litRender(
+      html`<div class="preview-stage" style="max-width:${previewWidth}px">${panelTpl}</div>`,
+      canvasWrap,
+    );
     canvasPanels.push(panel as unknown as CanvasPanel);
     renderCanvasIntoPanel(surface, panel as unknown as CanvasPanel, S.ui.featureToggles);
     return;
