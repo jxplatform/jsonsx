@@ -976,6 +976,49 @@ export function extractCssTemplates(source: string): string[] {
   return templateLiterals(source).filter((t) => CSS_SHAPE_RE.test(t));
 }
 
+/* ------------------------------------------------------------------------ underlay-stacking rule --- */
+
+/**
+ * The card an `<sp-underlay>` is opened beside, and the line it sits on.
+ *
+ * A modal body in this app is two siblings: the scrim and the surface. Only the FIRST element with
+ * a class after the underlay is taken — that is the card; everything below it is inside it.
+ */
+export function extractUnderlayCards(source: string): { classes: string[]; line: number }[] {
+  const newlines = newlineOffsets(source);
+  const out: { classes: string[]; line: number }[] = [];
+  const underlay = /<sp-underlay\b/g;
+  let match: RegExpExecArray | null;
+  while ((match = underlay.exec(source))) {
+    const after = source.slice(match.index, match.index + 600);
+    const card = /<(?!sp-underlay\b)[a-z][\w-]*[^>]*?\bclass\s*=\s*"([^"]*)"/i.exec(after);
+    if (!card) {
+      continue;
+    }
+    const classes = card[1]!.split(/\s+/).filter((c) => c.length > 0 && !c.includes("$"));
+    if (classes.length > 0) {
+      out.push({ classes, line: lineOf(newlines, match.index) });
+    }
+  }
+  return out;
+}
+
+/** Class names that some rule in this stylesheet gives a positive `z-index`. */
+export function stackedClasses(css: string): Set<string> {
+  const out = new Set<string>();
+  for (const rule of extractRules(css)) {
+    if (!/(?:^|[;{\s])z-index\s*:\s*(?:[1-9]\d*|var\()/.test(rule.body)) {
+      continue;
+    }
+    for (const selector of rule.selectors) {
+      for (const [, name] of selector.matchAll(SELECTOR_CLASS_RE)) {
+        out.add(name!);
+      }
+    }
+  }
+  return out;
+}
+
 /* ------------------------------------------------------------------------------ the run itself --- */
 
 export interface StyleCheckResult {
@@ -995,6 +1038,8 @@ export interface StyleCheckResult {
   focusRings: Finding[];
   /** FOCUS_RING_ALLOWANCES entries that suppress nothing any more — the ratchet. */
   staleFocusRings: string[];
+  /** Modal cards opened beside an `sp-underlay` that no rule lifts above it. */
+  underScrim: Finding[];
 }
 
 function isVendorClass(name: string): boolean {
@@ -1013,6 +1058,15 @@ export async function collect(root: string): Promise<StyleCheckResult> {
 
   const focusRings: Finding[] = [];
   const suppressedRings = new Set<string>();
+  /** Classes some rule gives a positive z-index — the underlay-stacking rule's evidence. */
+  const stacked = new Set<string>();
+  /** Every card opened beside an `sp-underlay`, with where it was opened. */
+  const underlayCards: { file: string; line: number; classes: string[] }[] = [];
+  const scanStacking = (css: string): void => {
+    for (const name of stackedClasses(css)) {
+      stacked.add(name);
+    }
+  };
   /** Run the focus-ring rule over one stylesheet, accumulating both halves of its answer. */
   const scanRings = (rel: string, css: string): void => {
     const { findings, suppressed } = checkFocusRings(rel, css);
@@ -1028,6 +1082,7 @@ export async function collect(root: string): Promise<StyleCheckResult> {
     hexErrors.push(...errors);
     pxWarnings.push(...warnings);
     scanRings(rel, cssOfHtml(source));
+    scanStacking(cssOfHtml(source));
     for (const block of extractStyleBlocks(source)) {
       for (const name of extractDefinedClasses(block)) {
         defined.add(name);
@@ -1046,6 +1101,7 @@ export async function collect(root: string): Promise<StyleCheckResult> {
     hexErrors.push(...errors);
     pxWarnings.push(...warnings);
     scanRings(rel, source);
+    scanStacking(source);
     for (const name of extractDefinedClasses(source)) {
       defined.add(name);
     }
@@ -1054,6 +1110,7 @@ export async function collect(root: string): Promise<StyleCheckResult> {
   for await (const rel of new Glob("src/**/*.css").scan(root)) {
     const source = await read(rel);
     scanRings(rel, source);
+    scanStacking(source);
     for (const name of extractDefinedClasses(source)) {
       defined.add(name);
     }
@@ -1080,9 +1137,13 @@ export async function collect(root: string): Promise<StyleCheckResult> {
     }
 
     for (const css of extractCssTemplates(source)) {
+      scanStacking(css);
       for (const name of extractDefinedClasses(css)) {
         defined.add(name);
       }
+    }
+    for (const card of extractUnderlayCards(source)) {
+      underlayCards.push({ classes: card.classes, file: rel, line: card.line });
     }
     for (const [name, line] of extractEmittedClasses(source)) {
       if (!emitted.has(name)) {
@@ -1112,6 +1173,21 @@ export async function collect(root: string): Promise<StyleCheckResult> {
     }
   }
 
+  /* An `sp-underlay` paints at `z-index: 1`. A card beside it at `auto` is therefore UNDER its own
+     scrim — visible through it, and unclickable, which is how a blocking progress modal shipped
+     with its only exit button unpressable. One rule anywhere giving one of the card's classes a
+     positive z-index is enough; this asks for evidence, not for a particular number. */
+  const underScrim: Finding[] = underlayCards
+    .filter((card) => !card.classes.some((name) => stacked.has(name)))
+    .map((card) => ({
+      file: card.file,
+      line: card.line,
+      text:
+        `.${card.classes.join(".")} is opened beside an <sp-underlay> but no rule stacks it. ` +
+        `The scrim paints at z-index 1, so the surface is under it: visible, and every click ` +
+        `lands on the underlay. Give the card a z-index.`,
+    }));
+
   const staleFocusRings = FOCUS_RING_ALLOWANCES.filter(
     (a) => !suppressedRings.has(focusKey(a.file, normalizeSelector(a.selector))),
   )
@@ -1128,13 +1204,14 @@ export async function collect(root: string): Promise<StyleCheckResult> {
     silentCatches: silentCatches.toSorted((a, b) => a.file.localeCompare(b.file)),
     focusRings,
     staleFocusRings,
+    underScrim,
   };
 }
 
 /** Print the findings and return the process exit code. */
 export function report(result: StyleCheckResult): number {
   const { hexErrors, pxWarnings, orphans, staleAllowed, banned, silentCatches } = result;
-  const { focusRings, staleFocusRings } = result;
+  const { focusRings, staleFocusRings, underScrim } = result;
 
   if (pxWarnings.length > 0) {
     console.warn(
@@ -1231,7 +1308,19 @@ export function report(result: StyleCheckResult): number {
     }
   }
 
+  if (underScrim.length > 0) {
+    console.error(
+      `\n❌ ${underScrim.length} modal card(s) opened under their own scrim. <sp-underlay> paints ` +
+        `at z-index 1, so a card beside it at auto is visible THROUGH the scrim and unclickable — ` +
+        `which shipped a blocking progress modal whose only exit could not be pressed.`,
+    );
+    for (const u of underScrim) {
+      console.error(`   ${u.file}:${u.line}  ${u.text}`);
+    }
+  }
+
   if (
+    underScrim.length > 0 ||
     hexErrors.length > 0 ||
     orphans.length > 0 ||
     staleAllowed.length > 0 ||
@@ -1250,7 +1339,7 @@ export function report(result: StyleCheckResult): number {
       `(${ALLOWED_ORPHANS.size} allow-listed orphan(s) remaining), no banned identifiers, ` +
       `${silentTotal} allow-listed silent catch(es) remaining, ` +
       `${FOCUS_RING_ALLOWANCES.length} focus-ring suppression(s) each paired with its ` +
-      `:focus-visible restore${pxNote}.`,
+      `:focus-visible restore, every underlay-bearing card stacked above its scrim${pxNote}.`,
   );
   return 0;
 }

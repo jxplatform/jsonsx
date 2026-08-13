@@ -1135,6 +1135,12 @@
 .progress-modal {
   position: fixed;
   inset: 0;
+  /* Above its own scrim. `sp-underlay` paints at `z-index: 1`, and this card — its sibling in the
+     modal layer — sat at `auto`, so the scrim covered it: the surface was VISIBLE (the scrim is
+     translucent) and every click landed on the underlay instead. `Run in the background` was the
+     only way out of a running install and could not be pressed. 1000 is what the other four
+     underlay-bearing cards use (.settings-modal, .about-modal, .new-project-modal, .seo-modal). */
+  z-index: 1000;
   margin: auto;
   width: min(420px, calc(100vw - 48px));
   max-height: calc(100vh - 96px);

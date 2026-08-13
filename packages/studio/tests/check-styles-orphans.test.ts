@@ -29,6 +29,8 @@ import {
   report,
   scanBannedIdentifiers,
   scanHex,
+  stackedClasses,
+  extractUnderlayCards,
   stripCommentsAndStrings,
   templateLiterals,
 } from "../scripts/check-styles";
@@ -391,6 +393,19 @@ describe("collect", () => {
       join(root, "src", "inject.ts"),
       "const css = `.injected { position: absolute; }`;\n",
     );
+    /* Two modal bodies, identical but for one declaration: the scrim paints at z-index 1, so the
+       one with no z-index is under it — visible through the scrim, and unclickable. */
+    writeFileSync(
+      join(root, "styles", "modals.css"),
+      ".lifted { position: fixed; z-index: 1000 }\n.sunken { position: fixed }",
+    );
+    writeFileSync(
+      join(root, "src", "modals.ts"),
+      [
+        'html`<sp-underlay open></sp-underlay><div class="lifted">ok</div>`;',
+        'html`<sp-underlay open></sp-underlay><div class="sunken">unclickable</div>`;',
+      ].join("\n"),
+    );
     writeFileSync(
       join(root, "src", "app.ts"),
       [
@@ -462,6 +477,11 @@ describe("collect", () => {
     expect(paired.text).toContain("no allowance");
   });
 
+  test("reports a modal card that no rule lifts above its own underlay", () => {
+    expect(result.underScrim.map((u) => `${u.file}:${u.line}`)).toEqual(["src/modals.ts:2"]);
+    expect(result.underScrim[0]!.text).toContain(".sunken");
+  });
+
   test("reports every allowance the tree no longer needs as stale — the same ratchet", () => {
     // The fixture contains none of the studio's six suppressions, so all six come back stale.
     expect(result.staleFocusRings).toEqual(
@@ -481,6 +501,7 @@ describe("report", () => {
     silentCatches: [],
     focusRings: [],
     staleFocusRings: [],
+    underScrim: [],
   };
   const finding = (text: string): { file: string; line: number; text: string } => ({
     file: "src/a.ts",
@@ -636,5 +657,45 @@ describe("countBareCatches", () => {
 
   test("a catch that does something is not counted", () => {
     expect(countBareCatches("try { a(); } catch (error) { notify.error(String(error)); }")).toBe(0);
+  });
+});
+
+describe("extractUnderlayCards", () => {
+  test("takes the card beside the scrim, not the elements inside it", () => {
+    const source = [
+      "html`<sp-underlay open></sp-underlay>",
+      '<div class="progress-modal"><div class="progress-head"><strong class="t"></strong></div></div>`;',
+    ].join("\n");
+    expect(extractUnderlayCards(source)).toEqual([{ classes: ["progress-modal"], line: 1 }]);
+  });
+
+  test("keeps every class on the card — any one of them may carry the z-index", () => {
+    const source =
+      'html`<sp-underlay open></sp-underlay><div class="new-project-modal add-repo"></div>`;';
+    expect(extractUnderlayCards(source)[0]!.classes).toEqual(["new-project-modal", "add-repo"]);
+  });
+
+  test("a template with no underlay declares no card", () => {
+    expect(extractUnderlayCards('html`<div class="plain"></div>`;')).toEqual([]);
+  });
+
+  test("an interpolated class token is not a name this rule can check", () => {
+    const source = 'html`<sp-underlay open></sp-underlay><div class="card ${mode}"></div>`;';
+    expect(extractUnderlayCards(source)[0]!.classes).toEqual(["card"]);
+  });
+});
+
+describe("stackedClasses", () => {
+  test("credits a positive z-index, in any rule that names the class", () => {
+    expect([...stackedClasses(".a { z-index: 1000 }")]).toEqual(["a"]);
+    expect([...stackedClasses(".b { position: fixed;\n  z-index: 3; }")]).toEqual(["b"]);
+  });
+
+  test("a token reference counts — the value is not this rule's business", () => {
+    expect([...stackedClasses(".c { z-index: var(--layer-modal) }")]).toEqual(["c"]);
+  });
+
+  test("z-index: auto and 0 stack nothing — they are the defect", () => {
+    expect([...stackedClasses(".d { z-index: auto }\n.e { z-index: 0 }")]).toEqual([]);
   });
 });
