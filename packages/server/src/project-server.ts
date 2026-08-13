@@ -238,6 +238,10 @@ export function createProjectServer(options: CreateProjectServerOptions): Projec
         }
       }
 
+      /* 8. The project's BUILT SITE is not served here — see the same note in `server.ts`. This
+         server's paths mean the project's SOURCES, and a built page means its own output by the
+         very same paths; `site-preview.ts` gives that output its own origin, which is what
+         `View: Open in Browser` opens. */
       return new Response("Not found", { status: 404 });
     },
 

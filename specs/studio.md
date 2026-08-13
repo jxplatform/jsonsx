@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.22-draft
+**Version:** 0.9.24-draft
 **Status:** Partial
 **Updated:** 2026-08-13
 **License:** MIT
@@ -1227,10 +1227,41 @@ Studio closes the loop from "I changed something" to "I looked at the real page"
 through the same seam Preview link clicks use (`canvas/preview-navigate.ts`, §4.2), so on desktop it
 reaches the real browser rather than a webview.
 
-The URL is the canvas origin (the server already serving the project) plus the compiler's output
-path for the document's route — `dist/<route>/index.html`, or `dist/<route>.html` under
-`build.trailingSlash: "never"`. The action is never hidden: when a page cannot be resolved it renders
-**disabled with the reason in its tooltip**, one of —
+**The URL is the page's ROUTE, not its output file's path**, and the difference is the whole
+feature. A built page is written for its published origin: it links to `/blog/hello/` and pulls
+`/components/demo.css`, both root-absolute. Handed `…/dist/blog/hello/index.html` — the compiler's
+output path, which is what this said and what shipped — a browser resolves those two against the
+server ROOT, so the HTML arrives, every stylesheet and script 404s, and the first link the reader
+clicks leaves the site. The page loads and nothing else works. So the address is `<route>`, with the
+trailing slash `build.trailingSlash` decides — the URL the page will have when it is published,
+which is also the one its own links already point at.
+
+**The built site is served on its own origin**, and the ORIGIN comes back from the build rather than
+being assumed to be the editor's. An editing server's paths mean the project's SOURCES — that is
+what the canvas reads through them — while a built page addresses its own OUTPUT by the very same
+paths: `/components/demo.js` is the module of formulas the compiler reads in one space and the
+custom-element definition the page needs in the other. Serving the output as a fallback on the
+editor's origin therefore looks like it works and is not: measured in a browser, the page rendered,
+`customElements.get(…)` was null, and nothing on it did anything. So `@jxsuite/server` starts a
+loopback server rooted AT the output directory (`site-preview.ts`, one per project, reused), where
+every path has exactly the meaning the published site gives it, nothing is injected, and a miss is
+the site's own `404.html` at 404. Neither editing server serves the built output at any position in
+its chain. `jx dev`'s `createDistMiddleware` is separate and unchanged — a site project's own dev
+server is showing the built site rather than visiting it, so there it runs FIRST and injects live
+reload.
+
+**The site is built first.** The action runs `platform.buildSite()` before it opens anything, so the
+reader sees what the author is looking at rather than whatever the last build left on disk — which,
+since nothing in Studio had ever written that output, was usually nothing at all. The same call
+returns `url`, the origin to open the route at. Build errors are NAMED and the page still opens: a
+partial build produced pages, and the author is better served by the one they asked for with the
+failures beside it. A build that throws opens nothing, because the page would be a lie. `buildSite`
+is optional on the PAL — but a backend that does not declare it, or that reports no `url`, cannot
+preview: the action says so rather than sending the reader to an origin where half the site is the
+wrong file.
+
+The action is never hidden: when a page cannot be resolved it renders **disabled with the reason in
+its tooltip**, one of —
 
 | Condition                       | Reason                                                            |
 | ------------------------------- | ----------------------------------------------------------------- |
@@ -1239,7 +1270,8 @@ path for the document's route — `dist/<route>/index.html`, or `dist/<route>.ht
 | Document is not under `pages/`  | Only pages have a route — `<path>` is not under pages/.           |
 | Catch-all route (`[...rest]`)   | Catch-all routes match many pages — open a generated one instead. |
 | Dynamic route with unset params | Pick a value for `:<param>` to open one of this route's pages.    |
-| Canvas origin is not `http(s)`  | No local server is serving this project yet.                      |
+| Backend cannot build            | This backend cannot build a preview of the site.                  |
+| Backend serves no preview       | The site was built, but this backend serves no preview of it.     |
 
 Invoked by chord while blocked, the reason goes to the status bar instead of opening nothing.
 
@@ -2027,6 +2059,8 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ## Changelog
 
+- **0.9.24-draft** (2026-08-13) — Open in Browser serves the built site on its own origin; the build reports the URL.
+- **0.9.23-draft** (2026-08-13) — Open in Browser opens the page's route on a server that serves the built site there, and builds it first.
 - **0.9.22-draft** (2026-08-13) — The slash menu is recognised at the editing host and gains a named door (insert.openSlashMenu).
 - **0.9.21-draft** (2026-08-13) — The block action bar steps aside when parent chrome takes the pointer, and returns on a selection change or a canvas pointerdown.
 - **0.9.20-draft** (2026-08-12) — The canvas iframe resolves keystrokes against the host keymap; inline formatting, Select All and the caret's chords become records.
@@ -2104,4 +2138,4 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.22-draft_
+_`@jxsuite/studio` Specification v0.9.24-draft_

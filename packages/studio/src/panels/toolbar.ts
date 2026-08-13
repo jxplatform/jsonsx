@@ -39,13 +39,14 @@ import { primarySelection } from "../tabs/selection";
 import { shell } from "../shell";
 import { openQuickSearch } from "./quick-search";
 import { showPromptDialog } from "../ui/layers";
-import { canvasBaseOrigin } from "../canvas/canvas-origin";
+import { getPlatform, hasPlatform } from "../platform";
 import { getPreviewNavigateHandler } from "../canvas/preview-navigate";
 import { documentUrlPattern, dynamicRouteParams } from "../page-params";
 import { getNodeAtPath, nodeLabel, projectState } from "../store";
 import { activeRegistry } from "../commands/active-registry";
 import { notify } from "../services/notify";
 import type { Tab } from "../tabs/tab";
+import type { SiteBuildResult } from "../types";
 import type { CommandRegistry } from "../commands/registry";
 import type { EffectScope } from "@vue/reactivity";
 import type { TemplateResult } from "lit-html";
@@ -168,17 +169,21 @@ export function tbCmd(registry: CommandRegistry, id: string, options: TbCmdOptio
 
 // ─── View: Open in Browser ───────────────────────────────────────────────────
 
-/** Where `View: Open in Browser` would go, or the sentence explaining why it cannot go anywhere. */
-export type BrowserTarget = { url: string } | { reason: string };
+/**
+ * Where `View: Open in Browser` would go — the site-relative PATH, not a URL — or the sentence
+ * explaining why it cannot go anywhere.
+ *
+ * A path rather than a URL because the origin is not this command's to know: the built site is
+ * served by the backend, on a port of its own, and the build call is what names it.
+ */
+export type BrowserTarget = { path: string } | { reason: string };
 
 /**
- * Resolve the active document's built page to a URL on the server already serving this project.
+ * Resolve the active document to the ROUTE its built page will be published at.
  *
- * The origin is the canvas's own ({@link canvasBaseOrigin}) — the one a Preview link click resolves
- * against — and the path mirrors the compiler's `routeToOutputPath` exactly, so `/blog/hello/` asks
- * for `dist/blog/hello/index.html` under `trailingSlash: "always"` and `dist/blog/hello.html` under
- * `"never"`. Every server Studio runs against (the monorepo dev server via its active-project
- * fallback, `jx dev` via its root, the desktop loopback project server) serves that path.
+ * The path mirrors the compiler's own `documentUrlPattern` plus the project's `trailingSlash`
+ * setting, so it is the URL every link inside the built site already points at — which is exactly
+ * why the reader can then browse from it.
  *
  * Everything that is not a page resolves to a REASON rather than to nothing: a disabled control the
  * user can hover is discoverable, an absent one is not.
@@ -208,18 +213,14 @@ export function openInBrowserTarget(tab: Tab | null): BrowserTarget {
     }
     route = route.replaceAll(/:(\w+)/g, (_m, name: string) => encodeURIComponent(chosen[name]!));
   }
-  const origin = canvasBaseOrigin();
-  if (!origin.startsWith("http://") && !origin.startsWith("https://")) {
-    return { reason: "No local server is serving this project yet." };
-  }
+  /* The page's URL, not its file's path.
+     This used to answer `${origin}/dist${route}/index.html` — the compiler's OUTPUT PATH — and the
+     browser then did exactly what a built page's own markup tells it to: a stylesheet at
+     `/components/demo.css` and a link to `/basics/counter` are ROOT-absolute, so from a `/dist/…`
+     URL the first 404s against the server root and the second leaves the site. Measured before the
+     fix: the page 200, its CSS 404, its first link 404. */
   const trailingSlash = projectState.projectConfig?.build?.trailingSlash ?? "always";
-  const output =
-    route === "/"
-      ? "/index.html"
-      : trailingSlash === "always"
-        ? `${route}/index.html`
-        : `${route}.html`;
-  return { url: `${origin}/dist${output}` };
+  return { path: route === "/" ? "/" : trailingSlash === "always" ? `${route}/` : route };
 }
 
 /**
@@ -246,13 +247,67 @@ function openUrlExternally(url: string) {
  * install (with its own `isModalOpen()` guard, its own shift test and no way to be rebound) is
  * deleted.
  */
-export function runOpenInBrowser() {
+export async function runOpenInBrowser() {
   const target = openInBrowserTarget(activeTab.value ?? null);
-  if ("url" in target) {
-    openUrlExternally(target.url);
+  if (!("path" in target)) {
+    notify.warn(target.reason, { key: OPEN_IN_BROWSER, source: "Preview" });
     return;
   }
-  notify.warn(target.reason, { key: "view.openInBrowser", source: "Preview" });
+  /* Build first, because the reader is about to see the OUTPUT and the author is looking at the
+     DOCUMENT. Without this they differ by however long it has been since anyone ran a build —
+     which for most projects is "always", since nothing in Studio had ever written the output at
+     all. A preview that quietly shows last week's page is worse than one that says it cannot open.
+
+     The build is also what NAMES the origin. The built site is served on a port of its own, because
+     the editor's own paths mean the project's sources while a built page means its output by the
+     same paths — so a backend that cannot build cannot preview either, and says so instead of
+     sending the reader to an address where half the site is the wrong file. */
+  const platform = hasPlatform() ? getPlatform() : null;
+  if (!platform?.buildSite) {
+    notify.warn("This backend cannot build a preview of the site.", {
+      key: OPEN_IN_BROWSER,
+      source: "Preview",
+    });
+    return;
+  }
+  notify.info("Building the site…", { key: OPEN_IN_BROWSER, source: "Preview" });
+  let result: SiteBuildResult;
+  try {
+    result = await platform.buildSite();
+  } catch (error) {
+    notify.error(`The site could not be built: ${errorText(error)}`, {
+      key: OPEN_IN_BROWSER,
+      source: "Preview",
+    });
+    return;
+  }
+  if (!result.url) {
+    notify.warn("The site was built, but this backend serves no preview of it.", {
+      key: OPEN_IN_BROWSER,
+      source: "Preview",
+    });
+    return;
+  }
+  if (result.errors.length > 0) {
+    /* Named, and the page still opens. A partial build produced pages, and the author can see the
+       one they asked for while reading what failed — which is the whole difference between a
+       preview and a build log. */
+    notify.warn(`The site built with ${result.errors.length} error(s): ${result.errors[0]}`, {
+      key: OPEN_IN_BROWSER,
+      source: "Preview",
+    });
+  } else {
+    notify.success(`Built ${result.routes} page(s).`, { key: OPEN_IN_BROWSER, source: "Preview" });
+  }
+  openUrlExternally(`${result.url}${target.path}`);
+}
+
+/** One notification key for the whole flow, so building → built → failed replaces rather than piles. */
+const OPEN_IN_BROWSER = "view.openInBrowser";
+
+/** The sentence in an unknown thrown value. */
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 // ─── ①a The Command Center pill ──────────────────────────────────────────────

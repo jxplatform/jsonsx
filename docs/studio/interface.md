@@ -38,7 +38,9 @@ From left to right:
 
 In the desktop app, the window's minimize, maximize and close controls also live in this row.
 
-**Open in Browser** (:kbd[⇧⌘O] on macOS, :kbd[Ctrl+Shift+O] on Windows/Linux) opens the built version of the page you're editing, at its real route, in your own browser — the fastest way to check the actual page rather than the canvas's approximation of it. It is always there: when the open file has no route it's disabled and its tooltip says why — a component isn't a page, a `[slug]` route needs a value picked in the pane context bar's **resolving with** popover first, and a project that doesn't build a site has nothing to serve.
+**Open in Browser** (:kbd[⇧⌘O] on macOS, :kbd[Ctrl+Shift+O] on Windows/Linux) opens the page you're editing in your own browser — the fastest way to check the actual page rather than the canvas's approximation of it. Studio **builds the site first**, so what opens is what you are looking at, and the page opens **at the route it will be published at** on a local address of its own — a small server that serves your built site and nothing else. Styles, scripts and images load the way they will in production, and every link on the page goes where it will go once the site is live, so you can click through the whole thing. If the build reports problems the page still opens and the problems are named beside it.
+
+It is always there: when the open file has no route it's disabled and its tooltip says why — a component isn't a page, a `[slug]` route needs a value picked in the pane context bar's **resolving with** popover first, and a project that doesn't build a site has nothing to serve.
 
 :::doc-tip
 A layout reconfigures the workspace; it never takes anything away. Every panel stays on the rail, on its shortcut and in the palette after any layout is applied.

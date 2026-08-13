@@ -55,6 +55,8 @@ writeFileSync(
 let projectRootValue = FIXTURES;
 
 const handlerMocks = {
+  // `View: Open in Browser` builds first, so the reader sees what the author does.
+  buildSite: mock(() => Promise.resolve({ errors: [], files: 0, routes: 0 })),
   codeService: mock((params: unknown) => Promise.resolve({ echoed: params })),
   // Data surface + secrets (desktop twins of /__studio/data/* + /__studio/secrets)
   dataConnections: mock(() => Promise.resolve({ connections: [] })),

@@ -24,6 +24,7 @@ import {
   updateDataRow,
 } from "@jxsuite/server/data";
 import { applyRename, createFsWatcher, findReferences } from "@jxsuite/server/refactor";
+import { startSitePreview } from "@jxsuite/server/site-preview";
 import {
   buildExtensionsPayload,
   buildProjectExtensionRegistry,
@@ -364,6 +365,42 @@ export function createProjectSession(initialRoot: string | null) {
       throw new Error("No project open");
     }
     return projectRoot;
+  }
+
+  /**
+   * Build the site to its output directory.
+   *
+   * `View: Open in Browser` runs this before it opens anything, so what the reader sees is what the
+   * author is looking at. The compiler is imported dynamically for the same reason the dev server
+   * does it: this is the one call that needs the build pipeline, and the desktop process should not
+   * carry it for every window that never previews.
+   *
+   * Errors are RETURNED. A partial build still wrote pages, and refusing to open the one the author
+   * asked for would trade a readable page plus a sentence for a sentence.
+   *
+   * The reply names the ORIGIN the result is browsable at. The built site is served on its own port
+   * rather than on this window's project server, because that server's paths mean the project's
+   * SOURCES and a built page means its output by the very same paths (`@jxsuite/server`'s
+   * `site-preview.ts` has the whole argument).
+   */
+  async function buildSite(): Promise<{
+    routes: number;
+    files: number;
+    errors: string[];
+    url?: string;
+  }> {
+    const root = requireRoot();
+    const { buildSite: build } = await import("@jxsuite/compiler/site");
+    // `clean: false` — the reader is on their way to a page, and wiping the output first would
+    // Mean every asset 404s for as long as the build takes.
+    const result = await build(root, { clean: false, verbose: false });
+    const preview = startSitePreview(root);
+    return {
+      errors: result.errors,
+      files: result.files,
+      routes: result.routes,
+      ...(preview ? { url: preview.origin } : {}),
+    };
   }
 
   async function getExtensionRegistry(): Promise<ExtensionRegistry> {
@@ -1065,6 +1102,7 @@ export function createProjectSession(initialRoot: string | null) {
     formatAction,
     openProject,
     openExternal,
+    buildSite,
     createProject,
     pickDirectory,
     listDirectory,

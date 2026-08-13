@@ -20,6 +20,7 @@
     "./import-api": "./src/import-api.ts",
     "./packages": "./src/packages.ts",
     "./project-server": "./src/project-server.ts",
+    "./site-preview": "./src/site-preview.ts",
     "./refactor": "./src/refactor/index.ts",
     "./resolve": "./src/resolve.ts",
     "./types": "./src/types.ts",

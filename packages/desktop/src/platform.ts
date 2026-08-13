@@ -470,6 +470,10 @@ export function createDesktopPlatform() {
       await rpc.request.gitInit();
     },
 
+    async buildSite() {
+      return rpc.request.buildSite();
+    },
+
     async gitAddRemote(name: string, url: string) {
       await rpc.request.gitAddRemote({ name, url });
     },

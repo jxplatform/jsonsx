@@ -273,6 +273,21 @@ export interface StudioRPC {
         params: { name: string; url: string };
         response: void;
       };
+      /**
+       * Build the site to its output directory, so `View: Open in Browser` opens what the author is
+       * looking at rather than whatever the last build left on disk.
+       *
+       * Errors come back in the payload, not as a rejection: a partial build still produced pages,
+       * and the author is better served by the page they asked for with the failures named beside
+       * it.
+       */
+      buildSite: {
+        params: void;
+        /* `url` is the origin the result is browsable at — its own port, because this window's
+           project server answers for the project's SOURCES and a built page addresses its OUTPUT
+           by the same paths. */
+        response: { routes: number; files: number; errors: string[]; url?: string };
+      };
       // Files
       /* `extensions` mirrors the PAL's second argument (the format registry's document extensions);
          declaring only `query` silently dropped it and made Quick Access .json-only on desktop. */

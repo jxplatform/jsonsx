@@ -450,7 +450,15 @@ export async function createDevServer(options: {
           await projectAssetMounts(activeProjectRoot),
         );
         if (mountRes) {
-          return new Response(mountRes.body, { headers: NO_CACHE });
+          // Carry the resolved response's own headers over. Re-wrapping just the BODY discards the
+          // Content-Type Bun inferred from the file, and a JavaScript file that arrives without one
+          // Is refused outright by strict MIME checking the moment a page loads it as a MODULE — so
+          // A previewed site kept its styles (link elements sniff) and silently lost its scripts.
+          const headers = new Headers(mountRes.headers);
+          for (const [name, value] of Object.entries(NO_CACHE)) {
+            headers.set(name, value);
+          }
+          return new Response(mountRes.body, { headers });
         }
       }
 
@@ -511,6 +519,13 @@ export async function createDevServer(options: {
             });
           }
         }
+        /* The project's BUILT SITE is deliberately NOT served here, at any position in this chain.
+           This server's URL space means the project's SOURCES — that is what the canvas reads —
+           and a built page addresses the same paths meaning its own output
+           (`/components/fetch-demo.js` is the formulas here and the custom element there). Filling
+           404s from the output looked like it worked and handed the reader whichever of the two
+           happened to be missing. `site-preview.ts` gives the built site its own origin instead,
+           where every path has exactly one meaning. */
         return new Response("Not found", { status: 404 });
       }
 

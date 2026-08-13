@@ -507,6 +507,8 @@ describe("platform methods", () => {
       { pk: "r1", table: "posts" },
     ],
     ["setSecrets", [{ set: { MAIN_URL: "v" } }], "setSecrets", { set: { MAIN_URL: "v" } }],
+    // `View: Open in Browser` builds through this and opens the origin the reply names.
+    ["buildSite", [], "buildSite", undefined],
   ];
 
   for (const [method, args, rpcMethod, expectedPayload] of delegations) {

@@ -28,6 +28,7 @@ export const { formatAction } = _default;
 export const { openProject } = _default;
 
 export const { openExternal } = _default;
+export const { buildSite } = _default;
 export const { createProject } = _default;
 export const { listDirectory } = _default;
 export const { handleReadFile } = _default;

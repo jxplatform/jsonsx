@@ -14,6 +14,7 @@ import { flush, installMockPlatform } from "./harness";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { notifyModule } from "./notify-mock";
 import type { Tab } from "../src/tabs/tab";
+import type { SiteBuildResult } from "../src/types";
 import type { PaletteMode } from "../src/commands/defaults";
 
 // ─── Module mocks (must precede the toolbar import) ───────────────────────────
@@ -527,7 +528,7 @@ describe("window controls", () => {
 
 // ─── View: Open in Browser ────────────────────────────────────────────────────
 
-/** The origin the mock platform's canvas — and therefore the built site — is served from. */
+/** The origin a backend reports the built site at — its own port, never the editor's. */
 const SITE_ORIGIN = "http://127.0.0.1:4321";
 
 function openSiteProject(trailingSlash?: "always" | "never") {
@@ -557,25 +558,28 @@ function pageTab(documentPath: string): Tab {
 }
 
 describe("openInBrowserTarget", () => {
-  test("a page resolves to its built route", () => {
+  /* These asserted the compiler's OUTPUT PATH — `/dist/blog/hello/index.html` — and passed against
+     a URL no reader could use. A built page's own markup is root-absolute (`/components/demo.css`,
+     a link to `/basics/counter`), so from a `/dist/…` URL the assets 404 against the server root
+     and the first link leaves the site: measured on the running dev server as page 200, CSS 404,
+     link 404. The answer is the page's ROUTE now — the one it will have when published, and the
+     one its own links already point at. The ORIGIN is the backend's to report, because the built
+     site is served on a port of its own. */
+  test("a page resolves to the route it will be published at", () => {
     openSiteProject();
     expect(toolbar.openInBrowserTarget(pageTab("pages/blog/hello.md"))).toEqual({
-      url: `${SITE_ORIGIN}/dist/blog/hello/index.html`,
+      path: "/blog/hello/",
     });
   });
 
-  test("the root page resolves to dist/index.html", () => {
+  test("the root page is the site root", () => {
     openSiteProject();
-    expect(toolbar.openInBrowserTarget(pageTab("./pages/index.md"))).toEqual({
-      url: `${SITE_ORIGIN}/dist/index.html`,
-    });
+    expect(toolbar.openInBrowserTarget(pageTab("./pages/index.md"))).toEqual({ path: "/" });
   });
 
-  test("trailingSlash: never asks for the flat .html the compiler emits", () => {
+  test("trailingSlash: never drops the slash, as the published URL does", () => {
     openSiteProject("never");
-    expect(toolbar.openInBrowserTarget(pageTab("pages/about.json"))).toEqual({
-      url: `${SITE_ORIGIN}/dist/about.html`,
-    });
+    expect(toolbar.openInBrowserTarget(pageTab("pages/about.json"))).toEqual({ path: "/about" });
   });
 
   test("a dynamic route waits for its params, then resolves the chosen page", () => {
@@ -585,9 +589,7 @@ describe("openInBrowserTarget", () => {
       reason: "Pick a value for :slug to open one of this route's pages.",
     });
     tab.session.ui.previewParams = { slug: "getting started" };
-    expect(toolbar.openInBrowserTarget(tab)).toEqual({
-      url: `${SITE_ORIGIN}/dist/blog/getting%20started/index.html`,
-    });
+    expect(toolbar.openInBrowserTarget(tab)).toEqual({ path: "/blog/getting%20started/" });
   });
 
   test("every refusal is a sentence, not an absence", () => {
@@ -605,23 +607,26 @@ describe("openInBrowserTarget", () => {
     expect(toolbar.openInBrowserTarget(pageTab("pages/docs/[...rest].json"))).toEqual({
       reason: "Catch-all routes match many pages — open a generated one instead.",
     });
-    (globalThis as Record<string, unknown>).__jxPlatform = {
-      canvasUrl: "views://studio/canvas.html",
-    };
-    expect(toolbar.openInBrowserTarget(pageTab("pages/index.md"))).toEqual({
-      reason: "No local server is serving this project yet.",
-    });
   });
 });
 
 describe("runOpenInBrowser", () => {
-  test("hands the URL to the preview-navigate seam, and falls back to a new tab", () => {
+  /** A backend that builds and reports where the result is browsable. */
+  function installBuildingPlatform(result: Partial<SiteBuildResult> = {}) {
+    installMockPlatform({
+      buildSite: async () => ({ errors: [], files: 3, routes: 2, url: SITE_ORIGIN, ...result }),
+      canvasUrl: `${SITE_ORIGIN}/__studio__/canvas.html`,
+    });
+  }
+
+  test("hands the URL to the preview-navigate seam, and falls back to a new tab", async () => {
     openSiteProject();
     pageTab("pages/index.md");
+    installBuildingPlatform();
     const opened: string[] = [];
     setPreviewNavigateHandler((url) => opened.push(url));
-    toolbar.runOpenInBrowser();
-    expect(opened).toEqual([`${SITE_ORIGIN}/dist/index.html`]);
+    await toolbar.runOpenInBrowser();
+    expect(opened).toEqual([`${SITE_ORIGIN}/`]);
 
     setPreviewNavigateHandler(null);
     const calls: unknown[][] = [];
@@ -631,8 +636,8 @@ describe("runOpenInBrowser", () => {
       return null;
     };
     try {
-      toolbar.runOpenInBrowser();
-      expect(calls).toEqual([[`${SITE_ORIGIN}/dist/index.html`, "_blank", "noopener,noreferrer"]]);
+      await toolbar.runOpenInBrowser();
+      expect(calls).toEqual([[`${SITE_ORIGIN}/`, "_blank", "noopener,noreferrer"]]);
     } finally {
       window.open = originalOpen;
     }
@@ -640,9 +645,99 @@ describe("runOpenInBrowser", () => {
 
   test("reports the blocking reason instead of opening nothing", () => {
     closeAllTabs();
-    toolbar.runOpenInBrowser();
+    void toolbar.runOpenInBrowser();
     expect(notified).toHaveBeenCalledTimes(1);
     expect(notified.mock.calls[0]![0]).toContain("Open a page to view it");
+  });
+
+  /* The other half of "as if published": what a reader opens is what the AUTHOR is looking at.
+     Nothing in Studio had ever written the site's output, so before this the reader saw whatever
+     the last `jx build` left on disk — for most projects nothing at all, which is a 404 dressed up
+     as a feature. */
+  test("builds before opening, and opens the origin the BUILD reports", async () => {
+    /* Not the editor's origin. The two URL spaces collide: `/components/demo.js` is the formula
+       module in the project's sources and the custom element in its output, and a reader handed
+       the editor's origin gets whichever the editor resolves — measured as a page that rendered
+       with `customElements.get(…)` null and nothing on it working. */
+    openSiteProject();
+    pageTab("pages/index.md");
+    const built: string[] = [];
+    installMockPlatform({
+      buildSite: async () => {
+        built.push("built");
+        return { errors: [], files: 3, routes: 2, url: "http://127.0.0.1:5555" };
+      },
+      canvasUrl: `${SITE_ORIGIN}/__studio__/canvas.html`,
+    });
+    const opened: string[] = [];
+    setPreviewNavigateHandler((url) => opened.push(url));
+    await toolbar.runOpenInBrowser();
+    expect(built).toEqual(["built"]);
+    expect(opened).toEqual(["http://127.0.0.1:5555/"]);
+    setPreviewNavigateHandler(null);
+  });
+
+  test("a build error is named, and the page still opens", async () => {
+    // A partial build produced pages. Refusing to show the one the author asked for would trade a
+    // Readable page plus a sentence for a sentence.
+    openSiteProject();
+    pageTab("pages/index.md");
+    installBuildingPlatform({ errors: ["pages/broken.json: unknown tag"], files: 1, routes: 1 });
+    const opened: string[] = [];
+    setPreviewNavigateHandler((url) => opened.push(url));
+    await toolbar.runOpenInBrowser();
+    expect(opened).toEqual([`${SITE_ORIGIN}/`]);
+    expect(notified.mock.calls.at(-1)![0]).toContain("unknown tag");
+    setPreviewNavigateHandler(null);
+  });
+
+  test("a build that THROWS does not open a page that would be a lie", async () => {
+    openSiteProject();
+    pageTab("pages/index.md");
+    installMockPlatform({
+      buildSite: async () => {
+        throw new Error("no disk space");
+      },
+      canvasUrl: `${SITE_ORIGIN}/__studio__/canvas.html`,
+    });
+    const opened: string[] = [];
+    setPreviewNavigateHandler((url) => opened.push(url));
+    await toolbar.runOpenInBrowser();
+    expect(opened).toEqual([]);
+    expect(notified.mock.calls.at(-1)![0]).toContain("no disk space");
+    setPreviewNavigateHandler(null);
+  });
+
+  test("a backend that cannot build says so rather than opening the editor's origin", async () => {
+    /* It used to open the canvas origin and call that graceful. It is not: that origin serves the
+       project's SOURCES, so the reader would get a page whose scripts and styles are whichever
+       source file shares the URL. A sentence beats a site that looks published and is not. */
+    openSiteProject();
+    pageTab("pages/index.md");
+    installMockPlatform({ canvasUrl: `${SITE_ORIGIN}/__studio__/canvas.html` });
+    const opened: string[] = [];
+    setPreviewNavigateHandler((url) => opened.push(url));
+    await toolbar.runOpenInBrowser();
+    expect(opened).toEqual([]);
+    expect(notified.mock.calls.at(-1)![0]).toContain("cannot build a preview");
+    setPreviewNavigateHandler(null);
+  });
+
+  test("a build that reports no origin does not send the reader anywhere", async () => {
+    // The build succeeded and the backend serves no preview of it — a real answer for a hosted
+    // Backend, and one the reader must be told rather than shown a broken address for.
+    openSiteProject();
+    pageTab("pages/index.md");
+    installMockPlatform({
+      buildSite: async () => ({ errors: [], files: 3, routes: 2 }),
+      canvasUrl: `${SITE_ORIGIN}/__studio__/canvas.html`,
+    });
+    const opened: string[] = [];
+    setPreviewNavigateHandler((url) => opened.push(url));
+    await toolbar.runOpenInBrowser();
+    expect(opened).toEqual([]);
+    expect(notified.mock.calls.at(-1)![0]).toContain("serves no preview");
+    setPreviewNavigateHandler(null);
   });
 });
 

@@ -32,6 +32,7 @@ import type {
   RenameResult,
   SecretsSetRequest,
   SecretsSetResponse,
+  SiteBuildResult,
   StarterInfo,
 } from "../types";
 
@@ -1114,6 +1115,14 @@ export function createDevServerPlatform() {
         const body = await readJson<ErrorBody>(res);
         throw new Error(body.error);
       }
+    },
+    async buildSite() {
+      const res = await fetch("/__studio/build", { method: "POST" });
+      if (!res.ok) {
+        const body = await readJson<ErrorBody>(res);
+        throw new Error(body.error || "The site could not be built.");
+      }
+      return (await res.json()) as SiteBuildResult;
     },
 
     /**

@@ -32,6 +32,7 @@ import {
   listFormats,
   listSecrets,
   locateFile,
+  buildSite,
   openExternal,
   openProject,
   searchFiles,
@@ -107,6 +108,8 @@ export const handlers: Record<string, (params: unknown) => Promise<unknown>> = {
     ),
   gitAddRemote: (params) => gitAddRemote(params as { name: string; url: string }),
   gitBranches: () => gitBranches(),
+  // `View: Open in Browser` builds before it opens, so the reader sees what the author sees.
+  buildSite: () => buildSite(),
   gitCheckout: (params) => gitCheckout(params as { branch: string }),
   gitCommit: (params) => gitCommit(params as { message: string }),
   gitCreateBranch: (params) => gitCreateBranch(params as { name: string }),

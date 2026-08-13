@@ -134,6 +134,28 @@ export type CreateProjectDestination =
   | { kind: "path"; parent: string }
   | { kind: "repo"; owner: string; repo: string; private: boolean };
 
+/**
+ * What a site build reports back.
+ *
+ * `errors` is a list rather than a thrown exception because a partial build still produced pages:
+ * the author is better served by opening the page they asked for with the failures named beside it
+ * than by a refusal that says only that something went wrong.
+ */
+export interface SiteBuildResult {
+  routes: number;
+  files: number;
+  errors: string[];
+  /**
+   * Origin the built site is browsable at, e.g. `http://127.0.0.1:41234`.
+   *
+   * The backend names it because only the backend knows it: the built site is served on a port of
+   * its own, not on the editor's, since the editor's paths mean the project's SOURCES and a built
+   * page means its own output by the very same paths. Absent when the backend serves no preview,
+   * and `View: Open in Browser` then says so rather than guessing an origin.
+   */
+  url?: string;
+}
+
 export interface StudioPlatform {
   id: string;
   projectRoot: string;
@@ -284,6 +306,15 @@ export interface StudioPlatform {
   gitDiscard: (files: string[]) => Promise<void>;
   gitClone?: (url: string) => Promise<{ ok: boolean; root: string }>;
   gitInit: () => Promise<void>;
+  /**
+   * Build the site to its output directory, so a reader opens what the author is looking at.
+   *
+   * `View: Open in Browser` runs this first and reports what it says. Optional because it is a
+   * capability, not an assumption: a backend that cannot build (a read-only cloud viewer) simply
+   * does not declare it, and the command says so rather than opening whatever stale output the last
+   * build happened to leave — which for most projects is nothing at all.
+   */
+  buildSite?: () => Promise<SiteBuildResult>;
   gitAddRemote: (name: string, url: string) => Promise<void>;
   /**
    * How the New Project modal collects a destination, and which `CreateProjectDestination` variant

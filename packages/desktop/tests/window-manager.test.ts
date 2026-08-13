@@ -91,6 +91,12 @@ function makeSession(initialRoot: string | null) {
     jxResolve: mock(async () => ({ body: "{}", status: 200 })),
     jxServerFunction: mock(async () => ({ body: "{}", status: 200 })),
     listFormats: mock(async () => []),
+    buildSite: mock(async () => ({
+      errors: [],
+      files: 2,
+      routes: 1,
+      url: "http://127.0.0.1:4321",
+    })),
     formatAction: mock(async () => ({})),
     // Data surface + secrets (desktop twins of /__studio/data/* + /__studio/secrets)
     dataConnections: mock(async () => ({ connections: [] })),
@@ -347,6 +353,13 @@ describe("per-window RPC", () => {
     await reqs.jxResolve({ body: "{}" } as never);
     await reqs.jxServerFunction({ body: "{}" } as never);
     await reqs.listFormats();
+    // `View: Open in Browser` builds through this window and opens the origin the reply names.
+    expect(await reqs.buildSite()).toEqual({
+      errors: [],
+      files: 2,
+      routes: 1,
+      url: "http://127.0.0.1:4321",
+    });
     expect(session.handleDeleteFile).toHaveBeenCalledWith({ path: "a.json" });
     expect(session.findReferences).toHaveBeenCalledWith({ path: "components/card.json" });
     expect(session.listDirectory).toHaveBeenCalledWith({ dir: "src" });

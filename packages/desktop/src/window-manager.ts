@@ -257,6 +257,7 @@ function buildWindowRpc(entry: WindowEntry, getWin: () => BrowserWindow) {
         jxResolve: (params) => session.jxResolve(params),
         jxServerFunction: (params) => session.jxServerFunction(params),
         fetchProjectSchemas: () => session.fetchProjectSchemas(),
+        buildSite: () => session.buildSite(),
         listDirectory: (params) => session.listDirectory(params),
         listExtensions: () => session.listExtensions(),
         listFormats: () => session.listFormats(),

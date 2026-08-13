@@ -53,6 +53,12 @@ The canonical Studio Backend Protocol route table (protocol version 1), from `@j
 | `codeMinify`     | POST   | `/__studio/code/minify`     | Minify posted source {code} → {code}                                                                                                                                                                                                            | yes      | Compiled-output minification is skipped.                                                                         |
 | `codeLint`       | POST   | `/__studio/code/lint`       | Lint posted source {code, path?} → {diagnostics}                                                                                                                                                                                                | yes      | Code editors show no lint markers.                                                                               |
 
+## Site build
+
+| Route       | Method | Path              | Summary                                                               | Optional | Degradation                                                      |
+| ----------- | ------ | ----------------- | --------------------------------------------------------------------- | -------- | ---------------------------------------------------------------- |
+| `buildSite` | POST   | `/__studio/build` | Build the site to its output directory → {routes, files, errors, url} | yes      | Open in Browser reports that this target cannot build a preview. |
+
 ## Packages
 
 | Route                  | Method | Path                               | Summary                                           | Optional | Degradation                                                               |
