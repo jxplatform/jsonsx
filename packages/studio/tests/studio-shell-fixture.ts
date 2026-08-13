@@ -161,6 +161,11 @@ export async function bootStudio(opts: {
     initBlockActionBar: (ctx: unknown) => {
       captured.blockBarCtx = ctx;
     },
+    // The inline-format family. The bootstrap composes it into the app-wide registry beside the
+    // Structural verbs below — a mock without it fails the boot at import time, which is the same
+    // Lesson the `commandIcon` note above records: this stub tracks the module's EXPORTS, not the
+    // Subset one caller happens to use.
+    formatCommands: mock(() => []),
     isEditChromeTarget: mock(() => false),
     // The bootstrap composes the bar's structural selection verbs into the app-wide registry so
     // The palette, the keyboard and `__jxAutomation` can reach them (plan §13.3).

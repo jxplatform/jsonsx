@@ -60,7 +60,13 @@ import { inspectorTab } from "../panels/right-panel";
 import { requestClose } from "../panels/tab-strip";
 import { showDialog } from "../ui/layers";
 import { rectOf } from "../utils/geometry";
-import { DOCK_IDS, setActivityTab, setDockCollapsed, shell } from "../shell";
+import {
+  DOCK_IDS,
+  requireNavigatorPanelId,
+  setActivityTab,
+  setDockCollapsed,
+  shell,
+} from "../shell";
 import { REGION_FOR_FOCUS, resolveRegion } from "../ui/regions";
 import { getPlatform, hasPlatform } from "../platform";
 import { notify } from "../services/notify";
@@ -153,6 +159,34 @@ function navigateSelection(direction: -1 | 1): void {
   const newIndex = (childIndex(selected) as number) + direction;
   if (newIndex >= 0 && newIndex < childList(parent).length) {
     tab.session.selection = [[...parentPath, "children", newIndex]];
+  }
+}
+
+/**
+ * Select every sibling of the selection — or the root's children when nothing is selected.
+ *
+ * Reads the same three helpers `navigateSelection` does, so "sibling" means one thing in this file.
+ * A parent whose children are strings (a text-only block) yields the element children alone: a raw
+ * string is not a node a verb can act on, and selecting one would put a path in `session.selection`
+ * that `getNodeAtPath` answers with a string.
+ */
+function selectSiblings(): void {
+  const tab = activeTab.value;
+  if (!tab) {
+    return;
+  }
+  const selected = primarySelection(tab.session.selection);
+  const parentPath = (
+    selected && selected.length >= 2 ? parentElementPath(selected) : []
+  ) as JxPath;
+  const parent = getNodeAtPath(tab.doc.document, parentPath);
+  const paths = childList(parent).flatMap((child, index) =>
+    typeof child === "object" && child !== null
+      ? [[...parentPath, "children", index] as JxPath]
+      : [],
+  );
+  if (paths.length > 0) {
+    tab.session.selection = paths;
   }
 }
 
@@ -475,14 +509,25 @@ function cycleRegion(direction: 1 | -1): void {
  * into a dock nothing here can name.
  */
 function focusPanel(panelId: string): void {
+  /* THE DOOR. `shell.ts`'s `NAVIGATOR_PANEL_IDS` docstring says the command is what refuses an
+     undeclared id, "at the one door a caller comes through" — this is that door for ⌘1–8, and it
+     was the only one of three doors that had no lock. `setActivityTab` now takes a
+     `NavigatorPanelId`, so the roster's `string` has to be narrowed somewhere; narrowing HERE keeps
+     `commands/defaults.ts` free of shell types, which is the property that lets three CI checks
+     load the command set in a bare Bun process.
+
+     A throw rather than a silent return: `tests/navigator-panels.test.ts` asserts the enum and the
+     registry agree, so this is unreachable while that passes, and a chord that quietly does nothing
+     is precisely the defect this change is closing. */
+  const id = requireNavigatorPanelId(panelId, "panel.focus");
   const alreadyThere =
-    shell.leftTab === panelId && !shell.docks.left.collapsed && shell.focusRegion === "navigator";
+    shell.leftTab === id && !shell.docks.left.collapsed && shell.focusRegion === "navigator";
   if (alreadyThere) {
     setDockCollapsed("left", true);
     focusShellRegion("pane");
     return;
   }
-  setActivityTab(panelId);
+  setActivityTab(id);
   focusShellRegion("navigator");
 }
 
@@ -563,7 +608,7 @@ export async function openProjectFlow(hooks: StudioCommandHooks): Promise<void> 
  * answers "may this chord fire here"; the `when` answers "does this verb exist here at all", which
  * is the question the palette, `__jxAutomation` and the assistant ask instead.
  */
-function canvasCommands(pointer: () => ShortcutPointerContext): AnyCommand[] {
+export function canvasCommands(pointer: () => ShortcutPointerContext): AnyCommand[] {
   const resetPan = () => {
     pointer().setPan(16, 16);
     pointer().applyTransform();
@@ -624,6 +669,38 @@ function canvasCommands(pointer: () => ShortcutPointerContext): AnyCommand[] {
       requires: "an open document",
       run: () => navigateSelection(1),
       title: "Select Next Sibling",
+      undo: "none",
+      when: inDocument,
+    },
+    {
+      category: "Selection",
+      group: "2_navigate",
+      /**
+       * ⌘A — every sibling of the selection, in one decision.
+       *
+       * The chord did nothing for two phases, and did it twice over: no record bound it, while
+       * `canvas/iframe-keys.ts` forwarded it anyway and called `preventDefault()` first, so the
+       * browser's own select-all was suppressed on the way to a host that had nothing to run. The
+       * keymap sync fixed the second half by construction — the frame forwards what the registry
+       * binds — and this record is the first half.
+       *
+       * `canvas` scope, so with a caret in text the stack is `["caret", "global"]`, nothing claims
+       * ⌘A, the frame does not forward it, and select-all means the SENTENCE. Structural select-all
+       * is what you get when no caret owns the keyboard, which is the same rule that decides the
+       * clipboard trio.
+       *
+       * Siblings rather than "every node in the document": the verbs a multi-selection feeds —
+       * delete, duplicate, a style paste — take a batch of peers, and a selection spanning depths
+       * makes half of them meaningless. From the root (which has no siblings) it selects the root's
+       * children, because that is the set a reader means by "all of it".
+       */
+      id: "selection.selectAll",
+      keybinding: "mod+a",
+      keyScope: "canvas",
+      level: "selection",
+      requires: "an open document",
+      run: () => selectSiblings(),
+      title: "Select All",
       undo: "none",
       when: inDocument,
     },

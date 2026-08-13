@@ -278,7 +278,16 @@ describe("file tree listing", () => {
       "omega.js",
       "zeta.json",
     ]);
-    expect(out.querySelector('[role="group"]')).not.toBeNull();
+    // The tree is FLAT — one windowed row list, not a `role="group"` per level (R5). A child of an
+    // Expanded directory says where it sits with aria-level/posinset/setsize instead, which is the
+    // Only account that stays true when the tree draws a window rather than all of itself.
+    expect(out.querySelector('[role="group"]')).toBeNull();
+    expect(rowFor(out, "pages/index.json").getAttribute("aria-level")).toBe("2");
+    expect(rowFor(out, "pages/index.json").getAttribute("aria-posinset")).toBe("1");
+    expect(rowFor(out, "pages/index.json").getAttribute("aria-setsize")).toBe("1");
+    expect(rowFor(out, "pages").getAttribute("aria-level")).toBe("1");
+    expect(rowFor(out, "pages").getAttribute("aria-posinset")).toBe("2");
+    expect(rowFor(out, "pages").getAttribute("aria-setsize")).toBe("9");
     expect(rowFor(out, "pages").getAttribute("aria-expanded")).toBe("true");
     expect(rowFor(out, "assets").getAttribute("aria-expanded")).toBe("false");
   });
@@ -977,38 +986,46 @@ describe("delete flow", () => {
 // ─── Keyboard navigation ──────────────────────────────────────────────────────
 
 describe("setupTreeKeyboard", () => {
-  function buildManualTree() {
-    const panel = document.createElement("div");
-    panel.className = "panel-body";
-    const tree = document.createElement("div");
-    tree.className = "file-tree";
-    for (const [path, type] of [
-      ["pages", "directory"],
-      ["a.json", "file"],
-      ["b.json", "file"],
-    ]) {
-      const item = document.createElement("div");
-      item.className = "file-tree-item";
-      item.tabIndex = -1;
-      item.dataset.path = path;
-      item.dataset.type = type;
-      item.textContent = path!;
-      tree.append(item);
-    }
-    panel.append(tree);
-    host.append(panel);
-    setupTreeKeyboard(tree);
-    const items = [...tree.querySelectorAll(".file-tree-item")] as HTMLElement[];
-    return { items, tree };
+  /**
+   * The keyboard is driven against the REAL rendered tree, not a hand-built one.
+   *
+   * It used to be three divs assembled by this file, which was equivalent while every row was drawn
+   * and stopped being equivalent when the tree windowed: ↑/↓ now step through the row MODEL
+   * `renderFilesTemplate` builds, so a fixture that never went through the renderer has no rows to
+   * step through. Rendering the template is also the only way the tab stop, the aria attributes and
+   * the walk are asserted about the same thing.
+   */
+  async function renderTree(seed: Record<string, string> = {}) {
+    const handle = installFsPlatform(seed);
+    siteState();
+    const st = requireProjectState();
+    st.dirs.set(".", [
+      { name: "pages", path: "pages", type: "directory" },
+      { name: "a.json", path: "a.json", type: "file" },
+      { name: "b.json", path: "b.json", type: "file" },
+    ]);
+    st.dirs.set("pages", [{ name: "index.json", path: "pages/index.json", type: "file" }]);
+    const tree = makeTreeCtx();
+    const out = await renderInto(renderFilesTemplate(tree.ctx), host);
+    const el = out.querySelector(".file-tree") as HTMLElement;
+    setupTreeKeyboard(el);
+    const items = [...el.querySelectorAll(".file-tree-item")] as HTMLElement[];
+    return { ...tree, handle, items, tree: el };
   }
 
-  test("marks the first item focusable", () => {
-    const { items } = buildManualTree();
+  test("the first row is the tab stop, and the selected row takes it over", async () => {
+    const { items } = await renderTree();
     expect(items[0]!.getAttribute("tabindex")).toBe("0");
+    expect(items[1]!.getAttribute("tabindex")).toBe("-1");
+
+    requireProjectState().selectedPath = "b.json";
+    const out = await renderInto(renderFilesTemplate(makeTreeCtx().ctx), host);
+    expect(rowFor(out, "b.json").getAttribute("tabindex")).toBe("0");
+    expect(rowFor(out, "pages").getAttribute("tabindex")).toBe("-1");
   });
 
-  test("ArrowDown / ArrowUp move focus and clamp at the edges", () => {
-    const { items, tree } = buildManualTree();
+  test("ArrowDown / ArrowUp move focus and clamp at the edges", async () => {
+    const { items, tree } = await renderTree();
     items[0]!.focus();
 
     key(tree, "ArrowDown");
@@ -1023,8 +1040,8 @@ describe("setupTreeKeyboard", () => {
     expect(document.activeElement).toBe(items[0]!);
   });
 
-  test("Enter clicks the focused row; unhandled keys are not prevented", () => {
-    const { items, tree } = buildManualTree();
+  test("Enter clicks the focused row; unhandled keys are not prevented", async () => {
+    const { items, tree } = await renderTree();
     let clicks = 0;
     items[1]!.addEventListener("click", () => {
       clicks += 1;
@@ -1051,54 +1068,65 @@ describe("setupTreeKeyboard", () => {
     expect(handled.defaultPrevented).toBe(true);
   });
 
-  test("keystrokes without a focused item are ignored", () => {
-    const { items, tree } = buildManualTree();
+  test("keystrokes without a focused item are ignored", async () => {
+    const { items, tree } = await renderTree();
     (document.activeElement as HTMLElement | null)?.blur?.();
 
     key(tree, "ArrowDown");
     expect(document.activeElement).not.toBe(items[1]);
   });
 
-  test("ArrowRight expands a collapsed directory and re-clicks the focused row", async () => {
-    const { state } = installFsPlatform({ "pages/index.json": "{}" });
-    siteState();
-    const { items, tree } = buildManualTree();
-    let dirClicks = 0;
-    items[0]!.addEventListener("click", () => {
-      dirClicks += 1;
-    });
+  test("one listener per tree, however many times the panel re-renders", async () => {
+    const { items, tree } = await renderTree();
+    setupTreeKeyboard(tree);
+    setupTreeKeyboard(tree);
+    items[0]!.focus();
+
+    key(tree, "ArrowDown");
+    // Three registrations of the same handler would walk three rows for one keystroke — which is
+    // What `afterRender` calling this on every repaint used to build up to.
+    expect(document.activeElement).toBe(items[1]!);
+  });
+
+  test("ArrowRight expands a collapsed directory and repaints the panel", async () => {
+    const { counters, handle, items, tree } = await renderTree({ "pages/index.json": "{}" });
+    requireProjectState().dirs.delete("pages");
+    const before = counters.left;
     items[0]!.focus();
 
     key(tree, "ArrowRight");
     await flush();
 
     expect(requireProjectState().expanded.has("pages")).toBe(true);
-    expect(state.calls).toContainEqual(["listDirectory", "pages"]);
-    expect(dirClicks).toBe(1);
+    expect(handle.state.calls).toContainEqual(["listDirectory", "pages"]);
+    // The repaint used to be a synthesised click on the focused row, which ran that row's own
+    // Toggle a second time; the panel is asked directly now.
+    expect(counters.left).toBeGreaterThan(before);
   });
 
   test("ArrowRight on an expanded directory does not reload", async () => {
-    const { state } = installFsPlatform({ "pages/index.json": "{}" });
-    siteState();
+    const { handle, items, tree } = await renderTree({ "pages/index.json": "{}" });
     requireProjectState().expanded.add("pages");
-    const { items, tree } = buildManualTree();
+    handle.state.calls.length = 0;
     items[0]!.focus();
 
     key(tree, "ArrowRight");
     await flush();
 
-    expect(state.calls.filter(([name]) => name === "listDirectory")).toHaveLength(0);
+    expect(handle.state.calls.filter(([name]) => name === "listDirectory")).toHaveLength(0);
   });
 
-  test("ArrowLeft collapses an expanded directory and ignores files", () => {
-    installFsPlatform();
-    siteState();
+  test("ArrowLeft collapses an expanded directory, repaints, and ignores files", async () => {
+    const { counters, items, tree } = await renderTree();
     requireProjectState().expanded.add("pages");
-    const { items, tree } = buildManualTree();
+    const before = counters.left;
     items[0]!.focus();
 
     key(tree, "ArrowLeft");
     expect(requireProjectState().expanded.has("pages")).toBe(false);
+    // It used to change the state and leave the children on screen — the collapse was invisible
+    // Until something else happened to redraw the panel.
+    expect(counters.left).toBeGreaterThan(before);
 
     items[1]!.focus();
     key(tree, "ArrowLeft"); // File row — nothing to collapse

@@ -127,6 +127,25 @@ export function isNavigatorPanelId(value: unknown): value is NavigatorPanelId {
 }
 
 /**
+ * Narrow an id arriving from a `string`-typed roster, or throw naming where it came from.
+ *
+ * The lock on the door {@link NAVIGATOR_PANEL_IDS} describes, in one place so the rail and the ⌘1–8
+ * dispatcher cannot disagree about what an undeclared id means. Both receive their id from
+ * `PanelRecord.id`, which is deliberately a `string` — the registry hosts the Bottom dock's panels
+ * too, and their ids are {@link BOTTOM_TAB_IDS}.
+ *
+ * It throws rather than returning null because `tests/navigator-panels.test.ts` asserts the enum
+ * and the registry agree, so a failure here means the two have drifted — and the symptom of the
+ * last drift was a control that silently did nothing.
+ */
+export function requireNavigatorPanelId(value: string, source: string): NavigatorPanelId {
+  if (!isNavigatorPanelId(value)) {
+    throw new Error(`${source}: "${value}" is not a declared Navigator panel id.`);
+  }
+  return value;
+}
+
+/**
  * Translate a stored panel id into a current one, or `null` when it names nothing.
  *
  * `null` rather than a default, so the caller decides: the boot path falls back to
@@ -1084,8 +1103,17 @@ export function setDockSize(dock: DockId, size: number): void {
  * `persistDocks()` is called unconditionally rather than relying on `setDockCollapsed` — that only
  * writes when the collapse flag actually changed, so re-picking a panel in an already-open dock
  * would have been forgotten.
+ *
+ * **The parameter is a {@link NavigatorPanelId}, not a `string`, and that is the whole guard.**
+ * `shell.leftTab` stays a `string` because it is read back from state an older build persisted —
+ * {@link migratePanelId} is what turns one of those into a current id. A LIVE caller is a different
+ * question, and it was answered wrong: the Outline's empty state called this with `"blocks"` for
+ * three phases after `blocks` became `insert`, so "Add an element" put the Navigator into
+ * `unknownPanel`'s dead state (`panels/left-panel.ts`). The rename shipped a migration for the read
+ * path and nothing for the write path, and no test could see it because a string is a string. This
+ * signature makes that class of bug a type error at the call site.
  */
-export function setActivityTab(tab: string): void {
+export function setActivityTab(tab: NavigatorPanelId): void {
   shell.leftTab = tab;
   setDockCollapsed("left", false);
   persistDocks();
@@ -1120,7 +1148,7 @@ export function setChromeTheme(theme: ChromeTheme): void {
  * Toggle-focus semantics for the rail: re-picking the panel that is already showing closes the dock
  * instead of reselecting it.
  */
-export function toggleActivityTab(tab: string): void {
+export function toggleActivityTab(tab: NavigatorPanelId): void {
   if (tab === shell.leftTab && !shell.docks.left.collapsed) {
     setDockCollapsed("left", true);
     return;
@@ -1371,7 +1399,15 @@ export function shellViewCommands(deps: ShellCommandDeps): AnyCommand[] {
       // `view.setRightTab { tab: "assistant" }` can only ever select.
       id: "view.setAssistant",
       level: "application",
-      menus: ["palette"],
+      /* `never`, not `palette` — and the reason is a rule, not a preference.
+         This and `inspector.focus.assistant` are both `View` + "Show Assistant", so the palette
+         printed the SAME SENTENCE twice, in two level groups, with two different chords: the only
+         duplicate title among 130 records. A palette row is a NAME, and two rows with one name is
+         the defect the registry exists to prevent, arriving through the registry itself.
+         `inspector.focus.assistant` is the row (it carries ⌘⇧4). This one keeps every other
+         consumer — the `open` STATE that `setRightTab` cannot express, the layout presets, three
+         screenshot steps, `⌘J`'s legacy branch — none of which needs a row to work. */
+      menus: ["never"],
       group: "4_docks",
       run: (_ctx, args) => {
         if (booleanArg("view.setAssistant", args, "open")) {

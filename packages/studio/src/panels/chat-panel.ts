@@ -27,15 +27,14 @@
 
 import { render as litRender } from "lit-html";
 import { effect, effectScope } from "../reactivity";
-import { setDockCollapsed } from "../shell";
 import { workspace } from "../workspace/workspace";
 import { consumePendingAgentPrompt, hasPendingAgentPrompt } from "../services/agent-seed";
-import { setInspectorTab } from "./right-panel";
 import { REGION_ATTR } from "../ui/regions";
 import {
   bindAiPanelHost,
   mountAiPanel,
   renderAiPanelTemplate,
+  revealAssistant,
   seedAssistantPrompt,
 } from "./ai-panel";
 
@@ -84,9 +83,9 @@ export function mount(host: HTMLElement | null) {
         return;
       }
       // Reveal the assistant the way any other inspector tab is revealed: open the dock it lives
-      // In, then select it. There is no assistant dock left to open.
-      setDockCollapsed("right", false);
-      setInspectorTab("assistant");
+      // In, then select it. There is no assistant dock left to open. Those two lines live in
+      // `ai-panel.ts` now, because the `Assistant:` command family needs the same pair.
+      revealAssistant();
       const prompt = consumePendingAgentPrompt(root);
       if (prompt) {
         // Defer past the current render so the assistant machinery is in place before the send.

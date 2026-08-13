@@ -157,6 +157,12 @@ export function createLiveContext(sources: LiveContextSources): () => CommandCon
     // A parent-realm text field owns the keyboard exactly as a canvas caret does. Folding both into
     // One key is what lets `keyScopeStack` stay a pure function of the context.
     ctx.caret.active = sources.isCaretActive() || isTextEntryFocused();
+    /* …and folding them is wrong for a RECORD, which is why `inCanvas` is the bridge fact alone.
+       `format.bold` and `format.link` are `keyScope: "caret"`, so they are live wherever the caret
+       stack is — including the link popover's own URL field, where ⌘K would re-mount the popover
+       being typed into. The stack asks "is something being typed into"; a record asks "is the
+       thing being typed into the page". */
+    ctx.caret.inCanvas = sources.isCaretActive();
     ctx.focus.region = shell.focusRegion as FocusRegion;
     ctx.modal.open = sources.isModalOpen();
 

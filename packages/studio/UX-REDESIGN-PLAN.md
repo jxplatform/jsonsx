@@ -106,6 +106,68 @@ byte instead of the `\u0000` escape) made git, grep, oxfmt and GitHub classify a
 file as **binary**. Three searches for text plainly in it returned nothing before anyone ran `file` on it. Neither the
 separator nor the joined key was needed: `pathsEqual` already answered the question.
 
+**J · What the branch audit changed about the plan itself** (added on landing, after a read of the
+whole feature set against this document). Every finding was an ABSENCE, and absence is what six
+green gates and 8,311 passing tests each read as fine. Four of them were things a user does with the
+keyboard.
+
+**⌘B in the canvas did nothing, and had done nothing since the iframe landed.** Not "was not a
+record" — did nothing. `iframe-keys.ts` withheld `b i u \`` from forwarding "because the editing
+engine implements them itself", and the engine does not: `editor/inline-edit.ts`'s keydown listener
+is bound to the BLOCK while the editing host is the canvas container, so it never fires, and
+`canvas/editable-actions.ts`rejects the browser's own`formatBold`because Jx owns its markup. The
+toolbar advertised the chord, §10 documented it, and a data file hardcoded`"Cmd+B"`into the tooltip
+on every platform. ⌘A was the same defect inverted: forwarded AND`preventDefault`ed, with no record
+bound to it, so it neither selected the paragraph nor selected anything else. **Two hand-written
+lists cannot agree with a registry**; the frame is handed the chord table now (§5.3's scope stack,
+crossing the bridge as a `keymap`message) and resolves against it, so the clipboard trio, the bare
+editing keys and the format chords all fall out of scope declarations instead of being listed. That
+is the decision this document owed`inline formatting's level`(§0 C) and §14's "no fifth range
+level" row: the eight verbs are`level: "selection"`, `keyScope: "caret"`records, in a`blockbar/format` placement with its own cap, because eight verbs sharing the bar's cap of five would
+have pushed Bold into an overflow menu.
+
+**Ten records the app ran were invisible to every check.** `appCommandSet()` — what
+`check-command-levels` counts and the generated keyboard sheet is built from — omitted
+`editor/shortcuts.ts`'s private `canvasCommands()`, so ⌘C, ⌘X, ⌘V, Enter, the three structural arrows
+and all three zoom chords were unvalidated and undocumented. The deferral was written down, with a
+reason (`edit.copy` declared twice) that had stopped being true two phases earlier. P7's composition
+test could not see it because it only checks projection → registration; the reverse direction has a
+guard now, and so does "no two palette rows print the same sentence" — which caught
+`view.setAssistant` and `inspector.focus.assistant` both rendering **View: Show Assistant**.
+
+**A rename migrated the read path and left the write path alone.** `blocks → insert` shipped with
+`migratePanelId` for persisted state, while the Outline's own empty state called
+`setActivityTab("blocks")` — so the one action an empty page offers landed the Navigator on _No
+Navigator panel is registered as "blocks"_. Its test asserted `"blocks"` under a title that said
+"opens Insert". A typed door (`setActivityTab(tab: NavigatorPanelId)`) closes the class.
+
+**One of this document's own promises was still open, and one was already kept.** P0's guard on bare
+`outline: none` did not exist — there is no stylelint in this repo and never was, so the rule joined
+`scripts/check-styles.ts` beside the orphan check. It is a **paired allowance**, not a ban: every
+allowed suppression names the `:focus-visible` rule that restores the ring, so deleting the restore
+turns the allowance red — which is how it immediately found a live defect a ban could not have, a
+`.jx-grid-input` whose restore covered the picker beside it and not the text cells. The count in P0
+is wrong twice over: five stylesheet declarations (six suppressions, one being a grouped selector),
+plus **two inline `style=` attributes that were never swept at all** and cannot be paired, in the
+slash menu's and the media picker's filter inputs. P1's `git init` on create, by contrast, **shipped
+long ago** (`files.ts`'s `initProjectRepo`, called from the one exit all three create paths take),
+and the status bar states the untracked case through the deploy checklist's first unforged link
+rather than a second item beside it; what was missing was anything pinning that pairing, so a test
+now asserts the state is stated exactly once and that its command is `git.init`.
+
+**Both trees are virtualized, on one primitive** (`ui/virtual-window.ts`, moved out of `browse/`),
+which closes §0 C's `unvirtualized trees`. The hazard was not the windowing: the Outline's shift-range
+read its row list **from the DOM**, so a range whose far end had scrolled out of the window would
+have silently selected the wrong set. Every DOM-derived row read in both trees — the range, the arrow
+walk, Home/End, ←'s climb to the parent, reveal-on-select, rename — moved to the model, and both
+trees now report `aria-posinset`/`aria-setsize` because a windowed tree without them tells a screen
+reader "3 of 11" about a 5,000-row document.
+
+**`rightTab` stayed per-document** against P3.1's letter — the code argues its case at
+`right-panel.ts:74` ("the tab you were on comes back with the file") and it is the better behaviour,
+so the plan follows the code: a layout preset's `inspectorTab` is the tab it OPENS on, not one it
+enforces.
+
 **C · Facts and dropped surfaces.** 36 `project.json` write sites → **42**, across eight files. `"stylebook"` is a wire-protocol value (`iframe-protocol.ts:25`), so it stays one. The Layout show/hide toggle, the GitHub-App install prompt, the per-recent remove affordance and the `?project=` deep link all get an explicit home in §11. The New Project wizard rework is scheduled in P1, the Insert command family in P3. Six owner-less findings — the 158 silent catch blocks, `leftTab`/`rightTab`, the three `$elements` writers, the unvirtualized trees, the panel scheduler's silent deferral, and inline formatting's level — each get a phase and a decision.
 
 ---

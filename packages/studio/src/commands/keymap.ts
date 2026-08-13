@@ -346,6 +346,15 @@ export interface Keymap {
   resolveEvent: (event: KeyChordEvent, scopeStack: readonly KeyScope[]) => KeymapMatch | undefined;
   /** Every (scope, chord, id) triple — the generated shortcut sheet reads this. */
   entries: () => readonly KeymapMatch[];
+  /**
+   * Subscribe to "the live bindings changed". Returns an unsubscribe.
+   *
+   * One listener exists today and it is the reason this hook does: the canvas iframe holds a COPY
+   * of the chord table (`canvas/iframe-keys.ts`), and a copy with no invalidation is a second
+   * authority that drifts the moment someone rebinds a key. Fired by {@link setOverrides}, which is
+   * the only operation that changes what is live after boot.
+   */
+  onChange: (listener: () => void) => () => void;
 }
 
 /**
@@ -369,6 +378,8 @@ export function createKeymap(options: { mac?: boolean } = {}): Keymap {
   const declared = new Map<string, { chords: string[]; scope: KeyScope }>();
   /** The user's layer. Replaced wholesale by `setOverrides`; empty until one is applied. */
   let userLayer = new Map<string, readonly string[]>();
+  /** Who to tell when the live bindings change. */
+  const listeners = new Set<() => void>();
 
   function chordsOf(record: BindableRecord): string[] {
     const raw = record.keybinding;
@@ -481,6 +492,13 @@ export function createKeymap(options: { mac?: boolean } = {}): Keymap {
         [...overrides].map(([id, chords]) => [id, chords.map((chord) => normalizeChord(chord))]),
       );
       rebuild();
+      for (const listener of listeners) {
+        listener();
+      }
+    },
+    onChange(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
     },
     overrides() {
       return new Map(userLayer);
@@ -514,4 +532,40 @@ export function createKeymap(options: { mac?: boolean } = {}): Keymap {
       return all;
     },
   };
+}
+
+/**
+ * Every live (chord, scope) pair in `scopes`, deduplicated — the table a second realm can resolve
+ * against.
+ *
+ * Written for the canvas iframe, which cannot see the registry at all: it is handed this and
+ * forwards a keystroke iff some scope on its own stack claims the chord (`canvas/iframe-keys.ts`).
+ * The command id is deliberately dropped — the frame decides whether to forward, never what runs —
+ * and the projection is a pure function of the keymap so the host can recompute and repost it
+ * whenever a rebinding lands.
+ */
+export function chordsInScopes<S extends KeyScope>(
+  keymap: Keymap,
+  scopes: readonly S[],
+): { chord: string; scope: S }[] {
+  const seen = new Set<string>();
+  const out: { chord: string; scope: S }[] = [];
+  for (const entry of keymap.entries()) {
+    /* `find` rather than a `Set.has` test: the narrowed member is what makes the result carry the
+       CALLER's scope union. The canvas frame's table is three scopes wide (`FRAME_KEY_SCOPES`) and
+       has to stay that way across the bridge, where `SyncedChord` declares exactly those three —
+       widening back to every `KeyScope` here would push a `grid` chord into a message that cannot
+       hold one. */
+    const scope = scopes.find((candidate) => candidate === entry.scope);
+    if (scope === undefined) {
+      continue;
+    }
+    const key = `${scope} ${entry.chord}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    out.push({ chord: entry.chord, scope });
+  }
+  return out;
 }

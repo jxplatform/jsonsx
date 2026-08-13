@@ -202,6 +202,19 @@ export interface CommandContext {
    */
   caret: {
     active: boolean;
+    /**
+     * Whether that caret is the CANVAS's, rather than a parent-realm text field's.
+     *
+     * `active` folds both together on purpose: for {@link keyScopeStack} they are the same fact —
+     * something is being typed into, so element-level chords must not fire. For a record they are
+     * not. `format.bold` acts on a run of text inside the selected node and is meaningless while
+     * the caret is in the Inspector's href field or the link popover's own URL box; a record gated
+     * on `active` alone would fire there, and `mod+k` would re-mount the popover the author is
+     * typing into.
+     *
+     * Sourced from the bridge alone (`isCaretActive()`), never from `isTextEntryFocused()`.
+     */
+    inCanvas: boolean;
   };
   focus: {
     region: FocusRegion;
@@ -268,7 +281,7 @@ export function emptyContext(): CommandContext {
       isLayoutNode: false,
       isRepeater: false,
     },
-    caret: { active: false },
+    caret: { active: false, inCanvas: false },
     focus: { region: "pane" },
     modal: { open: false },
     collab: { attached: false, readOnly: false, sourceCanonical: false },

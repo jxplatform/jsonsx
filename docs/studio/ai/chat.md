@@ -16,7 +16,7 @@ The assistant lives in the Inspector, as its fourth tab beside Content, Style an
 
 ## Open it
 
-Press :kbd[⌘⇧4] (macOS) / :kbd[Ctrl+Shift+4] (Windows/Linux), or click the **Assistant** tab at the top of the Inspector. Drag the Inspector's inner edge to resize it; the width and which tab you left selected are both remembered across sessions.
+Press :kbd[⌘⇧4] (macOS) / :kbd[Ctrl+Shift+4] (Windows/Linux), or click the **Assistant** tab at the top of the Inspector. :kbd[⌘⇧A] / :kbd[Ctrl+Shift+A] does the same and puts the cursor in the message box, ready to type — including on the welcome screen, before any project is open. Drag the Inspector's inner edge to resize it; the width and which tab you left selected are both remembered across sessions.
 
 If no AI provider is set up yet, the tab still opens on a chat, with one line under it — _No AI provider is connected yet_ — and an **Assistant: Settings…** button that opens the setup dialog. See **[Connect a provider](/docs/studio/ai#connect-a-provider)**.
 
@@ -80,6 +80,12 @@ The header names the current chat and holds two buttons: the history button (lef
 - When you reopen Studio, your last open chat is restored.
 
 History is stored on your machine and kept per project, so conversations never mix between projects. Each project keeps its 20 most recent chats, and each chat keeps its latest 50 messages.
+
+## By name, not only by button
+
+Everything the chat can do is also a command, so it is in the palette under **Assistant**, works from the keyboard, and can be rebound: **Focus Composer** (:kbd[⌘⇧A]), **New Chat**, **Chat History**, **Retry**, **Attach Selection** and **Stop**. The header's buttons run those same commands rather than a private copy of them, which is why a button's tooltip always prints the shortcut you actually have.
+
+Two of them state when they cannot act instead of going quiet: **Retry** needs a connected provider and a last message to re-send, and **Stop** is live only while a reply is streaming. Hover either one, or read the greyed row in the palette, and it says which.
 
 ## Next
 

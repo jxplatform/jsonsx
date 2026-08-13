@@ -69,6 +69,7 @@ import {
 } from "./canvas/canvas-surface";
 import { consumePatchedDocument, initCanvasPatcher } from "./canvas/canvas-patcher";
 import {
+  setKeymapSource,
   commitActiveEditSession,
   allowAutoRequestsOnNextRender,
   getEditSnapshot,
@@ -125,7 +126,7 @@ import { invalidateLibrary } from "./browse/library-pane";
 import { invalidateMediaCache } from "./ui/media-picker";
 import { setMediaChangedHandler } from "./files/media-upload";
 import { applyFileDrop } from "./editor/file-drop-action";
-import { seedAssistantMessages } from "./panels/ai-panel";
+import { assistantCommands, isAssistantStreaming, seedAssistantMessages } from "./panels/ai-panel";
 import { seedPublishConnected } from "./publish/publish-panel";
 
 import { getPlatform, hasPlatform, registerPlatform } from "./platform";
@@ -165,6 +166,8 @@ import "./ui/form-controls.js";
 import { initLayers, isModalOpen } from "./ui/layers";
 import { initShortcuts, registerStudioCommands } from "./editor/shortcuts";
 import { createCommandRegistry } from "./commands/registry";
+import { chordsInScopes } from "./commands/keymap";
+import { FRAME_KEY_SCOPES } from "./canvas/iframe-keys";
 import { createLiveContext } from "./commands/live-context";
 import { hasAiCredentials } from "./services/ai-models";
 import { mount as mountActivityBar } from "./panels/activity-bar";
@@ -185,6 +188,7 @@ import { defaultDef } from "./panels/shared";
 import { registerFormulaEditorCommands } from "./panels/formula-workspace";
 import { closeFunctionEditor } from "./panels/editors";
 import {
+  formatCommands,
   initBlockActionBar,
   isEditChromeTarget,
   registerSelectionCommands,
@@ -1256,6 +1260,9 @@ const stageContext = (surface: CanvasSurface) => ({
 const commandRegistry = createCommandRegistry({
   getContext: createLiveContext({
     aiConfigured: hasAiCredentials,
+    // The probe `live-context.ts` declared optional and nobody ever passed, so `ctx.ai.streaming`
+    // Read false forever. `assistant.stop` is gated on it.
+    aiStreaming: isAssistantStreaming,
     canvasMode: getCanvasMode,
     isCaretActive,
     isModalOpen,
@@ -1345,6 +1352,12 @@ registerGridViewCommands(commandRegistry);
 registerRedirectsCommands(commandRegistry);
 registerAboutCommands(commandRegistry);
 registerCollabCommands(commandRegistry);
+/* The `Assistant:` family (§11.1) — Focus Composer, New Chat, Chat History, Attach Selection, Retry
+   and Stop. Every one existed as a button in the chat view and as nothing else, so the category held
+   zero records and none of them was in the palette, bindable, or reachable by name. The chat header
+   and the error row render these ids through the registry now, which is what makes this line the
+   definition site rather than a second copy. */
+commandRegistry.registerAll(assistantCommands());
 /*
  * The structural selection verbs — Move Up/Down/In/Out, Convert to Component, Edit Component.
  *
@@ -1354,8 +1367,27 @@ registerCollabCommands(commandRegistry);
  * when no menu is open, which is precisely the app-wide meaning of these verbs.
  */
 registerSelectionCommands(commandRegistry, { convertToComponent, navigateToComponent });
+/* The format family — Bold, Italic, Code, Link and the four with no chord.
+   Same story as the structural verbs above, one wave later: they were the block action bar's own,
+   as a hand-written keydown switch rather than records, and the switch returned early whenever
+   focus was inside the canvas iframe — which is the only place a canvas caret can be. */
+commandRegistry.registerAll(formatCommands());
 
 initShortcuts(commandRegistry, stageContext);
+
+/* Hand the canvas frames the chord table.
+   The iframe cannot see the registry, so it used to answer "does the parent want this keystroke?"
+   from three hand-written lists that disagreed with the registry in both directions — ⌘A forwarded
+   and prevented with nothing to run it, ⌘B withheld for an engine that never handled it. It
+   resolves against this table instead, and `publishKeymap()` reposts it whenever a rebinding lands,
+   which is what makes Preferences › Keyboard reach inside the page. */
+setKeymapSource(
+  () => ({
+    chords: chordsInScopes(commandRegistry.keymap, FRAME_KEY_SCOPES),
+    mac: commandRegistry.keymap.mac,
+  }),
+  (listener) => commandRegistry.keymap.onChange(listener),
+);
 
 // The gated scripting surface (`?automation=1` only) is a PROJECTION of the registry above, so it
 // Installs after it — still inside this module's synchronous body, which is what the screenshot

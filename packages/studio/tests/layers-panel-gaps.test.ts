@@ -8,7 +8,7 @@ import { renderLayersTemplate, startLayerTitleEdit } from "../src/panels/layers-
 import { activeTab, closeAllTabs } from "../src/workspace/workspace";
 import { pathKey } from "../src/store";
 import { view } from "../src/view";
-import { shell } from "../src/shell";
+import { NAVIGATOR_PANEL_IDS, shell } from "../src/shell";
 import { initLayers } from "../src/ui/layers";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { JxPath } from "../src/state";
@@ -477,6 +477,13 @@ describe("renderLayersTemplate — empty state", () => {
 
     // One state write and no rerender callback beside it: the left panel tracks `shell.leftTab`.
     (host.querySelector(".empty-state-action") as HTMLElement).click();
-    expect(shell.leftTab).toBe("blocks");
+    /* `"insert"` — and the second assertion is the one that matters.
+       This test asserted `"blocks"` while its own title said "opens Insert", so it PASSED for three
+       phases over an action that put the Navigator into "No Navigator panel is registered as
+       blocks": P3.1 renamed the panel, migrated the persisted id, and left this live caller behind.
+       Naming the id alone would only re-encode whatever the code does, so the id is also checked
+       against the declared set — that is the assertion a rename cannot satisfy by accident. */
+    expect(shell.leftTab).toBe("insert");
+    expect([...NAVIGATOR_PANEL_IDS] as string[]).toContain(shell.leftTab);
   });
 });

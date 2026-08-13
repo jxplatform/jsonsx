@@ -35,6 +35,24 @@ describe("checkChromeBudget", () => {
     }
   });
 
+  test("a ninth inline-format verb is a design decision, not an append", () => {
+    /* The bar's verb cluster and its format cluster are two placements over one surface, with two
+       caps, because eight format verbs sharing the cluster's cap of five would have pushed Bold
+       behind a `⋮`. The vocabulary is `data/elements-meta.json`'s eight; a ninth has to be argued
+       for HERE, in `commands/budget.ts`, the way every other cap is. */
+    const formats = (count: number): BudgetableRecord[] =>
+      Array.from({ length: count }, (_unused, index) => ({
+        id: `format.verb${index}`,
+        menus: ["blockbar/format", "palette"],
+      }));
+    expect(checkChromeBudget({ commands: formats(CHROME_BUDGET.blockbarFormat) })).toEqual([]);
+    const over = checkChromeBudget({ commands: formats(CHROME_BUDGET.blockbarFormat + 1) });
+    expect(over).toHaveLength(1);
+    expect(over[0]?.subject).toBe("blockbar/format");
+    expect(over[0]?.count).toBe(CHROME_BUDGET.blockbarFormat + 1);
+    expect(over[0]?.message).toContain("the palette");
+  });
+
   test("the Inspector's row is the tab list itself, not a copy of it", () => {
     // Wave A wrote the four tab titles out by hand. They now come from `commands/defaults.ts`'s
     // `INSPECTOR_TABS` — the list the dock renders and ⌘⇧1–4 address — so a fifth tab fails this

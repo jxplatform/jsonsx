@@ -1,4 +1,4 @@
-import "./harness";
+import { flush, installMockPlatform, renderInto } from "./harness";
 import { afterEach, describe, expect, test } from "bun:test";
 import { html } from "lit-html";
 import {
@@ -13,7 +13,11 @@ import {
   resetPanels,
   unregisterPanel,
 } from "../src/panels/panel-registry";
-import type { PanelRecord } from "../src/panels/panel-registry";
+import type { NavigatorPanelDeps, PanelRecord } from "../src/panels/panel-registry";
+import { setProjectState } from "../src/store";
+import { closeAllTabs } from "../src/workspace/workspace";
+import { renderFilesTemplate } from "../src/files/files";
+import { cleanupGitPanel, renderGitPanel } from "../src/panels/git-panel";
 import {
   navigatorPanelSet,
   registerNavigatorPanels,
@@ -26,7 +30,13 @@ import {
   PANEL_PLACEMENT_MATRIX,
   panelPlacements,
 } from "../src/commands/levels";
-import { DEFAULT_PANEL_ID, migratePanelId, NAVIGATOR_PANEL_IDS, shell } from "../src/shell";
+import {
+  DEFAULT_PANEL_ID,
+  migratePanelId,
+  NAVIGATOR_PANEL_IDS,
+  resetProjectShell,
+  shell,
+} from "../src/shell";
 
 function record(over: Partial<PanelRecord> = {}): PanelRecord {
   return {
@@ -218,6 +228,124 @@ describe("the Navigator's panel set", () => {
 
   test("the default panel is one of them", () => {
     expect(navigatorPanelSet().map((p) => p.id)).toContain(DEFAULT_PANEL_ID);
+  });
+});
+
+// ─── principle 3's corollary ──────────────────────────────────────────────────
+
+/**
+ * The deps a PROJECT-level panel may touch, and a tripwire for everything else.
+ *
+ * Only the two renderers project-level records delegate to are real. Every other member of
+ * {@link NavigatorPanelDeps} is a document-level renderer or a document-level gesture registration,
+ * so reaching for one IS the violation this suite is looking for — and the error names which.
+ */
+function projectPanelDeps(): NavigatorPanelDeps {
+  const provided: Partial<NavigatorPanelDeps> = {
+    renderFilesTemplate: () =>
+      renderFilesTemplate({
+        openFileFromTree: () => {},
+        openProject: () => {},
+        renderLeftPanel: () => {},
+      }),
+    renderGitPanel,
+  };
+  return new Proxy(provided, {
+    get(target, prop) {
+      if (typeof prop === "symbol" || prop in target) {
+        return target[prop as keyof NavigatorPanelDeps];
+      }
+      throw new Error(
+        `a level: "project" panel read deps.${prop}, which only exists for a focused document`,
+      );
+    },
+  }) as NavigatorPanelDeps;
+}
+
+/**
+ * Principle 3's corollary, asserted as the loop `panel-registry.ts` says it is.
+ *
+ * The docstring on {@link import("../src/panels/panel-registry").NavigatorDocument} has claimed
+ * since P3 that this file "renders every project-level panel with `doc: null`". It rendered exactly
+ * one — Problems — so the claim was a promise rather than a check, and the defect it names (the
+ * Source Control badge vanishing when the last tab closed) could have come back through any of the
+ * others without a test moving.
+ *
+ * Three paints, because "renders" is not one body. The first is what kicks off `refreshGitStatus()`
+ * and `loadDirectory(".")`; the second is the empty state those resolve into; the third is the full
+ * Source Control body a real repository draws, which is the biggest surface any project-level panel
+ * has and the one whose badge used to come off the focused tab. A panel that only reaches for the
+ * document once it has something to show is still a panel that reaches.
+ */
+describe("every project-level panel renders with no document open", () => {
+  afterEach(() => {
+    cleanupGitPanel();
+    resetProjectShell();
+    setProjectState(null as never);
+    closeAllTabs();
+  });
+
+  test("no tab, no throw — cold, empty, and with a working tree to draw", async () => {
+    installMockPlatform();
+    setProjectState({
+      dirs: new Map(),
+      expanded: new Set(),
+      isSiteProject: true,
+      name: "Demo",
+      projectConfig: { name: "Demo" },
+      projectDirs: [],
+      projectRoot: ".",
+      searchQuery: "",
+      selectedPath: null,
+    } as never);
+    closeAllTabs();
+    registerNavigatorPanels();
+
+    const ctx = panelContext();
+    const panels = listPanels().filter((p) => p.level === "project" && isPanelVisible(p, ctx));
+    // Search is registered, `when`-hidden and deliberately unbuilt (its render throws), so the
+    // Set under test is the four that DRAW — two Navigator panels and two Bottom-dock tabs, since
+    // The corollary is about a panel's LEVEL and not about which dock hosts it. Named rather than
+    // Counted: a panel that quietly stopped being project-level would otherwise shrink this loop
+    // To nothing and still pass.
+    expect(panels.map((p) => p.id)).toEqual(["files", "git", "problems", "activity"]);
+
+    const deps = projectPanelDeps();
+    const paint = async (): Promise<Map<string, HTMLElement>> => {
+      const painted = new Map<string, HTMLElement>();
+      for (const panel of panels) {
+        const body = panel.render({ deps, doc: null, rerender: () => {} });
+        // `nothing` is a legal body (PanelBody says so); a TemplateResult is committed for real,
+        // Because a directive that throws does it on commit rather than on construction.
+        if (typeof body === "object" && "strings" in body) {
+          painted.set(panel.id, await renderInto(body));
+        }
+      }
+      await flush();
+      return painted;
+    };
+
+    // Each pass asserts WHICH body it drew, so "renders three times without throwing" cannot
+    // Quietly become "renders the same placeholder three times without throwing".
+    const cold = await paint();
+    expect(cold.get("git")?.textContent).toContain("Loading");
+
+    const settled = await paint();
+    expect(settled.get("git")?.textContent).toContain("not tracked by git");
+    expect(settled.get("files")?.querySelector(".file-tree")).not.toBeNull();
+
+    shell.git.branches = { branches: ["main"], current: "main" } as never;
+    shell.git.status = {
+      ahead: 1,
+      behind: 0,
+      branch: "main",
+      files: [{ path: "pages/index.json", staged: false, status: "M" }],
+      isRepo: true,
+      remotes: ["origin"],
+    } as never;
+    const tracked = await paint();
+    expect(tracked.get("git")?.querySelector(".git-branch-name")?.textContent).toBe("main");
+    expect(tracked.get("git")?.querySelector(".git-file-name")?.textContent).toBe("index.json");
   });
 });
 

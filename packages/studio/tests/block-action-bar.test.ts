@@ -67,12 +67,14 @@ const {
   BLOCKBAR_MAX_ITEMS,
   dismissBlockActionBar,
   dismissLinkPopover,
-  handleParentFormatShortcut,
+  formatCommands,
   initBlockActionBar,
   isEditChromeTarget,
   onCanvasScroll,
   renderBlockActionBar,
+  selectionCommandRegistry,
 } = await import("../src/panels/block-action-bar");
+const { makeContext } = await import("../src/commands/context");
 
 // ─── Layer hosts ─────────────────────────────────────────────────────────────
 
@@ -698,8 +700,16 @@ describe("block action bar", () => {
     const titles = [...group.querySelectorAll("sp-action-button")].map((b) =>
       b.getAttribute("title"),
     );
-    expect(titles).toContain("Bold (Cmd+B)");
-    expect(titles).toContain("Underline");
+    /* The chord comes from the KEYMAP now, so it is formatted for the platform the test is running
+       on. This asserted the literal "Bold (Cmd+B)", which is the string
+       `data/elements-meta.json` hardcoded into every tooltip on every machine — the exact defect
+       plan §5.3 names ("one function formats chords, which kills the hardcoded ⌘P shown to Windows
+       and Linux users"). Asserting the formatter's own answer is what makes the tooltip provably
+       not a hardcoded one. */
+    const chord = selectionCommandRegistry().keymap.formatBinding("format.bold");
+    expect(titles).toContain(`Bold (${chord})`);
+    // A verb with no chord prints its bare name — not an empty pair of brackets.
+    expect(titles).toContain("Strikethrough");
     expect(titles.length).toBe(8); // P inline actions
   });
 
@@ -920,83 +930,75 @@ describe("block action bar", () => {
     expect(linkPopoverHost()).toBeNull();
   });
 
-  // ─── Parent-focus format shortcuts (Ctrl+B etc.) ───────────────────────────
+  // ─── Inline formatting, as records ─────────────────────────────────────────
 
-  describe("handleParentFormatShortcut", () => {
-    function ctrl(key: string) {
-      return new KeyboardEvent("keydown", { bubbles: true, cancelable: true, ctrlKey: true, key });
-    }
+  /**
+   * These replace a `describe("handleParentFormatShortcut")` that drove a hand-written keydown
+   * switch — eight cases over a control that RETURNED EARLY whenever focus was inside the canvas
+   * iframe, which is the only place a canvas caret can be. Every one of them passed, because each
+   * dispatched its event at a parent-realm `<input>`; none could see that ⌘B in the page did
+   * nothing. The capability moved onto records, so the tests move with it: what is asserted now is
+   * the record's declaration and what running it posts.
+   */
+  describe("formatCommands", () => {
+    const byId = () => new Map(formatCommands().map((command) => [command.id, command]));
 
-    test("editing + parent-focused: Ctrl+B posts an applyFormat bold intent", () => {
-      host.editing = true;
-      const input = document.createElement("input");
-      document.body.append(input);
-      input.focus();
-      const e = ctrl("b");
-      handleParentFormatShortcut(e);
-      expect(host.posted).toEqual([{ command: "bold" }]);
-      expect(e.defaultPrevented).toBe(true);
-      input.remove();
+    test("the whole `$inlineActions` vocabulary has a record, and nothing else does", () => {
+      expect([...byId().keys()].toSorted()).toEqual([
+        "format.bold",
+        "format.code",
+        "format.italic",
+        "format.link",
+        "format.strikethrough",
+        "format.subscript",
+        "format.superscript",
+        "format.underline",
+      ]);
     });
 
-    test("Ctrl+I and Ctrl+` post italic/code", () => {
-      host.editing = true;
-      handleParentFormatShortcut(ctrl("i"));
-      handleParentFormatShortcut(ctrl("`"));
-      expect(host.posted).toEqual([{ command: "italic" }, { command: "code" }]);
+    test("selection level, caret scope — the case §5.1 uses to justify two fields", () => {
+      for (const command of formatCommands()) {
+        expect(command.level).toBe("selection");
+        expect(command.keyScope).toBe("caret");
+        expect(command.menus).toContain("blockbar/format");
+        expect(command.requires).toBeTruthy();
+      }
     });
 
-    test("a modal surface suppresses the format shortcut", () => {
-      host.editing = true;
-      const slot = document.createElement("div");
-      slot.innerHTML = "<sp-dialog-wrapper open></sp-dialog-wrapper>";
-      document.querySelector("#layer-dialog")!.append(slot);
-      handleParentFormatShortcut(ctrl("b"));
-      expect(host.posted).toEqual([]);
-      slot.remove();
-      handleParentFormatShortcut(ctrl("b"));
-      expect(host.posted).toEqual([{ command: "bold" }]);
+    test("the four documented chords are the records', formatted by the one formatter", () => {
+      const map = byId();
+      expect(map.get("format.bold")?.keybinding).toBe("mod+b");
+      expect(map.get("format.italic")?.keybinding).toBe("mod+i");
+      expect(map.get("format.underline")?.keybinding).toBe("mod+u");
+      expect(map.get("format.code")?.keybinding).toBe("mod+`");
+      expect(map.get("format.link")?.keybinding).toBe("mod+k");
+      // The three with no chord declare none rather than an unbindable placeholder.
+      expect(map.get("format.strikethrough")?.keybinding).toBeUndefined();
     });
 
-    test("Ctrl+K opens the link popover (anchored to the bar's Link button)", () => {
+    test("running one posts the intent the iframe already understands", () => {
+      const registry = selectionCommandRegistry();
+      host.editing = true;
+      void registry.run("format.bold");
+      void registry.run("format.code");
+      expect(host.posted).toEqual([{ command: "bold" }, { command: "code" }]);
+    });
+
+    test("format.link opens the link popover, anchored by record id", () => {
       setup({ children: [{ tagName: "p", textContent: "hi" }], tagName: "div" }, ["children", 0]);
       startEditingState();
-      const input = document.createElement("input");
-      document.body.append(input);
-      input.focus();
-
-      handleParentFormatShortcut(ctrl("k"));
+      void selectionCommandRegistry().run("format.link");
       expect(linkPopoverHost()).not.toBeNull();
-      input.remove();
+      dismissLinkPopover();
     });
 
-    test("does nothing when not editing", () => {
-      host.editing = false;
-      handleParentFormatShortcut(ctrl("b"));
-      expect(host.posted).toEqual([]);
-    });
-
-    test("ignores chords without ctrl/meta or with alt held", () => {
-      host.editing = true;
-      handleParentFormatShortcut(
-        new KeyboardEvent("keydown", { altKey: true, ctrlKey: true, key: "b" }),
-      );
-      handleParentFormatShortcut(new KeyboardEvent("keydown", { key: "b" }));
-      expect(host.posted).toEqual([]);
-    });
-
-    test("does nothing when focus is inside the canvas iframe", () => {
-      host.editing = true;
-      const iframe = document.createElement("iframe");
-      iframe.className = "jx-canvas-iframe";
-      document.body.append(iframe);
-      iframe.focus();
-      // Force activeElement to the iframe (happy-dom focus on iframe).
-      Object.defineProperty(document, "activeElement", { configurable: true, value: iframe });
-      handleParentFormatShortcut(ctrl("b"));
-      expect(host.posted).toEqual([]);
-      delete (document as unknown as Record<string, unknown>).activeElement;
-      iframe.remove();
+    test("`when` is the CANVAS caret, not any caret", () => {
+      // The distinction the record exists to make: `caret.active` is also true while focus is in a
+      // Parent text field — including the link popover's own URL box, where ⌘K would re-mount the
+      // Popover being typed into.
+      const command = byId().get("format.bold")!;
+      expect(command.when?.(makeContext({ caret: { active: true, inCanvas: false } }))).toBe(false);
+      expect(command.when?.(makeContext({ caret: { active: true, inCanvas: true } }))).toBe(true);
     });
   });
 });

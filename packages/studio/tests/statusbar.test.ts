@@ -59,6 +59,7 @@ function buildRegistry(ids?: readonly string[]) {
     stub("project.open", "Open Project…", "project"),
     stub("project.openRecent", "Open Recent…", "project"),
     stub("panel.focus.git", "Show Source Control", "application"),
+    stub("git.init", "Initialize Repository", "project"),
     // `view.setBottomTab`, not `panel.focus.problems` — that record is generated from the rail
     // Roster and Problems is off the rail.
     stub("view.setBottomTab", "Show Bottom Dock Tab", "application"),
@@ -160,6 +161,48 @@ describe("the PROJECT field", () => {
     expect(items()).toContain("⑂ main ↑1 ↓2");
   });
 
+  /*
+   * Plan §12 P1 workstream 9: "repo state becomes a persistent status-bar field".
+   *
+   * It reads like a request for a "not tracked" twin of the branch item, and it is not: the field
+   * already states an untracked project, one item along, because `deployStatusItem()`'s first link
+   * is `repo` — label "Track this project with git", command `git.init`. Two items saying that with
+   * the same verb is the adjacent-duplicate chrome §2 principle 9 forbids.
+   *
+   * So the invariant worth pinning is the PAIRING, and it is asserted from both ends: exactly one
+   * item names `git.init`, and it is there at all. Deleting the checklist's repo step takes the
+   * state off the bar and fails here; adding a second one fails here too.
+   */
+  test("an untracked project is stated ONCE, by the item whose command initializes the repo", () => {
+    resetStudioState({ name: "My Site", projectRoot: "/p" });
+    shell.git.status = { ahead: 0, behind: 0, files: [], isRepo: false, remotes: [] } as never;
+    renderStatusbar();
+    // No branch to name, so the branch item is absent — and the state is said anyway.
+    expect(items().some((t) => t?.startsWith("⑂"))).toBe(false);
+    expect(items()).toContain("Track this project with git");
+
+    const buttons = [...field("project")!.querySelectorAll("button")];
+    for (const button of buttons) {
+      button.click();
+    }
+    expect(ran.filter((r) => r.id === "git.init")).toHaveLength(1);
+  });
+
+  test("once tracked, the field stops offering to track it and names the branch instead", () => {
+    resetStudioState({ name: "My Site", projectRoot: "/p" });
+    shell.git.status = {
+      ahead: 0,
+      behind: 0,
+      branch: "main",
+      files: [],
+      isRepo: true,
+      remotes: [],
+    } as never;
+    renderStatusbar();
+    expect(items()).toContain("⑂ main");
+    expect(items()).not.toContain("Track this project with git");
+  });
+
   test("the problems item counts `notify`'s Problems store, and appears only when non-zero", () => {
     resetStudioState({ name: "My Site", projectRoot: "/p" });
     renderStatusbar();
@@ -168,7 +211,13 @@ describe("the PROJECT field", () => {
     notify.warn("Slots", { tier: "problem" });
     renderStatusbar();
     expect(items()).toContain("⚠ 2");
-    (field("project")!.querySelectorAll("button")[1] as HTMLElement).click();
+    // By LABEL, not by index: the field's item count moves with the deploy checklist and the peer
+    // Count, and a positional lookup here would silently start clicking whichever item grew in
+    // Front of it (it did — the deploy item's `git.init` link took slot 1).
+    const problems = [...field("project")!.querySelectorAll("button")].find(
+      (b) => b.textContent?.trim() === "⚠ 2",
+    )!;
+    problems.click();
     // The one door the other three Bottom-dock tabs use, carrying which tab it means.
     expect(ran.at(-1)!.id).toBe("view.setBottomTab");
     expect(ran.at(-1)!.args).toEqual({ tab: "problems" });

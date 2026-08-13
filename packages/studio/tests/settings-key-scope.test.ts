@@ -189,6 +189,77 @@ function pressDoc(key: string, init: KeyboardEventInit = {}) {
   return e;
 }
 
+// ─── Select All, which used to be two ways of doing nothing ──────────────────
+
+describe("selection.selectAll", () => {
+  /**
+   * ⌘A was forwarded out of the canvas frame AND `preventDefault`ed on the way, with no record
+   * bound to it — so it neither selected the paragraph's text nor selected anything structurally.
+   * The frame half is fixed by resolving against the keymap (`canvas/iframe-keys.ts`); this is the
+   * half that gives the chord something to do when no caret owns the keyboard.
+   */
+  function openDoc(): Tab {
+    return openTab({
+      document: {
+        children: [
+          { tagName: "h1", textContent: "Title" },
+          { tagName: "p", textContent: "One" },
+          { tagName: "p", textContent: "Two" },
+        ],
+        tagName: "div",
+      } as unknown as Record<string, unknown>,
+      documentPath: "pages/index.json",
+      id: "pages/index.json",
+    }) as unknown as Tab;
+  }
+
+  test("selects every sibling of the selection, in document order", () => {
+    const tab = openDoc();
+    tab.session.selection = [["children", 1]];
+    void registry.run("selection.selectAll");
+    expect(tab.session.selection).toEqual([
+      ["children", 0],
+      ["children", 1],
+      ["children", 2],
+    ]);
+  });
+
+  test("with nothing selected it takes the root's children — what a reader means by all of it", () => {
+    const tab = openDoc();
+    tab.session.selection = [];
+    void registry.run("selection.selectAll");
+    expect(tab.session.selection).toHaveLength(3);
+  });
+
+  test("from the root, whose siblings are none, it still selects the root's children", () => {
+    const tab = openDoc();
+    tab.session.selection = [[]];
+    void registry.run("selection.selectAll");
+    expect(tab.session.selection).toHaveLength(3);
+  });
+
+  test("a text-only block yields its ELEMENT children, never a raw string's path", () => {
+    // A string child has no node, so a path to one is a path `getNodeAtPath` answers with a string
+    // And every structural verb then mishandles.
+    const tab = openTab({
+      document: {
+        children: [{ children: ["hello", { tagName: "em", textContent: "there" }], tagName: "p" }],
+        tagName: "div",
+      } as unknown as Record<string, unknown>,
+      documentPath: "pages/text.json",
+      id: "pages/text.json",
+    }) as unknown as Tab;
+    tab.session.selection = [["children", 0, "children", 1]];
+    void registry.run("selection.selectAll");
+    expect(tab.session.selection).toEqual([["children", 0, "children", 1]]);
+  });
+
+  test("it is canvas-scoped, so a caret keeps ⌘A for its own sentence", () => {
+    expect(registry.get("selection.selectAll")?.keyScope).toBe("canvas");
+    expect(registry.keymap.declaredFor("selection.selectAll")).toEqual(["mod+a"]);
+  });
+});
+
 // ─── The map, in one place ───────────────────────────────────────────────────
 
 describe("mode → editor kind", () => {

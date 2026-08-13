@@ -7,6 +7,17 @@
  * file-ops.js. Every name the user supplies (new file, rename) is collected with the Spectrum
  * prompt dialog from ui/layers.ts — never a native browser prompt (studio-ui-guidelines.md §8.7).
  *
+ * **The tree is a flat list of rows, and the DOM holds a window onto it** ({@link FileRow},
+ * `ui/virtual-window.ts`). It used to recurse a template per directory level, which is why it drew
+ * every expanded row of every expanded directory — a `node_modules` expanded by accident is tens of
+ * thousands of `sp-icon` custom elements, built synchronously, on every repaint. A recursion has no
+ * row list to window, so the recursion moved into {@link collectFileRows}, which produces the rows
+ * in display order and nothing else; the render is then a window over that array.
+ *
+ * Flattening costs the `role="group"` wrappers, and pays for them with `aria-level` +
+ * `aria-posinset` / `aria-setsize` on every row — the same shape the Outline has always had, and
+ * the only shape that stays TRUE when the tree draws eleven rows out of ten thousand.
+ *
  * @docs studio/interface
  */
 
@@ -61,10 +72,18 @@ import { markSessionRestored, persistedSession, resetProjectShell, setActivityTa
 import { restoreSession } from "../workspace/session";
 import { cleanupGitPanel } from "../panels/git-panel";
 import { addRecentProject, trackRecentFile } from "../recent-projects";
+import {
+  listWindow,
+  measuredRowHeight,
+  revealListRow,
+  watchListWindow,
+} from "../ui/virtual-window";
 import type { TemplateResult } from "lit-html";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { DirEntry, RenameResult } from "../types";
+import type { ListWindowWatch } from "../ui/virtual-window";
 import { rectOf } from "../utils/geometry";
+import { repeat } from "lit-html/directives/repeat.js";
 
 // ─── File icon map ────────────────────────────────────────────────────────────
 
@@ -452,27 +471,104 @@ export function renderFilesTemplate({
         @submit=${(e: Event) => e.preventDefault()}
       ></sp-search>
     </div>
-    <div class="file-tree" role="tree" aria-label="Project files">
-      ${renderTreeLevelTemplate(".", 0, { openFileFn, renderLeftPanel })}
+    <div
+      class="file-tree"
+      role="tree"
+      aria-label="Project files"
+      ${ref((el) => {
+        if (el) {
+          afterFileTreeRender(el as HTMLElement);
+        }
+      })}
+    >
+      ${fileTreeBodyTemplate({ openFileFn, renderLeftPanel })}
     </div>
   `;
 }
 
-/** @returns {import("lit-html").TemplateResult | import("lit-html").TemplateResult[]} */
-function renderTreeLevelTemplate(
+// ─── The row model, and the window onto it ───────────────────────────────────
+
+/**
+ * One row the Files tree would draw, in display order.
+ *
+ * An expanded directory contributes its children immediately after its own row, so an index into
+ * this array is what "the row below this one" MEANS for the keyboard — and it goes on meaning it
+ * whether or not the row below happens to be painted.
+ */
+interface FileRow {
+  /**
+   * Lit's `repeat` key.
+   *
+   * Keyed, where the recursive form was positional: a windowed list re-uses its DOM nodes for
+   * DIFFERENT rows as the window slides, so positional reuse would leave the keyboard focused on an
+   * element that has since become another file. The prefix is what keeps a directory's own row and
+   * the "Loading…" row underneath it apart — they name the same path.
+   */
+  key: string;
+  path: string;
+  name: string;
+  type: string;
+  depth: number;
+  expanded: boolean;
+  /** A placeholder for a directory whose listing has not arrived yet. Not a `treeitem`. */
+  loading: boolean;
+  /** 1-based position among this row's siblings (`aria-posinset`). */
+  posInSet: number;
+  /** How many siblings the row has, itself included (`aria-setsize`). */
+  setSize: number;
+}
+
+/**
+ * The declared height of one row — `styles/panels.css` `.file-tree-item { block-size: 24px }`.
+ *
+ * The first paint of a session windows by this constant, because nothing has been laid out yet to
+ * measure; {@link fileRowHeight} measures a real row from then on and believes the measurement.
+ */
+export const FILE_ROW_HEIGHT = 24;
+
+/** The rows the tree last built, in display order. */
+let _fileRows: FileRow[] = [];
+/** The `.file-tree` element, kept between renders so the next one can be windowed. */
+let _fileList: HTMLElement | null = null;
+/** The scroll watch that repaints the tree as its scroller moves. */
+let _fileWatch: ListWindowWatch | null = null;
+/** The Navigator repaint, captured per render so the scroll watch never holds a stale one. */
+let _filesRerender: (() => void) | null = null;
+/** A keyboard jump that had to scroll first, spent by the repaint it provoked. */
+let _pendingFocusPath: string | null = null;
+
+/** The height one row actually has; the declared constant until a row has been laid out. */
+function fileRowHeight(): number {
+  return measuredRowHeight(_fileList, ".file-tree-item", FILE_ROW_HEIGHT);
+}
+
+/**
+ * Append one directory's rows, and every expanded child directory's rows after their own row.
+ *
+ * The listing side effect stays exactly where the recursive template had it: a directory nobody has
+ * listed yet is fetched, and a placeholder holds its place until the repaint arrives.
+ */
+function collectFileRows(
   dirPath: string,
   depth: number,
-  ctx: { openFileFn: (path: string) => void; renderLeftPanel: () => void },
-): TemplateResult | TemplateResult[] {
+  rows: FileRow[],
+  ctx: { renderLeftPanel: () => void },
+): void {
   const entries = requireProjectState().dirs.get(dirPath);
   if (!entries) {
     void loadDirectory(dirPath).then(() => ctx.renderLeftPanel());
-    return html`<div
-      class="file-tree-item"
-      style="padding-left:${8 + depth * 16}px;color:var(--fg-dim);font-style:italic"
-    >
-      Loading…
-    </div>`;
+    rows.push({
+      depth,
+      expanded: false,
+      key: `loading:${dirPath}`,
+      loading: true,
+      name: "Loading…",
+      path: dirPath,
+      posInSet: 1,
+      setSize: 1,
+      type: "file",
+    });
+    return;
   }
 
   const sorted = [...entries].toSorted((a, b) => {
@@ -490,126 +586,311 @@ function renderTreeLevelTemplate(
     ? sorted.filter((e) => e.type === "directory" || e.name.toLowerCase().includes(query))
     : sorted;
 
-  return filtered.map((entry) => {
+  for (const [index, entry] of filtered.entries()) {
     const isDir = entry.type === "directory";
-    const isExpanded = requireProjectState().expanded.has(entry.path);
-    const isSelected = requireProjectState().selectedPath === entry.path;
+    const isExpanded = isDir && requireProjectState().expanded.has(entry.path);
+    rows.push({
+      depth,
+      expanded: isExpanded,
+      key: entry.path,
+      loading: false,
+      name: entry.name,
+      path: entry.path,
+      posInSet: index + 1,
+      setSize: filtered.length,
+      type: entry.type,
+    });
+    if (isExpanded) {
+      collectFileRows(entry.path, depth + 1, rows, ctx);
+    }
+  }
+}
 
-    return html`
-      <div
-        class=${classMap({ "file-tree-item": true, selected: isSelected })}
-        style="padding-left:${8 + depth * 16}px"
-        role="treeitem"
-        aria-level=${depth + 1}
-        tabindex="-1"
-        data-path=${entry.path}
-        data-type=${entry.type}
-        aria-expanded=${isDir ? String(isExpanded) : nothing}
-        @click=${async (e: MouseEvent) => {
-          e.stopPropagation();
-          if (isDir) {
-            if (isExpanded) {
-              requireProjectState().expanded.delete(entry.path);
-            } else {
-              requireProjectState().expanded.add(entry.path);
-              if (!requireProjectState().dirs.has(entry.path)) {
-                await loadDirectory(entry.path);
-              }
-            }
-            ctx.renderLeftPanel();
-          } else {
-            ctx.openFileFn(entry.path);
-          }
-        }}
-        @contextmenu=${(e: MouseEvent) => {
-          e.preventDefault();
-          e.stopPropagation();
-          showFileContextMenu(e, entry, ctx);
-        }}
-      >
-        ${
-          isDir
-            ? html`<span class="file-tree-toggle">${isExpanded ? "\u25BC" : "\u25B6"}</span>`
-            : html`<span class="file-tree-toggle empty"> </span>`
+/** The model index of `path`, or -1. A "Loading…" row is keyed apart and never matches. */
+function fileIndexOfPath(path: string | undefined): number {
+  return path === undefined ? -1 : _fileRows.findIndex((row) => !row.loading && row.path === path);
+}
+
+/** The next focusable row from `index`, walking by `step`; -1 at the ends. */
+function fileStep(index: number, step: 1 | -1): number {
+  for (let i = index + step; i >= 0 && i < _fileRows.length; i += step) {
+    if (!_fileRows[i]!.loading) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+/**
+ * Repaint the tree because its window changed.
+ *
+ * Deferred to a microtask so a scroll arriving mid-commit cannot re-enter the render producing the
+ * rows, and skipped during a drag: `registerFileTreeDnD` holds pragmatic-dnd registrations on the
+ * rows it can see, and re-rendering under an active drag would drop every one of them.
+ */
+function fileWindowChanged(): void {
+  if (_fileList?.isConnected !== true || _fileList.querySelector(".file-tree-item.dragging")) {
+    return;
+  }
+  queueMicrotask(() => _filesRerender?.());
+}
+
+/**
+ * Adopt the rendered tree: remember it, keep it watching whatever scrolls it, and hand the keyboard
+ * the row a jump asked for once that row exists.
+ *
+ * The first paint of a session draws every row, because nothing can be measured before it exists;
+ * the watch's opening measurement is what asks for the second, windowed pass. Idempotent by
+ * construction — `watchListWindow` hands back the same watch for the same element and scroller — so
+ * calling it after every render costs a comparison.
+ */
+function adoptFileTree(tree: HTMLElement): void {
+  _fileList = tree;
+  _fileWatch = watchListWindow(_fileWatch, tree, {
+    count: () => _fileRows.length,
+    onChange: fileWindowChanged,
+    rowHeight: fileRowHeight,
+  });
+  const wanted = _pendingFocusPath;
+  if (wanted !== null) {
+    // One shot: a focus request that outlived its own repaint is stale, and moving the keyboard
+    // Later is worse than never having moved it.
+    _pendingFocusPath = null;
+    fileRowElement(tree, wanted)?.focus();
+  }
+}
+
+/**
+ * Adopt the tree once its rows are in the document.
+ *
+ * Deferred by a microtask on purpose, exactly as the Outline's `afterTreeRender` is: a `ref` on the
+ * tree element commits BEFORE the child part holding the rows, so on a first render the callback
+ * would otherwise measure an empty tree.
+ */
+function afterFileTreeRender(tree: HTMLElement): void {
+  queueMicrotask(() => adoptFileTree(tree));
+}
+
+/** The rendered row for a path, or null when the window does not currently hold it. */
+function fileRowElement(tree: HTMLElement, path: string): HTMLElement | null {
+  return tree.querySelector<HTMLElement>(`.file-tree-item[data-path="${CSS.escape(path)}"]`);
+}
+
+/**
+ * The tree's rows, windowed, with the scroll height of the rows it left out reserved either side.
+ *
+ * The two spacers are `aria-hidden` because a `role="tree"` owns `treeitem`s, and an empty div that
+ * exists to be 4 000 pixels tall is not one.
+ */
+function fileTreeBodyTemplate(ctx: {
+  openFileFn: (path: string) => void;
+  renderLeftPanel: () => void;
+}): TemplateResult {
+  // The scroll watch outlives this call and must never repaint through a closure from an earlier
+  // One — the Navigator's scheduler is the only thing that knows how to draw this panel.
+  _filesRerender = ctx.renderLeftPanel;
+  _fileRows = [];
+  collectFileRows(".", 0, _fileRows, ctx);
+  // Windowed against the PREVIOUS render's element, the only one that exists while this template is
+  // Being built. There is none on the first paint, and `listWindow` then answers "all of them".
+  const range = listWindow(_fileList, { count: _fileRows.length, rowHeight: fileRowHeight() });
+  // The roving tab stop is decided from the MODEL — the first DRAWN row of a windowed tree is
+  // Usually not the first row of the tree — and then clamped INTO the window, because a tab stop
+  // That is not in the document is not a tab stop: a tree whose selected row has scrolled away
+  // Would otherwise have no tabbable row at all, and Tab would skip the whole panel.
+  const wanted = Math.max(0, fileIndexOfPath(requireProjectState().selectedPath ?? undefined));
+  const tabStop = Math.min(Math.max(wanted, range.start), Math.max(range.start, range.end - 1));
+  const slice = _fileRows
+    .slice(range.start, range.end)
+    .map((row, offset) => ({ row, tabStop: range.start + offset === tabStop }));
+  return html`
+    <div style="height:${range.padTop}px" aria-hidden="true"></div>
+    ${repeat(
+      slice,
+      (entry) => entry.row.key,
+      (entry) => fileRowTemplate(entry.row, entry.tabStop, ctx),
+    )}
+    <div style="height:${range.padBottom}px" aria-hidden="true"></div>
+  `;
+}
+
+/** One row, drawn. */
+function fileRowTemplate(
+  row: FileRow,
+  tabStop: boolean,
+  ctx: { openFileFn: (path: string) => void; renderLeftPanel: () => void },
+): TemplateResult {
+  if (row.loading) {
+    return html`<div
+      class="file-tree-item"
+      style="padding-left:${8 + row.depth * 16}px;color:var(--fg-dim);font-style:italic"
+    >
+      Loading…
+    </div>`;
+  }
+  const isDir = row.type === "directory";
+  return html`
+    <div
+      class=${classMap({
+        "file-tree-item": true,
+        selected: requireProjectState().selectedPath === row.path,
+      })}
+      style="padding-left:${8 + row.depth * 16}px"
+      role="treeitem"
+      aria-level=${row.depth + 1}
+      aria-posinset=${row.posInSet}
+      aria-setsize=${row.setSize}
+      tabindex=${tabStop ? "0" : "-1"}
+      data-path=${row.path}
+      data-type=${row.type}
+      aria-expanded=${isDir ? String(row.expanded) : nothing}
+      @click=${async (e: MouseEvent) => {
+        e.stopPropagation();
+        if (isDir) {
+          await toggleTreeDirectory(row.path);
+          ctx.renderLeftPanel();
+        } else {
+          ctx.openFileFn(row.path);
         }
-        <span class="file-tree-icon">${fileTypeIconTpl(entry.path, entry.type)}</span>
-        <span class="file-tree-name">${entry.name}</span>
-      </div>
+      }}
+      @contextmenu=${(e: MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        showFileContextMenu(e, { name: row.name, path: row.path, type: row.type }, ctx);
+      }}
+    >
       ${
-        isDir && isExpanded
-          ? html`<div role="group">${renderTreeLevelTemplate(entry.path, depth + 1, ctx)}</div>`
-          : nothing
+        isDir
+          ? html`<span class="file-tree-toggle">${row.expanded ? "▼" : "▶"}</span>`
+          : html`<span class="file-tree-toggle empty"> </span>`
       }
-    `;
+      <span class="file-tree-icon">${fileTypeIconTpl(row.path, row.type)}</span>
+      <span class="file-tree-name">${row.name}</span>
+    </div>
+  `;
+}
+
+/** Expand or collapse one directory, listing it the first time it is opened. */
+async function toggleTreeDirectory(path: string): Promise<void> {
+  const state = requireProjectState();
+  if (state.expanded.has(path)) {
+    state.expanded.delete(path);
+    return;
+  }
+  state.expanded.add(path);
+  if (!state.dirs.has(path)) {
+    await loadDirectory(path);
+  }
+}
+
+/** Tree elements this module has already given a keydown listener. */
+const _keyboardTrees = new WeakSet<HTMLElement>();
+
+/**
+ * Give the tree its keyboard, once per tree ELEMENT.
+ *
+ * The panel's `afterRender` calls this after every repaint and lit re-uses the `.file-tree` element
+ * across all of them, so the unguarded `addEventListener` it replaces accumulated one listener per
+ * render — after ten repaints a single Down keystroke walked ten rows. The WeakSet still lets a
+ * remounted panel's new element bind its own.
+ */
+export function setupTreeKeyboard(tree: HTMLElement) {
+  if (_keyboardTrees.has(tree)) {
+    return;
+  }
+  _keyboardTrees.add(tree);
+  tree.addEventListener("keydown", (e: KeyboardEvent) => {
+    onFileTreeKeydown(e, tree);
   });
 }
 
-export function setupTreeKeyboard(tree: HTMLElement) {
-  tree.addEventListener("keydown", (e: KeyboardEvent) => {
-    const items = [...tree.querySelectorAll(".file-tree-item")] as HTMLElement[];
-    const focused = tree.querySelector(".file-tree-item:focus") as HTMLElement | null;
-    if (!focused || items.length === 0) {
-      return;
-    }
+/**
+ * The tree's keyboard model: ↑↓ walk the rows, → expands, ← collapses, Enter opens.
+ *
+ * ↑ and ↓ step through the MODEL, not through the rendered rows. A DOM-indexed walk stopped dead at
+ * the last row of the window — three rows past the bottom of the viewport, with thousands of files
+ * still below it — because there was simply no next element to focus. When the step lands outside
+ * the window the scroller moves instead, and the focus follows on the repaint ({@link
+ * adoptFileTree}).
+ */
+function onFileTreeKeydown(e: KeyboardEvent, tree: HTMLElement): void {
+  const focused = tree.querySelector(".file-tree-item:focus") as HTMLElement | null;
+  if (!focused) {
+    return;
+  }
+  let handled = true;
 
-    const idx = items.indexOf(focused);
-    let handled = true;
-
-    switch (e.key) {
-      case "ArrowDown": {
-        if (idx < items.length - 1) {
-          items[idx + 1]!.focus();
-        }
-        break;
-      }
-      case "ArrowUp": {
-        if (idx > 0) {
-          items[idx - 1]!.focus();
-        }
-        break;
-      }
-      case "ArrowRight": {
-        if (focused.dataset.type === "directory") {
-          const path = focused.dataset.path as string;
-          if (!requireProjectState().expanded.has(path)) {
-            requireProjectState().expanded.add(path);
-            void loadDirectory(path).then(() => {
-              const panel = tree.closest(".panel-body");
-              if (panel) {
-                (panel.querySelector(".file-tree-item:focus") as HTMLElement | null)?.click();
-              }
-            });
-          }
-        }
-        break;
-      }
-      case "ArrowLeft": {
-        if (focused.dataset.type === "directory") {
-          const path = focused.dataset.path as string;
-          if (requireProjectState().expanded.has(path)) {
-            requireProjectState().expanded.delete(path);
-            // RenderLeftPanel will be called by the caller who sets up keyboard
-          }
-        }
-        break;
-      }
-      case "Enter": {
-        focused.click();
-        break;
-      }
-      default: {
-        handled = false;
-      }
+  switch (e.key) {
+    case "ArrowDown":
+    case "ArrowUp": {
+      const from = fileIndexOfPath(focused.dataset.path);
+      focusFileRow(tree, fileStep(from, e.key === "ArrowDown" ? 1 : -1));
+      break;
     }
-    if (handled) {
-      e.preventDefault();
+    case "ArrowRight": {
+      const path = collapsedDirectoryAt(focused);
+      if (path !== null) {
+        // The expansion repaints THROUGH the panel. It used to synthesise a click on the focused
+        // Row to get a repaint, which ran that row's own toggle a second time and only did the
+        // Right thing because the handler's captured `isExpanded` was already stale.
+        void toggleTreeDirectory(path).then(() => _filesRerender?.());
+      }
+      break;
     }
-  });
+    case "ArrowLeft": {
+      const path = expandedDirectoryAt(focused);
+      if (path !== null) {
+        requireProjectState().expanded.delete(path);
+        // It used to leave the repaint to "the caller who sets up keyboard", and there was no such
+        // Caller: ← changed the state and left the children on screen until something else
+        // Happened to redraw the panel.
+        _filesRerender?.();
+      }
+      break;
+    }
+    case "Enter": {
+      focused.click();
+      break;
+    }
+    default: {
+      handled = false;
+    }
+  }
+  if (handled) {
+    e.preventDefault();
+  }
+}
 
-  // Set first item focusable
-  const first = tree.querySelector(".file-tree-item");
-  if (first) {
-    first.setAttribute("tabindex", "0");
+/** The row's directory path when it is a COLLAPSED directory — what → acts on, and nothing else. */
+function collapsedDirectoryAt(row: HTMLElement): string | null {
+  const { path, type } = row.dataset;
+  return type === "directory" && path !== undefined && !requireProjectState().expanded.has(path)
+    ? path
+    : null;
+}
+
+/** The row's directory path when it is an EXPANDED directory — what ← acts on, and nothing else. */
+function expandedDirectoryAt(row: HTMLElement): string | null {
+  const { path, type } = row.dataset;
+  return type === "directory" && path !== undefined && requireProjectState().expanded.has(path)
+    ? path
+    : null;
+}
+
+/** Move the keyboard to the model row at `index`, bringing it into the window if it is outside. */
+function focusFileRow(tree: HTMLElement, index: number): void {
+  const row = _fileRows[index];
+  if (!row) {
+    return;
+  }
+  const el = fileRowElement(tree, row.path);
+  if (el) {
+    el.focus();
+    return;
+  }
+  if (revealListRow(_fileList, index, fileRowHeight())) {
+    _pendingFocusPath = row.path;
+    _filesRerender?.();
   }
 }
 

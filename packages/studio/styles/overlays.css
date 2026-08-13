@@ -2299,6 +2299,11 @@
   outline: none;
 }
 
+/* Both halves of the suppression above, not just the picker: the text input shared the `outline:
+   none` and none of the restore, so a keyboard-focused text cell showed nothing at all. A grouped
+   selector is exactly what a per-line ban cannot see — FOCUS_RING_ALLOWANCES lists the two
+   separately for that reason. */
+.jx-grid-editor .jx-grid-input:focus-visible,
 .jx-grid-editor .jx-grid-select:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -1px;

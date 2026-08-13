@@ -67,6 +67,15 @@ export const PLACEMENTS = [
   "context/tab",
   "context/pane",
   "blockbar",
+  /**
+   * The block action bar's SECOND cluster — inline formatting, shown while the caret is in text.
+   *
+   * A separate placement rather than a crowd inside `blockbar`, for the reason the status bar is
+   * three placements and not one "mixed" region: the bar's verb cluster is capped at five, and
+   * eight format verbs sharing that cap would push Bold into a `⋮` menu. Same level, same surface,
+   * different budget — which is a row in the table, not an exemption in prose.
+   */
+  "blockbar/format",
   "outline/row",
   "palette",
   "never",
@@ -105,6 +114,10 @@ export const PLACEMENT_MATRIX: Readonly<Record<Placement, PlacementRule>> = {
   "context/tab": { admits: ["document"], note: "a tab addresses one document" },
   "context/pane": { admits: ["document"], note: "a pane hosts one document" },
   blockbar: { admits: ["selection"], note: "the floating bar owns selection-scoped verbs" },
+  "blockbar/format": {
+    admits: ["selection"],
+    note: "the bar's inline-format cluster — a range inside the selection is still the selection",
+  },
   "outline/row": { admits: ["selection"], note: "row actions act on the row's node" },
   palette: {
     admits: ["application", "project", "document", "selection"],

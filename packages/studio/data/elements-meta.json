@@ -42,15 +42,13 @@
           "tag": "strong",
           "label": "Bold",
           "icon": "sp-icon-text-bold",
-          "command": "bold",
-          "shortcut": "Cmd+B"
+          "command": "bold"
         },
         {
           "tag": "em",
           "label": "Italic",
           "icon": "sp-icon-text-italic",
-          "command": "italic",
-          "shortcut": "Cmd+I"
+          "command": "italic"
         },
         {
           "tag": "u",
@@ -88,15 +86,13 @@
           "tag": "strong",
           "label": "Bold",
           "icon": "sp-icon-text-bold",
-          "command": "bold",
-          "shortcut": "Cmd+B"
+          "command": "bold"
         },
         {
           "tag": "em",
           "label": "Italic",
           "icon": "sp-icon-text-italic",
-          "command": "italic",
-          "shortcut": "Cmd+I"
+          "command": "italic"
         },
         { "tag": "code", "label": "Code", "icon": "sp-icon-code", "command": "code" },
         { "tag": "a", "label": "Link", "icon": "sp-icon-link", "command": "link" }
@@ -323,15 +319,13 @@
           "tag": "strong",
           "label": "Bold",
           "icon": "sp-icon-text-bold",
-          "command": "bold",
-          "shortcut": "Cmd+B"
+          "command": "bold"
         },
         {
           "tag": "em",
           "label": "Italic",
           "icon": "sp-icon-text-italic",
-          "command": "italic",
-          "shortcut": "Cmd+I"
+          "command": "italic"
         },
         { "tag": "code", "label": "Code", "icon": "sp-icon-code", "command": "code" }
       ]

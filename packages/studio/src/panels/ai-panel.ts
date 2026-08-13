@@ -20,6 +20,7 @@
  * textarea is uncontrolled). The right panel renders the same template into the same
  * container on tab switches; lit reconciles both paths through one part cache.
  *
+ * @docs studio/ai/chat
  * @license MIT
  */
 
@@ -35,11 +36,16 @@ import { setOpenAiKey } from "../services/ai-settings";
 import { hasAiCredentials } from "../services/ai-models";
 import { openPreferences } from "../settings/preferences-dialog";
 import { onCredentialsChanged } from "../settings/preferences-accounts";
+import { setDockCollapsed } from "../shell";
+import { hasSelection } from "../commands/context";
 import { clearMarkdownCache } from "./ai-chat/chat-markdown";
 import { renderChatHeader, renderMessageList } from "./ai-chat/chat-view";
 import { createComposer } from "./ai-chat/composer";
 import { renderSessionsList } from "./ai-chat/sessions-view";
+import { setInspectorTab } from "./right-panel";
 
+import type { AnyCommand } from "../commands/registry";
+import type { CommandContext } from "../commands/context";
 import type { EffectScope } from "@vue/reactivity";
 
 // ─── State (module-level, persists across tab switches) ─────────────────────
@@ -311,6 +317,35 @@ export function seedAssistantMessages(messages: SeededAssistantMessage[]): void 
 
 // ─── Controls ─────────────────────────────────────────────────────────────────
 
+/**
+ * Show the assistant: open the Inspector, then select its fourth tab.
+ *
+ * The two lines `view.setAssistant { open: true }` runs, in the module that owns the surface, so
+ * the three callers that need them — that record, `chat-panel.ts`'s pending-prompt handoff, and
+ * every `Assistant:` command below — do not each keep their own copy. `chat-panel.ts` had one
+ * inline, and a reveal that opens the dock but forgets the tab (or the reverse) is a silent
+ * half-success.
+ */
+export function revealAssistant(): void {
+  setDockCollapsed("right", false);
+  setInspectorTab("assistant");
+}
+
+/**
+ * Whether a turn is in flight — the probe `commands/live-context.ts` declares as `aiStreaming` and
+ * projects onto `ctx.ai.streaming`.
+ *
+ * That source was declared optional with the note "there is nothing to read yet; the caller passes
+ * a probe when one exists", and no caller ever did — so `ctx.ai.streaming` read `false` forever and
+ * `assistant.stop` would have been permanently refused. Reading the reactive chat state here is
+ * what makes the fact LIVE: `createLiveContext` builds a fresh record per predicate evaluation, so
+ * a surface repainting from an effect tracks this status and re-renders when the stream starts or
+ * ends.
+ */
+export function isAssistantStreaming(): boolean {
+  return assistant.chatState.status === "streaming";
+}
+
 function stop() {
   assistant.stop();
 }
@@ -353,7 +388,7 @@ function activeSessionTitle(): string | null {
 // ─── Composer ───────────────────────────────────────────────────────────────
 
 const composer = createComposer({
-  isStreaming: () => assistant.chatState.status === "streaming",
+  isStreaming: isAssistantStreaming,
   onOpenSettings: () => {
     void openPreferences("assistant");
   },
@@ -364,6 +399,146 @@ const composer = createComposer({
   requestRender: scheduleAiRender,
 });
 
+/**
+ * Reveal the assistant, put it on the chat view, and place the caret in the composer.
+ *
+ * The focus rides a frame because {@link scheduleAiRender} is rAF-coalesced: revealing from the
+ * sessions list means the textarea does not exist yet, and focusing a node that is about to be
+ * replaced would leave the caret nowhere. Ordering holds because this frame is queued after the
+ * render's.
+ */
+function focusComposer(): void {
+  revealAssistant();
+  if (view !== "chat") {
+    view = "chat";
+    scheduleAiRender();
+  }
+  requestAnimationFrame(() => {
+    composer.focus();
+  });
+}
+
+// ─── The `Assistant:` command family (§11.1) ────────────────────────────────
+
+/**
+ * Six records, beside the chat session they write.
+ *
+ * §11.1 pays for the chat column's demotion into an Inspector tab with a command family, and the
+ * `Assistant` category — declared in `commands/levels.ts` since the taxonomy landed — held ZERO
+ * records. Every capability below already existed and every one of them existed ONLY as a button in
+ * this panel: not in the palette, not bindable, not reachable by `__jxAutomation` or by name, and
+ * absent from the generated commands and shortcuts sheets. A capability that one surface can reach
+ * and the registry cannot is the second definition site inverted.
+ *
+ * **All six are `level: "application"`, by principle 3 — a record is filed by the level of the
+ * state it WRITES, not the state it reads.** The chat session is application state: it outlives the
+ * open document, survives project close, and `assistant.attachSelection` is the case that proves
+ * the rule — it READS the canvas selection and writes a chip into the composer, so it is
+ * application, not selection, however selection-ish it looks. That is also why it may declare
+ * `menus: ["palette"]` at all: `blockbar` and `context/element` admit selection-level records
+ * only.
+ *
+ * **No `aiTool` on any of them.** The assistant projecting "start a new chat" into its own tool
+ * list would let a turn end its own conversation; the tier tables in `services/ai-tools.ts` gate
+ * what the agent may do TO A PROJECT, not to the chat it is running inside.
+ */
+export function assistantCommands(): AnyCommand[] {
+  return [
+    {
+      category: "Assistant",
+      id: "assistant.focus",
+      level: "application",
+      /* A sixth record, and it earns its place: `inspector.focus.assistant` (⌘⇧4) is DOCUMENT-level
+         and refuses when nothing is open — which is exactly the state the assistant is most wanted
+         in, because the panel deliberately renders with no project and no document. `view.setAssistant`
+         is `menus: ["never"]`. Neither puts the caret anywhere, so neither answers "let me type".
+         The title is distinct on purpose: two palette rows printing one sentence is the defect
+         `tests/app-commands-composition.test.ts` refuses, and "Show Assistant" is already taken. */
+      title: "Focus Composer",
+      keybinding: "mod+shift+a",
+      menus: ["palette"],
+      group: "1_chat",
+      run: focusComposer,
+    },
+    {
+      category: "Assistant",
+      id: "assistant.newChat",
+      level: "application",
+      title: "New Chat",
+      menus: ["palette"],
+      group: "1_chat",
+      // No `enablement` on the stream: `newChat()` calls `stop()` first (see
+      // `services/document-assistant.ts`), so starting one mid-turn is already the handled case.
+      run: () => {
+        revealAssistant();
+        newChat();
+      },
+    },
+    {
+      category: "Assistant",
+      id: "assistant.history",
+      level: "application",
+      title: "Chat History",
+      menus: ["palette"],
+      group: "1_chat",
+      run: () => {
+        revealAssistant();
+        showSessions();
+      },
+    },
+    {
+      category: "Assistant",
+      id: "assistant.attachSelection",
+      level: "application",
+      title: "Attach Selection",
+      menus: ["palette"],
+      group: "2_turn",
+      requires: "an element selected on the canvas",
+      // `hasSelection` is `commands/context.ts`'s shared predicate — the same one the element menu
+      // And the structural verbs are gated on, so "a selection" means one thing in three menus.
+      when: (ctx: CommandContext) => hasSelection(ctx),
+      run: () => {
+        if (!composer.attachSelection()) {
+          // Reachable despite `when`: a script or the palette can race the selection away between
+          // The predicate and the run, and a silent no-op would look like the chip had landed.
+          notify.warn("Nothing is selected to attach.", { source: "Assistant" });
+          return;
+        }
+        focusComposer();
+      },
+    },
+    {
+      category: "Assistant",
+      id: "assistant.retry",
+      level: "application",
+      title: "Retry Last Message",
+      menus: ["palette"],
+      group: "2_turn",
+      requires: "a connected AI provider, and no turn already in flight",
+      /* `ctx.ai.configured` and `ctx.ai.streaming` have been declared in `commands/context.ts` with
+         zero readers; this record and `assistant.stop` are the first. Re-sending with no provider
+         connected reproduces the same failure the error row is already explaining, and re-sending
+         mid-stream would interleave two turns. */
+      enablement: (ctx: CommandContext) => ctx.ai.configured && !ctx.ai.streaming,
+      run: () => {
+        revealAssistant();
+        void handleRetry();
+      },
+    },
+    {
+      category: "Assistant",
+      id: "assistant.stop",
+      level: "application",
+      title: "Stop Responding",
+      menus: ["palette"],
+      group: "2_turn",
+      requires: "a turn in flight",
+      enablement: (ctx: CommandContext) => ctx.ai.streaming,
+      run: stop,
+    },
+  ];
+}
+
 // ─── Template ───────────────────────────────────────────────────────────────
 
 /** @returns {TemplateResult} */
@@ -373,7 +548,6 @@ export function renderAiPanelTemplate(): TemplateResult {
       <div class="ai-tab-body">
         ${renderSessionsList({
           onDelete: deleteSession,
-          onNew: newChat,
           onOpen: openSession,
           sessions: assistant.listSessions(),
         })}
@@ -385,8 +559,6 @@ export function renderAiPanelTemplate(): TemplateResult {
   return html`
     <div class="ai-tab-body">
       ${renderChatHeader({
-        onNewChat: newChat,
-        onShowSessions: showSessions,
         overBudget: cs.contextWarning,
         streaming: cs.status === "streaming",
         title: activeSessionTitle(),
@@ -397,9 +569,6 @@ export function renderAiPanelTemplate(): TemplateResult {
         listRef: onMessagesListRef,
         messages: cs.messages,
         onRestore: handleRestore,
-        onRetry: () => {
-          void handleRetry();
-        },
         onScroll: onMessagesScroll,
         status: cs.status,
       })}

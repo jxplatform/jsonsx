@@ -46,6 +46,22 @@ export interface WireMapperCtx {
   arrayPaths: string[];
 }
 
+/**
+ * One live binding, as the frame needs to know it: the chord and the scope that holds it.
+ *
+ * Scopes are carried rather than flattened because the frame picks its own stack per keystroke —
+ * `caret` when an inline-edit session is live, `canvas` when the artboard has a selection, `global`
+ * under both — which is the same ladder `commands/context.ts`'s `keyScopeStack` walks host-side.
+ * Flattening to "chords the parent wants" would lose exactly the distinction that lets ⌘C reach the
+ * browser mid-sentence and the structural copy verb at every other moment.
+ *
+ * The command ID is deliberately absent: the frame decides whether to FORWARD, never what runs.
+ */
+export interface SyncedChord {
+  chord: string;
+  scope: "caret" | "canvas" | "global";
+}
+
 /** Messages the editor (parent) sends into the canvas iframe. */
 export type ParentToIframe =
   | { kind: "init"; gen: number }
@@ -82,6 +98,27 @@ export type ParentToIframe =
   // Flip the forced color-scheme preview on the iframe root without re-rendering — a document-level
   // Idempotent attribute write, deliberately gen-less (like endEdit).
   | { kind: "setColorScheme"; scheme: "light" | "dark" | null }
+  /**
+   * The chord table, so the frame forwards exactly what the host's registry binds.
+   *
+   * The frame used to answer "does the parent want this keystroke?" from three hand-written lists —
+   * eight bare keys, four "the editor owns these" chords, three "the browser owns these" chords —
+   * maintained beside a registry that already knew the answer. They disagreed in both directions:
+   * ⌘A was forwarded and `preventDefault`ed by a frame that assumed the host would claim it (no
+   * record binds it, so select-all did nothing AND the native one was suppressed), while ⌘B was
+   * withheld on the assumption the editing engine handled it (it does not — the parent's
+   * block-level keydown listener never fires against a container-level editing host, and
+   * `canvas/editable-actions.ts` rejects the browser's own `formatBold`), so Bold in the canvas did
+   * nothing at all.
+   *
+   * Idempotent and render-free, like `setColorScheme` above, and deliberately gen-less: it
+   * describes the APP, not a document. The host reposts it whenever the keymap changes, which is
+   * what makes a rebinding in Preferences take effect inside the canvas.
+   *
+   * A frame built before this message existed ignores it and keeps its own lists — which is the
+   * compatibility story `dist/iframe-entry.js` shipping prebuilt requires.
+   */
+  | { kind: "keymap"; mac: boolean; chords: readonly SyncedChord[] }
   // Replace the injected site-style sheet in place (live design-token editing) — idempotent and
   // Render-free; the superseding render carries the same style via its own siteStyle.
   | {

@@ -18,11 +18,16 @@
  * **Deps are the no-op set.** Nothing here runs a command; the checks read `id`, `level`, `menus`
  * and `args`. Passing real implementations would mean importing the app.
  *
- * **What is deliberately NOT here.** `editor/shortcuts.ts` and `editor/context-menu.ts` still build
- * their OWN registries over their own contexts, and both declare `edit.copy` / `edit.cut` that the
- * other also declares (see the handoff table in `shortcuts.ts`). Listing them would put duplicate
- * ids in front of a checker that has no way to know which one wins. They join when that
- * reconciliation lands — one line each, and no script changes.
+ * **The canvas keyboard is here now.** This note used to say `editor/shortcuts.ts`'s records were
+ * deliberately absent because `edit.copy` / `edit.cut` were declared in two places, and that they
+ * would join "when that reconciliation lands — one line each, and no script changes". The
+ * reconciliation had already landed (`shortcuts.ts`'s handoff table records it as PAID: the
+ * clipboard pair is defined once, in `editor/context-menu.ts`, and spread from there), so the
+ * deferral outlived its reason by two phases while ten records the app runs stayed invisible to
+ * every check and to the generated keyboard sheet. It was one line. `tests/
+ * app-commands-composition.test.ts` now asserts the projection from BOTH directions, because a
+ * record the app registers and the projection omits is exactly as invisible as the reverse, and
+ * only one of the two had a guard.
  */
 
 import { defaultCommands, noopCommandDeps } from "./defaults";
@@ -42,6 +47,7 @@ import { styleCommands } from "../panels/style-panel";
 import { gridCommands } from "../grid/grid-open";
 import { settingsCommands } from "../settings/settings-document";
 import { collabCommands } from "../collab/collab-commands";
+import { assistantCommands } from "../panels/ai-panel";
 import { preferencesCommands } from "../settings/preferences-dialog";
 import { aboutCommands } from "../about/about-modal";
 import { libraryCommands } from "../browse/library-commands";
@@ -51,13 +57,31 @@ import { gridViewCommands } from "../grid/grid-panel";
 import { redirectsCommands } from "../grid/redirects-grid";
 import { contentCommands } from "../content/entry-commands";
 import { newProjectCommands } from "../new-project/new-project-modal";
-import { registerSelectionCommands } from "../panels/block-action-bar";
+import { canvasCommands } from "../editor/shortcuts";
+import { formatCommands, registerSelectionCommands } from "../panels/block-action-bar";
 import { registerTabCommands } from "../workspace/workspace";
 import { derivationCommands, noopDerivationDeps } from "../workspace/pane-derive";
 import type { AnyCommand } from "./registry";
 
 /** A verb set that does nothing — the checks read declarations, never behaviour. */
 const NO_OP = () => {};
+
+/**
+ * A stage the zoom verbs can be DECLARED against. Reading it is a no-op; running one is not the
+ * point here — the checks read `id`, `level`, `menus` and `args`.
+ *
+ * Exported so its own test can call it. The zoom records only reach a stage when they RUN with a
+ * document open, which no check does, so the accessor would otherwise be a function nothing in the
+ * suite ever enters — and "nothing calls it" is the shape this repository treats as a defect
+ * everywhere else.
+ */
+export const noopStage = () => ({
+  applyTransform: NO_OP,
+  canvasMode: "design",
+  panX: 0,
+  panY: 0,
+  setPan: NO_OP,
+});
 
 /**
  * Records that are only reachable through a `registerX(registry, deps)` entry point.
@@ -109,6 +133,7 @@ export function appCommandSet(): AnyCommand[] {
     ...gridCommands(),
     ...settingsCommands(),
     ...collabCommands(),
+    ...assistantCommands(),
     ...preferencesCommands(),
     ...aboutCommands(),
     ...libraryCommands(),
@@ -119,6 +144,19 @@ export function appCommandSet(): AnyCommand[] {
     ...redirectsCommands(),
     ...newProjectCommands(),
     ...styleCommands(),
+    // Inline formatting — the eight `format.*` records. Registered in the bootstrap beside the bar
+    // That renders them, and projected here so the palette, the level check and the generated
+    // Keyboard sheet all see the first `caret`-scoped chords the app has ever had.
+    ...formatCommands(),
+    /* The canvas keyboard's own nine, plus the clipboard pair they spread.
+       These were the last records the app registered and this projection did not contain, so ⌘C,
+       ⌘X, ⌘V, Enter, the three structural arrows and all three zoom chords were absent from
+       `check-command-levels`, from the chrome budget and from the GENERATED keyboard sheet — a
+       reader of `docs/studio/interface/shortcuts.md` could not find Copy. The docstring above used
+       to defer this on the grounds that `edit.copy` was declared twice; it is not, and has not been
+       since the four literal duplicates were paid off (`shortcuts.ts`'s handoff table). It is one
+       line, exactly as that note promised. */
+    ...canvasCommands(noopStage),
   ];
 }
 

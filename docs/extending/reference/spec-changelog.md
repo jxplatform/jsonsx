@@ -14,6 +14,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `ai.md`
 
+- **0.1.4-draft** (2026-08-12) — The assistant's six capabilities are command records, gated on ai.configured and ai.streaming.
 - **0.1.3-draft** (2026-08-04) — §3.2 the turn is accountable (per-write disk marking, Restore to here, chip outcomes, partial success) and §3.3 the batch follows the document, not the tab.
 - **0.1.2-draft** (2026-07-25) — Schema gate (§3.1): tool-level validation against the active project's entry documents, before-write for disk writes and after-apply on canvas, project.json included.
 - **0.1.1-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
@@ -276,6 +277,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio-ui-guidelines.md`
 
+- **0.3.7** (2026-08-12) — blockbar/format joins the level × placement matrix, with its own chrome budget.
 - **0.3.6** (2026-08-10) — §12.4 the agent counts as a surface — an assistant tool that writes what a command writes binds to the command's rule by reading the same CommandContext, not by recomputing it; the element-tree writers move to a document-tree tier gated on the registry's own editor.kind.
 - **0.3.5** (2026-08-10) — §12 a command family over one surface declares ONE availability rule — six families disagreed with themselves, and in each the loose member was the one that wrote: git.createGithubRepository created a remote repository where its disabled peer git.push would not, publish.deploy pushed on a host with no Cloudflare API, the Outline's movers and the element menu's mutating rows spliced elements into project.json where Delete was correctly refused, view.setActivity persisted a gated-off panel, and the inspector.focus chords half-applied.
 - **0.3.4** (2026-08-05) — §9.2 history covers project documents — a settings mistake undoes like a document mistake, and a failed write leaves no entry.
@@ -299,6 +301,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.9.20-draft** (2026-08-12) — The canvas iframe resolves keystrokes against the host keymap; inline formatting, Select All and the caret's chords become records.
 - **0.9.19-draft** (2026-08-12) — Preview is a toggle over an edit/design base in the View control rather than a third radio value; it honours the chosen breakpoint like Edit and Design; and canvas.html's clip is lifted in preview so the pane-height frame can actually scroll its document.
 - **0.9.18-draft** (2026-08-11) — §12's status table re-read against the code: collection browser, entry editor, component library management and the redirect editor were shipped and still marked Pending; the CSS properties/parts panels are read-only reflections, not declaration forms; the CEM exporter is complete and unreachable; media usage is computed but only the delete confirmation reads it.
 - **0.9.17-draft** (2026-08-11) — SEO panel status is Partial — Search appearance ships the previews, counters and warnings; the schema.org editor is still pending.

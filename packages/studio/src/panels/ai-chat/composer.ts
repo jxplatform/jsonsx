@@ -48,6 +48,16 @@ export interface Composer {
   render: () => TemplateResult;
   focus: () => void;
   clear: () => void;
+  /**
+   * Attach the canvas selection as a context chip, as the attach menu's second item does.
+   *
+   * `false` when nothing is selected, so a caller can say why nothing happened. This exists because
+   * `assistant.attachSelection` (`panels/ai-panel.ts`) must reach the SAME chip the menu builds —
+   * the attach convention is one delimiter and one `ContextChip` shape (`attached-context.ts`), and
+   * a command that assembled its own line would be a second way to say "this element", diverging
+   * the first time the label changes.
+   */
+  attachSelection: () => boolean;
 }
 
 /**
@@ -174,6 +184,16 @@ export function createComposer(opts: ComposerOptions): Composer {
   function removeChip(kind: ContextChip["kind"]) {
     chips = chips.filter((c) => c.kind !== kind);
     opts.requestRender();
+  }
+
+  /** {@link Composer.attachSelection} — the attach menu's "Selected element" item, by name. */
+  function attachSelection(): boolean {
+    const { selectionChip } = contextCandidates();
+    if (!selectionChip) {
+      return false;
+    }
+    addChip(selectionChip);
+    return true;
   }
 
   function renderAttachMenu(): TemplateResult {
@@ -323,5 +343,5 @@ export function createComposer(opts: ComposerOptions): Composer {
     `;
   }
 
-  return { clear, focus, render };
+  return { attachSelection, clear, focus, render };
 }

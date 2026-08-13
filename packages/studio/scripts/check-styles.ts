@@ -22,7 +22,16 @@
  * system — it is invariably being held together by inline `style=` attributes instead, which is how
  * half the app drifted away from the tokens in the first place. See ALLOWED_ORPHANS.
  *
- * The third and fourth rules are about SILENCE rather than styling, and they live here because this
+ * The third rule is the FOCUS RING. UX-REDESIGN-PLAN §12 P0 workstream 7 replaced eight bare
+ * `outline: none` declarations with `:focus-visible` pairs and promised "a stylelint rule bans bare
+ * `outline: none`" — the sweep landed and the rule never did, so the next `outline: none` would
+ * have gone in unremarked and taken a control off the keyboard with it. A ban alone would have been
+ * the weaker gate, because the defect is not the suppression: it is a suppression whose RESTORE is
+ * missing. So each allowance names the `:focus-visible` rule that puts the ring back, and the check
+ * verifies that rule still exists and still sets an outline — deleting the restore turns the
+ * allowance red at the line the suppression is on. See FOCUS_RING_ALLOWANCES.
+ *
+ * The fourth and fifth rules are about SILENCE rather than styling, and they live here because this
  * file is the package's idiom for "a wide, shallow property with a ratcheting allow-list" — the
  * shape UX-REDESIGN-PLAN §7.1 asks for by name:
  *
@@ -268,6 +277,84 @@ export interface Finding {
   line: number;
   text: string;
 }
+
+/* ------------------------------------------------------------------------- focus-ring rule --- */
+
+/** One place a stylesheet takes the focus ring away, and the rule that gives it back. */
+export interface FocusRingAllowance {
+  /** Stylesheet holding the suppression, relative to the package root. */
+  file: string;
+  /** The suppressing rule's selector, exactly as written (whitespace is normalised for you). */
+  selector: string;
+  /**
+   * The `:focus-visible` rule that restores the ring for that same selector. Checked: it must exist
+   * in the same stylesheet AND still declare a real outline. This is the whole point of the entry.
+   */
+  restoredBy: string;
+}
+
+/**
+ * Every `outline: none` the studio's stylesheets are allowed to contain, each paired with its
+ * restore — a **closed list**, not a knob, and it fails in three directions.
+ *
+ * A suppression with no entry fails ("you took the ring away"). An entry whose `restoredBy` rule
+ * has been deleted, renamed, or has stopped declaring an outline fails at the suppression's own
+ * line ("you took the ring away and then took the replacement away too") — which is the failure a
+ * plain ban could never see, because a ban only ever looks at the line it bans. An entry whose
+ * suppression is gone fails as stale, so the list ratchets down exactly like ALLOWED_ORPHANS.
+ *
+ * Suppressing the ring for POINTER focus is legitimate — a clicked text field with a 2px ring
+ * around it looks broken — and that is why this is a paired allowance rather than a prohibition.
+ * Taking it away from the KEYBOARD makes the control untraversable, and nothing on screen says so,
+ * which is why it needs a machine to notice.
+ *
+ * Scope is the package's stylesheets: `styles/*.css`, any `.css` under `src/`, and the `<style>`
+ * blocks of `index.html` / `canvas.html`. An inline `style="…outline:none…"` attribute is out of
+ * reach by construction — an attribute cannot carry a `:focus-visible` rule at all — so those
+ * surfaces are the ORPHAN rule's business: give them a class with real CSS and this rule inherits
+ * them.
+ */
+export const FOCUS_RING_ALLOWANCES: readonly FocusRingAllowance[] = [
+  /* The AI composer's textarea. The only one of the six scoped to `:focus:not(:focus-visible)`
+     rather than to the bare element, which is the same bargain said in CSS instead of in a pair. */
+  {
+    file: "styles/shell.css",
+    restoredBy: ".ai-composer-input:focus-visible",
+    selector: ".ai-composer-input:focus:not(:focus-visible)",
+  },
+  // The quick-search field: borderless inside its own framed popover.
+  {
+    file: "styles/overlays.css",
+    restoredBy: ".quick-search-input:focus-visible",
+    selector: ".quick-search-input",
+  },
+  // The Source view textarea, which fills its pane edge to edge.
+  {
+    file: "styles/overlays.css",
+    restoredBy: "#source-view:focus-visible",
+    selector: "#source-view",
+  },
+  /* The two grid cell editors, which share one suppressing rule and — until this check was
+     written — did NOT share its restore: `.jx-grid-input` had no `:focus-visible` rule at all, so
+     every text cell in the data grid was keyboard-focusable with nothing on screen to prove it. A
+     grouped selector is the shape a per-line ban is blindest to, and the shape this list splits. */
+  {
+    file: "styles/overlays.css",
+    restoredBy: ".jx-grid-editor .jx-grid-input:focus-visible",
+    selector: ".jx-grid-editor .jx-grid-input",
+  },
+  {
+    file: "styles/overlays.css",
+    restoredBy: ".jx-grid-editor .jx-grid-select:focus-visible",
+    selector: ".jx-grid-editor .jx-grid-select",
+  },
+  // The pill editor's inline input, which draws its border on the surrounding chip row.
+  {
+    file: "styles/overlays.css",
+    restoredBy: ".jx-grid-pill-input:focus-visible",
+    selector: ".jx-grid-pill-input",
+  },
+];
 
 /* --------------------------------------------------------------------------- silence rules --- */
 
@@ -697,6 +784,209 @@ export function extractStyleBlocks(html: string): string[] {
 }
 
 /**
+ * An HTML document with every byte outside a `<style>` element blanked, newlines kept.
+ *
+ * {@link extractStyleBlocks} throws away where each block sat, which is fine for collecting class
+ * names and useless for the focus-ring rule, whose whole output is "line N of this file". Blanking
+ * in place means the result IS the document's line numbering, so one CSS parser serves the
+ * stylesheets and the two HTML shells without either of them carrying an offset.
+ */
+export function cssOfHtml(html: string): string {
+  const blank = (text: string): string => text.replaceAll(/[^\n]/g, " ");
+  let out = "";
+  let cursor = 0;
+  for (const m of html.matchAll(STYLE_BLOCK_RE)) {
+    const bodyStart = m.index + m[0].indexOf(">") + 1;
+    out += blank(html.slice(cursor, bodyStart)) + m[1]!;
+    cursor = bodyStart + m[1]!.length;
+  }
+  return out + blank(html.slice(cursor));
+}
+
+/* ------------------------------------------------------------------------- focus-ring rule --- */
+
+/** One `{ … }` block of a stylesheet. At-rules are not rules and are never returned. */
+export interface CssRule {
+  /** The prelude's comma-separated selectors, each whitespace-normalised. */
+  selectors: string[];
+  /** The declarations between the braces. Never contains a nested block. */
+  body: string;
+  /** 1-based line the prelude starts on. */
+  line: number;
+}
+
+/** Blank every comment in place, preserving newlines so line numbers survive. */
+function blankCssComments(css: string): string {
+  return css.replaceAll(COMMENT_RE, (match) => match.replaceAll(/[^\n]/g, " "));
+}
+
+/** Collapse runs of whitespace so `.a .b` and `.a\n.b` are the same selector. */
+export function normalizeSelector(selector: string): string {
+  return selector.trim().replaceAll(/\s+/g, " ");
+}
+
+/** A prelude's selectors — split on top-level commas, so `:not(.a, .b)` stays one selector. */
+function splitSelectors(prelude: string): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let current = "";
+  for (const c of prelude) {
+    if (c === "(" || c === "[") {
+      depth += 1;
+    } else if (c === ")" || c === "]") {
+      depth -= 1;
+    } else if (c === "," && depth === 0) {
+      out.push(current);
+      current = "";
+      continue;
+    }
+    current += c;
+  }
+  out.push(current);
+  return out.map((s) => normalizeSelector(s)).filter((s) => s.length > 0);
+}
+
+/**
+ * Every rule of a stylesheet, with the line its selector starts on.
+ *
+ * {@link extractSelectorPreludes} answers a different question — which classes are DEFINED anywhere
+ * — and deliberately discards both bodies and positions. The focus-ring rule needs to pair a
+ * selector with the declarations under it, so it needs the block; a brace stack gives that and
+ * drops at-rules on the way (a `@media` prelude is not a selector, and its nested rules are emitted
+ * in their own right).
+ */
+export function extractRules(css: string): CssRule[] {
+  const text = blankCssComments(css);
+  const newlines = newlineOffsets(text);
+  const out: CssRule[] = [];
+  const open: { prelude: string; at: number; from: number }[] = [];
+  let buf = "";
+  let start = 0;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i]!;
+    if (c === "{") {
+      open.push({ at: start, from: i + 1, prelude: buf });
+      buf = "";
+      continue;
+    }
+    // `;` ends a statement at-rule (`@import …;`) as surely as `}` ends a block, so both reset the
+    // Prelude under construction. Inside a declaration block the buffer is discarded anyway.
+    if (c === "}" || c === ";") {
+      if (c === "}") {
+        const rule = open.pop();
+        if (rule && !rule.prelude.startsWith("@")) {
+          out.push({
+            body: text.slice(rule.from, i),
+            line: lineOf(newlines, rule.at),
+            selectors: splitSelectors(rule.prelude),
+          });
+        }
+      }
+      buf = "";
+      continue;
+    }
+    if (buf.length === 0) {
+      if (/\s/.test(c)) {
+        continue;
+      }
+      start = i;
+    }
+    buf += c;
+  }
+  return out;
+}
+
+/** `outline: …` declarations only — `outline-offset` and `-webkit-outline` are different props. */
+const OUTLINE_DECL_RE = /(?:^|;)\s*outline\s*:\s*([^;]*)/g;
+
+/** Every `outline` value a rule body declares, lowercased and stripped of `!important`. */
+function outlineValues(body: string): string[] {
+  return [...body.matchAll(OUTLINE_DECL_RE)].map((m) =>
+    m[1]!
+      .replace(/!important/i, "")
+      .trim()
+      .toLowerCase(),
+  );
+}
+
+/** Whether a rule takes the ring away. `0` is the same removal spelled shorter. */
+function suppressesRing(body: string): boolean {
+  return outlineValues(body).some((value) => value === "none" || value === "0");
+}
+
+/** Whether a rule draws a ring — an `outline` with a value that is not a removal. */
+function restoresRing(body: string): boolean {
+  return outlineValues(body).some((value) => value.length > 0 && value !== "none" && value !== "0");
+}
+
+/** How an allowance is named in output, and how a suppression is matched back to one. */
+export function focusKey(file: string, selector: string): string {
+  return `${file} → ${selector}`;
+}
+
+/**
+ * One stylesheet's focus-ring findings, plus the suppressions it actually contains.
+ *
+ * The second half is what makes the list ratchet: `collect()` subtracts it from
+ * {@link FOCUS_RING_ALLOWANCES} and reports whatever is left as stale.
+ */
+export function checkFocusRings(
+  rel: string,
+  css: string,
+  allowances: readonly FocusRingAllowance[] = FOCUS_RING_ALLOWANCES,
+): { findings: Finding[]; suppressed: string[] } {
+  const rules = extractRules(css);
+  const restores = new Set<string>();
+  for (const rule of rules) {
+    if (restoresRing(rule.body)) {
+      for (const selector of rule.selectors) {
+        restores.add(selector);
+      }
+    }
+  }
+
+  const mine = allowances.filter((a) => a.file === rel);
+  const findings: Finding[] = [];
+  const suppressed: string[] = [];
+  for (const rule of rules) {
+    if (!suppressesRing(rule.body)) {
+      continue;
+    }
+    for (const selector of rule.selectors) {
+      suppressed.push(focusKey(rel, selector));
+      const allowance = mine.find((a) => normalizeSelector(a.selector) === selector);
+      const restoredBy = allowance ? normalizeSelector(allowance.restoredBy) : "";
+      if (!allowance) {
+        findings.push({
+          file: rel,
+          line: rule.line,
+          text:
+            `${selector} — the focus ring is removed with no allowance. Restore it in a ` +
+            `:focus-visible rule and add a FOCUS_RING_ALLOWANCES entry naming that rule.`,
+        });
+      } else if (!restoredBy.includes(":focus-visible")) {
+        findings.push({
+          file: rel,
+          line: rule.line,
+          text:
+            `${selector} — its allowance names "${allowance.restoredBy}", which is not a ` +
+            `:focus-visible rule. A ring that pointer focus also draws is not a keyboard ring.`,
+        });
+      } else if (!restores.has(restoredBy)) {
+        findings.push({
+          file: rel,
+          line: rule.line,
+          text:
+            `${selector} — its allowance names "${allowance.restoredBy}", which no longer sets ` +
+            `an outline in this stylesheet. Nothing puts the keyboard ring back.`,
+        });
+      }
+    }
+  }
+  return { findings, suppressed };
+}
+
+/**
  * Stylesheet text embedded in a TypeScript source — the CSS the canvas iframe modules inject into
  * their own document, plus any `<style>` a lit template carries. Template literals that don't look
  * like a stylesheet are ignored, so a lit `html` template isn't mined for selectors.
@@ -720,6 +1010,10 @@ export interface StyleCheckResult {
   banned: Finding[];
   /** Files whose bare-empty-catch count disagrees with SILENT_CATCH_BUDGET, either way. */
   silentCatches: { file: string; found: number; allowed: number }[];
+  /** Unallowed `outline: none`, and allowances whose `:focus-visible` restore has gone. */
+  focusRings: Finding[];
+  /** FOCUS_RING_ALLOWANCES entries that suppress nothing any more — the ratchet. */
+  staleFocusRings: string[];
 }
 
 function isVendorClass(name: string): boolean {
@@ -736,11 +1030,23 @@ export async function collect(root: string): Promise<StyleCheckResult> {
 
   const read = (rel: string): Promise<string> => Bun.file(join(root, rel)).text();
 
+  const focusRings: Finding[] = [];
+  const suppressedRings = new Set<string>();
+  /** Run the focus-ring rule over one stylesheet, accumulating both halves of its answer. */
+  const scanRings = (rel: string, css: string): void => {
+    const { findings, suppressed } = checkFocusRings(rel, css);
+    focusRings.push(...findings);
+    for (const key of suppressed) {
+      suppressedRings.add(key);
+    }
+  };
+
   for (const rel of ["index.html", "canvas.html"]) {
     const source = await read(rel);
     const { errors, warnings } = scanHex(rel, source);
     hexErrors.push(...errors);
     pxWarnings.push(...warnings);
+    scanRings(rel, cssOfHtml(source));
     for (const block of extractStyleBlocks(source)) {
       for (const name of extractDefinedClasses(block)) {
         defined.add(name);
@@ -758,13 +1064,16 @@ export async function collect(root: string): Promise<StyleCheckResult> {
     const { errors, warnings } = scanHex(rel, source);
     hexErrors.push(...errors);
     pxWarnings.push(...warnings);
+    scanRings(rel, source);
     for (const name of extractDefinedClasses(source)) {
       defined.add(name);
     }
   }
 
   for await (const rel of new Glob("src/**/*.css").scan(root)) {
-    for (const name of extractDefinedClasses(await read(rel))) {
+    const source = await read(rel);
+    scanRings(rel, source);
+    for (const name of extractDefinedClasses(source)) {
       defined.add(name);
     }
   }
@@ -822,6 +1131,12 @@ export async function collect(root: string): Promise<StyleCheckResult> {
     }
   }
 
+  const staleFocusRings = FOCUS_RING_ALLOWANCES.filter(
+    (a) => !suppressedRings.has(focusKey(a.file, normalizeSelector(a.selector))),
+  )
+    .map((a) => focusKey(a.file, a.selector))
+    .toSorted();
+
   return {
     hexErrors,
     pxWarnings,
@@ -830,12 +1145,15 @@ export async function collect(root: string): Promise<StyleCheckResult> {
     allOrphans,
     banned,
     silentCatches: silentCatches.toSorted((a, b) => a.file.localeCompare(b.file)),
+    focusRings,
+    staleFocusRings,
   };
 }
 
 /** Print the findings and return the process exit code. */
 export function report(result: StyleCheckResult): number {
   const { hexErrors, pxWarnings, orphans, staleAllowed, banned, silentCatches } = result;
+  const { focusRings, staleFocusRings } = result;
 
   if (pxWarnings.length > 0) {
     console.warn(
@@ -911,12 +1229,35 @@ export function report(result: StyleCheckResult): number {
     }
   }
 
+  if (focusRings.length > 0) {
+    console.error(
+      `\n❌ ${focusRings.length} focus-ring problem(s). A control whose outline is removed must ` +
+        `get it back under :focus-visible, and FOCUS_RING_ALLOWANCES must name the rule that ` +
+        `does — that pairing is what keeps deleting the restore from being silent.`,
+    );
+    for (const f of focusRings) {
+      console.error(`   ${f.file}:${f.line}  ${f.text}`);
+    }
+  }
+
+  if (staleFocusRings.length > 0) {
+    console.error(
+      `\n❌ ${staleFocusRings.length} stale FOCUS_RING_ALLOWANCES entry(ies) — these selectors no ` +
+        `longer remove the ring, so delete them from the list (it only ratchets down):`,
+    );
+    for (const name of staleFocusRings) {
+      console.error(`   ${name}`);
+    }
+  }
+
   if (
     hexErrors.length > 0 ||
     orphans.length > 0 ||
     staleAllowed.length > 0 ||
     banned.length > 0 ||
-    silentCatches.length > 0
+    silentCatches.length > 0 ||
+    focusRings.length > 0 ||
+    staleFocusRings.length > 0
   ) {
     return 1;
   }
@@ -926,7 +1267,9 @@ export function report(result: StyleCheckResult): number {
   console.log(
     `✓ check-styles: no hard-coded colours, no undefined classes ` +
       `(${ALLOWED_ORPHANS.size} allow-listed orphan(s) remaining), no banned identifiers, ` +
-      `${silentTotal} allow-listed silent catch(es) remaining${pxNote}.`,
+      `${silentTotal} allow-listed silent catch(es) remaining, ` +
+      `${FOCUS_RING_ALLOWANCES.length} focus-ring suppression(s) each paired with its ` +
+      `:focus-visible restore${pxNote}.`,
   );
   return 0;
 }

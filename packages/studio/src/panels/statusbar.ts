@@ -159,6 +159,15 @@ function projectFieldTpl(registry: CommandRegistry | null) {
     project
       ? itemTpl(registry, { command: "project.openRecent", label: project.name })
       : itemTpl(registry, { command: "project.open", label: "No project" }),
+    /* WHICH branch, when there is one — and deliberately no "not tracked" twin, though plan §12 P1
+       workstream 9's "repo state becomes a persistent status-bar field" reads like a request for
+       one. An untracked project already states itself in this field, one item along:
+       `deployStatusItem()`'s first link is `repo`, whose label is "Track this project with git" and
+       whose command is `git.init`. A second item beside it would carry no fact the first does not
+       — "Not tracked" and "Track this project with git" answer the same question with the same verb
+       — and adjacent duplicate chrome is what §2 principle 9 forbids. `tests/statusbar.test.ts`
+       pins the pairing from both ends, so deleting the checklist's repo step fails there rather
+       than quietly taking the state off the bar. */
     status?.isRepo === true && status.branch
       ? itemTpl(registry, {
           command: "panel.focus.git",

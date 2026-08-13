@@ -52,6 +52,14 @@ export interface InlineAction {
   label: string;
   icon?: string;
   command?: string;
+  /**
+   * REMOVED from the data, and the field stays only so an older `elements-meta.json` still parses.
+   *
+   * It held `"Cmd+B"` — a mac spelling, printed verbatim into every tooltip on every platform,
+   * which is the hardcoded-chord defect plan §5.3 exists to kill. The chord now lives on the
+   * `format.*` record (`panels/block-action-bar.ts`) and is formatted by the keymap's one
+   * formatter. Nothing reads this.
+   */
   shortcut?: string;
 }
 

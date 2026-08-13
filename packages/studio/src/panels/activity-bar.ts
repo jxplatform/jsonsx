@@ -22,7 +22,7 @@
 import { html, render as litRender, nothing } from "lit-html";
 import { activityBar } from "../store";
 import { effect, effectScope } from "../reactivity";
-import { shell, toggleActivityTab } from "../shell";
+import { requireNavigatorPanelId, shell, toggleActivityTab } from "../shell";
 import { refreshGitStatus } from "./git-panel";
 import { panelContext, railGroups } from "./panel-registry";
 import { registerNavigatorPanels } from "./navigator-panels";
@@ -124,7 +124,11 @@ export function isRailPanelShowing(panel: PanelRecord): boolean {
  * @param {PanelRecord} panel
  */
 export function toggleRailPanel(panel: PanelRecord): void {
-  toggleActivityTab(panel.id);
+  // `PanelRecord.id` is a `string` because the same registry hosts the Bottom dock's panels; the
+  // Rail only ever draws Navigator ones, and `requireNavigatorPanelId` is the shared lock that says
+  // So out loud rather than letting an undeclared id reach `shell.leftTab` (which is how the
+  // Outline's empty state spent three phases opening a panel that did not exist).
+  toggleActivityTab(requireNavigatorPanelId(panel.id, "the Navigator rail"));
 }
 
 /**

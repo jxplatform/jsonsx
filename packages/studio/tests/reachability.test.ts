@@ -105,12 +105,6 @@ const KNOWN_UNREACHABLE: Record<string, Record<string, string>> = {
       "the type guard behind `library.setLayout`'s argument. The command validates through its " +
       "JSON-Schema `args` enum instead, so the guard is a second spelling of the same rule",
   },
-  "browse/virtual-window.ts": {
-    createVirtualWindow:
-      "row virtualisation, built and perf-tested but not adopted — the Library still renders " +
-      "every row. Adopting it is a Library-pane change, not a ledger line",
-    sameWindow: "the repaint guard `createVirtualWindow` uses; dead for the same reason it is",
-  },
   "canvas/canvas-perf.ts": { resetCanvasPerf: TEST_RESET },
   "canvas/canvas-utils.ts": {
     hasDeclaredFit:
@@ -133,8 +127,11 @@ const KNOWN_UNREACHABLE: Record<string, Record<string, string>> = {
   },
   "canvas/iframe-position.ts": {
     isAtBlockEnd:
-      "caret-at-end-of-block, for the block-merge behaviours (Delete at a block's end joining the " +
-      "next) that inline editing has not built",
+      "a SECOND SPELLING of a predicate that ships. Delete-at-a-block's-end joining the next block " +
+      "is built — `canvas/editable-actions.ts` returns `mergeForward` from it — but the caller " +
+      "computes the same fact inline (`resolved.to.offset >= blockTextLength(resolved.endEl)` in " +
+      "`iframe-editable-root.ts`), so this export has no reader. An audit found this reason " +
+      "claiming the behaviour was unbuilt; either the caller adopts this or it goes",
   },
   "canvas/iframe-protocol.ts": {
     isCanvasMode:

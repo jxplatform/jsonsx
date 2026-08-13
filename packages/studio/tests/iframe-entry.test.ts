@@ -76,6 +76,38 @@ describe("startCanvasIframe", () => {
     expect(document.documentElement.dataset.colorScheme).toBeUndefined();
   });
 
+  test("the keymap message arms the forwarding, and only then", async () => {
+    /* The frame's authority arrives from the host, and the gap before it is deliberate: an unarmed
+       frame forwards NOTHING and `preventDefault`s nothing, because a frame that guessed would
+       swallow a keystroke it cannot name — which is exactly how ⌘A came to do nothing twice over
+       (see `canvas/iframe-keys.ts`). */
+    const pair = fakeChannelPair<ParentToIframe, IframeToParent>();
+    const fromIframe: IframeToParent[] = [];
+    pair.parent.onMessage((m) => fromIframe.push(m));
+    const container = document.createElement("div");
+    document.body.append(container);
+    teardown = startCanvasIframe({ channel: pair.iframe, container });
+    pair.flush();
+
+    const chord = () =>
+      new KeyboardEvent("keydown", { bubbles: true, cancelable: true, ctrlKey: true, key: "z" });
+
+    const before = chord();
+    container.ownerDocument.body.dispatchEvent(before);
+    pair.flush();
+    expect(before.defaultPrevented).toBe(false);
+    expect(fromIframe.map((m) => m.kind)).toEqual(["ready"]);
+
+    pair.parent.post({ chords: [{ chord: "mod+z", scope: "global" }], kind: "keymap", mac: false });
+    pair.flush();
+
+    const after = chord();
+    container.ownerDocument.body.dispatchEvent(after);
+    pair.flush();
+    expect(after.defaultPrevented).toBe(true);
+    expect(fromIframe.map((m) => m.kind)).toEqual(["ready", "forwardKey"]);
+  });
+
   test("siteStyleUpdate replaces the site-style sheet in place without a render", async () => {
     const pair = fakeChannelPair<ParentToIframe, IframeToParent>();
     const fromIframe: IframeToParent[] = [];

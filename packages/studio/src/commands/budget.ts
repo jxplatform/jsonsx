@@ -31,6 +31,15 @@ export const CHROME_BUDGET = {
   commandbarPrimary: 5,
   /** Tabs allowed in any one dock (or rail group). */
   dockTabs: 4,
+  /**
+   * Verbs allowed in the block action bar's inline-format cluster.
+   *
+   * Eight, which is the whole vocabulary `data/elements-meta.json` declares — bold, italic,
+   * underline, strikethrough, superscript, subscript, code, link. It is a cap and not a count: an
+   * element offers the SUBSET its `$inlineActions` names, so the bar never draws eight, and a ninth
+   * verb is a design decision that has to be made here rather than by appending to a data file.
+   */
+  blockbarFormat: 8,
 } as const;
 
 /** One tabbed region and what it currently hosts. */
@@ -116,6 +125,20 @@ export function checkChromeBudget(input: {
         `${primary.length} commands declare menus:["commandbar/primary"], the cap is ` +
         `${CHROME_BUDGET.commandbarPrimary} — ${primary.join(", ")}. Retire one to ` +
         `"commandbar/overflow": it keeps its name, its chord and its palette row.`,
+    });
+  }
+  const formatting = input.commands
+    .filter((command) => (command.menus ?? []).includes("blockbar/format"))
+    .map((command) => command.id);
+  if (formatting.length > CHROME_BUDGET.blockbarFormat) {
+    violations.push({
+      subject: "blockbar/format",
+      count: formatting.length,
+      limit: CHROME_BUDGET.blockbarFormat,
+      message:
+        `${formatting.length} commands declare menus:["blockbar/format"], the cap is ` +
+        `${CHROME_BUDGET.blockbarFormat} — ${formatting.join(", ")}. The cluster sits over a text ` +
+        `range in a floating bar; a ninth verb belongs in the palette.`,
     });
   }
   for (const dock of input.docks ?? dockTabs()) {

@@ -23,13 +23,35 @@ Every row is also a command: press :kbd[⌘K] and type the name to run it withou
 
 ## Canvas selection
 
-| macOS       | Windows / Linux | Command       | Id                       |
-| ----------- | --------------- | ------------- | ------------------------ |
-| `←`         | `←`             | Select Parent | `selection.selectParent` |
-| `Backspace` | `Backspace`     | Delete        | `selection.delete`       |
-| `Delete`    | `Delete`        | Delete        | `selection.delete`       |
-| `Esc`       | `Esc`           | Select Parent | `selection.selectParent` |
-| `⌘D`        | `Ctrl+D`        | Duplicate     | `selection.duplicate`    |
+| macOS       | Windows / Linux | Command                 | Id                           |
+| ----------- | --------------- | ----------------------- | ---------------------------- |
+| `↓`         | `↓`             | Select Next Sibling     | `selection.selectNext`       |
+| `←`         | `←`             | Select Parent           | `selection.selectParent`     |
+| `→`         | `→`             | Select First Child      | `selection.selectFirstChild` |
+| `↑`         | `↑`             | Select Previous Sibling | `selection.selectPrevious`   |
+| `Backspace` | `Backspace`     | Delete                  | `selection.delete`           |
+| `Delete`    | `Delete`        | Delete                  | `selection.delete`           |
+| `Enter`     | `Enter`         | Insert Paragraph After  | `selection.insertSibling`    |
+| `Esc`       | `Esc`           | Select Parent           | `selection.selectParent`     |
+| `⌘-`        | `Ctrl+-`        | Zoom Out                | `canvas.zoomOut`             |
+| `⌘+`        | `Ctrl++`        | Zoom In                 | `canvas.zoomIn`              |
+| `⌘=`        | `Ctrl+=`        | Zoom In                 | `canvas.zoomIn`              |
+| `⌘A`        | `Ctrl+A`        | Select All              | `selection.selectAll`        |
+| `⌘C`        | `Ctrl+C`        | Copy                    | `edit.copy`                  |
+| `⌘D`        | `Ctrl+D`        | Duplicate               | `selection.duplicate`        |
+| `⌘⇧+`       | `Ctrl+Shift++`  | Zoom In                 | `canvas.zoomIn`              |
+| `⌘V`        | `Ctrl+V`        | Paste                   | `edit.paste`                 |
+| `⌘X`        | `Ctrl+X`        | Cut                     | `edit.cut`                   |
+
+## Text caret
+
+| macOS | Windows / Linux | Command   | Id                 |
+| ----- | --------------- | --------- | ------------------ |
+| `⌘``  | `Ctrl+``        | Code      | `format.code`      |
+| `⌘B`  | `Ctrl+B`        | Bold      | `format.bold`      |
+| `⌘I`  | `Ctrl+I`        | Italic    | `format.italic`    |
+| `⌘K`  | `Ctrl+K`        | Link…     | `format.link`      |
+| `⌘U`  | `Ctrl+U`        | Underline | `format.underline` |
 
 ## Anywhere
 
@@ -62,6 +84,7 @@ Every row is also a command: press :kbd[⌘K] and type the name to run it withou
 | `⌘⇧2`   | `Ctrl+Shift+2`   | Show Style             | `inspector.focus.style`      |
 | `⌘⇧3`   | `Ctrl+Shift+3`   | Show Logic             | `inspector.focus.events`     |
 | `⌘⇧4`   | `Ctrl+Shift+4`   | Show Assistant         | `inspector.focus.assistant`  |
+| `⌘⇧A`   | `Ctrl+Shift+A`   | Focus Composer         | `assistant.focus`            |
 | `⌘⇧E`   | `Ctrl+Shift+E`   | Open Library           | `library.open`               |
 | `⌘⇧O`   | `Ctrl+Shift+O`   | Open in Browser        | `view.openInBrowser`         |
 | `⌘⇧P`   | `Ctrl+Shift+P`   | Run Command…           | `palette.openCommands`       |

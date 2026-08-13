@@ -17,7 +17,8 @@
  *    (`library.refresh`), and the surface says so. A filter that matched nothing says which
  *    filter.
  * 2. **The rendered item count is proportional to the viewport, not to the project.** See
- *    `virtual-window.ts` and `library-preview.ts`; the acceptance case is 300 pages in "All".
+ *    `../ui/virtual-window.ts` and `library-preview.ts`; the acceptance case is 300 pages in
+ *    "All".
  * 3. **An upload has a named destination**, shown before the drop, asked for when the active category
  *    does not name one.
  * 4. **Creation is somebody else's flow.** A page, layout or component is `files.ts`'s creation, so a
@@ -54,7 +55,7 @@ import {
 } from "./library-model";
 import { createLibrarySource, libraryColumns } from "./library-source";
 import { createPreviewCache, createPreviewObserver, previewFor } from "./library-preview";
-import { computeWindow } from "./virtual-window";
+import { computeWindow } from "../ui/virtual-window";
 import { paneRegion } from "../ui/regions";
 import {
   LAYOUT_METRICS,
@@ -72,7 +73,7 @@ import type { LibraryFile, LibraryLayout } from "./library-model";
 import type { LibrarySource } from "./library-source";
 import type { LayoutContext } from "./library-layouts";
 import type { PreviewCache, PreviewObserver } from "./library-preview";
-import type { WindowRange } from "./virtual-window";
+import type { WindowRange } from "../ui/virtual-window";
 import type { Tab } from "../tabs/tab";
 import type { CanvasSurface } from "../canvas/canvas-surface";
 

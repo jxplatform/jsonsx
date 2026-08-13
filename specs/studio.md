@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.19-draft
+**Version:** 0.9.20-draft
 **Status:** Partial
 **Updated:** 2026-08-12
 **License:** MIT
@@ -1162,25 +1162,28 @@ live caret: copying a phrase copied the whole block, and cutting mid-sentence de
 
 **With a caret in the canvas** — the caret owns the editing and navigation keys, and the clipboard:
 
-| Shortcut                               | Action                                                         |
-| -------------------------------------- | -------------------------------------------------------------- |
-| Click                                  | Place the caret at the clicked character, and select the block |
-| Arrows, Home/End, word and line motion | Move the caret, across block boundaries                        |
-| `Shift` + motion, or drag              | Extend the selection, across block boundaries                  |
-| `Enter`                                | Split the block                                                |
-| `Shift+Enter`                          | Line break within the block                                    |
-| `Backspace` at a block start           | Join onto the previous block                                   |
-| `Delete` at a block end                | Pull the next block up                                         |
-| `Cmd+C` / `Cmd+X` / `Cmd+V`            | Copy / cut / paste the TEXT selection, never the block         |
-| `Cmd+B` / `Cmd+I` / `` Cmd+` ``        | Bold / italic / code                                           |
-| `/`                                    | Slash menu (at a block start or after a space)                 |
-| `Escape`                               | Dismiss the caret                                              |
+| Shortcut                                  | Action                                                         |
+| ----------------------------------------- | -------------------------------------------------------------- |
+| Click                                     | Place the caret at the clicked character, and select the block |
+| Arrows, Home/End, word and line motion    | Move the caret, across block boundaries                        |
+| `Shift` + motion, or drag                 | Extend the selection, across block boundaries                  |
+| `Enter`                                   | Split the block                                                |
+| `Shift+Enter`                             | Line break within the block                                    |
+| `Backspace` at a block start              | Join onto the previous block                                   |
+| `Delete` at a block end                   | Pull the next block up                                         |
+| `Cmd+C` / `Cmd+X` / `Cmd+V`               | Copy / cut / paste the TEXT selection, never the block         |
+| `Cmd+A`                                   | Select the text of the block, natively                         |
+| `Cmd+B` / `Cmd+I` / `Cmd+U` / `` Cmd+` `` | Bold / italic / underline / code                               |
+| `Cmd+K`                                   | Link the selected run of text                                  |
+| `/`                                       | Slash menu (at a block start or after a space)                 |
+| `Escape`                                  | Dismiss the caret                                              |
 
 **With a block selected but no caret** (from the layers panel, or after a structural edit):
 
 | Shortcut               | Action                   |
 | ---------------------- | ------------------------ |
 | `Delete` / `Backspace` | Delete the selected node |
+| `Cmd+A`                | Select every sibling     |
 | Arrows                 | Structural navigation    |
 | `Escape`               | Deselect                 |
 
@@ -1358,6 +1361,24 @@ the mechanism, not an accident, and it is why the two fields are separate. A cho
 `when` is false is **not a hit**: the key falls through to the browser rather than being swallowed by
 an action that is not there.
 
+Shadowing is by the narrowest **available** claimant, not the narrowest one. A hidden narrow binding
+does not hide the wider ones behind it: the dispatcher walks the stack a scope at a time and takes
+the first whose command is visible. `format.link` holds ⌘K at `caret` scope and `palette.open` holds
+it globally, and the caret stack is live in every parent-realm text field as well as in the canvas —
+so without this rule, ⌘K would have gone quiet in every panel field, resolving to a record whose
+`when` was false there.
+
+**The canvas iframe resolves against the same table.** Studio's chords are dispatched against the
+editor document, so a keystroke inside the cross-origin canvas has to be forwarded to reach them.
+The frame is told the live (chord, scope) pairs for `caret`, `canvas` and `global` — a `keymap`
+message on the canvas protocol, reposted whenever a rebinding changes what is live — and forwards a
+keystroke iff some scope on its own stack claims it. Three consequences are derived rather than
+configured: the clipboard trio is `canvas`-scoped, so with a caret live nothing claims ⌘C and the
+browser copies the selected text; the bare editing keys behave the same way; and the `format.*`
+records are `caret`-scoped, so ⌘B forwards exactly while a caret exists. A chord no scope on the
+stack claims is neither forwarded nor `preventDefault`ed, which is what leaves the browser's own
+behaviour intact.
+
 Chords normalise to one canonical string — modifiers in the fixed order `mod+ctrl+alt+shift`, key
 lowercased — so `"Cmd+Shift+P"`, `"meta+shift+p"` and `"mod+shift+P"` are the same chord. `mod` is ⌘
 on macOS and Ctrl elsewhere. **One function formats a chord for display** (`⌘⇧P` on macOS,
@@ -1382,7 +1403,7 @@ and `activeTab`. Predicates read it; nothing writes to it from a predicate.
 | `canvas`     | `view` — `edit` \| `design` \| `preview`                                                                                       |
 | `pane`       | `count`, `derived`                                                                                                             |
 | `selection`  | `count`, `kind`, `isRoot`, `isComponentInstance`, `isLayoutNode`                                                               |
-| `caret`      | `active` (§10)                                                                                                                 |
+| `caret`      | `active` (§10), `inCanvas`                                                                                                     |
 | `focus`      | `region` — `rail` \| `navigator` \| `pane` \| `inspector` \| `dock` \| `status` \| `palette`                                   |
 | `modal`      | `open`                                                                                                                         |
 | `collab`     | `attached`, `readOnly`, `sourceCanonical`                                                                                      |
@@ -1396,6 +1417,13 @@ touches the feature.
 **Project-level keys are never sourced from the focused document.** Git status is a property of the
 project, so it lives on the `shell` record (§3): sourcing it from `activeTab` made the rail's Source
 Control badge vanish when the last tab closed, and let two tabs disagree about the branch.
+
+**`caret.active` and `caret.inCanvas` are two facts, deliberately.** The scope stack asks "is
+something being typed into" and folds a parent-realm text field in with the canvas caret, which is
+what stops element-level chords firing over a half-typed field. A RECORD asks a narrower question:
+`format.bold` acts on a run of text inside the selected node and means nothing while the caret is in
+the Inspector's href field, so the `format.*` family gates on `inCanvas`, which is sourced from the
+canvas bridge alone.
 
 ### 13.5 Enforcement
 
@@ -1973,6 +2001,7 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ## Changelog
 
+- **0.9.20-draft** (2026-08-12) — The canvas iframe resolves keystrokes against the host keymap; inline formatting, Select All and the caret's chords become records.
 - **0.9.19-draft** (2026-08-12) — Preview is a toggle over an edit/design base in the View control rather than a third radio value; it honours the chosen breakpoint like Edit and Design; and canvas.html's clip is lifted in preview so the pane-height frame can actually scroll its document.
 - **0.9.18-draft** (2026-08-11) — §12's status table re-read against the code: collection browser, entry editor, component library management and the redirect editor were shipped and still marked Pending; the CSS properties/parts panels are read-only reflections, not declaration forms; the CEM exporter is complete and unreachable; media usage is computed but only the delete confirmation reads it.
 - **0.9.17-draft** (2026-08-11) — SEO panel status is Partial — Search appearance ships the previews, counters and warnings; the schema.org editor is still pending.
@@ -2047,4 +2076,4 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.19-draft_
+_`@jxsuite/studio` Specification v0.9.20-draft_

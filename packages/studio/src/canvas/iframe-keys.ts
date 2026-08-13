@@ -1,87 +1,121 @@
 /// <reference lib="dom" />
 /**
- * In-iframe keyboard forwarding. Studio's shortcuts are bound to the EDITOR document, so once focus
- * moves into the canvas iframe (a click selects a node there) undo/redo/save/delete/duplicate/arrow
- * navigation stop firing. This captures the global-shortcut subset inside the iframe, prevents the
- * browser default, and posts a flattened event the parent re-dispatches to its shortcut handler.
+ * In-iframe keyboard forwarding — one authority, synced from the host's keymap.
  *
- * The subset mirrors `editor/shortcuts.ts`: any Ctrl/Cmd combo, plus the bare editing/navigation
- * keys. Keystrokes while an editable element (input / contenteditable — e.g. a future inline edit)
- * is focused inside the iframe are left alone so typing still works.
+ * Studio's chords are dispatched against the EDITOR document, so once focus moves into the canvas
+ * iframe (a click selects a node there) nothing the parent binds fires. This captures the
+ * keystrokes the parent actually wants, prevents their default, and posts a flattened event the
+ * host re-dispatches into its own registry.
+ *
+ * **Which keystrokes those are is no longer written down here.** It used to be, in three
+ * hand-maintained lists — eight bare keys, four "the editor owns these" chords, three "the browser
+ * owns these" chords — kept beside a registry that already knew the answer, and they disagreed with
+ * it in both directions:
+ *
+ * - **⌘A was forwarded AND prevented.** No record binds it, so the host claimed nothing and select-
+ *   all did nothing — while the `preventDefault` had already suppressed the browser's own, so a
+ *   writer mid-sentence could not select their paragraph either. Two ways of doing nothing.
+ * - **⌘B was withheld**, on the list's stated assumption that "the editing engine implements it
+ *   itself". It does not: `editor/inline-edit.ts`'s keydown listener is attached to the BLOCK while
+ *   the editing host is the canvas container, so it never fires, and `canvas/editable-actions.ts`
+ *   rejects the browser's native `formatBold` because Jx owns its own markup. Bold in the canvas
+ *   did nothing at all, under a toolbar advertising ⌘B.
+ *
+ * So the frame is told the table instead ({@link ParentToIframe} `keymap`), and answers the
+ * question by RESOLVING: pick the scope stack the host would pick, and forward iff some scope in it
+ * claims the chord. Everything the three lists encoded falls out of that, without being encoded:
+ *
+ * - The clipboard trio is bound at `canvas` scope only (`editor/context-menu.ts`), so with a caret
+ *   session live the stack is `["caret", "global"]`, nothing claims ⌘C/⌘X/⌘V, and the browser's own
+ *   copy of the selected TEXT happens — the old `CLIPBOARD_CHORDS` contract, derived rather than
+ *   listed.
+ * - The bare editing keys (Backspace, Enter, the arrows) are `canvas`-scoped for the same reason and
+ *   behave the same way.
+ * - `format.*` is `caret`-scoped, so ⌘B forwards exactly while a caret exists and the host posts
+ *   `applyFormat` back — the path the toolbar's own buttons have always taken.
+ *
+ * The remaining local rule is a real one: a genuine `INPUT` / `TEXTAREA` / `SELECT` inside the
+ * rendered page (an author's own form) keeps every keystroke, because Backspace and Enter are
+ * canvas-bound and a resolved table would happily prevent them mid-field.
  */
+
+import { chordFromEvent } from "../commands/keymap";
+
+import type { KeyScope } from "../commands/levels";
 
 import type { IframeChannel } from "./iframe-channel";
-import type { IframeToParent, ParentToIframe, SerializedKey } from "./iframe-protocol";
-
-/** Bare (non-modifier) keys the editor's shortcut handler acts on. */
-const BARE_FORWARD_KEYS: ReadonlySet<string> = new Set([
-  "Delete",
-  "Backspace",
-  "Escape",
-  "Enter",
-  "ArrowUp",
-  "ArrowDown",
-  "ArrowLeft",
-  "ArrowRight",
-]);
+import type { IframeToParent, ParentToIframe, SerializedKey, SyncedChord } from "./iframe-protocol";
 
 /**
- * Chords the EDITOR owns even while the caret is in text. Everything else with a modifier is a
- * document-level command (save, undo, duplicate, zoom) and must reach the parent.
- */
-const EDITOR_OWNED_CHORDS: ReadonlySet<string> = new Set(["b", "i", "u", "`"]);
-
-/**
- * Chords the BROWSER owns while a caret session is live — the clipboard.
+ * The three scopes a canvas frame can ever be dispatching under.
  *
- * These cannot join {@link EDITOR_OWNED_CHORDS}, because that set is gated on "the target is
- * editable" and the canvas root is PERMANENTLY `contenteditable`: every canvas keystroke passes
- * that test, session or not, so adding them there would kill structural ⌘C/⌘X/⌘V on a selected
- * element too. They are gated on a real session instead — and when one is live the right handler is
- * neither the editor nor the parent but the browser, so forwarding is skipped WITHOUT a
- * preventDefault and native copy/cut/paste of the selected text happens as the author expects.
+ * The host projects exactly these out of the keymap ({@link import("../commands/keymap").
+ * chordsInScopes}) — narrower than "every scope", because the grid and code engines, the focused
+ * dock and the palette are other surfaces entirely and their chords must not make a canvas swallow
+ * a keystroke.
  */
-const CLIPBOARD_CHORDS: ReadonlySet<string> = new Set(["c", "x", "v"]);
+export const FRAME_KEY_SCOPES = ["caret", "canvas", "global"] as const;
 
-/** Whether `el` is a text-entry target whose own keystrokes must not be hijacked. */
-function isEditableTarget(el: EventTarget | null): boolean {
+/** The scope stack a caret session is in — app chords still fire, element-level ones do not. */
+const CARET_STACK = ["caret", "global"] as const;
+/** The stack with a selection but no caret: structural verbs are live. */
+const CANVAS_STACK = ["canvas", "global"] as const;
+/** Preview draws no overlays and posts no hits, so element-level chords have nothing to aim at. */
+const GLOBAL_STACK = ["global"] as const;
+
+/** The synced table, plus the platform the chords were computed for. */
+export interface ForwardTable {
+  mac: boolean;
+  chords: readonly SyncedChord[];
+}
+
+/** An empty table — what the frame knows before the host's first `keymap` message arrives. */
+export const NO_TABLE: ForwardTable = { chords: [], mac: false };
+
+/** Whether `el` is a text-entry control in the RENDERED PAGE whose keystrokes are its own. */
+function isPageTextEntry(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) {
     return false;
-  }
-  if (el.isContentEditable) {
-    return true;
   }
   return el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT";
 }
 
 /**
- * Whether this keydown belongs to the global-shortcut subset the parent handles.
+ * The scope stack this keystroke would be dispatched under, host-side.
  *
- * The canvas is now a persistent `contenteditable` root, so "is the target editable" is true for
- * essentially every keystroke on the canvas — using it alone (as this once did) would mean ⌘S, ⌘Z
- * and ⌘C never reached the parent at all while the caret was in a document. The split is instead by
- * INTENT:
- *
- * - Bare editing/navigation keys (Backspace, Enter, the arrows) belong to the caret when there is
- *   one, and to structural selection when there is not.
- * - Modifier chords are app commands and always forward, EXCEPT the inline-formatting ones the
- *   editing engine implements itself and — while a caret session is live — the clipboard, which
- *   belongs to the browser.
- *
- * `sessionLive` is the answer to "is there a real inline-edit session right now", threaded from the
- * engine's `isEditing()`. Editability alone cannot answer it (the canvas root is permanently
- * `contenteditable`), and the clipboard is exactly the case where the two differ.
+ * The same ladder as `commands/context.ts`'s `keyScopeStack`, minus the branches the frame cannot
+ * be in: there is no modal and no focused dock inside the canvas, and the grid and code engines are
+ * other editors entirely. Keeping the two in step is what makes the forwarding decision and the
+ * dispatch decision the same decision.
  */
-export function shouldForwardKey(e: KeyboardEvent, sessionLive = false): boolean {
-  const editable = isEditableTarget(e.target);
-  if (e.ctrlKey || e.metaKey) {
-    const chord = e.key.toLowerCase();
-    if (editable && EDITOR_OWNED_CHORDS.has(chord)) {
-      return false;
-    }
-    return !(sessionLive && editable && CLIPBOARD_CHORDS.has(chord));
+export function frameScopeStack(sessionLive: boolean, mode: string): readonly KeyScope[] {
+  if (sessionLive) {
+    return CARET_STACK;
   }
-  return !editable && BARE_FORWARD_KEYS.has(e.key);
+  return mode === "preview" ? GLOBAL_STACK : CANVAS_STACK;
+}
+
+/**
+ * Whether the parent's registry claims this keystroke.
+ *
+ * `""` from {@link chordFromEvent} means a bare modifier — the start of every chord — and is never
+ * forwarded.
+ */
+export function shouldForwardKey(
+  e: KeyboardEvent,
+  table: ForwardTable = NO_TABLE,
+  sessionLive = false,
+  mode = "design",
+): boolean {
+  if (isPageTextEntry(e.target)) {
+    return false;
+  }
+  const chord = chordFromEvent(e, table.mac);
+  if (!chord) {
+    return false;
+  }
+  const stack = frameScopeStack(sessionLive, mode);
+  return table.chords.some((entry) => entry.chord === chord && stack.includes(entry.scope));
 }
 
 /** Flatten a KeyboardEvent to the structured-cloneable subset the bridge carries. */
@@ -97,21 +131,22 @@ export function serializeKey(e: KeyboardEvent): SerializedKey {
 }
 
 /**
- * Listen for global-shortcut keystrokes on the iframe document, prevent their default, and forward
- * them to the parent. Returns a teardown function.
+ * Listen for the parent's chords on the iframe document, prevent their default, and forward them.
+ * Returns a teardown function.
  *
- * `isSessionLive` reports whether an inline-edit session currently holds the caret; it decides who
- * owns the clipboard chords (see {@link shouldForwardKey}). It is read per keystroke, never
- * captured, because the session comes and goes under the same listener. Defaults to "no session",
- * which is the structural-selection reading.
+ * All three accessors are read PER KEYSTROKE, never captured: the table is replaced whenever the
+ * author rebinds a key, the session comes and goes under the same listener, and the mode changes
+ * without one.
  */
 export function startKeyForwarding(
   channel: IframeChannel<IframeToParent, ParentToIframe>,
   doc: Document = document,
   isSessionLive: () => boolean = () => false,
+  getTable: () => ForwardTable = () => NO_TABLE,
+  getMode: () => string = () => "design",
 ): () => void {
   const onKey = (e: KeyboardEvent) => {
-    if (!shouldForwardKey(e, isSessionLive())) {
+    if (!shouldForwardKey(e, getTable(), isSessionLive(), getMode())) {
       return;
     }
     e.preventDefault();

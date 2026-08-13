@@ -195,6 +195,9 @@ void mock.module("../src/panels/block-action-bar.ts", () => ({
   initBlockActionBar: (ctx: unknown) => {
     blockBarCtx = ctx;
   },
+  // The inline-format family, composed into the app-wide registry by the bootstrap. A mock that
+  // Stops at the exports one caller uses fails the boot at IMPORT time.
+  formatCommands: mock(() => []),
   isEditChromeTarget: mock(() => false),
   registerSelectionCommands: mock(() => {}),
   renderBlockActionBar: mock(() => {}),

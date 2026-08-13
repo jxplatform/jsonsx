@@ -1,8 +1,8 @@
 # Jx Studio UI/UX Interface Guidelines
 
-**Version:** 0.3.6
+**Version:** 0.3.7
 **Status:** Implemented
-**Updated:** 2026-08-10
+**Updated:** 2026-08-12
 **Applies to:** `packages/studio/`
 
 ---
@@ -673,27 +673,34 @@ every appearance must print.
 `packages/studio/src/commands/levels.ts` (`PLACEMENT_MATRIX`) mirrors it, and
 `scripts/check-command-levels.ts` validates every registered command's `menus` against it in CI.
 
-| Placement             | Admits levels                             | Why                                                                            |
-| --------------------- | ----------------------------------------- | ------------------------------------------------------------------------------ |
-| `commandbar/primary`  | application, document                     | document only for Save / Undo / Redo / Open in Browser, by frequency; ≤5 total |
-| `commandbar/overflow` | application, project, document            | never selection — the Command Bar is not a selection surface                   |
-| `statusbar/project`   | project                                   | the status bar's left field                                                    |
-| `statusbar/document`  | document                                  | the status bar's centre field                                                  |
-| `statusbar/selection` | selection                                 | the status bar's right field                                                   |
-| `context/element`     | selection                                 | the canvas element menu acts on a selection                                    |
-| `context/file`        | project                                   | a file row addresses the project's file set                                    |
-| `context/layer`       | selection                                 | an outline row IS a selection                                                  |
-| `context/tab`         | document                                  | a tab addresses one document                                                   |
-| `context/pane`        | document                                  | a pane hosts one document                                                      |
-| `blockbar`            | selection                                 | the floating bar owns selection-scoped verbs                                   |
-| `outline/row`         | selection                                 | row actions act on the row's node                                              |
-| `palette`             | application, project, document, selection | the level-agnostic surface; it groups its rows by level                        |
-| `never`               | application, project, document, selection | keyboard- and API-only; there is no rendered surface to be misplaced in        |
+| Placement             | Admits levels                             | Why                                                                             |
+| --------------------- | ----------------------------------------- | ------------------------------------------------------------------------------- |
+| `commandbar/primary`  | application, document                     | document only for Save / Undo / Redo / Open in Browser, by frequency; ≤5 total  |
+| `commandbar/overflow` | application, project, document            | never selection — the Command Bar is not a selection surface                    |
+| `statusbar/project`   | project                                   | the status bar's left field                                                     |
+| `statusbar/document`  | document                                  | the status bar's centre field                                                   |
+| `statusbar/selection` | selection                                 | the status bar's right field                                                    |
+| `context/element`     | selection                                 | the canvas element menu acts on a selection                                     |
+| `context/file`        | project                                   | a file row addresses the project's file set                                     |
+| `context/layer`       | selection                                 | an outline row IS a selection                                                   |
+| `context/tab`         | document                                  | a tab addresses one document                                                    |
+| `context/pane`        | document                                  | a pane hosts one document                                                       |
+| `blockbar`            | selection                                 | the floating bar owns selection-scoped verbs                                    |
+| `blockbar/format`     | selection                                 | the bar's inline-format cluster — a range inside the selection is the selection |
+| `outline/row`         | selection                                 | row actions act on the row's node                                               |
+| `palette`             | application, project, document, selection | the level-agnostic surface; it groups its rows by level                         |
+| `never`               | application, project, document, selection | keyboard- and API-only; there is no rendered surface to be misplaced in         |
+
+`blockbar/format` is one surface with two budgets, and that is why it is a row rather than a note.
+The bar's verb cluster is capped at five (`CHROME_BUDGET.commandbarPrimary`'s sibling), and the
+inline-format vocabulary is eight — Bold, Italic, Underline, Strikethrough, Superscript, Subscript,
+Code, Link — so sharing one cap would have pushed Bold behind a `⋮`. Same level, same region,
+separate budget: the status bar's three single-level placements are the precedent.
 
 Panel placements — the two Navigator rail groups (project above, document below), the Navigator dock
 body, the Bottom dock (project and document, with the panel header stating which) and the Inspector
 dock (selection) — belong to the same matrix. They admit **Panel** records rather than commands, and
-they join `levels.ts` when `registerPanel()` ships.
+they are `PANEL_PLACEMENT_MATRIX` in `levels.ts`, checked by `registerPanel()` at registration.
 
 Three rules follow from the table and are not negotiable in review:
 
@@ -858,6 +865,7 @@ that must be fixed is a Problem, and an error the user cannot act on is a toast 
 
 ## Changelog
 
+- **0.3.7** (2026-08-12) — blockbar/format joins the level × placement matrix, with its own chrome budget.
 - **0.3.6** (2026-08-10) — §12.4 the agent counts as a surface — an assistant tool that writes what a command writes binds to the command's rule by reading the same CommandContext, not by recomputing it; the element-tree writers move to a document-tree tier gated on the registry's own editor.kind.
 - **0.3.5** (2026-08-10) — §12 a command family over one surface declares ONE availability rule — six families disagreed with themselves, and in each the loose member was the one that wrote: git.createGithubRepository created a remote repository where its disabled peer git.push would not, publish.deploy pushed on a host with no Cloudflare API, the Outline's movers and the element menu's mutating rows spliced elements into project.json where Delete was correctly refused, view.setActivity persisted a gated-off panel, and the inspector.focus chords half-applied.
 - **0.3.4** (2026-08-05) — §9.2 history covers project documents — a settings mistake undoes like a document mistake, and a failed write leaves no entry.

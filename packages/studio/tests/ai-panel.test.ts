@@ -96,15 +96,48 @@ void mock.module("../src/services/document-assistant", () => ({
 }));
 
 const {
+  assistantCommands,
   bindAiPanelHost,
   handleRestore,
+  isAssistantStreaming,
   mountAiPanel,
   renderAiPanelTemplate,
+  revealAssistant,
   seedAssistantMessages,
   seedAssistantPrompt,
 } = await import("../src/panels/ai-panel");
 const { closePreferences } = await import("../src/settings/preferences-dialog");
 const { initLayers } = await import("../src/ui/layers");
+
+/*
+ * The `Assistant:` family, in a real registry (§11.1).
+ *
+ * The chat header's two buttons and the error row's Retry are RENDERED FROM the registry now, so a
+ * panel with no registry draws none of them — which is the contract, and which means these tests
+ * have to compose one exactly as `studio.ts` does. The context is a plain mutable record so a test
+ * can state "a provider is connected" or "a turn is in flight" instead of standing up the app.
+ */
+const { createCommandRegistry } = await import("../src/commands/registry");
+const { makeContext } = await import("../src/commands/context");
+const { setActiveRegistry } = await import("../src/commands/active-registry");
+const { hasAiCredentials } = await import("../src/services/ai-models");
+
+/** How many nodes the canvas has selected, as `live-context.ts` would report it. */
+let selectionCount = 0;
+
+const registry = createCommandRegistry({
+  // Derived per evaluation from the same two probes `live-context.ts` reads, so a test that flips
+  // `chatState.status` moves `ctx.ai.streaming` without restating anything.
+  getContext: () =>
+    makeContext({
+      ai: { configured: hasAiCredentials(), streaming: isAssistantStreaming() },
+      editor: { kind: "canvas" },
+      selection: { count: selectionCount },
+    }),
+  mac: true,
+});
+registry.registerAll(assistantCommands());
+setActiveRegistry(registry);
 
 // The panel renders into its bound host via the rAF loop, exactly as in the app.
 const host = document.createElement("div");
@@ -153,6 +186,7 @@ async function closeSettings() {
 
 beforeEach(() => {
   resetWorkspaceWithTab();
+  selectionCount = 0;
 });
 
 // ─── Ordered scenario (module-level singleton state) ─────────────────────────
@@ -329,7 +363,7 @@ describe("ai-panel", () => {
       { createdAt: 1, id: "s1", messageCount: 4, title: "First chat", updatedAt: 2 },
       { createdAt: 3, id: "s2", messageCount: 2, title: "Second chat", updatedAt: 4 },
     ];
-    pointer(q("sp-action-button[title='Chat history']")!, "click");
+    pointer(q("sp-action-button[title='Chat History']")!, "click");
     await flush(3);
     expect(q(".ai-sessions")).not.toBeNull();
     expect(host.querySelectorAll(".ai-session-row")).toHaveLength(2);
@@ -351,9 +385,9 @@ describe("ai-panel", () => {
   });
 
   test("New Chat clears to a fresh unsaved chat from either view", async () => {
-    pointer(q("sp-action-button[title='Chat history']")!, "click");
+    pointer(q("sp-action-button[title='Chat History']")!, "click");
     await flush(3);
-    pointer(q("sp-action-button[title='New chat']")!, "click");
+    pointer(q("sp-action-button[title='New Chat']")!, "click");
     await flush(3);
     expect(newChatMock).toHaveBeenCalledTimes(1);
     expect(q(".ai-chat-messages")).not.toBeNull();
@@ -553,5 +587,165 @@ describe("restore to here", () => {
     closeAllTabs();
     handleRestore(id);
     expect(notices().at(-1)).toBe("Open the document that turn edited to restore it.");
+  });
+});
+
+// ─── §11.1: the `Assistant:` command family ──────────────────────────────────
+
+const { shell } = await import("../src/shell");
+const { inspectorTab } = await import("../src/panels/right-panel");
+const { emptyContext, makeContext: ctxWith } = await import("../src/commands/context");
+
+/** The record with this id, straight off the factory — the declaration, not the registry's copy. */
+function record(id: string) {
+  return assistantCommands().find((c) => c.id === id)!;
+}
+
+describe("the Assistant command family", () => {
+  beforeEach(() => {
+    resetNotifications();
+    globalThis.localStorage.setItem("jx.ai.openaiKey", "sk-test");
+    chatState.messages.length = 0;
+    chatState.error = null;
+    chatState.status = "idle";
+    shell.docks.right.collapsed = true;
+    newChatMock.mockClear();
+    stopMock.mockClear();
+    sendMessage.mockClear();
+  });
+
+  test("six records, every one Assistant + application + palette", () => {
+    /* Application by principle 3 — a record is filed by the level of the state it WRITES. The chat
+       session outlives the open document and survives project close, and `attachSelection` is the
+       case that proves it: it READS the canvas selection and writes a chip into the composer. */
+    const all = assistantCommands();
+    expect(all.map((c) => c.id)).toEqual([
+      "assistant.focus",
+      "assistant.newChat",
+      "assistant.history",
+      "assistant.attachSelection",
+      "assistant.retry",
+      "assistant.stop",
+    ]);
+    for (const command of all) {
+      expect(command.category).toBe("Assistant");
+      expect(command.level).toBe("application");
+      expect(command.menus).toEqual(["palette"]);
+      // The assistant does not get to end its own conversation: none of these is an agent tool.
+      expect(command.aiTool).toBeUndefined();
+    }
+    // Every gated record says why in one sentence — the disabled tooltip, the palette subtitle and
+    // The agent's refusal all read it. An ungated one has no refusal to explain.
+    for (const command of all) {
+      expect(Boolean(command.requires)).toBe(Boolean(command.when ?? command.enablement));
+    }
+  });
+
+  test("revealAssistant opens the Inspector and selects its fourth tab", () => {
+    revealAssistant();
+    expect(shell.docks.right.collapsed).toBe(false);
+    expect(inspectorTab()).toBe("assistant");
+  });
+
+  test("`assistant.focus` reveals, leaves the sessions view, and lands the caret", async () => {
+    // Start on the sessions list, which has no composer to focus at all.
+    await registry.run("assistant.history");
+    await flush(3);
+    expect(q(".ai-sessions")).not.toBeNull();
+
+    await registry.run("assistant.focus");
+    await flush(4);
+    expect(shell.docks.right.collapsed).toBe(false);
+    const ta = q<HTMLTextAreaElement>(".ai-composer textarea")!;
+    expect(ta).not.toBeNull();
+    expect(document.activeElement).toBe(ta);
+  });
+
+  test("⌘⇧A is its chord, and its title is not `Show Assistant`", () => {
+    /* `inspector.focus.assistant` is DOCUMENT-level and refuses with nothing open — the state the
+       assistant is most wanted in — and `view.setAssistant` is `menus: ["never"]`. Neither puts a
+       caret anywhere. A distinct title is required: two palette rows printing one sentence is the
+       defect `tests/app-commands-composition.test.ts` refuses. */
+    expect(record("assistant.focus").keybinding).toBe("mod+shift+a");
+    expect(record("assistant.focus").title).toBe("Focus Composer");
+  });
+
+  test("`assistant.newChat` and `assistant.history` reveal before they act", async () => {
+    await registry.run("assistant.newChat");
+    await flush(3);
+    expect(newChatMock).toHaveBeenCalledTimes(1);
+    expect(inspectorTab()).toBe("assistant");
+    expect(q(".ai-chat-messages")).not.toBeNull();
+
+    shell.docks.right.collapsed = true;
+    await registry.run("assistant.history");
+    await flush(3);
+    expect(shell.docks.right.collapsed).toBe(false);
+    expect(q(".ai-sessions")).not.toBeNull();
+    await registry.run("assistant.newChat");
+    await flush(3);
+  });
+
+  test("`assistant.attachSelection` attaches the canvas selection as a chip", async () => {
+    const tab = resetWorkspaceWithTab();
+    tab.session.selection = [["children", 0]];
+    selectionCount = 1;
+    expect(registry.isEnabled("assistant.attachSelection")).toBe(true);
+
+    await registry.run("assistant.attachSelection");
+    await flush(4);
+    const chip = q(".ai-composer-chips .ai-context-chip")!;
+    expect(chip.textContent).toContain("<p>");
+    // The chip is the attach menu's own, so a send carries the same delimiter block.
+    expect(chip.getAttribute("title")).toContain('Selected element at ["children",0]');
+  });
+
+  test("with nothing selected it is refused, and refuses again if called anyway", async () => {
+    resetWorkspaceWithTab();
+    selectionCount = 0;
+    expect(registry.isEnabled("assistant.attachSelection")).toBe(false);
+    expect(registry.refusalMessage("assistant.attachSelection")).toContain(
+      "an element selected on the canvas",
+    );
+    // `when` is asked of a snapshot; the selection can go away before the run. A silent no-op
+    // Would look exactly like a chip that had landed.
+    record("assistant.attachSelection").run(emptyContext(), undefined as never);
+    expect(notices().at(-1)).toBe("Nothing is selected to attach.");
+  });
+
+  test("`assistant.retry` needs a provider and an idle turn — and then re-sends", async () => {
+    expect(record("assistant.retry").enablement!(ctxWith({ ai: { configured: false } }))).toBe(
+      false,
+    );
+    expect(
+      record("assistant.retry").enablement!(ctxWith({ ai: { configured: true, streaming: true } })),
+    ).toBe(false);
+
+    chatState.error = "429 rate limit";
+    chatState.status = "error";
+    pushMessage("user", "make it blue");
+    pushMessage("assistant", "");
+    await flush(3);
+    await registry.run("assistant.retry");
+    await flush(4);
+    expect(sendMessage).toHaveBeenCalledWith("make it blue");
+    chatState.error = null;
+    chatState.status = "idle";
+  });
+
+  test("`assistant.stop` is live only while a turn is in flight", async () => {
+    // `ctx.ai.streaming` had ZERO readers and no producer: `live-context.ts` declared the probe
+    // Optional and `studio.ts` never passed one, so this predicate would have been false forever.
+    expect(isAssistantStreaming()).toBe(false);
+    expect(registry.isEnabled("assistant.stop")).toBe(false);
+    expect(registry.refusalMessage("assistant.stop")).toContain("a turn in flight");
+
+    chatState.status = "streaming";
+    expect(isAssistantStreaming()).toBe(true);
+    expect(registry.isEnabled("assistant.stop")).toBe(true);
+    await registry.run("assistant.stop");
+    expect(stopMock).toHaveBeenCalledTimes(1);
+    chatState.status = "idle";
+    await flush(3);
   });
 });

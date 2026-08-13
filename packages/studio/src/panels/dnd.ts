@@ -349,9 +349,10 @@ export function clearLayerDropGap(container: HTMLElement) {
   for (const r of rows) {
     (r as HTMLElement).style.transform = "";
     // Also clear `display:none` left by hideDescendantRows. The `.layer-row` div has no `style`
-    // Lit binding and rows aren't keyed, so lit reuses these DOM nodes positionally on the
-    // Post-drop re-render — a stale `display:none` would otherwise hide whichever row lands on the
-    // Reused node (e.g. a sibling of the moved subtree).
+    // Lit binding, so an imperative style set during the drag survives the post-drop re-render on
+    // Whichever row keeps that key — and a move is exactly the edit that hands a key to a different
+    // Node. (The rows ARE keyed, by `pathKey`; the earlier form of this note said they were not,
+    // Which made the wrong thing sound load-bearing. What is load-bearing is the missing binding.)
     (r as HTMLElement).style.display = "";
   }
 }

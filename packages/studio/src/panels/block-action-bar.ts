@@ -46,7 +46,6 @@ import {
 } from "../tabs/transact";
 import { view } from "../view";
 import { getInlineActions, isInlineElement } from "../editor/inline-edit";
-import type { InlineAction } from "../editor/inline-edit";
 import { buildMergeTags, buildRepeaterTagsFromFields } from "../editor/merge-tags";
 import { findEnclosingRepeater, resolveRepeaterItemFields } from "../editor/repeater-scope";
 import { projectState } from "../state";
@@ -70,8 +69,19 @@ import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { TemplateResult } from "lit-html";
 import type { SlashCommand } from "../editor/convert-targets.js";
 
-/** The plain format commands (everything an action button posts except link/insertData). */
-type FormatCommand = Extract<ApplyFormatIntent, { command: "bold" }>["command"];
+/**
+ * The plain format commands — everything an action button posts except link/insertData.
+ *
+ * This read `Extract<ApplyFormatIntent, { command: "bold" }>["command"]`, which resolves to
+ * `never`: `Extract` distributes, and the intent member whose `command` is `"bold" | "italic" | …`
+ * is not assignable to `{ command: "bold" }`. Every use of the alias was therefore an unchecked
+ * cast, and the compiler agreed to all of them. Subtracting the two members that carry extra fields
+ * is the shape that actually names the seven.
+ */
+type FormatCommand = Exclude<
+  Extract<ApplyFormatIntent, { command: string }>["command"],
+  "link" | "insertData"
+>;
 
 /**
  * @type {{
@@ -98,7 +108,11 @@ export function initBlockActionBar(ctx: {
 }) {
   _ctx = ctx;
   if (!_formatShortcutBound) {
-    document.addEventListener("keydown", handleParentFormatShortcut);
+    /* The format chords are gone from here. They were a `keydown` switch on ⌘B/⌘I/⌘`/⌘K that ran
+       BESIDE the registry's dispatcher on the same document, with its own modal check and its own
+       early return — a second keyboard authority for four verbs that now hold their chords as
+       records ({@link formatCommands}). Leaving it in place would fire ⌘K twice, and the second
+       call re-mounts the link popover over the URL field the first one opened. */
     // ⌥↑ is the keyboard way INTO the bar. The audit found it unreachable without a mouse.
     document.addEventListener("keydown", handleBlockBarEntryKey);
     // `scroll` doesn't bubble but IS deliverable capture-phase at the document — one app-lifetime
@@ -215,41 +229,88 @@ function clampBarToWindow(bar: HTMLElement): void {
 }
 
 /**
- * Route Ctrl/Cmd+B/I/`/K to the iframe while an inline-edit session is live but focus is on the
- * PARENT (the format toolbar or its link popover) — the keystroke never reaches the iframe's own
- * contenteditable handler. When focus is inside the canvas iframe, do nothing (the iframe handles
- * it and forwards globals via `forwardKey`). Exported so the unit test can dispatch it directly.
+ * The inline-format vocabulary, as records.
  *
- * @param {KeyboardEvent} e
+ * **What this replaces, and what it revives.** Bold, Italic, Code and Link had chords printed in
+ * three places — a tooltip, a spec table, a data file's `shortcut: "Cmd+B"` string that is wrong on
+ * every Windows machine — and lived in a hand-written `keydown` switch that returned early whenever
+ * focus was inside the canvas iframe, which is exactly when a caret exists. Inside the frame
+ * `iframe-keys.ts` refused to forward them "because the engine handles them", and the engine did
+ * not: the parent's `editor/inline-edit.ts` keydown listener is attached to the BLOCK while the
+ * editing host is the canvas container, and `canvas/editable-actions.ts` rejects the browser's own
+ * `formatBold` because Jx owns its markup. So ⌘B in the canvas did nothing at all, in an app whose
+ * toolbar advertised it.
+ *
+ * They are the case UX-REDESIGN-PLAN §5.1 uses to justify two fields, so they are written the way
+ * it says: `level: "selection"` — a range inside the selected node is still the selection, and a
+ * fifth `range` level would demand a fifth region — with `keyScope: "caret"`, which is what makes
+ * the chord live only where a caret is. They were, until this change, the only capability in Studio
+ * with a chord and no record.
+ *
+ * **The set is the schema's, the verbs are the registry's.** `data/elements-meta.json` says which
+ * of the eight a given tag accepts (`$inlineActions`), so the bar draws four on an `<h1>` and eight
+ * on a `<p>`; what each one is CALLED, which chord it holds and what it does are on the record.
+ * That is the same division P5.3 made for value sources — caps derive from the schema, behaviour
+ * does not.
+ *
+ * `when` is {@link CommandContext.caret.inCanvas} and not `caret.active`: the caret stack is live
+ * in every parent-realm text field too, and ⌘K firing there would re-mount the link popover over
+ * the URL the author is typing into it.
  */
-export function handleParentFormatShortcut(e: KeyboardEvent): void {
-  if (!(e.ctrlKey || e.metaKey) || e.altKey) {
-    return;
-  }
-  // Same rule as the global shortcuts: a modal surface owns the keyboard, so ⌘B never reformats the
-  // Document behind an underlay the author cannot click through.
-  if (isModalOpen() || !getEditSnapshot().editing) {
-    return;
-  }
-  // Focus inside the cross-origin canvas iframe surfaces as the <iframe> element being active.
-  const active = document.activeElement;
-  if (active instanceof HTMLIFrameElement && active.classList.contains("jx-canvas-iframe")) {
-    return;
-  }
-  const key = e.key.toLowerCase();
-  if (key === "b") {
-    e.preventDefault();
-    postApplyFormat({ command: "bold" });
-  } else if (key === "i") {
-    e.preventDefault();
-    postApplyFormat({ command: "italic" });
-  } else if (key === "`") {
-    e.preventDefault();
-    postApplyFormat({ command: "code" });
-  } else if (key === "k") {
-    e.preventDefault();
-    openLinkPopoverFromShortcut();
-  }
+export function formatCommands(): AnyCommand[] {
+  const record = (
+    command: FormatCommand,
+    title: string,
+    icon: string,
+    keybinding?: string,
+  ): AnyCommand => ({
+    category: "Edit",
+    group: "6_format",
+    icon,
+    id: `format.${command}`,
+    ...(keybinding === undefined ? {} : { keybinding }),
+    keyScope: "caret",
+    level: "selection",
+    menus: ["blockbar/format", "palette"],
+    requires: "a text caret in the canvas",
+    run: () => {
+      postApplyFormat({ command });
+    },
+    title,
+    undo: "document",
+    when: (ctx: CommandContext) => ctx.caret.inCanvas,
+  });
+
+  return [
+    record("bold", "Bold", "sp-icon-text-bold", "mod+b"),
+    record("italic", "Italic", "sp-icon-text-italic", "mod+i"),
+    record("underline", "Underline", "sp-icon-text-underline", "mod+u"),
+    record("strikethrough", "Strikethrough", "sp-icon-text-strikethrough"),
+    record("superscript", "Superscript", "sp-icon-text-superscript"),
+    record("subscript", "Subscript", "sp-icon-text-subscript"),
+    record("code", "Code", "sp-icon-code", "mod+`"),
+    {
+      category: "Edit",
+      group: "6_format",
+      icon: "sp-icon-link",
+      id: "format.link",
+      /* ⌘K, at `caret` scope, beside `palette.open`'s global ⌘K. Two scopes may hold one chord —
+         that is what a shadowing ladder is — and the caret's wins only while a caret is in the
+         page. `commands/registry.ts`'s dispatcher takes the narrowest AVAILABLE claimant, so with
+         focus in a panel field (where this record's `when` is false) ⌘K still opens the palette. */
+      keybinding: "mod+k",
+      keyScope: "caret",
+      level: "selection",
+      menus: ["blockbar/format", "palette"],
+      requires: "a text caret in the canvas",
+      run: () => {
+        openLinkPopoverFromShortcut();
+      },
+      title: "Link…",
+      undo: "document",
+      when: (ctx: CommandContext) => ctx.caret.inCanvas,
+    },
+  ];
 }
 
 // ─── The selection command layer ─────────────────────────────────────────────
@@ -325,6 +386,12 @@ export function selectionCommandContext(): CommandContext {
   const path = commandTargetPath();
   const node = tab && path ? getNodeAtPath(tab.doc.document, path) : null;
   return makeContext({
+    /* The caret, as this surface knows it. `getEditSnapshot().editing` IS "a caret session is live
+       in the canvas" — the same fact `commands/live-context.ts` derives from the bridge for the
+       app-wide registry — and the format records are gated on it, so without this line the bar
+       would draw its own format cluster permanently hidden. `active` and `inCanvas` are the same
+       answer here because this surface has no parent-realm text field to confuse it with. */
+    caret: { active: getEditSnapshot().editing, inCanvas: getEditSnapshot().editing },
     // The editor kind is part of the answer, not a default: `makeContext` fills it with "none",
     // Which now reads as "not a canvas" and would hide the bar's own verbs from itself.
     editor: { kind: tab ? editorKindForMode(tab.session.ui.canvasMode) : "none" },
@@ -718,6 +785,10 @@ export function selectionCommandRegistry(): CommandRegistry {
     convertToComponent: () => convertToComponent(),
     navigateToComponent: (path) => _ctx?.navigateToComponent(path),
   });
+  // The format cluster renders from records like every other button on this bar, so the surface's
+  // Own registry has to hold them — otherwise `keymap.formatBinding("format.bold")` has nothing to
+  // Format and the tooltip goes back to the hardcoded `Cmd+B` this change deleted.
+  registry.registerAll(formatCommands());
   _registry = registry;
   return registry;
 }
@@ -737,9 +808,21 @@ const commandIconMap: Record<string, TemplateResult> = {
   "sp-icon-arrow-right": html`<sp-icon-arrow-right slot="icon"></sp-icon-arrow-right>`,
   "sp-icon-arrow-up": html`<sp-icon-arrow-up slot="icon"></sp-icon-arrow-up>`,
   "sp-icon-box": html`<sp-icon-box slot="icon" size="xs"></sp-icon-box>`,
+  "sp-icon-code": html`<sp-icon-code slot="icon"></sp-icon-code>`,
   "sp-icon-delete": html`<sp-icon-delete slot="icon"></sp-icon-delete>`,
   "sp-icon-duplicate": html`<sp-icon-duplicate slot="icon"></sp-icon-duplicate>`,
   "sp-icon-edit": html`<sp-icon-edit slot="icon" size="xs"></sp-icon-edit>`,
+  "sp-icon-link": html`<sp-icon-link slot="icon"></sp-icon-link>`,
+  "sp-icon-text-bold": html`<sp-icon-text-bold slot="icon"></sp-icon-text-bold>`,
+  "sp-icon-text-italic": html`<sp-icon-text-italic slot="icon"></sp-icon-text-italic>`,
+  "sp-icon-text-strikethrough": html`<sp-icon-text-strikethrough
+    slot="icon"
+  ></sp-icon-text-strikethrough>`,
+  "sp-icon-text-subscript": html`<sp-icon-text-subscript slot="icon"></sp-icon-text-subscript>`,
+  "sp-icon-text-superscript": html`<sp-icon-text-superscript
+    slot="icon"
+  ></sp-icon-text-superscript>`,
+  "sp-icon-text-underline": html`<sp-icon-text-underline slot="icon"></sp-icon-text-underline>`,
 };
 
 /** The record's icon, or its title drawn as a compact label. */
@@ -779,22 +862,6 @@ export function runCommand(registry: CommandRegistry, id: string, target?: JxPat
   }
 }
 
-/** Pre-built icon templates for inline format buttons (avoids unsafeStatic) */
-const formatIconMap = {
-  "sp-icon-code": html`<sp-icon-code slot="icon"></sp-icon-code>`,
-  "sp-icon-link": html`<sp-icon-link slot="icon"></sp-icon-link>`,
-  "sp-icon-text-bold": html`<sp-icon-text-bold slot="icon"></sp-icon-text-bold>`,
-  "sp-icon-text-italic": html`<sp-icon-text-italic slot="icon"></sp-icon-text-italic>`,
-  "sp-icon-text-strikethrough": html`<sp-icon-text-strikethrough
-    slot="icon"
-  ></sp-icon-text-strikethrough>`,
-  "sp-icon-text-subscript": html`<sp-icon-text-subscript slot="icon"></sp-icon-text-subscript>`,
-  "sp-icon-text-superscript": html`<sp-icon-text-superscript
-    slot="icon"
-  ></sp-icon-text-superscript>`,
-  "sp-icon-text-underline": html`<sp-icon-text-underline slot="icon"></sp-icon-text-underline>`,
-} as Record<string, TemplateResult>;
-
 /**
  * Prevent the bar from stealing focus from contenteditable
  *
@@ -830,22 +897,6 @@ function onTagBadgeClick(e: MouseEvent, targets: SlashCommand[], selection: JxPa
     },
     showFilter: targets.length > 6,
   });
-}
-
-/**
- * Handle a format-button click. The iframe owns the Selection — link opens the parent popover;
- * every other command posts an `applyFormat` intent across the bridge.
- *
- * @param {MouseEvent} e
- * @param {InlineAction} action
- */
-function onFormatClick(e: MouseEvent, action: InlineAction) {
-  e.stopPropagation();
-  if (action.command === "link") {
-    showLinkPopover((e.target as HTMLElement).closest("sp-action-button") as HTMLElement);
-  } else if (action.command) {
-    postApplyFormat({ command: action.command as FormatCommand });
-  }
 }
 
 /**
@@ -1276,8 +1327,12 @@ function showLinkPopover(anchorBtn: HTMLElement) {
  */
 export function openLinkPopoverFromShortcut(): void {
   const bar = view.blockActionBarEl?.querySelector(".block-action-bar") as HTMLElement | null;
+  /* By RECORD ID, not by rendered text. This queried `sp-action-button[title^="Link"]`, which is
+     the addressing §13's first rule bans in the screenshot manifest — a match on a title the app
+     DERIVES (it now reads "Link… (⌘K)", and on Windows it reads something else again). The id is
+     the input the app accepts. */
   const linkBtn =
-    (bar?.querySelector('sp-action-button[title^="Link"]') as HTMLElement | null) ?? bar;
+    (bar?.querySelector('[data-command-id="format.link"]') as HTMLElement | null) ?? bar;
   if (linkBtn) {
     showLinkPopover(linkBtn);
   }
@@ -1368,6 +1423,16 @@ export function renderBlockActionBar() {
   // False and sorted the rest by group; everything past the cap keeps its name and its chord in the
   // `⋮` menu rather than being silently unavailable.
   const registry = selectionCommandRegistry();
+  /* The SET is the schema's, the VERBS are the registry's (see {@link formatCommands}).
+     `$inlineActions` says which of the eight this tag accepts and in what order — four on an `<h1>`,
+     eight on a `<p>` — and each one's name, icon, chord and behaviour come off its record. An action
+     the registry has no record for is dropped rather than drawn as a button that runs nothing, so
+     adding a ninth verb to the data file without a record shows up as a missing button and as a red
+     `tests/block-action-bar.test.ts`, not as a silent no-op. */
+  const formatButtons = actions.flatMap((action) => {
+    const command = registry.get(`format.${action.command}`);
+    return command ? [{ action, command }] : [];
+  });
   const placed = registry.forPlacement("blockbar");
   const shown = placed.slice(0, BLOCKBAR_MAX_ITEMS);
   const overflow = placed.slice(BLOCKBAR_MAX_ITEMS);
@@ -1457,20 +1522,24 @@ export function renderBlockActionBar() {
                   selects="multiple"
                   selected=${activeValues.length > 0 ? JSON.stringify(activeValues) : nothing}
                 >
-                  ${actions.map(
-                    (action) => html`
+                  ${formatButtons.map(
+                    ({ action, command }) => html`
                       <sp-action-button
                         size="xs"
                         value=${action.tag}
+                        data-command-id=${command.id}
                         data-toolbar-item
                         tabindex="-1"
-                        aria-label=${action.label}
-                        title="${action.label}${action.shortcut ? ` (${action.shortcut})` : ""}"
+                        aria-label=${command.title}
+                        title=${commandTooltip(registry, command)}
                         ?disabled=${formatDisabled && action.command !== "link"}
                         @mousedown=${(e: MouseEvent) => e.preventDefault()}
-                        @click=${(e: MouseEvent) => onFormatClick(e, action)}
+                        @click=${(e: MouseEvent) => {
+                          e.stopPropagation();
+                          runCommand(registry, command.id);
+                        }}
                       >
-                        ${action.icon ? (formatIconMap[action.icon] ?? nothing) : nothing}
+                        ${commandIcon(command)}
                       </sp-action-button>
                     `,
                   )}

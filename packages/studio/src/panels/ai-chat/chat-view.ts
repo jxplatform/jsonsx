@@ -6,7 +6,8 @@
  * blocks become chips), assistant messages render sanitized markdown plus tool-call
  * chips, tool messages surface failures only (ADR §11.3), the streaming tail renders
  * as plain text with a cursor (markdown parses once on finalize), and chat errors get
- * a danger row with recovery advice and a Retry. Pure templates — state lives in ai-panel.
+ * a danger row with recovery advice and a Retry. Templates only — chat state lives in ai-panel, and
+ * the three buttons are records the registry holds (see below).
  *
  * §7.4 (AI honesty) is why three things here are not what they were:
  *
@@ -20,6 +21,13 @@
  * - **An error offers Retry.** `chatState.retryLast()` has been implemented, exported and called by
  *   nobody; the error row is where it belongs.
  *
+ * §11.1 is why the three buttons here are not callbacks any more. History, New Chat and Retry were
+ * closures this module received and invoked, so the capabilities existed ONLY as buttons: the
+ * `Assistant` category held zero records, and nothing could reach them from the palette, a chord,
+ * the automation runner or the generated commands sheet. They run {@link commandButton} now, in the
+ * idiom `panels/statusbar.ts` established — the record is the definition site, and this file only
+ * decides where it is drawn.
+ *
  * @license MIT
  */
 
@@ -30,6 +38,7 @@ import type { Message, ToolCallRecord } from "@jxsuite/ai/chat-state";
 import { splitAttachedContext } from "./attached-context";
 import { renderMarkdown } from "./chat-markdown";
 import { summarizeWrites, writesForTurn } from "../../services/ai-writes";
+import { activeRegistry } from "../../commands/active-registry";
 
 // ─── Helpers (moved from ai-panel.ts) ────────────────────────────────────────
 
@@ -102,14 +111,74 @@ export function formatErrorAdvice(error: string): string {
   return "";
 }
 
+// ─── Commands as buttons ────────────────────────────────────────────────────
+
+/** What {@link commandButton} draws inside the button, and how. */
+export interface CommandButtonOptions {
+  /** Slotted content — an icon element for the header, a label for the error row's Retry. */
+  content: TemplateResult | string;
+  /** Extra class, so the CSS that already targets `.ai-msg-retry` keeps landing. */
+  className?: string;
+  /** Quiet chrome. The header's icon buttons are quiet; the labelled Retry is not. */
+  quiet?: boolean;
+}
+
+/**
+ * One control that IS a command — `panels/statusbar.ts`'s `itemTpl`, for the assistant.
+ *
+ * A command the registry does not hold, or whose `when` is false, renders NOTHING rather than a
+ * dead button; a visible-but-refused one renders disabled with its `requires` sentence in the
+ * tooltip. That is what keeps this file a rendering of the registry instead of a second place the
+ * assistant's capabilities are decided — and it is why `tests/ai-chat-view.test.ts` asserts the
+ * ids, exactly as `tests/statusbar.test.ts` does: an id is not an interface between two files
+ * unless something checks it.
+ *
+ * Before any registry exists (the bootstrap composes one at the END of `studio.ts`, and a reduced
+ * test fixture may compose none) the button is simply absent. The chat is still readable, which is
+ * the same bargain the status bar strikes for the frame it paints early.
+ */
+export function commandButton(
+  id: string,
+  opts: CommandButtonOptions,
+): TemplateResult | typeof nothing {
+  const registry = activeRegistry();
+  const command = registry?.get(id);
+  if (!registry || !command || !registry.isVisible(id)) {
+    return nothing;
+  }
+  const reason = registry.disabledReason(id);
+  const chord = registry.keymap.formatBinding(id);
+  const title = reason
+    ? `${command.title} — requires ${reason}`
+    : chord
+      ? `${command.title} (${chord})`
+      : command.title;
+  return html`<sp-action-button
+    size="s"
+    ?quiet=${opts.quiet ?? false}
+    class=${opts.className ?? ""}
+    ?disabled=${reason !== undefined}
+    title=${title}
+    @click=${() => {
+      /* Re-asked at click time, not trusted from the render: state moves between the two, and
+         `registry.run` THROWS on a refusal. Same bargain `registry.handleKeyEvent` strikes for a
+         chord bound to a disabled command — swallow it here rather than make every surface wrap a
+         dispatch in try/catch. */
+      if (registry.isEnabled(id)) {
+        void registry.run(id);
+      }
+    }}
+  >
+    ${opts.content}
+  </sp-action-button>`;
+}
+
 // ─── Header ─────────────────────────────────────────────────────────────────
 
 export interface ChatHeaderOptions {
   /** The open session's title, or null for a fresh unsaved chat. */
   title: string | null;
   streaming: boolean;
-  onShowSessions: () => void;
-  onNewChat: () => void;
   /**
    * The conversation's estimated token count, and whether it is over the warning line.
    *
@@ -132,9 +201,10 @@ function tokenLabel(tokens: number): string {
 export function renderChatHeader(opts: ChatHeaderOptions): TemplateResult {
   return html`
     <div class="ai-chat-header">
-      <sp-action-button size="s" quiet title="Chat history" @click=${opts.onShowSessions}>
-        <sp-icon-history slot="icon"></sp-icon-history>
-      </sp-action-button>
+      ${commandButton("assistant.history", {
+        content: html`<sp-icon-history slot="icon"></sp-icon-history>`,
+        quiet: true,
+      })}
       <span class="ai-chat-title">${opts.title ?? "New chat"}</span>
       <span class="ai-header-spacer"></span>
       ${
@@ -156,9 +226,10 @@ export function renderChatHeader(opts: ChatHeaderOptions): TemplateResult {
           ? html`<sp-progress-circle size="s" indeterminate></sp-progress-circle>`
           : nothing
       }
-      <sp-action-button size="s" quiet title="New chat" @click=${opts.onNewChat}>
-        <sp-icon-add slot="icon"></sp-icon-add>
-      </sp-action-button>
+      ${commandButton("assistant.newChat", {
+        content: html`<sp-icon-add slot="icon"></sp-icon-add>`,
+        quiet: true,
+      })}
     </div>
   `;
 }
@@ -352,11 +423,6 @@ export interface MessageListOptions {
   onScroll: (e: Event) => void;
   /** Ref to the scrolling element, for stick-to-bottom maintenance. */
   listRef: (el: Element | undefined) => void;
-  /**
-   * Re-send the last user message. Wires `chatState.retryLast()`, which has been implemented,
-   * exported and called by nobody — so a failed turn's only recovery was retyping the prompt.
-   */
-  onRetry?: (() => void) | undefined;
   /** Undo everything one turn changed. Offered only for turns whose changes are all transactional. */
   onRestore?: ((messageId: string) => void) | undefined;
 }
@@ -403,16 +469,14 @@ export function renderMessageList(opts: MessageListOptions): TemplateResult {
                     : nothing
                 }
                 ${
-                  opts.onRetry
-                    ? html`<sp-action-button
-                        size="s"
-                        class="ai-msg-retry"
-                        title="Send the last message again"
-                        @click=${opts.onRetry}
-                      >
-                        Retry
-                      </sp-action-button>`
-                    : nothing
+                  /* `assistant.retry`, not a closure. Its `enablement` reads `ctx.ai.configured`,
+                     so the one error this row cannot recover from — no provider connected, whose
+                     advice line above already says to add a key — draws the button disabled with
+                     that sentence rather than offering a send that will fail identically. */
+                  commandButton("assistant.retry", {
+                    className: "ai-msg-retry",
+                    content: "Retry",
+                  })
                 }
               </div>
             `

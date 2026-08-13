@@ -2,9 +2,9 @@
 
 ## AI Assistant for Jx Studio
 
-**Version:** 0.1.3-draft
+**Version:** 0.1.4-draft
 **Status:** Partial
-**Updated:** 2026-08-04
+**Updated:** 2026-08-12
 **License:** MIT
 
 ---
@@ -42,6 +42,19 @@ The assistant is given a fixed set of document-editing tools (create/edit page a
 inspect the tree, apply edits the canvas renders live). The tool schemas and the edit-application
 path live in `packages/ai/src`. This section is a placeholder; the concrete tool list will be
 enumerated here once it stabilizes.
+
+### 3.0 The assistant is addressable by name
+
+Every capability the chat surface offers is a command record in the `Assistant` category — Focus
+Composer (`⌘⇧A`), New Chat, Chat History, Retry, Attach Selection and Stop — so each one is in the
+palette, in the generated keyboard sheet, and rebindable, and the chat header's buttons RUN those
+records rather than calling module functions beside them. They are `level: "application"`, including
+Attach Selection: it READS the selection and WRITES a chip into the composer, and a record is filed
+by the level of the state it writes.
+
+Two context keys gate them and had no readers before: `ai.configured` (a provider is connected) and
+`ai.streaming` (a turn is in flight, which is the only state in which Stop can act). None carries an
+`aiTool` projection — the assistant does not get to end its own conversation.
 
 ### 3.1 Schema gate
 
@@ -93,6 +106,7 @@ filesystem access beyond the connected provider endpoint.
 
 ## Changelog
 
+- **0.1.4-draft** (2026-08-12) — The assistant's six capabilities are command records, gated on ai.configured and ai.streaming.
 - **0.1.3-draft** (2026-08-04) — §3.2 the turn is accountable (per-write disk marking, Restore to here, chip outcomes, partial success) and §3.3 the batch follows the document, not the tab.
 - **0.1.2-draft** (2026-07-25) — Schema gate (§3.1): tool-level validation against the active project's entry documents, before-write for disk writes and after-apply on canvas, project.json included.
 - **0.1.1-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
@@ -100,4 +114,4 @@ filesystem access beyond the connected provider endpoint.
 
 ---
 
-_Jx `@jxsuite/ai` Specification v0.1.3-draft — a stub, subject to expansion._
+_Jx `@jxsuite/ai` Specification v0.1.4-draft — a stub, subject to expansion._

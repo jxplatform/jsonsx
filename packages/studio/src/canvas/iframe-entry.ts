@@ -24,7 +24,8 @@ import {
 } from "./iframe-drop";
 import { startIframeInlineEdit } from "./iframe-inline-edit";
 import { startIframeSlashBridge } from "./iframe-slash";
-import { startKeyForwarding } from "./iframe-keys";
+import { NO_TABLE, startKeyForwarding } from "./iframe-keys";
+import type { ForwardTable } from "./iframe-keys";
 import { applyIframePatch } from "./iframe-patch";
 import { disposeAllSubtrees } from "./iframe-subtree";
 import { evaluateLiveExprs } from "./iframe-eval";
@@ -221,6 +222,11 @@ export function startCanvasIframe(opts: {
   // The mode of the LIVE render — gates the interactive surfaces (inline editing, insert zones,
   // Grab-drags) that only design/edit modes own. Adopted alongside shadowDoc.
   let currentMode: CanvasMode = "design";
+  /* The host's chord table. Empty until the first `keymap` message, which the host posts on
+     `ready` — before any render, so there is nothing to type into during the gap. An empty table
+     forwards nothing, which is the honest cold-start answer: the frame does not guess at what the
+     parent might bind, and it never `preventDefault`s a key it cannot name. */
+  let forwardTable: ForwardTable = NO_TABLE;
   // The current render's retained context (scope/mapping), used to render subtrees for structural
   // Patches. Set together with `shadowDoc`, so it's non-null whenever a patch is applied.
   let renderCtx: IframeRenderCtx | null = null;
@@ -351,7 +357,13 @@ export function startCanvasIframe(opts: {
   // `isEditing` is the real "is a caret session live" predicate: the canvas root is PERMANENTLY
   // Contenteditable, so "the target is editable" is true even with no session, and the clipboard
   // Chords have to be split on the session — not on editability — to reach the right owner.
-  const stopKeyForwarding = startKeyForwarding(channel, container.ownerDocument, isEditing);
+  const stopKeyForwarding = startKeyForwarding(
+    channel,
+    container.ownerDocument,
+    isEditing,
+    () => forwardTable,
+    () => currentMode,
+  );
   // Run inline editing (contenteditable) here, posting committed/split/insert results to the parent.
   // The shadow-doc accessor gates prop-bound sessions on the RAW instance prop value (template/$ref
   // Valued props render display sugar and must not be plain-text edited).
@@ -771,6 +783,12 @@ export function startCanvasIframe(opts: {
       dragGen = -1;
       sessionSeq = -1;
       stopAutoScroll();
+      return;
+    }
+    if (msg.kind === "keymap") {
+      // Replaced wholesale, never merged: the host sends the whole live table, so a chord the
+      // Author unbound disappears here rather than lingering as a key the canvas still swallows.
+      forwardTable = { chords: msg.chords, mac: msg.mac };
       return;
     }
     if (msg.kind === "setColorScheme") {

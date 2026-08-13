@@ -27,7 +27,7 @@
  */
 
 import { createKeymap } from "./keymap";
-import type { KeyChordEvent, Keymap } from "./keymap";
+import type { KeyChordEvent, Keymap, KeymapMatch } from "./keymap";
 import { checkRecordPlacements } from "./levels";
 import type { Category, KeyScope, Level, Placement } from "./levels";
 import type { CommandContext } from "./context";
@@ -254,10 +254,26 @@ export function createCommandRegistry(options: CommandRegistryOptions): CommandR
     },
     keymap,
     handleKeyEvent(event, scopeStack) {
-      const match = keymap.resolveEvent(event, scopeStack);
-      // A chord bound to a command whose `when` is false is not a hit: the key falls through to
-      // The browser rather than being swallowed by an action that is not there.
-      const hit = match && registry.isVisible(match.commandId) ? match : undefined;
+      /* NARROWEST AVAILABLE wins, not narrowest.
+         A chord bound to a command whose `when` is false is not a hit — the key falls through to
+         the browser rather than being swallowed by an action that is not there. It used to fall
+         through to the browser and NOWHERE ELSE: `resolveEvent` answers with the first scope that
+         binds the chord, so a hidden narrow binding also hid every wider one behind it. That is a
+         defect the caret scope was about to make real. `format.link` binds ⌘K at `caret`, and the
+         caret stack is live in every parent-realm text field too (`caret.active` folds both, by
+         design — see `commands/context.ts`); its `when` is false there, so ⌘K would have resolved
+         to a hidden record and stopped reaching `palette.open`, and the omnibox would have gone
+         quiet in every panel field with nothing to show for it.
+         Walking the stack one scope at a time and taking the first VISIBLE claimant is what
+         "shadowing" has to mean: a command shadows a wider one while it is THERE. */
+      let hit: KeymapMatch | undefined;
+      for (const scope of scopeStack) {
+        const match = keymap.resolveEvent(event, [scope]);
+        if (match && registry.isVisible(match.commandId)) {
+          hit = match;
+          break;
+        }
+      }
       if (!hit) {
         return;
       }

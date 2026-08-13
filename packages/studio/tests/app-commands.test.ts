@@ -10,7 +10,7 @@
  * would connect to this file, so the subprocess test below fails here instead.
  */
 import { describe, expect, test } from "bun:test";
-import { appCommandSet, defaultCommandSet } from "../src/commands/app-commands";
+import { appCommandSet, defaultCommandSet, noopStage } from "../src/commands/app-commands";
 import { checkPlacements } from "../src/commands/levels";
 import { checkChromeBudget, dockTabs } from "../src/commands/budget";
 import { railDeclarations } from "../src/panels/panel-registry";
@@ -46,6 +46,11 @@ describe("the set", () => {
       // Accounts · Keyboard). Application configuration, as distinct from `settings.*`, which
       // Configures a project.
       "app",
+      // `assistant.*` — the six §11.1 records (Focus Composer, New Chat, Chat History, Attach
+      // Selection, Retry, Stop). The `Assistant` category has existed in `commands/levels.ts` since
+      // The taxonomy landed and held ZERO records: every one of these was a button in the chat view
+      // And nothing else, so none was in the palette, bindable, or reachable by name.
+      "assistant",
       "canvas",
       "collab",
       "collection",
@@ -58,6 +63,9 @@ describe("the set", () => {
       "document",
       "edit",
       "file",
+      // The inline-format family — the app's first `caret`-scoped chords, and the case §5.1 uses
+      // To justify `level` and `keyScope` being two fields.
+      "format",
       "formula",
       "git",
       "grid",
@@ -211,6 +219,24 @@ describe("the ids the screenshot manifest names now have records", () => {
 });
 
 describe("the injected no-op deps", () => {
+  test("the canvas keyboard's records are declared against a stage that does nothing", () => {
+    /* `canvasCommands()` takes a live stage accessor, and the projection hands it a no-op one — the
+       checks read `id`, `level`, `menus` and `args`, never behaviour. Running one here is what
+       proves the stub is a stage and not an `undefined` waiting to throw the first time a check
+       (or the palette's `enablement`) reaches it. */
+    const zoom = appCommandSet().find((command) => command.id === "canvas.zoomReset");
+    expect(zoom).toBeDefined();
+    expect(() => zoom?.run(emptyContext(), undefined as never)).not.toThrow();
+    // …and the stage itself is a STAGE: the zoom verbs only reach it with a document open, which
+    // No check has, so nothing else would ever prove it is not an `undefined` waiting to throw.
+    const stage = noopStage();
+    expect(stage.canvasMode).toBe("design");
+    expect(() => {
+      (stage.setPan as (x: number, y: number) => void)(0, 0);
+      stage.applyTransform();
+    }).not.toThrow();
+  });
+
   const byId = new Map(COMMANDS.map((c) => [c.id, c]));
 
   test("a predicate that reads a dep answers rather than throwing", () => {

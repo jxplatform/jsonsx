@@ -58,6 +58,7 @@ import type {
   SelectionSnapshot,
   SerializableRect,
   SerializedKey,
+  SyncedChord,
   WireDocOp,
 } from "./iframe-protocol";
 import type { IframeChannel } from "./iframe-channel";
@@ -1755,6 +1756,12 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
   switch (msg.kind) {
     case "ready": {
       state.ready = true;
+      /* The chord table first, before the pending render: a frame that has painted a page the
+         author can click into must already know which keystrokes to hand back. */
+      const table = keymapSource?.();
+      if (table) {
+        state.channel.post({ chords: table.chords, kind: "keymap", mac: table.mac });
+      }
       if (state.pending) {
         state.channel.post(state.pending);
         state.pending = null;
@@ -2875,6 +2882,56 @@ export function getEditSnapshot(): {
     editingProp: host.editingProp,
     snapshot: host.snapshot,
   };
+}
+
+/**
+ * The chord table every live canvas frame forwards against, and the source it is computed from.
+ *
+ * `setKeymapSource` is called once at bootstrap with the app's registry, and again by nothing:
+ * {@link publishKeymap} re-reads it, so a rebinding in Preferences reaches the canvas by the host
+ * calling `publishKeymap()` rather than by anyone holding a stale copy.
+ */
+let keymapSource: (() => { mac: boolean; chords: readonly SyncedChord[] }) | null = null;
+
+/**
+ * Tell the host how to read the live chord table.
+ *
+ * Injected rather than imported so this module keeps its one direction of dependency: the canvas
+ * host knows nothing about the command registry, and the bootstrap that owns both wires them.
+ */
+export function setKeymapSource(
+  source: () => { mac: boolean; chords: readonly SyncedChord[] },
+  onChange?: (listener: () => void) => () => void,
+): void {
+  keymapSource = source;
+  // A copy with no invalidation is a second authority that drifts. `onChange` fires when the user
+  // Rebinds a key, and reposting is what makes Preferences › Keyboard reach inside the canvas —
+  // Which three hand-written lists in `iframe-keys.ts` could never do.
+  onChange?.(() => publishKeymap());
+  publishKeymap();
+}
+
+/**
+ * Send the current chord table to every live frame.
+ *
+ * Called on a frame's `ready` (so a newly mounted canvas is never guessing) and whenever the keymap
+ * changes (so rebinding ⌘B in Preferences rebinds it inside the page too — the thing three
+ * hand-written lists in `iframe-keys.ts` could never do).
+ */
+export function publishKeymap(): void {
+  const table = keymapSource?.();
+  if (!table) {
+    return;
+  }
+  for (const host of liveHosts) {
+    if (!host.iframe.isConnected) {
+      liveHosts.delete(host);
+      continue;
+    }
+    if (host.ready) {
+      host.channel.post({ chords: table.chords, kind: "keymap", mac: table.mac });
+    }
+  }
 }
 
 /** Post an `applyFormat` intent to the active edit host's iframe (no-op when none/not ready). */
