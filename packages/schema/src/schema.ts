@@ -678,7 +678,8 @@ export async function validateWithSchema(
   doc: Record<string, unknown>,
   schema: Record<string, unknown>,
 ) {
-  let Ajv: AjvCtor, addFormats: AddFormatsFn;
+  let Ajv: AjvCtor;
+  let addFormats: AddFormatsFn;
   try {
     // The generated schema is JSON Schema 2020-12, so use the matching Ajv build
     // (the default `ajv` export is draft-07 and can't compile a 2020-12 schema).

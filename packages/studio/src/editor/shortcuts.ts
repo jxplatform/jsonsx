@@ -1009,8 +1009,8 @@ export function installStageGestures(surface: CanvasSurface): () => void {
       } // Middle button only
       e.preventDefault();
       canvasWrap.setPointerCapture(e.pointerId);
-      let lastX = e.clientX,
-        lastY = e.clientY;
+      let lastX = e.clientX;
+      let lastY = e.clientY;
       const onMove = (ev: PointerEvent) => {
         const { panX, panY, setPan, applyTransform } = getContext();
         setPan(panX + (ev.clientX - lastX), panY + (ev.clientY - lastY));

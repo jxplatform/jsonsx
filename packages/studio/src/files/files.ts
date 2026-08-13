@@ -1336,8 +1336,8 @@ function showFileContextMenu(
     },
   );
 
-  let x = e.clientX,
-    y = e.clientY;
+  let x = e.clientX;
+  let y = e.clientY;
 
   _fileCtxHandle = renderPopover(
     html`<sp-popover

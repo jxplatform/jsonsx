@@ -999,7 +999,9 @@ if (_projectParam) {
 
         const content = await platform.readFile(fileRelPath);
         if (content) {
-          let frontmatter, parsedDoc, parsedMode;
+          let frontmatter;
+          let parsedDoc;
+          let parsedMode;
           await loadFormats();
           const fileFormat = formatForPath(fileRelPath);
           if (fileFormat || !fileRelPath.endsWith(".json")) {

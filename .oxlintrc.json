@@ -72,6 +72,13 @@
     // Jx() is the framework entry point; D-Bus portal methods are capitalized by protocol;
     // quikchat is a third-party lowercase class.
     "new-cap": ["error", { "capIsNew": false, "newIsCapExceptions": ["quikchat"] }],
+    // One declaration per statement — the convention this codebase already follows (oxlint
+    // 1.78 shipped the rule and found exactly 5 violations tree-wide, all fixed). The rule's
+    // ESLint-inherited default is the OPPOSITE ("always", one `const` per scope): an ES5
+    // var-hoisting habit that here demanded 17,610 rewrites, 6,324 of which oxlint itself
+    // declines to autofix because the declarations are separated by statements that must run
+    // between them — combining those would reorder evaluation, not restyle it.
+    "one-var": ["error", "never"],
     // Members are implicitly public; only private/protected must be explicit.
     "typescript/explicit-member-accessibility": ["error", { "accessibility": "no-public" }],
 

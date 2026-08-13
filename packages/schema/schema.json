@@ -7738,26 +7738,6 @@
             }
           ]
         },
-        "animation-delay-end": {
-          "oneOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "number"
-            }
-          ]
-        },
-        "animation-delay-start": {
-          "oneOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "number"
-            }
-          ]
-        },
         "animation-direction": {
           "oneOf": [
             {
@@ -7899,26 +7879,6 @@
           ]
         },
         "animationDelay": {
-          "oneOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "number"
-            }
-          ]
-        },
-        "animationDelayEnd": {
-          "oneOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "number"
-            }
-          ]
-        },
-        "animationDelayStart": {
           "oneOf": [
             {
               "type": "string"

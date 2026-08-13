@@ -1038,8 +1038,8 @@ export function showContextMenu(
   _activeIdx = 0;
   _opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
-  let x = e.clientX,
-    y = e.clientY;
+  let x = e.clientX;
+  let y = e.clientY;
 
   _ctxHandle = renderPopover(
     html`<sp-popover
