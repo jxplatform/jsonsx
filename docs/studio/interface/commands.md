@@ -82,6 +82,7 @@ Everything Studio can do is a command, and every command is reachable by name: p
 | ------------- | ------------------------ | -------- | --------- | ------------------------------------------------------------------------- |
 | Insert after  | `selection.insertAfter`  | —        | selection | an element with a sibling position — not the page root or a repeater item |
 | Insert before | `selection.insertBefore` | —        | selection | an element with a sibling position — not the page root or a repeater item |
+| Insert Block… | `insert.openSlashMenu`   | —        | selection | a live text caret in the canvas                                           |
 | Insert Data   | `insert.data`            | —        | selection | a live text caret in the canvas                                           |
 
 ## View

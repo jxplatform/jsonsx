@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.21-draft
+**Version:** 0.9.22-draft
 **Status:** Partial
 **Updated:** 2026-08-13
 **License:** MIT
@@ -1195,6 +1195,15 @@ live caret: copying a phrase copied the whole block, and cutting mid-sentence de
 | `/`                                       | Slash menu (at a block start or after a space)                 |
 | `Escape`                                  | Dismiss the caret                                              |
 
+**The slash menu has two doors, and the gesture is recognised at the EDITING HOST.** `/` at a block
+start or after a space opens it; so does `insert.openSlashMenu`, which is what puts it in the
+palette, under a rebindable chord, and in reach of the automation runner and the assistant. Opened
+by name there is no `/` in the document to filter against, so the menu carries its own filter field
+and choosing a block deletes nothing — the anchored gesture still strips the `/…` run it opened
+with. The trigger listens on the canvas container rather than on the block: for an ordinary block
+the container is the editing host, so it is the focused element and every keystroke's target, and a
+listener anywhere below it never fires.
+
 **With a block selected but no caret** (from the layers panel, or after a structural edit):
 
 | Shortcut               | Action                   |
@@ -2018,6 +2027,7 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ## Changelog
 
+- **0.9.22-draft** (2026-08-13) — The slash menu is recognised at the editing host and gains a named door (insert.openSlashMenu).
 - **0.9.21-draft** (2026-08-13) — The block action bar steps aside when parent chrome takes the pointer, and returns on a selection change or a canvas pointerdown.
 - **0.9.20-draft** (2026-08-12) — The canvas iframe resolves keystrokes against the host keymap; inline formatting, Select All and the caret's chords become records.
 - **0.9.19-draft** (2026-08-12) — Preview is a toggle over an edit/design base in the View control rather than a third radio value; it honours the chosen breakpoint like Edit and Design; and canvas.html's clip is lifted in preview so the pane-height frame can actually scroll its document.
@@ -2094,4 +2104,4 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.21-draft_
+_`@jxsuite/studio` Specification v0.9.22-draft_

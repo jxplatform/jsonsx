@@ -99,6 +99,19 @@ export type ParentToIframe =
   // Idempotent attribute write, deliberately gen-less (like endEdit).
   | { kind: "setColorScheme"; scheme: "light" | "dark" | null }
   /**
+   * Open the slash menu at the caret, by name rather than by typing "/".
+   *
+   * The gesture is recognised inside the frame (`canvas/iframe-inline-edit.ts`), because that is
+   * where the keystroke is; this is the door for `insert.openSlashMenu` — the palette, a rebound
+   * chord, the automation runner and the assistant. The frame opens it UNANCHORED: there is no "/"
+   * in the document, so the menu carries its own filter field and selecting a block deletes
+   * nothing.
+   *
+   * Gen-less and render-free, like `setColorScheme` above. A frame with no caret session ignores
+   * it, which is the same refusal the record's `requires` sentence states.
+   */
+  | { kind: "openSlash" }
+  /**
    * The chord table, so the frame forwards exactly what the host's registry binds.
    *
    * The frame used to answer "does the parent want this keystroke?" from three hand-written lists —
@@ -501,7 +514,17 @@ export type IframeToParent =
   // The engine (in the iframe) detected "/" in a live edit session; the parent shows the real
   // Lit/Spectrum menu. Re-posted with a new `filter` as the author keeps typing (the engine's
   // UpdateSlashMenu drives it). `rect` is the edited element's bbox in IFRAME-VIEWPORT coords.
-  | { kind: "slashShow"; rect: SerializableRect; filter: string }
+  /**
+   * Show the parent's slash menu at this rect.
+   *
+   * `showFilter` is what an UNANCHORED menu needs — one opened by `insert.openSlashMenu` rather
+   * than by typing "/". There is no "/…" run in the document to narrow the list with, so the menu
+   * has to carry its own field or the only way past fifteen blocks is scrolling. It existed as a
+   * callback option INSIDE the frame and was dropped at this boundary, which is the argument for a
+   * message carrying every fact its receiver needs rather than most of them: the loss was
+   * invisible, because the menu still appeared.
+   */
+  | { kind: "slashShow"; rect: SerializableRect; filter: string; showFilter?: boolean }
   // A menu-navigation key pressed in the iframe while the parent menu is open. The iframe
   // Intercepts these four keys capture-phase (restoring the "menu captures Enter" contract) and the
   // Host drives the parent menu's key handler directly — no synthetic keydown redispatch.

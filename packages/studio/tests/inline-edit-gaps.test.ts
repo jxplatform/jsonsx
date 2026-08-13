@@ -17,6 +17,7 @@ void mock.module("../src/editor/inline-format.js", () => ({
 
 const {
   getActiveElement,
+  handleSlashTrigger,
   isEditing,
   setSlashController,
   splitActiveBlock,
@@ -92,6 +93,21 @@ function caretAt(node: Node, offset: number) {
 function keydown(target: HTMLElement, key: string, init: KeyboardEventInit = {}) {
   target.dispatchEvent(
     new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key, ...init }),
+  );
+}
+
+/**
+ * The "/" gesture, as the EDITING HOST delivers it.
+ *
+ * These cases used to dispatch a keydown at the block, which is where the engine's listener was —
+ * and where a keystroke never arrives, because for an ordinary block the editing host is the canvas
+ * container. Every one of them passed against a trigger no author could reach. `handleSlashTrigger`
+ * is the entry point the host calls now (`canvas/iframe-inline-edit.ts` listens on the container),
+ * so driving it is driving the real path.
+ */
+function slashKey(init: KeyboardEventInit = {}) {
+  handleSlashTrigger(
+    new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "/", ...init }),
   );
 }
 
@@ -187,17 +203,16 @@ describe("commit conversion", () => {
 // ─── Formatting shortcuts, paste, blur ────────────────────────────────────────
 
 describe("editing interactions", () => {
-  test("ctrl+b / ctrl+i / ctrl+` toggle inline formats", () => {
+  test("the format chords are NOT this listener's — they are records", () => {
+    /* This asserted that ⌘B/⌘I/⌘` reached `toggleInlineFormat` from here, and it passed against a
+       listener bound to the block: a keystroke never arrives there, so the branch fired for nobody
+       while the toolbar advertised the chord. The verbs are `format.*` records now, forwarded out
+       of the frame and applied through `applyFormat` — one definition site — and a revived copy
+       here would toggle bold twice per press. */
     edit();
     keydown(el, "b", { ctrlKey: true });
     keydown(el, "i", { ctrlKey: true });
     keydown(el, "`", { ctrlKey: true });
-    expect(toggleInlineFormat.mock.calls.map((c) => c[0])).toEqual(["strong", "em", "code"]);
-    expect(toggleInlineFormat.mock.calls[0]![1]).toBe(el);
-  });
-
-  test("other ctrl keys do not toggle formats", () => {
-    edit();
     keydown(el, "k", { ctrlKey: true });
     expect(toggleInlineFormat).not.toHaveBeenCalled();
   });
@@ -314,7 +329,7 @@ describe("slash menu", () => {
     el.textContent = "";
     edit();
     caretAt(el, 0);
-    keydown(el, "/");
+    slashKey();
     await flush();
     expect(isSlashMenuOpen()).toBe(true);
   });
@@ -323,7 +338,7 @@ describe("slash menu", () => {
     el.textContent = "word ";
     edit();
     caretAt(el.firstChild!, 5);
-    keydown(el, "/");
+    slashKey();
     await flush();
     expect(isSlashMenuOpen()).toBe(true);
   });
@@ -331,7 +346,7 @@ describe("slash menu", () => {
   test("/ mid-word does not open the menu", async () => {
     edit();
     caretAt(el.firstChild!, 3);
-    keydown(el, "/");
+    slashKey();
     await flush();
     expect(isSlashMenuOpen()).toBe(false);
   });
@@ -340,7 +355,7 @@ describe("slash menu", () => {
     el.textContent = "";
     edit();
     caretAt(el, 0);
-    keydown(el, "/");
+    slashKey();
     await flush();
 
     el.textContent = "/he";
@@ -354,7 +369,7 @@ describe("slash menu", () => {
     el.textContent = "";
     edit();
     caretAt(el, 0);
-    keydown(el, "/");
+    slashKey();
     await flush();
     expect(isSlashMenuOpen()).toBe(true);
 
@@ -368,7 +383,7 @@ describe("slash menu", () => {
     el.textContent = "intro ";
     edit();
     caretAt(el.firstChild!, 6);
-    keydown(el, "/");
+    slashKey();
     await flush();
 
     el.textContent = "intro /hea";
@@ -392,7 +407,7 @@ describe("slash menu", () => {
     el.textContent = "";
     edit();
     caretAt(el, 0);
-    keydown(el, "/");
+    slashKey();
     await flush();
 
     document.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Escape" }));

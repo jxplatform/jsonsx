@@ -142,6 +142,9 @@ void mock.module("../src/canvas/iframe-host.js", () => ({
   getEditBarAnchorRect: () => null,
   getEditSnapshot: () => ({ editing: false, snapshot: null }),
   mountIframeCanvas: () => Promise.resolve(),
+  // `insert.openSlashMenu`'s poster; a PARTIAL mock of a module the graph reaches is a load
+  // Error, not a missing stub at call time.
+  postOpenSlash: () => {},
   postApplyFormat: () => {},
   postStyleUpdateToStylebookHosts: () => 0,
   requestCanvasEval: () => Promise.resolve(null),

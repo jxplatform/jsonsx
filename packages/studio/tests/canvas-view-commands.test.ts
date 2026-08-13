@@ -62,6 +62,11 @@ void mock.module("../src/canvas/iframe-host.js", () => ({
   postApplyFormat: (intent: { command: string; token?: string }) => {
     formatIntents.push(intent);
   },
+  // `insert.openSlashMenu`'s poster. Recorded the same way, so the record's run is observable —
+  // And stubbed at all because a PARTIAL mock of a module the graph reaches is a load error.
+  postOpenSlash: () => {
+    formatIntents.push({ command: "openSlash" });
+  },
   postStyleUpdateToStylebookHosts: () => {},
   requestCanvasEval: () => Promise.resolve(null),
   /* The non-lazy way out of `liveHosts`: `panels/pane-grid.ts` calls it as a cell is
@@ -213,6 +218,10 @@ describe("the records themselves", () => {
       "selection.set",
       "selection.setPaths",
       "insert.data",
+      // The slash menu's named door. Not a setter and not a toggle — it OPENS a transient surface,
+      // Which is the same shape as `canvas.setResolvingOpen` above and the same reason: a menu a
+      // Shot can only reach by typing is a menu no script, chord or assistant can reach at all.
+      "insert.openSlashMenu",
     ]);
     expect(ids.some((id) => /\.toggle[A-Z]/.test(id))).toBe(false);
   });
@@ -460,8 +469,30 @@ describe("insert.data", () => {
   beforeEach(() => {
     formatIntents.length = 0;
     caretPath = null;
-    ctx = makeContext({ caret: { active: true }, document: { open: true } });
+    // `inCanvas`, not just `active`: the record is gated on the CANVAS's caret, because a caret in
+    // A parent-realm text field (the Inspector's href box) is not somewhere a token can land.
+    ctx = makeContext({ caret: { active: true, inCanvas: true }, document: { open: true } });
     openBound();
+  });
+
+  test("insert.openSlashMenu asks the frame to open the menu, and refuses without a caret", () => {
+    /* The record the "/" gesture never had. The gesture itself was recognised at the BLOCK while
+       the editing host is the container, so it fired for nobody — and the shot of the menu spent a
+       release quarantined saying the controller "does not respond to a synthetic keydown", when in
+       truth nothing responded to a real one. The gesture is fixed at the host; this is the door
+       that lets the palette, a rebound chord and the manifest reach the same menu by name. */
+    const record = registry.get("insert.openSlashMenu");
+    expect(record?.level).toBe("selection");
+    expect(record?.keyScope).toBe("caret");
+    expect(record?.requires).toBe("a live text caret in the canvas");
+    expect(registry.isVisible("insert.openSlashMenu")).toBe(true);
+    void registry.run("insert.openSlashMenu");
+    expect(formatIntents).toEqual([{ command: "openSlash" }]);
+
+    // A caret in a parent-realm text field is not a caret in the page: `caret.active` is true for
+    // Both, and `inCanvas` is the one this record reads.
+    ctx = makeContext({ caret: { active: true }, document: { open: true } });
+    expect(registry.isVisible("insert.openSlashMenu")).toBe(false);
   });
 
   test("is hidden without a live caret — a token has nowhere to land", () => {

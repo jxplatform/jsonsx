@@ -1013,6 +1013,8 @@ function registerCanvasGutterDrop(canvasEl: HTMLElement, host: () => HostState |
 export interface CanvasSlashRequest {
   rect: { left: number; top: number; bottom: number; width: number; height: number };
   filter: string;
+  /** Whether the menu draws its own filter field — see the `slashShow` message for why. */
+  showFilter?: boolean;
   onSelect: (cmd: SlashCommand) => void;
   onDismiss: () => void;
 }
@@ -2310,6 +2312,7 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       const top = msg.rect.y * scale + ifr.top;
       canvasSlashHandler?.show({
         filter: msg.filter,
+        ...(msg.showFilter === true ? { showFilter: true } : {}),
         onDismiss: () => state.channel.post({ kind: "slashDismissed" }),
         onSelect: (cmd) => state.channel.post({ cmd: { ...cmd }, kind: "slashSelect" }),
         rect: {
@@ -2964,6 +2967,21 @@ export function postApplyFormat(intent: ApplyFormatIntent): void {
     return;
   }
   host.channel.post({ intent, kind: "applyFormat" });
+}
+
+/**
+ * Ask the active edit host's iframe to open the slash menu at its caret.
+ *
+ * The same shape and the same guard as {@link postApplyFormat}: the caret lives in the other realm,
+ * so a command in this one can only ask. `activeEditHost` is null when no session is live, which is
+ * exactly when `insert.openSlashMenu` refuses.
+ */
+export function postOpenSlash(): void {
+  const host = activeEditHost;
+  if (!host || !host.ready) {
+    return;
+  }
+  host.channel.post({ kind: "openSlash" });
 }
 
 /**

@@ -6,7 +6,13 @@
 import "./with-dom.js";
 import { afterEach, describe, expect, test } from "bun:test";
 import { startIframeInlineEdit } from "../src/canvas/iframe-inline-edit";
-import { isEditing, setSlashController, stopEditing } from "../src/editor/inline-edit";
+import { startIframeSlashBridge } from "../src/canvas/iframe-slash";
+import {
+  isEditing,
+  openSlashMenu,
+  setSlashController,
+  stopEditing,
+} from "../src/editor/inline-edit";
 import { caretInto } from "./harness";
 import type { SlashCommand } from "../src/editor/inline-edit";
 import { serializeJxPath } from "../src/canvas/path-mapping";
@@ -351,7 +357,11 @@ describe("guards and inserts", () => {
       const sel = window.getSelection()!;
       sel.removeAllRanges();
       sel.addRange(range);
-      el.dispatchEvent(new KeyboardEvent("keydown", { key: "/" }));
+      /* Dispatched at the CONTAINER, which is where a real "/" lands: the container is the editing
+         host, so it is the focused element and every keydown's target. This case used to dispatch
+         at the block and pass, because the engine's listener was bound there — the one place a
+         keystroke never arrives. That is why the shot of this menu spent a release quarantined. */
+      container.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "/" }));
       await new Promise((resolve) => {
         requestAnimationFrame(resolve);
       });
@@ -883,5 +893,142 @@ describe("prop-bound inline editing", () => {
     });
     expect(isEditing()).toBe(false);
     stop();
+  });
+});
+
+// ─── The slash menu's two doors ───────────────────────────────────────────────
+
+/**
+ * The gesture and the command, in the realm where the caret is.
+ *
+ * The "/" trigger was recognised by a `keydown` listener `editor/inline-edit.ts` bound to the
+ * BLOCK, and the editing host is the container — so it never fired, for anyone, and typing "/" in
+ * the canvas inserted a slash and nothing else. The manifest's `slash-menu-shot` recorded the
+ * symptom as "the slash controller does not respond to a synthetic keydown"; the truth was that
+ * nothing responded to a real one either.
+ */
+describe("the slash menu", () => {
+  /** Boot a frame with a live caret and a controller that records what it is shown. */
+  function bootWithCaret() {
+    const shows: { filter: string; showFilter?: boolean }[] = [];
+    let open = false;
+    setSlashController({
+      dismiss: () => {
+        open = false;
+      },
+      isOpen: () => open,
+      show: (_el, filter, cbs) => {
+        open = true;
+        shows.push({
+          filter,
+          ...(cbs.showFilter === undefined ? {} : { showFilter: cbs.showFilter }),
+        });
+      },
+    });
+    const { channel, deliver, posts } = fakeChannel();
+    const { container, el } = editableContainer();
+    const stop = boot(channel, container);
+    clickInto(el);
+    return { container, deliver, el, posts, shows, stop };
+  }
+
+  /** Put the caret at `offset` in the block's first text node. */
+  function caretAt(el: HTMLElement, offset: number) {
+    const range = document.createRange();
+    range.setStart(el.firstChild!, offset);
+    range.collapse(true);
+    const sel = window.getSelection()!;
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+
+  const slashAt = (container: HTMLElement) =>
+    container.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "/" }));
+
+  const nextFrame = () =>
+    new Promise((resolve) => {
+      requestAnimationFrame(resolve);
+    });
+
+  afterEach(() => {
+    setSlashController({ dismiss: () => {}, isOpen: () => false, show: () => {} });
+  });
+
+  test('"/" at the start of a block opens it — at the HOST, where the keystroke is', async () => {
+    const { container, el, shows } = bootWithCaret();
+    caretAt(el, 0);
+    slashAt(container);
+    await nextFrame();
+    expect(shows).toHaveLength(1);
+    expect(shows[0]).toEqual({ filter: "" });
+  });
+
+  test('"/" mid-word is punctuation, not a menu', async () => {
+    // "and/or" must not ambush the author. The engine still owns what a slash MEANS; only the
+    // Listener moved.
+    const { container, el, shows } = bootWithCaret();
+    caretAt(el, 3);
+    slashAt(container);
+    await nextFrame();
+    expect(shows).toEqual([]);
+  });
+
+  test("a keydown at the BLOCK opens nothing — which is the whole defect, pinned", async () => {
+    // The block is a descendant of the editing host, and an event dispatched at a descendant never
+    // Reaches a listener on it. This case exists so the trigger cannot quietly move back.
+    const { el, shows } = bootWithCaret();
+    caretAt(el, 0);
+    el.dispatchEvent(new KeyboardEvent("keydown", { key: "/" }));
+    await nextFrame();
+    expect(shows).toEqual([]);
+  });
+
+  test("the openSlash message opens it by name, with its own filter field", () => {
+    const { deliver, shows } = bootWithCaret();
+    deliver({ kind: "openSlash" });
+    expect(shows).toEqual([{ filter: "", showFilter: true }]);
+  });
+
+  test("the frame's controller CARRIES showFilter across the bridge", async () => {
+    /* The option is set inside the frame and the menu is drawn by the parent, so a boundary that
+       forgets it loses the field silently — the menu still appears, just with no way past fifteen
+       blocks but scrolling. Found in a real browser, not here: the unit path stops at the
+       controller, and the controller was doing its job. This asserts the POST. */
+    const { channel, posts } = fakeChannel();
+    const { container, el } = editableContainer();
+    const stop = boot(channel, container);
+    clickInto(el);
+    /* The bridge takes its OWN channel: `fakeChannel` holds a single `onMessage` handler, so
+       registering the bridge on the same one would replace the inline-edit handler and the
+       `openSlash` message would never arrive. The engine's session is module state, so driving
+       `openSlashMenu` directly is the same call the message handler makes. */
+    const bridge = fakeChannel();
+    const stopBridge = startIframeSlashBridge(bridge.channel, container.ownerDocument);
+    openSlashMenu({ anchored: false });
+    await Promise.resolve();
+    const show = bridge.posts.find((p) => p.kind === "slashShow");
+    expect(show).toBeDefined();
+    expect((show as { showFilter?: boolean }).showFilter).toBe(true);
+    stopBridge();
+    stop();
+    expect(posts.length).toBeGreaterThanOrEqual(0);
+  });
+
+  test("an unanchored menu is not re-filtered from the document, so typing cannot dismiss it", () => {
+    // The filter would be derived from the text before the caret, where there is no "/" at all —
+    // `refreshSlashMenu` would find none and dismiss the menu on the first character typed.
+    const { container, deliver, shows } = bootWithCaret();
+    deliver({ kind: "openSlash" });
+    container.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(shows).toHaveLength(1);
+  });
+
+  test("teardown takes both listeners with it", async () => {
+    const { container, el, shows, stop } = bootWithCaret();
+    caretAt(el, 0);
+    stop();
+    slashAt(container);
+    await nextFrame();
+    expect(shows).toEqual([]);
   });
 });

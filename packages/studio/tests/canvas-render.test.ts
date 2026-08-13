@@ -214,6 +214,9 @@ void mock.module("../src/canvas/iframe-host.js", () => ({
     canvas: HTMLElement,
     widthPx?: number | null,
   ) => iframeImpl(gen, doc, canvas, widthPx),
+  // `insert.openSlashMenu`'s poster; a PARTIAL mock of a module the graph reaches is a load
+  // Error, not a missing stub at call time.
+  postOpenSlash: () => {},
   postApplyFormat: () => {},
   // Live-preview seam (transitively imported via the panels) — no iframe in this suite.
   requestCanvasEval: () => Promise.resolve(null),

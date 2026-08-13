@@ -22,8 +22,12 @@
 import {
   commitActiveBlock,
   getActiveElement,
+  handleSlashTrigger,
   isEditableBlock,
   isEditing,
+  isSlashActive,
+  openSlashMenu,
+  refreshSlashMenu,
   splitActiveBlock,
   startEditing,
   stopEditing,
@@ -452,6 +456,23 @@ export function startIframeInlineEdit(
     onSplit: () => splitActiveBlock(),
   });
 
+  /* The slash gesture, at the EDITING HOST.
+     `editor/inline-edit.ts` recognised "/" in a `keydown` listener it attached to the BLOCK, and
+     for an ordinary block the editing host is this container — so the focused element, and every
+     keydown's target, is the container and that listener never fired. Typing "/" in the canvas
+     simply inserted a slash: the menu the docs describe, and the shot the manifest quarantined,
+     had no trigger at all. It is recognised here, where the keystrokes are, and the engine still
+     owns what a slash MEANS (start of a block or after a space; anywhere else it is punctuation).
+     The matching `input` half re-filters the open menu, for the same reason: a contenteditable's
+     `input` targets its host, not the block the caret happens to be in. */
+  const onSlashKey = (e: Event) => handleSlashTrigger(e as KeyboardEvent);
+  const onSlashInput = () => {
+    if (isSlashActive()) {
+      refreshSlashMenu();
+    }
+  };
+  container.addEventListener("keydown", onSlashKey);
+  container.addEventListener("input", onSlashInput);
   doc.addEventListener("mouseup", onMouseUp, true);
   doc.addEventListener("keyup", onKeyUp, true);
   doc.addEventListener("blur", onBlurCapture, true);
@@ -459,6 +480,14 @@ export function startIframeInlineEdit(
   const off = channel.onMessage((msg) => {
     if (msg.kind === "applyFormat") {
       applyFormatIntent(msg.intent);
+      return;
+    }
+    if (msg.kind === "openSlash") {
+      /* Opened BY NAME, so there is no "/" in the document to anchor it — the engine gives this
+         menu its own filter field and deletes nothing when a block is chosen. `openSlashMenu`
+         refuses when no caret session is live, which is the same refusal the record's `requires`
+         sentence states. */
+      openSlashMenu({ anchored: false });
       return;
     }
     if (msg.kind === "flushEdits") {
@@ -492,6 +521,8 @@ export function startIframeInlineEdit(
   });
 
   return () => {
+    container.removeEventListener("keydown", onSlashKey);
+    container.removeEventListener("input", onSlashInput);
     doc.removeEventListener("mouseup", onMouseUp, true);
     doc.removeEventListener("keyup", onKeyUp, true);
     doc.removeEventListener("blur", onBlurCapture, true);

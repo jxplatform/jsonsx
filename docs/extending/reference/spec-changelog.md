@@ -302,6 +302,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.9.22-draft** (2026-08-13) — The slash menu is recognised at the editing host and gains a named door (insert.openSlashMenu).
 - **0.9.21-draft** (2026-08-13) — The block action bar steps aside when parent chrome takes the pointer, and returns on a selection change or a canvas pointerdown.
 - **0.9.20-draft** (2026-08-12) — The canvas iframe resolves keystrokes against the host keymap; inline formatting, Select All and the caret's chords become records.
 - **0.9.19-draft** (2026-08-12) — Preview is a toggle over an edit/design base in the View control rather than a third radio value; it honours the chosen breakpoint like Edit and Design; and canvas.html's clip is lifted in preview so the pane-height frame can actually scroll its document.

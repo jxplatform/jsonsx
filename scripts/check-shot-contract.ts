@@ -133,6 +133,16 @@ export const CONTRACT_VERSION = 1;
  *   transform Edit does not render), and lifting the quarantine hands its one `caret` step back. No
  *   step was added, and the number of shots the app can actually be driven through went up. This is
  *   the only way this budget may rise: a step returning from quarantine, named.
+ *
+ *   **13 → 14, and it is the same way and the same reason.** `slash-menu-shot` came back from
+ *   quarantine, handing its one `caret` step back. It went in because a synthetic "/" opened nothing,
+ *   and the diagnosis in its `status` was too kind to the app: the menu had NO working trigger at
+ *   all, in a browser or out of one. `editor/inline-edit.ts` recognised the keystroke in a listener
+ *   bound to the BLOCK, while the editing host is the canvas container — so the listener never fired,
+ *   for anyone. The gesture is fixed at the host, and the shot's two `type` steps became ONE command
+ *   step (`insert.openSlashMenu`), which is the conversion this file exists to ask for: the step now
+ *   names an input the app accepts by name. Net input steps for the shot: three to one. The budget
+ *   rises by the one `caret` step quarantine was hiding.
  * - `nonDerivedRegions` DISTINCT region ids no registry stamps for free — the hand-stamped leaves
  *   §13.3 budgets for (`navigator/panel:git/commit`, `navigator/statements`, the settings entry
  *   rows…). Contract 0 counted 17 CSS selectors here.
@@ -158,7 +168,7 @@ export const CONTRACT_BUDGET = {
   regionSelectors: 0,
   clipSelectors: 0,
   argSelectors: 0,
-  inputSteps: 13,
+  inputSteps: 14,
   nonDerivedRegions: 10,
   unstable: 2,
 } as const;

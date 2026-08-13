@@ -163,11 +163,6 @@ const KNOWN_UNREACHABLE: Record<string, Record<string, string>> = {
       "somebody has to choose it rather than a refactor sliding it in",
     pasteStyles: "see `copyStyles` — the same divergence, and the half that carries the §6.5 batch",
   },
-  "editor/inline-edit.ts": {
-    isSlashActive:
-      "re-reads the injected slash menu's own `isOpen()`. The session guards that need it hold the " +
-      "`slash` dependency and ask it directly",
-  },
   "editor/slash-menu.ts": {
     isSlashMenuOpen:
       "the concrete menu's open flag. Callers go through the injected `slash.isOpen()` seam, which " +

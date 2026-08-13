@@ -59,6 +59,12 @@ export function startIframeSlashBridge(
         filter,
         kind: "slashShow",
         rect: { height: r.height, width: r.width, x: r.left, y: r.top },
+        /* Carried, because the parent draws the menu and only the FRAME knows why it opened. A
+           menu opened by name has no "/…" run in the document to filter with, so it needs its own
+           field; the "/" gesture needs none, because the author types into the block. This option
+           was dropped at this boundary and the loss was invisible — the menu still appeared, just
+           with no way past fifteen items but scrolling. */
+        ...(cbs.showFilter === true ? { showFilter: true } : {}),
       });
     },
   };

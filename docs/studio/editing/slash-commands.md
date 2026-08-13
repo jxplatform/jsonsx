@@ -22,6 +22,8 @@ On an empty paragraph, the paragraph itself becomes the block you chose. On a li
 
 To close the menu without inserting anything, press :kbd[Esc], click anywhere else, or delete back past the `/`. And a slash in the middle of a word — "and/or" — just types a slash; the menu only opens at the start of a line or after a space.
 
+The menu also has a name. **Insert: Insert Block…** in the command palette (:kbd[⌘K]) opens the same list at the caret, which is how you reach it without typing anything — bind it to a key of your own in **Preferences › Keyboard**, or ask the assistant for it. Opened that way there is no `/` in your text to filter against, so the menu brings its own filter field, and choosing a block leaves everything you have written exactly where it is.
+
 ## The block list
 
 | Command             | What you get      |

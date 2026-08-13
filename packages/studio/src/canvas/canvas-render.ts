@@ -77,6 +77,7 @@ import {
   getEditSnapshot,
   mountIframeCanvas,
   postApplyFormat,
+  postOpenSlash,
   postStyleUpdateToStylebookHosts,
   releaseCanvasHosts,
 } from "./iframe-host";
@@ -1697,7 +1698,12 @@ export function selectionCommands(): AnyCommand[] {
       group: "5_data",
       undo: "document",
       requires: "a live text caret in the canvas",
-      when: (ctx) => ctx.caret.active,
+      /* `inCanvas`, not `active`. `caret.active` is also true while focus is in a parent-realm text
+         field (`commands/live-context.ts` folds both, because the SCOPE STACK wants them folded),
+         and inserting a data token into the Inspector's href field is not a thing this verb can do
+         — `postApplyFormat` would no-op against a frame with no session and the palette row would
+         read as available. The `format.*` family is gated the same way, for the same reason. */
+      when: (ctx) => ctx.caret.inCanvas,
       aiTool: {
         description:
           "Insert a live data placeholder at the text caret, binding that run of text to a state " +
@@ -1710,6 +1716,36 @@ export function selectionCommands(): AnyCommand[] {
         postApplyFormat({ command: "insertData", token });
       },
       title: "Insert Data",
+    },
+    {
+      category: "Insert",
+      /**
+       * The slash menu's door, and for two phases its ONLY working one.
+       *
+       * "/" at the caret is the gesture the docs describe and §10 documents, and it was recognised
+       * in a `keydown` listener bound to the BLOCK — while the editing host is the canvas
+       * container, so the listener never fired and typing "/" simply inserted a slash. The gesture
+       * is fixed where it belongs (`canvas/iframe-inline-edit.ts` listens at the host), and this
+       * record is the half that gesture never had: a name, so the palette, a rebound chord, the
+       * automation runner and the screenshot manifest can all reach the same menu.
+       *
+       * Opened this way the menu has no "/" in the document to filter against, so the frame gives
+       * it its own filter field and selecting a block deletes nothing — see `openSlashMenu`.
+       */
+      id: "insert.openSlashMenu",
+      level: "selection",
+      keyScope: "caret",
+      // No `blockbar`: the bar already carries the tag badge, which opens the same list for a
+      // CONVERSION. A second control for "insert" beside it would be two buttons over one menu.
+      menus: ["palette"],
+      group: "5_data",
+      undo: "document",
+      requires: "a live text caret in the canvas",
+      when: (ctx) => ctx.caret.inCanvas,
+      run: () => {
+        postOpenSlash();
+      },
+      title: "Insert Block…",
     },
   ];
 }

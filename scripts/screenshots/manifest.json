@@ -698,11 +698,6 @@
     {
       "name": "slash-menu-shot",
       "docs": ["studio/editing/slash-commands"],
-      "status": {
-        "reason": "the inline editor's slash controller does not respond to a synthetic \"/\" keydown: the caret session is live and the character lands in the document, but no overlay.menu:slash-menu slot is ever created. Red on main before the conversion, for the same reason.",
-        "since": "d4e63504",
-        "state": "quarantined"
-      },
       "open": {
         "project": "packages/starters/sites/restaurant",
         "file": "pages/index.md",
@@ -724,12 +719,7 @@
           "path": ["children", 1]
         },
         {
-          "input": "type",
-          "text": " "
-        },
-        {
-          "input": "type",
-          "text": "/"
+          "cmd": "insert.openSlashMenu"
         }
       ],
       "expect": [
