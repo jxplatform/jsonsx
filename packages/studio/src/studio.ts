@@ -64,6 +64,7 @@ import {
 import {
   canvasModeOfPane,
   canvasModeOfTab,
+  stageContaining,
   surfaceForPane,
   tabOfPane,
 } from "./canvas/canvas-surface";
@@ -76,6 +77,7 @@ import {
   isCaretActive,
   postColorSchemeToLiveHosts,
   setCanvasContextMenuHandler,
+  setCanvasPointerDownHandler,
   setCanvasSlashHandler,
   setIframePatchEscalation,
   setFileDropHandler,
@@ -192,7 +194,9 @@ import {
   initBlockActionBar,
   isEditChromeTarget,
   registerSelectionCommands,
+  releaseBlockActionBar,
   renderBlockActionBar,
+  suppressBlockActionBar,
 } from "./panels/block-action-bar";
 import { initCssData } from "./panels/style-utils";
 import { initQuickSearch } from "./panels/quick-search";
@@ -437,6 +441,10 @@ initBlockActionBar({
 });
 // The iframe's re-emitted selection snapshot drives the parent format toolbar refresh (4b-2).
 setToolbarRefresh(renderBlockActionBar);
+// The other half of that seam: a pointerdown inside a canvas frame ends the bar's suppression (the
+// Canvas is in play again). It is the only signal that can, because clicking the SAME
+// Already-selected element changes nothing the render path can compare.
+setCanvasPointerDownHandler(releaseBlockActionBar);
 // The cross-origin insertion "+" click runs the parent-realm slash-menu → mutateInsertNode flow.
 setInsertZoneClickHandler(runInsertZoneAction);
 // Files dragged from the OS onto a canvas: upload, then replace an image's source or insert.
@@ -462,16 +470,38 @@ setStylebookHitHandler((tag, media) => {
     updateSession(activeTab.value, { ui: { activeSelector: null } });
   }
 });
-// Commit-on-parent-click: a pointerdown in PARENT chrome outside the edit-session chrome (format
-// Toolbar / link popover / slash menu) ends the live inline-edit session — the iframe can't observe
-// Parent-realm pointer events (layers panel, tab strip, right panel…). Pointerdowns over the canvas
-// Land inside the cross-origin iframe and never reach this listener, so it can't double-fire with
-// The iframe's own click-away commit.
+/* Two duties, one listener, because both answer the same question: intent has left the canvas.
+   Pointerdowns over the canvas land inside the cross-origin iframe and never reach this listener,
+   so a hit here IS parent chrome — which is why the listener can be this blunt and why it cannot
+   double-fire with the iframe's own click-away commit.
+
+   1. Commit-on-parent-click: it ends the live inline-edit session, which the iframe cannot observe
+      itself (layers panel, tab strip, right panel…).
+   2. The block action bar goes with it. The bar is `position: fixed` and clamped into the window,
+      so it can sit over the Document Header card, the pane context bar and the docks; an author
+      working in the Inspector's Logic tab reported it "blocking a part of the interface that the
+      user needs to utilize". It is SUPPRESSED, not dismissed — a plain dismiss flashes back on the
+      next snapshot or overlay repaint — and it comes back the moment the canvas takes a pointer or
+      the selection moves. Nothing here touches the selection: the Inspector edits the selected
+      node, so a click into it must keep the thing it is about to edit.
+
+   Both spare the edit-session chrome (`isEditChromeTarget`: the bar, its `⋮` menu, the link
+   popover, the slash menu) — those surfaces act ON the session and the bar rather than away from
+   them. Only the suppression spares the canvas STAGE, whose margins, artboard headers and insertion
+   "+" are parent-realm elements around the frame: they are the canvas, not somewhere else in the
+   shell, and hiding the bar to pan or to nudge the zoom would be the app losing the author's place
+   for them. */
 document.addEventListener(
   "pointerdown",
   (e) => {
-    if (getEditSnapshot().editing && !isEditChromeTarget(e.target)) {
+    if (isEditChromeTarget(e.target)) {
+      return;
+    }
+    if (getEditSnapshot().editing) {
       commitActiveEditSession();
+    }
+    if (!(e.target instanceof Node) || stageContaining(e.target) === null) {
+      suppressBlockActionBar();
     }
   },
   true,

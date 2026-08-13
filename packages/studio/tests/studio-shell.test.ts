@@ -179,6 +179,14 @@ void mock.module("../src/editor/shortcuts.ts", () => ({
   },
 }));
 
+/* The bar's two suppression doors, as the shell sees them: the chrome pointerdown that hides it and
+   the canvas-pointerdown release the bootstrap injects into the host. What each one DOES is the
+   bar's own test file's business; this file owns the wiring. */
+const suppressBarMock = mock(() => {});
+const releaseBarMock = mock(() => {});
+/** Whether the next pointerdown lands on edit-session chrome (the bar, its menus, the slash menu). */
+let editChromeTarget = false;
+
 void mock.module("../src/panels/block-action-bar.ts", () => ({
   // The Outline's row actions render through `commandIcon`, and the Navigator now reaches
   // Layers through the panel registry, so the mock has to carry it.
@@ -198,9 +206,11 @@ void mock.module("../src/panels/block-action-bar.ts", () => ({
   // The inline-format family, composed into the app-wide registry by the bootstrap. A mock that
   // Stops at the exports one caller uses fails the boot at IMPORT time.
   formatCommands: mock(() => []),
-  isEditChromeTarget: mock(() => false),
+  isEditChromeTarget: mock(() => editChromeTarget),
   registerSelectionCommands: mock(() => {}),
+  releaseBlockActionBar: releaseBarMock,
   renderBlockActionBar: mock(() => {}),
+  suppressBlockActionBar: suppressBarMock,
 }));
 
 void mock.module("../src/canvas/canvas-render.ts", () => ({
@@ -253,10 +263,16 @@ void mock.module("../src/panels/left-panel.ts", () => ({
 const iframeHostSnapshot = { ...(await import("../src/canvas/iframe-host")) };
 let stylebookHit: ((tag: string | null, media: string | null) => void) | null = null;
 let editingOverride = false;
+/** What the bootstrap injected as the canvas-pointerdown signal (the bar's suppression release). */
+let canvasPointerDown: (() => void) | null = null;
 const commitEditMock = mock(() => {});
 void mock.module("../src/canvas/iframe-host.ts", () => ({
   ...iframeHostSnapshot,
   commitActiveEditSession: commitEditMock,
+  setCanvasPointerDownHandler: (fn: (() => void) | null) => {
+    canvasPointerDown = fn;
+    iframeHostSnapshot.setCanvasPointerDownHandler(fn);
+  },
   getEditSnapshot: () =>
     editingOverride ? { editing: true, snapshot: null } : iframeHostSnapshot.getEditSnapshot(),
   setStylebookHitHandler: (fn: (tag: string | null, media: string | null) => void) => {
@@ -1484,24 +1500,87 @@ describe("unsaved-changes guard", () => {
 });
 
 describe("parent-chrome commit guard", () => {
+  beforeEach(() => {
+    editChromeTarget = false;
+    suppressBarMock.mockClear();
+    releaseBarMock.mockClear();
+  });
+
+  /** Dispatch a capture-phase pointerdown at `target` (the document when none is given). */
+  function pointerDownAt(target?: EventTarget): void {
+    const e = new PointerEvent("pointerdown", { bubbles: true });
+    if (target) {
+      target.dispatchEvent(e);
+    } else {
+      document.dispatchEvent(e);
+    }
+  }
+
   test("a chrome pointerdown with no live edit session is a harmless no-op", () => {
     // The capture-phase guard registered at init runs on every parent pointerdown; without an
     // Active edit host (getEditSnapshot().editing false) it must short-circuit silently.
-    expect(() =>
-      document.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true })),
-    ).not.toThrow();
+    expect(() => pointerDownAt()).not.toThrow();
     expect(commitEditMock).not.toHaveBeenCalled();
   });
 
   test("a chrome pointerdown during a live edit session commits it", () => {
     editingOverride = true;
     try {
-      document.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+      pointerDownAt();
       expect(commitEditMock).toHaveBeenCalled();
     } finally {
       editingOverride = false;
       commitEditMock.mockClear();
     }
+  });
+
+  /*
+   * The second duty of the same listener. The bar is `position: fixed` and clamped into the window,
+   * so a bar left up while the author works in the Inspector sits over the panel they reached for.
+   * What suppression DOES is `tests/block-action-bar.test.ts`'s business; what this file owns is
+   * which pointerdowns are "somewhere else in the shell" and which are not.
+   */
+  test("a chrome pointerdown suppresses the block action bar", () => {
+    pointerDownAt();
+    expect(suppressBarMock).toHaveBeenCalledTimes(1);
+  });
+
+  test("edit-session chrome is exempt from both duties — it acts ON the bar, not away from it", () => {
+    editingOverride = true;
+    editChromeTarget = true;
+    try {
+      pointerDownAt();
+      expect(suppressBarMock).not.toHaveBeenCalled();
+      expect(commitEditMock).not.toHaveBeenCalled();
+    } finally {
+      editingOverride = false;
+      commitEditMock.mockClear();
+    }
+  });
+
+  test("a pointerdown inside a canvas stage is the canvas, not somewhere else in the shell", () => {
+    // The stage's margins, artboard headers and insertion "+" are parent-realm elements AROUND the
+    // Frame (a pointerdown on the frame itself is delivered in the iframe's own realm and never
+    // Reaches this listener). Hiding the bar to pan or to nudge the zoom would be the app losing
+    // The author's place for them — but the edit session still commits, as it always has.
+    editingOverride = true;
+    const inStage = document.createElement("div");
+    surfaceForPane("primary").wrap.append(inStage);
+    try {
+      pointerDownAt(inStage);
+      expect(suppressBarMock).not.toHaveBeenCalled();
+      expect(commitEditMock).toHaveBeenCalled();
+    } finally {
+      editingOverride = false;
+      commitEditMock.mockClear();
+      inStage.remove();
+    }
+  });
+
+  test("the bootstrap injects the release as the canvas-pointerdown signal", () => {
+    // The other door out of suppression, and the only one that can answer a click on the element
+    // That is already selected: the parent never sees that pointer, the frame reports it.
+    expect(canvasPointerDown).toBe(releaseBarMock);
   });
 });
 

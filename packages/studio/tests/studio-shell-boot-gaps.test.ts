@@ -115,6 +115,7 @@ void mock.module("../src/panels/block-action-bar.ts", () => ({
   formatCommands: mock(() => []),
   isEditChromeTarget: mock(() => false),
   registerSelectionCommands: mock(() => {}),
+  releaseBlockActionBar: mock(() => {}),
   renderBlockActionBar: mock(() => {}),
   runCommand: mock(() => {}),
   selectionCommandRegistry: () => ({
@@ -123,6 +124,7 @@ void mock.module("../src/panels/block-action-bar.ts", () => ({
     keymap: { formatBinding: () => {} },
   }),
   showCommandOverflow: mock(() => {}),
+  suppressBlockActionBar: mock(() => {}),
   withCommandTarget: <T>(_path: unknown, fn: () => T) => fn(),
 }));
 

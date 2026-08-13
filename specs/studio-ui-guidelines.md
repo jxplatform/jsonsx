@@ -1,8 +1,8 @@
 # Jx Studio UI/UX Interface Guidelines
 
-**Version:** 0.3.7
+**Version:** 0.3.8
 **Status:** Implemented
-**Updated:** 2026-08-12
+**Updated:** 2026-08-13
 **Applies to:** `packages/studio/`
 
 ---
@@ -250,6 +250,30 @@ let debounce;
 
 For `sp-picker` and menu-based inputs, use `@change` directly — no debounce needed. For `sp-textfield` and `textarea`, always debounce `@input`.
 
+### 4.6 A Row Wraps; It Never Overflows
+
+Every form in the Inspector renders at a width the author chooses, and in two docks of very different
+sizes. A field that leaves the panel is not a cosmetic problem: the control is unreachable, and the
+author's only recourse is to widen a dock they may not have room to widen.
+
+- **A row is a wrapping flex row**, and the wrap threshold is a `flex-basis`, never a fixed width. The
+  same markup is then one line where there is room and a stack where there is not, without a second
+  template or a media query.
+- **`min-width: 0` on every flex child in the chain.** A flex item refuses to shrink below its
+  min-content by default, and a Spectrum field is 192px wide (`--spectrum-field-width`) before it
+  starts negotiating — one operand row of a mode picker, a type picker and a field therefore demands
+  ~360px in a 280px dock and simply overflows. This one declaration is the difference.
+- **A `flex` shorthand belongs in a row.** `.style-row` (§4.1) is `flex-direction: column`, so
+  `flex: 1` on one of its children is permission to grow TALL, not wide — which is how a text field
+  came to render 128px high beside a picker in the Logic tab. Widen a child of a `.style-row` with
+  `width: 100%`; spend a basis only inside a container that is genuinely a row.
+- **Long values ellipsize or wrap.** A `$ref` path, a formula and a component name are all
+  author-supplied and unbounded; none of them may set the width of the form that contains them.
+
+The rule is checkable without a browser — assert the structure that produces the layout, not computed
+pixels, which happy-dom does not lay out — but the judgement is not. A change here is looked at in a
+real browser at the narrowest dock the app allows and at a wide one.
+
 ---
 
 ## 5. Accordion Sections
@@ -442,6 +466,11 @@ Fixed-position toolbar that follows the selected element:
 - ONE shape: the bar does not rearrange itself when the author starts typing. Controls that cannot
   act are disabled, not removed — a toolbar whose buttons move under the cursor is worse than one
   with a greyed button
+- **It steps aside when the author leaves the canvas.** A pointerdown in parent chrome outside the
+  canvas hides the bar; a selection change or a pointerdown back in the canvas brings it back. The
+  bar is `position: fixed` and clamped into the window, so a bar that outlived the author's attention
+  sat over the Document Header, the pane context bar and the docks — chrome the author was reaching
+  for. Hiding it never clears the SELECTION: the Inspector's whole job is editing what is selected
 - Z-index: 100
 - Shadow: standard elevation shadow
 
@@ -865,6 +894,7 @@ that must be fixed is a Problem, and an error the user cannot act on is a toast 
 
 ## Changelog
 
+- **0.3.8** (2026-08-13) — A row wraps and never overflows (§4.6); the floating bar's visibility rule.
 - **0.3.7** (2026-08-12) — blockbar/format joins the level × placement matrix, with its own chrome budget.
 - **0.3.6** (2026-08-10) — §12.4 the agent counts as a surface — an assistant tool that writes what a command writes binds to the command's rule by reading the same CommandContext, not by recomputing it; the element-tree writers move to a document-tree tier gated on the registry's own editor.kind.
 - **0.3.5** (2026-08-10) — §12 a command family over one surface declares ONE availability rule — six families disagreed with themselves, and in each the loose member was the one that wrote: git.createGithubRepository created a remote repository where its disabled peer git.push would not, publish.deploy pushed on a host with no Cloudflare API, the Outline's movers and the element menu's mutating rows spliced elements into project.json where Delete was correctly refused, view.setActivity persisted a gated-off panel, and the inspector.focus chords half-applied.

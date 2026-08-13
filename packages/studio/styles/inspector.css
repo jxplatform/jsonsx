@@ -1130,3 +1130,325 @@ button.provenance-chip:focus-visible {
 .reference-missing {
   color: var(--spectrum-red-600, #e34850);
 }
+
+/* ─── The statement editor (studio-ui-guidelines.md §4.6) ────────────────────────────────────────
+   A Function body as cards on a connector line — `panels/statement-editor.ts`.
+   Until this block existed the surface had NO stylesheet at all: every frame,
+   indent and connector was an inline `style=` attribute, and twenty class names
+   sat in check-styles.ts's orphan list.
+
+   An attribute cannot carry the one declaration the layout needs. A flex item's
+   automatic minimum size is its min-content width, so a chain with no
+   `min-width: 0` on it refuses to shrink: an operand row asking for a 112px
+   picker + a 56px picker + a Spectrum field (192px by default) is wider than a
+   280px Inspector, and Operator, Target and Value were clipped by the right
+   edge of the WINDOW. The editor is drawn in three docks of very different
+   widths — the Navigator's State panel, the Inspector's Events tab and the
+   Bottom dock's Logic tab — so a pixel layout is wrong by construction.
+
+   Colours here are the ones the attributes already carried: this is a layout
+   change and nothing else. */
+.statement-editor {
+  min-width: 0;
+}
+/* One indent per nesting level, drawn once. The lane used to add a 6px margin of
+   its own on top of the list's 4px + 2px + 8px, so a three-deep branch spent
+   48px of a 240px panel on indentation alone. */
+.statement-list {
+  min-width: 0;
+  padding: 2px 0 0 8px;
+  border-left: 2px solid var(--spectrum-gray-300, #3c3c3c);
+}
+.statement-lane {
+  min-width: 0;
+  margin: 4px 0;
+}
+.statement-lane-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+/* The card is the draggable object, so its frame is what carries the weight. */
+.statement-card {
+  min-width: 0;
+  margin: 0 0 6px;
+  padding: 4px 6px;
+  border: 1px solid var(--spectrum-gray-300, #3c3c3c);
+  border-radius: var(--radius);
+  background: var(--spectrum-gray-75, #1e1e1e);
+}
+.statement-card-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.statement-card-body {
+  min-width: 0;
+}
+.statement-drag-handle {
+  flex-shrink: 0;
+  color: var(--spectrum-gray-500, #6e6e6e);
+  font-size: var(--spectrum-font-size-50, 11px);
+  line-height: 1;
+  cursor: grab;
+  user-select: none;
+}
+/* The kind label and a lane's name are the same 10px caption. */
+.statement-kind-label,
+.statement-lane-label {
+  min-width: 0;
+  color: var(--fg-dim);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+/* "Dispatch event" beside a drag handle and a delete button is already most of a
+   narrow header, so the kind ellipsizes rather than widening the card. */
+.statement-kind-label {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* A `$switch` case renames itself in the lane header, so this label slot holds a
+   text FIELD rather than a word — hence a flex row and no `overflow: hidden`,
+   which would clip the field's focus ring. */
+.statement-lane-label {
+  display: flex;
+  align-items: center;
+}
+/* The uppercase and the 10px belong to the label, not to the value: inherited
+   properties cross the shadow boundary, so `case 1` rendered as `CASE 1` in the
+   field you were about to type into. */
+.statement-case-key {
+  /* It may not GROW: the lane's remove button shares this header, and a key
+     field that takes the whole line pushes it onto one of its own. */
+  flex: 0 1 6rem;
+  min-width: 0;
+  font-size: var(--spectrum-font-size-50, 11px);
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+}
+/* Hard right, and it used to take a `<span style="flex:1">` spacer to get there. */
+.statement-delete {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.statement-lane-remove {
+  flex-shrink: 0;
+}
+.statement-add,
+.statement-add-case,
+.statement-add-else {
+  max-width: 100%;
+}
+/* A direct child of `.style-row`, which is a flex COLUMN — so `flex: 1` here was
+   never a width, it was permission to grow TALL, and a flex-basis would have been
+   a height outright. That is the empty column the bug report photographed. Width
+   comes from the `.style-row > sp-textfield` stretch rule above; all this row
+   needs of its own is permission to shrink. */
+.statement-dispatch-name {
+  min-width: 0;
+}
+/* `bubbles` and `composed` read as one row and stack when they cannot. */
+.statement-dispatch-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  min-width: 0;
+}
+.statement-dispatch-bubbles,
+.statement-dispatch-composed {
+  flex: 0 0 auto;
+  max-width: 100%;
+}
+/* Drag feedback. `dragging`, `drop-above` and `drop-below` are toggled by
+   registerStatementsDnD and had no rule anywhere, so a drag showed the cursor
+   moving and nothing else until the drop landed. */
+.statement-card.dragging {
+  opacity: 0.4;
+}
+.statement-card.drop-above {
+  box-shadow: inset 0 2px 0 0 var(--accent);
+}
+.statement-card.drop-below {
+  box-shadow: inset 0 -2px 0 0 var(--accent);
+}
+
+/* ─── The expression editor ──────────────────────────────────────────────────
+   `ui/expression-editor.ts`, drawn inside a statement card, inside the Data
+   panel's signal editor, and on its own in the Bottom dock's formula workspace.
+   Same story as above: no stylesheet, so no `min-width: 0`, so the operand
+   controls could not shrink to the dock they were in. */
+.expression-editor {
+  min-width: 0;
+}
+/* Nesting depth, from CSS rather than from a `style=` string built in TS. */
+.expression-editor--nested {
+  margin-left: 4px;
+  padding-left: 6px;
+  border-left: 2px solid var(--spectrum-gray-300, #3c3c3c);
+}
+.expr-subsection {
+  min-width: 0;
+  margin-top: 4px;
+}
+.expr-error {
+  padding: 2px 0;
+  color: var(--danger);
+  font-size: 10px;
+}
+/* Two of the editor's three row primitives — the operand is the third, just
+   below, and differs only in how it aligns a tall widget. Between them they are
+   the rule that makes the whole thing hold at any width: a row when there is
+   room for one, a stack when there is not. The break is decided by a flex-basis,
+   never by a fixed width, so the same markup is two columns in a 600px dock and
+   two lines in a 240px rail and neither is a special case. */
+.expr-widget,
+.expr-literal {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+/* An operand may be a nested editor several rows tall; its mode picker belongs
+   at the top of that block, not at the middle of it. */
+.expr-operand {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+.expr-operand-mode {
+  flex: 0 1 6.5rem;
+}
+.expr-literal {
+  flex: 1 1 8rem;
+}
+/* The operator is two or three glyphs, so it may compress a long way before the
+   Browse-catalog button beside it is pushed onto a line of its own. */
+.expr-operator {
+  flex: 1 1 4rem;
+}
+.expr-ref {
+  flex: 1 1 6rem;
+}
+/* A nested formula is a BLOCK of rows, not a control, so it always takes a line
+   of its own under the mode picker that names it. Sizing it as a sibling instead
+   is what put a lone "Formula ▾" at the top of a tall empty column in the bug
+   report — the picker labels what follows it, and a label does not want a column
+   to itself. A `flex-basis: 100%` is the wrap, said once. */
+.expr-operand > .expression-editor {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+.expr-literal-type {
+  flex: 0 1 4rem;
+}
+.expr-literal-value {
+  flex: 1 1 4.5rem;
+}
+.expr-browse-catalog,
+.expr-literal-bool {
+  flex: 0 0 auto;
+}
+.expr-literal-null {
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-75, 12px);
+}
+/* The live value (spec §19.9). A resolved formula is arbitrary text — an object,
+   a URL, a paragraph — so it ellipsizes inside the row it annotates and never
+   sets the row's width. The same badge is drawn on the chip strip
+   (ui/formula-chips.ts), which still carries its own inline copy. */
+.expr-live-badge {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 0 5px;
+  border-radius: var(--radius);
+  background: var(--spectrum-gray-200, #323232);
+  color: var(--spectrum-seafoam-900, #35a690);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 16px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* Positional args (`splice`, `call`) — also drawn by ui/schema-form.ts, which
+   still passes its own inline flex; the wrap and the shrink are what it gains. */
+.array-object-field {
+  min-width: 0;
+}
+.array-object-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  margin-bottom: 4px;
+}
+.array-object-label {
+  flex: 0 0 auto;
+  min-width: 30px;
+  color: var(--fg-dim);
+  font-size: 10px;
+}
+.array-object-row sp-action-button {
+  flex: 0 0 auto;
+}
+/* `switch` cases: matched value → result operand, plus the default row. The
+   default's label keeps the key column's width so the two align. */
+.switch-cases {
+  min-width: 0;
+  margin-top: 4px;
+}
+.switch-case-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+  margin-bottom: 4px;
+}
+.switch-case-key {
+  flex: 0 1 5rem;
+  min-width: 0;
+}
+.switch-case-default {
+  color: var(--fg-dim);
+  font-size: 10px;
+  line-height: 24px;
+}
+.switch-cases sp-action-button {
+  flex: 0 0 auto;
+}
+/* The belt, for both editors. A Spectrum field is `--spectrum-field-width` wide
+   by default (192px) and declares its own min-inline-size; a field row that
+   never says otherwise is therefore ~200px of demand per control, which is the
+   whole width of the rail. Outer-tree rules win over a shadow root's `:host`,
+   so this is where that demand is answered. */
+.statement-editor .style-row,
+.expression-editor .style-row {
+  min-width: 0;
+}
+.statement-editor sp-picker,
+.statement-editor sp-textfield,
+.statement-editor sp-number-field,
+.statement-editor sp-combobox,
+.expression-editor sp-picker,
+.expression-editor sp-textfield,
+.expression-editor sp-number-field,
+.expression-editor sp-combobox {
+  min-width: 0;
+  max-width: 100%;
+}

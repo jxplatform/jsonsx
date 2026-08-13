@@ -126,6 +126,7 @@ const {
   requestCanvasEval,
   sawIframeDragOver,
   setCanvasContextMenuHandler,
+  setCanvasPointerDownHandler,
   setCanvasSlashHandler,
   setIframePatchEscalation,
   setFileDropHandler,
@@ -740,6 +741,37 @@ describe("iframe canvas interaction", () => {
     expect(sel.style.top).toBe("5px");
     expect(sel.style.width).toBe("100px");
     expect(sel.style.height).toBe("20px");
+  });
+
+  /*
+   * The parent's only proof that the author is back on the canvas — `studio.ts` injects the block
+   * action bar's suppression release here. {@link focusHostPane} cannot serve: `focusPane` returns
+   * early when the pane already has focus, which is the ordinary case AND the one the release
+   * exists for (clicking the element that is already selected posts the same path back, so the
+   * parent's render path has nothing to compare).
+   */
+  test("both canvas pointerdown messages report to the injected handler", async () => {
+    await mountReady();
+    let fired = 0;
+    setCanvasPointerDownHandler(() => {
+      fired += 1;
+    });
+    try {
+      channels[0]!.deliver({ kind: "paneFocus" });
+      expect(fired).toBe(1);
+      // `hit` reports too, for the same reason it also calls `focusHostPane`: the canvas bundle
+      // Ships prebuilt, so a frame whose build predates `paneFocus` still has to be heard.
+      channels[0]!.deliver({
+        hit: { path: ["children", 0], rect: { height: 1, width: 1, x: 0, y: 0 } },
+        kind: "hit",
+      });
+      expect(fired).toBe(2);
+    } finally {
+      setCanvasPointerDownHandler(null);
+    }
+    // Unregistered, the messages are still handled — they just report to nobody.
+    channels[0]!.deliver({ kind: "paneFocus" });
+    expect(fired).toBe(2);
   });
 
   test("a ctrl/cmd-click ACCUMULATES instead of replacing (§6.5)", async () => {

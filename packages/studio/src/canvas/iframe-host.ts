@@ -1119,6 +1119,22 @@ export function setToolbarRefresh(fn: () => void): void {
   toolbarRefresh = fn;
 }
 
+/** Injected "a pointer went down in a canvas" signal (studio.ts → releaseBlockActionBar). */
+let canvasPointerDownHandler: (() => void) | null = null;
+
+/**
+ * Register what runs when a canvas frame reports a pointerdown. Pass `null` to unregister.
+ *
+ * Injected rather than imported for the reason {@link setToolbarRefresh} gives — this module
+ * deliberately knows nothing about panels — and it exists as its own seam because
+ * {@link focusHostPane} cannot serve as one: `focusPane` returns early when the pane already has
+ * focus, which is the ordinary case (clicking around inside the pane you are already in) and
+ * precisely the case the one subscriber, the block action bar's suppression release, is for.
+ */
+export function setCanvasPointerDownHandler(fn: (() => void) | null): void {
+  canvasPointerDownHandler = fn;
+}
+
 let selectionWatch: { stop: () => void } | null = null;
 
 /** Full-render escalation, injected by studio init (a patchError can't apply surgically). */
@@ -1774,6 +1790,10 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       /* The frame says only that a pointer went down in it. Every mode posts this, including
          preview — see the message's own docstring for the two holes in `hit` that it closes. */
       focusHostPane(state);
+      // …and "a pointer went down in a canvas" is exactly what un-hides the block action bar: the
+      // Author is back on the surface it belongs to. Harmless in preview, where the bar draws
+      // Nothing anyway.
+      canvasPointerDownHandler?.();
       return;
     }
     case "hit": {
@@ -1783,6 +1803,9 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
          beaten it here, and both stay: the canvas bundle ships prebuilt, so a frame whose build
          predates `paneFocus` must still focus its pane on a click that lands on a node. */
       focusHostPane(state);
+      // Both, for the same reason and the same cost: the release is a no-op unless the bar is
+      // Actually suppressed, so the pair of calls a modern frame makes is one null check.
+      canvasPointerDownHandler?.();
       // Selecting a real document node retires any layout selection — the two are alternatives, and
       // A stale layout panel next to a fresh element selection would name the wrong thing.
       setLayoutSelection(null);

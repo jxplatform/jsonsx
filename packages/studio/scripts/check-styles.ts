@@ -192,27 +192,11 @@ export const ALLOWED_ORPHANS = new Set<string>([
   "link-target-value",
   "link-target-window",
   "style-section-body",
-  // Owner: panels/statement-editor.ts
-  "drop-above",
-  "drop-below",
-  "statement-add",
-  "statement-add-case",
-  "statement-add-else",
-  "statement-card",
-  "statement-card-body",
-  "statement-card-header",
-  "statement-case-key",
-  "statement-delete",
-  "statement-dispatch-bubbles",
-  "statement-dispatch-composed",
-  "statement-dispatch-name",
-  "statement-drag-handle",
-  "statement-editor",
-  "statement-kind-label",
-  "statement-lane",
-  "statement-lane-header",
-  "statement-lane-remove",
-  "statement-list",
+  /* Owner: panels/statement-editor.ts — the whole surface (twenty names, including the two
+     drag-feedback classes that had no rule anywhere) is styled in styles/inspector.css now. It
+     held itself together with inline `style=` attributes, and an attribute cannot carry the
+     `min-width: 0` a flex chain needs, so the Logic tab's operand controls were clipped by the
+     right edge of the window at Inspector width. */
   // Owner: panels/welcome-screen.ts
   "welcome-catalogue",
   // Owner: publish/publish-panel.ts
@@ -241,13 +225,10 @@ export const ALLOWED_ORPHANS = new Set<string>([
   // Owner: ui/dynamic-slot.ts
   "dynamic-slot",
   "dynamic-slot-mode",
-  // Owner: ui/expression-editor.ts
-  "array-object-field",
-  "array-object-row",
-  "expr-browse-catalog",
-  "expr-live-badge",
-  "expression-editor",
-  "switch-cases",
+  /* Owner: ui/expression-editor.ts — styled in styles/inspector.css beside the statement editor it
+     is drawn inside. `array-object-*` and `expr-live-badge` are shared with ui/schema-form.ts and
+     ui/formula-chips.ts, which still pass their own inline copies; the rule they now inherit is
+     the wrap and the shrink. */
   // Owner: ui/form-controls.ts
   "schema-builder",
   "secret-field",

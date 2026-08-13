@@ -71,8 +71,10 @@ const {
   initBlockActionBar,
   isEditChromeTarget,
   onCanvasScroll,
+  releaseBlockActionBar,
   renderBlockActionBar,
   selectionCommandRegistry,
+  suppressBlockActionBar,
 } = await import("../src/panels/block-action-bar");
 const { makeContext } = await import("../src/commands/context");
 
@@ -112,8 +114,9 @@ function setAnchor(
   host.anchor = { height: 20, left: 30, top: 200, width: 100, ...rect };
 }
 
-function setup(docNode: JxMutableNode, selection: JxPath | null) {
-  const tab = resetWorkspaceWithTab(docNode);
+/** Open one tab on `docNode` with `selection` selected. `opts.id` names it (a second document). */
+function setup(docNode: JxMutableNode, selection: JxPath | null, opts: { id?: string } = {}) {
+  const tab = resetWorkspaceWithTab(docNode, opts);
   tab.session.selection = selection ? [selection] : [];
   setAnchor();
   return tab;
@@ -1077,6 +1080,130 @@ describe("scroll tracking", () => {
     onCanvasScroll(e);
     await raf();
     expect(bar()!.style.top).toBe(before);
+  });
+});
+
+// ─── Suppression: the bar follows the canvas ─────────────────────────────────
+
+/**
+ * The reported defect, in the author's words: the bar "persists, potentially blocking a part of the
+ * interface that the user needs to utilize" — they were working in the Inspector's Logic tab while
+ * the bar sat over the canvas, and it is `position: fixed` and clamped into the window, so it can
+ * overlap the Document Header card, the pane context bar and the docks.
+ *
+ * What these tests are really about is why a dismiss is not the fix. The bar is re-rendered from
+ * the `toolbarRefresh` seam on every selection snapshot and from `renderOnly("overlays")` on
+ * zoom/pan, so a bar that is merely dismissed flashes back on the next repaint. The state has to
+ * survive those, and end on its own — by the selection moving, or by the canvas taking a pointer.
+ */
+describe("suppression", () => {
+  beforeEach(() => {
+    canvasMode = "design";
+    host.editing = false;
+    host.snapshot = null;
+    setup(
+      {
+        children: [
+          { tagName: "p", textContent: "A" },
+          { tagName: "p", textContent: "B" },
+        ],
+        tagName: "div",
+      },
+      ["children", 0],
+    );
+    renderBlockActionBar();
+  });
+
+  // Also drops the suppression, so no test here can leak one into the next.
+  afterEach(() => dismissBlockActionBar());
+
+  test("a chrome pointerdown hides the bar, and a repaint does not bring it back", () => {
+    expect(bar()).not.toBeNull();
+    suppressBlockActionBar();
+    expect(bar()).toBeNull();
+    // The snapshot- and overlay-driven repaints, which is what `dismissBlockActionBar` alone
+    // Could not survive.
+    renderBlockActionBar();
+    renderBlockActionBar();
+    expect(bar()).toBeNull();
+  });
+
+  test("the selection is untouched — the Inspector still edits what the author selected", () => {
+    suppressBlockActionBar();
+    expect(activeTab.value!.session.selection).toEqual([["children", 0]] as never);
+  });
+
+  test("a different selection releases it — an Outline row click hides the bar and shows it", () => {
+    suppressBlockActionBar();
+    // One click, both halves: it is chrome (so it suppresses) AND it moves the selection (so the
+    // Suppression is already over by the time the bar renders).
+    activeTab.value!.session.selection = [["children", 1]] as never;
+    renderBlockActionBar();
+    expect(bar()).not.toBeNull();
+    // Released for good, not for one pass.
+    renderBlockActionBar();
+    expect(bar()).not.toBeNull();
+  });
+
+  test("clicking the SAME element again brings it back — the door the selection cannot open", () => {
+    suppressBlockActionBar();
+    // The `hit` for the already-selected block posts the same path back, so the render path has
+    // Nothing to compare and the bar would stay hidden for as long as the author kept clicking it.
+    renderBlockActionBar();
+    expect(bar()).toBeNull();
+    // Which is why the frame's own pointerdown is a second, independent signal.
+    releaseBlockActionBar();
+    expect(bar()).not.toBeNull();
+  });
+
+  test("a release with nothing suppressed renders nothing at all", () => {
+    dismissBlockActionBar();
+    releaseBlockActionBar();
+    // A canvas pointerdown is the most frequent event in the app; unsuppressed it must cost a null
+    // Check, not a re-render of a bar that was deliberately taken down.
+    expect(bar()).toBeNull();
+  });
+
+  test("a dismiss drops the suppression, so it cannot leak into the next document", () => {
+    suppressBlockActionBar();
+    // What a mode switch or a stage teardown does. `["children",0]` names a node in every document,
+    // So a key that outlived this one would hide the bar over a node nobody clicked away from.
+    dismissBlockActionBar();
+    renderBlockActionBar();
+    expect(bar()).not.toBeNull();
+  });
+
+  test("the same path in another document is another node — the key carries the tab", () => {
+    suppressBlockActionBar();
+    // Switching tabs is itself a chrome click, so it arrives suppressed. `["children",0]` names a
+    // Node in every document there has ever been; keyed on the path alone the bar would come up
+    // Hidden over a block in a document the author has not touched.
+    setup({ children: [{ tagName: "p", textContent: "C" }], tagName: "div" }, ["children", 0], {
+      id: "other-doc",
+    });
+    renderBlockActionBar();
+    expect(bar()).not.toBeNull();
+  });
+
+  test("nothing selected is not the document root: the two keys must not collide", () => {
+    activeTab.value!.session.selection = [];
+    renderBlockActionBar();
+    suppressBlockActionBar();
+    activeTab.value!.session.selection = [[]] as never;
+    renderBlockActionBar();
+    expect(bar()).not.toBeNull();
+  });
+
+  test("the link popover goes with the bar — it is anchored to a button that is gone", () => {
+    startEditingState();
+    barButton("Link").click();
+    expect(linkPopoverHost()).not.toBeNull();
+    suppressBlockActionBar();
+    expect(bar()).toBeNull();
+    expect(linkPopoverHost()).toBeNull();
+    // And the popover's own render guard cannot strand the bar: a suppressed bar stays suppressed.
+    renderBlockActionBar();
+    expect(bar()).toBeNull();
   });
 });
 

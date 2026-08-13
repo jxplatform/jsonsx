@@ -3,6 +3,7 @@
 import { flush, stubRect } from "./harness";
 import { describe, expect, mock, test } from "bun:test";
 import { render } from "lit-html";
+import { emittedClassesOf, inlineStyledOwn, unstyledClassesOf } from "./styled-surface";
 import { extractInstruction } from "@atlaskit/pragmatic-drag-and-drop-hitbox/tree-item";
 import {
   laneListAt,
@@ -271,9 +272,77 @@ describe("renderStatementEditor structure", () => {
     const { container } = mount([{ if: { $ref: "#/state/count" }, then: [] }]);
     const lists = [...container.querySelectorAll(".statement-list")];
     expect(lists.length).toBe(2);
+    // The connector, the indent and the card frame are `.statement-list` / `.statement-card` rules
+    // In styles/inspector.css — asserted as the class, because the rule is not in the markup.
     for (const list of lists) {
-      expect(list.getAttribute("style")).toContain("border-left");
+      expect(list.getAttribute("style")).toBeNull();
     }
+  });
+});
+
+// ─── The layout is a stylesheet's, not an attribute's ────────────────────────
+
+describe("every surface is addressable by CSS", () => {
+  /*
+   * The Logic tab shipped with no stylesheet at all: twenty class names in check-styles.ts's
+   * ALLOWED_ORPHANS and a handful of inline `style="display:flex;…"` attributes doing the layout.
+   * An attribute cannot carry `min-width: 0`, and a flex item's automatic minimum is its
+   * min-content width, so an operand row asking for a 112px picker + a 56px picker + a Spectrum
+   * field simply refused to shrink: in a 280px Inspector the Operator, Target and Value controls
+   * were clipped by the right edge of the WINDOW.
+   *
+   * Under happy-dom nothing lays out, so these tests assert the two things that DO decide it — the
+   * class is on the element, and the element carries no inline style to outrank the stylesheet.
+   * The pixels were checked in Chrome instead, in the Navigator's State panel at 180 / 240 / 280 /
+   * 420 / 600px: from 240px up, no descendant's right edge passes the panel's, and the operand rows
+   * that sit side by side at 600px are stacked at 240px. Below ~200px the panel overflows already,
+   * at `sp-accordion-item`, with these editors hidden — the signals panel's own rows, not this.
+   */
+  const EVERY_KIND: JxStatement[] = [
+    { operator: "=", target: { $ref: "#/state/count" }, value: 1 },
+    { else: [], if: { $ref: "#/state/count" }, then: [{ dispatchEvent: "x" }] },
+    { $switch: { $ref: "#/state/count" }, cases: { a: [] }, default: [] },
+    { dispatchEvent: "saved" },
+  ];
+
+  test("no element the editor names carries an inline style attribute", async () => {
+    const { container } = mount(EVERY_KIND);
+    const own = await emittedClassesOf("src/panels/statement-editor.ts");
+    expect(inlineStyledOwn(container, own)).toEqual([]);
+  });
+
+  test("the card, its header and its body are all named", () => {
+    const { container } = mount([{ dispatchEvent: "x" }]);
+    const card = cards(container)[0]!;
+    expect(card.querySelector(".statement-card-header")).toBeTruthy();
+    expect(card.querySelector(".statement-card-body")).toBeTruthy();
+    // The delete button is pushed right by `margin-left: auto`, not by a spacer element.
+    expect(card.querySelector(".statement-card-header > span:not([class])")).toBeNull();
+  });
+
+  test("a lane's label is a class, and a case key is a field inside it", () => {
+    const { container } = mount([
+      { $switch: { $ref: "#/state/count" }, cases: { a: [] }, default: [] },
+    ]);
+    const labels = [...container.querySelectorAll(".statement-lane-label")];
+    expect(labels.length).toBe(2);
+    // The case key lives INSIDE the label slot, so it resets the label's uppercase itself —
+    // Inherited properties cross the shadow boundary and `case 1` rendered as `CASE 1`.
+    expect(labels[0]!.querySelector(".statement-case-key")).toBeTruthy();
+    expect(labels[1]!.textContent!.trim()).toBe("Default");
+  });
+
+  test("the dispatch options row is one wrapping container, not a bare flex attribute", () => {
+    const { container } = mount([{ dispatchEvent: "x" }]);
+    const options = container.querySelector(".statement-dispatch-options")!;
+    expect(options.querySelector(".statement-dispatch-bubbles")).toBeTruthy();
+    expect(options.querySelector(".statement-dispatch-composed")).toBeTruthy();
+  });
+
+  test("every class the editor emits is one a stylesheet defines", async () => {
+    // The ratchet, at the level that matters to this panel: check-styles.ts fails on a new orphan
+    // Anywhere and reports a count; this fails on one introduced HERE, and names it.
+    expect(await unstyledClassesOf("src/panels/statement-editor.ts")).toEqual([]);
   });
 });
 

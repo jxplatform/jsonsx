@@ -170,6 +170,7 @@ export async function bootStudio(opts: {
     // The bootstrap composes the bar's structural selection verbs into the app-wide registry so
     // The palette, the keyboard and `__jxAutomation` can reach them (plan §13.3).
     registerSelectionCommands: mock(() => {}),
+    releaseBlockActionBar: mock(() => {}),
     renderBlockActionBar: mock(() => {}),
     runCommand: mock(() => {}),
     selectionCommandRegistry: () => ({
@@ -178,6 +179,7 @@ export async function bootStudio(opts: {
       keymap: { formatBinding: () => {} },
     }),
     showCommandOverflow: mock(() => {}),
+    suppressBlockActionBar: mock(() => {}),
     withCommandTarget: <T>(_path: unknown, fn: () => T) => fn(),
   }));
 

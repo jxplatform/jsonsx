@@ -54,6 +54,8 @@ A small floating toolbar appears above the selected element:
 - For a component instance, **Edit Component** opens the component itself; for anything else, **Convert to Component** turns the selection into a reusable component.
 - While you're editing text, formatting buttons (bold, italic, and friends) and an **Insert data** button join the bar. See [Edit mode](/docs/studio/editing).
 
+The bar steps aside when you leave the canvas. Click into the Inspector, a panel or the document header and it disappears, so it is never sitting over the control you were reaching for — **your selection stays exactly as it was**, which is what the Inspector is editing. It comes back the moment the canvas is in play again: click the element on the canvas, or select anything from the Outline, and the bar is there for it. The bar's own pieces — its `⋮` menu, the link popover, the slash menu — and panning or zooming the canvas all leave it alone.
+
 :::doc-tip
 The bar keeps one shape. An action that cannot apply to the current selection — moving the first child up, deleting the document root — is shown greyed with a tooltip saying what it needs, rather than disappearing. Buttons never move under your cursor.
 :::

@@ -1200,10 +1200,88 @@ export function dismissLinkPopover() {
 
 /** Dismiss the block action bar. */
 export function dismissBlockActionBar() {
+  /* A dismiss is the bar's STRUCTURAL teardown — `canvas/canvas-render.ts` calls it when a stage is
+     torn down and again on a mode transition — so it also drops any suppression. The bar it would
+     otherwise be holding down does not exist any more; what comes back is a different one. */
+  _suppressedFor = null;
   dismissBlockBarOverflow();
   if (view.blockActionBarEl) {
     litRender(nothing, view.blockActionBarEl);
   }
+}
+
+/**
+ * The document + selection the bar is currently suppressed FOR, or null while it is free to draw.
+ *
+ * **Why a key and not a boolean.** The bar is `position: fixed` and clamped into the window, so it
+ * can sit over the Document Header card, the pane context bar and the docks; an author working in
+ * the Inspector's Logic tab reported it "blocking a part of the interface that the user needs to
+ * utilize". Hiding it on a chrome pointerdown is half an answer — {@link dismissBlockActionBar}
+ * alone would flash back on the very next repaint, because the bar is re-rendered from the
+ * `toolbarRefresh` seam on every selection snapshot and from `renderOnly("overlays")` on zoom/pan.
+ * The key is what makes the state end by itself: a render for a DIFFERENT selection is the click
+ * that hid the bar having also chosen a new target (an Outline row, a Navigator entry), and the bar
+ * belongs over the new one. {@link releaseBlockActionBar} is the other door, for the click that
+ * chose the same target again.
+ *
+ * Nothing outside this module reads it. "Is the bar suppressed" is not a fact any other surface may
+ * branch on — it is one panel declining to draw itself, and a second reader would make it a mode.
+ */
+let _suppressedFor: { key: string } | null = null;
+
+/**
+ * What the bar is suppressed FOR: a path, in a document.
+ *
+ * The tab is half the key because `["children",0]` names a node in every document there has ever
+ * been. Keyed on the path alone, an author who suppressed the bar and then switched tabs — itself a
+ * chrome click — would find it hidden over the new document's first block, which they never clicked
+ * away from. `JSON.stringify` rather than `join` for the same reason one level down: the document
+ * root is `[]` and "nothing selected" is `null`, and those two must not compare equal.
+ */
+function suppressionKey(tab: ActiveTab | null, path: JxPath | null): string {
+  return JSON.stringify([tab?.id ?? null, path]);
+}
+
+/**
+ * Hide the bar until the canvas is in play again — the author pressed a pointer down in parent
+ * chrome, which is a surface the bar may be sitting on top of.
+ *
+ * **The selection is deliberately untouched.** The Inspector edits the selected node, so a click
+ * into it is how the author edits the thing they selected; clearing the selection here would make
+ * the panel they just reached for go blank. Only the bar's own rendering is suspended.
+ *
+ * The `⋮` menu and the link popover go with it, because both are ANCHORED to the bar — the overflow
+ * under its `⋮` button, the popover under its Link button. Left open they would float over the
+ * chrome with nothing under them to belong to, which is the same defect one level down. Neither can
+ * be the cause of this call: {@link isEditChromeTarget} exempts both.
+ */
+export function suppressBlockActionBar(): void {
+  // Clears any earlier key as its first act; this selection's replaces it below.
+  dismissBlockActionBar();
+  if (_linkPopoverOpen) {
+    dismissLinkPopover();
+  }
+  const tab = activeTab.value;
+  _suppressedFor = { key: suppressionKey(tab, primarySelection(tab?.session.selection)) };
+}
+
+/**
+ * Let the bar draw again — a pointer went down in a canvas frame, so the canvas is the surface the
+ * author is working on.
+ *
+ * This is the door the SELECTION cannot open: clicking the already-selected element posts the same
+ * path back, so the key comparison in {@link renderBlockActionBar} still matches and the bar would
+ * stay hidden for as long as the author kept clicking the block they are editing.
+ *
+ * A no-op when nothing is suppressed, so the common case — every canvas pointerdown, suppressed or
+ * not — costs a null check rather than a render.
+ */
+export function releaseBlockActionBar(): void {
+  if (!_suppressedFor) {
+    return;
+  }
+  _suppressedFor = null;
+  renderBlockActionBar();
 }
 
 /**
@@ -1356,6 +1434,19 @@ export function renderBlockActionBar() {
   const canvasMode = _ctx.getCanvasMode();
 
   const selection = primarySelection(tab?.session.selection);
+
+  /* Suppressed by a chrome pointerdown, and this pass is the first of the two doors out of it (see
+     {@link _suppressedFor}). A different selection means the click that hid the bar also chose a new
+     target, so the suppression is over; the same selection keeps it, which is what stops the next
+     snapshot- or overlay-driven repaint from flashing the bar back under the author's cursor. */
+  if (_suppressedFor) {
+    if (_suppressedFor.key === suppressionKey(tab, selection)) {
+      litRender(nothing, view.blockActionBarEl);
+      return;
+    }
+    _suppressedFor = null;
+  }
+
   if (!tab || !selection || (canvasMode !== "design" && canvasMode !== "edit")) {
     litRender(nothing, view.blockActionBarEl);
     return;

@@ -2,9 +2,9 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.20-draft
+**Version:** 0.9.21-draft
 **Status:** Partial
-**Updated:** 2026-08-12
+**Updated:** 2026-08-13
 **License:** MIT
 
 ---
@@ -294,6 +294,23 @@ Unified floating action bar (Gutenberg-style) attached to the selected element:
 The bar has ONE shape. The formatting group is present whenever the selected block can carry inline
 markup — that is, whenever its element metadata declares `$inlineActions`. It is not gated on an
 editing session, because there is none (§8.2).
+
+**It is gated on the author's attention.** A pointerdown in parent chrome outside the canvas hides
+the bar, and a selection change or a pointerdown back in the canvas brings it back. The bar is
+fixed-position and clamped into the window, so one left behind sits over the Document Header card,
+the pane context bar and the docks — the chrome the author has just reached for. Three rules make
+that safe:
+
+- **Hiding is not deselecting.** The selection is untouched, because the Inspector the author just
+  clicked into edits exactly that selection.
+- **The bar's own surfaces are exempt** — the bar, its `⋮` overflow, the link popover and the slash
+  menu act ON the bar rather than away from it, and so does the canvas stage around the artboard
+  (panning or zooming is not leaving the canvas). Its popovers close WITH it: they are anchored to
+  buttons that are about to disappear.
+- **Two doors back, because one is not enough.** A selection change reopens it, which is what makes
+  a click on an Outline row — chrome, and therefore a hide — still show the bar for the row it
+  selected. Clicking the already-selected element changes no selection, so the canvas's own
+  pointerdown is the second door.
 
 Formatting applies to a range, so the buttons are disabled for a collapsed caret and for a block
 selected without a caret at all (from the layers panel, or by a structural edit moving the
@@ -2001,6 +2018,7 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ## Changelog
 
+- **0.9.21-draft** (2026-08-13) — The block action bar steps aside when parent chrome takes the pointer, and returns on a selection change or a canvas pointerdown.
 - **0.9.20-draft** (2026-08-12) — The canvas iframe resolves keystrokes against the host keymap; inline formatting, Select All and the caret's chords become records.
 - **0.9.19-draft** (2026-08-12) — Preview is a toggle over an edit/design base in the View control rather than a third radio value; it honours the chosen breakpoint like Edit and Design; and canvas.html's clip is lifted in preview so the pane-height frame can actually scroll its document.
 - **0.9.18-draft** (2026-08-11) — §12's status table re-read against the code: collection browser, entry editor, component library management and the redirect editor were shipped and still marked Pending; the CSS properties/parts panels are read-only reflections, not declaration forms; the CEM exporter is complete and unreachable; media usage is computed but only the delete confirmation reads it.
@@ -2076,4 +2094,4 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.20-draft_
+_`@jxsuite/studio` Specification v0.9.21-draft_
