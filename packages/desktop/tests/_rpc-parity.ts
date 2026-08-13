@@ -116,6 +116,8 @@ export const CHROMIUM_RPC_EXEMPT: Record<string, string> = {
   newWindow: "single-window launcher; chromium/platform.ts implements no multi-window PAL",
   openProjectInNewWindow:
     "single-window launcher; chromium/platform.ts implements no multi-window PAL",
+  pickProject:
+    "picking without binding exists for the New Window branch alone; single-window launcher, so chromium/platform.ts offers no such branch and its openProject() picks and binds together",
   updaterApplyUpdate: "no self-updater outside electrobun; not implemented by chromium/platform.ts",
   updaterCheckForUpdate:
     "no self-updater outside electrobun; not implemented by chromium/platform.ts",

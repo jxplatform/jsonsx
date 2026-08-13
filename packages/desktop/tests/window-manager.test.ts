@@ -131,8 +131,16 @@ const createProjectSession = mock((root: string | null) => {
   sessions.push(s);
   return s;
 });
+/** The session-free picker: answers "which project" and binds nothing. Null models a cancel. */
+let pickedProject: { root: string; name: string; config: { name: string } } | null = {
+  config: { name: "Picked" },
+  name: "Picked",
+  root: "/proj/picked",
+};
+const pickProjectFile = mock(async () => pickedProject);
 void mock.module("../src/project-session", () => ({
   createProjectSession,
+  pickProjectFile,
   setFileDialog: mock(() => {}),
 }));
 
@@ -485,8 +493,53 @@ describe("per-window RPC", () => {
     reqs.newWindow();
     expect(listOpenWindows().length).toBe(before + 1);
     expect(createdWindows.at(-1)!.opts.title).toBe("Jx Studio");
-    reqs.openProjectInNewWindow({ root: "/proj/sibling" } as never);
+    const res = reqs.openProjectInNewWindow({ root: "/proj/sibling" } as never);
     expect(createdWindows.at(-1)!.opts.title).toBe(`sibling ${DASH} Jx Studio`);
+    expect(res).toEqual({ focused: false } as never);
+  });
+
+  test("openProjectInNewWindow reports a FOCUS when the project is already open", () => {
+    // Both outcomes hand back a window, so the caller cannot tell them apart by the return value
+    // Alone — and "opened in a new window" is the wrong thing to tell someone whose existing
+    // Window just came forward. The flag is asked before the open, while the answer is still true.
+    const owner = openProjectWindow("/proj/twice") as unknown as MockWindow;
+    openProjectWindow(null);
+    const reqs = lastRequests();
+    const created = createdWindows.length;
+
+    expect(reqs.openProjectInNewWindow({ root: "/proj/twice" } as never)).toEqual({
+      focused: true,
+    } as never);
+    expect(createdWindows.length).toBe(created); // Nothing new was built…
+    expect(owner.activate).toHaveBeenCalled(); // …the one that had it was raised.
+  });
+
+  test("pickProject answers WHICH project without binding this window to it", () => {
+    // The whole reason this request exists beside `openProject`: the New Window branch has to ask
+    // The question without suffering the answer. A session bound here would leave the window that
+    // Merely asked serving a project it is not showing.
+    const win = openProjectWindow("/proj/asking") as unknown as MockWindow;
+    const session = sessions.at(-1)!;
+    const reqs = lastRequests();
+
+    return reqs.pickProject().then((res) => {
+      expect(res).toEqual({ name: "Picked", root: "/proj/picked" } as never);
+      expect(session.setProjectRoot).not.toHaveBeenCalled();
+      expect(session.openProject).not.toHaveBeenCalled();
+      expect(win.setTitle).not.toHaveBeenCalled();
+      expect(listOpenWindows().find((w) => w.id === win.id)?.projectRoot).toBe("/proj/asking");
+    });
+  });
+
+  test("pickProject passes a cancelled picker straight through as null", async () => {
+    const previous = pickedProject;
+    pickedProject = null;
+    try {
+      openProjectWindow(null);
+      expect(await lastRequests().pickProject()).toBeNull();
+    } finally {
+      pickedProject = previous;
+    }
   });
 });
 

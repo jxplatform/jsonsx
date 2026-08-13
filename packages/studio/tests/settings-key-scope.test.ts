@@ -148,7 +148,11 @@ beforeAll(() => {
   });
   registerStudioCommands(
     registry,
-    { openInBrowser: () => {}, openProject: () => {}, saveDocument: () => {} },
+    {
+      openInBrowser: () => {},
+      openProject: async () => "opened" as const,
+      saveDocument: () => {},
+    },
     () => ({
       applyTransform: () => {},
       canvasMode: canvasMode(),

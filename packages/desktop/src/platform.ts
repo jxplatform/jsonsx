@@ -268,10 +268,14 @@ export function createDesktopPlatform() {
       return res;
     },
 
+    async pickProject() {
+      return rpc.request.pickProject();
+    },
+
     // ─── Multi-window ──────────────────────────────────────────────────────────
 
     async openProjectInNewWindow(root: string) {
-      await rpc.request.openProjectInNewWindow({ root });
+      return rpc.request.openProjectInNewWindow({ root });
     },
 
     async newWindow() {

@@ -167,6 +167,7 @@ import "./ui/panel-resize.js";
 import "./ui/form-controls.js";
 import { initLayers, isModalOpen } from "./ui/layers";
 import { initShortcuts, registerStudioCommands } from "./editor/shortcuts";
+import type { ProjectOpenOutcome, ProjectOpenTarget } from "./editor/shortcuts";
 import { createCommandRegistry } from "./commands/registry";
 import { chordsInScopes } from "./commands/keymap";
 import { FRAME_KEY_SCOPES } from "./canvas/iframe-keys";
@@ -1093,19 +1094,43 @@ function renderLeftPanel() {
 function loadProject() {
   return _loadProject();
 }
-async function openProject() {
+/**
+ * Open a project, in the window the user asked for, and report what actually happened.
+ *
+ * THE TARGET IS HONOURED HERE OR NOWHERE. `openProjectFlow` asks the question and this is the
+ * bootstrap's side of that contract — which it did not hold up: the hook was wired as `openProject:
+ * () => openProject()` against a function that took no target, so "New Window" was collected,
+ * dropped on the floor, and fell through to the line below that re-roots THIS window. The dialog
+ * worked, the answer was discarded, and picking a project in the file browser replaced the project
+ * the user had just said to keep.
+ */
+async function openProject(target: ProjectOpenTarget = "thisWindow"): Promise<ProjectOpenOutcome> {
   // Repo-list platforms (cloud) pick from the user's writable repositories instead of a
   // Backend dialog; the choice opens through the same path as a recent project.
   if (platformUsesRepoPicker()) {
     const picked = await openProjectPickerModal();
-    if (picked) {
-      // The catalogue may have gained an entry; refresh it before navigating into the project.
-      void hydrateProjectList().then(() => {
-        render();
-      });
-      void openRecentProject(picked.root);
+    if (!picked) {
+      return "cancelled";
     }
-    return;
+    // The catalogue may have gained an entry; refresh it before navigating into the project.
+    void hydrateProjectList().then(() => {
+      render();
+    });
+    void openRecentProject(picked.root);
+    return "opened";
+  }
+  const platform = getPlatform();
+  // ELSEWHERE, and nothing here closes: no `confirmCloseAll`, no `replaceAllTabs`, no re-rooting.
+  // `pickProject` exists precisely so this branch can ask which project without `openProject()`'s
+  // Side effect of binding the asking window to the answer. The window that opens loads it, adds
+  // Its own recent-projects entry, and this one carries on untouched.
+  if (target === "newWindow" && platform.pickProject && platform.openProjectInNewWindow) {
+    const picked = await platform.pickProject();
+    if (!picked) {
+      return "cancelled";
+    }
+    const { focused } = await platform.openProjectInNewWindow(picked.root);
+    return focused ? "focused" : "newWindow";
   }
   // The SECOND destroyer, and it was ungated for as long as the first one was. `openRecentProject`
   // Below asks `confirmCloseAll` and then calls `closeAllTabs`; this branch reaches
@@ -1114,11 +1139,11 @@ async function openProject() {
   // Button and the welcome screen all discarded unsaved work in silence. `platformUsesRepoPicker()`
   // Is true only for the cloud platform, so desktop and browser both arrived here.
   if (!(await tabStrip.confirmCloseAll("Opening another project"))) {
-    return;
+    return "cancelled";
   }
-  const result = await _openProject({ renderLeftPanel });
+  const opened = await _openProject({ renderLeftPanel });
   ensureFsSync();
-  return result;
+  return opened ? "opened" : "cancelled";
 }
 async function openRecentProject(root: string) {
   // One entry for the whole sequence, not three surfaces for its three phases. Opening a project

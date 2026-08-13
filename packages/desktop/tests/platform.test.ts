@@ -474,6 +474,11 @@ describe("platform methods", () => {
     ["listStarters", [], "listStarters", undefined],
     ["aiChatUrl", [], "aiChatUrl", undefined],
     ["setWindowProject", ["/proj/x"], "setWindowProject", { root: "/proj/x" }],
+    // Both of these ANSWER now. `openProjectInNewWindow` reports whether it built a window or
+    // Raised one that already had the project, and `pickProject` is the picker whose whole value
+    // Is its return: the chosen project, with this window left bound to its own.
+    ["openProjectInNewWindow", ["/proj/y"], "openProjectInNewWindow", { root: "/proj/y" }],
+    ["pickProject", [], "pickProject", undefined],
     ["getProjectRoot", [], "getProjectRoot", undefined],
     ["getRecentProjects", [], "getRecentProjects", undefined],
     ["getSettings", [], "getSettings", undefined],
@@ -556,7 +561,6 @@ describe("platform methods", () => {
         url: "git@host:repo.git",
       },
     ],
-    ["openProjectInNewWindow", ["/proj/y"], "openProjectInNewWindow", { root: "/proj/y" }],
     ["newWindow", [], "newWindow", undefined],
     [
       "saveRecentProjects",

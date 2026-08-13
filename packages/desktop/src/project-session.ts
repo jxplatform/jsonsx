@@ -170,6 +170,40 @@ export function setDirectoryDialog(fn: () => Promise<string | null>) {
   directoryDialogFn = fn;
 }
 
+/**
+ * Ask the user for a project.json and answer with the project it names — WITHOUT binding any
+ * session to it.
+ *
+ * Session-free on purpose, and that is the whole point of it existing beside `openProject()`.
+ * Picking and binding were one operation, so "open this in a NEW window" had no way to ask the
+ * question: the only picker Studio could reach re-rooted the asking window as a side effect of
+ * being asked, which is exactly what opening a project elsewhere must not do. `openProject()` is
+ * this function plus the binding, so both paths validate identically.
+ */
+export async function pickProjectFile(): Promise<{
+  root: string;
+  name: string;
+  config: SiteConfig;
+} | null> {
+  if (!fileDialogFn) {
+    throw new Error("No file dialog configured");
+  }
+  const selectedPath = await fileDialogFn();
+  if (!selectedPath) {
+    return null;
+  }
+
+  const filePath = resolve(selectedPath);
+  if (!existsSync(filePath) || basename(filePath) !== "project.json") {
+    throw new Error("Selected file is not a project.json");
+  }
+
+  const raw = await readFile(filePath, "utf8");
+  const config = JSON.parse(raw) as SiteConfig;
+  const root = dirname(filePath);
+  return { config, name: config.name || basename(root), root };
+}
+
 // ─── Pure helpers (no session state) ──────────────────────────────────────────
 
 // Path convention: every path returned to the studio MUST be forward-slash and project-relative.
@@ -557,34 +591,25 @@ export function createProjectSession(initialRoot: string | null) {
   }
 
   async function openProject(): Promise<OpenProjectResult | null> {
-    if (!fileDialogFn) {
-      throw new Error("No file dialog configured");
-    }
-    const selectedPath = await fileDialogFn();
-    if (!selectedPath) {
+    const picked = await pickProjectFile();
+    if (!picked) {
       return null;
     }
 
-    const filePath = resolve(selectedPath);
-    if (!existsSync(filePath) || basename(filePath) !== "project.json") {
-      throw new Error("Selected file is not a project.json");
-    }
-
-    const raw = await readFile(filePath, "utf8");
-    const config = JSON.parse(raw) as SiteConfig;
-    projectRoot = dirname(filePath);
+    // Binding is the part `pickProjectFile` deliberately leaves out — see its docstring.
+    projectRoot = picked.root;
     extensionRegistry = null;
     startWatching();
 
     return {
-      config,
+      config: picked.config,
       handle: {
-        name: config.name || basename(projectRoot),
-        projectConfig: config,
+        name: picked.name,
+        projectConfig: picked.config,
         // Absolute project path: the canonical, re-openable identity used for the recent-projects
         // List and multi-window dedup. File I/O is unaffected (handlers resolve relative paths
         // Against this session's root regardless of the studio-side value).
-        root: projectRoot,
+        root: picked.root,
       },
     };
   }

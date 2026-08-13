@@ -370,8 +370,23 @@ export interface StudioPlatform {
   /** Stack B AI assistant: URL of the OpenAI-compatible SSE chat proxy (`/__studio/ai/chat`). */
   aiChatUrl: () => string | Promise<string>;
   // ─── Multi-window (desktop only; undefined on dev-server) ───────────────────
-  /** Open a project in a new window, focusing an existing window if it is already open. */
-  openProjectInNewWindow?: (root: string) => Promise<void>;
+  /**
+   * Open a project in a new window, focusing an existing window if it is already open.
+   *
+   * `focused` says which of the two happened, so the caller reports the outcome instead of
+   * announcing the intent — "opened in a new window" is a lie when the project was already open
+   * somewhere and that window merely came to the front.
+   */
+  openProjectInNewWindow?: (root: string) => Promise<{ focused: boolean }>;
+  /**
+   * Pick a project WITHOUT binding this window to it — the answer to "which project", separated
+   * from the act of opening it here. Backs the New Window branch of Open Project: `openProject()`
+   * re-roots this window's backend as a side effect of picking, so it cannot ask a question whose
+   * answer is "not in this window". Resolves null when the user cancels the picker.
+   *
+   * Desktop only. Without it Studio does not offer the choice, because it could not honour it.
+   */
+  pickProject?: () => Promise<{ root: string; name: string } | null>;
   /** Open a fresh welcome window. */
   newWindow?: () => Promise<void>;
   /**
