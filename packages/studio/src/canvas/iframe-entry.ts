@@ -6,6 +6,7 @@
  */
 
 import { postMessageChannel } from "./iframe-channel";
+import { displayTagName } from "@jxsuite/schema/guards";
 import {
   applyPreviewColorScheme,
   applySiteStyle,
@@ -23,7 +24,8 @@ import {
 } from "./iframe-drop";
 import { startIframeInlineEdit } from "./iframe-inline-edit";
 import { startIframeSlashBridge } from "./iframe-slash";
-import { startKeyForwarding } from "./iframe-keys";
+import { NO_TABLE, startKeyForwarding } from "./iframe-keys";
+import type { ForwardTable } from "./iframe-keys";
 import { applyIframePatch } from "./iframe-patch";
 import { disposeAllSubtrees } from "./iframe-subtree";
 import { evaluateLiveExprs } from "./iframe-eval";
@@ -49,6 +51,7 @@ import type {
   DragSrcKind,
   FileDropHit,
   IframeToParent,
+  LayoutHit,
   ParentToIframe,
 } from "./iframe-protocol";
 import type { JxDocument, JxMutableNode, JxStyle } from "@jxsuite/schema/types";
@@ -106,7 +109,35 @@ export function fileDropHitFor(
   return {
     path,
     rect: rectFor(targetEl),
-    tagName: (node?.tagName ?? targetEl.tagName).toLowerCase(),
+    tagName: (displayTagName(node?.tagName) || targetEl.tagName).toLowerCase(),
+  };
+}
+
+/**
+ * Resolve a click to the layout-chrome node it landed on, or null when it did not land on one.
+ *
+ * Page content wins outright: a `[data-jx-path]` ancestor means the runtime rendered this node from
+ * the page document, and {@link file://./iframe-interaction.ts} already reports it as a normal
+ * `hit`. Only when no page node claims the click does the nearest `[data-jx-layout-region]` — the
+ * dimmed, frozen chrome the layout contributed — answer for it.
+ */
+export function layoutHitFor(target: EventTarget | null): LayoutHit | null {
+  if (!(target instanceof Element)) {
+    return null;
+  }
+  if (target.closest("[data-jx-path]")) {
+    return null;
+  }
+  const el = target.closest("[data-jx-layout-region]");
+  if (!(el instanceof HTMLElement)) {
+    return null;
+  }
+  return {
+    className: typeof el.className === "string" ? el.className : "",
+    layoutFile: el.dataset.jxLayoutFile ?? "",
+    layoutPath: parseJxPath(el.dataset.jxLayoutPath ?? "[]"),
+    rect: rectFor(el),
+    tagName: el.tagName.toLowerCase(),
   };
 }
 
@@ -147,6 +178,27 @@ export function patchDisturbsActiveEdit(forwardOps: JxDocOp[]): boolean {
   return false;
 }
 
+/** Consecutive quiet animation frames before the frame declares itself settled (§13.4). */
+export const IDLE_QUIET_FRAMES = 2;
+
+/**
+ * How long the idle watcher keeps sampling before it stops.
+ *
+ * A page with an endless animation never reaches two quiet frames, and a rAF loop that runs for the
+ * life of the tab to prove it is not free. Giving up is safe because the last posted sample already
+ * names the animation — the parent stays honestly "not idle" rather than being told a comfortable
+ * lie.
+ */
+export const IDLE_WATCH_MAX_MS = 5000;
+
+/**
+ * How long after a failed image load a retry may still be in flight.
+ *
+ * `installCanvasImageRetry` re-fires at 150/300/450 ms; each further failure re-arms the window, so
+ * a per-error grace comfortably covers the whole chain without encoding its schedule twice.
+ */
+export const IMAGE_RETRY_WINDOW_MS = 500;
+
 /**
  * Drive a channel: render each `render` message into `container`, dropping stale generations, and
  * acknowledge with `renderComplete`/`renderError`. Exposed (rather than inlined in {@link boot}) so
@@ -170,6 +222,11 @@ export function startCanvasIframe(opts: {
   // The mode of the LIVE render — gates the interactive surfaces (inline editing, insert zones,
   // Grab-drags) that only design/edit modes own. Adopted alongside shadowDoc.
   let currentMode: CanvasMode = "design";
+  /* The host's chord table. Empty until the first `keymap` message, which the host posts on
+     `ready` — before any render, so there is nothing to type into during the gap. An empty table
+     forwards nothing, which is the honest cold-start answer: the frame does not guess at what the
+     parent might bind, and it never `preventDefault`s a key it cannot name. */
+  let forwardTable: ForwardTable = NO_TABLE;
   // The current render's retained context (scope/mapping), used to render subtrees for structural
   // Patches. Set together with `shadowDoc`, so it's non-null whenever a patch is applied.
   let renderCtx: IframeRenderCtx | null = null;
@@ -280,9 +337,33 @@ export function startCanvasIframe(opts: {
     getMode: () => currentMode,
     getShadowDoc: () => shadowDoc,
   });
+  // Report clicks that land on LAYOUT chrome. The interaction wiring above only knows about
+  // `[data-jx-path]` nodes, and layout chrome has none — so this is the listener that makes "My
+  // Site" in the header answer a click at all. It runs in CAPTURE alongside the interaction click
+  // Handler; the two are disjoint by construction (`layoutHitFor` refuses anything a page node
+  // Claims), so exactly one of them posts per click.
+  const onLayoutClick = (e: Event) => {
+    if (currentMode !== "design" && currentMode !== "edit") {
+      return;
+    }
+    const hit = layoutHitFor(e.target);
+    if (hit) {
+      channel.post({ hit, kind: "layoutHit" });
+    }
+  };
+  container.ownerDocument.addEventListener("click", onLayoutClick, true);
   // Forward global-shortcut keystrokes to the parent — its shortcut handler is bound to the editor
   // Document, so without this they'd be swallowed whenever focus is inside the canvas iframe.
-  const stopKeyForwarding = startKeyForwarding(channel, container.ownerDocument);
+  // `isEditing` is the real "is a caret session live" predicate: the canvas root is PERMANENTLY
+  // Contenteditable, so "the target is editable" is true even with no session, and the clipboard
+  // Chords have to be split on the session — not on editability — to reach the right owner.
+  const stopKeyForwarding = startKeyForwarding(
+    channel,
+    container.ownerDocument,
+    isEditing,
+    () => forwardTable,
+    () => currentMode,
+  );
   // Run inline editing (contenteditable) here, posting committed/split/insert results to the parent.
   // The shadow-doc accessor gates prop-bound sessions on the RAW instance prop value (template/$ref
   // Valued props render display sugar and must not be plain-text edited).
@@ -315,17 +396,122 @@ export function startCanvasIframe(opts: {
       const root = container.firstElementChild;
       const fragment = root instanceof HTMLElement && root.dataset.jxDefinitionRoot !== undefined;
       channel.post({ fragment, height: measured, kind: "contentHeight" });
+      // The content box moved, so fonts/animations/images may not be where they were.
+      armIdleWatch();
     }
   }
   const ResizeObs = win?.ResizeObserver;
   const heightObserver = ResizeObs ? new ResizeObs(() => postContentHeight()) : null;
+
+  // ─── Cross-realm quiescence ─────────────────────────────────────────────────
+  // The frame answers "have I settled?" instead of being polled (§13.4 condition 5). Nothing in the
+  // Parent realm can look inside a cross-origin frame, so the alternative was `wait: {ms}` — and 115
+  // Of those were 115 places a slow subsystem got answered with +500 ms and the wrong picture was
+  // Accepted. Sampling lives HERE, next to the render that changes the answer.
+  const frameDoc = container.ownerDocument;
+  let idleFrame = 0;
+  let quietFrames = 0;
+  let idleDeadline = 0;
+  let lastIdleKey = "";
+  /** Images whose load failed, and the moment `installCanvasImageRetry` can no longer be waiting. */
+  const retryingImages = new Map<HTMLImageElement, number>();
+
+  /**
+   * Images with a retry still outstanding.
+   *
+   * `installCanvasImageRetry` re-fires at 150/300/450 ms and bounds itself at three attempts, so an
+   * error puts the image back in flight for at most that long; each further error extends the
+   * window. Only the app knows this is pending — a `<img>` mid-retry looks exactly like one that
+   * settled broken.
+   */
+  function pendingImageRetries(): number {
+    const now = Date.now();
+    for (const [img, deadline] of retryingImages) {
+      if (deadline <= now) {
+        retryingImages.delete(img);
+      }
+    }
+    return retryingImages.size;
+  }
+
+  function sampleIdle(): Extract<IframeToParent, { kind: "idle" }> {
+    const running =
+      typeof frameDoc.getAnimations === "function"
+        ? frameDoc.getAnimations().filter((a) => a.playState === "running").length
+        : 0;
+    return {
+      animations: running,
+      fonts: frameDoc.fonts ? frameDoc.fonts.status === "loaded" : true,
+      gen: renderedGen,
+      images: pendingImageRetries(),
+      kind: "idle",
+    };
+  }
+
+  function idleTick(): void {
+    idleFrame = 0;
+    const sample = sampleIdle();
+    const key = `${sample.gen}|${sample.fonts}|${sample.animations}|${sample.images}`;
+    const changed = key !== lastIdleKey;
+    if (changed) {
+      lastIdleKey = key;
+      channel.post(sample);
+    }
+    const quiet = sample.fonts && sample.animations === 0 && sample.images === 0;
+    quietFrames = quiet ? (changed ? 1 : quietFrames + 1) : 0;
+    // Two consecutive quiet frames, then stop — the state is stable and any change re-arms us.
+    if (quietFrames >= IDLE_QUIET_FRAMES) {
+      return;
+    }
+    // A page with a genuinely endless animation never goes quiet. Give up rather than burn a rAF
+    // Loop forever: the last posted sample already NAMES the animation, which is the honest answer.
+    if (Date.now() >= idleDeadline) {
+      return;
+    }
+    idleFrame = win ? win.requestAnimationFrame(idleTick) : 0;
+  }
+
+  /** Something changed the frame's DOM or assets — re-sample until it is quiet again. */
+  function armIdleWatch(): void {
+    quietFrames = 0;
+    idleDeadline = Date.now() + IDLE_WATCH_MAX_MS;
+    if (!idleFrame && win) {
+      idleFrame = win.requestAnimationFrame(idleTick);
+    }
+  }
+
+  const onImageError = (event: Event): void => {
+    if (event.target instanceof HTMLImageElement) {
+      retryingImages.set(event.target, Date.now() + IMAGE_RETRY_WINDOW_MS);
+      armIdleWatch();
+    }
+  };
+  const onImageLoad = (event: Event): void => {
+    if (event.target instanceof HTMLImageElement && retryingImages.delete(event.target)) {
+      armIdleWatch();
+    }
+  };
+  // Capture: neither `error` nor `load` bubbles from an <img>.
+  container.addEventListener("error", onImageError, true);
+  container.addEventListener("load", onImageLoad, true);
+  armIdleWatch();
+  // Observed only once the quiescence state above exists: a reflow arms the watcher.
   heightObserver?.observe(container);
 
   // ─── Wheel forwarding (canvas zoom/pan) ─────────────────────────────────────
   // The iframe is sized to its content (never scrolls itself), so wheel events over it are meant for
   // The parent canvas: ctrl/cmd+wheel = zoom, plain = pan. A cross-origin OOPIF doesn't bubble wheel to
   // The parent, so forward the deltas + modifiers + cursor; the host redispatches to its wheel handler.
+  //
+  // PREVIEW is the exception, and it is not a small one. There the host keeps the iframe at the
+  // Preview stage's own height and the document scrolls FOR REAL, which is the whole point of the
+  // View — sticky headers, scroll-driven animation and IntersectionObserver reveals only fire when
+  // Something actually scrolls. Swallowing the wheel here (this handler used to preventDefault
+  // Unconditionally) made the one view whose job is fidelity the one view you could not scroll.
   const onWheel = (e: WheelEvent) => {
+    if (currentMode === "preview") {
+      return;
+    }
     e.preventDefault();
     channel.post({
       ctrlKey: e.ctrlKey,
@@ -473,7 +659,16 @@ export function startCanvasIframe(opts: {
     if (msg.kind === "patch") {
       const { gen } = msg;
       if (gen < renderedGen) {
-        // A newer full render already supersedes this edit — drop it.
+        /* BEHIND, and that is now said out loud rather than dropped.
+           "A newer full render already supersedes this edit" is only true when the generation the
+           patch carries came from the stage THIS frame is mounted on. It did not while
+           `postPatchToHosts` took a single `gen` and fanned it to every host rendering the tab: one
+           document displayed in two panes meant whichever pane had rendered more recently held the
+           higher `renderedGen` and silently stopped applying patches, with a wrong picture on screen
+           and not one counter moving. The parent resolves the generation per host now, so reaching
+           here means the frame really is behind — an escalation, which repaints exactly this pane
+           and records the reason in `__jxCanvasPerf`. */
+        channel.post({ gen, kind: "patchError", message: "patch-behind-render" });
         return;
       }
       if (gen > renderedGen || !shadowDoc || !renderCtx) {
@@ -514,6 +709,7 @@ export function startCanvasIframe(opts: {
           restoreDocSelection(container, caret);
         }
         channel.post({ gen, kind: "patchComplete" });
+        armIdleWatch();
       } catch (error) {
         channel.post({
           gen,
@@ -589,6 +785,12 @@ export function startCanvasIframe(opts: {
       stopAutoScroll();
       return;
     }
+    if (msg.kind === "keymap") {
+      // Replaced wholesale, never merged: the host sends the whole live table, so a chord the
+      // Author unbound disappears here rather than lingering as a key the canvas still swallows.
+      forwardTable = { chords: msg.chords, mac: msg.mac };
+      return;
+    }
     if (msg.kind === "setColorScheme") {
       // Document-level attribute flip — deliberately patch-free (no render, no gen).
       applyPreviewColorScheme(container.ownerDocument, msg.scheme);
@@ -646,6 +848,7 @@ export function startCanvasIframe(opts: {
           renderedGen = gen;
           currentMode = msg.mode;
           channel.post({ gen, kind: "renderComplete" });
+          armIdleWatch();
           // Thread a serializable snapshot of the resolved $defs to the parent so the data-explorer
           // Panel shows live data (the iframe, not the parent, now resolves the scope). Inside a
           // Reactive effect: dev-proxy data sources ($prototype/$src) return a ref that fills AFTER
@@ -681,8 +884,15 @@ export function startCanvasIframe(opts: {
     stopInlineEdit();
     stopSlashBridge();
     stopImageRetry();
+    if (idleFrame && win) {
+      win.cancelAnimationFrame(idleFrame);
+    }
+    idleFrame = 0;
+    container.removeEventListener("error", onImageError, true);
+    container.removeEventListener("load", onImageLoad, true);
     stopAutoScroll();
     heightObserver?.disconnect();
+    container.ownerDocument.removeEventListener("click", onLayoutClick, true);
     container.ownerDocument.removeEventListener("wheel", onWheel);
     container.ownerDocument.removeEventListener("dragenter", onNativeDragOver, true);
     container.ownerDocument.removeEventListener("dragleave", onNativeDragLeave, true);

@@ -789,6 +789,45 @@ describe("file — rename", () => {
   });
 });
 
+// ─── references endpoint ────────────────────────────────────────────────────
+
+describe("references", () => {
+  test("answers who refers to a path, as a file and as a tag", async () => {
+    mkdirSync(join(FIXTURES, "refs-demo/components"), { recursive: true });
+    mkdirSync(join(FIXTURES, "refs-demo/pages"), { recursive: true });
+    writeFileSync(
+      join(FIXTURES, "refs-demo/components/card.json"),
+      JSON.stringify({ children: [], tagName: "ref-card" }),
+      "utf8",
+    );
+    writeFileSync(
+      join(FIXTURES, "refs-demo/pages/index.json"),
+      JSON.stringify({ children: [{ $ref: "../components/card.json" }, { tagName: "ref-card" }] }),
+      "utf8",
+    );
+
+    const root = join(FIXTURES, "refs-demo");
+    const url = new URL("http://localhost/__studio/references?path=components%2Fcard.json");
+    const res = await callApi(new Request(url, { method: "GET" }), url, root);
+    const data = await res.json();
+    expect(data.tagName).toBe("ref-card");
+    expect(data.files.map((f: { path: string }) => f.path)).toEqual(["pages/index.json"]);
+    expect(data.refsTotal).toBe(2);
+  });
+
+  test("returns 400 when neither path nor tag is given", async () => {
+    const url = new URL("http://localhost/__studio/references");
+    const res = await callApi(new Request(url, { method: "GET" }), url, FIXTURES);
+    expect(res.status).toBe(400);
+  });
+
+  test("rejects a path outside the project root", async () => {
+    const url = new URL("http://localhost/__studio/references?path=..%2F..%2Fetc%2Fpasswd");
+    const res = await callApi(new Request(url, { method: "GET" }), url, FIXTURES);
+    expect(res.status).toBe(400);
+  });
+});
+
 // ─── files listing endpoint ─────────────────────────────────────────────────
 
 describe("files — listing", () => {

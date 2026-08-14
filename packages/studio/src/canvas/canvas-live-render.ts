@@ -7,7 +7,8 @@
  */
 
 import { projectState, stripEventHandlers } from "../store";
-import { activeTab } from "../workspace/workspace";
+import { displayTagName } from "@jxsuite/schema/guards";
+import { canvasModeOfTab } from "./canvas-surface";
 import { toRaw } from "../reactivity";
 import {
   distributePageIntoLayout,
@@ -29,12 +30,12 @@ import {
 import { isComponentDoc, substitutePreviewProps } from "../component-props";
 import { rewriteContentAssets } from "./content-assets";
 
-import type { JxElement, JxMutableNode } from "@jxsuite/schema/types";
+import type { JxElement, JxMutableNode, JxPath } from "@jxsuite/schema/types";
 import type { ComponentEntry } from "../files/components.js";
 import type { ContentSectionEntry } from "../types";
+import type { LayoutMarker } from "./path-mapping";
+import type { Tab } from "../tabs/tab";
 import type { WireMapperCtx } from "./iframe-protocol";
-
-let _ctx: { getCanvasMode: () => string } | null = null;
 
 /**
  * Walk the merged document tree to find where page children were distributed into the layout slot.
@@ -77,40 +78,33 @@ function findPageContentPrefix(
 }
 
 /**
- * Recursively mark all nodes in a layout doc tree with $__layout: true so we can identify which
- * rendered DOM elements came from the layout vs page content.
+ * Recursively mark every node of a layout doc tree with its ORIGIN — `$__layout: { file, path }` —
+ * so the renderer can both tell layout nodes apart from page content and say which node of which
+ * file each one is. The marker used to be a bare `true`, which made a layout node identifiable but
+ * unaddressable: the canvas could tell you had clicked something it could not edit, but not what
+ * you had clicked or where to go to edit it. `path` is the node's own path inside `file`, so the
+ * editor can open the layout with that node selected. See {@link LayoutMarker}.
  */
-function markLayoutNodes(node: JxMutableNode) {
+export function markLayoutNodes(node: JxMutableNode, file: string, path: JxPath = []) {
   if (!node || typeof node !== "object") {
     return;
   }
-  node.$__layout = true;
+  node.$__layout = { file, path } satisfies LayoutMarker;
   if (Array.isArray(node.children)) {
-    for (const child of node.children) {
+    for (const [i, child] of node.children.entries()) {
       if (typeof child === "string") {
         continue;
       }
-      markLayoutNodes(child);
+      markLayoutNodes(child, file, [...path, "children", i]);
     }
   }
-  if (node.$elements) {
-    for (const el of node.$elements) {
+  if (Array.isArray(node.$elements)) {
+    for (const [i, el] of node.$elements.entries()) {
       if (typeof el !== "string") {
-        markLayoutNodes(el as JxMutableNode);
+        markLayoutNodes(el as JxMutableNode, file, [...path, "$elements", i]);
       }
     }
   }
-}
-
-/**
- * Initialize the canvas live render module.
- *
- * @param {{
- *   getCanvasMode: () => string;
- * }} ctx
- */
-export function initCanvasLiveRender(ctx: { getCanvasMode: () => string }) {
-  _ctx = ctx;
 }
 
 /**
@@ -119,16 +113,36 @@ export function initCanvasLiveRender(ctx: { getCanvasMode: () => string }) {
  * is the "parent resolves, iframe renders" split — the realm-specific work (defineElement,
  * injecting $head/site-style into the DOM, buildScope/renderNode) happens inside the iframe from
  * this result.
+ *
+ * **`tab` is the tab the render is FOR, and it is a parameter because it is not "the active tab".**
+ * This function opened with `const tab = activeTab.value` and took its mode from an injected
+ * `getCanvasMode()` — the focused pane's, one layer down — which threw away everything the caller
+ * had already resolved correctly: `canvas-render.ts` picks the document with
+ * `tabOfPane(surface.paneId)` and threads that tab's id through `mountIframeCanvas` →
+ * `preparePassRender`. Six values came from the wrong tab whenever the pane being drawn was not the
+ * focused one: `documentPath` (hence `docBase` and the `isPage` test), `showLayout`,
+ * `previewParams`, `previewProps`, and the composed `canvasMode`.
+ *
+ * The mode is the one with teeth. `mountIframeCanvas` ends with `setHostPreview(state, message.mode
+ * === "preview")`, so a side pane in Edit whose neighbour was in Preview got a PREVIEW frame — no
+ * overlay, no editing messages honoured — and a pane being previewed beside an editing one got an
+ * editable frame for a document nobody was editing. `canvasModeOfTab(tab)` is the same composition
+ * every other gate reads, applied to the tab that is actually being drawn.
+ *
+ * @param {JxMutableNode} doc
+ * @param {Tab | null} tab — the tab whose document and view settings this render is of.
  */
-export async function resolveCanvasDocument(doc: JxMutableNode): Promise<{
+export async function resolveCanvasDocument(
+  doc: JxMutableNode,
+  tab: Tab | null,
+): Promise<{
   renderDoc: JxMutableNode;
   docBase: string | undefined;
   mapperCtx: WireMapperCtx;
   siteStyle: Record<string, unknown> | null;
 }> {
-  const tab = activeTab.value;
   const S = { documentPath: tab?.documentPath, mode: tab?.doc.mode };
-  const canvasMode = _ctx!.getCanvasMode();
+  const canvasMode = canvasModeOfTab(tab);
 
   let renderDoc =
     canvasMode === "preview"
@@ -150,7 +164,9 @@ export async function resolveCanvasDocument(doc: JxMutableNode): Promise<{
     if (layoutPath) {
       const layoutDoc = (await resolveLayoutDoc(layoutPath)) as JxMutableNode | null;
       if (layoutDoc) {
-        markLayoutNodes(layoutDoc);
+        // The SAME normalization resolveLayoutDoc reads the file with, so the marker's `file` is a
+        // Path the editor can hand straight to navigateToComponent when the author asks to open it.
+        markLayoutNodes(layoutDoc, layoutPath.replace(/^\.\//, ""));
         const pageForSlots = canvasMode === "preview" ? structuredClone(toRaw(doc)) : renderDoc;
         const merged = distributePageIntoLayout(layoutDoc, pageForSlots);
         renderDoc =
@@ -262,7 +278,7 @@ export async function resolveCanvasDocument(doc: JxMutableNode): Promise<{
         return tags;
       }
       if (node.tagName) {
-        tags.add(node.tagName);
+        tags.add(displayTagName(node.tagName));
       }
       if (Array.isArray(node.children)) {
         for (const child of node.children) {

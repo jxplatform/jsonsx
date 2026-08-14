@@ -43,7 +43,9 @@ import {
   isMappedArray,
   isNamedFormulaDef,
   isPrototypeDef,
+  isTagExpression,
   paramNames,
+  tagNameCandidates,
 } from "@jxsuite/schema/guards";
 import type { CompileContext, ExpressionNode } from "../shared.ts";
 import type {
@@ -338,6 +340,19 @@ function buildClientNode(
     raw?.$media ?? context.media,
   );
 
+  /* REFUSED, LOUDLY. This target has no branch construct — it also drops `$switch` on the floor
+     today, compiling a switch node to `<div><div></div></div>` with no binding at all. Emitting a
+     silently wrong element here would be a second instance of the class the tagName pattern was
+     added to end, so a dynamic page that needs a chosen tag is told to put the element in a
+     component (which compiles through `compile-element`, where the construct is implemented)
+     rather than shipping markup that is quietly missing a branch. */
+  if (isTagExpression(def.tagName)) {
+    throw new Error(
+      "A tag chosen at creation is not supported on a dynamic page yet (candidates: " +
+        `${tagNameCandidates(def.tagName).join(", ")}). Move the element into a component, or ` +
+        "give it a literal tagName.",
+    );
+  }
   const tag = def.tagName ?? "div";
   // `white-space` inherits, so once inside a <pre> the whole subtree stays whitespace-significant.
   nextContext.preformatted = context.preformatted === true || PREFORMATTED_TAGS.has(tag);
@@ -587,6 +602,15 @@ function buildClientNode(
 function emitLitMapTemplate(def: JxMutableNode | undefined, preformatted = false) {
   if (!def) {
     return "";
+  }
+  // Same refusal as `buildClientNode` above, for the repeater's item template — this target has no
+  // Branch construct, and a silently wrong element is what the tagName pattern exists to prevent.
+  if (isTagExpression(def.tagName)) {
+    throw new Error(
+      "A tag chosen at creation is not supported inside a dynamic page's repeater yet " +
+        `(candidates: ${tagNameCandidates(def.tagName).join(", ")}). Move the item into a ` +
+        "component, or give it a literal tagName.",
+    );
   }
   const tag = def.tagName ?? "div";
   // `white-space` inherits, so once inside a <pre> the whole subtree stays whitespace-significant.

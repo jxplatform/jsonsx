@@ -5,6 +5,13 @@
 
 export { applyRename, deriveTag } from "./apply.ts";
 export type { ApplyRenameOptions, FileChange, RenameReport } from "./apply.ts";
+export { findReferences, invalidateReferenceCache } from "./find-refs.ts";
+export type {
+  FindReferencesOptions,
+  ReferenceFile,
+  ReferenceHit,
+  ReferencesResult,
+} from "./find-refs.ts";
 export { coalesceFsEvents, toFsEvent } from "./fs-events.ts";
 export type { FsEventPayload } from "./fs-events.ts";
 export { createFsWatcher } from "./watcher.ts";

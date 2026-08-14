@@ -9,6 +9,7 @@ import {
   registerRenderer,
   render,
   renderOnly,
+  rendersInFlight,
 } from "../src/store";
 
 // ─── isNestedSelector ───────────────────────────────────────────────────────
@@ -110,5 +111,71 @@ describe("debouncedStyleCommit", () => {
 
   test("cancelStyleDebounce does not throw for unknown prop", () => {
     cancelStyleDebounce("unknown-prop");
+  });
+});
+
+// ─── Render accounting (probe.idle() condition 1) ───────────────────────────
+
+describe("rendersInFlight", () => {
+  test("is zero at rest and while a synchronous renderer runs it is one", () => {
+    expect(rendersInFlight()).toBe(0);
+    let seen = -1;
+    registerRenderer("count-sync", () => {
+      seen = rendersInFlight();
+    });
+    try {
+      renderOnly("count-sync");
+      expect(seen).toBe(1);
+      expect(rendersInFlight()).toBe(0);
+    } finally {
+      registerRenderer("count-sync", () => {});
+    }
+  });
+
+  test("an ASYNC renderer stays counted until its promise settles", async () => {
+    // `registerRenderer` declares `() => void`, and TypeScript happily accepts an async function
+    // There — so a renderer that awaits keeps repainting long after render() returned. Counting
+    // Only the synchronous body would report "settled" over a half-painted panel.
+    let release = () => {};
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    registerRenderer("count-async", (() => pending) as () => void);
+    try {
+      render();
+      expect(rendersInFlight()).toBe(1);
+      release();
+      await pending;
+      expect(rendersInFlight()).toBe(0);
+    } finally {
+      registerRenderer("count-async", () => {});
+    }
+  });
+
+  test("a renderer that throws is logged and released, never left counted", () => {
+    registerRenderer("count-throws", () => {
+      throw new Error("boom");
+    });
+    try {
+      renderOnly("count-throws");
+      expect(rendersInFlight()).toBe(0);
+    } finally {
+      registerRenderer("count-throws", () => {});
+    }
+  });
+
+  test("a renderer whose promise REJECTS is released too", async () => {
+    const rejected = Promise.reject(new Error("async boom"));
+    registerRenderer("count-rejects", (() => rejected) as () => void);
+    try {
+      renderOnly("count-rejects");
+      expect(rendersInFlight()).toBe(1);
+      await rejected.catch(() => {});
+      // One more microtask turn for the counter's own settle handler.
+      await Promise.resolve();
+      expect(rendersInFlight()).toBe(0);
+    } finally {
+      registerRenderer("count-rejects", () => {});
+    }
   });
 });

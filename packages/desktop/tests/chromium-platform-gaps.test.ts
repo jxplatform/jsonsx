@@ -150,6 +150,14 @@ describe("chromium platform: search, formats and packages", () => {
     expect(lastRequest()).toEqual({ method: "searchFiles", params: { query: "found" } });
   });
 
+  test("searchFiles forwards the format registry's extensions", async () => {
+    await platform.searchFiles("found", [".md"]);
+    expect(lastRequest()).toEqual({
+      method: "searchFiles",
+      params: { extensions: [".md"], query: "found" },
+    });
+  });
+
   test("listFormats returns registered formats", async () => {
     const formats = await platform.listFormats();
     expect(formats).toEqual([{ extensions: [".md"], format: "markdown" }]);

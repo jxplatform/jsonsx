@@ -2,20 +2,32 @@
 /**
  * Imports panel — context-aware import manager with cherry-pick component selection.
  *
- * When editing project.json: shows Class Imports, Dependencies (add/remove packages), and
+ * When editing project.json: shows imported modules, Dependencies (add/remove packages), and
  * per-package component toggles for cherry-picking individual elements. When editing a
  * page/layout/component/content type: shows Component Imports ($ref picker) and per-package
  * component toggles.
  */
 
 import { html, nothing } from "lit-html";
-import { componentRegistry, computeRelativePath } from "../files/components";
+import { componentRegistry } from "../files/components";
+import {
+  disableElement,
+  enableElement,
+  hasElement,
+  removeElementRef,
+  removePackageElements,
+} from "../files/elements";
 import { projectState } from "../store";
 import { updateSiteConfig } from "../site-context";
 import { getPlatform } from "../platform";
 import { showConfirmDialog } from "../ui/layers";
+import { renderEmptyState } from "./empty-state";
+import { registerPanel } from "./panel-registry";
+import { activeTab } from "../workspace/workspace";
+import { transact } from "../tabs/transact";
 
 import type { ComponentEntry } from "../files/components";
+import type { ElementsEntry } from "../files/elements";
 import type { JxElement, JxMutableNode } from "@jxsuite/schema/types";
 
 interface ImportsContext {
@@ -25,46 +37,14 @@ interface ImportsContext {
   applyMutation: (fn: (doc: JxMutableNode) => void) => void;
 }
 
-export type ElementsEntry = string | JxMutableNode | { $ref: string };
+/* `ElementsEntry` is `files/elements.ts`'s now — the module that decides what belongs in the
+   array owns the type of its members. Re-exported so importers of this panel keep resolving. */
+export type { ElementsEntry } from "../files/elements";
 
-/**
- * Build the subpath specifier for a component: `<package>/<modulePath>`
- *
- * @param {ComponentEntry} comp
- * @returns {string}
- */
-function componentSpecifier(comp: ComponentEntry) {
-  return `${comp.package}/${comp.modulePath}`;
-}
-
-/**
- * Check if a component is enabled (present in $elements array). Supports both cherry-picked subpath
- * specifiers and legacy full-package imports.
- *
- * @param {ComponentEntry} comp
- * @param {ElementsEntry[]} elements
- * @returns {boolean}
- */
-function isComponentEnabled(comp: ComponentEntry, elements: ElementsEntry[]) {
-  if (!elements?.length) {
-    return false;
-  }
-  const specifier = componentSpecifier(comp);
-  for (const entry of elements) {
-    if (typeof entry !== "string") {
-      continue;
-    }
-    // Cherry-picked subpath match
-    if (entry === specifier) {
-      return true;
-    }
-    // Legacy full-package match
-    if (entry === comp.package) {
-      return true;
-    }
-  }
-  return false;
-}
+/* `componentSpecifier` and `isComponentEnabled` are `files/elements.ts`'s `npmSpecifier` and
+   `hasElement`. They lived here and answered only for the two checkboxes in this file; the picker
+   below and the canvas drop each asked the question their own way and got different answers
+   (plan §11.2). One rule, four call sites. */
 
 /**
  * Group npm components by package name.
@@ -109,7 +89,7 @@ export function renderImportsTemplate({
   });
 }
 
-// ─── Site-level: Class Imports + Dependencies + Component Cherry-pick ─────────
+// ─── Site-level: Imported Modules + Dependencies + Component Cherry-pick ──────
 
 /** @param {() => void} renderLeftPanel */
 function renderSiteLevelImports(renderLeftPanel: () => void) {
@@ -121,10 +101,10 @@ function renderSiteLevelImports(renderLeftPanel: () => void) {
 
   return html`
     <div class="imports-panel">
-      <!-- Class Imports -->
+      <!-- Imported modules ($prototype sources) -->
       <div class="imports-section">
         <div class="imports-section-header">
-          <span class="imports-section-title">Class Imports</span>
+          <span class="imports-section-title">Imported Modules</span>
           <span class="imports-count">${entries.length}</span>
         </div>
         ${
@@ -154,7 +134,12 @@ function renderSiteLevelImports(renderLeftPanel: () => void) {
                   )}
                 </div>
               `
-            : html`<div class="imports-empty">No class imports</div>`
+            : renderEmptyState({
+                compact: true,
+                message:
+                  "Imported modules give this project extra kinds of data — " +
+                  "a content collection, a CMS, an API client. Name one below.",
+              })
         }
         <div class="import-add-form">
           <sp-textfield placeholder="Name" size="s" class="import-add-name"></sp-textfield>
@@ -206,9 +191,9 @@ function renderSiteLevelImports(renderLeftPanel: () => void) {
                     const platform = getPlatform();
                     await platform.removePackage(pkg);
                     // Also remove all cherry-picked elements for this package
-                    const updatedElements = siteElements.filter(
-                      (e: ElementsEntry) => typeof e !== "string" || !e.startsWith(`${pkg}/`),
-                    );
+                    // …including the legacy whole-package entry. The hand-rolled filter kept it,
+                    // So removing a package left `@acme/ui` importing a package that was gone.
+                    const updatedElements = removePackageElements(siteElements, pkg);
                     const { loadComponentRegistry } = await import("../files/components.js");
                     await loadComponentRegistry();
                     await updateSiteConfig({
@@ -225,24 +210,18 @@ function renderSiteLevelImports(renderLeftPanel: () => void) {
             </div>
             <div class="imports-list imports-component-list">
               ${comps.map((comp: ComponentEntry) => {
-                const enabled = isComponentEnabled(comp, siteElements);
-                const specifier = componentSpecifier(comp);
+                const enabled = hasElement(siteElements, comp, null);
                 return html`
                   <div class="import-row import-component-row">
                     <sp-checkbox
                       size="s"
                       .checked=${enabled}
                       @change=${async (e: Event) => {
-                        let updated: ElementsEntry[] = [...siteElements];
-                        // Remove legacy full-package import if present
-                        updated = updated.filter((el: ElementsEntry) => el !== pkg);
-                        if ((e.target as HTMLInputElement).checked) {
-                          if (!updated.includes(specifier)) {
-                            updated.push(specifier);
-                          }
-                        } else {
-                          updated = updated.filter((el: ElementsEntry) => el !== specifier);
-                        }
+                        // ONE service (`files/elements.ts`) — this checkbox, the picker below and
+                        // The canvas drop each had their own idea of "already imported".
+                        const updated = (e.target as HTMLInputElement).checked
+                          ? enableElement(siteElements, comp, null)
+                          : disableElement(siteElements, comp, null);
                         await updateSiteConfig({
                           $elements: updated as (string | JxElement)[],
                         });
@@ -350,9 +329,10 @@ function renderDocumentLevelImports({
   /** @param {string} ref */
   const removeRef = (ref: string) => {
     applyMutation((doc: JxMutableNode) => {
-      doc.$elements = (doc.$elements || []).filter(
-        (e: ElementsEntry) => !(e && typeof e === "object" && e.$ref === ref),
-      );
+      doc.$elements = removeElementRef((doc.$elements ?? []) as ElementsEntry[], ref) as (
+        | string
+        | JxElement
+      )[];
     });
     renderLeftPanel();
   };
@@ -388,7 +368,14 @@ function renderDocumentLevelImports({
                   )}
                 </div>
               `
-            : nothing
+            : renderEmptyState({
+                compact: true,
+                message:
+                  availableComponents.length > 0
+                    ? "Components you add here can be dropped onto this page. Pick one below."
+                    : "Components you add here can be dropped onto this page. " +
+                      "This project has none yet — create one from any selection on the canvas.",
+              })
         }
         ${
           availableComponents.length > 0
@@ -408,12 +395,14 @@ function renderDocumentLevelImports({
                       if (!comp?.path) {
                         return;
                       }
-                      const relPath = computeRelativePath(documentPath, comp.path);
+                      // Through the service, which is also what makes this idempotent: it checked
+                      // Nothing and pushed a second `$ref` every time you chose the same component.
                       applyMutation((doc: JxMutableNode) => {
-                        if (!doc.$elements) {
-                          doc.$elements = [];
-                        }
-                        doc.$elements.push({ $ref: relPath });
+                        doc.$elements = enableElement(
+                          (doc.$elements ?? []) as ElementsEntry[],
+                          comp,
+                          documentPath,
+                        ) as (string | JxElement)[];
                       });
                       renderLeftPanel();
                     }}
@@ -438,29 +427,22 @@ function renderDocumentLevelImports({
             </div>
             <div class="imports-list imports-component-list">
               ${comps.map((comp: ComponentEntry) => {
-                const enabled = isComponentEnabled(comp, npmEntries);
-                const specifier = componentSpecifier(comp);
+                const enabled = hasElement(npmEntries, comp, documentPath);
                 return html`
                   <div class="import-row import-component-row">
                     <sp-checkbox
                       size="s"
                       .checked=${enabled}
                       @change=${(e: Event) => {
+                        // The FOURTH writer of this array, and the same service as the other three.
+                        const { checked } = e.target as HTMLInputElement;
                         applyMutation((doc: JxMutableNode) => {
-                          if (!doc.$elements) {
-                            doc.$elements = [];
-                          }
-                          // Remove legacy full-package import if present
-                          doc.$elements = doc.$elements.filter((el: ElementsEntry) => el !== pkg);
-                          if ((e.target as HTMLInputElement).checked) {
-                            if (!doc.$elements.includes(specifier)) {
-                              doc.$elements.push(specifier);
-                            }
-                          } else {
-                            doc.$elements = doc.$elements.filter(
-                              (el: ElementsEntry) => el !== specifier,
-                            );
-                          }
+                          const before = (doc.$elements ?? []) as ElementsEntry[];
+                          doc.$elements = (
+                            checked
+                              ? enableElement(before, comp, documentPath)
+                              : disableElement(before, comp, documentPath)
+                          ) as (string | JxElement)[];
                         });
                         renderLeftPanel();
                       }}
@@ -476,4 +458,32 @@ function renderDocumentLevelImports({
       )}
     </div>
   `;
+}
+
+/**
+ * Contribute the Packages panel.
+ *
+ * `level: "document"` — it writes the open document's `$elements`. The id and the title are both
+ * `packages` now: "Imports" named the mechanism, and the panel silently changed meaning on
+ * `documentPath?.endsWith("project.json")` with nothing on screen saying so. The header the
+ * Navigator draws from this record ("PACKAGES · document") is where that stops.
+ */
+export function registerPackagesPanel(): void {
+  registerPanel({
+    id: "packages",
+    title: "Packages",
+    level: "document",
+    dock: "navigator",
+    icon: "sp-icon-box",
+    requiresDocument: "Open a page to choose which components it can use.",
+    render: (ctx) =>
+      ctx.deps.renderImportsTemplate({
+        applyMutation: (fn: (doc: JxMutableNode) => void) => {
+          transact(activeTab.value, fn);
+        },
+        documentElements: ctx.doc?.document.$elements ?? [],
+        documentPath: ctx.doc?.documentPath ?? null,
+        renderLeftPanel: ctx.rerender,
+      }),
+  });
 }

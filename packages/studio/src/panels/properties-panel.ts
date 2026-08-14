@@ -1,43 +1,72 @@
 /// <reference lib="dom" />
-/** Properties panel — inspector for element attributes, component props, media, and frontmatter. */
+/**
+ * The Content tab — everything about WHAT this element is and says.
+ *
+ * Plan §6.5 re-split the inspector by task. Content is the element itself (tag, id, class, text),
+ * its HTML attributes, its link target, its custom attributes, its component props and its media.
+ * Three things left, and each left for a place that already had a better claim on it:
+ *
+ * - **Repeater · Switch · Observed Attributes · CSS Properties · CSS Parts → the Logic tab.** Wiring
+ *   a `$switch` and wiring a click handler are the same task (`panels/events-panel.ts`).
+ * - **The Page section → the Document Header card.** `panels/head-panel.ts` owns the one layout
+ *   picker; this panel drew a second one that could disagree with it.
+ * - **Media breakpoint DEFINITIONS → Project Settings › Contexts** (P4). Nothing remains here: the
+ *   only reason adding a breakpoint used to cost you your element selection.
+ *
+ * What is left is one accordion of rows, all of which go through `ui/field-row.ts`.
+ */
 
 import { html, nothing } from "lit-html";
+import type { TemplateResult } from "lit-html";
 import { live } from "lit-html/directives/live.js";
-import { debouncedStyleCommit, getNodeAtPath, projectState, renderOnly } from "../store";
-import { isRef } from "@jxsuite/schema/guards";
+import { debouncedStyleCommit, getNodeAtPath, renderOnly } from "../store";
+import { displayTagName, isRef, isTagExpression } from "@jxsuite/schema/guards";
 import type { DirEntry, JsonValue } from "../types";
 import {
-  mutateAddSwitchCase,
-  mutateRemoveSwitchCase,
-  mutateRenameSwitchCase,
   mutateUpdateAttribute,
-  mutateUpdateMedia,
+  mutateUpdateDef,
   mutateUpdateProp,
   mutateUpdateProperty,
   transactDoc,
 } from "../tabs/transact";
-import { activeTab } from "../workspace/workspace";
-import { view } from "../view";
+import { activeTab, workspace } from "../workspace/workspace";
+import { deriveRefusal } from "../workspace/pane-derive";
+import { primarySelection, unifyValues } from "../tabs/selection";
+import { shell } from "../shell";
+import {
+  argsSchema,
+  booleanArg,
+  booleanProperty,
+  stringArg,
+  stringProperty,
+} from "../commands/command-args";
+import type { LayoutSelection } from "../shell";
+import type { AnyCommand, CommandRegistry } from "../commands/registry";
+import { activeRegistry } from "../commands/active-registry";
 import { componentRegistry } from "../files/components";
 import { widgetForType } from "./style-inputs";
-import { renderFieldRow } from "../ui/field-row";
+import { renderFieldRow, renderKvRow } from "../ui/field-row";
+import type { FieldProvenance } from "./provenance";
 import { renderDynamicSlot, slotMode } from "../ui/dynamic-slot";
 import { spTextArea, spTextField } from "../ui/field-input";
-import {
-  attrLabel,
-  camelToLabel,
-  friendlyNameToVar,
-  inferInputType,
-  parseCemType,
-} from "../utils/studio-utils";
+import { attrLabel, camelToLabel, inferInputType, parseCemType } from "../utils/studio-utils";
 import { classifyHref, composeHref } from "../utils/link-target";
 import type { LinkKind } from "../utils/link-target";
-import { collectCssParts, isCustomElementDoc } from "./signals-panel";
-import { mediaDisplayName } from "./shared";
-import { getCssInitialMap } from "./style-utils";
+import {
+  clickAnythingTo,
+  openPageAction,
+  renderEmptyState,
+  staleSelectionMessage,
+} from "./empty-state";
 import { renderMediaPicker } from "../ui/media-picker";
 import { renderColorSelector } from "../ui/color-selector";
-import { getEffectiveLayoutPath, invalidateLayoutCache } from "../site-context";
+import {
+  loadUsages,
+  peekUsages,
+  retryUsages,
+  usageFiles,
+  usageHeadline,
+} from "../services/references";
 import { getPlatform } from "../platform";
 import htmlMeta from "../../data/html-meta.json";
 
@@ -48,14 +77,8 @@ import type {
   JxStateDefinition,
   JxStateObject,
 } from "@jxsuite/schema/types";
-import type { SlotMode } from "../ui/dynamic-slot";
+import type { SignalOption } from "../ui/dynamic-slot";
 import type { JxPath } from "../state";
-import type { SignalDef } from "./signals-panel.js";
-
-interface SignalOption {
-  value: string;
-  label: string;
-}
 
 interface HtmlMetaEntry {
   $section: string;
@@ -69,23 +92,35 @@ interface HtmlMetaEntry {
   [key: string]: unknown;
 }
 
+// ─── The binding vocabulary, shared with the Logic tab ───────────────────────
+
 /**
- * Convert a human-friendly name like "Tablet" to a $media key "--tablet"
+ * The two extra signals a position inside a repeater template can bind to, or `null` outside one.
  *
- * @param {string} name
+ * A "map" segment addresses a repeater template (`[…, "children", i, "map", …]`, or the legacy `[…,
+ * "children", "map", …]`), so anything at or below it is inside one.
+ *
+ * Exported because Content and Logic both offer them and there is one right answer: a `$switch`
+ * inside a `$map` can read `$map/item`, and so can the `alt` attribute two nodes below it.
  */
-function friendlyNameToMedia(name: string) {
-  return friendlyNameToVar(name, "--");
+export function mapSignalsFor(path: JxPath): SignalOption[] | null {
+  return path.includes("map")
+    ? [
+        { label: "$map/item", value: "$map/item" },
+        { label: "$map/index", value: "$map/index" },
+      ]
+    : null;
 }
 
-/** Check if a selection path is inside a $map template (contains [..., "children", "map", ...]). */
-function isInsideMapTemplate(path: JxPath | null) {
-  if (!path) {
-    return false;
-  }
-  // A "map" segment addresses a repeater template (`[…, "children", i, "map", …]`, or the legacy
-  // `[…, "children", "map", …]`), so anything at or below it is inside a map template.
-  return path.includes("map");
+/** State keys a value position may bind to — handlers and Functions are not values. */
+export function bindableSignalNames(doc: JxMutableNode): string[] {
+  return Object.entries(doc.state || {})
+    .filter(
+      ([, d]) =>
+        !(d as Record<string, unknown>)?.$handler &&
+        (d as JxPrototypeDef)?.$prototype !== "Function",
+    )
+    .map(([defName]) => defName);
 }
 
 /**
@@ -94,7 +129,7 @@ function isInsideMapTemplate(path: JxPath | null) {
  * @param {import("@jxsuite/schema/types").JxStateDefinition | undefined} def
  * @returns {string}
  */
-function defaultAsString(def: JxStateDefinition | undefined) {
+export function defaultAsString(def: JxStateDefinition | undefined) {
   if (!def || typeof def !== "object" || Array.isArray(def)) {
     return "";
   }
@@ -105,305 +140,78 @@ function defaultAsString(def: JxStateDefinition | undefined) {
   return typeof dv === "object" ? JSON.stringify(dv) : String(dv);
 }
 
-/**
- * Field row with binding toggle — allows switching between static value and signal binding.
- * rawValue can be a JSON literal (static) or { $ref: "..." } (bound).
- */
-function bindableFieldRow(
-  label: string,
-  type: string,
-  rawValue: unknown,
-  onChange: (v?: JsonValue) => void,
-  filterFn: ((d: SignalDef) => boolean) | null = null,
-  extraSignals: SignalOption[] | null = null,
-  fieldKey = `prop:${label}`,
-  caps: SlotMode[] = ["literal", "ref"],
-) {
-  const tab = activeTab.value;
-  const defs = tab!.doc.document.state || {};
-  const boundRef = isRef(rawValue) ? rawValue.$ref : null;
-  const isDynamic = slotMode(rawValue) !== "literal";
-
-  const signalDefs = Object.entries(defs).filter(([, d]) =>
-    filterFn
-      ? filterFn(d as SignalDef)
-      : !(d as Record<string, unknown>)?.$handler &&
-        (d as JxPrototypeDef)?.$prototype !== "Function",
-  );
-
-  const staticVal = isDynamic ? "" : (rawValue ?? "");
-  const draftKey = `prop:${label}`;
-  const staticTpl =
-    type === "textarea"
-      ? spTextArea(draftKey, String(staticVal), (v: string) => onChange(v))
-      : type === "checkbox"
-        ? html`<sp-checkbox
-            ?checked=${Boolean(staticVal)}
-            @change=${(e: Event) => onChange((e.target as HTMLInputElement).checked)}
-          ></sp-checkbox>`
-        : spTextField(draftKey, String(staticVal), (v: string) => onChange(v));
-
-  // De-escalating to literal restores the bound signal's declared default (old unbind behavior).
-  const literalDefault = boundRef
-    ? defaultAsString(defs[boundRef.startsWith("#/state/") ? boundRef.slice(8) : boundRef]) ||
-      undefined
-    : undefined;
-
-  const slot = renderDynamicSlot({
-    caps,
-    extraSignals,
-    fieldKey,
-    literalDefault,
-    onChange,
-    staticWidget: staticTpl,
-    stateDefs: signalDefs.map(([defName]) => defName),
-    value: rawValue,
-  });
-  return html`
-    <div class="field-row">
-      <sp-field-label size="s">${label}</sp-field-label>
-      ${slot.modeButton} ${slot.widget}
-    </div>
-  `;
+/** Who a bound value comes from, in the fewest words that are true — the chip's donor text. */
+function bindingDonor(value: unknown): string {
+  if (isRef(value)) {
+    const ref = value.$ref;
+    return ref.startsWith("#/state/") ? ref.slice(8) : ref || "nothing yet";
+  }
+  return typeof value === "string" ? "a template" : "a formula";
 }
 
-/** Key-value pair row for styles / attributes */
-function kvRow(
-  key: string,
-  value: string,
-  onChange: (newKey: string, newVal: string) => void,
-  onDelete: () => void,
-  /** @type {string | null} */ datalistId = null,
-) {
-  /** @type {ReturnType<typeof setTimeout> | undefined} */
-  let debounceTimer: ReturnType<typeof setTimeout> | undefined;
-  let currentKey = key;
-  let currentVal = value;
-  const commit = () => {
-    clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => onChange(currentKey, currentVal), 400);
+/**
+ * The state entry a bound value reads, when the chip can name one — a `$ref` or a `${…}` template.
+ *
+ * §6.2's table says a bound chip "click opens the source", and on the Content tab it did not: both
+ * bound branches returned a `donor` and a `title` and no `onClick`, so `renderProvenanceChip` drew
+ * a handler-less span. The Style tab's chip has jumped to the Data panel since P5; the same promise
+ * on the other tab was a label. Same regex as `style-panel.ts`'s `templateSignalOf`, because both
+ * spellings of a template (`${x}` and `${state.x}`) name the same entry.
+ */
+function boundSignalOf(value: unknown): string | null {
+  if (isRef(value)) {
+    const ref = value.$ref;
+    return ref.startsWith("#/state/") ? (ref.slice(8).split("/")[0] ?? null) : null;
+  }
+  if (typeof value !== "string") {
+    return null;
+  }
+  return /\$\{\s*(?:state\.)?([A-Za-z_$][\w$]*)/.exec(value)?.[1] ?? null;
+}
+
+/**
+ * Reveal the state entry a bound field reads: the Data panel, and that entry's row.
+ *
+ * Both verbs, because the rail tab alone leaves you looking at a collapsed list — the same pair the
+ * Style tab's chip runs.
+ */
+function revealSignal(name: string): void {
+  const registry = activeRegistry();
+  void registry?.run("view.setActivity", { tab: "data" });
+  void registry?.run("data.expandRow", { name });
+}
+
+/**
+ * The bound chip, naming its donor and — when the donor is a state entry — opening it.
+ *
+ * The entry list is read here rather than threaded through both callers' signatures: the two
+ * provenance functions differ in everything else, and the question "does this document define
+ * `title`?" has one answer that neither of them should have to be handed.
+ */
+function boundProvenance(value: unknown, title: string): FieldProvenance {
+  const signal = boundSignalOf(value);
+  const document = activeTab.value?.doc.document;
+  const known = signal && document ? bindableSignalNames(document).includes(signal) : false;
+  return {
+    donor: bindingDonor(value),
+    state: "bound",
+    title,
+    // Only when the document actually defines it: a chip that jumps to a row that is not there
+    // Would be a worse answer than a chip that does not jump.
+    ...(known && signal ? { onClick: () => revealSignal(signal) } : {}),
   };
-  const placeholder = datalistId === "css-props" ? getCssInitialMap().get(key) || "" : "";
-  return html`
-    <div class="kv-row">
-      <sp-textfield
-        size="s"
-        class="kv-key"
-        .value=${live(key)}
-        @input=${(e: Event) => {
-          currentKey = (e.target as HTMLInputElement).value;
-          commit();
-        }}
-        @change=${
-          datalistId === "css-props"
-            ? (e: Event) => {
-                const el = (e.target as HTMLInputElement)
-                  .closest(".kv-row")
-                  ?.querySelector(".kv-val");
-                if (el) {
-                  el.setAttribute(
-                    "placeholder",
-                    getCssInitialMap().get((e.target as HTMLInputElement).value) || "",
-                  );
-                }
-              }
-            : nothing
-        }
-      ></sp-textfield>
-      <sp-textfield
-        size="s"
-        class="kv-val"
-        .value=${live(value)}
-        placeholder=${placeholder}
-        @input=${(e: Event) => {
-          currentVal = (e.target as HTMLInputElement).value;
-          commit();
-        }}
-      ></sp-textfield>
-      <sp-action-button size="xs" quiet @click=${onDelete}>
-        <sp-icon-close slot="icon"></sp-icon-close>
-      </sp-action-button>
-    </div>
-  `;
 }
 
 // ─── Sub-templates ──────────────────────────────────────────────────────────
 
-/** Repeater fields template */
-function renderRepeaterFieldsTemplate(
-  node: JxMutableNode,
-  path: JxPath,
-  _mapSignals: SignalOption[] | null,
-) {
-  return html`
-    ${bindableFieldRow(
-      "Items",
-      "text",
-      node.items,
-      (v: JsonValue) =>
-        transactDoc(activeTab.value, (t) => mutateUpdateProperty(t, path, "items", v)),
-      null,
-      null,
-      `prop|${path.join("/")}|items`,
-    )}
-    ${
-      node.filter
-        ? bindableFieldRow(
-            "Filter",
-            "text",
-            node.filter,
-            (v: JsonValue) =>
-              transactDoc(activeTab.value, (t) =>
-                mutateUpdateProperty(t, path, "filter", v || undefined),
-              ),
-            null,
-            null,
-            `prop|${path.join("/")}|filter`,
-          )
-        : nothing
-    }
-    ${
-      node.sort
-        ? bindableFieldRow(
-            "Sort",
-            "text",
-            node.sort,
-            (v: JsonValue) =>
-              transactDoc(activeTab.value, (t) =>
-                mutateUpdateProperty(t, path, "sort", v || undefined),
-              ),
-            null,
-            null,
-            `prop|${path.join("/")}|sort`,
-          )
-        : nothing
-    }
-    <div style="display:flex;gap:8px;margin-top:4px">
-      ${
-        !node.filter
-          ? html`<span
-              class="kv-add"
-              @click=${() =>
-                transactDoc(activeTab.value, (t) =>
-                  mutateUpdateProperty(t, path, "filter", { $ref: "#/state/" }),
-                )}
-              >+ Add filter</span
-            >`
-          : nothing
-      }
-      ${
-        !node.sort
-          ? html`<span
-              class="kv-add"
-              @click=${() =>
-                transactDoc(activeTab.value, (t) =>
-                  mutateUpdateProperty(t, path, "sort", { $ref: "#/state/" }),
-                )}
-              >+ Add sort</span
-            >`
-          : nothing
-      }
-    </div>
-    ${
-      node.map
-        ? html`
-            <sp-action-button
-              size="s"
-              style="margin-top:8px;width:100%"
-              @click=${() => {
-                activeTab.value!.session.selection = [...path, "map"];
-              }}
-              >Edit template →</sp-action-button
-            >
-          `
-        : nothing
-    }
-  `;
-}
-
-/** Switch fields template */
-function renderSwitchFieldsTemplate(
-  node: JxMutableNode,
-  path: JxPath,
-  mapSignals: SignalOption[] | null,
-) {
-  const caseNames = Object.keys(node.cases || {});
-  return html`
-    ${bindableFieldRow(
-      "Expression",
-      "text",
-      node.$switch,
-      (v: JsonValue) =>
-        transactDoc(activeTab.value, (t) => mutateUpdateProperty(t, path, "$switch", v)),
-      null,
-      mapSignals,
-      `prop|${path.join("/")}|$switch`,
-      // No literal rung: a $switch is inherently dynamic.
-      // De-escalating to literal would delete the key and demote the node mid-cycle.
-      ["ref", "template"],
-    )}
-    <div
-      style="font-size:var(--spectrum-font-size-50, 11px);font-weight:600;color:var(--fg-dim);margin:8px 0 4px;text-transform:uppercase;letter-spacing:0.05em"
-    >
-      Cases
-    </div>
-    ${caseNames.map((caseName) => {
-      /** @type {ReturnType<typeof setTimeout> | undefined} */
-      let debounce: ReturnType<typeof setTimeout> | undefined;
-      return html`
-        <div class="field-row" style="display:flex;align-items:center;gap:4px;margin-bottom:3px">
-          <input
-            class="field-input"
-            .value=${live(caseName)}
-            style="flex:1"
-            @input=${(e: Event) => {
-              clearTimeout(debounce);
-              debounce = setTimeout(() => {
-                if (
-                  (e.target as HTMLInputElement).value &&
-                  (e.target as HTMLInputElement).value !== caseName
-                ) {
-                  transactDoc(activeTab.value, (t) =>
-                    mutateRenameSwitchCase(t, path, caseName, (e.target as HTMLInputElement).value),
-                  );
-                }
-              }, 500);
-            }}
-          />
-          <span
-            class="bind-toggle"
-            title="Edit case"
-            style="cursor:pointer"
-            @click=${(e: Event) => {
-              e.stopPropagation();
-              activeTab.value!.session.selection = [...path, "cases", caseName];
-            }}
-            >→</span
-          >
-          <span
-            style="cursor:pointer;color:var(--danger);font-size:var(--spectrum-font-size-50, 11px)"
-            @click=${(e: Event) => {
-              e.stopPropagation();
-              transactDoc(activeTab.value!, (t) => mutateRemoveSwitchCase(t, path, caseName));
-            }}
-            >✕</span
-          >
-        </div>
-      `;
-    })}
-    <span
-      class="kv-add"
-      @click=${() => {
-        transactDoc(activeTab.value, (t) =>
-          mutateAddSwitchCase(t, path, `case${caseNames.length + 1}`),
-        );
-      }}
-      >+ Add case</span
-    >
-  `;
-}
-
-/** Component props fields template */
+/**
+ * Component props, each row carrying §6.2's provenance chip — the SECOND cascade.
+ *
+ * A component instance's value for a prop either overrides the component's declared default or does
+ * not exist, and until now the two were the same blank field. The chip states which, and in the
+ * inherited case it names the donor AND jumps to it: the donor of a component default is the
+ * component definition, which this panel can already open.
+ */
 function renderComponentPropsFieldsTemplate(
   node: JxMutableNode,
   path: JxPath,
@@ -411,140 +219,147 @@ function renderComponentPropsFieldsTemplate(
   navigateToComponent: (path: string) => void,
 ) {
   const tab = activeTab.value;
-  const comp = componentRegistry.find((c) => c.tagName === node.tagName);
+  const comp = componentRegistry.find((c) => c.tagName === displayTagName(node.tagName));
+  const definitionOfThis = isComponentDefinitionOpen(node);
   if (!comp || !comp.props) {
-    return html`<div class="empty-state">Component not found</div>`;
+    return renderEmptyState({
+      compact: true,
+      message: "This component is not in the project's library, so it has no settings to show.",
+    });
   }
   const isNpm = comp.source === "npm";
-  const currentVals = isNpm ? node.attributes || {} : node.$props || {};
-  const updateFn = isNpm
+  /* In the definition the "value" of a setting is its DECLARED DEFAULT — the state entry's
+     `default` — not a per-instance override, so the row reads and writes there instead. */
+  const stateEntries = (tab?.doc.document.state ?? {}) as Record<string, { default?: JsonValue }>;
+  const currentVals: Record<string, unknown> = definitionOfThis
+    ? Object.fromEntries(comp.props.map((prop) => [prop.name, stateEntries[prop.name]?.default]))
+    : isNpm
+      ? node.attributes || {}
+      : node.$props || {};
+  const updateFn = definitionOfThis
     ? (name: string, v?: JsonValue) =>
-        transactDoc(activeTab.value, (t) =>
-          mutateUpdateAttribute(
-            t,
-            path,
-            name,
-            v === "" ? undefined : (v as JxAttributeValue | undefined),
-          ),
-        )
-    : (name: string, v?: JsonValue) =>
-        transactDoc(activeTab.value, (t) => mutateUpdateProp(t, path, name, v));
+        transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { default: v }))
+    : isNpm
+      ? (name: string, v?: JsonValue) =>
+          transactDoc(activeTab.value, (t) =>
+            mutateUpdateAttribute(
+              t,
+              path,
+              name,
+              v === "" ? undefined : (v as JxAttributeValue | undefined),
+            ),
+          )
+      : (name: string, v?: JsonValue) =>
+          transactDoc(activeTab.value, (t) => mutateUpdateProp(t, path, name, v));
 
   const defs = tab!.doc.document.state || {};
-  const signalDefs = Object.entries(defs).filter(
-    ([, d]) =>
-      !(d as Record<string, unknown>)?.$handler && (d as JxPrototypeDef)?.$prototype !== "Function",
-  );
+  const signalNames = bindableSignalNames(tab!.doc.document);
   const extraSignals = mapSignals;
 
   return html`
-    ${comp.props.map(
-      (
-        /** @type {{ name: string; type?: string; format?: string; description?: string }} */ prop,
-      ) => {
-        const rawValue = currentVals[prop.name];
-        const boundRef = isRef(rawValue) ? rawValue.$ref : null;
-        const hasVal = rawValue !== undefined && rawValue !== null;
-        const parsed = parseCemType(prop.type);
-        const onChange = (v?: JsonValue) => updateFn(prop.name, v);
-        const staticVal = slotMode(rawValue) === "literal" ? String(rawValue ?? "") : "";
+    ${comp.props.map((prop) => {
+      const rawValue = currentVals[prop.name];
+      const boundRef = isRef(rawValue) ? rawValue.$ref : null;
+      const hasVal = rawValue !== undefined && rawValue !== null;
+      const parsed = parseCemType(prop.type);
+      const onChange = (v?: JsonValue) => updateFn(prop.name, v);
+      const staticVal = slotMode(rawValue) === "literal" ? String(rawValue ?? "") : "";
 
-        const clearProp = (e: Event) => {
-          e.stopPropagation();
-          updateFn(prop.name);
-        };
+      // De-escalating to literal restores the bound signal's declared default (old unbind behavior).
+      const literalDefault = boundRef
+        ? defaultAsString(defs[boundRef.startsWith("#/state/") ? boundRef.slice(8) : boundRef]) ||
+          undefined
+        : undefined;
 
-        // De-escalating to literal restores the bound signal's declared default (old unbind behavior).
-        const literalDefault = boundRef
-          ? defaultAsString(defs[boundRef.startsWith("#/state/") ? boundRef.slice(8) : boundRef]) ||
-            undefined
-          : undefined;
+      /** @type {ReturnType<typeof setTimeout> | undefined} */
+      let debounce: ReturnType<typeof setTimeout> | undefined;
+      let widgetTpl;
+      if (prop.format === "image") {
+        widgetTpl = renderMediaPicker(prop.name, staticVal, onChange);
+      } else if (prop.format === "color") {
+        widgetTpl = renderColorSelector(prop.name, staticVal, onChange);
+      } else if (prop.format === "date") {
+        widgetTpl = spTextField(
+          `cprop:${prop.name}`,
+          String(staticVal),
+          (v: string) => onChange(v),
+          {
+            placeholder: "YYYY-MM-DD",
+          },
+        );
+      } else if (parsed.kind === "boolean") {
+        widgetTpl = html`<sp-checkbox
+          size="s"
+          .checked=${live(Boolean(staticVal))}
+          @change=${(e: Event) => onChange((e.target as HTMLInputElement).checked || undefined)}
+        ></sp-checkbox>`;
+      } else if (parsed.kind === "number") {
+        widgetTpl = html`<sp-number-field
+          size="s"
+          .value=${live(staticVal)}
+          @input=${(e: Event) => {
+            clearTimeout(debounce);
+            debounce = setTimeout(() => onChange((e.target as HTMLInputElement).value), 400);
+          }}
+        ></sp-number-field>`;
+      } else if (parsed.kind === "combobox") {
+        const options = parsed.options as string[];
+        widgetTpl = html`<jx-value-selector
+          .value=${String(staticVal)}
+          size="s"
+          placeholder="—"
+          .options=${options.map((o) => ({ label: camelToLabel(o), value: o }))}
+          @change=${(e: Event & { detail?: { value?: string } }) =>
+            onChange(e.detail?.value ?? (e.target as HTMLInputElement).value)}
+        ></jx-value-selector>`;
+      } else {
+        widgetTpl = spTextField(`cprop:${prop.name}`, String(staticVal), (v: string) =>
+          onChange(v),
+        );
+      }
 
-        /** @type {ReturnType<typeof setTimeout> | undefined} */
-        let debounce: ReturnType<typeof setTimeout> | undefined;
-        let widgetTpl;
-        if (prop.format === "image") {
-          widgetTpl = renderMediaPicker(prop.name, staticVal, onChange);
-        } else if (prop.format === "color") {
-          widgetTpl = renderColorSelector(prop.name, staticVal, onChange);
-        } else if (prop.format === "date") {
-          widgetTpl = spTextField(
-            `cprop:${prop.name}`,
-            String(staticVal),
-            (v: string) => onChange(v),
-            {
-              placeholder: "YYYY-MM-DD",
-            },
-          );
-        } else if (parsed.kind === "boolean") {
-          widgetTpl = html`<sp-checkbox
-            size="s"
-            .checked=${live(Boolean(staticVal))}
-            @change=${(e: Event) => onChange((e.target as HTMLInputElement).checked || undefined)}
-          ></sp-checkbox>`;
-        } else if (parsed.kind === "number") {
-          widgetTpl = html`<sp-number-field
-            size="s"
-            .value=${live(staticVal)}
-            @input=${(e: Event) => {
-              clearTimeout(debounce);
-              debounce = setTimeout(() => onChange((e.target as HTMLInputElement).value), 400);
-            }}
-          ></sp-number-field>`;
-        } else if (parsed.kind === "combobox") {
-          const options = /** @type {{ options?: string[] }} */ parsed.options as string[];
-          widgetTpl = html`<jx-value-selector
-            .value=${String(staticVal)}
-            size="s"
-            placeholder="—"
-            .options=${options.map((o) => ({
-              label: camelToLabel(o),
-              value: o,
-            }))}
-            @change=${(e: Event & { detail?: { value?: string } }) =>
-              onChange(e.detail?.value ?? (e.target as HTMLInputElement).value)}
-          ></jx-value-selector>`;
-        } else {
-          widgetTpl = spTextField(`cprop:${prop.name}`, String(staticVal), (v: string) =>
-            onChange(v),
-          );
-        }
+      const slot = renderDynamicSlot({
+        caps: "componentProp",
+        extraSignals,
+        fieldKey: `cprop|${path.join("/")}|${prop.name}`,
+        literalDefault,
+        onChange,
+        staticWidget: widgetTpl,
+        stateDefs: signalNames,
+        value: rawValue,
+      });
 
-        const slot = renderDynamicSlot({
-          caps: ["literal", "ref", "template"],
-          extraSignals,
-          fieldKey: `cprop|${path.join("/")}|${prop.name}`,
-          literalDefault,
-          onChange,
-          staticWidget: widgetTpl,
-          stateDefs: signalDefs.map(([defName]) => defName),
-          value: rawValue,
-        });
-        return html`
-          <div class="style-row" data-prop=${prop.name}>
-            <div class="style-row-label">
-              ${
-                hasVal
-                  ? html`<span
-                      class="set-dot"
-                      title="Clear ${prop.name}"
-                      @click=${clearProp}
-                    ></span>`
-                  : nothing
-              }
-              <sp-field-label size="s" title=${prop.description || prop.name}
-                >${camelToLabel(prop.name)}</sp-field-label
-              >
-              ${slot.modeButton}
-            </div>
-            ${slot.widget}
-          </div>
-        `;
-      },
-    )}
-    ${comp.props.length === 0 ? html`<div class="empty-state">No props defined</div>` : nothing}
+      return renderFieldRow({
+        hasValue: hasVal,
+        label: camelToLabel(prop.name),
+        labelExtra: slot.modeButton,
+        prop: prop.name,
+        provenance: componentPropProvenance(prop, rawValue, hasVal, {
+          // No donor and no jump in the definition: the value IS the component's default, and
+          // "→ the component definition" would open the document already in front of you.
+          isDefinition: definitionOfThis,
+          onClear: () => updateFn(prop.name),
+          ...(definitionOfThis || !comp.path
+            ? {}
+            : { openDefinition: () => navigateToComponent(comp.path!) }),
+        }),
+        widget: slot.widget,
+      });
+    })}
     ${
-      comp.path
+      comp.props.length === 0
+        ? renderEmptyState({
+            compact: true,
+            message: definitionOfThis
+              ? "This component declares no settings yet. Add a state entry with a default to " +
+                "give whoever places it something to fill in."
+              : "This component has no settings to fill in yet.",
+          })
+        : nothing
+    }
+    ${
+      // A link to the definition, from inside the definition, is a link to here.
+      comp.path && !definitionOfThis
         ? html`<span class="kv-add" @click=${() => navigateToComponent(comp.path!)}
             >→ Edit definition</span
           >`
@@ -553,9 +368,60 @@ function renderComponentPropsFieldsTemplate(
   `;
 }
 
-/** Custom attrs fields template */
+/**
+ * Is the selected node an INSTANCE of a component, or the definition of one?
+ *
+ * A component's own root tag has a hyphen, so "the tag contains a dash" answers yes to both — and
+ * that is what put the instance form in front of someone editing the component itself. The
+ * distinguishing fact is whose document this is: if the component's definition path IS the open
+ * file, there is no instance, no override and no donor to jump to.
+ */
+export function isComponentDefinitionOpen(node: JxMutableNode): boolean {
+  const comp = componentRegistry.find((c) => c.tagName === displayTagName(node.tagName));
+  const open = activeTab.value?.documentPath;
+  return comp?.path !== undefined && open !== undefined && comp.path === open;
+}
+
+/**
+ * Which of §6.2's four states a component-prop row is in.
+ *
+ * Bound beats set (a `$ref` IS a value, but "bound to `title`" is the more useful sentence); set
+ * beats inherited; a prop with no declared default and no value is plain Default and draws
+ * nothing.
+ */
+function componentPropProvenance(
+  prop: { name: string; default?: unknown; description?: string },
+  rawValue: unknown,
+  hasVal: boolean,
+  actions: {
+    onClear: () => void;
+    openDefinition?: (() => void) | undefined;
+    /** Editing the component itself, where there is no instance and therefore no donor. */
+    isDefinition?: boolean;
+  },
+): FieldProvenance {
+  if (hasVal && slotMode(rawValue) !== "literal") {
+    return boundProvenance(rawValue, `Bound — ${prop.name}`);
+  }
+  if (hasVal) {
+    return { onClick: actions.onClear, state: "set", title: `Clear ${prop.name}` };
+  }
+  /* INHERITED is a statement about somewhere ELSE, so it cannot be true here. In the definition an
+     unset field means this component ships no default for that setting — which is `default`, the
+     state that draws nothing, not a badge pointing at itself. */
+  if (prop.default !== undefined && !actions.isDefinition) {
+    return {
+      donor: "the component default",
+      state: "inherited",
+      title: `Not set here — the component's default (${String(prop.default)}) applies`,
+      ...(actions.openDefinition ? { onClick: actions.openDefinition } : {}),
+    };
+  }
+  return { state: "default" };
+}
+
+/** Custom attrs fields template — attributes this element's schema does not know about. */
 function renderCustomAttrsFieldsTemplate(
-  _node: JxMutableNode,
   path: JxPath,
   attrs: Record<string, unknown>,
   knownAttrNames: Set<string>,
@@ -563,10 +429,9 @@ function renderCustomAttrsFieldsTemplate(
   const customAttrs = Object.entries(attrs).filter(([k]) => !knownAttrNames.has(k));
   return html`
     ${customAttrs.map(([attr, val]) =>
-      kvRow(
-        attr,
-        String(val),
-        (newAttr: string, newVal: string) => {
+      renderKvRow({
+        name: attr,
+        onCommit: (newAttr: string, newVal: string) => {
           if (newAttr !== attr) {
             transactDoc(activeTab.value, (t) => {
               mutateUpdateAttribute(t, path, attr);
@@ -576,228 +441,16 @@ function renderCustomAttrsFieldsTemplate(
             transactDoc(activeTab.value, (t) => mutateUpdateAttribute(t, path, attr, newVal));
           }
         },
-        () => transactDoc(activeTab.value, (t) => mutateUpdateAttribute(t, path, attr)),
-      ),
+        onDelete: () => transactDoc(activeTab.value, (t) => mutateUpdateAttribute(t, path, attr)),
+        value: String(val),
+      }),
     )}
     <span
       class="kv-add"
-      @click=${() =>
-        transactDoc(activeTab.value, (t) => mutateUpdateAttribute(t, path, "data-", ""))}
+      @click=${() => transactDoc(activeTab.value, (t) => mutateUpdateAttribute(t, path, "data-", ""))}
       >+ Add attribute</span
     >
   `;
-}
-
-// ─── Media breakpoints ──────────────────────────────────────────────────────
-
-/** Media breakpoint fields template */
-function renderMediaFieldsTemplate(node: JxMutableNode) {
-  const media = node.$media || {};
-  /** @type {ReturnType<typeof setTimeout> | undefined} */
-  let baseDebounce: ReturnType<typeof setTimeout> | undefined;
-  const breakpoints = Object.entries(media).filter(([k]) => k !== "--");
-
-  return html`
-    <div class="kv-row" style="align-items:center">
-      <span class="field-label" style="width:auto;margin-right:4px">Base width</span>
-      <input
-        class="field-input"
-        style="width:70px;flex:none"
-        placeholder="320px"
-        .value=${live(media["--"] || "")}
-        @input=${(e: Event) => {
-          clearTimeout(baseDebounce);
-          baseDebounce = setTimeout(() => {
-            const val = (e.target as HTMLInputElement).value.trim();
-            transactDoc(activeTab.value, (t) => mutateUpdateMedia(t, "--", val || undefined));
-          }, 400);
-        }}
-      />
-      ${
-        media["--"]
-          ? html`<span
-              class="kv-del"
-              @click=${() => transactDoc(activeTab.value, (t) => mutateUpdateMedia(t, "--"))}
-              >✕</span
-            >`
-          : nothing
-      }
-    </div>
-
-    ${breakpoints.map(([name, query]) => mediaBreakpointRowTemplate(name, query))}
-
-    <div>
-      <span
-        class="kv-add"
-        style=${view.showAddBreakpointForm ? "display:none" : ""}
-        @click=${(_e: Event) => {
-          view.showAddBreakpointForm = true;
-          renderOnly("rightPanel");
-        }}
-        >+ Add breakpoint</span
-      >
-      ${
-        view.showAddBreakpointForm
-          ? html`
-              <div style="margin-top:4px">
-                <div style="display:flex;gap:4px;margin-bottom:3px;align-items:center">
-                  <input
-                    class="field-input"
-                    placeholder="Name (e.g. Tablet)"
-                    style="flex:1"
-                    @input=${(e: Event) => {
-                      view.addBreakpointPreview =
-                        friendlyNameToMedia((e.target as HTMLInputElement).value) || "";
-                      renderOnly("rightPanel");
-                    }}
-                  />
-                  <span
-                    style="font-size:10px;color:var(--fg-dim);font-family:var(--font-mono);white-space:nowrap"
-                    >${view.addBreakpointPreview}</span
-                  >
-                </div>
-                <div style="display:flex;gap:4px;margin-bottom:3px;align-items:center">
-                  <input
-                    class="field-input add-bp-query"
-                    value="(min-width: 768px)"
-                    style="flex:1"
-                  />
-                </div>
-                <div style="display:flex;gap:4px">
-                  <button
-                    class="kv-add"
-                    style="padding:2px 10px;cursor:pointer"
-                    @click=${(e: Event) => {
-                      const wrap = (e.target as HTMLElement).closest("div")?.parentElement;
-                      const nameVal = wrap?.querySelector("input")?.value;
-                      const queryVal = (
-                        wrap?.querySelector(".add-bp-query") as HTMLInputElement | null
-                      )?.value?.trim();
-                      const key = friendlyNameToMedia(nameVal || "");
-                      if (key && queryVal) {
-                        view.showAddBreakpointForm = false;
-                        view.addBreakpointPreview = "";
-                        transactDoc(activeTab.value, (t) => mutateUpdateMedia(t, key, queryVal));
-                      }
-                    }}
-                  >
-                    Add
-                  </button>
-                  <button
-                    class="kv-add"
-                    style="padding:2px 10px;cursor:pointer;color:var(--fg-dim)"
-                    @click=${() => {
-                      view.showAddBreakpointForm = false;
-                      view.addBreakpointPreview = "";
-                      renderOnly("rightPanel");
-                    }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            `
-          : nothing
-      }
-    </div>
-  `;
-}
-
-/** Single media breakpoint row template */
-function mediaBreakpointRowTemplate(name: string, query: string) {
-  /** @type {ReturnType<typeof setTimeout> | undefined} */
-  let debounceTimer: ReturnType<typeof setTimeout> | undefined;
-  let currentRawLabel = name;
-  return html`
-    <div style="margin-bottom:6px;padding:4px 0;border-bottom:1px solid var(--border)">
-      <div style="display:flex;align-items:center;gap:4px;margin-bottom:2px">
-        <input
-          class="field-input"
-          .value=${live(mediaDisplayName(name))}
-          style="flex:1;font-weight:600;font-size:var(--spectrum-font-size-75, 12px)"
-          @input=${(e: Event) => {
-            const newKey = friendlyNameToMedia((e.target as HTMLInputElement).value);
-            currentRawLabel = newKey || "";
-            const rawEl = (e.target as HTMLElement).parentElement?.querySelector(".bp-raw-label");
-            if (rawEl) {
-              rawEl.textContent = currentRawLabel;
-            }
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(() => {
-              if (newKey && newKey !== name) {
-                const queryEl = (e.target as HTMLElement)
-                  .closest("div[style]")
-                  ?.parentElement?.querySelector(".bp-query-input") as HTMLInputElement | null;
-                transactDoc(activeTab.value, (t) => {
-                  mutateUpdateMedia(t, name);
-                  mutateUpdateMedia(t, newKey, queryEl?.value || query);
-                });
-              }
-            }, 600);
-          }}
-        />
-        <span
-          class="bp-raw-label"
-          style="font-size:10px;color:var(--fg-dim);font-family:var(--font-mono);white-space:nowrap"
-          >${name}</span
-        >
-        <span
-          class="kv-del"
-          @click=${() => transactDoc(activeTab.value, (t) => mutateUpdateMedia(t, name))}
-          >✕</span
-        >
-      </div>
-      <div style="display:flex;gap:4px;align-items:center">
-        <input
-          class="field-input bp-query-input"
-          .value=${live(query)}
-          style="flex:1"
-          @input=${(e: Event) => {
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(
-              () =>
-                transactDoc(activeTab.value, (t) =>
-                  mutateUpdateMedia(t, name, (e.target as HTMLInputElement).value),
-                ),
-              400,
-            );
-          }}
-        />
-      </div>
-    </div>
-  `;
-}
-
-// ─── Layout picker ──────────────────────────────────────────────────────────
-
-/** @type {{ name: string; path: string }[] | null} */
-let layoutEntries: { name: string; path: string }[] | null = null;
-
-async function loadLayoutEntries() {
-  try {
-    const platform = getPlatform();
-    const listing = await platform.listDirectory("layouts");
-    layoutEntries = listing
-      .filter((f: DirEntry) => f.type === "file" && f.name.endsWith(".json"))
-      .map((f: DirEntry) => ({
-        name: f.name.replace(/\.json$/, ""),
-        path: `./layouts/${f.name}`,
-      }));
-  } catch {
-    layoutEntries = [];
-  }
-  renderOnly("rightPanel");
-}
-
-export function invalidateLayoutPickerCache() {
-  layoutEntries = null;
-}
-
-function isPageDocument(documentPath: string | undefined | null) {
-  if (!documentPath || !projectState?.isSiteProject) {
-    return false;
-  }
-  return documentPath.startsWith("pages/") || documentPath.startsWith("./pages/");
 }
 
 // ─── Page-route enumeration (for the Link-target Internal picker) ─────────────
@@ -996,128 +649,102 @@ function isBoundAttrValue(value: unknown): boolean {
   return isRef(value) || (typeof value === "string" && value.includes("${"));
 }
 
-function renderPageSection(node: JxMutableNode) {
-  const tab = activeTab.value;
-  if (!isPageDocument(tab!.documentPath)) {
-    return nothing;
-  }
-
-  if (layoutEntries === null) {
-    void loadLayoutEntries();
-    return nothing;
-  }
-
-  const currentLayout = node.$layout;
-  const defaultLayout = projectState?.projectConfig?.defaults?.layout;
-  const effectivePath = getEffectiveLayoutPath(currentLayout);
-  const displayValue = currentLayout === false ? "__none__" : currentLayout || "__default__";
-
-  return html`
-    <sp-accordion-item label="Page" open>
-      <div class="style-section-body">
-        <div class="style-row" data-prop="$layout">
-          <div class="style-row-label">
-            ${
-              currentLayout !== undefined
-                ? html`<span
-                    class="set-dot"
-                    title="Reset to default"
-                    @click=${(e: Event) => {
-                      e.stopPropagation();
-                      transactDoc(activeTab.value, (t) => mutateUpdateProperty(t, [], "$layout"));
-                    }}
-                  ></span>`
-                : nothing
-            }
-            <sp-field-label size="s">Layout</sp-field-label>
-          </div>
-          <sp-picker
-            size="s"
-            value=${displayValue}
-            @change=${(e: Event) => {
-              const val = (e.target as HTMLInputElement).value;
-              if (val === "__default__") {
-                transactDoc(activeTab.value, (t) => mutateUpdateProperty(t, [], "$layout"));
-              } else if (val === "__none__") {
-                transactDoc(activeTab.value, (t) => mutateUpdateProperty(t, [], "$layout", false));
-              } else {
-                transactDoc(activeTab.value, (t) => mutateUpdateProperty(t, [], "$layout", val));
-              }
-              invalidateLayoutCache();
-            }}
-          >
-            <sp-menu-item value="__default__"
-              >Default${
-                defaultLayout
-                  ? ` (${defaultLayout.replace(/^\.\/layouts\//, "").replace(/\.json$/, "")})`
-                  : ""
-              }</sp-menu-item
-            >
-            <sp-menu-item value="__none__">None</sp-menu-item>
-            <sp-menu-divider></sp-menu-divider>
-            ${layoutEntries!.map(
-              (l: { name: string; path: string }) =>
-                html`<sp-menu-item value=${l.path}>${l.name}</sp-menu-item>`,
-            )}
-          </sp-picker>
-        </div>
-        ${
-          effectivePath
-            ? html`<div style="font-size:10px;color:var(--fg-dim);padding:2px 0;font-style:italic">
-                Wraps page content via &lt;slot&gt; distribution
-              </div>`
-            : nothing
-        }
-      </div>
-    </sp-accordion-item>
-  `;
-}
-
 // ─── Layout selection panel ─────────────────────────────────────────────────
 
-function renderLayoutSelectionPanel(ctx: { navigateToComponent: (path: string) => void }) {
-  const { el, layoutPath } = view.layoutSelection as {
-    el: HTMLElement;
-    layoutPath: string;
-  };
-  const tagName = el?.tagName?.toLowerCase() || "element";
-  const className = el?.className || "";
-  const displayPath = layoutPath || "layout";
+/*
+ * There is no `openLayoutAtNode`, and every line of it was wrong by the time it was deleted.
+ *
+ * Its docstring said `navigateToComponent` "swaps the tab's document (pushing the page onto the
+ * document stack)" — two releases stale: nothing has swapped since §14.1 landed and there is no
+ * document stack. Then it did four things, and the last three were the defect:
+ *
+ * 1. **Navigate.** Now the command's job, and the command opens the layout BESIDE the page rather
+ *    than over the page it is teaching about — §8.2's promise since P3, never shipped.
+ * 2. **`setLayoutSelection(null)`.** Its stated reason — "the layout is now the open document, so
+ *    its nodes are ordinary editable content" — stops being true the moment the layout opens beside
+ *    the page rather than replacing it. Clearing it is precisely what killed the follow on its first
+ *    frame, and it is what made the Inspector blank at the instant the layout appeared.
+ * 3. **Re-select against `activeTab`.** The focus deliberately stays in the page now, so the tab
+ *    this reached was the wrong one. The selection is carried by the derivation instead —
+ *    `pane-derive.ts`'s `DerivedTarget.select`, read from `shell.layoutSelection`'s `layoutPath`
+ *    and applied to the companion pane's tab once the open resolves. For one release that sentence
+ *    was written here and nothing implemented it: `layoutPath` had no consumer outside the canvas
+ *    hit test, `derivationFor("layout")` stored `{resolved: null}`, and the exact regression this
+ *    ledger entry describes — dropped into a layout file with nothing selected — was back while
+ *    the comment denied it.
+ *
+ *    The companion resolves `shell.layoutSelection.layoutFile` in preference to the page's own
+ *    `$layout` for the same reason the old code did: they are different answers for a nested chain,
+ *    and the one the author clicked is the one they meant.
+ * 4. **`renderOnly("rightPanel")`.** `panels/right-panel.ts:106` tracks `shell.layoutSelection`
+ *    itself and `:212` reads it, so the repaint was already subscribed — a second, imperative
+ *    subscription that only looked necessary because the function above had just cleared the state
+ *    the real one is keyed on.
+ */
+
+/**
+ * The Layout-element panel — what the inspector says when you click page chrome.
+ *
+ * It spent a release cycle unreachable: `shell.layoutSelection` had this reader and no writer, so
+ * clicking the site name in the header — the first click a new user makes — did nothing at all. The
+ * canvas hit test writes it now (§8.2), and `panels/right-panel.ts` tracks it, so the panel
+ * renders.
+ */
+/**
+ * The chip that opens the layout beside the page.
+ *
+ * **Drawn only where it can run**, which is why the condition lives at the call site rather than
+ * inside the handler. `canvas/iframe-host.ts` focuses the pane a layout click landed in — including
+ * a LENS, which draws layout chrome because it draws the same document — and from a derived pane
+ * `pane.derive` can only throw `an open document in a pane that is not itself derived`, into a
+ * floating `void registry.run(…)` that swallows it. A chip that does nothing when you press it is
+ * worse than no chip: the sentence above it already says where the element comes from, and in that
+ * shell the layout is either already beside you or one Unsplit away.
+ */
+function openLayoutTpl(): TemplateResult {
+  return html`<span
+    class="kv-add"
+    @click=${() => {
+      /* ONE command, addressed by id — the chip is a control, not a second definition site for
+         what "open the layout" means. It opens the layout BESIDE the page and leaves the keyboard
+         in the page, so the next click on layout chrome moves the side pane's selection instead of
+         teaching the author what a pane is. */
+      void activeRegistry()?.run("pane.derive", { preset: "layout" });
+    }}
+    >Open Layout →</span
+  >`;
+}
+
+function renderLayoutSelectionPanel() {
+  const selection = shell.layoutSelection as LayoutSelection;
+  const tagName = selection.tagName || "element";
+  const { className } = selection;
+  const displayPath = selection.layoutFile || "layout";
 
   return html`
     <div class="style-sidebar">
       <sp-accordion allow-multiple size="s">
         <sp-accordion-item label="Layout Element" open>
           <div class="style-section-body">
-            <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
-              <span
-                style="font-size:9px;padding:2px 6px;background:var(--spectrum-purple-600);color:white;border-radius:3px;text-transform:uppercase;letter-spacing:0.5px"
-                >Layout</span
-              >
-              <code
-                style="font-size:var(--spectrum-font-size-75, 12px);font-family:var(--font-mono)"
-                >&lt;${tagName}&gt;</code
-              >
+            <div class="layout-origin">
+              <span class="layout-origin-badge">Layout</span>
+              <code class="layout-origin-tag">&lt;${tagName}&gt;</code>
             </div>
             ${
               className
-                ? html`<div class="style-row">
-                    <div class="style-row-label">
-                      <sp-field-label size="s">Class</sp-field-label>
-                    </div>
-                    <span
-                      style="font-size:var(--spectrum-font-size-50, 11px);color:var(--fg-dim);word-break:break-all"
-                      >${className}</span
-                    >
-                  </div>`
+                ? renderFieldRow({
+                    hasValue: false,
+                    label: "Class",
+                    prop: "className",
+                    widget: html`<span class="layout-origin-class">${className}</span>`,
+                  })
                 : nothing
             }
-            <div style="font-size:10px;color:var(--fg-dim);padding:4px 0;font-style:italic">
-              This element is part of the page layout. Edit it by opening the layout file.
-            </div>
-            <span class="kv-add" @click=${() => ctx.navigateToComponent(displayPath)}
-              >Open Layout →</span
-            >
+            <p class="layout-origin-note">
+              This element comes from ${displayPath}, which wraps every page that uses it. Open the
+              layout to edit it.
+            </p>
+            ${deriveRefusal(workspace.activePaneId) === null ? openLayoutTpl() : nothing}
           </div>
         </sp-accordion-item>
       </sp-accordion>
@@ -1125,10 +752,112 @@ function renderLayoutSelectionPanel(ctx: { navigateToComponent: (path: string) =
   `;
 }
 
+// ─── Usages (§9.6) ───────────────────────────────────────────────────────────
+
+/**
+ * The Usage section's key, in the same per-tab `inspectorSections` record every other section uses,
+ * so `inspector.setSection` addresses it exactly like the rest and nothing needs a second store.
+ */
+const USAGES_SECTION = "__usages";
+
+/**
+ * The component instance's usage line — "Used on 7 pages →", expanding to the files.
+ *
+ * Three things this deliberately does NOT do. It does not render when the host cannot answer
+ * (`usagesSupported()` is `capability.findReferences`): a confident "0" for a component used
+ * everywhere is worse than no line at all. It does not ask on every paint — `peekUsages` is
+ * side-effect-free and only a cold target starts a request, which repaints once when it lands. And
+ * it does not swallow a failure: a failed count says so and offers Retry, because "we could not
+ * check" and "nothing uses this" are the two answers a user must never confuse.
+ *
+ * @param tagName — the instance's custom-element tag.
+ * @param componentPath — its definition file, when the registry knows one. Passing both asks the
+ *   one question that covers file references AND element instances.
+ */
+function renderUsagesSection(tagName: string, componentPath: string | null) {
+  const query = { tagName, ...(componentPath ? { path: componentPath } : {}) };
+  const state = peekUsages(query);
+  // ONE gate, and it is the peek itself: a host with no `findReferences` answers "unsupported"
+  // Synchronously, and the section does not exist. A separate `usagesSupported()` guard above this
+  // Would make the arm below unreachable, which is a branch nothing can ever test.
+  if (state?.status === "unsupported") {
+    return nothing;
+  }
+  if (state === null) {
+    // Cold: ask once, and repaint the inspector when the answer arrives.
+    void loadUsages(query).then(() => renderOnly("rightPanel"));
+  }
+
+  let body;
+  let heading = "Usage";
+  if (state === null || state.status === "pending") {
+    body = html`<div class="usage-note">Counting references…</div>`;
+  } else if (state.status === "failed") {
+    heading = "Usage · unknown";
+    body = html`
+      <div class="usage-note">
+        References could not be counted: ${state.message}. This is not the same as “unused”.
+      </div>
+      <sp-action-button
+        size="s"
+        quiet
+        @click=${() => {
+          void retryUsages(query).then(() => renderOnly("rightPanel"));
+        }}
+        >Retry</sp-action-button
+      >
+    `;
+  } else {
+    const files = usageFiles(state.result);
+    heading = usageHeadline(state.result);
+    body =
+      files.length === 0
+        ? html`<div class="usage-note">
+            Nothing else in this project places <code>&lt;${tagName}&gt;</code> yet.
+          </div>`
+        : html`${files.map(
+            (file) => html`
+              <button
+                class="usage-row"
+                type="button"
+                title=${file.refs.map((r) => `${r.refType} ${r.ref} ×${r.count}`).join(", ")}
+                @click=${() => openUsage(file.path)}
+              >
+                <span class="usage-row-path">${file.path}</span>
+                <span class="usage-row-count">${file.count}</span>
+              </button>
+            `,
+          )}`;
+  }
+
+  return html`
+    <sp-accordion-item
+      label=${heading}
+      ?open=${isInspectorSectionOpen(USAGES_SECTION, false)}
+      @sp-accordion-item-toggle=${() =>
+        setInspectorSection(USAGES_SECTION, !isInspectorSectionOpen(USAGES_SECTION, false))}
+    >
+      <div class="style-section-body">${body}</div>
+    </sp-accordion-item>
+  `;
+}
+
+/** Open a referencing file in a tab — the "→" half of "Used on N pages →". */
+function openUsage(path: string): void {
+  // Lazy import: `files/files.ts` imports this panel's siblings, and a static edge here would close
+  // The inspector → files → inspector cycle.
+  void import("../files/files").then((m) => m.openFileInTab(path));
+}
+
+/** Send the user to the tab that DOES answer, without this module importing the dock. */
+function showLogicTab(): void {
+  void import("./right-panel").then((m) => m.setInspectorTab("events"));
+}
+
 // ─── Main entry point ───────────────────────────────────────────────────────
 
 /**
- * Properties panel — lit-html template with accordion sections.
+ * The Content tab — lit-html template with accordion sections.
  *
  * @param {{ navigateToComponent: (path: string) => void }} ctx
  */
@@ -1137,53 +866,61 @@ export function renderPropertiesPanelTemplate(ctx: {
 }) {
   const tab = activeTab.value;
   if (!tab) {
-    return html`<div class="empty-state">No document loaded</div>`;
+    return renderEmptyState({
+      actions: [openPageAction()],
+      message: "Open a page to inspect and style what you click.",
+    });
   }
 
   // Layout element selected — show read-only info with link to open layout
-  if (view.layoutSelection) {
-    return renderLayoutSelectionPanel(ctx);
+  if (shell.layoutSelection) {
+    return renderLayoutSelectionPanel();
   }
 
-  if (!tab.session.selection) {
-    return html`<div class="empty-state">Select an element to inspect</div>`;
+  const selected = primarySelection(tab.session.selection);
+  if (!selected) {
+    return renderEmptyState({ message: clickAnythingTo("edit its content") });
   }
-  const node = getNodeAtPath(tab.doc.document, tab.session.selection);
+  const path: JxPath = selected;
+  const node = getNodeAtPath(tab.doc.document, path);
   if (!node) {
-    return html`<div class="empty-state">Node not found</div>`;
+    return renderEmptyState({ message: staleSelectionMessage() });
   }
 
-  const path = tab.session.selection;
-  const isMapNode = node.$prototype === "Array";
-  const isSwitchNode = Boolean(node.$switch);
-  const isCustomInstance = (node.tagName || "").includes("-");
-  const isRoot = path.length === 0;
-  const tagName = node.tagName || "div";
+  // A repeating list has no content of its own — it has a source and a template, and both are
+  // Wiring. Content says where the answer lives rather than drawing an empty accordion (§6.5).
+  if (node.$prototype === "Array") {
+    return renderEmptyState({
+      actions: [{ label: "Open Logic", run: showLogicTab }],
+      detail: "Its items, filter, sort and template are wiring, so they live in Logic.",
+      message: "A repeating list has no content of its own.",
+    });
+  }
+
+  // The whole selection the Content tab edits. `[path]` when one element is selected, which is
+  // Every existing call site's behaviour unchanged.
+  const targets: JxPath[] = tab.session.selection.length > 0 ? tab.session.selection : [path];
+  const doc = tab.doc.document;
+  const isCustomInstance = displayTagName(node.tagName).includes("-");
+  const chosenTag = isTagExpression(node.tagName) ? node.tagName.$expression : null;
+  const tagName = displayTagName(node.tagName) || "div";
   const attrs = node.attributes || {};
 
-  const mapSignals = isInsideMapTemplate(path)
-    ? [
-        { label: "$map/item", value: "$map/item" },
-        { label: "$map/index", value: "$map/index" },
-      ]
-    : null;
-
+  const mapSignals = mapSignalsFor(path);
   // Signals offered to attribute/textContent bindings (handlers and Functions excluded).
-  const bindableSignals = Object.entries(tab.doc.document.state || {})
-    .filter(
-      ([, d]) =>
-        !(d as Record<string, unknown>)?.$handler &&
-        (d as JxPrototypeDef)?.$prototype !== "Function",
-    )
-    .map(([defName]) => defName);
+  const bindableSignals = bindableSignalNames(tab.doc.document);
 
   function renderAttrRow(attr: string, entry: HtmlMetaEntry, value: unknown) {
     const type = inferInputType(entry);
     const hasVal = value !== undefined && value !== "";
+    // One write per selected element, inside ONE transaction (§6.5). `targets` is `[path]` for a
+    // Single selection, so this is the same single mutation it has always been.
     const commitAttr = (v?: JsonValue) =>
-      transactDoc(activeTab.value!, (t) =>
-        mutateUpdateAttribute(t, path, attr, v as JxAttributeValue | undefined),
-      );
+      transactDoc(activeTab.value!, (t) => {
+        for (const target of targets) {
+          mutateUpdateAttribute(t, target, attr, v as JxAttributeValue | undefined);
+        }
+      });
 
     // Enhanced Link handling: only for anchors (a/area) with a plain (non-binding) value. Bindings
     // ($ref objects or ${…} template strings) fall through to the raw widget to stay editable.
@@ -1197,10 +934,9 @@ export function renderPropertiesPanelTemplate(ctx: {
       }
     }
 
-    // Attribute strings are schema-legal at three rungs: literal, $ref binding, ${} template.
     const attrSlot = (staticWidget: unknown) =>
       renderDynamicSlot({
-        caps: ["literal", "ref", "template"],
+        caps: "attribute",
         extraSignals: mapSignals,
         fieldKey: `attr|${path.join("/")}|${attr}`,
         onChange: commitAttr,
@@ -1209,41 +945,37 @@ export function renderPropertiesPanelTemplate(ctx: {
         value,
       });
 
-    if (entry.type === "boolean") {
-      const checkboxWidget = html`
-        <sp-checkbox
-          size="s"
-          .checked=${live(Boolean(value))}
-          @change=${(e: Event) =>
-            commitAttr((e.target as HTMLInputElement).checked ? "" : undefined)}
-        >
-        </sp-checkbox>
-      `;
-      const slot = attrSlot(checkboxWidget);
-      return renderFieldRow({
-        hasValue: hasVal,
-        label: attrLabel(entry, attr),
-        labelExtra: slot.modeButton,
-        onClear: () => transactDoc(activeTab.value, (t) => mutateUpdateAttribute(t, path, attr)),
-        prop: attr,
-        widget: slot.widget,
-      });
-    }
-
-    const literalWidget = widgetForType(
-      type,
-      entry,
-      attr,
-      isRef(value) ? "" : String(value || ""),
-      (v: string) => commitAttr(v || undefined),
-    );
+    const literalWidget =
+      entry.type === "boolean"
+        ? html`
+            <sp-checkbox
+              size="s"
+              .checked=${live(Boolean(value))}
+              @change=${(e: Event) => commitAttr((e.target as HTMLInputElement).checked ? "" : undefined)}
+            >
+            </sp-checkbox>
+          `
+        : widgetForType(type, entry, attr, isRef(value) ? "" : String(value || ""), (v: string) =>
+            commitAttr(v || undefined),
+          );
     const slot = attrSlot(literalWidget);
     return renderFieldRow({
       hasValue: hasVal,
       label: attrLabel(entry, attr),
       labelExtra: slot.modeButton,
-      onClear: () => transactDoc(activeTab.value, (t) => mutateUpdateAttribute(t, path, attr)),
       prop: attr,
+      provenance: attributeProvenance(
+        attr,
+        value,
+        hasVal,
+        () =>
+          transactDoc(activeTab.value, (t) => {
+            for (const target of targets) {
+              mutateUpdateAttribute(t, target, attr);
+            }
+          }),
+        mixedAcrossSelection(doc, targets, (n) => (n?.attributes ?? {})[attr] ?? null),
+      ),
       widget: slot.widget,
     });
   }
@@ -1251,7 +983,7 @@ export function renderPropertiesPanelTemplate(ctx: {
   // ── Collect applicable attributes from html-meta ──
   const applicableAttrs = {} as Record<string, HtmlMetaEntry>;
   for (const [attr, entry] of Object.entries(htmlMeta.$defs) as [string, HtmlMetaEntry][]) {
-    if (!entry.$elements || entry.$elements.includes(tagName)) {
+    if (!entry.$elements || entry.$elements.includes(displayTagName(tagName))) {
       // The $attr field aliases a $defs key to a different attribute name.
       // This lets the same attribute (e.g. "name") carry per-element metadata.
       applicableAttrs[entry.$attr ?? attr] = entry;
@@ -1298,24 +1030,19 @@ export function renderPropertiesPanelTemplate(ctx: {
   }
 
   function isSectionOpen(key: string) {
-    if (tab!.session.ui.inspectorSections[key] !== undefined) {
-      return tab!.session.ui.inspectorSections[key];
-    }
-    return autoOpen.has(key);
+    return isInspectorSectionOpen(key, autoOpen.has(key));
   }
 
   function toggleSection(key: string) {
-    const current = isSectionOpen(key);
-    activeTab.value!.session.ui.inspectorSections = {
-      ...activeTab.value!.session.ui.inspectorSections,
-      [key]: !current,
-    };
+    // One writer: the accordion's own click and `inspector.setSection` land in the same function,
+    // So the command and the control cannot disagree about what "open" means.
+    setInspectorSection(key, !isSectionOpen(key));
   }
 
   // ── Build section templates ─────────────────────────────────────────
 
   const textSlot = renderDynamicSlot({
-    caps: ["literal", "ref", "template"],
+    caps: "textProperty",
     extraSignals: mapSignals,
     fieldKey: `prop|${path.join("/")}|textContent`,
     onChange: (v?: JsonValue) =>
@@ -1332,6 +1059,31 @@ export function renderPropertiesPanelTemplate(ctx: {
     value: node.textContent,
   });
 
+  /**
+   * A draft key for one field ON THIS NODE.
+   *
+   * The three Element rows used constant keys — `"prop:tagName"`, `"prop:$id"`, `"prop:className"`
+   * — and `ui/field-input.ts`'s draft map is module-global, so every element shared one draft slot
+   * per field. Type a class name, click a sibling before blurring, and the sibling's Class row
+   * showed the text you had typed for the first one; blur it there and the commit landed on the
+   * WRONG element. Plan §11.4 asks for "drafts keyed by node path (today all elements share one
+   * draft slot per field)".
+   */
+  const fieldKey = (name: string) => `prop:${path.join("/")}:${name}`;
+
+  /**
+   * The set-here chip for a document property, with the tooltip in the label's own words.
+   *
+   * The derived tooltip would read "Clear textContent"; the label above it reads "Text Content".
+   * The row's key and the row's name are different vocabularies, and the tooltip belongs to the one
+   * the user is looking at.
+   */
+  const propertyChip = (name: string, human: string): FieldProvenance => ({
+    onClick: () => transactDoc(activeTab.value, (t) => mutateUpdateProperty(t, path, name)),
+    state: "set",
+    title: `Clear ${human}`,
+  });
+
   const elemT = html`
     <sp-accordion-item
       label="Element"
@@ -1339,210 +1091,122 @@ export function renderPropertiesPanelTemplate(ctx: {
       @sp-accordion-item-toggle=${() => toggleSection("__element")}
     >
       <div class="style-section-body">
-        <div class="style-row" data-prop="tagName">
-          <div class="style-row-label">
-            <sp-field-label size="s">Tag</sp-field-label>
-          </div>
-          <sp-textfield
-            size="s"
-            .value=${live(tagName)}
-            autocomplete="off"
-            list="tag-names"
-            @input=${debouncedStyleCommit("prop:tagName", 400, (e: Event) => {
+        ${(() => {
+          /* THE SHARED SLOT, not a hand-rolled control.
+             `tagName` is a bindable position like any other — a literal name or a `TagExpression`
+             — so it gets the same Value Source chip and the same expression editor as `href`, a
+             style declaration or an event handler. The rungs are DERIVED from
+             `SLOT_POSITION_SCHEMAS.elementTag`, which is why only Fixed value and Formula are
+             offered: `TagName` carries a pattern, so `isFreeStringSchema` refuses a template rung,
+             and a `${…}` in tag position is precisely what that pattern exists to reject.
+
+             The seed is ours because the generic one is `{ operator: "??" }`, which a
+             `TagExpression` does not admit — clicking the chip would otherwise write a document
+             that fails its own validator. */
+          const tagSlot = renderDynamicSlot({
+            caps: "elementTag",
+            fieldKey: `${path.join(".")}:tagName`,
+            onChange: (next) => {
               transactDoc(activeTab.value, (t) =>
-                mutateUpdateProperty(
-                  t,
-                  path,
-                  "tagName",
-                  (e.target as HTMLInputElement).value || undefined,
-                ),
+                mutateUpdateProperty(t, path, "tagName", next ?? undefined),
               );
-            })}
-          ></sp-textfield>
-        </div>
-        <div class="style-row" data-prop="$id">
-          <div class="style-row-label">
-            ${
-              node.$id
-                ? html`<span
-                    class="set-dot"
-                    title="Clear $id"
-                    @click=${(e: Event) => {
-                      e.stopPropagation();
-                      transactDoc(activeTab.value, (t) => mutateUpdateProperty(t, path, "$id"));
-                    }}
-                  ></span>`
-                : nothing
-            }
-            <sp-field-label size="s">ID</sp-field-label>
-          </div>
-          ${spTextField("prop:$id", String(node.$id || ""), (v: string) =>
+            },
+            seedFor: (mode) =>
+              mode === "expression"
+                ? {
+                    $expression: {
+                      initial: tagName,
+                      operator: "?:",
+                      target: null,
+                      value: tagName,
+                    },
+                  }
+                : undefined,
+            staticWidget: spTextField(fieldKey("tagName"), tagName, (v: string) => {
+              transactDoc(activeTab.value, (t) =>
+                mutateUpdateProperty(t, path, "tagName", v || undefined),
+              );
+            }),
+            stateDefs: bindableSignalNames(activeTab.value!.doc.document),
+            value: node.tagName as JsonValue | undefined,
+          });
+          return renderFieldRow({
+            hasValue: chosenTag !== null,
+            label: "Tag",
+            labelExtra: tagSlot.modeButton,
+            prop: "tagName",
+            widget: tagSlot.widget,
+          });
+        })()}
+        ${renderFieldRow({
+          hasValue: Boolean(node.$id),
+          label: "ID",
+          prop: "$id",
+          ...(node.$id ? { provenance: propertyChip("$id", "ID") } : {}),
+          widget: spTextField(fieldKey("$id"), String(node.$id || ""), (v: string) =>
             transactDoc(activeTab.value, (t) =>
               mutateUpdateProperty(t, path, "$id", v || undefined),
             ),
-          )}
-        </div>
-        <div class="style-row" data-prop="className">
-          <div class="style-row-label">
-            ${
-              node.className
-                ? html`<span
-                    class="set-dot"
-                    title="Clear class"
-                    @click=${(e: Event) => {
-                      e.stopPropagation();
-                      transactDoc(activeTab.value, (t) =>
-                        mutateUpdateProperty(t, path, "className"),
-                      );
-                    }}
-                  ></span>`
-                : nothing
-            }
-            <sp-field-label size="s">Class</sp-field-label>
-          </div>
-          ${spTextField("prop:className", String(node.className || ""), (v: string) =>
+          ),
+        })}
+        ${renderFieldRow({
+          hasValue: Boolean(node.className),
+          label: "Class",
+          prop: "className",
+          ...(node.className ? { provenance: propertyChip("className", "class") } : {}),
+          widget: spTextField(fieldKey("className"), String(node.className || ""), (v: string) =>
             transactDoc(activeTab.value, (t) =>
               mutateUpdateProperty(t, path, "className", v || undefined),
             ),
-          )}
-        </div>
+          ),
+        })}
         ${
           !Array.isArray(node.children) || node.children.length === 0
-            ? html`
-                <div class="style-row" data-prop="textContent">
-                  <div class="style-row-label">
-                    ${
-                      node.textContent !== undefined
-                        ? html`<span
-                            class="set-dot"
-                            title="Clear text"
-                            @click=${(e: Event) => {
-                              e.stopPropagation();
-                              transactDoc(activeTab.value, (t) =>
-                                mutateUpdateProperty(t, path, "textContent"),
-                              );
-                            }}
-                          ></span>`
-                        : nothing
-                    }
-                    <sp-field-label size="s">Text Content</sp-field-label>
-                    ${textSlot.modeButton}
-                  </div>
-                  ${textSlot.widget}
-                </div>
-              `
+            ? renderFieldRow({
+                hasValue: node.textContent !== undefined,
+                label: "Text Content",
+                labelExtra: textSlot.modeButton,
+                prop: "textContent",
+                widget: textSlot.widget,
+                ...(node.textContent === undefined
+                  ? {}
+                  : { provenance: propertyChip("textContent", "text") }),
+              })
             : nothing
         }
-        <div class="style-row" data-prop="hidden">
-          <div class="style-row-label">
-            ${
-              node.hidden
-                ? html`<span
-                    class="set-dot"
-                    title="Clear hidden"
-                    @click=${(e: Event) => {
-                      e.stopPropagation();
-                      transactDoc(activeTab.value, (t) => mutateUpdateProperty(t, path, "hidden"));
-                    }}
-                  ></span>`
-                : nothing
-            }
-            <sp-field-label size="s">Hidden</sp-field-label>
-          </div>
-          <sp-checkbox
-            size="s"
-            .checked=${live(Boolean(node.hidden))}
-            @change=${(e: Event) =>
-              transactDoc(activeTab.value, (t) =>
-                mutateUpdateProperty(
-                  t,
-                  path,
-                  "hidden",
-                  (e.target as HTMLInputElement).checked || undefined,
-                ),
-              )}
-          >
-          </sp-checkbox>
-        </div>
+        ${renderFieldRow({
+          hasValue: Boolean(node.hidden),
+          label: "Hidden",
+          prop: "hidden",
+          ...(node.hidden ? { provenance: propertyChip("hidden", "hidden") } : {}),
+          widget: html`
+            <sp-checkbox
+              size="s"
+              .checked=${live(Boolean(node.hidden))}
+              @change=${(e: Event) =>
+                transactDoc(activeTab.value, (t) =>
+                  mutateUpdateProperty(
+                    t,
+                    path,
+                    "hidden",
+                    (e.target as HTMLInputElement).checked || undefined,
+                  ),
+                )}
+            >
+            </sp-checkbox>
+          `,
+        })}
       </div>
     </sp-accordion-item>
   `;
 
-  const repeaterT = isMapNode
-    ? html`
-        <sp-accordion-item label="Repeater" open>
-          <div class="style-section-body">
-            ${renderRepeaterFieldsTemplate(node, path, mapSignals)}
-          </div>
-        </sp-accordion-item>
-      `
-    : nothing;
-
-  const switchT = isSwitchNode
-    ? html`
-        <sp-accordion-item label="Switch" open>
-          <div class="style-section-body">
-            ${renderSwitchFieldsTemplate(node, path, mapSignals)}
-          </div>
-        </sp-accordion-item>
-      `
-    : nothing;
-
-  const observedAttrsT =
-    isCustomElementDoc({ document: tab.doc.document }) && isRoot
-      ? (() => {
-          const state = tab.doc.document.state || {};
-          const entries = Object.entries(state).filter(
-            ([, d]) => (d as Record<string, unknown>).attribute,
-          );
-          return html`
-            <sp-accordion-item label="Observed Attributes" ?open=${isSectionOpen("__observed")}>
-              <div class="style-section-body">
-                ${
-                  entries.length === 0
-                    ? html`<div class="empty-state">
-                        No attributes declared. Set "attribute" on a state entry.
-                      </div>`
-                    : entries.map(([key, d]) => {
-                        const def = d as Record<string, unknown>;
-                        return html`
-                          <div
-                            style="display:flex;gap:6px;align-items:center;padding:2px 0;font-size:var(--spectrum-font-size-50, 11px)"
-                          >
-                            <code style="font-family:var(--font-mono);color:var(--accent)"
-                              >${def.attribute}</code
-                            >
-                            <span style="color:var(--fg-dim)"> → </span>
-                            <span>${key}</span>
-                            ${
-                              def.type
-                                ? html`<span
-                                    style="margin-left:auto;color:var(--fg-dim);font-size:10px"
-                                    >${def.type}</span
-                                  >`
-                                : nothing
-                            }
-                            ${
-                              def.reflects
-                                ? html`<span
-                                    style="font-size:9px;background:var(--hover-bg);padding:1px 4px;border-radius:var(--radius)"
-                                    >reflects</span
-                                  >`
-                                : nothing
-                            }
-                          </div>
-                        `;
-                      })
-                }
-              </div>
-            </sp-accordion-item>
-          `;
-        })()
-      : nothing;
-
+  const editingDefinition = isCustomInstance && isComponentDefinitionOpen(node);
   const compPropsT = isCustomInstance
     ? html`
-        <sp-accordion-item label="Component Props" open>
+        <sp-accordion-item
+          label=${editingDefinition ? "Component Defaults" : "Component Settings"}
+          open
+        >
           <div class="style-section-body">
             ${renderComponentPropsFieldsTemplate(node, path, mapSignals, ctx.navigateToComponent)}
           </div>
@@ -1550,24 +1214,29 @@ export function renderPropertiesPanelTemplate(ctx: {
       `
     : nothing;
 
+  // "Used on N pages →". Only for a component instance: an ordinary <div> is not a thing that can
+  // Be reused, so the question does not arise.
+  const usagesT = isCustomInstance
+    ? renderUsagesSection(
+        displayTagName(tagName),
+        componentRegistry.find((c) => c.tagName === displayTagName(tagName))?.path ?? null,
+      )
+    : nothing;
+
   const attrSectionTemplates = htmlMeta.$sections
     .filter((sec) => attrSections[sec.key]!.length > 0)
     .map((sec) => {
       const sectionAttrs = attrSections[sec.key]!;
-      const hasAnySet = sectionAttrs.some(
+      const setCount = sectionAttrs.filter(
         (a: { name: string; entry: HtmlMetaEntry }) => attrs[a.name] !== undefined,
-      );
+      ).length;
       return html`
         <sp-accordion-item
           label=${sec.label}
           ?open=${isSectionOpen(sec.key)}
           @sp-accordion-item-toggle=${() => toggleSection(sec.key)}
         >
-          ${
-            hasAnySet
-              ? html`<span slot="heading" class="set-dot set-dot--section"></span>`
-              : nothing
-          }
+          ${sectionDot(setCount)}
           <div class="style-section-body">
             ${sectionAttrs.map((a: { name: string; entry: HtmlMetaEntry }) =>
               renderAttrRow(a.name, a.entry, attrs[a.name]),
@@ -1585,107 +1254,245 @@ export function renderPropertiesPanelTemplate(ctx: {
             ?open=${isSectionOpen("__custom")}
             @sp-accordion-item-toggle=${() => toggleSection("__custom")}
           >
-            ${
-              customAttrs.length > 0
-                ? html`<span slot="heading" class="set-dot set-dot--section"></span>`
-                : nothing
-            }
+            ${sectionDot(customAttrs.length)}
             <div class="style-section-body">
-              ${renderCustomAttrsFieldsTemplate(node, path, attrs, knownAttrNames)}
+              ${renderCustomAttrsFieldsTemplate(path, attrs, knownAttrNames)}
             </div>
           </sp-accordion-item>
         `
       : nothing;
 
-  const mediaT = isRoot
-    ? html`
-        <sp-accordion-item
-          label="Media"
-          ?open=${isSectionOpen("__media")}
-          @sp-accordion-item-toggle=${() => toggleSection("__media")}
-        >
-          <div class="style-section-body">${renderMediaFieldsTemplate(node)}</div>
-        </sp-accordion-item>
-      `
-    : nothing;
-
-  const cssPropsT =
-    isCustomElementDoc({ document: tab.doc.document }) && isRoot
-      ? (() => {
-          const style = node.style || {};
-          const cssProps = Object.entries(style).filter(([k]) => k.startsWith("--"));
-          if (cssProps.length === 0) {
-            return nothing;
-          }
-          return html`
-            <sp-accordion-item
-              label="CSS Properties"
-              ?open=${isSectionOpen("__cssprops")}
-              @sp-accordion-item-toggle=${() => toggleSection("__cssprops")}
-            >
-              <div class="style-section-body">
-                ${cssProps.map(
-                  ([prop, val]) => html`
-                    <div
-                      style="display:flex;gap:6px;align-items:center;padding:2px 0;font-size:var(--spectrum-font-size-50, 11px)"
-                    >
-                      <code style="font-family:var(--font-mono);color:var(--accent)">${prop}</code>
-                      <span style="margin-left:auto;color:var(--fg-dim)">${String(val)}</span>
-                    </div>
-                  `,
-                )}
-              </div>
-            </sp-accordion-item>
-          `;
-        })()
-      : nothing;
-
-  const cssPartsT =
-    isCustomElementDoc({ document: tab.doc.document }) && isRoot
-      ? (() => {
-          const parts = collectCssParts(tab.doc.document);
-          if (parts.length === 0) {
-            return nothing;
-          }
-          return html`
-            <sp-accordion-item
-              label="CSS Parts"
-              ?open=${isSectionOpen("__cssparts")}
-              @sp-accordion-item-toggle=${() => toggleSection("__cssparts")}
-            >
-              <div class="style-section-body">
-                ${parts.map(
-                  (p) => html`
-                    <div
-                      style="display:flex;gap:6px;align-items:center;padding:2px 0;font-size:var(--spectrum-font-size-50, 11px)"
-                    >
-                      <code style="font-family:var(--font-mono);color:var(--accent)"
-                        >${p.name}</code
-                      >
-                      <span style="color:var(--fg-dim)">&lt;${p.tag}&gt;</span>
-                    </div>
-                  `,
-                )}
-              </div>
-            </sp-accordion-item>
-          `;
-        })()
-      : nothing;
-
-  const pageT = isRoot ? renderPageSection(node) : nothing;
-
-  // ── Assemble ──
-  const tpl = html`
+  return html`
     <div class="style-sidebar">
       <sp-accordion allow-multiple size="s">
-        ${pageT} ${isMapNode ? repeaterT : elemT} ${isMapNode ? nothing : observedAttrsT}
-        ${isMapNode ? nothing : switchT} ${isMapNode ? nothing : compPropsT}
-        ${isMapNode ? nothing : attrSectionTemplates} ${isMapNode ? nothing : customSectionT}
-        ${isMapNode ? nothing : mediaT} ${isMapNode ? nothing : cssPropsT}
-        ${isMapNode ? nothing : cssPartsT}
+        ${elemT} ${compPropsT} ${usagesT} ${attrSectionTemplates} ${customSectionT}
       </sp-accordion>
     </div>
   `;
+}
 
-  return tpl;
+/**
+ * The collapsed-header provenance dot (§6.2), and the end of a false affordance.
+ *
+ * It inherited `.set-dot`'s `cursor: pointer` and its "turns red on hover" rule, which together say
+ * "click me to clear this" — and nothing happened, because it never had a handler. It is not a
+ * control and it is not deleted either: §6.2 puts a provenance dot on collapsed accordion headers
+ * precisely so a section's state is legible while closed, and clicking anywhere in the header
+ * already toggles the section, so a second, different meaning for the same click would be worse
+ * than the silence. So it keeps the information and gives up the affordance: an inert, labelled
+ * indicator that says how many values in the section are set.
+ */
+function sectionDot(setCount: number) {
+  return setCount > 0
+    ? html`<span
+        slot="heading"
+        class="set-dot set-dot--section"
+        aria-hidden="true"
+        title=${`${setCount} value${setCount === 1 ? "" : "s"} set in this section`}
+      ></span>`
+    : nothing;
+}
+
+/** Which of §6.2's states an HTML-attribute row is in. Attributes have no third cascade layer. */
+function attributeProvenance(
+  attr: string,
+  value: unknown,
+  hasVal: boolean,
+  onClear: () => void,
+  mixedCount = 0,
+): FieldProvenance {
+  // Mixed first, for the same reason the Style tab decides it first: it is a fact about the
+  // SELECTION, and the primary's own value says nothing about whether the others agree. A count of
+  // 0 (a selection of one) can never reach this branch, so single-selection rows are untouched.
+  if (mixedCount > 0) {
+    return { donor: String(mixedCount), onClick: onClear, state: "mixed" };
+  }
+  if (hasVal && (isRef(value) || (typeof value === "string" && value.includes("${")))) {
+    return boundProvenance(value, `Bound — ${attr}`);
+  }
+  return hasVal ? { onClick: onClear, state: "set", title: `Clear ${attr}` } : { state: "default" };
+}
+
+/**
+ * How many selected elements disagree about `key` on `read` — 0 when they agree or there is one.
+ *
+ * The Content tab's two cascades (HTML attributes and component props) both need the same answer
+ * about the same set, so the question is asked once here and answered with `unifyValues`, the same
+ * comparison the Style tab uses.
+ *
+ * @param {JxMutableNode} doc
+ * @param {readonly JxPath[]} targets
+ * @param {(node: JxMutableNode | undefined) => unknown} read
+ * @returns {number}
+ */
+export function mixedAcrossSelection(
+  doc: JxMutableNode,
+  targets: readonly JxPath[],
+  read: (node: JxMutableNode | undefined) => unknown,
+): number {
+  if (targets.length < 2) {
+    return 0;
+  }
+  const values = targets.map((path) => read(getNodeAtPath(doc, path) as JxMutableNode | undefined));
+  return unifyValues(values).mixed ? targets.length : 0;
+}
+
+// ─── Section state ────────────────────────────────────────────────────────────
+
+/**
+ * The Inspector's fixed section keys — the accordion rows the inspector always draws.
+ *
+ * Attribute-schema sections add their own keys at render time (a class's `$section`), so this is a
+ * floor, not a closed set: {@link inspectorSectionKeys} unions it with whatever the OPEN DOCUMENT
+ * declares, and that union is what `inspector.setSection` validates against. A fixed enum would
+ * refuse a section the user is looking at; no validation at all would accept the label the old
+ * `inspector.toggleSection` step passed ("Element", not `__element`) and silently do nothing.
+ *
+ * `__media` left with the breakpoint definitions, which are Project Settings › Contexts now (P4).
+ * `__observed`, `__cssprops` and `__cssparts` are drawn by the Logic tab; the key space is the
+ * INSPECTOR's, not one tab's, so `inspector.setSection` keeps addressing all of them.
+ */
+export const INSPECTOR_SECTION_KEYS = [
+  "__element",
+  "__observed",
+  "__usages",
+  "__custom",
+  "__cssprops",
+  "__cssparts",
+] as const;
+
+export type InspectorSectionKey = (typeof INSPECTOR_SECTION_KEYS)[number];
+
+/** Section keys addressable right now: the fixed rows plus any already recorded for this tab. */
+export function inspectorSectionKeys(): string[] {
+  const recorded = Object.keys(activeTab.value?.session.ui.inspectorSections ?? {});
+  return [...new Set<string>([...INSPECTOR_SECTION_KEYS, ...recorded])];
+}
+
+/**
+ * Whether one Inspector section is expanded, falling back to the caller's default.
+ *
+ * The fallback is the caller's because it is not a constant: an attribute section opens itself when
+ * one of its attributes is set, and Usage never does. Only the panel drawing the row knows.
+ */
+export function isInspectorSectionOpen(section: string, fallback: boolean): boolean {
+  const recorded = activeTab.value?.session.ui.inspectorSections?.[section];
+  return recorded === undefined ? fallback : recorded;
+}
+
+/**
+ * Open or close one Inspector section, per tab.
+ *
+ * The pair `{ section, open }` is the whole point: `inspector.toggleSection` named a DELTA against
+ * a section whose state depended on the selected node's own attributes (`autoOpen`), so the same
+ * three manifest steps opened a section on one document and closed it on the next. Writing a new
+ * object rather than mutating in place is what the reactive read in `isSectionOpen` depends on.
+ */
+export function setInspectorSection(section: string, open: boolean): void {
+  const tab = activeTab.value;
+  if (!tab) {
+    return;
+  }
+  tab.session.ui.inspectorSections = { ...tab.session.ui.inspectorSections, [section]: open };
+}
+
+// ─── Commands ─────────────────────────────────────────────────────────────────
+
+/**
+ * The Inspector's section verb. **This is the setter that retires `inspector.toggleSection`.**
+ *
+ * @returns {AnyCommand[]}
+ */
+export function inspectorCommands(): AnyCommand[] {
+  return [
+    {
+      args: argsSchema({
+        open: booleanProperty("True to expand the section, false to collapse it."),
+        section: stringProperty(
+          "The section key — one of the fixed rows (__element, __observed, __usages, " +
+            "__custom, __cssprops, __cssparts) or an attribute schema's own $section.",
+        ),
+      }),
+      category: "View",
+      id: "inspector.setSection",
+      level: "document",
+      menus: ["palette"],
+      group: "4_docks",
+      requires: "an open document",
+      when: (ctx) => ctx.document.open,
+      run: (_commandCtx, args) => {
+        const open = booleanArg("inspector.setSection", args, "open");
+        const section = stringArg("inspector.setSection", args, "section");
+        const known = inspectorSectionKeys();
+        if (!known.includes(section)) {
+          throw new RangeError(
+            `command "inspector.setSection" argument "section": "${section}" is not a section ` +
+              `this document declares — declared: ${known.join(", ")}`,
+          );
+        }
+        setInspectorSection(section, open);
+      },
+      title: "Show Inspector Section",
+    },
+    {
+      /**
+       * Find Usages. Defined ONCE, here, and rendered twice: the palette gets it from the app
+       * registry, and `editor/context-menu.ts` pulls the `context/element` records out of this same
+       * set into the menu it builds — so the row and the palette entry cannot drift in title, chord
+       * or availability. It reads `ctx.selection.kind`, which both contexts populate from the node
+       * under the cursor, so one `run` serves the menu's target and the canvas selection alike.
+       *
+       * `when` is the capability, not a `try`: a host with no `findReferences` route hides the
+       * command rather than offering a verb that answers "0 usages" for a component on every page.
+       */
+      category: "Selection",
+      id: "selection.findUsages",
+      level: "selection",
+      menus: ["context/element", "palette"],
+      group: "4_identity",
+      undo: "none",
+      when: (ctx) => ctx.capability.findReferences && ctx.selection.isComponentInstance,
+      requires: "a component instance, on a backend that can search the project",
+      run: () => {
+        const tagName = componentSelectionTag();
+        if (!tagName) {
+          return;
+        }
+        const componentPath = componentRegistry.find((c) => c.tagName === tagName)?.path ?? null;
+        setInspectorSection(USAGES_SECTION, true);
+        void loadUsages({ tagName, ...(componentPath ? { path: componentPath } : {}) }).then(() =>
+          renderOnly("rightPanel"),
+        );
+      },
+      title: "Find Usages",
+    },
+  ];
+}
+
+/**
+ * The tag of the selected component instance, or null.
+ *
+ * Read from the document rather than from a menu target so the one record works in both registries:
+ * the context menu's own `getContext` reports the right-clicked node's tag as `selection.kind`, and
+ * the app's reports the canvas selection's. This is the fallback for the app registry, where the
+ * selection lives on the tab.
+ */
+function componentSelectionTag(): string | null {
+  const tab = activeTab.value;
+  const selection = primarySelection(tab?.session.selection);
+  if (!tab || !selection) {
+    return null;
+  }
+  const node = getNodeAtPath(tab.doc.document, selection);
+  const tagName = typeof node?.tagName === "string" ? node.tagName : "";
+  return tagName.includes("-") ? tagName : null;
+}
+
+/**
+ * Register the Inspector's section verb.
+ *
+ * @param {CommandRegistry} registry
+ */
+export function registerInspectorCommands(registry: CommandRegistry): void {
+  registry.registerAll(inspectorCommands());
 }

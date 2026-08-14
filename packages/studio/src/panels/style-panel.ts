@@ -1,15 +1,36 @@
 /// <reference lib="dom" />
 /**
- * Style panel — CSS property editor with media breakpoint tabs, selector dropdown, section
- * accordion, shorthand expand/compress, and filter.
+ * Style panel — CSS property editor under the **Target Line** (§6.1), with provenance-coded rows
+ * (§6.2), a section accordion, shorthand expand/compress, and a property filter.
+ *
+ * The panel resolves a compound coordinate before it can commit anything: `(selection, breakpoint,
+ * scheme layer, nested selector)`. It has always computed that tuple — it is the per-field key and
+ * the five-branch if/else below — and it used to hide it behind three disconnected widgets on two
+ * different bars. `target-line.ts` renders it as one sentence instead, and the three widgets are
+ * gone: the breakpoint and scheme axes are selected on the pane context bar (region ⑦), and the
+ * selector is the one axis this tab owns.
+ *
+ * Every row then says where its value came from. `provenance.ts` supplies the chip;
+ * `computeInheritedSources()` supplies the donor breakpoint the cascade walk always knew and this
+ * panel used to throw away.
  */
 
 import { html, nothing } from "lit-html";
 import { getNestedStyle } from "@jxsuite/schema/guards";
 import { live } from "lit-html/directives/live.js";
 import { ifDefined } from "lit-html/directives/if-defined.js";
-import { COMMON_SELECTORS, debouncedStyleCommit, getNodeAtPath, isNestedSelector } from "../store";
+import {
+  COMMON_SELECTORS,
+  debouncedStyleCommit,
+  getNodeAtPath,
+  isNestedSelector,
+  renderOnly,
+  updateUi,
+} from "../store";
 import { activeTab } from "../workspace/workspace";
+import { primarySelection, unifyValues } from "../tabs/selection";
+import { shell } from "../shell";
+import { activeRegistry } from "../commands/active-registry";
 import { selectStylebookTag } from "./stylebook-panel";
 import {
   mutateUpdateMediaNestedStyle,
@@ -21,13 +42,28 @@ import {
   transactDoc,
 } from "../tabs/transact";
 import { inferInputType, propLabel } from "../utils/studio-utils";
+import { stringArg } from "../commands/command-args";
+import type { AnyCommand, CommandRegistry } from "../commands/registry";
 import { renderFieldRow } from "../ui/field-row";
 import { showPromptDialog } from "../ui/layers";
 import { renderDynamicSlot } from "../ui/dynamic-slot";
 import { parseMediaEntries, schemeOfQuery } from "../utils/canvas-media";
 import { getEffectiveMedia, getEffectiveStyle } from "../site-context";
-import { computeInheritedStyle } from "../utils/inherited-style";
+import { computeInheritedSources } from "../utils/inherited-style";
+import { loadUsages, peekUsages, usageFiles } from "../services/references";
 import { mediaDisplayName } from "./shared";
+import { countProvenance, renderProvenanceChip, renderProvenanceDots } from "./provenance";
+import {
+  openSelectorMenu,
+  renderTargetLine,
+  resetSelectorTrigger as resetTargetSelector,
+} from "./target-line";
+import {
+  clickAnythingTo,
+  openPageAction,
+  renderEmptyState,
+  staleSelectionMessage,
+} from "./empty-state";
 import {
   allConditionsPass,
   autoOpenSections,
@@ -41,6 +77,8 @@ import {
 } from "./style-utils";
 import { widgetForType } from "./style-inputs";
 
+import type { FieldProvenance, ProvenanceState } from "./provenance";
+import type { TargetScope, TargetSegment } from "./target-line";
 import type { Tab } from "../tabs/tab";
 import type { JxPath } from "../state";
 import type { JsonValue } from "../types";
@@ -52,6 +90,9 @@ interface CssLonghand {
 }
 
 type CssPropertyEntry = Record<string, unknown>;
+
+/** The chip a row wears when its caller has nothing more specific to say. */
+const DEFAULT_PROVENANCE: FieldProvenance = { state: "default" };
 
 type StyleMutateFn = (
   t: Tab,
@@ -88,6 +129,133 @@ function resolveNestedTagStyle(style: JxStyle, tagPath: string): JxStyle {
   return obj;
 }
 
+/**
+ * The style object one compound coordinate addresses.
+ *
+ * Split out of the panel body because the coordinate has to be resolved TWICE: once against the
+ * effective (site-merged) style, which is what the rows display, and once against the document's
+ * own, which is what a commit writes. The difference between the two is the "from site tokens"
+ * donor — invisible for as long as there was only one resolution.
+ *
+ * @param {JxStyle} style
+ * @param {string | null} activeSelector
+ * @param {string | null} editMedia
+ * @returns {JxStyle}
+ */
+function resolveContextStyle(
+  style: JxStyle,
+  activeSelector: string | null,
+  editMedia: string | null,
+): JxStyle {
+  const base = editMedia ? (getNestedStyle(style, `@${editMedia}`) ?? {}) : style;
+  if (activeSelector) {
+    return isTagPath(activeSelector)
+      ? resolveNestedTagStyle(base, activeSelector)
+      : (getNestedStyle(base, activeSelector) ?? {});
+  }
+  const flat: JxStyle = {};
+  for (const [p, v] of Object.entries(base)) {
+    if (typeof v !== "object") {
+      flat[p] = v;
+    }
+  }
+  return flat;
+}
+
+/**
+ * The mutation that writes to one compound coordinate — the other half of
+ * {@link resolveContextStyle}, and the reason the two now sit side by side: they are one decision
+ * expressed twice, and they used to be interleaved in a five-branch `if/else` where a new branch
+ * could easily read one coordinate and write another.
+ *
+ * @param {JxPath} sel
+ * @param {string | null} activeSelector
+ * @param {string | null} editMedia
+ * @returns {StyleMutateFn}
+ */
+function contextMutate(
+  sel: JxPath,
+  activeSelector: string | null,
+  editMedia: string | null,
+): StyleMutateFn {
+  if (activeSelector && isTagPath(activeSelector)) {
+    const stylePath = activeSelector.split(" ");
+    return editMedia
+      ? (t, prop, val) =>
+          mutateUpdateMediaNestedStylePath(
+            t,
+            sel,
+            editMedia,
+            stylePath,
+            prop,
+            val as string | undefined,
+          )
+      : (t, prop, val) =>
+          mutateUpdateNestedStylePath(t, sel, stylePath, prop, val as string | undefined);
+  }
+  if (activeSelector) {
+    return editMedia
+      ? (t, prop, val) =>
+          mutateUpdateMediaNestedStyle(
+            t,
+            sel,
+            editMedia,
+            activeSelector,
+            prop,
+            val as string | undefined,
+          )
+      : (t, prop, val) =>
+          mutateUpdateNestedStyle(t, sel, activeSelector, prop, val as string | undefined);
+  }
+  return editMedia
+    ? (t, prop, val) => mutateUpdateMediaStyle(t, sel, editMedia, prop, val as string | undefined)
+    : (t, prop, val) => mutateUpdateStyle(t, sel, prop, val as string | undefined);
+}
+
+/**
+ * Which properties the selected elements disagree about, at the coordinate the tab is editing.
+ *
+ * Resolved through the SAME `resolveContextStyle` the panel reads its own values with, so "mixed"
+ * is decided at exactly the breakpoint, scheme layer and selector the Target Line names — two cards
+ * that differ only inside `@md` are not mixed while you are editing Base.
+ *
+ * Returns an empty set for a selection of one, which is the whole reason a single selection renders
+ * no Mixed state anywhere: the loop never finds a second value to disagree with.
+ *
+ * @param {Tab} tab
+ * @param {readonly JxPath[]} targets
+ * @param {string | null} activeSelector
+ * @param {string | null} editMedia
+ * @returns {Set<string>}
+ */
+function mixedStyleProps(
+  tab: Tab,
+  targets: readonly JxPath[],
+  activeSelector: string | null,
+  editMedia: string | null,
+): Set<string> {
+  const mixed = new Set<string>();
+  if (targets.length < 2) {
+    return mixed;
+  }
+  const blocks = targets.map((path) => {
+    const node = getNodeAtPath(tab.doc.document, path) as JxMutableNode | undefined;
+    return resolveContextStyle(node?.style ?? {}, activeSelector, editMedia);
+  });
+  const props = new Set<string>();
+  for (const block of blocks) {
+    for (const prop of Object.keys(block)) {
+      props.add(prop);
+    }
+  }
+  for (const prop of props) {
+    if (unifyValues(blocks.map((block) => block[prop] ?? null)).mixed) {
+      mixed.add(prop);
+    }
+  }
+  return mixed;
+}
+
 // ─── Row renderers ──────────────────────────────────────────────────────────
 
 function renderStyleRow(
@@ -95,131 +263,154 @@ function renderStyleRow(
   prop: string,
   value: string,
   onCommit: (v: string | undefined) => void,
-  onDelete: () => void,
   isWarning: boolean,
   gridMode: boolean,
   inheritedValue: string | undefined,
   templateSignals: string[] = [],
   fieldKey: string = prop,
+  provenance?: FieldProvenance,
 ) {
+  const chip: FieldProvenance = provenance ?? DEFAULT_PROVENANCE;
   const type = inferInputType(entry);
   const hasVal = value !== undefined && value !== "";
   const placeholder = !hasVal && inheritedValue ? String(inheritedValue) : "";
   const spanVal = gridMode && (entry as Record<string, unknown>).$span === 2 ? 2 : undefined;
-  // Style values are schema-legal at two rungs: literal and ${} template (no $ref in JxStyle).
+  // The rungs come from `StyleObject.additionalProperties`, not from a list here (§6.6 rule 2).
+  // That derives literal + ${} template: a CSS value carrying `${…}` IS a signal binding, which
+  // `emitStyleString` compiles to a reactive declaration, and `$ref` is not admitted by JxStyle.
+  // Naming the POSITION rather than the answer is the point — a schema that later admits another
+  // Rung cannot then be contradicted by a hand-written array sitting here.
   const slot = renderDynamicSlot({
-    caps: ["literal", "template"],
+    caps: "styleProperty",
     fieldKey,
     onChange: (v?: JsonValue) => onCommit(v === undefined || v === "" ? undefined : String(v)),
     staticWidget: widgetForType(type, entry, prop, value, onCommit, { placeholder }),
     stateDefs: templateSignals,
     value,
   });
+  // `hasValue` is false because the chip supersedes the row's derived set-dot: the dot could only
+  // Say set-or-not, and three of the four states this panel can now answer with were previously
+  // Indistinguishable from "unset".
   return renderFieldRow({
     prop,
     label: propLabel(entry, prop),
-    hasValue: hasVal,
-    onClear: onDelete,
+    hasValue: false,
     widget: slot.widget,
+    provenance: chip,
     labelExtra: slot.modeButton,
     ...(spanVal != null && { span: spanVal }),
     warning: isWarning,
   });
 }
 
+/** What {@link renderShorthandRow} needs to draw one shorthand and its longhand children. */
+interface ShorthandRowOptions {
+  prop: string;
+  entry: CssPropertyEntry;
+  /** The style block at the edited coordinate — the primary element's, as every row reads it. */
+  style: Record<string, unknown>;
+  /** The write, already fanned across the selection. Called INSIDE a transaction. */
+  mutate: StyleMutateFn;
+  inherited: Record<string, string | number>;
+  ctx: ProvenanceCtx;
+}
+
 /**
- * @param {string} shortProp
- * @param {CssPropertyEntry} entry
- * @param {Record<string, unknown>} style
- * @param {(t: Tab, prop: string, val: string | Record<string, unknown> | undefined) => void} mutateFn
- * @param {() => void} _deleteFn
- * @param {Record<string, string | number>} inherited
+ * A shorthand property row: the header field, plus one row per longhand when it is expanded.
+ *
+ * Two things were wrong with it, and they were the same thing. It took a single-target mutation
+ * while every other row in the tab took the selection-wide one, so "set padding on six cards in one
+ * decision" — the sentence §6.5 makes, with padding as its example — wrote to one card. And it drew
+ * its own `.set-dot` rather than a provenance chip, so a shorthand `mixedStyleProps` had ALREADY
+ * flagged as mixed offered a plain "Clear padding" affordance instead of saying so.
+ *
+ * Both are fixed by taking the same two things every other row takes: `mutate`, which fans across
+ * the selection, and `ctx`, which answers where a value came from.
  */
-function renderShorthandRow(
-  shortProp: string,
-  entry: CssPropertyEntry,
-  style: Record<string, unknown>,
-  mutateFn: StyleMutateFn,
-  _deleteFn: () => void,
-  inherited: Record<string, string | number> = {},
-) {
+function renderShorthandRow({
+  prop: shortProp,
+  entry,
+  style,
+  mutate,
+  inherited,
+  ctx,
+}: ShorthandRowOptions) {
   const tab = activeTab.value!;
   const longhands = getLonghands(shortProp) as CssLonghand[];
   const shortVal = style[shortProp];
   const hasLonghands = longhands.some((l: CssLonghand) => style[l.name] !== undefined);
   const isExpanded = tab.session.ui.styleShorthands[shortProp] ?? hasLonghands;
-  const hasAnyVal =
-    shortVal !== undefined || longhands.some((l: CssLonghand) => style[l.name] !== undefined);
+  const hasAnyVal = shortVal !== undefined || hasLonghands;
+
+  /**
+   * Drop every longhand, then write the shorthand — the one write order this row has.
+   *
+   * The longhands go unconditionally rather than "the ones the panel can see set", because what the
+   * panel can see is the PRIMARY element's style: a second selected element with a `paddingTop` of
+   * its own would otherwise keep it and quietly out-rank the shorthand just written over it.
+   * Deleting a property an element does not have is a no-op on that element.
+   */
+  const writeShorthand = (val?: string | undefined) =>
+    transactDoc(activeTab.value, (t) => {
+      for (const l of longhands) {
+        mutate(t, l.name);
+      }
+      mutate(t, shortProp, val);
+    });
+  const clearAll = () =>
+    transactDoc(activeTab.value, (t) => {
+      mutate(t, shortProp);
+      for (const l of longhands) {
+        mutate(t, l.name);
+      }
+    });
+
+  const headerWidget = html`
+    <div class="style-shorthand-header">
+      <sp-textfield
+        size="s"
+        .value=${live(shortVal || "")}
+        placeholder=${
+          !shortVal && hasLonghands
+            ? longhands.map((l: CssLonghand) => style[l.name] || "0").join(" ")
+            : !shortVal && inherited[shortProp]
+              ? inherited[shortProp]
+              : !shortVal && longhands.some((l: CssLonghand) => inherited[l.name])
+                ? longhands.map((l: CssLonghand) => inherited[l.name] || "0").join(" ")
+                : ""
+        }
+        @input=${debouncedStyleCommit(`short:${shortProp}`, 400, (e: Event) => {
+          writeShorthand((e.target as HTMLInputElement).value || undefined);
+        })}
+      ></sp-textfield>
+      <sp-action-button
+        size="xs"
+        quiet
+        @click=${(e: Event) => {
+          e.stopPropagation();
+          activeTab.value!.session.ui.styleShorthands = {
+            ...activeTab.value!.session.ui.styleShorthands,
+            [shortProp]: !isExpanded,
+          };
+        }}
+      >
+        ${
+          isExpanded
+            ? html`<sp-icon-chevron-down slot="icon"></sp-icon-chevron-down>`
+            : html`<sp-icon-chevron-right slot="icon"></sp-icon-chevron-right>`
+        }
+      </sp-action-button>
+    </div>
+  `;
 
   return html`
-    <div class="style-row" data-prop=${shortProp}>
-      <div class="style-row-label">
-        ${
-          hasAnyVal
-            ? html`<span
-                class="set-dot"
-                title="Clear ${shortProp}"
-                @click=${(e: Event) => {
-                  e.stopPropagation();
-                  transactDoc(activeTab.value, (t) => {
-                    if (shortVal !== undefined) {
-                      mutateFn(t, shortProp);
-                    }
-                    for (const l of longhands) {
-                      if (style[l.name] !== undefined) {
-                        mutateFn(t, l.name);
-                      }
-                    }
-                  });
-                }}
-              ></span>`
-            : nothing
-        }
-        <sp-field-label size="s" title=${shortProp}>${propLabel(entry, shortProp)}</sp-field-label>
-      </div>
-      <div class="style-shorthand-header">
-        <sp-textfield
-          size="s"
-          .value=${live(shortVal || "")}
-          placeholder=${
-            !shortVal && hasLonghands
-              ? longhands.map((l: CssLonghand) => style[l.name] || "0").join(" ")
-              : !shortVal && inherited[shortProp]
-                ? inherited[shortProp]
-                : !shortVal && longhands.some((l: CssLonghand) => inherited[l.name])
-                  ? longhands.map((l: CssLonghand) => inherited[l.name] || "0").join(" ")
-                  : ""
-          }
-          @input=${debouncedStyleCommit(`short:${shortProp}`, 400, (e: Event) => {
-            transactDoc(activeTab.value, (t) => {
-              for (const l of longhands) {
-                if (style[l.name] !== undefined) {
-                  mutateFn(t, l.name);
-                }
-              }
-              mutateFn(t, shortProp, (e.target as HTMLInputElement).value || undefined);
-            });
-          })}
-        ></sp-textfield>
-        <sp-action-button
-          size="xs"
-          quiet
-          @click=${(e: Event) => {
-            e.stopPropagation();
-            activeTab.value!.session.ui.styleShorthands = {
-              ...activeTab.value!.session.ui.styleShorthands,
-              [shortProp]: !isExpanded,
-            };
-          }}
-        >
-          ${
-            isExpanded
-              ? html`<sp-icon-chevron-down slot="icon"></sp-icon-chevron-down>`
-              : html`<sp-icon-chevron-right slot="icon"></sp-icon-chevron-right>`
-          }
-        </sp-action-button>
-      </div>
-    </div>
+    ${renderFieldRow({
+      prop: shortProp,
+      label: propLabel(entry, shortProp),
+      hasValue: hasAnyVal,
+      widget: headerWidget,
+      provenance: shorthandProvenance(shortProp, ctx, hasAnyVal ? clearAll : undefined),
+    })}
     ${
       isExpanded
         ? (() => {
@@ -232,35 +423,27 @@ function renderShorthandRow(
               : null;
             const compress = isBorderSide ? compressBorderSide : compressShorthand;
             const emptyVal = isBorderSide ? "" : "0";
+            /** This longhand becomes `val`; the others keep whatever they show. */
+            const recompress = (idx: number, val: string) =>
+              writeShorthand(
+                compress(
+                  longhands.map((l: CssLonghand, i: number) =>
+                    i === idx ? val : (style[l.name] ?? (expanded ? expanded[i] : emptyVal)),
+                  ) as string[],
+                ),
+              );
             return longhands.map(({ name, entry: lEntry }: CssLonghand, idx: number) => {
               const lVal = style[name] ?? (expanded ? expanded[idx] : "");
+              const hasLVal = lVal !== undefined && lVal !== "";
               return html`
                 <div class="style-row style-row--child" data-prop=${name}>
                   <div class="style-row-label">
-                    ${
-                      lVal !== undefined && lVal !== ""
-                        ? html`<span
-                            class="set-dot"
-                            title="Clear ${name}"
-                            @click=${(e: Event) => {
-                              e.stopPropagation();
-                              const vals = longhands.map((l: CssLonghand, i: number) =>
-                                i === idx
-                                  ? emptyVal
-                                  : (style[l.name] ?? (expanded ? expanded[i] : emptyVal)),
-                              );
-                              transactDoc(activeTab.value, (t) => {
-                                for (const l of longhands) {
-                                  if (style[l.name] !== undefined) {
-                                    mutateFn(t, l.name);
-                                  }
-                                }
-                                mutateFn(t, shortProp, compress(vals as string[]));
-                              });
-                            }}
-                          ></span>`
-                        : nothing
-                    }
+                    ${renderProvenanceChip(
+                      name,
+                      longhandProvenance(name, shortProp, hasLVal, ctx, () =>
+                        recompress(idx, emptyVal),
+                      ),
+                    )}
                     <sp-field-label size="s" title=${name}
                       >${propLabel(lEntry, name)}</sp-field-label
                     >
@@ -270,21 +453,7 @@ function renderShorthandRow(
                     lEntry,
                     name,
                     lVal as string,
-                    (newVal: string) => {
-                      const vals = longhands.map((l: CssLonghand, i: number) =>
-                        i === idx
-                          ? newVal || emptyVal
-                          : (style[l.name] ?? (expanded ? expanded[i] : emptyVal)),
-                      );
-                      transactDoc(activeTab.value, (t) => {
-                        for (const l of longhands) {
-                          if (style[l.name] !== undefined) {
-                            mutateFn(t, l.name);
-                          }
-                        }
-                        mutateFn(t, shortProp, compress(vals as string[]));
-                      });
-                    },
+                    (newVal: string) => recompress(idx, newVal || emptyVal),
                     {
                       placeholder: !lVal && inherited[name] ? String(inherited[name]) : "",
                     },
@@ -298,23 +467,403 @@ function renderShorthandRow(
   `;
 }
 
+// ─── The edit target ─────────────────────────────────────────────────────────
+
+/** Forget the selector menu's element handle — the Inspector unmounted, or a test starts clean. */
+export function resetSelectorMenu(): void {
+  resetTargetSelector();
+}
+
+/**
+ * Whether the "show affected" list under a project-wide warning band is open.
+ *
+ * Module-local rather than a `session.ui` field: it is a disclosure on a project-level warning, and
+ * a per-document field would make the same warning open in one tab and closed in another.
+ */
+let _showAffected = false;
+
+/** Fold the affected list away — the Inspector unmounted, or a test starts clean. */
+export function resetAffectedDisclosure(): void {
+  _showAffected = false;
+}
+
+/**
+ * Ask a registered command to do something this panel does not own.
+ *
+ * The breakpoint and the colour scheme are DEFINED in Project Settings › Contexts and SELECTED on
+ * the pane context bar. A Target Line segment that opened its own list would be the third selector
+ * §6.4 forbids, so it routes to the definition site through the same command the context bar's
+ * "Manage contexts…" footer runs.
+ */
+function runCommand(id: string, args?: Record<string, unknown>): void {
+  void activeRegistry()?.run(id, args);
+}
+
+/**
+ * The tag a stylebook rule restyles, when one is being edited.
+ *
+ * In Stylebook the "selector" is a bare tag path (`h1`, `table th`) written into the DOCUMENT's
+ * root style, so the first segment of the path is the tag whose blast radius the scope chip
+ * states.
+ */
+function stylebookTagOf(selector: string | null): string | null {
+  return selector && isTagPath(selector) ? (selector.split(" ")[0] ?? null) : null;
+}
+
+/**
+ * Whether this document IS the project's stylesheet.
+ *
+ * `project.json`'s `style` is not a document's style. The compiler hands it to EVERY route's
+ * compile as `projectStyle` (`site/site-build.ts`), and `compileStyles` emits its custom properties
+ * as `:root`, its flat properties as `body`, and every bare tag key as a global rule — so `{ "h1":
+ * { "color": "red" } }` in project.json becomes `h1 { color: red }` in the stylesheet of every
+ * page, reaching inside every component instance too (nothing in the compiler or the runtime
+ * attaches a shadow root). Studio shows the same cascade: `getEffectiveStyle` merges the object
+ * into every open document.
+ *
+ * That makes the document Stylebook opens by default the widest blast radius in the app — and it is
+ * the one `resolveScope` used to label "in this **document**", the narrowest.
+ *
+ * Matched by suffix rather than by equality, the way `studio.ts` and `imports-panel.ts` already
+ * address this file: a config reached from a sub-directory is still a config, and it still has no
+ * elements of its own for "in this document" to be about.
+ */
+function isProjectStylesheet(path: string): boolean {
+  return /(?:^|\/)project\.json$/.test(path);
+}
+
+/**
+ * How wide an edit here reaches, and — for the project case — how wide, in numbers.
+ *
+ * Three kinds, in the order a user meets them:
+ *
+ * - **element** — an element is selected; the rule is scoped to it and to nothing else.
+ * - **document** — Stylebook on an ordinary document: every `<tag>` on this page.
+ * - **project** — the same keystroke restyles files that are not open. Two documents reach this far:
+ *   a LAYOUT, whose root style is inherited by every page declaring it, and
+ *   {@link isProjectStylesheet}, which is inherited by all of them.
+ *
+ * The project stylesheet reaches it with NO tag as well, which no other document does: deselecting
+ * in Stylebook leaves the tab editing project.json's own root style — `:root` and `body` on every
+ * route — and there is no element anywhere for "this element" to have meant.
+ */
+function resolveScope(tab: Tab, stylebookTag: string | null): TargetScope {
+  const path = tab.documentPath ?? "";
+  const isProjectStyle = isProjectStylesheet(path);
+  if (!stylebookTag) {
+    return isProjectStyle
+      ? projectScope("every page in this project", null)
+      : { kind: "element", label: "this element" };
+  }
+  const shared = isProjectStyle || /^\.?\/?layouts\//.test(path);
+  const label = `all <${stylebookTag}> in this ${shared ? "project" : "document"}`;
+  return shared ? projectScope(label, stylebookTag) : { kind: "document", label };
+}
+
+/**
+ * The project-wide warning band: its label, its count, and its disclosure.
+ *
+ * The count is `findReferences`' tag walk, which counts `tagName` matches across the project. Where
+ * the host cannot answer — no `findReferences` route, a failed sweep, or no tag to ask about — the
+ * band says **unknown** rather than a confident zero, exactly as `services/references.ts` requires
+ * of every rendering.
+ *
+ * @param {string} label
+ * @param {string | null} tagName — null for a root-style edit, which has no tag to count.
+ * @returns {TargetScope}
+ */
+function projectScope(label: string, tagName: string | null): TargetScope {
+  if (tagName === null) {
+    // No tag, so no query: `:root`/`body` on every route is not a `tagName` sweep, and how many
+    // Routes that is, is a question no surface here can answer. A zero would be the same lie the
+    // Band exists to stop, in a smaller font — and with no file list, there is nothing to disclose.
+    return { affected: "how many pages that is, is unknown", kind: "project", label };
+  }
+  const query = { tagName };
+  const state = peekUsages(query);
+  if (state === null) {
+    // First paint for this tag: ask once, and repaint when the answer lands. `loadUsages` joins an
+    // In-flight request, so a panel repainting sixty times a second is still one sweep.
+    void loadUsages(query).then(() => renderOnly("rightPanel"));
+  }
+  return {
+    kind: "project",
+    label,
+    affected: affectedSentence(state),
+    affectedFiles: state?.status === "ready" ? usageFiles(state.result) : [],
+    showAffected: _showAffected,
+    onToggleAffected: () => {
+      _showAffected = !_showAffected;
+      renderOnly("rightPanel");
+    },
+  };
+}
+
+/** The affected count, in words — and "unknown" wherever the query cannot answer. */
+function affectedSentence(state: ReturnType<typeof peekUsages>): string {
+  if (state === null || state.status === "pending") {
+    return "counting the elements it affects…";
+  }
+  if (state.status !== "ready") {
+    return "how many elements that is, is unknown";
+  }
+  const { files, refsTotal } = state.result;
+  if (refsTotal === 0) {
+    return "no element in the project uses it yet";
+  }
+  return `${refsTotal} element${refsTotal === 1 ? "" : "s"} in ${files.length} file${
+    files.length === 1 ? "" : "s"
+  }`;
+}
+
+/** The two axes the Style tab states but does not own, plus the element it is pointed at. */
+function targetSegments(
+  elementLabel: string,
+  mediaTab: string | null,
+  hasBreakpoints: boolean,
+  schemeLayer: string | null,
+): TargetSegment[] {
+  const segments: TargetSegment[] = [
+    {
+      key: "element",
+      label: elementLabel,
+      title: "What these edits are pointed at — click to find it in the Outline",
+      onActivate: () => runCommand("view.setActivity", { tab: "layers" }),
+    },
+    {
+      key: "media",
+      label: hasBreakpoints && mediaTab ? `@${mediaDisplayName(mediaTab)}` : "Base",
+      title:
+        "The breakpoint these edits land in. Choose it on the pane's Context control; click to " +
+        "manage breakpoints.",
+      onActivate: () => runCommand("settings.open", { section: "contexts" }),
+    },
+  ];
+  if (schemeLayer) {
+    segments.push({
+      key: "scheme",
+      label: `${mediaDisplayName(schemeLayer)} variant`,
+      title:
+        "Edits land in this colour-scheme variant. Set the pane's Context control back to Auto " +
+        "to edit base styles; click to manage schemes.",
+      onActivate: () => runCommand("settings.open", { section: "contexts" }),
+    });
+  }
+  return segments;
+}
+
+// ─── Provenance ──────────────────────────────────────────────────────────────
+
+/** An inherited value, its donor's name, and how to go there. */
+interface InheritedInfo {
+  value: string | number;
+  donor: string;
+  jump?: (() => void) | undefined;
+}
+
+/**
+ * The signal a `${…}` style value reads, when it reads one.
+ *
+ * `state.` is optional because both spellings occur in documents and both mean the same entry — the
+ * chip names the signal, not the accessor path it was reached by.
+ */
+function templateSignalOf(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  return /\$\{\s*(?:state\.)?([A-Za-z_$][\w$]*)/.exec(value)?.[1] ?? null;
+}
+
+/** Whether a value is a `${}` template rather than a literal — the `bound` rung for a CSS value. */
+function isTemplateValue(value: unknown): boolean {
+  return typeof value === "string" && value.includes("${");
+}
+
+/** What the Style tab can say about one property's origin. */
+interface ProvenanceCtx {
+  own: JxStyle;
+  active: JxStyle;
+  inherited: Record<string, InheritedInfo>;
+  signals: string[];
+  clear: (prop: string) => void;
+  /**
+   * Properties the selected elements DISAGREE about, and how many elements are selected (§6.5).
+   *
+   * Empty for a selection of one — which is what keeps every other branch of `provenanceOf`
+   * reachable exactly as often as it was before the selection became a set.
+   */
+  mixed?: { props: Set<string>; count: number } | undefined;
+}
+
+/**
+ * Where this property's value came from.
+ *
+ * Four answers, and three of them were previously indistinguishable from each other: an inherited
+ * value arrived as a placeholder identical to the CSS initial value, a site token arrived looking
+ * like a local override, and a `${}` binding arrived looking like a literal with braces in it.
+ */
+function provenanceOf(prop: string, ctx: ProvenanceCtx): FieldProvenance {
+  // Mixed is decided FIRST, because it is a fact about the selection rather than about the value:
+  // The primary's own value may be perfectly ordinary while five other elements disagree with it,
+  // And drawing that as `set` is exactly the lie this state exists to stop.
+  if (ctx.mixed?.props.has(prop)) {
+    return {
+      state: "mixed",
+      donor: String(ctx.mixed.count),
+      onClick: () => ctx.clear(prop),
+    };
+  }
+  const value = ctx.active[prop];
+  if (value !== undefined && ctx.own[prop] === undefined) {
+    // Present in the effective style but not in the document's own: it came from the site style.
+    // No jump: the project style document is not something this tab can open.
+    return {
+      state: "inherited",
+      donor: "site tokens",
+      title: `Inherited from the project's site tokens — ${prop} is not set on this document`,
+    };
+  }
+  if (value !== undefined) {
+    if (isTemplateValue(value)) {
+      const signal = templateSignalOf(value);
+      return {
+        state: "bound",
+        ...(signal ? { donor: signal } : {}),
+        ...(signal && ctx.signals.includes(signal)
+          ? {
+              onClick: () => {
+                runCommand("view.setActivity", { tab: "data" });
+                runCommand("data.expandRow", { name: signal });
+              },
+            }
+          : {}),
+      };
+    }
+    return { state: "set", onClick: () => ctx.clear(prop) };
+  }
+  const inherited = ctx.inherited[prop];
+  if (inherited) {
+    return {
+      state: "inherited",
+      donor: inherited.donor,
+      ...(inherited.jump ? { onClick: inherited.jump } : {}),
+    };
+  }
+  return { state: "default" };
+}
+
+/**
+ * Where a SHORTHAND row's value came from.
+ *
+ * A shorthand is less a value than a name for four of them, so every answer it can give is about
+ * five properties at once: `padding` is set when `padding` or any of `paddingTop…Left` is, mixed
+ * when the selection disagrees about any of the five, and inherited when the cascade supplies one
+ * and this document supplies none. Asking only about the shorthand key is what let the row draw a
+ * plain "Clear padding" dot over a property the panel had already computed as mixed.
+ *
+ * @param {string} shortProp
+ * @param {ProvenanceCtx} ctx
+ * @param {(() => void) | undefined} [clearAll] — clears the shorthand AND its longhands, which is
+ *   the only clear this row has ever meant; omitted where there is nothing to clear.
+ * @returns {FieldProvenance}
+ */
+function shorthandProvenance(
+  shortProp: string,
+  ctx: ProvenanceCtx,
+  clearAll?: (() => void) | undefined,
+): FieldProvenance {
+  const props = [shortProp, ...(getLonghands(shortProp) as CssLonghand[]).map((l) => l.name)];
+  const { mixed } = ctx;
+  if (mixed && props.some((p) => mixed.props.has(p))) {
+    return {
+      state: "mixed",
+      donor: String(mixed.count),
+      ...(clearAll ? { onClick: clearAll } : {}),
+    };
+  }
+  for (const p of props) {
+    const prov = provenanceOf(p, ctx);
+    if (prov.state === "default") {
+      continue;
+    }
+    return prov.state === "set" && clearAll ? { ...prov, onClick: clearAll } : prov;
+  }
+  return DEFAULT_PROVENANCE;
+}
+
+/**
+ * Where a longhand CHILD row's value came from.
+ *
+ * A longhand can hold a value it was never given: `padding: 1px 2px` fills four child rows, and
+ * clearing one of them recompresses the shorthand rather than deleting a key. So a value derived
+ * from the shorthand counts as `set` here, and a selection that disagrees about the shorthand
+ * disagrees about every child the shorthand fills.
+ *
+ * @param {string} name
+ * @param {string} shortProp
+ * @param {boolean} hasValue — set here, or filled in by the shorthand above.
+ * @param {ProvenanceCtx} ctx
+ * @param {() => void} clearChild
+ * @returns {FieldProvenance}
+ */
+function longhandProvenance(
+  name: string,
+  shortProp: string,
+  hasValue: boolean,
+  ctx: ProvenanceCtx,
+  clearChild: () => void,
+): FieldProvenance {
+  const { mixed } = ctx;
+  if (mixed && (mixed.props.has(name) || (hasValue && mixed.props.has(shortProp)))) {
+    return { state: "mixed", donor: String(mixed.count), onClick: clearChild };
+  }
+  const prov = provenanceOf(name, ctx);
+  if (prov.state === "set" || (prov.state === "default" && hasValue)) {
+    return { state: "set", onClick: clearChild };
+  }
+  return prov;
+}
+
+/**
+ * A section's tally, counting a shorthand as set when any of its longhands is.
+ *
+ * @param {{ prop: string; entry: CssPropertyEntry }[]} entries
+ * @param {ProvenanceCtx} ctx
+ */
+function sectionProvenance(
+  entries: { prop: string; entry: CssPropertyEntry }[],
+  ctx: ProvenanceCtx,
+): ProvenanceState[] {
+  return entries.map(({ prop, entry }) =>
+    inferInputType(entry) === "shorthand"
+      ? shorthandProvenance(prop, ctx).state
+      : provenanceOf(prop, ctx).state,
+  );
+}
+
 // ─── Main template ──────────────────────────────────────────────────────────
 
 /**
  * @param {JxMutableNode} node
  * @param {string | null} activeMediaTab
  * @param {string | null} activeSelector
- * @param {JxStyle} [effectiveStyle]
+ * @param {{ effectiveStyle?: JxStyle; stylebookSelector?: string | null }} [opts] —
+ *   `effectiveStyle` is the site-merged style Stylebook edits against; `stylebookSelector` is the
+ *   tag catalogue entry being styled, which is what makes the edit tag-wide rather than
+ *   element-wide and therefore what the scope chip reports.
  */
 function styleSidebarTemplate(
   node: JxMutableNode,
   activeMediaTab: string | null,
   activeSelector: string | null,
-  effectiveStyle?: JxStyle,
+  opts: { effectiveStyle?: JxStyle | undefined; stylebookSelector?: string | null } = {},
 ) {
+  const { effectiveStyle, stylebookSelector = null } = opts;
   const tab = activeTab.value!;
-  const sel = tab.session.selection as JxPath;
-  const style = effectiveStyle || node.style || {};
+  const sel = primarySelection(tab.session.selection) as JxPath;
+  /** The document's OWN style — what a commit writes into. */
+  const ownRootStyle: JxStyle = node.style || {};
+  const style = effectiveStyle ?? ownRootStyle;
   // Signals seeding the ${} template default when a style value escalates (no $ref in JxStyle).
   const templateSignals = Object.entries(tab.doc.document.state || {})
     .filter(
@@ -341,130 +890,59 @@ function styleSidebarTemplate(
   // The media context edits actually target: a valid breakpoint tab, else the scheme layer.
   const editMedia = mediaTab && mediaNames.length > 0 ? mediaTab : schemeLayer;
 
-  // ── Media tabs template ──────────────────────────────────────────────────
-  const mediaTabsT =
-    mediaNames.length > 0
-      ? html`
-          <sp-tabs
-            size="s"
-            selected=${mediaTab || "base"}
-            @change=${(e: Event) => {
-              const val = (e.target as HTMLElement & { selected: string }).selected;
-              const newMedia = val === "base" ? null : val;
-              if (newMedia !== tab.session.ui.activeMedia) {
-                tab.session.ui.activeMedia = newMedia;
-              }
-            }}
-          >
-            <sp-tab label="Base" value="base"></sp-tab>
-            ${mediaNames.map(
-              (name) => html` <sp-tab label=${mediaDisplayName(name)} value=${name}></sp-tab> `,
-            )}
-          </sp-tabs>
-        `
-      : nothing;
-
-  // ── Selector dropdown ──────────────────────────────────────────────────────
+  // ── The selector axis — the one this tab owns ──────────────────────────────
   const contextStyle = editMedia
     ? (style[`@${editMedia}`] as Record<string, unknown>) || {}
     : style;
-  const existingSelectors = Object.keys(contextStyle).filter((s) => isNestedSelector(s));
-  const existingSet = new Set(existingSelectors);
-  const commonSet = new Set(COMMON_SELECTORS);
-  const extraSelectors = existingSelectors.filter((s) => !commonSet.has(s));
-  if (activeSelector && !commonSet.has(activeSelector) && !existingSet.has(activeSelector)) {
-    extraSelectors.unshift(activeSelector);
-  }
+  const declaredSelectors = new Set(Object.keys(contextStyle).filter((s) => isNestedSelector(s)));
+  const selectorOptions = [
+    ...new Set([
+      ...COMMON_SELECTORS,
+      ...declaredSelectors,
+      ...(activeSelector ? [activeSelector] : []),
+    ]),
+  ];
 
-  const _selectorVal = activeSelector || "__base__";
-  const selectorT = html`
-    <sp-picker
-      size="s"
-      class="selector-select"
-      quiet
-      .value=${live(_selectorVal)}
-      @change=${(e: Event) => {
-        const val = (e.target as HTMLElement & { value: string }).value;
-        if (val === "__add_custom__") {
-          requestAnimationFrame(() => {
-            (e.target as HTMLElement & { value: string }).value = activeSelector || "__base__";
-          });
-          const picker = e.target as HTMLElement;
-          const bar = picker.closest(".style-toolbar") as HTMLElement;
-          picker.style.display = "none";
-          const inp = document.createElement("input");
-          inp.type = "text";
-          inp.className = "selector-custom-input";
-          inp.placeholder = ":hover, .child, &.active, [attr]";
-          bar.append(inp);
-          inp.focus();
-          let done = false;
-          const finish = (accept: boolean) => {
-            if (done) {
-              return;
-            }
-            done = true;
-            const v = inp.value.trim();
-            inp.remove();
-            picker.style.display = "";
-            if (accept && v && isNestedSelector(v)) {
-              activeTab.value!.session.ui.activeSelector = v;
-            }
-          };
-          inp.addEventListener("keydown", (ev) => {
-            if (ev.key === "Enter") {
-              finish(true);
-            } else if (ev.key === "Escape") {
-              finish(false);
-            }
-          });
-          inp.addEventListener("blur", () => finish(inp.value.trim().length > 0));
-          return;
-        }
-        const newSelector = val === "__base__" ? null : val;
-        activeTab.value!.session.ui.activeSelector = newSelector;
-      }}
-    >
-      <sp-menu-item value="__base__">(base)</sp-menu-item>
-      <sp-menu-divider></sp-menu-divider>
-      ${COMMON_SELECTORS.map(
-        (s) => html`
-          <sp-menu-item value=${s}>${existingSet.has(s) ? `${s}  \u25CF` : s}</sp-menu-item>
-        `,
-      )}
-      ${
-        extraSelectors.length > 0
-          ? html`
-              <sp-menu-divider></sp-menu-divider>
-              ${extraSelectors.map((s) => html` <sp-menu-item value=${s}>${s} ●</sp-menu-item> `)}
-            `
-          : nothing
-      }
-      <sp-menu-divider></sp-menu-divider>
-      <sp-menu-item value="__add_custom__">+ Add custom…</sp-menu-item>
-    </sp-picker>
-  `;
-
-  // ── Combined toolbar (media tabs + scheme badge + selector) ────────────────
-  // No scheme tabs — the tab-bar control is the one switch; the badge shows where edits land.
-  const schemeBadgeT = schemeLayer
-    ? html`
-        <span
-          class="style-scheme-badge"
-          title="Edits target the @${schemeLayer} variant — set the tab-bar scheme control to Auto to edit base styles"
-        >
-          ${mediaDisplayName(schemeLayer)} variant
-        </span>
-      `
-    : nothing;
-  const toolbarT = html`
-    <div class="style-toolbar">
-      <div class="style-toolbar-tabs">${mediaTabsT} ${schemeBadgeT}</div>
-      ${selectorT}
-    </div>
-  `;
+  // ── The Target Line (§6.1) ─────────────────────────────────────────────────
+  // The three widgets this replaces are gone: the breakpoint `<sp-tabs>` strip, the
+  // `.selector-select` picker and the `.style-scheme-badge`. The first two named axes the pane
+  // Context bar already selects; the third emitted a class with no CSS rule anywhere in the repo.
+  const stylebookTag = stylebookTagOf(stylebookSelector);
+  const elementLabel =
+    stylebookTag ?? (typeof node.tagName === "string" ? node.tagName : "element");
+  const targetLineT = renderTargetLine({
+    segments: targetSegments(elementLabel, mediaTab, mediaNames.length > 0, schemeLayer),
+    selector: {
+      value: activeSelector,
+      options: selectorOptions,
+      declared: declaredSelectors,
+      onSelect: (value) => {
+        activeTab.value!.session.ui.activeSelector = value;
+      },
+      onAddCustom: () => {
+        // One flow, through `ui/layers.ts` — the imperative `<input>` this replaces was appended to
+        // A bar lit-html owns, bypassing both the renderer and the overlay stack (§11.4).
+        void showPromptDialog("Add Selector", {
+          confirmLabel: "Use",
+          message: "A state or nested rule to edit under this element.",
+          placeholder: ":hover, .child, &.active, [attr]",
+          validate: (v) =>
+            isNestedSelector(v.trim()) ? "" : 'A selector must start with ":", ".", "&" or "[".',
+        }).then((value) => {
+          if (value) {
+            activeTab.value!.session.ui.activeSelector = value.trim();
+            renderOnly("rightPanel");
+          }
+        });
+      },
+    },
+    scope: resolveScope(tab, stylebookTag),
+  });
 
   // ── Filter bar ─────────────────────────────────────────────────────────────
+  // One control. The "Active" toggle is gone: it existed only because provenance was invisible
+  // With a section closed, and a heading that says "3 set here · 2 inherited" answers the same
+  // Question without hiding two thirds of the panel to do it (§6.2).
   const filterBarT = html`
     <div class="style-filter-bar">
       <sp-textfield
@@ -476,85 +954,85 @@ function styleSidebarTemplate(
           activeTab.value!.session.ui.styleFilter = (e.target as HTMLInputElement).value;
         }}
       ></sp-textfield>
-      <sp-action-button
-        size="xs"
-        class="style-filter-toggle"
-        ?selected=${tab.session.ui.styleFilterActive}
-        @click=${() => {
-          activeTab.value!.session.ui.styleFilterActive =
-            !activeTab.value!.session.ui.styleFilterActive;
-        }}
-      >
-        Active
-      </sp-action-button>
     </div>
   `;
 
   // ── Determine the active style object ──────────────────────────────────────
-  let activeStyle: JxStyle;
-  let commitMutate: StyleMutateFn;
-  if (activeSelector && isTagPath(activeSelector) && editMedia) {
-    const mediaObj = getNestedStyle(style, `@${editMedia}`) ?? {};
-    activeStyle = resolveNestedTagStyle(mediaObj, activeSelector);
-    const stylePath = activeSelector.split(" ");
-    commitMutate = (t: Tab, prop: string, val: string | Record<string, unknown> | undefined) =>
-      mutateUpdateMediaNestedStylePath(
-        t,
-        sel,
-        editMedia,
-        stylePath,
-        prop,
-        val as string | undefined,
-      );
-  } else if (activeSelector && isTagPath(activeSelector)) {
-    activeStyle = resolveNestedTagStyle(style, activeSelector);
-    const stylePath = activeSelector.split(" ");
-    commitMutate = (t: Tab, prop: string, val: string | Record<string, unknown> | undefined) =>
-      mutateUpdateNestedStylePath(t, sel, stylePath, prop, val as string | undefined);
-  } else if (activeSelector && editMedia) {
-    const mediaObj = getNestedStyle(style, `@${editMedia}`) ?? {};
-    activeStyle = getNestedStyle(mediaObj, activeSelector) ?? {};
-    commitMutate = (t: Tab, prop: string, val: string | Record<string, unknown> | undefined) =>
-      mutateUpdateMediaNestedStyle(
-        t,
-        sel,
-        editMedia,
-        activeSelector,
-        prop,
-        val as string | undefined,
-      );
-  } else if (activeSelector) {
-    activeStyle = getNestedStyle(style, activeSelector) ?? {};
-    commitMutate = (t: Tab, prop: string, val: string | Record<string, unknown> | undefined) =>
-      mutateUpdateNestedStyle(t, sel, activeSelector, prop, val as string | undefined);
-  } else {
-    activeStyle = {};
-    const inMediaCtx = editMedia !== null;
-    const flatSource = inMediaCtx ? (getNestedStyle(style, `@${editMedia}`) ?? {}) : style;
-    for (const [p, v] of Object.entries(flatSource)) {
+  const activeStyle = resolveContextStyle(style, activeSelector, editMedia);
+  // The SAME coordinate, resolved against the document's own style. In Stylebook `style` is the
+  // Site-merged effective style, so a property present here and absent there arrived from the
+  // Project's tokens — a donor the panel can now name instead of drawing it as a local override
+  // Whose "clear" would silently do nothing.
+  const ownStyle =
+    style === ownRootStyle
+      ? activeStyle
+      : resolveContextStyle(ownRootStyle, activeSelector, editMedia);
+  // ── The selection, and what it means to commit to it (§6.5) ────────────────
+  // Every selected element gets the same write, inside ONE `transactDoc` — so setting padding on
+  // Six cards is one decision and one undo step. With one element selected this loop runs once
+  // Against `sel` and is indistinguishable from the single-target commit it replaces.
+  const targets = tab.session.selection.length > 0 ? tab.session.selection : [sel];
+  /**
+   * ONE write, applied to every selected element — the only write function this tab has.
+   *
+   * It takes the caller's transaction rather than opening its own, because a row that writes twice
+   * (a shorthand and the longhands it supersedes; a renamed custom property and its old key) must
+   * still be one undo step. There is no single-target counterpart: every row that had one wrote to
+   * the primary element and silently dropped the rest of the selection on the floor.
+   */
+  const mutateTargets: StyleMutateFn = (t, prop, val) => {
+    for (const target of targets) {
+      contextMutate(target, activeSelector, editMedia)(t, prop, val);
+    }
+  };
+  const commitStyle = (prop: string, val?: string | Record<string, unknown> | undefined) =>
+    transactDoc(activeTab.value, (t) => mutateTargets(t, prop, val));
+  /** One target's OWN block at this coordinate — what a write that preserves values reads first. */
+  const targetStyleOf = (t: Tab, target: JxPath): JxStyle => {
+    const targetNode = getNodeAtPath(t.doc.document, target) as JxMutableNode | undefined;
+    return resolveContextStyle(targetNode?.style ?? {}, activeSelector, editMedia);
+  };
+
+  // ── Compute inherited style, and NAME THE DONOR ────────────────────────────
+  // Scheme layer: the base styles show through as inherited; breakpoint tabs inherit from lower
+  // Breakpoints as before. Either way the donor is known at this point and is now kept: it is the
+  // Difference between "some value is showing through" and "Base sets this to 16px, go and look".
+  const inheritedInfo: Record<string, InheritedInfo> = {};
+  if (schemeLayer) {
+    const baseBlock = activeSelector ? (getNestedStyle(style, activeSelector) ?? {}) : style;
+    for (const [p, v] of Object.entries(baseBlock)) {
       if (typeof v !== "object") {
-        activeStyle[p] = v;
+        inheritedInfo[p] = {
+          value: (v as string | number) ?? "",
+          donor: "Base",
+          jump: () => updateUi(activeTab.value, "previewColorScheme", "auto"),
+        };
       }
     }
-    commitMutate = inMediaCtx
-      ? (t: Tab, prop: string, val: string | Record<string, unknown> | undefined) =>
-          mutateUpdateMediaStyle(t, sel, editMedia, prop, val as string | undefined)
-      : (t: Tab, prop: string, val: string | Record<string, unknown> | undefined) =>
-          mutateUpdateStyle(t, sel, prop, val as string | undefined);
+  } else {
+    for (const [p, source] of Object.entries(
+      computeInheritedSources(style, mediaNames, mediaTab, activeSelector),
+    )) {
+      inheritedInfo[p] = {
+        value: source.value,
+        donor: source.donor === null ? "Base" : mediaDisplayName(source.donor),
+        jump: () => updateUi(activeTab.value, "activeMedia", source.donor),
+      };
+    }
   }
-  const commitStyle = (prop: string, val?: string | Record<string, unknown> | undefined) =>
-    transactDoc(activeTab.value, (t) => commitMutate(t, prop, val));
-
-  // ── Compute inherited style ────────────────────────────────────────────────
-  // Scheme layer: the base styles show through as inherited (placeholders); breakpoint tabs
-  // Inherit from higher breakpoints as before.
-  const inheritedStyle: Record<string, string | number> = schemeLayer
-    ? (Object.fromEntries(
-        Object.entries(
-          activeSelector ? (getNestedStyle(style, activeSelector) ?? {}) : style,
-        ).filter(([, v]) => typeof v !== "object"),
-      ) as Record<string, string | number>)
-    : computeInheritedStyle(style, mediaNames, mediaTab, activeSelector);
+  const inheritedStyle: Record<string, string | number> = {};
+  for (const [p, info] of Object.entries(inheritedInfo)) {
+    inheritedStyle[p] = info.value;
+  }
+  const mixedProps = mixedStyleProps(tab, targets, activeSelector, editMedia);
+  const provCtx: ProvenanceCtx = {
+    own: ownStyle,
+    active: activeStyle,
+    inherited: inheritedInfo,
+    signals: templateSignals,
+    clear: (prop: string) => commitStyle(prop),
+    ...(mixedProps.size > 0 ? { mixed: { count: targets.length, props: mixedProps } } : {}),
+  };
 
   // Auto-open sections that have properties
   const newSections = autoOpenSections({ style: activeStyle }, tab.session.ui.styleSections);
@@ -606,8 +1084,7 @@ function styleSidebarTemplate(
 
   // ── Filter state ─────────────────────────────────────────────────────────
   const filterText = (tab.session.ui.styleFilter || "").toLowerCase();
-  const filterActive = tab.session.ui.styleFilterActive;
-  const isFiltering = filterText.length > 0 || filterActive;
+  const isFiltering = filterText.length > 0;
 
   // ── Section templates ────────────────────────────────────────────────────
   const sectionTemplates = cssMeta.$sections
@@ -629,6 +1106,34 @@ function styleSidebarTemplate(
         },
       );
 
+      const clearSection = () => {
+        transactDoc(activeTab.value, (t) => {
+          for (const { prop, entry } of sectionActiveProps) {
+            if (activeStyle[prop] !== undefined) {
+              mutateTargets(t, prop);
+            }
+            if (inferInputType(entry) === "shorthand") {
+              for (const l of getLonghands(prop) as CssLonghand[]) {
+                mutateTargets(t, l.name);
+              }
+            }
+          }
+        });
+      };
+
+      // The heading's own answer to "is anything in here set, inherited or bound" — the question
+      // The retired "Active" toggle answered by hiding everything that was not.
+      const counts = countProvenance(sectionProvenance(entries, provCtx));
+      const headingT = html`
+        <span slot="heading" class="style-section-heading">
+          ${sec.label}
+          ${renderProvenanceDots(counts, {
+            onClearSet: sectionActiveProps.length > 0 ? clearSection : undefined,
+            clearTitle: `Clear all ${sec.label.toLowerCase()} properties`,
+          })}
+        </span>
+      `;
+
       const isOpen = isFiltering ? true : (tab.session.ui.styleSections[sec.key] ?? false);
 
       if (!isOpen) {
@@ -643,37 +1148,7 @@ function styleSidebarTemplate(
               };
             }}
           >
-            ${
-              sectionActiveProps.length > 0
-                ? html`
-                    <span slot="heading" style="display:flex;align-items:center;gap:6px">
-                      ${sec.label}
-                      <span
-                        class="set-dot set-dot--section"
-                        title="Clear all ${sec.label.toLowerCase()} properties"
-                        @click=${(e: Event) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                          transactDoc(activeTab.value, (t) => {
-                            for (const { prop, entry } of sectionActiveProps) {
-                              if (activeStyle[prop] !== undefined) {
-                                commitMutate(t, prop);
-                              }
-                              if (inferInputType(entry) === "shorthand") {
-                                for (const l of getLonghands(prop) as CssLonghand[]) {
-                                  if (activeStyle[l.name] !== undefined) {
-                                    commitMutate(t, l.name);
-                                  }
-                                }
-                              }
-                            }
-                          });
-                        }}
-                      ></span>
-                    </span>
-                  `
-                : nothing
-            }
+            ${headingT}
           </sp-accordion-item>
         `;
       }
@@ -694,18 +1169,6 @@ function styleSidebarTemplate(
             continue;
           }
         }
-        if (filterActive) {
-          if (type === "shorthand") {
-            const longhands = getLonghands(prop) as CssLonghand[];
-            const hasAnySet =
-              hasVal || longhands.some((l: CssLonghand) => activeStyle[l.name] !== undefined);
-            if (!hasAnySet) {
-              continue;
-            }
-          } else if (!hasVal) {
-            continue;
-          }
-        }
 
         if (type === "shorthand") {
           const longhands = getLonghands(prop) as CssLonghand[];
@@ -715,7 +1178,14 @@ function styleSidebarTemplate(
             continue;
           }
           rows.push(
-            renderShorthandRow(prop, entry, activeStyle, commitMutate, () => {}, inheritedStyle),
+            renderShorthandRow({
+              prop,
+              entry,
+              style: activeStyle,
+              mutate: mutateTargets,
+              inherited: inheritedStyle,
+              ctx: provCtx,
+            }),
           );
         } else {
           const isWarning = hasVal && !condMet;
@@ -726,12 +1196,12 @@ function styleSidebarTemplate(
                 prop,
                 (val as string) ?? "",
                 (newVal: string | undefined) => commitStyle(prop, newVal || undefined),
-                () => commitStyle(prop),
                 isWarning,
                 sec.$layout === "grid",
                 inheritedStyle[prop] as string | undefined,
                 templateSignals,
                 `style|${sel.join("/")}|${editMedia ?? ""}|${activeSelector ?? ""}|${prop}`,
+                provenanceOf(prop, provCtx),
               ),
             );
           }
@@ -753,37 +1223,7 @@ function styleSidebarTemplate(
             };
           }}
         >
-          ${
-            sectionActiveProps.length > 0
-              ? html`
-                  <span slot="heading" style="display:flex;align-items:center;gap:6px">
-                    ${sec.label}
-                    <span
-                      class="set-dot set-dot--section"
-                      title="Clear all ${sec.label.toLowerCase()} properties"
-                      @click=${(e: Event) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        transactDoc(activeTab.value, (t) => {
-                          for (const { prop, entry } of sectionActiveProps) {
-                            if (activeStyle[prop] !== undefined) {
-                              commitMutate(t, prop);
-                            }
-                            if (inferInputType(entry) === "shorthand") {
-                              for (const l of getLonghands(prop) as CssLonghand[]) {
-                                if (activeStyle[l.name] !== undefined) {
-                                  commitMutate(t, l.name);
-                                }
-                              }
-                            }
-                          }
-                        });
-                      }}
-                    ></span>
-                  </span>
-                `
-              : nothing
-          }
+          ${headingT}
           <div class=${sec.$layout === "grid" ? "style-section-body--grid" : ""}>${rows}</div>
         </sp-accordion-item>
       `;
@@ -813,12 +1253,26 @@ function styleSidebarTemplate(
                 .value=${live(prop)}
                 @change=${(e: Event) => {
                   const newProp = (e.target as HTMLInputElement).value.trim();
-                  if (newProp && newProp !== prop) {
-                    transactDoc(activeTab.value, (t) => {
-                      commitMutate(t, prop);
-                      commitMutate(t, newProp, String(activeStyle[prop]));
-                    });
+                  if (!newProp || newProp === prop) {
+                    return;
                   }
+                  // A rename is the one write that cannot be fanned out with a single value: each
+                  // Element keeps ITS OWN value under the new key. The old code batched half of the
+                  // Rename (the delete) against the primary and the other half against the primary
+                  // Too, while the value cell beside it wrote to the whole selection — so renaming
+                  // A property the selection shared moved it on one element and left it on the
+                  // Rest.
+                  transactDoc(activeTab.value, (t) => {
+                    for (const target of targets) {
+                      const current = targetStyleOf(t, target)[prop];
+                      if (current === undefined) {
+                        continue;
+                      }
+                      const write = contextMutate(target, activeSelector, editMedia);
+                      write(t, prop);
+                      write(t, newProp, String(current));
+                    }
+                  });
                 }}
               ></sp-textfield>
               <sp-textfield
@@ -917,7 +1371,7 @@ function styleSidebarTemplate(
 
   return html`
     <div class="style-sidebar">
-      ${toolbarT} ${filterBarT}
+      ${targetLineT} ${filterBarT}
       <sp-accordion allow-multiple size="s">
         ${sectionTemplates} ${nestedSectionT} ${customSectionT}
       </sp-accordion>
@@ -935,71 +1389,128 @@ function styleSidebarTemplate(
  */
 export function renderStylePanelTemplate(ctx: { getCanvasMode: () => string }) {
   const tab = activeTab.value;
+  const noDocument = () =>
+    renderEmptyState({
+      actions: [openPageAction()],
+      message: "Open a page to style what you click.",
+    });
   if (!tab) {
-    return html`<div class="empty-state">No document loaded</div>`;
+    return noDocument();
   }
-  if (ctx.getCanvasMode() === "stylebook" && tab.session.ui.stylebookSelection) {
+  if (ctx.getCanvasMode() === "stylebook" && shell.stylebook.selection) {
     const node = tab.doc.document;
     if (!node) {
-      return html`<div class="empty-state">No document loaded</div>`;
+      return noDocument();
     }
-    return html`
-      <div class="stylebook-style-header">
-        Styling: &lt;${tab.session.ui.stylebookSelection}&gt;
-      </div>
-      ${styleSidebarTemplate(
-        node,
-        tab.session.ui.activeMedia,
-        tab.session.ui.activeSelector,
-        getEffectiveStyle(node.style),
-      )}
-    `;
+    // No separate `Styling: <h1>` header. It said the same thing the Target Line's scope chip says,
+    // Except that it said it as a caption, after the fact, and without the blast radius (§6.1).
+    return styleSidebarTemplate(node, tab.session.ui.activeMedia, tab.session.ui.activeSelector, {
+      effectiveStyle: getEffectiveStyle(node.style),
+      stylebookSelector: shell.stylebook.selection,
+    });
   }
-  if (!tab.session.selection) {
-    return html`<div class="empty-state">Select an element to style</div>`;
+  const selected = primarySelection(tab.session.selection);
+  if (!selected) {
+    return renderEmptyState({ message: clickAnythingTo("style it") });
   }
-  const node = getNodeAtPath(tab.doc.document, tab.session.selection);
+  const node = getNodeAtPath(tab.doc.document, selected);
   if (!node) {
-    return html`<div class="empty-state">Select an element to style</div>`;
+    return renderEmptyState({ message: staleSelectionMessage() });
   }
   return styleSidebarTemplate(node, tab.session.ui.activeMedia, tab.session.ui.activeSelector);
 }
 
-/** Single property input row (generic field row helper) */
-export function _fieldRow(
-  label: string,
-  type: string,
-  value: string,
-  onChange: (v: string | boolean) => void,
-  _datalistId: string | undefined,
-) {
-  let debounceTimer: ReturnType<typeof setTimeout> | undefined;
-  const onInput = (e: Event) => {
-    clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => onChange((e.target as HTMLInputElement).value), 400);
+// ─── Commands ─────────────────────────────────────────────────────────────────
+
+/**
+ * The Style tab's selector verbs.
+ *
+ * `style.openSelectorMenu` is the one command here that addresses a CONTROL rather than a state,
+ * and it earns that on purpose: the shot it serves photographs the open menu, so the menu is the
+ * subject. What it does not do is hand a CSS selector back to the runner for a synthetic mouse
+ * press — the element comes from the Target Line's own `ref`, so a refactor of that markup moves
+ * the handle with it. The menu it opens is now a segment of the Target Line rather than a picker on
+ * a retired toolbar; the id, and therefore the shot, is unchanged.
+ *
+ * `style.setSelector` is the state half of the same idea, and it is what a caller that wants a
+ * RESULT rather than a picture should use: the menu exists to choose a selector, and choosing one
+ * is expressible.
+ *
+ * @returns {AnyCommand[]}
+ */
+export function styleCommands(): AnyCommand[] {
+  const styleTabOpen = (ctx: { document: { open: boolean }; selection: { count: number } }) =>
+    ctx.document.open && ctx.selection.count > 0;
+
+  return [
+    {
+      category: "View",
+      id: "style.openSelectorMenu",
+      level: "selection",
+      menus: ["palette"],
+      group: "8_style",
+      requires: "the Style tab showing a selected element",
+      when: styleTabOpen,
+      run: () => openSelectorMenu(),
+      title: "Open Selector Menu",
+    },
+    {
+      args: {
+        additionalProperties: false,
+        properties: {
+          selector: pathlessSelectorProperty(),
+        },
+        required: ["selector"],
+        type: "object",
+      },
+      category: "View",
+      id: "style.setSelector",
+      level: "selection",
+      menus: ["palette"],
+      group: "8_style",
+      requires: "an element selection",
+      when: styleTabOpen,
+      run: (_commandCtx, args) => {
+        const { selector } = args as { selector?: unknown };
+        if (selector === null) {
+          const tab = activeTab.value;
+          if (tab) {
+            tab.session.ui.activeSelector = null;
+          }
+          return;
+        }
+        const value = stringArg("style.setSelector", args, "selector");
+        if (!isNestedSelector(value)) {
+          throw new RangeError(
+            `command "style.setSelector" argument "selector": "${value}" is not a nested ` +
+              `selector — it must start with ":", ".", "&" or "["`,
+          );
+        }
+        const tab = activeTab.value;
+        if (!tab) {
+          throw new RangeError(`command "style.setSelector" needs an open document`);
+        }
+        tab.session.ui.activeSelector = value;
+      },
+      title: "Set Style Selector",
+    },
+  ];
+}
+
+/** The `selector` property's schema: a nested selector, or `null` for the base context. */
+function pathlessSelectorProperty(): object {
+  return {
+    description:
+      'A nested selector such as ":hover", ".child" or "[open]". null edits the base context.',
+    oneOf: [{ type: "string" }, { type: "null" }],
   };
-  const inputTpl =
-    type === "textarea"
-      ? html`<sp-textfield
-          multiline
-          size="s"
-          .value=${live(value ?? "")}
-          @input=${onInput}
-        ></sp-textfield>`
-      : type === "checkbox"
-        ? html`<sp-checkbox
-            ?checked=${Boolean(value)}
-            @change=${(e: Event) => onChange((e.target as HTMLInputElement).checked)}
-          ></sp-checkbox>`
-        : html`<sp-textfield
-            size="s"
-            .value=${live(value ?? "")}
-            @input=${onInput}
-          ></sp-textfield>`;
-  return html`
-    <div class="field-row">
-      <sp-field-label size="s">${label}</sp-field-label>
-      ${inputTpl}
-    </div>
-  `;
+}
+
+/**
+ * Register the Style tab's selector verbs.
+ *
+ * @param {CommandRegistry} registry
+ */
+export function registerStyleCommands(registry: CommandRegistry): void {
+  registry.registerAll(styleCommands());
 }

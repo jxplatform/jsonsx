@@ -8,7 +8,8 @@
  */
 
 import elementsMeta from "../../data/elements-meta.json";
-import { normalizeInlineContent, toggleInlineFormat } from "./inline-format";
+import { displayTagName } from "@jxsuite/schema/guards";
+import { normalizeInlineContent } from "./inline-format";
 import { isEditableTag } from "./editable-tags";
 import type { EditableVerdicts } from "./editable-tags";
 import type { JxPath } from "../state";
@@ -51,6 +52,14 @@ export interface InlineAction {
   label: string;
   icon?: string;
   command?: string;
+  /**
+   * REMOVED from the data, and the field stays only so an older `elements-meta.json` still parses.
+   *
+   * It held `"Cmd+B"` — a mac spelling, printed verbatim into every tooltip on every platform,
+   * which is the hardcoded-chord defect plan §5.3 exists to kill. The chord now lives on the
+   * `format.*` record (`panels/block-action-bar.ts`) and is formatted by the keymap's one
+   * formatter. Nothing reads this.
+   */
   shortcut?: string;
 }
 
@@ -213,9 +222,9 @@ export function isInlineElement(node: JxMutableNode, parentNode?: JxMutableNode)
   if (!node || typeof node !== "object") {
     return false;
   }
-  const childTag = (node.tagName ?? "div").toLowerCase();
+  const childTag = (displayTagName(node.tagName) || "div").toLowerCase();
   if (parentNode) {
-    const parentTag = (parentNode.tagName ?? "div").toLowerCase();
+    const parentTag = (displayTagName(parentNode.tagName) || "div").toLowerCase();
     return isInlineInContext(childTag, parentTag);
   }
   return INLINE_TAGS.has(childTag);
@@ -423,57 +432,25 @@ function handleKeydown(e: KeyboardEvent) {
     if ((e.ctrlKey || e.metaKey) && ["b", "i", "u", "`"].includes(e.key)) {
       e.preventDefault();
     }
-    return;
   }
 
   // Escape and Enter are NOT handled here. Enter arrives as a `beforeinput` (`insertParagraph`),
   // Which is the one place structural intent is classified; Escape belongs to the editing host,
   // Which owns dismissing the caret. See {@link file://../canvas/iframe-editable-root.ts}.
-
-  // Slash command trigger
-  if (e.key === "/" && !e.ctrlKey && !e.metaKey) {
-    // Check if at start of empty block or after a space/newline
-    const sel = window.getSelection();
-    if (sel && sel.rangeCount > 0) {
-      const range = sel.getRangeAt(0);
-      const textBefore = getTextBeforeCursor(range);
-      if (textBefore === "" || textBefore.endsWith(" ") || textBefore.endsWith("\n")) {
-        // Let the / character be typed, then show menu on next input
-        requestAnimationFrame(() => openSlashMenu());
-        return;
-      }
-    }
-  }
-
-  // Rich text shortcuts
-  if (e.ctrlKey || e.metaKey) {
-    switch (e.key) {
-      case "b": {
-        e.preventDefault();
-        toggleInlineFormat("strong", activeEl);
-        break;
-      }
-      case "i": {
-        e.preventDefault();
-        toggleInlineFormat("em", activeEl);
-        break;
-      }
-      case "`": {
-        e.preventDefault();
-        toggleInlineFormat("code", activeEl);
-        break;
-      }
-      default: {
-        break;
-      }
-    }
-  }
+  //
+  // Neither is the "/" gesture, and neither are the format chords. Both used to be here, and
+  // Both were DEAD: this listener is attached to the BLOCK, and for an ordinary block the editing
+  // Host is the canvas container (see {@link startEditing}), so the focused element — and every
+  // Keydown's target — is the container, never a descendant of it. The "/" trigger is
+  // {@link handleSlashTrigger}, driven from the host; the format chords are `format.*` records
+  // Whose chords the frame forwards (`canvas/iframe-keys.ts`). A revived copy here would have
+  // Toggled bold twice per press.
 }
 
 function handleInput() {
   // Check if slash menu should update or dismiss
   if (slash.isOpen()) {
-    updateSlashMenu();
+    refreshSlashMenu();
   }
 }
 
@@ -773,7 +750,28 @@ function getTextBeforeCursor(range: Range) {
 /** Track the character offset where "/" was typed so we can detect backspace-past-slash */
 let _slashFilterStart = 0;
 
-function openSlashMenu() {
+/**
+ * Whether a literal "/" in the block anchors the open menu.
+ *
+ * False when the menu was opened BY NAME — `insert.openSlashMenu`, the palette, the automation
+ * runner — where there is no slash in the text at all. Two behaviours hang off it, and both are
+ * wrong without it: the filter would be re-derived from the text before the caret and dismiss the
+ * menu on the very next keystroke, and selecting a block would delete everything from the previous
+ * slash in the line ("and/or…") back to the caret. A command-opened menu filters in its own field
+ * and deletes nothing.
+ */
+let _slashAnchored = true;
+
+/**
+ * Open the slash menu at the caret.
+ *
+ * Exported because the block-level `keydown` listener that used to call it never fires: for an
+ * ordinary block the editing host is the canvas container, so the "/" gesture is recognised at the
+ * host ({@link handleSlashTrigger}) and a command opens it from the other realm entirely.
+ *
+ * @param opts.anchored Whether a literal "/" precedes the caret. See {@link _slashAnchored}.
+ */
+export function openSlashMenu(opts?: { anchored?: boolean }): void {
   if (!activeEl || !insertFn || !activePath) {
     return;
   }
@@ -783,13 +781,48 @@ function openSlashMenu() {
     return;
   }
   const range = sel.getRangeAt(0);
+  _slashAnchored = opts?.anchored !== false;
   _slashFilterStart = getTextBeforeCursor(range).length;
 
-  slash.show(activeEl, "", { onSelect: handleSlashSelect });
+  // An unanchored menu carries its own filter field: there is no "/…" run in the document for the
+  // Author to type into, so without one the list could only ever be filtered by scrolling it.
+  slash.show(activeEl, "", {
+    onSelect: handleSlashSelect,
+    ...(_slashAnchored ? {} : { showFilter: true }),
+  });
 }
 
-function updateSlashMenu() {
-  if (!activeEl) {
+/**
+ * The "/" gesture, driven from the EDITING HOST.
+ *
+ * A slash opens the menu at the start of a block or after a space — anywhere else it is punctuation
+ * ("and/or"), and a menu there would be an ambush. The character is allowed to land first, so the
+ * document holds what the author typed whether or not they pick anything from the list.
+ */
+export function handleSlashTrigger(e: KeyboardEvent): void {
+  if (e.key !== "/" || e.ctrlKey || e.metaKey || !activeEl) {
+    return;
+  }
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) {
+    return;
+  }
+  const textBefore = getTextBeforeCursor(sel.getRangeAt(0));
+  if (textBefore === "" || textBefore.endsWith(" ") || textBefore.endsWith("\n")) {
+    requestAnimationFrame(() => openSlashMenu());
+  }
+}
+
+/**
+ * Re-filter an open menu from the text the author has typed after the "/".
+ *
+ * Exported for the same reason {@link openSlashMenu} is: the `input` listener that called it is on
+ * the block, and a contenteditable's `input` targets the editing HOST.
+ */
+export function refreshSlashMenu(): void {
+  if (!activeEl || !_slashAnchored) {
+    // The menu owns its own filter field; the document has no "/…" run to derive one from, and
+    // Deriving one would dismiss the menu on the first character.
     return;
   }
 
@@ -818,8 +851,11 @@ function handleSlashSelect(cmd: SlashCommand) {
     return;
   }
 
-  // Remove the /command text from the element
-  const sel = window.getSelection();
+  /* Remove the "/command" run the author typed — but ONLY when a "/" is what opened the menu.
+     An unanchored menu (opened by name, from the palette or `insert.openSlashMenu`) has no such
+     run, and this walk would delete from the last slash ANYWHERE earlier in the block back to the
+     caret: type "and/or" and pick Heading, and "or" goes with it. */
+  const sel = _slashAnchored ? window.getSelection() : null;
   if (sel && sel.rangeCount) {
     const range = sel.getRangeAt(0);
     const fullText = getTextBeforeCursor(range);

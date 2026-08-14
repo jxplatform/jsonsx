@@ -95,8 +95,10 @@ export interface InteractionDeps {
    */
   getShadowDoc: () => JxMutableNode | null;
   /**
-   * The live render's canvas mode. Insertion "+" zones are a document-editing affordance —
-   * suppressed for stylebook renders (specimens aren't insert targets). Absent = permissive.
+   * The live render's canvas mode. Editing affordances are suppressed per mode: insertion "+" zones
+   * are meaningless for stylebook renders (specimens aren't insert targets), and preview reports
+   * nothing at all beyond link intent — no hit, no hover, no zones, no Jx context menu — because a
+   * preview is the shipped page, not a document you can point at. Absent = permissive.
    */
   getMode?: () => string;
   /**
@@ -129,6 +131,31 @@ export function startInteraction(
   let lastZonesKey: string | null = null;
   let lastGen = deps?.getGen?.() ?? 0;
 
+  /**
+   * Whether this render is a preview. Preview is the fidelity view: it has no selection, no hover
+   * box, no insertion "+" and no Jx element menu, so the frame reports none of them. (The host
+   * refuses the same messages independently — the iframe bundle ships prebuilt, so neither side may
+   * rely on the other's build being current.)
+   */
+  const isPreview = () => deps?.getMode?.() === "preview";
+
+  /**
+   * Report that the person is now working in this frame's pane — every mode, every button, every
+   * target.
+   *
+   * `pointerdown` rather than `click`, and unconditional rather than mode-gated, because both of
+   * `hit`'s holes are holes in what a CLICK means here. In preview there is no `hit` by design (a
+   * click in preview is a click on the page), and in edit/design `hit` is posted only when the
+   * click lands on a `[data-jx-path]` node — so an artboard's empty margin, a right-click, and
+   * every single interaction with a Preview pane all left the keyboard in the other pane.
+   *
+   * It carries nothing, which is what makes it safe to send from preview: the parent moves pane
+   * focus and does not touch the document, so the page underneath is still just a page.
+   */
+  const onPointerDown = () => {
+    channel.post({ kind: "paneFocus" });
+  };
+
   const onClick = (e: Event) => {
     /*
      * Preview keeps anchors live, so a click would navigate this iframe and destroy the render (and
@@ -139,18 +166,29 @@ export function startInteraction(
      * Design/edit never reach this: the runtime de-links anchors onto `data-jx-href` there, so there
      * is no navigation to intercept and a click means "select this element".
      */
-    if (deps?.getMode?.() === "preview" && e.target instanceof Element) {
-      const anchor = e.target.closest("a[href]");
-      const href = anchor?.getAttribute("href");
-      if (href && !href.startsWith("#")) {
-        e.preventDefault();
-        channel.post({ href, kind: "previewNavigate" });
-        return;
+    if (isPreview()) {
+      if (e.target instanceof Element) {
+        const anchor = e.target.closest("a[href]");
+        const href = anchor?.getAttribute("href");
+        if (href && !href.startsWith("#")) {
+          e.preventDefault();
+          channel.post({ href, kind: "previewNavigate" });
+        }
       }
+      // No hit post: a click in preview is a click on the page, never a selection.
+      return;
     }
     const hit = nearestHit(e.target);
     if (hit) {
-      channel.post({ hit, kind: "hit" });
+      // Ctrl/Cmd is the accumulate gesture (§6.5). The iframe reports the modifier and nothing
+      // Else — it holds no selection state, so what a modified click MEANS is the parent's to
+      // Decide, exactly as the unmodified click already was.
+      const mouse = e as MouseEvent;
+      channel.post({
+        additive: mouse.ctrlKey === true || mouse.metaKey === true,
+        hit,
+        kind: "hit",
+      });
     }
   };
 
@@ -163,6 +201,9 @@ export function startInteraction(
    * the key was ever compared — a forced layout per mouse move, thrown away almost every time.
    */
   const reportHover = (el: HTMLElement | null) => {
+    if (isPreview()) {
+      return;
+    }
     const key = el?.dataset.jxPath ?? null;
     if (key === lastHoverKey) {
       return;
@@ -186,7 +227,7 @@ export function startInteraction(
 
   /** Resolve + post the insertion "+" zones for an iframe-viewport cursor, deduped by key. */
   const reportInsertZones = (target: EventTarget | null, cursor: { x: number; y: number }) => {
-    if (!deps || deps.getMode?.() === "stylebook") {
+    if (!deps || deps.getMode?.() === "stylebook" || isPreview()) {
       return;
     }
     syncZoneGen();
@@ -242,7 +283,7 @@ export function startInteraction(
       return;
     }
     reportHover(null);
-    if (deps && lastZonesKey !== "none") {
+    if (deps && !isPreview() && lastZonesKey !== "none") {
       lastZonesKey = "none";
       channel.post({ kind: "insertZones", zones: null });
     }
@@ -250,23 +291,41 @@ export function startInteraction(
 
   const onContextMenu = (e: Event) => {
     const me = e as MouseEvent;
+    // Preview keeps the NATIVE menu: the Jx element menu's verbs (duplicate, delete, paste, wrap)
+    // Are document edits, and preview does not edit. Copy Link Address does what it says instead.
+    if (isPreview()) {
+      return;
+    }
     // Inside the ACTIVE editable keep the NATIVE menu (spellcheck / paste) — the session owns it.
     const active = isEditing() ? getActiveElement() : null;
     if (active && e.target instanceof Node && active.contains(e.target)) {
       return;
     }
-    // Suppress the browser menu everywhere else (legacy parity — the deleted panel-events handler
-    // PreventDefaulted even with no element hit) and let the parent show the Jx element menu.
-    e.preventDefault();
     const hit = nearestHit(e.target);
+    /*
+     * NO ELEMENT UNDER THE POINTER — keep the browser's menu.
+     *
+     * This called `preventDefault()` before looking, "legacy parity" with a handler that did the
+     * same. The parent then posts `path: null`, `showContextMenu` returns early on it, and the
+     * result is a right-click that suppresses the browser menu and shows nothing in its place:
+     * plan §10's dead zone, named there as the thing to fix. The margin around the artboard is
+     * exactly where a reader reaches for View Source or Inspect.
+     */
+    if (!hit) {
+      return;
+    }
+    // An element IS under the pointer, so the Jx element menu is the right answer and the browser's
+    // Would be a worse one.
+    e.preventDefault();
     channel.post({
       kind: "contextMenu",
-      path: hit ? hit.path : null,
+      path: hit.path,
       x: me.clientX,
       y: me.clientY,
     });
   };
 
+  doc.addEventListener("pointerdown", onPointerDown, true);
   doc.addEventListener("click", onClick, true);
   doc.addEventListener("pointermove", onMove, true);
   doc.addEventListener("pointerleave", onLeave, true);
@@ -277,6 +336,7 @@ export function startInteraction(
       cancelRaf(movePending);
       movePending = 0;
     }
+    doc.removeEventListener("pointerdown", onPointerDown, true);
     doc.removeEventListener("click", onClick, true);
     doc.removeEventListener("pointermove", onMove, true);
     doc.removeEventListener("pointerleave", onLeave, true);

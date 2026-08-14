@@ -1,0 +1,2674 @@
+/* Jx Studio — toolbar, overlays and full-surface screens.
+   Load last, after tokens.css, shell.css, canvas.css, panels.css and
+   inspector.css.
+
+   This is the residual tail of the original inline stylesheet, kept as one
+   file because its sections are interleaved in source order and the split
+   is move-only. It owns, in cascade order: the toolbar and its responsive
+   collapse; the browse modal and browse view; the settings modal, its
+   collection/definition editors and schema field cards; the media picker;
+   the source view; the empty state; the style toolbar; the git panel; the
+   stylebook (and its feature toggle); inline editing; the welcome screen;
+   and the Tabulator grid editor theme. */
+
+/* ─── ① Command Bar ──────────────────────────────
+   Region ① of UX-REDESIGN-PLAN §3.2. The band is now three things —
+   the ⬢ menu, the Command Center pill and a verb cluster capped at
+   five by scripts/check-chrome-budget.ts — so the two-stage responsive
+   collapse the old toolbar needed is down to one stage. */
+.tb-spacer {
+  flex: 1;
+}
+
+/* ─── ①a Command Center pill ─────────────────────
+   ◈ project › document › selection, right-aligned ⌘K. The whole pill is
+   clickable (it opens the mode picker); each segment stops propagation
+   and opens the palette pre-scoped to what that segment addresses. */
+.tb-center {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 1 520px;
+  min-width: 0;
+  padding: 0 8px;
+  height: 24px;
+  cursor: pointer;
+  border: 1px solid var(--spectrum-gray-300, #393939);
+  border-radius: var(--radius);
+  background: var(--spectrum-gray-75, #141414);
+  font-size: var(--spectrum-font-size-75, 12px);
+}
+.tb-center:hover {
+  border-color: var(--spectrum-gray-400, #4a4a4a);
+}
+.tb-center-mark {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.tb-center-sep {
+  color: var(--spectrum-gray-600, #666);
+  flex-shrink: 0;
+}
+.tb-center-seg {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 2px 4px;
+  border-radius: var(--radius);
+  color: var(--spectrum-gray-800, #ccc);
+  font: inherit;
+  cursor: pointer;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tb-center-seg:hover {
+  background: var(--spectrum-gray-200, #2a2a2a);
+  color: var(--spectrum-gray-900, #e0e0e0);
+}
+.tb-center-seg:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.tb-center-chord {
+  margin-left: auto;
+  padding-left: 8px;
+  font-family: inherit;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--spectrum-gray-600, #666);
+  flex-shrink: 0;
+}
+/* ─── Responsive Command Bar collapse ──────────────
+   Below this width every verb drops its text label and reads as an icon
+   (the `title` attribute, built by `commandTooltip`, carries the full
+   name and the chord). The pill keeps its labels: it is the answer to
+   "where am I", which is the one thing §4.4 requires never to collapse. */
+@container toolbar (max-width: 1140px) {
+  #toolbar .tb-label {
+    display: none;
+  }
+  /* Collapse the icon-to-(now hidden)-label gap so buttons read as icons. */
+  #toolbar sp-action-button {
+    gap: 0;
+  }
+}
+.quick-search-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  padding-top: 60px;
+  background: rgba(0, 0, 0, 0.4);
+}
+.quick-search-panel {
+  width: 560px;
+  max-height: 420px;
+  display: flex;
+  flex-direction: column;
+  background: var(--spectrum-gray-100, #1e1e1e);
+  border: 1px solid var(--spectrum-gray-300, #393939);
+  border-radius: var(--spectrum-corner-radius-200, 8px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  align-self: flex-start;
+}
+/* The mode chip sits INSIDE the input row, left of the caret, so Backspace
+   at position zero deletes it — see `chipTemplate` / `onKeydown`. */
+.palette-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 12px;
+  background: var(--spectrum-gray-75, #141414);
+  border-bottom: 1px solid var(--spectrum-gray-300, #393939);
+}
+.palette-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  padding: 2px 4px 2px 8px;
+  border-radius: var(--radius);
+  background: var(--spectrum-blue-700, #0054a3);
+  color: var(--spectrum-white, #fff);
+  font-size: var(--spectrum-font-size-75, 12px);
+}
+.palette-chip-remove {
+  appearance: none;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  line-height: 1;
+  padding: 0 2px;
+  opacity: 0.7;
+}
+.palette-chip-remove:hover {
+  opacity: 1;
+}
+.palette-chord {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-family: inherit;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--spectrum-gray-600, #666);
+  border: 1px solid var(--spectrum-gray-300, #393939);
+  border-radius: var(--radius);
+  padding: 0 5px;
+}
+/* Every row prints its binding, and the footer prints the palette's own
+   namespace — that is how the surface teaches the keyboard it replaced. */
+.palette-hint {
+  padding: 6px 16px;
+  border-top: 1px solid var(--spectrum-gray-300, #393939);
+  color: var(--spectrum-gray-600, #666);
+  font-size: var(--spectrum-font-size-50, 11px);
+}
+.palette-hint kbd {
+  font-family: inherit;
+  color: var(--spectrum-gray-700, #999);
+}
+.quick-search-input {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 16px 12px 4px;
+  font-size: var(--spectrum-font-size-100, 14px);
+  border: none;
+  /* Pointer focus only — the keyboard ring is restored below. */
+  outline: none;
+  background: none;
+  color: var(--spectrum-gray-900, #e0e0e0);
+}
+
+.quick-search-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.quick-search-results {
+  overflow-y: auto;
+  flex: 1;
+}
+.quick-search-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--spectrum-gray-800, #ccc);
+}
+.quick-search-item.selected {
+  background: var(--spectrum-blue-700, #0054a3);
+  color: var(--spectrum-white, #fff);
+}
+.quick-search-item:hover:not(.selected) {
+  background: var(--spectrum-gray-200, #2a2a2a);
+}
+/* An unavailable command is GREYED, never hidden (§2 principle 4): the row
+   stays, its `requires` sentence becomes the subtitle, and Enter is inert. */
+.quick-search-item.disabled .quick-search-name,
+.quick-search-item.disabled .quick-search-icon {
+  opacity: 0.45;
+}
+.quick-search-item.disabled {
+  cursor: default;
+}
+.quick-search-icon {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+.quick-search-name {
+  font-weight: 500;
+  white-space: nowrap;
+}
+.quick-search-path {
+  opacity: 0.5;
+  font-size: var(--spectrum-font-size-75, 12px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.quick-search-badge {
+  margin-left: auto;
+  font-size: var(--spectrum-font-size-50, 11px);
+  padding: 1px 6px;
+  border-radius: var(--radius);
+  background: var(--spectrum-gray-300, #393939);
+  color: var(--spectrum-gray-700, #999);
+}
+.quick-search-empty {
+  padding: 16px;
+  text-align: center;
+  color: var(--spectrum-gray-600, #666);
+  font-size: 13px;
+}
+.quick-search-section-label {
+  padding: 8px 16px 4px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  text-transform: uppercase;
+  color: var(--spectrum-gray-600, #666);
+  letter-spacing: 0.5px;
+}
+
+/* ─── Library ────────────────────────────────────
+   The Library is a PANE surface, not an overlay — the Manage modal it replaces is gone. It keeps
+   its rules here beside the grid's for one reason: both are non-iframe editors drawn into a
+   pane's stage, and splitting them across two sheets is how the two drifted apart before. */
+.library {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+.library-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.library-toolbar sp-search {
+  width: 220px;
+}
+.library-upload-input {
+  display: none;
+}
+.library-spacer {
+  flex: 1;
+}
+.library-layout-switch {
+  margin-left: auto;
+}
+.library-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--spectrum-orange-100, #3a2a10);
+  border-bottom: 1px solid var(--border);
+  color: var(--fg);
+  font-size: var(--spectrum-font-size-75, 12px);
+}
+.library-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  position: relative;
+}
+.library-body.library-drop-active {
+  outline: 2px dashed var(--spectrum-blue-600, #0070c1);
+  outline-offset: -4px;
+}
+.library-empty {
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--fg-dim);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.library-empty-detail {
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--fg-dim);
+}
+.library-truncated {
+  margin: 8px 0 0;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+}
+
+/* Cards and Media — the two windowed grids. The item sizes here are the ones
+   `library-layouts.ts`'s LAYOUT_METRICS counts rows in; change one and change both. */
+.library-grid {
+  display: grid;
+  gap: 12px;
+  padding: 12px 16px;
+  align-items: start;
+}
+.library-grid-cards {
+  grid-template-columns: repeat(auto-fill, minmax(188px, 1fr));
+}
+.library-grid-media {
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+}
+.library-card,
+.library-tile {
+  cursor: pointer;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+}
+.library-card:hover,
+.library-tile:hover {
+  border-color: var(--spectrum-blue-600, #0070c1);
+}
+.library-card-preview,
+.library-tile-preview {
+  aspect-ratio: 4 / 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--spectrum-gray-100, #222);
+  pointer-events: none;
+}
+.library-preview-slot {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+.library-preview-slot > * {
+  transform: scale(0.4);
+  transform-origin: top left;
+  width: 250%;
+  height: 250%;
+}
+.library-thumb {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.library-card-label,
+.library-tile-label {
+  padding: 6px 8px 0;
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.library-card-meta {
+  padding: 0 8px 6px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+}
+
+/* Table — a windowed list, not a `sp-table`: the rows have to be sliceable. */
+.library-table {
+  display: flex;
+  flex-direction: column;
+  padding: 0 16px 16px;
+}
+.library-table-head,
+.library-table-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  border-bottom: 1px solid var(--border);
+}
+.library-table-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-panel);
+  font-weight: 600;
+  font-size: var(--spectrum-font-size-75, 12px);
+}
+.library-table-row {
+  cursor: pointer;
+}
+.library-table-row:hover {
+  background: var(--spectrum-gray-200, #333);
+}
+.library-table-cell {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--spectrum-font-size-75, 12px);
+}
+.library-table-cell[data-field="name"] {
+  flex: 3;
+  font-weight: 500;
+}
+.library-table-cell[data-field="path"] {
+  flex: 3;
+  color: var(--fg-dim);
+  font-family: var(--font-mono);
+  font-size: var(--spectrum-font-size-50, 11px);
+}
+.library-table-cell[data-field="size"],
+.library-table-cell[data-field="modified"] {
+  flex: 0 0 96px;
+}
+
+/* Calendar and Board — grouped, capped, and each states what it left out. */
+.library-calendar {
+  padding: 12px 16px;
+}
+.library-day {
+  margin-bottom: 16px;
+}
+.library-day-date {
+  margin: 0 0 4px;
+  font-size: var(--spectrum-font-size-75, 12px);
+  font-weight: 600;
+  color: var(--fg);
+}
+.library-day-undated .library-day-date {
+  color: var(--fg-dim);
+}
+.library-day-note {
+  margin: 0 0 4px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+}
+.library-board {
+  display: flex;
+  gap: 12px;
+  padding: 12px 16px;
+  align-items: flex-start;
+  overflow-x: auto;
+}
+.library-board-column {
+  flex: 0 0 220px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px;
+  background: var(--bg-panel);
+}
+.library-board-title {
+  margin: 0 0 6px;
+  font-size: var(--spectrum-font-size-75, 12px);
+  font-weight: 600;
+  display: flex;
+  justify-content: space-between;
+}
+.library-board-count {
+  color: var(--fg-dim);
+  font-weight: 400;
+}
+.library-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.library-list-item {
+  padding: 3px 4px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: var(--spectrum-font-size-75, 12px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.library-list-item:hover {
+  background: var(--spectrum-gray-200, #333);
+}
+
+/* ─── Settings Modal ─── */
+.settings-modal {
+  position: fixed;
+  inset: 40px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--spectrum-corner-radius-200, 8px);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+.about-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(440px, calc(100vw - 48px));
+  max-height: calc(100vh - 80px);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--spectrum-corner-radius-200, 8px);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+.about-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+/* ─── Search appearance ───────────────────────────────────────────────────────
+   Wider than .about-modal because the two preview cards are side by side, and a SERP snippet
+   narrower than a SERP snippet is not a preview of anything. Below ~700px they wrap (the .seo-card
+   flex-basis in panels.css does that) and the modal is simply a tall column. */
+.seo-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(720px, calc(100vw - 48px));
+  max-height: calc(100vh - 80px);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--spectrum-corner-radius-200, 8px);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+/* Which document this is about. Between the title and the close button, and it truncates rather
+   than pushing the button off — a long path must not cost you the way out. */
+.seo-modal-doc {
+  flex: 1;
+  min-width: 0;
+  margin-left: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--fg-dim);
+  direction: rtl;
+  text-align: left;
+}
+.seo-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px 16px;
+}
+/* The form, split by the card each half feeds — Open Graph has its own Title/Description/Image. */
+.seo-modal-group {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.seo-modal-group-title {
+  margin: 0 0 2px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-dim);
+}
+.seo-modal-group-note {
+  margin: 0 0 8px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+}
+/* The previews sit at the top of a scroll container, so they need no top padding of their own. */
+.seo-modal-body .seo-previews {
+  padding-top: 0;
+}
+.about-meta {
+  margin: 0 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.about-meta-row {
+  display: flex;
+  gap: 12px;
+  font-size: 13px;
+}
+.about-meta-label {
+  width: 96px;
+  min-width: 96px;
+  margin: 0;
+  color: var(--fg-dim);
+}
+.about-meta-value {
+  margin: 0;
+  color: var(--fg);
+  word-break: break-word;
+}
+.about-links {
+  display: flex;
+  gap: 16px;
+  padding: 12px 0;
+  margin-bottom: 12px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.about-links a {
+  color: var(--spectrum-accent-color-1000, #6aa9ff);
+  text-decoration: none;
+}
+.about-links a:hover {
+  text-decoration: underline;
+}
+.about-section-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+}
+.about-muted {
+  margin: 0;
+  font-size: 13px;
+  color: var(--fg-dim);
+}
+.about-packages {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.about-package-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: var(--spectrum-font-size-75, 12px);
+}
+.about-package-name {
+  color: var(--fg-dim);
+}
+.about-package-version {
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+.settings-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.settings-modal-title {
+  margin: 0;
+  font-size: var(--spectrum-font-size-100, 14px);
+  font-weight: 600;
+  color: var(--fg);
+}
+.settings-modal-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.settings-modal-nav {
+  width: 180px;
+  min-width: 180px;
+  padding: 8px 0;
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.settings-nav-item {
+  display: block;
+  width: 100%;
+  padding: 8px 16px;
+  border: none;
+  background: none;
+  color: var(--fg-dim);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 0;
+}
+.settings-nav-item:hover {
+  background: var(--spectrum-gray-200, #333);
+  color: var(--fg);
+}
+.settings-nav-item.active {
+  background: var(--spectrum-gray-300, #444);
+  color: var(--fg);
+  font-weight: 500;
+}
+.settings-modal-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+}
+.settings-section-title {
+  margin: 0 0 16px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--fg);
+}
+.settings-field {
+  margin-bottom: 20px;
+}
+.settings-field-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fg);
+  margin-bottom: 2px;
+}
+.settings-field-desc {
+  margin: 0 0 6px;
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--fg-dim);
+}
+/* A write that failed, or a value the field refuses. Rendered under the control it belongs to
+   (or under the section title for a whole-file write failure) — settings save on change, so a
+   silent rejection would otherwise read as "my edit just vanished". */
+.settings-field-error {
+  margin: 6px 0 0;
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--danger);
+}
+.settings-site-name,
+.settings-site-url {
+  width: 100%;
+  max-width: 420px;
+}
+.settings-site-description {
+  width: 100%;
+  max-width: 420px;
+  min-height: 64px;
+}
+.settings-field-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.settings-media-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.settings-media-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.settings-media-name-fixed {
+  width: 80px;
+  font-size: var(--spectrum-font-size-75, 12px);
+  font-weight: 500;
+  color: var(--fg-dim);
+  padding: 0 8px;
+}
+.settings-media-name {
+  width: 80px;
+}
+.settings-media-value {
+  flex: 1;
+}
+/* New Project modal */
+.new-project-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--spectrum-corner-radius-200, 8px);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+  width: min(720px, calc(100vw - 48px));
+  max-height: 80vh;
+}
+.new-project-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.new-project-modal-title {
+  margin: 0;
+  font-size: var(--spectrum-font-size-100, 14px);
+  font-weight: 600;
+  color: var(--fg);
+}
+.new-project-modal-body {
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.new-project-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+}
+.new-project-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.new-project-label {
+  font-size: var(--spectrum-font-size-75, 12px);
+  font-weight: 500;
+  color: var(--fg-dim);
+}
+.new-project-error {
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--danger);
+  padding: 4px 0;
+}
+/* Destination row: the Location field takes the slack, Browse… stays its natural width. */
+.new-project-location-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.new-project-location-row .new-project-location {
+  flex: 1;
+  min-width: 0;
+}
+/* Live preview of where the project will land — the answer to "where did that go?". */
+.new-project-destination-preview {
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--fg-dim);
+  padding: 2px 0 4px;
+  overflow-wrap: anywhere;
+}
+.new-project-destination-preview code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  color: var(--fg);
+}
+/* Backend/global creation errors sit between the scroll body and the footer so they are
+   visible regardless of scroll position. */
+.new-project-error--global {
+  flex: none;
+  padding: 8px 16px;
+  border-top: 1px solid var(--border);
+}
+.add-repo-modal .new-project-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.add-repo-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.add-repo-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 8px;
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: 13px;
+  color: var(--fg);
+  cursor: pointer;
+  text-align: left;
+}
+.add-repo-row:hover:not([disabled]) {
+  background: var(--hover-bg);
+}
+.add-repo-row[disabled] {
+  opacity: 0.6;
+  cursor: default;
+}
+.add-repo-name {
+  color: var(--accent);
+}
+.add-repo-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+}
+.add-repo-badge {
+  padding: 0 5px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.add-repo-busy {
+  margin-left: auto;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+}
+.add-repo-empty {
+  padding: 12px 8px;
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--fg-dim);
+}
+.add-repo-install {
+  color: var(--accent, #1473e6);
+  text-decoration: underline;
+}
+/* Repository-access footer: widen the GitHub App, or reload after doing so. */
+.add-repo-access {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+}
+.add-repo-access-note {
+  flex: 1 1 auto;
+}
+.add-repo-access-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.add-repo-access-link {
+  color: var(--accent, #1473e6);
+  text-decoration: underline;
+}
+.add-repo-refresh {
+  padding: 2px 8px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg);
+  cursor: pointer;
+}
+.add-repo-refresh:hover:not([disabled]) {
+  background: var(--hover-bg);
+}
+.add-repo-refresh[disabled] {
+  opacity: 0.5;
+  cursor: default;
+}
+.new-project-tabs {
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+}
+.new-project-tab-intro {
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--fg-dim);
+  line-height: 1.5;
+}
+.new-project-creds {
+  display: flex;
+  flex-direction: column;
+  max-width: 480px;
+}
+.new-project-import-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.new-project-import-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--fg);
+}
+.new-project-import-log {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.6;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  max-height: 240px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.new-project-import-log-line {
+  color: var(--fg);
+}
+.new-project-import-phase {
+  color: var(--fg-dim);
+  margin-right: 6px;
+}
+.new-project-agent-prompt {
+  min-height: 120px;
+}
+.new-project-step-context {
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--fg-dim);
+}
+.new-project-templates {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+.new-project-template {
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--bg-panel);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.new-project-template:hover {
+  border-color: var(--fg-dim);
+}
+.new-project-template.selected {
+  border-color: var(--accent, #3b82f6);
+  box-shadow: 0 0 0 1px var(--accent, #3b82f6);
+}
+.new-project-template-thumb {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  display: block;
+  background: var(--bg-elevated, #1a1a1a);
+}
+.new-project-template-blank {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 16 / 10;
+  color: var(--fg-dim);
+  font-size: 28px;
+  background: var(--bg-elevated, #1a1a1a);
+}
+.new-project-template-body {
+  padding: 6px 8px 8px;
+}
+.new-project-template-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg);
+}
+.new-project-template-tag {
+  font-size: 11px;
+  color: var(--fg-dim);
+  margin-top: 2px;
+  line-height: 1.3;
+}
+
+/* The one non-starter card, last in the gallery and spanning it, so the sites lead. */
+.new-project-scratch {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  align-items: center;
+}
+.new-project-scratch .new-project-template-blank {
+  width: 96px;
+  flex-shrink: 0;
+}
+/* CSS Vars editor */
+.css-vars-group {
+  margin-bottom: 24px;
+}
+.css-vars-group-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.css-var-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+.css-var-name {
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--fg-dim);
+  min-width: 100px;
+}
+.css-var-swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+}
+.css-var-swatch input[type="color"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+}
+.css-var-font-preview {
+  font-size: 13px;
+  color: var(--fg-dim);
+  padding: 4px 0 12px 108px;
+}
+.css-var-media-overrides {
+  padding-left: 108px;
+  margin-bottom: 8px;
+}
+.css-var-media-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+}
+.css-var-media-label {
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+  min-width: 60px;
+}
+.css-var-add-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+}
+/* Head editor */
+.head-entry {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  margin-bottom: 8px;
+}
+.head-entry-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.head-entry-tag {
+  font-size: var(--spectrum-font-size-75, 12px);
+  font-weight: 600;
+  color: var(--fg);
+}
+.head-code-editor {
+  width: 100%;
+  min-height: 80px;
+  padding: 8px;
+  font-family: var(--font-mono);
+  font-size: var(--spectrum-font-size-75, 12px);
+  background: var(--spectrum-gray-100, #1e1e1e);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  resize: vertical;
+}
+
+/* ─── Settings editors (Collections / Definitions) ─── */
+.settings-two-col {
+  display: flex;
+  height: 100%;
+  gap: 1px;
+  background: var(--border);
+}
+.settings-list-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  width: 200px;
+  min-width: 200px;
+  background: var(--bg-panel);
+  overflow-y: auto;
+}
+.settings-list-panel sp-action-button {
+  width: 100%;
+  justify-content: flex-start;
+}
+.settings-editor-panel {
+  flex: 1;
+  padding: 16px;
+  background: var(--bg-panel);
+  overflow-y: auto;
+}
+.settings-editor-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.settings-editor-header h3 {
+  margin: 0;
+  font-size: var(--spectrum-font-size-100, 14px);
+  font-weight: 600;
+}
+.settings-empty-state {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-panel);
+  color: var(--fg-dim);
+  font-size: 13px;
+}
+.settings-inline-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.settings-top-chrome {
+  z-index: 16 !important;
+}
+
+/* ─── Schema field cards ─── */
+.schema-field-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+.schema-field-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+}
+.schema-field-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.schema-field-nested {
+  margin-left: 16px;
+  margin-top: 6px;
+  padding-left: 8px;
+  border-left: 2px solid var(--border);
+}
+.schema-field-name-input {
+  flex: 1;
+  max-width: 140px;
+}
+.schema-field-card--nested {
+  border-color: var(--spectrum-gray-300, #444);
+}
+.schema-nested-add {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+}
+.schema-nested-add-name {
+  flex: 1;
+  max-width: 120px;
+}
+.schema-add-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+/* ─── Media picker ─────────────────────────────── */
+.media-picker {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+}
+.media-picker sp-textfield {
+  flex: 1;
+  min-width: 0;
+}
+/* Upload + Browse always render, so the field yields width before the buttons do. */
+.media-picker sp-action-button {
+  flex-shrink: 0;
+}
+.media-picker-thumb {
+  width: 24px;
+  height: 24px;
+  object-fit: cover;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+/* .media-picker-popover is no longer used — inlined in media-picker.ts */
+
+/* ─── Source view ────────────────────────────── */
+#source-view {
+  width: 100%;
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font: 11px/1.6 var(--font-mono, monospace);
+  border: none;
+  padding: 8px;
+  resize: none;
+  /* Pointer focus only — the keyboard ring is restored below. */
+  outline: none;
+}
+
+#source-view:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* ─── Empty state ────────────────────────────── */
+.empty-state {
+  padding: 24px;
+  text-align: center;
+  color: var(--fg-dim);
+  font-size: 13px;
+}
+
+/* ─── Style filter bar ───────────────────────── */
+.style-filter-bar {
+  display: flex;
+  align-items: center;
+  padding: 2px 8px 4px;
+  gap: 6px;
+}
+.style-filter-input {
+  flex: 1;
+  min-width: 0;
+  --spectrum-textfield-texticon-min-width: 0;
+}
+/* ─── Git panel ──────────────────────────────── */
+.git-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  font-size: var(--spectrum-font-size-75, 12px);
+}
+
+/* Sync status bar */
+.git-sync-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.git-sync-icon {
+  flex-shrink: 0;
+}
+.git-sync-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+.git-sync-actions {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.git-sync-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+}
+.git-sync-time {
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+}
+
+/* Branch selector row */
+.git-branch-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.git-branch-icon {
+  flex-shrink: 0;
+  color: var(--fg-dim);
+}
+.git-branch-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+.git-branch-label {
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+}
+.git-branch-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+}
+.git-branch-picker {
+  flex-shrink: 0;
+  --spectrum-picker-min-width: 0;
+}
+
+/* Tabs: Local Changes / History */
+.git-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+}
+.git-tab {
+  flex: 1;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: var(--spectrum-font-size-75, 12px);
+  font-weight: 600;
+  background: var(--hover-bg);
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--fg-dim);
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
+}
+.git-tab:hover {
+  color: var(--fg);
+}
+.git-tab.active {
+  color: var(--fg);
+  border-bottom-color: var(--accent, #e2b93d);
+  background: transparent;
+}
+
+/* Commit area */
+.git-commit-area {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.git-commit-label {
+  font-size: var(--spectrum-font-size-75, 12px);
+  font-weight: 500;
+  color: var(--fg-dim);
+}
+.git-commit-input {
+  width: 100%;
+  --spectrum-textfield-texticon-min-width: 0;
+}
+.git-commit-actions {
+  display: flex;
+}
+.git-split-btn {
+  display: flex;
+  flex: 1;
+  position: relative;
+}
+.git-split-btn .git-commit-btn {
+  flex: 1;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.git-split-btn .git-split-trigger {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: 1px solid rgba(0, 0, 0, 0.15);
+}
+.git-split-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  z-index: 10;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+.git-split-menu-item {
+  display: block;
+  width: 100%;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--fg);
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+}
+.git-split-menu-item:hover {
+  background: var(--hover-bg);
+}
+
+/* Changed Components grouping */
+.git-component-group {
+  margin-bottom: 2px;
+}
+.git-component-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+}
+.git-component-overflow {
+  flex-shrink: 0;
+}
+.git-component-name {
+  font-size: var(--spectrum-font-size-75, 12px);
+  font-weight: 500;
+  color: var(--fg);
+}
+
+/* Sections */
+.git-section {
+  border-bottom: 1px solid var(--border);
+}
+.git-section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px 6px;
+  font-size: var(--spectrum-font-size-75, 12px);
+  font-weight: 700;
+  color: var(--fg);
+}
+.git-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--accent-15);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 600;
+}
+.git-section-header .git-count {
+  margin-right: auto;
+}
+
+/* File rows */
+.git-file-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px 2px 16px;
+  cursor: default;
+}
+.git-file-row:hover {
+  background: var(--hover-bg);
+}
+.git-file-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  overflow: hidden;
+}
+.git-file-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.git-file-dir {
+  font-size: 10px;
+  color: var(--fg-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.git-file-actions {
+  display: flex;
+  gap: 0;
+  opacity: 0;
+}
+.git-file-row:hover .git-file-actions {
+  opacity: 1;
+}
+.git-file-badge {
+  flex-shrink: 0;
+  width: 16px;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+.git-status-M {
+  color: var(--signal);
+}
+.git-status-A {
+  color: var(--success);
+}
+.git-status-D {
+  color: var(--danger);
+}
+.git-status-R {
+  color: var(--tag);
+}
+.git-status-U {
+  color: var(--success);
+}
+.git-status-C {
+  color: var(--tag);
+}
+
+/* History tab */
+.git-history {
+  padding: 4px 0;
+  overflow-y: auto;
+  flex: 1;
+}
+.git-history-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.git-history-entry:hover {
+  background: var(--hover-bg);
+}
+.git-history-hash {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--accent);
+}
+.git-history-message {
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--fg);
+}
+.git-history-meta {
+  font-size: 10px;
+  color: var(--fg-dim);
+}
+
+/* Utility */
+.git-loading {
+  padding: 8px;
+  text-align: center;
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-50, 11px);
+}
+.git-error {
+  padding: 6px 8px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+  border-bottom: 1px solid var(--border);
+}
+
+.git-panel-empty {
+  justify-content: center;
+  align-items: center;
+}
+.git-sync-bar--no-remote {
+  gap: 8px;
+}
+
+/* GitHub auth dialog */
+.github-auth-dialog {
+  text-align: center;
+  padding: 16px 0;
+}
+.github-auth-dialog p {
+  margin: 8px 0;
+  font-size: 13px;
+}
+.github-auth-code {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  font-family: var(--font-mono, monospace);
+  padding: 12px 16px;
+  background: var(--hover-bg);
+  border-radius: var(--radius);
+  display: inline-block;
+  margin: 8px 0;
+}
+.github-auth-waiting {
+  color: var(--fg-dim);
+  font-style: italic;
+}
+
+/* GitHub publish dialog */
+.github-publish-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 0;
+}
+.github-publish-dialog sp-textfield {
+  width: 100%;
+}
+
+/* ─── Feature toggle (stylebook) ─────────────── */
+.tb-toggle {
+  padding: 3px 8px;
+  font: inherit;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.tb-toggle:hover {
+  background: var(--hover-bg);
+}
+.tb-toggle.active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-15);
+}
+
+/* ─── Stylebook ─────────────────────────────────── */
+/* Chrome bar (tabs + filter) above the canvas viewport */
+.sb-chrome {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+/* Section layout in canvas */
+.sb-section {
+  margin-bottom: 24px;
+}
+.sb-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--canvas-muted);
+  padding: 8px 0 4px;
+  border-bottom: 1px solid var(--canvas-rule);
+  margin-bottom: 8px;
+}
+.sb-body {
+  padding: 4px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Variable rows — unified layout for existing + add-new */
+.sb-var-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--canvas-rule);
+}
+.sb-var-row:last-child {
+  border-bottom: none;
+}
+.sb-var-row-header {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-height: 18px;
+  flex-wrap: wrap;
+}
+.sb-var-row-title {
+  font-weight: 600;
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--canvas-fg-2);
+  white-space: nowrap;
+}
+.sb-var-row-ref {
+  font-size: 10px;
+  color: var(--canvas-muted);
+  font-family: var(--font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sb-var-row-header .sb-var-del {
+  margin-left: auto;
+}
+.sb-var-row sp-textfield {
+  pointer-events: auto;
+}
+/* Existing variable: horizontal swatch + value */
+.sb-var-input-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+.sb-var-col-name {
+  min-width: 0;
+}
+.sb-var-col-value {
+  flex: 1;
+  min-width: 0;
+}
+.sb-var-col-name sp-textfield,
+.sb-var-col-value sp-textfield {
+  width: 100%;
+}
+.sb-var-col-label {
+  font-size: 10px;
+  color: var(--canvas-dim);
+  margin-bottom: 2px;
+  font-weight: 500;
+}
+/* Add-new form: horizontal layout matching existing rows */
+.sb-var-row.is-new .sb-var-input-row {
+  flex-wrap: nowrap;
+  align-items: flex-end;
+}
+.sb-var-row.is-new .sb-var-col-name {
+  flex: 2;
+  min-width: 0;
+}
+.sb-var-row.is-new .sb-var-col-value {
+  flex: 3;
+  min-width: 0;
+}
+.sb-var-row.is-new .sb-var-swatch {
+  align-self: flex-end;
+  margin-bottom: 2px;
+}
+.sb-var-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius);
+  border: 1px solid var(--canvas-border);
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+  align-self: flex-end;
+  margin-bottom: 2px;
+}
+.sb-var-swatch input[type="color"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.sb-var-preview {
+  margin-top: 2px;
+  padding: 8px;
+  background: var(--canvas-bg-1);
+  border-radius: var(--radius);
+  border: 1px solid var(--canvas-rule);
+}
+.sb-var-font-preview {
+  font-size: var(--spectrum-font-size-100, 14px);
+  line-height: 1.4;
+  color: var(--canvas-fg-2);
+}
+.sb-var-size-track {
+  background: var(--canvas-track);
+  height: 8px;
+  border-radius: var(--radius);
+  width: 100%;
+  overflow: hidden;
+}
+.sb-var-size-bar {
+  height: 100%;
+  background: var(--accent, #3b82f6);
+  transition: width 0.3s;
+  border-radius: var(--radius);
+}
+.sb-var-del {
+  opacity: 0;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+.sb-var-row:hover .sb-var-del {
+  opacity: 1;
+}
+.sb-var-empty {
+  padding: 16px 8px;
+  text-align: center;
+  color: var(--canvas-light);
+  font-size: var(--spectrum-font-size-75, 12px);
+  font-style: italic;
+}
+.sb-var-add-btn {
+  margin-top: 6px;
+  pointer-events: auto;
+  background: none;
+  border: 1px dashed var(--canvas-border);
+  border-radius: var(--radius);
+  padding: 5px 10px;
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--canvas-fg-3);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s;
+}
+.sb-var-add-btn:hover {
+  border-color: var(--canvas-muted);
+  color: var(--canvas-fg-2);
+  background: var(--canvas-bg-1);
+}
+.sb-var-add-icon {
+  font-size: var(--spectrum-font-size-100, 14px);
+  font-weight: 600;
+}
+.sb-var-add-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-shrink: 0;
+  align-self: flex-end;
+  margin-bottom: 2px;
+}
+.sb-unit-input {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+.sb-unit-input sp-textfield {
+  width: 100%;
+}
+.sb-unit-input sp-picker {
+  position: absolute;
+  right: 2px;
+  --mod-picker-border-width: 0;
+  --mod-picker-min-width: 56px;
+}
+.sb-var-add-preview {
+  font-size: 10px;
+  color: var(--canvas-muted);
+  font-family: var(--font-mono);
+  min-height: 14px;
+}
+
+/* ─── Inline editing ─────────────────────────── */
+.canvas-panel-canvas [contenteditable="true"] {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  cursor: text;
+  min-height: 1.5em;
+  border-radius: var(--spectrum-corner-radius-75, 2px);
+}
+.canvas-panel-canvas [contenteditable="true"]:focus {
+  outline-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-15);
+}
+
+/* ─── Start pane (no project open) ─────────────────────────── */
+.welcome-screen {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 10vh;
+  overflow-y: auto;
+}
+.welcome-content {
+  max-width: 560px;
+  width: 100%;
+  padding: 0 24px 48px;
+}
+.welcome-title {
+  font-size: 28px;
+  font-weight: 300;
+  color: var(--fg);
+  margin: 0;
+  letter-spacing: -0.5px;
+}
+.welcome-subtitle {
+  font-size: var(--spectrum-font-size-100, 14px);
+  color: var(--fg-dim);
+  margin: 2px 0 0;
+}
+.welcome-section {
+  margin-top: 28px;
+}
+.welcome-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+  margin: 0 0 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.welcome-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+}
+.welcome-action {
+  --mod-actionbutton-content-color-default: var(--accent);
+  --mod-actionbutton-content-color-hover: var(--accent);
+
+  justify-content: flex-start;
+  text-align: left;
+}
+.welcome-install-note {
+  margin: 4px 8px 0;
+  font-size: 12px;
+  color: var(--fg-dim);
+}
+.welcome-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.welcome-recent {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: baseline;
+  gap: 12px;
+  width: 100%;
+  padding: 5px 8px;
+  margin: 0;
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: 13px;
+  color: var(--fg);
+  cursor: pointer;
+  text-align: left;
+}
+.welcome-recent:hover {
+  background: var(--hover-bg);
+}
+.welcome-recent-name {
+  color: var(--accent);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.welcome-recent-path {
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-75, 12px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.welcome-recent-when {
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-75, 12px);
+  white-space: nowrap;
+}
+.welcome-section-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.welcome-clear {
+  --mod-actionbutton-content-color-default: var(--fg-dim);
+
+  flex-shrink: 0;
+}
+.welcome-recent-row {
+  display: flex;
+  align-items: center;
+}
+.welcome-recent-row .welcome-recent {
+  flex: 1;
+  min-width: 0;
+}
+.welcome-recent-remove {
+  flex-shrink: 0;
+  opacity: 0;
+}
+.welcome-recent-row:hover .welcome-recent-remove,
+.welcome-recent-remove:focus-visible {
+  opacity: 1;
+}
+
+/* ─── Grid editor (Tabulator theme over Spectrum tokens) ─────────────── */
+.jx-grid {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--bg);
+}
+.jx-grid-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-panel);
+  flex-shrink: 0;
+}
+.jx-grid-toolbar sp-search {
+  width: 200px;
+}
+.jx-grid-spacer {
+  flex: 1;
+}
+.jx-grid-note {
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1px 6px;
+  cursor: help;
+}
+.jx-grid-count {
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--fg-dim);
+  white-space: nowrap;
+}
+.jx-grid-error-text {
+  color: var(--danger);
+}
+.jx-grid-host {
+  flex: 1;
+  min-height: 0;
+}
+.jx-grid-missing {
+  padding: 24px;
+  color: var(--fg-dim);
+}
+
+/* Tabulator structural overrides — tokens only, scoped under .jx-grid. */
+.jx-grid .tabulator {
+  background: var(--bg);
+  color: var(--fg);
+  border: none;
+  font-size: var(--spectrum-font-size-75, 12px);
+  height: 100%;
+}
+.jx-grid .tabulator .tabulator-header {
+  background: var(--bg-panel);
+  color: var(--fg);
+  border-bottom: 1px solid var(--border);
+}
+.jx-grid .tabulator .tabulator-header .tabulator-col {
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border);
+}
+.jx-grid .tabulator .tabulator-header .tabulator-col .tabulator-col-title {
+  color: var(--fg);
+  font-weight: 600;
+}
+.jx-grid .tabulator .tabulator-header .tabulator-header-filter input {
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--spectrum-corner-radius-75, 2px);
+  padding: 1px 4px;
+  font: inherit;
+}
+.jx-grid .tabulator .tabulator-tableholder {
+  background: var(--bg);
+}
+.jx-grid .tabulator .tabulator-row {
+  background: var(--bg);
+  color: var(--fg);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+  min-height: 26px;
+}
+.jx-grid .tabulator .tabulator-row.tabulator-row-even {
+  background: color-mix(in srgb, var(--bg-panel) 45%, var(--bg));
+}
+.jx-grid .tabulator .tabulator-row.tabulator-selected {
+  background: color-mix(in srgb, var(--accent) 16%, var(--bg));
+}
+.jx-grid .tabulator .tabulator-row .tabulator-cell {
+  border-right: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+  padding: 3px 8px;
+}
+.jx-grid .tabulator .tabulator-row .tabulator-cell.tabulator-frozen {
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border);
+}
+.jx-grid .tabulator .tabulator-range {
+  border: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+.jx-grid .tabulator .tabulator-range-overlay .tabulator-range-cell-active {
+  border: 2px solid var(--accent);
+}
+.jx-grid .tabulator .tabulator-placeholder .tabulator-placeholder-contents {
+  color: var(--fg-dim);
+  background: transparent;
+}
+
+/* Buffer-state paint (dirty / error / stale / pending rows). */
+.jx-grid .tabulator-cell.jx-grid-cell--dirty {
+  box-shadow: inset 2px 0 0 var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.jx-grid .tabulator-cell.jx-grid-cell--error {
+  box-shadow: inset 2px 0 0 var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+.jx-grid .tabulator-cell.jx-grid-cell--stale {
+  opacity: 0.65;
+}
+.jx-grid .tabulator-row.jx-grid-row--pending-delete .tabulator-cell {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+.jx-grid .tabulator-row.jx-grid-row--pending-insert {
+  background: color-mix(in srgb, var(--success, var(--accent)) 10%, var(--bg));
+}
+.jx-grid .tabulator-row.jx-grid-row--stale {
+  outline: 1px dashed var(--fg-dim);
+  outline-offset: -1px;
+}
+
+/* Cell content + in-cell editors. */
+.jx-grid-cell-content {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.jx-grid-kind-number {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.jx-grid-kind-readonly {
+  color: var(--fg-dim);
+  font-family: var(--font-mono);
+  font-size: var(--spectrum-font-size-50, 11px);
+}
+.jx-grid-chip {
+  display: inline-block;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  border-radius: 8px;
+  padding: 0 6px;
+  margin-right: 4px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  line-height: 16px;
+}
+.jx-grid-editor {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+.jx-grid-editor .jx-grid-input,
+.jx-grid-editor .jx-grid-select {
+  width: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--accent);
+  border-radius: var(--spectrum-corner-radius-75, 2px);
+  padding: 2px 6px;
+  font: inherit;
+  /* Pointer focus only — the keyboard ring is restored below. */
+  outline: none;
+}
+
+/* Both halves of the suppression above, not just the picker: the text input shared the `outline:
+   none` and none of the restore, so a keyboard-focused text cell showed nothing at all. A grouped
+   selector is exactly what a per-line ban cannot see — FOCUS_RING_ALLOWANCES lists the two
+   separately for that reason. */
+.jx-grid-editor .jx-grid-input:focus-visible,
+.jx-grid-editor .jx-grid-select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+.jx-grid-editor .jx-grid-checkbox {
+  margin: 0 auto;
+  accent-color: var(--accent);
+}
+.jx-grid-pill-editor .jx-grid-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  align-items: center;
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--accent);
+  border-radius: var(--spectrum-corner-radius-75, 2px);
+  padding: 1px 4px;
+}
+.jx-grid-pill-input {
+  flex: 1;
+  min-width: 60px;
+  background: transparent;
+  border: none;
+  /* Pointer focus only — the keyboard ring is restored below. */
+  outline: none;
+  color: var(--fg);
+  font: inherit;
+}
+
+.jx-grid-pill-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+.jx-grid-chip-x {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 0 0 0 4px;
+  font: inherit;
+  line-height: 1;
+}
+.jx-grid-chip-x:hover {
+  color: var(--danger);
+}
+.jx-grid-cell-popover-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  min-width: 260px;
+}
+.jx-grid-cell-popover-title {
+  font-weight: 600;
+  font-size: var(--spectrum-font-size-75, 12px);
+}
+.jx-grid-cell-popover-hint {
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-50, 11px);
+}
+.jx-grid-cell-popover-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.jx-grid-cell-popover .jx-grid-select,
+.jx-grid-cell-popover .jx-grid-input,
+.jx-grid-view-popover .jx-grid-input {
+  width: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--spectrum-corner-radius-75, 2px);
+  padding: 3px 6px;
+  font: inherit;
+}
+
+/* Saved views — one popover for the four facets a view is made of (plan §12 P7.2). The name of the
+   applied view is on the toolbar button, so the control says what is on screen before it is
+   opened. */
+.jx-grid-view-button {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.jx-grid-view-popover .jx-grid-cell-popover-body {
+  min-width: 280px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.jx-grid-view-empty {
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-50, 11px);
+}
+.jx-grid-view-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.jx-grid-view-name {
+  flex: 1;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--fg);
+  font: inherit;
+  padding: 3px 6px;
+  border-radius: var(--spectrum-corner-radius-75, 2px);
+  cursor: pointer;
+}
+.jx-grid-view-name:hover {
+  background: var(--bg-hover);
+}
+.jx-grid-view-name.is-active {
+  font-weight: 600;
+  background: var(--bg-selected);
+}
+.jx-grid-view-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--spectrum-font-size-75, 12px);
+}
+.jx-grid-sort-field,
+.jx-grid-sort-dir,
+.jx-grid-group-field {
+  width: 100%;
+}
+
+/* The redirect paste box (site-architecture.md §11.4's "import from _redirects or CSV"). Monospace
+   because both formats are column-aligned in the file the author copied them out of. */
+.jx-redirect-import {
+  width: 100%;
+  min-width: 420px;
+  font-family: var(--font-mono, monospace);
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--spectrum-corner-radius-75, 2px);
+  padding: 6px;
+  resize: vertical;
+}
+
+/* ─── ④ The toast host — the fourth overlay layer ─────────────────────────── */
+/* The stack is bottom-right and pinned to the layer, not to the app grid: a toast reports on an
+   operation, and operations are started from every region — pinning it to one of them would put it
+   furthest from wherever the reader was looking half the time. `pointer-events` is re-enabled per
+   toast rather than on the stack, so the empty area of the layer never eats a canvas click. */
+.toast-stack {
+  position: absolute;
+  right: 12px;
+  bottom: 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+  max-width: min(420px, calc(100vw - 24px));
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--fg-dim);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  color: var(--fg);
+  font-size: var(--spectrum-font-size-75, 12px);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 35%);
+  animation: toast-in 180ms ease-out;
+}
+/* §13.3 clause 6: the app honours reduced motion itself, so the photograph shows what a
+   reduced-motion reader actually sees rather than what a runner-injected freeze produced. */
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.toast--success {
+  border-left-color: var(--success);
+}
+.toast--info {
+  border-left-color: var(--accent);
+}
+.toast--warn {
+  border-left-color: var(--warning);
+}
+.toast--error {
+  border-left-color: var(--danger);
+}
+.toast-icon {
+  flex: none;
+  width: 14px;
+  text-align: center;
+  font-weight: 700;
+}
+.toast--success .toast-icon {
+  color: var(--success);
+}
+.toast--info .toast-icon {
+  color: var(--accent);
+}
+.toast--warn .toast-icon {
+  color: var(--warning);
+}
+.toast--error .toast-icon {
+  color: var(--danger);
+}
+.toast-message {
+  flex: 1;
+  min-width: 0;
+  /* Four lines is a message that belongs in Problems, where it can be read at leisure. */
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+/* The recovery button IS a command: its label is the command's title, so it is never a bare
+   "Retry" that fails to say what would be retried. */
+.toast-action {
+  flex: none;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--spectrum-corner-radius-75, 2px);
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+}
+.toast-action:hover:not(:disabled) {
+  background: var(--hover-bg);
+}
+.toast-action:disabled {
+  color: var(--fg-dim);
+  cursor: default;
+}
+.toast-dismiss {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: var(--spectrum-corner-radius-75, 2px);
+  background: transparent;
+  color: var(--fg-dim);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+.toast-dismiss:hover {
+  color: var(--fg);
+  background: var(--hover-bg);
+}
+
+/* The consequence line inside a destructive confirmation — what this delete or rename breaks, and
+   what survives it. Set apart from the question above it, because the question is a sentence the
+   user already wrote in their head and this is the part they have not thought about. */
+.dialog-consequence {
+  margin-top: 8px;
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-75, 12px);
+  line-height: 1.5;
+}
+
+/* A panel withholding a render because one of its own fields has focus (`panel-scheduler.ts`).
+   The panel is deliberately stale — finishing your sentence beats being current — but it used to
+   make that trade in silence, which is indistinguishable from a panel that has stopped working.
+   Pinned to the panel's top edge rather than the viewport's, because it is that panel that is
+   behind, and it retires itself on focusout when the withheld render finally lands. */
+[data-jx-stale] {
+  position: relative;
+}
+[data-jx-stale]::before {
+  content: "New changes — applied when you finish editing";
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  right: 0;
+  left: 0;
+  padding: 3px 8px;
+  background: var(--spectrum-yellow-400, #d8b400);
+  color: var(--spectrum-gray-900, #000);
+  font-size: var(--spectrum-font-size-50, 11px);
+  line-height: 1.4;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* ─── The Entry editor (content/entry-editor.ts) ─────────────────────────────
+   One content entry's fields, drawn by ui/schema-form.ts in a pane. Same
+   pane-editor family as the Project Settings document above, so it borrows its
+   metrics rather than inventing a second set. */
+.entry-editor {
+  height: 100%;
+  padding: 16px;
+  overflow-y: auto;
+  background: var(--bg-panel);
+}
+.entry-editor-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.entry-editor-header h3 {
+  margin: 0;
+  font-size: var(--spectrum-font-size-100, 14px);
+  font-weight: 600;
+}
+.entry-editor-collection {
+  padding: 1px 8px;
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-50, 11px);
+}
+.entry-draft-switch {
+  margin-left: auto;
+}
+.entry-editor-fields {
+  display: flex;
+  flex-direction: column;
+}
+.entry-editor-note {
+  margin: 0 0 12px;
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-75, 12px);
+  line-height: 1.5;
+}
+.entry-editor-empty {
+  display: flex;
+  max-width: 46ch;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-75, 12px);
+  line-height: 1.5;
+}
+
+/* The draft pill, on the tab chip. "Published" is deliberately as visible as
+   "Draft": a state you can only see one half of is a state you cannot check. */
+.entry-pill {
+  padding: 0 5px;
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-50, 11px);
+  line-height: 15px;
+  white-space: nowrap;
+}
+.entry-pill--draft {
+  background: var(--spectrum-yellow-400, #d8b400);
+  color: var(--spectrum-gray-900, #000);
+}

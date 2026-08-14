@@ -780,7 +780,9 @@ export function assignHeadingIds(children?: (JxElement | string)[]): TocEntry[] 
       if (typeof node !== "object" || node === null) {
         continue;
       }
-      const tag = node.tagName;
+      // Heading extraction reads a literal tag; a chosen one is never a heading (every candidate
+      // Would have to be, and the construct exists to vary a WRAPPER), so it is simply not one.
+      const tag = typeof node.tagName === "string" ? node.tagName : "";
       if (tag && HEADING_TAGS.has(tag)) {
         const text = jxNodeText(node).trim();
         let id = typeof node.id === "string" && node.id.length > 0 ? node.id : "";

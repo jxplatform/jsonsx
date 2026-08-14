@@ -8,6 +8,7 @@ import { renderLayersTemplate, startLayerTitleEdit } from "../src/panels/layers-
 import { activeTab, closeAllTabs } from "../src/workspace/workspace";
 import { pathKey } from "../src/store";
 import { view } from "../src/view";
+import { NAVIGATOR_PANEL_IDS, shell } from "../src/shell";
 import { initLayers } from "../src/ui/layers";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { JxPath } from "../src/state";
@@ -153,11 +154,11 @@ describe("renderLayersTemplate — selection and collapse", () => {
   test("clicking a row selects its path", async () => {
     await renderLayers();
     rowByKey(["children", 1])!.click();
-    expect(activeTab.value!.session.selection).toEqual(["children", 1]);
+    expect(activeTab.value!.session.selection).toEqual([["children", 1]]);
   });
 
   test("selected row gets the selected class", async () => {
-    activeTab.value!.session.selection = ["children", 0];
+    activeTab.value!.session.selection = [["children", 0]];
     await renderLayers();
     expect(rowByKey(["children", 0])!.classList.contains("selected")).toBe(true);
   });
@@ -200,30 +201,42 @@ describe("renderLayersTemplate — selection and collapse", () => {
     row.dispatchEvent(
       new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: 10, clientY: 10 }),
     );
-    expect(activeTab.value!.session.selection).toEqual(["children", 1]);
+    expect(activeTab.value!.session.selection).toEqual([["children", 1]]);
   });
 });
 
 describe("renderLayersTemplate — move and delete actions", () => {
   /**
-   * Select the row, render, and collect its action buttons by title.
+   * Select the row, render, and collect its action buttons by COMMAND ID.
    *
-   * Row actions are built for the SELECTED row only (five sp-action-buttons per row is ~5 custom
-   * elements with shadow roots per visible row), so selecting first is the real interaction — a
-   * click on the row both selects it and reveals its actions.
+   * Two things this helper encodes. Row actions exist for the selected row (and the hovered one)
+   * only — five sp-action-buttons per row is ~5 custom elements with shadow roots per visible row —
+   * so selecting first is the real interaction; a click on the row both selects it and reveals its
+   * verbs. And the buttons are keyed by `data-command` rather than by their title, because the
+   * title is now the record's own tooltip (its chord when it can act, its `requires` sentence when
+   * it cannot) and the surface is not allowed to know either string.
    */
   async function buttons(path: JxPath): Promise<Record<string, HTMLElement>> {
-    activeTab.value!.session.selection = path;
+    activeTab.value!.session.selection = [path];
     await renderLayers();
     const out: Record<string, HTMLElement> = {};
-    for (const btn of rowByKey(path)!.querySelectorAll("sp-action-button")) {
-      out[btn.getAttribute("title") ?? ""] = btn as HTMLElement;
+    for (const btn of rowByKey(path)!.querySelectorAll("sp-action-button[data-command]")) {
+      out[(btn as HTMLElement).dataset.command ?? ""] = btn as HTMLElement;
     }
     return out;
   }
 
+  /** Whether the row's button for `id` is present but refusing (ONE shape: disabled, not removed). */
+  function isDisabled(acts: Record<string, HTMLElement>, id: string): boolean {
+    const btn = acts[id];
+    if (!btn) {
+      throw new Error(`row action not rendered: ${id}`);
+    }
+    return btn.hasAttribute("disabled");
+  }
+
   test("actions are built only for the selected row", async () => {
-    activeTab.value!.session.selection = ["children", 1];
+    activeTab.value!.session.selection = [["children", 1]];
     await renderLayers();
     expect(rowByKey(["children", 1])!.querySelectorAll("sp-action-button").length).toBeGreaterThan(
       0,
@@ -233,18 +246,22 @@ describe("renderLayersTemplate — move and delete actions", () => {
     expect(rowByKey(["children", 4])!.querySelectorAll("sp-action-button").length).toBe(0);
   });
 
-  test("first child cannot move up, last cannot move down", async () => {
+  test("first child cannot move up, last cannot move down — disabled, not removed", async () => {
     const first = await buttons(["children", 0]);
-    expect(first["Move up"]).toBeUndefined();
-    expect(first["Move down"]).toBeDefined();
+    expect(isDisabled(first, "selection.moveUp")).toBe(true);
+    expect(isDisabled(first, "selection.moveDown")).toBe(false);
+    // The refusal is the record's own sentence, printed once.
+    expect(first["selection.moveUp"]!.getAttribute("title")).toBe(
+      "Move Up — requires an element with a sibling above it",
+    );
     const last = await buttons(["children", 4]);
-    expect(last["Move down"]).toBeUndefined();
-    expect(last["Move up"]).toBeDefined();
+    expect(isDisabled(last, "selection.moveDown")).toBe(true);
+    expect(isDisabled(last, "selection.moveUp")).toBe(false);
   });
 
   test("move down reorders siblings", async () => {
     const acts = await buttons(["children", 0]);
-    acts["Move down"]!.click();
+    acts["selection.moveDown"]!.click();
     const children = activeTab.value!.doc.document.children as JxMutableNode[];
     expect(children[0]!.tagName).toBe("p");
     expect(children[1]!.tagName).toBe("section");
@@ -252,7 +269,7 @@ describe("renderLayersTemplate — move and delete actions", () => {
 
   test("move up reorders siblings", async () => {
     const acts = await buttons(["children", 1]);
-    acts["Move up"]!.click();
+    acts["selection.moveUp"]!.click();
     const children = activeTab.value!.doc.document.children as JxMutableNode[];
     expect(children[0]!.tagName).toBe("p");
     expect(children[1]!.tagName).toBe("section");
@@ -260,8 +277,8 @@ describe("renderLayersTemplate — move and delete actions", () => {
 
   test("move into previous sibling appends the node to that sibling's children", async () => {
     const acts = await buttons(["children", 1]);
-    const btn = acts["Move into previous sibling"];
-    expect(btn).toBeDefined();
+    const btn = acts["selection.moveIn"];
+    expect(isDisabled(acts, "selection.moveIn")).toBe(false);
     btn!.click();
     const children = activeTab.value!.doc.document.children as JxMutableNode[];
     expect(children.length).toBe(4);
@@ -275,13 +292,13 @@ describe("renderLayersTemplate — move and delete actions", () => {
   test("move-in is unavailable when previous sibling is not a container", async () => {
     // Children[2] (ul with $map children) follows children[1] (p with no children array)
     const acts = await buttons(["children", 2]);
-    expect(acts["Move into previous sibling"]).toBeUndefined();
+    expect(isDisabled(acts, "selection.moveIn")).toBe(true);
   });
 
   test("move out of parent lifts node after its parent", async () => {
     const acts = await buttons(["children", 0, "children", 0]);
-    const btn = acts["Move out of parent"];
-    expect(btn).toBeDefined();
+    const btn = acts["selection.moveOut"];
+    expect(isDisabled(acts, "selection.moveOut")).toBe(false);
     btn!.click();
     const children = activeTab.value!.doc.document.children as JxMutableNode[];
     expect(children[1]!.tagName).toBe("h2");
@@ -289,12 +306,32 @@ describe("renderLayersTemplate — move and delete actions", () => {
     expect((section.children as JxMutableNode[]).length).toBe(1);
   });
 
-  test("delete removes the node", async () => {
+  test("the row's inline cluster is the four moves; Duplicate and Delete ride in ⋮", async () => {
     const acts = await buttons(["children", 1]);
-    acts["Delete"]!.click();
+    expect(Object.keys(acts)).toEqual([
+      "selection.moveUp",
+      "selection.moveDown",
+      "selection.moveIn",
+      "selection.moveOut",
+    ]);
+    expect(rowByKey(["children", 1])!.querySelector(".layer-overflow")).not.toBeNull();
+  });
+
+  test("delete removes the node, from the ⋮ menu", async () => {
+    await buttons(["children", 1]);
+    (rowByKey(["children", 1])!.querySelector(".layer-overflow") as HTMLElement).click();
+    const menu = [...document.querySelectorAll("#layer-popover sp-menu-item")];
+    expect(menu.map((el) => (el as HTMLElement).dataset.command)).toEqual([
+      "selection.duplicate",
+      "selection.delete",
+    ]);
+    (menu[1] as HTMLElement).click();
+
     const children = activeTab.value!.doc.document.children as JxMutableNode[];
     expect(children.length).toBe(4);
     expect(children.map((c) => c.tagName)).not.toContain("p");
+    // The menu closes behind the verb it ran.
+    expect(document.querySelectorAll("#layer-popover sp-menu-item")).toHaveLength(0);
   });
 
   test("dnd cleanups run and reset on each render", async () => {
@@ -421,5 +458,32 @@ describe("renderLayersTemplate — keyed rows", () => {
     expect(para).not.toBeNull();
     expect(para!.textContent).toContain("keep me");
     expect(para!.style.display).not.toBe("none");
+  });
+});
+
+describe("renderLayersTemplate — empty state", () => {
+  test("a page with nothing on it teaches what the outline lists, and opens Insert", async () => {
+    shell.leftTab = "layers";
+    resetWorkspaceWithTab({ children: [], tagName: "div" } as JxMutableNode, {
+      id: "empty-doc-tab",
+    });
+    // Content mode drops the root row, so the tree really is empty.
+    activeTab.value!.doc.mode = "content";
+    await renderLayers({ rerender: () => {} });
+    expect(host.querySelectorAll(".layer-row")).toHaveLength(0);
+    expect(host.querySelector(".empty-state-message")?.textContent).toBe(
+      "This page is empty. Everything you add to it is listed here, in order.",
+    );
+
+    // One state write and no rerender callback beside it: the left panel tracks `shell.leftTab`.
+    (host.querySelector(".empty-state-action") as HTMLElement).click();
+    /* `"insert"` — and the second assertion is the one that matters.
+       This test asserted `"blocks"` while its own title said "opens Insert", so it PASSED for three
+       phases over an action that put the Navigator into "No Navigator panel is registered as
+       blocks": P3.1 renamed the panel, migrated the persisted id, and left this live caller behind.
+       Naming the id alone would only re-encode whatever the code does, so the id is also checked
+       against the declared set — that is the assertion a rename cannot satisfy by accident. */
+    expect(shell.leftTab).toBe("insert");
+    expect([...NAVIGATOR_PANEL_IDS] as string[]).toContain(shell.leftTab);
   });
 });

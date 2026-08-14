@@ -5,7 +5,7 @@
  */
 import { installMockPlatform, resetStudioState, resetWorkspaceWithTab } from "./harness";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { initCanvasLiveRender, resolveCanvasDocument } from "../src/canvas/canvas-live-render";
+import { resolveCanvasDocument } from "../src/canvas/canvas-live-render";
 import { invalidateLayoutCache } from "../src/site-context";
 import { loadComponentRegistry } from "../src/files/components";
 import { closeAllTabs } from "../src/workspace/workspace";
@@ -16,16 +16,12 @@ import type { Tab } from "../src/tabs/tab";
 const { happyDOM } = globalThis as unknown as { happyDOM: { setURL: (u: string) => void } };
 happyDOM.setURL("http://localhost:3000/");
 
-let canvasMode = "design";
-
 beforeEach(() => {
   document.body.innerHTML = "";
   document.head.innerHTML = "";
   resetStudioState();
   installMockPlatform();
   invalidateLayoutCache();
-  canvasMode = "design";
-  initCanvasLiveRender({ getCanvasMode: () => canvasMode });
 });
 
 afterEach(async () => {
@@ -60,7 +56,7 @@ describe("layout wrapping with irregular trees", () => {
       } as unknown as JxMutableNode,
       { documentPath: "pages/home.json" },
     ) as Tab;
-    const result = await resolveCanvasDocument(tab.doc.document as JxMutableNode);
+    const result = await resolveCanvasDocument(tab.doc.document as JxMutableNode, tab);
 
     expect(result.mapperCtx.layoutWrapped).toBe(true);
     // The prefix descends into the wrapper's main container…
@@ -84,14 +80,14 @@ describe("layout wrapping with irregular trees", () => {
       } as unknown as JxMutableNode,
       { documentPath: "pages/odd.json" },
     ) as Tab;
-    const result = await resolveCanvasDocument(tab.doc.document as JxMutableNode);
+    const result = await resolveCanvasDocument(tab.doc.document as JxMutableNode, tab);
     expect(result.mapperCtx.layoutWrapped).toBe(true);
   });
 });
 
 describe("findArrayPaths edge shapes", () => {
   test("walks the legacy whole-children repeater form", async () => {
-    resetWorkspaceWithTab();
+    const tab = resetWorkspaceWithTab() as Tab;
     const legacy = {
       children: [
         {
@@ -105,12 +101,12 @@ describe("findArrayPaths edge shapes", () => {
       ],
       tagName: "div",
     } as unknown as JxMutableNode;
-    const result = await resolveCanvasDocument(legacy);
+    const result = await resolveCanvasDocument(legacy, tab);
     expect(result.mapperCtx.arrayPaths).toContain("children/0/children");
   });
 
   test("walks $switch cases (including nested repeaters and primitive case values)", async () => {
-    resetWorkspaceWithTab();
+    const tab = resetWorkspaceWithTab() as Tab;
     const doc = {
       $switch: { $ref: "#/state/view" },
       cases: {
@@ -123,12 +119,12 @@ describe("findArrayPaths edge shapes", () => {
       children: [],
       tagName: "div",
     } as unknown as JxMutableNode;
-    const result = await resolveCanvasDocument(doc);
+    const result = await resolveCanvasDocument(doc, tab);
     expect(result.mapperCtx.arrayPaths).toContain("cases/list/children/0");
   });
 
   test("nested map templates and primitive children are walked safely", async () => {
-    resetWorkspaceWithTab();
+    const tab = resetWorkspaceWithTab() as Tab;
     const doc = {
       children: [
         7 as unknown as JxMutableNode,
@@ -140,7 +136,7 @@ describe("findArrayPaths edge shapes", () => {
       ],
       tagName: "div",
     } as unknown as JxMutableNode;
-    const result = await resolveCanvasDocument(doc);
+    const result = await resolveCanvasDocument(doc, tab);
     expect(result.mapperCtx.arrayPaths).toContain("children/1");
     expect(result.mapperCtx.arrayPaths).toContain("children/1/map");
   });
@@ -167,7 +163,7 @@ describe("content-mode component discovery with irregular children", () => {
       { documentPath: "content/odd.md" },
     ) as Tab;
     tab.doc.mode = "content";
-    const result = await resolveCanvasDocument(tab.doc.document as JxMutableNode);
+    const result = await resolveCanvasDocument(tab.doc.document as JxMutableNode, tab);
     const refs = ((result.renderDoc as { $elements?: { $ref?: string }[] }).$elements ?? []).map(
       (e) => e.$ref,
     );
@@ -195,7 +191,7 @@ describe("content-entry asset mapping", () => {
       documentPath: "content/posts/hello.md",
     }) as Tab;
 
-    const result = await resolveCanvasDocument(tab.doc.document as JxMutableNode);
+    const result = await resolveCanvasDocument(tab.doc.document as JxMutableNode, tab);
     const kids = result.renderDoc.children as Record<string, any>[];
 
     // The URL the built site serves — not `./images/hero.png` resolved against canvas.html.
@@ -210,7 +206,7 @@ describe("content-entry asset mapping", () => {
       documentPath: "content/posts/hello.md",
     }) as Tab;
 
-    await resolveCanvasDocument(tab.doc.document as JxMutableNode);
+    await resolveCanvasDocument(tab.doc.document as JxMutableNode, tab);
 
     const source = tab.doc.document as unknown as { children: Record<string, any>[] };
     expect(source.children[0]!.attributes.src).toBe("./images/hero.png");
@@ -220,20 +216,20 @@ describe("content-entry asset mapping", () => {
     resetStudioState({ isSiteProject: true, projectConfig: { content: POSTS } });
     const tab = resetWorkspaceWithTab(entryDoc(), { documentPath: "pages/index.json" }) as Tab;
 
-    const result = await resolveCanvasDocument(tab.doc.document as JxMutableNode);
+    const result = await resolveCanvasDocument(tab.doc.document as JxMutableNode, tab);
     const kids = result.renderDoc.children as Record<string, any>[];
 
     expect(kids[0]!.attributes.src).toBe("./images/hero.png");
   });
 
   test("preview mode maps too — the preview is what the built page will look like", async () => {
-    canvasMode = "preview";
     resetStudioState({ isSiteProject: true, projectConfig: { content: POSTS } });
     const tab = resetWorkspaceWithTab(entryDoc(), {
       documentPath: "content/posts/hello.md",
     }) as Tab;
+    tab.session.ui.canvasMode = "preview";
 
-    const result = await resolveCanvasDocument(tab.doc.document as JxMutableNode);
+    const result = await resolveCanvasDocument(tab.doc.document as JxMutableNode, tab);
     const kids = result.renderDoc.children as Record<string, any>[];
 
     expect(kids[0]!.attributes.src).toBe("/content/posts/images/hero.png");

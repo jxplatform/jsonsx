@@ -39,6 +39,27 @@
       #jx-canvas-root:has(> [data-jx-definition-root]) {
         min-height: 0;
       }
+      /* PREVIEW is the exception to all three rules above, and it is the point of the mode.
+         The host keeps the iframe at the pane's height there (a real viewport) so `position:sticky`,
+         scroll-driven animation and IntersectionObserver reveals fire exactly as they will in
+         production. A real viewport that cannot scroll shows only its first screenful — and that is
+         what this document did: `overflow:hidden` clipped every page at the fold with no scrollbar
+         and no way down. So preview scrolls the DOCUMENT, and sizes the query container to the real
+         viewport (`100vh` inside the iframe IS the iframe) so a `100vh` section means the screenful
+         the reader actually has rather than a fixed 800px design box.
+
+         Set by `syncPreviewShell` on every render, because one iframe is reused across modes. */
+      html[data-jx-preview] {
+        overflow: auto;
+      }
+      html[data-jx-preview] body {
+        height: auto;
+        min-height: 100%;
+        overflow: visible;
+      }
+      html[data-jx-preview] #jx-canvas-viewport {
+        height: 100vh;
+      }
     </style>
   </head>
   <body>

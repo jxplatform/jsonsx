@@ -111,7 +111,9 @@ describe("handleJxMounts", () => {
     rmSync(broken, { force: true, recursive: true });
     const warned: string[] = [];
     const origWarn = console.warn;
-    console.warn = (...args: unknown[]) => void warned.push(args.map(String).join(" "));
+    console.warn = (...args: unknown[]) => {
+      warned.push(args.map(String).join(" "));
+    };
     try {
       mkdirSync(broken, { recursive: true });
       writeFileSync(resolve(broken, "project.json"), "{not json", "utf8");

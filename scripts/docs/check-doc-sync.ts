@@ -17,8 +17,30 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
+import { DEFAULT_MANIFEST, shotsByDocsPage } from "../check-image-lock";
+
 const ROOT = resolve(import.meta.dir, "../..");
 const DOCS_DIR = join(ROOT, "docs");
+
+/**
+ * Docs slug → the screenshot shots that illustrate it (UX-REDESIGN-PLAN §13.5).
+ *
+ * Both halves of this join already existed and never met: shots carry `docs:`, and this file maps a
+ * diff to pages. Without the join the report says "you changed the components page's code" and
+ * stays silent about the picture on that page being of the old thing — which is the residual Lane 1
+ * structurally cannot see, since a command that still exists and now means something different
+ * passes the contract check green.
+ */
+function loadShotsByPage(): Map<string, string[]> {
+  try {
+    const source = readFileSync(join(ROOT, DEFAULT_MANIFEST), "utf8");
+    return shotsByDocsPage(JSON.parse(source));
+  } catch {
+    return new Map<string, string[]>();
+  }
+}
+
+const shotsByPage = loadShotsByPage();
 
 const args = process.argv.slice(2);
 const strict = args.includes("--strict");
@@ -151,15 +173,25 @@ console.error(
   `docs sync: ${findings.length} changed source file(s) are documented, but the diff ` +
     `touches neither their docs page(s) nor the linked spec(s):`,
 );
+let shotsNamed = false;
 for (const { file, pages } of findings) {
   console.error(`  ${relative(ROOT, join(ROOT, file))}`);
-  for (const { pagePath, specs } of pages) {
+  for (const { pagePath, slug, specs } of pages) {
     const specNote = specs.length > 0 ? ` (spec: ${specs.join(", ")})` : "";
-    console.error(`    → ${pagePath}${specNote}`);
+    const shots = shotsByPage.get(slug) ?? [];
+    const shotNote = shots.length > 0 ? ` [shot: ${shots.join(", ")}]` : "";
+    shotsNamed ||= shots.length > 0;
+    console.error(`    → ${pagePath}${specNote}${shotNote}`);
   }
 }
 console.error(
   "If the change alters behavior, update the page(s) and spec section(s) in the same " +
     "change set; if it's a pure refactor, no update is needed.",
 );
+if (shotsNamed) {
+  console.error(
+    "A [shot: …] page is illustrated by a screenshot of the surface you changed. The picture is " +
+      "re-captured by the screenshots CI lane, but the PROSE around it is yours — re-read it.",
+  );
+}
 process.exit(strict ? 1 : 0);

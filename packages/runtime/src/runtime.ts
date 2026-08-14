@@ -23,7 +23,7 @@ import {
   ref,
   toRaw,
 } from "@vue/reactivity";
-import { evaluateExpression, isMutating } from "./expression.ts";
+import { evaluateExpression, evaluateOperand, isMutating } from "./expression.ts";
 import type { DynamicClass, JxEventHandler, JxPath, JxRenderOptions, JxScope } from "./types.ts";
 import {
   bodyReturnsValue,
@@ -36,6 +36,7 @@ import {
   isPrototypeDef,
   isRef as isRefValue,
   isServerFnDef,
+  isTagExpression,
   isTemplateString,
   paramNames,
 } from "@jxsuite/schema/guards";
@@ -783,8 +784,18 @@ export function renderNode(
     }
   }
 
-  // Custom element with $props: set JS properties on the element instance
-  const tagName = def.tagName ?? "div";
+  /* RESOLVED ONCE, HERE, before anything branches on it.
+     A tag may be a name or a choice between names (`ElementTagName`). Resolving at the top means
+     every test below — the hyphen check that routes to the custom-element path, `customElements.get`,
+     `createElement` itself — sees a literal, exactly as it did when a tag could only be written out.
+
+     It is not tracked. `tagName` is in RESERVED_KEYS so no binding sweep reaches it, and a tag that
+     changed after mount would mean replacing the node: the subtree's listeners, its focus, its typed
+     input values and its component instances all go with it, and this runtime has no dispose walk to
+     pay that bill (renderSwitch, two hundred lines up, still leaks its previous case's effects).
+     `jx validate` warns when a tag discriminant is also an assignment target, so the case where this
+     rule bites is caught before it ships rather than found as a `<div>` that never became an `<a>`. */
+  const tagName = resolveTagName(def.tagName, localState);
   const isCustomEl = tagName.includes("-") && customElements.get(tagName);
 
   if (def.$props && isCustomEl) {
@@ -1249,6 +1260,34 @@ function renderMappedArrayInto(
   });
 }
 
+/**
+ * An element's tag: a name, or the branch of a {@link JxTagExpression} the state selects.
+ *
+ * Every branch of the expression is itself a `TagName`, so this can only ever return something the
+ * schema already held to the tag-name pattern — the property that lets the compiler enumerate the
+ * candidates and lets `createElement` be called without a second thought here.
+ *
+ * @param {unknown} tagName The element's declared tag.
+ * @param {JxScope} scope The state the discriminant reads.
+ * @returns {string} A literal tag name; `"div"` when nothing is declared.
+ */
+export function resolveTagName(tagName: unknown, scope: JxScope): string {
+  if (typeof tagName === "string") {
+    return tagName;
+  }
+  if (!isTagExpression(tagName)) {
+    return "div";
+  }
+  const expression = tagName.$expression;
+  if (expression.operator === "?:") {
+    // `evaluateOperand`, not `evaluateExpression`: the discriminant is an OPERAND — a pointer, a
+    // Literal or a nested node — exactly as it is for a `$switch`, whose docstring names this.
+    return evaluateOperand(expression.target, scope, null) ? expression.value : expression.initial;
+  }
+  const key = evaluateOperand(expression.target, scope, null);
+  return expression.cases[String(key)] ?? expression.default;
+}
+
 // ─── $switch ──────────────────────────────────────────────────────────────────
 
 /**
@@ -1259,7 +1298,7 @@ function renderMappedArrayInto(
  */
 function renderSwitch(def: JxElement, state: JxScope, options?: JxRenderOptions) {
   const path = options?._path ?? [];
-  const container = document.createElement(def.tagName ?? "div");
+  const container = document.createElement(resolveTagName(def.tagName, state));
 
   if (options?.onNodeCreated) {
     options.onNodeCreated(container, path, def, state);
@@ -2522,7 +2561,7 @@ function renderCustomElementWithProps(
   options?: JxRenderOptions,
   path?: JxPath,
 ) {
-  const el = document.createElement(def.tagName ?? "div");
+  const el = document.createElement(resolveTagName(def.tagName, state));
 
   if (options?.onNodeCreated) {
     options.onNodeCreated(el, path ?? [], def, state);

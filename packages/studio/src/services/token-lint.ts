@@ -6,6 +6,7 @@
  */
 
 import type { JxMutableNode } from "@jxsuite/schema/types";
+import { displayTagName } from "@jxsuite/schema/guards";
 
 interface TokenLintFinding {
   path: string;
@@ -112,14 +113,14 @@ export function flagHardcodedTokens(
       for (let i = 0; i < el.children.length; i++) {
         const child = el.children[i];
         if (child && typeof child === "object") {
-          walk(child, `${pathPrefix} > ${child.tagName || `[${i}]`}`);
+          walk(child, `${pathPrefix} > ${displayTagName(child.tagName) || `[${i}]`}`);
         }
       }
     }
   }
 
   const tag = doc.tagName || "root";
-  walk(doc, tag);
+  walk(doc, displayTagName(tag));
   return findings;
 }
 

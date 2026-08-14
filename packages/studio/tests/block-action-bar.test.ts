@@ -13,6 +13,7 @@ import { getConvertTargets } from "../src/editor/convert-targets";
 import { dismissSlashMenu, isSlashMenuOpen } from "../src/editor/slash-menu";
 import { componentRegistry } from "../src/files/components";
 import { initLayers } from "../src/ui/layers";
+import { setTransactGate } from "../src/tabs/transact";
 import { view } from "../src/view";
 import { activeTab } from "../src/workspace/workspace";
 
@@ -63,14 +64,19 @@ void mock.module("../src/canvas/iframe-host", () => ({
 }));
 
 const {
+  BLOCKBAR_MAX_ITEMS,
   dismissBlockActionBar,
   dismissLinkPopover,
-  handleParentFormatShortcut,
+  formatCommands,
   initBlockActionBar,
   isEditChromeTarget,
   onCanvasScroll,
+  releaseBlockActionBar,
   renderBlockActionBar,
+  selectionCommandRegistry,
+  suppressBlockActionBar,
 } = await import("../src/panels/block-action-bar");
+const { makeContext } = await import("../src/commands/context");
 
 // ─── Layer hosts ─────────────────────────────────────────────────────────────
 
@@ -108,9 +114,10 @@ function setAnchor(
   host.anchor = { height: 20, left: 30, top: 200, width: 100, ...rect };
 }
 
-function setup(docNode: JxMutableNode, selection: JxPath | null) {
-  const tab = resetWorkspaceWithTab(docNode);
-  tab.session.selection = selection as never;
+/** Open one tab on `docNode` with `selection` selected. `opts.id` names it (a second document). */
+function setup(docNode: JxMutableNode, selection: JxPath | null, opts: { id?: string } = {}) {
+  const tab = resetWorkspaceWithTab(docNode, opts);
+  tab.session.selection = selection ? [selection] : [];
   setAnchor();
   return tab;
 }
@@ -123,6 +130,21 @@ function barButton(title: string): HTMLElement {
   const btn = bar()?.querySelector(`sp-action-button[title^="${title}"]`) as HTMLElement | null;
   if (!btn) {
     throw new Error(`bar button not found: ${title}`);
+  }
+  return btn;
+}
+
+/**
+ * A registry verb by command id.
+ *
+ * The verb cluster is `registry.forPlacement("blockbar")`, so its buttons are addressed by the
+ * record that produced them — their `title` is the record's tooltip (chord when it can act, the
+ * `requires` sentence when it cannot) and belongs to the record, not to this surface.
+ */
+function cmdButton(id: string): HTMLElement {
+  const btn = bar()?.querySelector(`sp-action-button[data-command="${id}"]`) as HTMLElement | null;
+  if (!btn) {
+    throw new Error(`bar command not rendered: ${id}`);
   }
   return btn;
 }
@@ -191,11 +213,11 @@ describe("block action bar", () => {
     expect(bar()).toBeNull();
 
     canvasMode = "design";
-    activeTab.value!.session.selection = null as never;
+    activeTab.value!.session.selection = [];
     renderBlockActionBar();
     expect(bar()).toBeNull();
 
-    activeTab.value!.session.selection = ["children", 0] as never;
+    activeTab.value!.session.selection = [["children", 0]] as never;
     host.anchor = null; // No anchor rect from the bridge → nothing to position from.
     renderBlockActionBar();
     expect(bar()).toBeNull();
@@ -235,9 +257,9 @@ describe("block action bar", () => {
     expect(barEl.querySelector(".bar-tag")!.classList.contains("bar-tag--interactive")).toBe(true);
     expect(barEl.querySelector("sp-icon-back")).not.toBeNull(); // Parent selector
     expect(barEl.querySelector(".bar-drag-handle")!.textContent).toContain("⠿");
-    expect(barButton("Move up").hasAttribute("disabled")).toBe(true); // Idx 0
-    expect(barButton("Move down").hasAttribute("disabled")).toBe(false);
-    expect(barButton("Convert to Component")).not.toBeNull();
+    expect(cmdButton("selection.moveUp").hasAttribute("disabled")).toBe(true); // Idx 0
+    expect(cmdButton("selection.moveDown").hasAttribute("disabled")).toBe(false);
+    expect(cmdButton("selection.convertToComponent")).not.toBeNull();
     // ONE bar: the format group is part of it whenever the block can carry inline markup, whether
     // Or not a caret is in the block yet.
     expect(barEl.querySelector("sp-action-group")).not.toBeNull();
@@ -261,15 +283,193 @@ describe("block action bar", () => {
     expect(style).toContain("top:34px"); // 10 + 20 + 4
   });
 
-  test("root selection renders only the tag badge", () => {
+  test("the root selection keeps the bar's shape and disables what cannot act", () => {
+    // §8.6 is normative: ONE shape. The bar used to drop the parent selector, the drag handle and
+    // Every verb at the root, so selecting the document rearranged the toolbar under the cursor.
     setup({ children: [{ tagName: "p", textContent: "A" }], tagName: "div" }, []);
     renderBlockActionBar();
     const barEl = bar()!;
     expect(barEl.querySelector(".bar-tag")!.textContent!.trim()).toBe("div");
-    expect(barEl.querySelector("sp-icon-back")).toBeNull();
-    expect(barEl.querySelector(".bar-drag-handle")).toBeNull();
-    expect(barEl.querySelector('sp-action-button[title^="Move"]')).toBeNull();
-    expect(barEl.querySelector('sp-action-button[title="Convert to Component"]')).toBeNull();
+
+    const parentBtn = barEl.querySelector("sp-icon-back")!.parentElement!;
+    expect(parentBtn.hasAttribute("disabled")).toBe(true);
+    const handle = barEl.querySelector(".bar-drag-handle")!;
+    expect(handle.classList.contains("bar-drag-handle--disabled")).toBe(true);
+    expect(handle.getAttribute("aria-disabled")).toBe("true");
+
+    for (const id of ["selection.moveUp", "selection.moveDown"]) {
+      expect(cmdButton(id).hasAttribute("disabled")).toBe(true);
+    }
+    // `selection.duplicate` now declares the same gate `selection.delete` has, so the root
+    // Disables it here instead of offering a button whose only effect is nothing.
+    const dup = cmdButton("selection.duplicate");
+    expect(dup.hasAttribute("disabled")).toBe(true);
+    expect(dup.getAttribute("title")).toBe(
+      "Duplicate — requires an element that has a sibling position",
+    );
+    // Delete arrives from the registry with the one sentence that refuses the document root.
+    const del = cmdButton("selection.delete");
+    expect(del.hasAttribute("disabled")).toBe(true);
+    expect(del.getAttribute("title")).toBe(
+      "Delete — requires an element selection that is not the document root",
+    );
+    expect(del.getAttribute("aria-label")).toBe("Delete"); // The name stays the bare name.
+    expect(cmdButton("selection.convertToComponent").hasAttribute("disabled")).toBe(true);
+  });
+
+  test("the verb cluster is the blockbar placement, in group order, with Delete last", () => {
+    setup(
+      {
+        children: [
+          { tagName: "p", textContent: "A" },
+          { tagName: "p", textContent: "B" },
+        ],
+        tagName: "div",
+      },
+      ["children", 1],
+    );
+    renderBlockActionBar();
+    const ids = [...bar()!.querySelectorAll<HTMLElement>("sp-action-button[data-command]")].map(
+      (b) => b.dataset.command,
+    );
+    expect(ids).toEqual([
+      "selection.moveUp",
+      "selection.moveDown",
+      "selection.duplicate",
+      "selection.convertToComponent",
+      "selection.delete",
+    ]);
+    // Exactly the cap, so nothing folds away: no ⋮ on a default selection.
+    expect(ids.length).toBe(BLOCKBAR_MAX_ITEMS);
+    expect(bar()!.querySelector(".bar-overflow")).toBeNull();
+  });
+
+  test("Delete removes the selected element and leaves its parent selected", () => {
+    setup(
+      {
+        children: [
+          { tagName: "p", textContent: "A" },
+          { tagName: "p", textContent: "B" },
+        ],
+        tagName: "div",
+      },
+      ["children", 1],
+    );
+    renderBlockActionBar();
+    cmdButton("selection.delete").click();
+    expect((doc().children as JxMutableNode[]).map((c) => c.textContent)).toEqual(["A"]);
+    expect(activeTab.value!.session.selection).toEqual([[]]);
+  });
+
+  test("Delete over a row that names no splice coordinate moves nothing at all", () => {
+    // A repeater's map template is a first-class Outline row and therefore a selectable target,
+    // But `structuralBatch` filters it out: there is no `children/<n>` to splice. The bar used to
+    // Run the transaction anyway and THEN move the selection to `parentElementPath(path)` —
+    // `["children"]`, which addresses no node — so the author watched their selection jump to a
+    // Dangling path while the document, and the delete they asked for, stood still.
+    const tab = setup(
+      {
+        children: [{ $prototype: "Array", map: { tagName: "li", textContent: "A" } }],
+        tagName: "ul",
+      },
+      ["children", 0, "map"],
+    );
+    tab.doc.dirty = false;
+    const historyBefore = tab.history.index;
+    renderBlockActionBar();
+    cmdButton("selection.delete").click();
+
+    expect(activeTab.value!.session.selection).toEqual([["children", 0, "map"]]);
+    expect((doc().children as JxMutableNode[])[0]!.map).toEqual({
+      tagName: "li",
+      textContent: "A",
+    });
+    // No transaction ran, so there is no empty undo step and no unsaved-changes mark to explain.
+    expect(tab.history.index).toBe(historyBefore);
+    expect(tab.doc.dirty).toBe(false);
+  });
+
+  test("Delete leaves the selection where it was when the transaction is declined", () => {
+    // `transactDoc` refuses while a peer holds source-canonical. The document is untouched, so the
+    // Selection must be too — the move is conditional on the transaction having changed something,
+    // Not on it having been attempted.
+    const tab = setup(
+      {
+        children: [
+          { tagName: "p", textContent: "A" },
+          { tagName: "p", textContent: "B" },
+        ],
+        tagName: "div",
+      },
+      ["children", 1],
+    );
+    renderBlockActionBar();
+    setTransactGate(() => "source-canonical");
+    try {
+      cmdButton("selection.delete").click();
+    } finally {
+      setTransactGate(null);
+    }
+
+    expect((doc().children as JxMutableNode[]).map((c) => c.textContent)).toEqual(["A", "B"]);
+    expect(tab.session.selection).toEqual([["children", 1]]);
+  });
+
+  test("Duplicate inserts a copy after the selection", () => {
+    setup({ children: [{ tagName: "p", textContent: "A" }], tagName: "div" }, ["children", 0]);
+    renderBlockActionBar();
+    cmdButton("selection.duplicate").click();
+    expect((doc().children as JxMutableNode[]).map((c) => c.textContent)).toEqual(["A", "A"]);
+  });
+
+  test("Delete on a multi-selection removes every one, in ONE undo step (§6.5)", () => {
+    const tab = setup(
+      {
+        children: [
+          { tagName: "p", textContent: "A" },
+          { tagName: "p", textContent: "B" },
+          { tagName: "p", textContent: "C" },
+        ],
+        tagName: "div",
+      },
+      ["children", 0],
+    );
+    tab.session.selection = [
+      ["children", 0],
+      ["children", 2],
+    ];
+    const before = tab.history.index;
+    renderBlockActionBar();
+    cmdButton("selection.delete").click();
+    expect((doc().children as JxMutableNode[]).map((c) => c.textContent)).toEqual(["B"]);
+    expect(tab.history.index).toBe(before + 1);
+  });
+
+  test("Duplicate on a multi-selection copies every one, in ONE undo step", () => {
+    const tab = setup(
+      {
+        children: [
+          { tagName: "p", textContent: "A" },
+          { tagName: "p", textContent: "B" },
+        ],
+        tagName: "div",
+      },
+      ["children", 0],
+    );
+    tab.session.selection = [
+      ["children", 0],
+      ["children", 1],
+    ];
+    const before = tab.history.index;
+    renderBlockActionBar();
+    cmdButton("selection.duplicate").click();
+    expect((doc().children as JxMutableNode[]).map((c) => c.textContent)).toEqual([
+      "A",
+      "A",
+      "B",
+      "B",
+    ]);
+    expect(tab.history.index).toBe(before + 1);
   });
 
   test("badge prefers the node $id over the tag name", () => {
@@ -309,7 +509,7 @@ describe("block action bar", () => {
     ]);
     renderBlockActionBar();
     bar()!.querySelector("sp-icon-back")!.parentElement!.click();
-    expect(activeTab.value!.session.selection).toEqual(["children", 0]);
+    expect(activeTab.value!.session.selection).toEqual([["children", 0]]);
   });
 
   test("Move down and Move up reorder siblings and track the selection", () => {
@@ -325,16 +525,16 @@ describe("block action bar", () => {
     );
     renderBlockActionBar();
 
-    barButton("Move down").click();
+    cmdButton("selection.moveDown").click();
     let children = doc().children as JxMutableNode[];
     expect(children.map((c) => c.textContent)).toEqual(["B", "A"]);
-    expect(activeTab.value!.session.selection).toEqual(["children", 1]);
+    expect(activeTab.value!.session.selection).toEqual([["children", 1]]);
 
     renderBlockActionBar(); // Selection now at idx 1
-    barButton("Move up").click();
+    cmdButton("selection.moveUp").click();
     children = doc().children as JxMutableNode[];
     expect(children.map((c) => c.textContent)).toEqual(["A", "B"]);
-    expect(activeTab.value!.session.selection).toEqual(["children", 0]);
+    expect(activeTab.value!.session.selection).toEqual([["children", 0]]);
   });
 
   test("Move up at the first index and Move down at the last index are no-ops", () => {
@@ -349,13 +549,13 @@ describe("block action bar", () => {
       ["children", 0],
     );
     renderBlockActionBar();
-    barButton("Move up").click(); // Disabled guard
+    cmdButton("selection.moveUp").click(); // Disabled guard
     expect((doc().children as JxMutableNode[]).map((c) => c.textContent)).toEqual(["A", "B"]);
 
-    activeTab.value!.session.selection = ["children", 1] as never;
+    activeTab.value!.session.selection = [["children", 1]] as never;
     renderBlockActionBar();
-    expect(barButton("Move down").hasAttribute("disabled")).toBe(true);
-    barButton("Move down").click();
+    expect(cmdButton("selection.moveDown").hasAttribute("disabled")).toBe(true);
+    cmdButton("selection.moveDown").click();
     expect((doc().children as JxMutableNode[]).map((c) => c.textContent)).toEqual(["A", "B"]);
   });
 
@@ -404,9 +604,11 @@ describe("block action bar", () => {
     const badge = bar()!.querySelector(".bar-tag")!;
     expect(badge.textContent!.trim()).toBe("x-card");
     expect(badge.classList.contains("bar-tag--interactive")).toBe(false);
-    expect(bar()!.querySelector('sp-action-button[title="Convert to Component"]')).toBeNull();
+    expect(
+      bar()!.querySelector('sp-action-button[data-command="selection.convertToComponent"]'),
+    ).toBeNull();
 
-    barButton("Edit Component").click();
+    cmdButton("selection.editComponent").click();
     expect(navigated).toEqual(["components/card.json"]);
   });
 
@@ -501,8 +703,16 @@ describe("block action bar", () => {
     const titles = [...group.querySelectorAll("sp-action-button")].map((b) =>
       b.getAttribute("title"),
     );
-    expect(titles).toContain("Bold (Cmd+B)");
-    expect(titles).toContain("Underline");
+    /* The chord comes from the KEYMAP now, so it is formatted for the platform the test is running
+       on. This asserted the literal "Bold (Cmd+B)", which is the string
+       `data/elements-meta.json` hardcoded into every tooltip on every machine — the exact defect
+       plan §5.3 names ("one function formats chords, which kills the hardcoded ⌘P shown to Windows
+       and Linux users"). Asserting the formatter's own answer is what makes the tooltip provably
+       not a hardcoded one. */
+    const chord = selectionCommandRegistry().keymap.formatBinding("format.bold");
+    expect(titles).toContain(`Bold (${chord})`);
+    // A verb with no chord prints its bare name — not an empty pair of brackets.
+    expect(titles).toContain("Strikethrough");
     expect(titles.length).toBe(8); // P inline actions
   });
 
@@ -723,83 +933,75 @@ describe("block action bar", () => {
     expect(linkPopoverHost()).toBeNull();
   });
 
-  // ─── Parent-focus format shortcuts (Ctrl+B etc.) ───────────────────────────
+  // ─── Inline formatting, as records ─────────────────────────────────────────
 
-  describe("handleParentFormatShortcut", () => {
-    function ctrl(key: string) {
-      return new KeyboardEvent("keydown", { bubbles: true, cancelable: true, ctrlKey: true, key });
-    }
+  /**
+   * These replace a `describe("handleParentFormatShortcut")` that drove a hand-written keydown
+   * switch — eight cases over a control that RETURNED EARLY whenever focus was inside the canvas
+   * iframe, which is the only place a canvas caret can be. Every one of them passed, because each
+   * dispatched its event at a parent-realm `<input>`; none could see that ⌘B in the page did
+   * nothing. The capability moved onto records, so the tests move with it: what is asserted now is
+   * the record's declaration and what running it posts.
+   */
+  describe("formatCommands", () => {
+    const byId = () => new Map(formatCommands().map((command) => [command.id, command]));
 
-    test("editing + parent-focused: Ctrl+B posts an applyFormat bold intent", () => {
-      host.editing = true;
-      const input = document.createElement("input");
-      document.body.append(input);
-      input.focus();
-      const e = ctrl("b");
-      handleParentFormatShortcut(e);
-      expect(host.posted).toEqual([{ command: "bold" }]);
-      expect(e.defaultPrevented).toBe(true);
-      input.remove();
+    test("the whole `$inlineActions` vocabulary has a record, and nothing else does", () => {
+      expect([...byId().keys()].toSorted()).toEqual([
+        "format.bold",
+        "format.code",
+        "format.italic",
+        "format.link",
+        "format.strikethrough",
+        "format.subscript",
+        "format.superscript",
+        "format.underline",
+      ]);
     });
 
-    test("Ctrl+I and Ctrl+` post italic/code", () => {
-      host.editing = true;
-      handleParentFormatShortcut(ctrl("i"));
-      handleParentFormatShortcut(ctrl("`"));
-      expect(host.posted).toEqual([{ command: "italic" }, { command: "code" }]);
+    test("selection level, caret scope — the case §5.1 uses to justify two fields", () => {
+      for (const command of formatCommands()) {
+        expect(command.level).toBe("selection");
+        expect(command.keyScope).toBe("caret");
+        expect(command.menus).toContain("blockbar/format");
+        expect(command.requires).toBeTruthy();
+      }
     });
 
-    test("a modal surface suppresses the format shortcut", () => {
-      host.editing = true;
-      const slot = document.createElement("div");
-      slot.innerHTML = "<sp-dialog-wrapper open></sp-dialog-wrapper>";
-      document.querySelector("#layer-dialog")!.append(slot);
-      handleParentFormatShortcut(ctrl("b"));
-      expect(host.posted).toEqual([]);
-      slot.remove();
-      handleParentFormatShortcut(ctrl("b"));
-      expect(host.posted).toEqual([{ command: "bold" }]);
+    test("the four documented chords are the records', formatted by the one formatter", () => {
+      const map = byId();
+      expect(map.get("format.bold")?.keybinding).toBe("mod+b");
+      expect(map.get("format.italic")?.keybinding).toBe("mod+i");
+      expect(map.get("format.underline")?.keybinding).toBe("mod+u");
+      expect(map.get("format.code")?.keybinding).toBe("mod+`");
+      expect(map.get("format.link")?.keybinding).toBe("mod+k");
+      // The three with no chord declare none rather than an unbindable placeholder.
+      expect(map.get("format.strikethrough")?.keybinding).toBeUndefined();
     });
 
-    test("Ctrl+K opens the link popover (anchored to the bar's Link button)", () => {
+    test("running one posts the intent the iframe already understands", () => {
+      const registry = selectionCommandRegistry();
+      host.editing = true;
+      void registry.run("format.bold");
+      void registry.run("format.code");
+      expect(host.posted).toEqual([{ command: "bold" }, { command: "code" }]);
+    });
+
+    test("format.link opens the link popover, anchored by record id", () => {
       setup({ children: [{ tagName: "p", textContent: "hi" }], tagName: "div" }, ["children", 0]);
       startEditingState();
-      const input = document.createElement("input");
-      document.body.append(input);
-      input.focus();
-
-      handleParentFormatShortcut(ctrl("k"));
+      void selectionCommandRegistry().run("format.link");
       expect(linkPopoverHost()).not.toBeNull();
-      input.remove();
+      dismissLinkPopover();
     });
 
-    test("does nothing when not editing", () => {
-      host.editing = false;
-      handleParentFormatShortcut(ctrl("b"));
-      expect(host.posted).toEqual([]);
-    });
-
-    test("ignores chords without ctrl/meta or with alt held", () => {
-      host.editing = true;
-      handleParentFormatShortcut(
-        new KeyboardEvent("keydown", { altKey: true, ctrlKey: true, key: "b" }),
-      );
-      handleParentFormatShortcut(new KeyboardEvent("keydown", { key: "b" }));
-      expect(host.posted).toEqual([]);
-    });
-
-    test("does nothing when focus is inside the canvas iframe", () => {
-      host.editing = true;
-      const iframe = document.createElement("iframe");
-      iframe.className = "jx-canvas-iframe";
-      document.body.append(iframe);
-      iframe.focus();
-      // Force activeElement to the iframe (happy-dom focus on iframe).
-      Object.defineProperty(document, "activeElement", { configurable: true, value: iframe });
-      handleParentFormatShortcut(ctrl("b"));
-      expect(host.posted).toEqual([]);
-      delete (document as unknown as Record<string, unknown>).activeElement;
-      iframe.remove();
+    test("`when` is the CANVAS caret, not any caret", () => {
+      // The distinction the record exists to make: `caret.active` is also true while focus is in a
+      // Parent text field — including the link popover's own URL box, where ⌘K would re-mount the
+      // Popover being typed into.
+      const command = byId().get("format.bold")!;
+      expect(command.when?.(makeContext({ caret: { active: true, inCanvas: false } }))).toBe(false);
+      expect(command.when?.(makeContext({ caret: { active: true, inCanvas: true } }))).toBe(true);
     });
   });
 });
@@ -878,6 +1080,130 @@ describe("scroll tracking", () => {
     onCanvasScroll(e);
     await raf();
     expect(bar()!.style.top).toBe(before);
+  });
+});
+
+// ─── Suppression: the bar follows the canvas ─────────────────────────────────
+
+/**
+ * The reported defect, in the author's words: the bar "persists, potentially blocking a part of the
+ * interface that the user needs to utilize" — they were working in the Inspector's Logic tab while
+ * the bar sat over the canvas, and it is `position: fixed` and clamped into the window, so it can
+ * overlap the Document Header card, the pane context bar and the docks.
+ *
+ * What these tests are really about is why a dismiss is not the fix. The bar is re-rendered from
+ * the `toolbarRefresh` seam on every selection snapshot and from `renderOnly("overlays")` on
+ * zoom/pan, so a bar that is merely dismissed flashes back on the next repaint. The state has to
+ * survive those, and end on its own — by the selection moving, or by the canvas taking a pointer.
+ */
+describe("suppression", () => {
+  beforeEach(() => {
+    canvasMode = "design";
+    host.editing = false;
+    host.snapshot = null;
+    setup(
+      {
+        children: [
+          { tagName: "p", textContent: "A" },
+          { tagName: "p", textContent: "B" },
+        ],
+        tagName: "div",
+      },
+      ["children", 0],
+    );
+    renderBlockActionBar();
+  });
+
+  // Also drops the suppression, so no test here can leak one into the next.
+  afterEach(() => dismissBlockActionBar());
+
+  test("a chrome pointerdown hides the bar, and a repaint does not bring it back", () => {
+    expect(bar()).not.toBeNull();
+    suppressBlockActionBar();
+    expect(bar()).toBeNull();
+    // The snapshot- and overlay-driven repaints, which is what `dismissBlockActionBar` alone
+    // Could not survive.
+    renderBlockActionBar();
+    renderBlockActionBar();
+    expect(bar()).toBeNull();
+  });
+
+  test("the selection is untouched — the Inspector still edits what the author selected", () => {
+    suppressBlockActionBar();
+    expect(activeTab.value!.session.selection).toEqual([["children", 0]] as never);
+  });
+
+  test("a different selection releases it — an Outline row click hides the bar and shows it", () => {
+    suppressBlockActionBar();
+    // One click, both halves: it is chrome (so it suppresses) AND it moves the selection (so the
+    // Suppression is already over by the time the bar renders).
+    activeTab.value!.session.selection = [["children", 1]] as never;
+    renderBlockActionBar();
+    expect(bar()).not.toBeNull();
+    // Released for good, not for one pass.
+    renderBlockActionBar();
+    expect(bar()).not.toBeNull();
+  });
+
+  test("clicking the SAME element again brings it back — the door the selection cannot open", () => {
+    suppressBlockActionBar();
+    // The `hit` for the already-selected block posts the same path back, so the render path has
+    // Nothing to compare and the bar would stay hidden for as long as the author kept clicking it.
+    renderBlockActionBar();
+    expect(bar()).toBeNull();
+    // Which is why the frame's own pointerdown is a second, independent signal.
+    releaseBlockActionBar();
+    expect(bar()).not.toBeNull();
+  });
+
+  test("a release with nothing suppressed renders nothing at all", () => {
+    dismissBlockActionBar();
+    releaseBlockActionBar();
+    // A canvas pointerdown is the most frequent event in the app; unsuppressed it must cost a null
+    // Check, not a re-render of a bar that was deliberately taken down.
+    expect(bar()).toBeNull();
+  });
+
+  test("a dismiss drops the suppression, so it cannot leak into the next document", () => {
+    suppressBlockActionBar();
+    // What a mode switch or a stage teardown does. `["children",0]` names a node in every document,
+    // So a key that outlived this one would hide the bar over a node nobody clicked away from.
+    dismissBlockActionBar();
+    renderBlockActionBar();
+    expect(bar()).not.toBeNull();
+  });
+
+  test("the same path in another document is another node — the key carries the tab", () => {
+    suppressBlockActionBar();
+    // Switching tabs is itself a chrome click, so it arrives suppressed. `["children",0]` names a
+    // Node in every document there has ever been; keyed on the path alone the bar would come up
+    // Hidden over a block in a document the author has not touched.
+    setup({ children: [{ tagName: "p", textContent: "C" }], tagName: "div" }, ["children", 0], {
+      id: "other-doc",
+    });
+    renderBlockActionBar();
+    expect(bar()).not.toBeNull();
+  });
+
+  test("nothing selected is not the document root: the two keys must not collide", () => {
+    activeTab.value!.session.selection = [];
+    renderBlockActionBar();
+    suppressBlockActionBar();
+    activeTab.value!.session.selection = [[]] as never;
+    renderBlockActionBar();
+    expect(bar()).not.toBeNull();
+  });
+
+  test("the link popover goes with the bar — it is anchored to a button that is gone", () => {
+    startEditingState();
+    barButton("Link").click();
+    expect(linkPopoverHost()).not.toBeNull();
+    suppressBlockActionBar();
+    expect(bar()).toBeNull();
+    expect(linkPopoverHost()).toBeNull();
+    // And the popover's own render guard cannot strand the bar: a suppressed bar stays suppressed.
+    renderBlockActionBar();
+    expect(bar()).toBeNull();
   });
 });
 

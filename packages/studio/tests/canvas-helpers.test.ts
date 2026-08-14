@@ -5,10 +5,16 @@ import {
   findCanvasElement,
   getActivePanel,
   panelMediaToActiveMedia,
+  panelOfSurface,
 } from "../src/canvas/canvas-helpers";
-import { canvasPanels } from "../src/store";
-import { closeAllTabs } from "../src/workspace/workspace";
+import { activeCanvasSurface, surfaceForPane } from "../src/canvas/canvas-surface";
+import { PRIMARY_PANE, SECONDARY_PANE, closeAllTabs, workspace } from "../src/workspace/workspace";
 import type { JxMutableNode } from "@jxsuite/schema/types";
+
+/* The panels of the FOCUSED pane's stage. Panels belong to a pane's surface now, not to the
+   app (`src/canvas/canvas-surface.ts`); the array identity is stable, so a module-level
+   binding still sees what the render mutated. */
+const canvasPanels = activeCanvasSurface().panels;
 
 beforeEach(() => {
   resetStudioState();
@@ -90,6 +96,48 @@ describe("getActivePanel", () => {
     const base = { mediaName: "base" };
     canvasPanels.push({ mediaName: "md" } as never, base as never);
     expect(getActivePanel()).toBe(base as never);
+  });
+});
+
+// ─── panelOfSurface, in a lens ────────────────────────────────────────────────
+
+/*
+ * "The active panel" is what the block action bar anchors to, what the Style panel resolves its
+ * breakpoint context from, and what every panel-relative measurement starts at — so a lens getting
+ * it wrong is not one wrong artboard, it is every one of those addressing the pane beside it.
+ *
+ * The line that decides it is `activeMediaOfPane(surface.paneId)`, and spelling it
+ * `tabOfPane(...)?.session.ui.activeMedia` — which is what it means for every OTHER pane, and what
+ * it was before the lens existed — left the whole suite green.
+ */
+describe("panelOfSurface in a breakpoint lens", () => {
+  test("resolves the LENS's own breakpoint, not the breakpoint of the tab it shares", () => {
+    const tab = resetWorkspaceWithTab();
+    // The tab is on the base artboard in the pane that owns it.
+    tab.session.ui.activeMedia = null;
+    workspace.panes.push({ activeTabId: null, derived: null, id: SECONDARY_PANE, tabOrder: [] });
+    workspace.panes[1]!.derived = {
+      diff: null,
+      kind: "lens",
+      media: "md",
+      mode: "design",
+      preset: "breakpoint",
+      reason: "",
+      sourcePaneId: PRIMARY_PANE,
+      status: "ready",
+      zoom: 1,
+    };
+    const side = surfaceForPane(SECONDARY_PANE);
+    const base = { mediaName: "base" };
+    const md = { mediaName: "md" };
+    side.panels.length = 0;
+    side.panels.push(base as never, md as never);
+    canvasPanels.push(base as never, md as never);
+
+    expect(panelOfSurface(side)).toBe(md as never);
+    // …and the pane that owns the tab still answers with the tab's, which is the base artboard.
+    expect(getActivePanel()).toBe(base as never);
+    side.panels.length = 0;
   });
 });
 

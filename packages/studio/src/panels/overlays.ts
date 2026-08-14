@@ -11,7 +11,10 @@ import { updateActivePanelHeaders } from "../canvas/canvas-utils";
 import type { EffectScope } from "@vue/reactivity";
 
 interface OverlaysCtx {
-  getCanvasMode: () => string;
+  // No `getCanvasMode`. It was declared here and supplied by the bootstrap for as long as this
+  // Interface has existed, and this module never called it — a focus reader wired into a surface
+  // With no use for it, which is one more edge for the pane rule to walk and one more thing a
+  // Reader has to rule out.
   isEditing: () => boolean;
   renderBlockActionBar: () => void;
 }
@@ -38,7 +41,9 @@ export function mount(ctx: OverlaysCtx) {
       }
       // Track selection, hover, mode, and the active panel (a hit in another breakpoint panel — or
       // A header click — re-anchors the block action bar even when the selection path is unchanged).
-      void tab.session.selection;
+      // The whole SET, joined — a bare property read would not re-trigger when the selection
+      // Changes WITHIN the array, and §6.5's helpers always replace it but nothing enforces that.
+      void tab.session.selection.map((path) => path.join("/")).join("|");
       void tab.session.hover;
       void tab.doc.mode;
       void tab.session.ui.activeMedia;

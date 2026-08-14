@@ -53,6 +53,7 @@ interface Entry {
   name: string;
   path: string;
   type: "file" | "directory";
+  size?: number;
 }
 
 const defaultTree: Record<string, Entry[]> = {
@@ -400,5 +401,106 @@ describe("media picker thumbnail for a content entry", () => {
     const container = await renderLoaded("/logo.png");
 
     expect(container.querySelector(".media-picker-thumb")?.getAttribute("src")).toBe("/logo.png");
+  });
+});
+
+// ─── Metadata captions ───────────────────────────────────────────────────────
+
+/**
+ * The browse list says how big each file is, and it costs nothing extra to say: the size rides in
+ * on the listing that enumerated the row, and the dimensions come off the thumbnail that was going
+ * to load anyway. Both are captions — a file whose size is unknown gets no caption at all rather
+ * than a zero.
+ */
+describe("browse list metadata", () => {
+  const sizedTree: Record<string, Entry[]> = {
+    public: [
+      { name: "logo.png", path: "public/logo.png", size: 86_016, type: "file" },
+      { name: "clip.mp4", path: "public/clip.mp4", type: "file" },
+    ],
+  };
+
+  /** Fire `load` on a rendered thumbnail with the intrinsic size a real decode would report. */
+  function loadThumb(img: HTMLImageElement, width: number, height: number) {
+    Object.defineProperty(img, "naturalWidth", { configurable: true, value: width });
+    Object.defineProperty(img, "naturalHeight", { configurable: true, value: height });
+    img.dispatchEvent(new Event("load"));
+  }
+
+  function descriptions(): (string | undefined)[] {
+    return [...popoverHost().querySelectorAll("sp-menu-item")].map((item) =>
+      item.querySelector('[slot="description"]')?.textContent?.trim(),
+    );
+  }
+
+  test("the listing's size becomes the row's caption", async () => {
+    invalidateMediaCache();
+    installTree(sizedTree);
+    const container = await renderLoaded("");
+    pointer(browseButton(container), "click");
+    // The video's size was absent from the listing, so it gets no caption rather than "0 B".
+    expect(descriptions()).toEqual(["84 KB", undefined]);
+  });
+
+  test("a loaded thumbnail adds its dimensions on the next frame", async () => {
+    invalidateMediaCache();
+    installTree(sizedTree);
+    const container = await renderLoaded("");
+    pointer(browseButton(container), "click");
+    const img = popoverHost().querySelector("sp-menu-item img") as HTMLImageElement;
+    loadThumb(img, 1200, 800);
+    // Nothing repaints synchronously — the measurement is coalesced into one frame.
+    expect(descriptions()).toEqual(["84 KB", undefined]);
+    runRaf();
+    expect(descriptions()).toEqual(["1200 × 800 · 84 KB", undefined]);
+  });
+
+  test("re-firing load from cache does not schedule a second repaint", async () => {
+    invalidateMediaCache();
+    installTree(sizedTree);
+    const container = await renderLoaded("");
+    pointer(browseButton(container), "click");
+    loadThumb(popoverHost().querySelector("sp-menu-item img") as HTMLImageElement, 1200, 800);
+    runRaf();
+    // Only the popover's own reposition frame is left; the measurement is settled.
+    const afterFirst = rafQueue.length;
+    loadThumb(popoverHost().querySelector("sp-menu-item img") as HTMLImageElement, 1200, 800);
+    expect(rafQueue).toHaveLength(afterFirst);
+  });
+
+  test("a broken thumbnail reports 0 and is not written down as a measurement", async () => {
+    invalidateMediaCache();
+    installTree(sizedTree);
+    const container = await renderLoaded("");
+    pointer(browseButton(container), "click");
+    loadThumb(popoverHost().querySelector("sp-menu-item img") as HTMLImageElement, 0, 0);
+    runRaf();
+    expect(descriptions()).toEqual(["84 KB", undefined]);
+  });
+
+  test("a measurement landing after the popover closed repaints nothing", async () => {
+    invalidateMediaCache();
+    installTree(sizedTree);
+    const container = await renderLoaded("");
+    pointer(browseButton(container), "click");
+    const img = popoverHost().querySelector("sp-menu-item img") as HTMLImageElement;
+    loadThumb(img, 1200, 800);
+    dismissViaEscape();
+    runRaf();
+    expect(popoverHost().querySelectorAll("sp-menu-item")).toHaveLength(0);
+  });
+
+  test("invalidating the cache drops the sizes with the listing", async () => {
+    invalidateMediaCache();
+    installTree(sizedTree);
+    const container = await renderLoaded("");
+    pointer(browseButton(container), "click");
+    expect(descriptions()).toEqual(["84 KB", undefined]);
+    dismissViaEscape();
+    invalidateMediaCache();
+    installTree({ public: [{ name: "logo.png", path: "public/logo.png", type: "file" }] });
+    const reloaded = await renderLoaded("");
+    pointer(browseButton(reloaded), "click");
+    expect(descriptions()).toEqual([undefined]);
   });
 });

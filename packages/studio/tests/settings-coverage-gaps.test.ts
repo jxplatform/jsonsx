@@ -8,6 +8,8 @@
  *   and the entry-name keydown (Enter/Escape) handling.
  */
 import { flush, installMockPlatform, key, pointer, resetStudioState } from "./harness";
+import { problems, resetNotifications } from "../src/services/notify";
+import { resetActivities } from "../src/panels/activity-panel";
 import { afterEach, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
 import type { MockPlatformState } from "./harness";
 import type { SettingsContribution } from "../src/settings/contributed-section";
@@ -43,6 +45,8 @@ beforeAll(() => {
 });
 
 afterEach(() => {
+  resetNotifications();
+  resetActivities();
   for (const d of document.querySelectorAll("body > div")) {
     if (!d.id) {
       d.remove();
@@ -136,7 +140,7 @@ describe("dependencies editor gaps", () => {
     expect(modalLayer().querySelector(".progress-modal")).toBeNull();
   });
 
-  test("a failed row update surfaces the backend log in the progress modal", async () => {
+  test("a failed row update surfaces the backend log in Problems", async () => {
     installMockPlatform({
       ...TWO_DEPS,
       setPackageVersions: async () => ({ log: "conflicting peer deps", ok: false }),
@@ -146,8 +150,7 @@ describe("dependencies editor gaps", () => {
     await flush();
     pointer(c.querySelector('sp-action-button[title="Update to 4.6.0"]')!, "click");
     await flush();
-    expect(modalLayer().textContent).toContain("failed");
-    expect(modalLayer().textContent).toContain("conflicting peer deps");
+    expect(problems[0]?.message).toContain("conflicting peer deps");
   });
 
   test("update all skips current packages and reports a log-less failure", async () => {
@@ -170,7 +173,7 @@ describe("dependencies editor gaps", () => {
     await flush();
     // The current package produced no update entry; the failure fell back to a generic message.
     expect(received.map((u) => u.name)).toEqual(["hono"]);
-    expect(modalLayer().textContent).toContain("Update failed");
+    expect(problems[0]?.message).toContain("Update failed");
   });
 
   test("a stale update-all click after the list refreshes to current is a no-op", async () => {
@@ -200,7 +203,7 @@ describe("dependencies editor gaps", () => {
     expect(modalLayer().querySelector(".progress-modal")).toBeNull();
   });
 
-  test("a failed reinstall surfaces the install log", async () => {
+  test("a failed reinstall surfaces the install log in Problems", async () => {
     installMockPlatform({
       ...TWO_DEPS,
       installDependencies: async () => ({ log: "lockfile busted", ok: false }),
@@ -210,7 +213,7 @@ describe("dependencies editor gaps", () => {
     await flush();
     pointer(c.querySelector('sp-action-button[title="Reinstall (bun install)"]')!, "click");
     await flush();
-    expect(modalLayer().textContent).toContain("lockfile busted");
+    expect(problems[0]?.message).toContain("lockfile busted");
   });
 
   test("operations are ignored while another one is running", async () => {
@@ -248,7 +251,9 @@ describe("dependencies editor gaps", () => {
 describe("jxsuite-update dismissal storage", () => {
   test("the prompt still shows when localStorage access throws (never remembered)", async () => {
     installMockPlatform({
-      listPackages: async () => [{ name: "@jxsuite/runtime", version: "^0.1.0" }],
+      outdatedPackages: async () => [
+        { current: "^0.1.0", latest: "0.4.0", name: "@jxsuite/runtime" },
+      ],
       setPackageVersions: async () => ({ ok: true }),
     });
     const original = Object.getOwnPropertyDescriptor(globalThis, "localStorage");

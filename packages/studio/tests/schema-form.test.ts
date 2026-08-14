@@ -5,7 +5,7 @@
  * refs).
  */
 import { pointer } from "./harness";
-import { describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { html, render } from "lit-html";
 import {
   getFormControl,
@@ -14,8 +14,10 @@ import {
   renderForm,
   renderInlineField,
   resolveFormEnum,
+  validateFieldValue,
 } from "../src/ui/schema-form";
 import { resolveContextPointer } from "../src/services/context-resolver";
+import { resetSlotModeMemory } from "../src/ui/dynamic-slot";
 import contentCollectionClass from "@jxsuite/parser/ContentCollection.class.json";
 import type { JsonSchema, SchemaFormContext } from "../src/ui/schema-form";
 
@@ -270,12 +272,30 @@ describe("renderForm dispatch", () => {
   });
 });
 
-// ─── $ref bindings ───────────────────────────────────────────────────────────
+// ─── The Value Source ladder (§6.6) ──────────────────────────────────────────
 
-describe("$ref binding dispatch", () => {
+describe("binding a config field", () => {
   const schema: JsonSchema = { properties: { id: { type: "string" } } };
+  const sourced = (over: Partial<SchemaFormContext> = {}): SchemaFormContext => ({
+    fieldKeyPrefix: "cfg",
+    params: ["sku"],
+    resolvePointer: () => {
+      // No context data in this test
+    },
+    ...over,
+  });
 
-  test("without a registered binding control, a plain ref textfield edits the $ref", () => {
+  beforeEach(() => {
+    resetSlotModeMemory();
+  });
+
+  test("a host that names no source draws no chip — settings forms edit fixed values", () => {
+    const m = mountForm(schema, { id: "abc" });
+    expect(m.container.querySelector(".dynamic-slot-mode")).toBeNull();
+    expect(m.container.querySelector('[data-prop="id"] sp-textfield')).not.toBeNull();
+  });
+
+  test("without a source, a ref left in the record is edited as the pointer string it is", () => {
     const m = mountForm(schema, { id: { $ref: "#/$params/sku" } });
     const tf = fieldEl<ValueEl>(m.container, "id", "sp-textfield");
     expect(tf.value).toBe("#/$params/sku");
@@ -284,58 +304,74 @@ describe("$ref binding dispatch", () => {
     expect(m.patches).toEqual([{ id: { $ref: "#/other/path" } }, { id: undefined }]);
   });
 
-  test("a registered binding control takes over $ref values", () => {
-    registerFormControl(
-      "binding",
-      ({ key, value, ctx }) =>
-        html`<div class="stub-binding" data-key=${key} data-prefix=${ctx.fieldKeyPrefix ?? ""}>
-          ${(value as { $ref: string }).$ref} ${(ctx.params ?? []).join(",")}
-        </div>`,
-    );
+  test("a plain string field offers the whole ladder — the way IN to a binding", () => {
+    /* The old control mounted only when the value ALREADY was a `$ref`, so the first binding in
+       any config form had to be typed in Code mode. */
+    const m = mountForm(schema, { id: "abc" }, { context: sourced() });
+    const chip = m.container.querySelector(".dynamic-slot-mode")!;
+    expect(chip.textContent!.trim()).toBe("Fixed value");
+    const rungs = [...m.container.querySelectorAll<HTMLElement>("sp-menu-item[data-mode]")];
+    expect(rungs.map((r) => r.dataset.mode)).toEqual(["literal", "ref", "template"]);
+    expect(rungs.map((r) => r.textContent!.trim().split("\n")[0]!.trim())).toEqual([
+      "Fixed value",
+      "From data…",
+      "Mixed text",
+    ]);
+  });
+
+  test("choosing From data… binds to the first source the host named", () => {
+    const m = mountForm(schema, { id: "abc" }, { context: sourced() });
+    pointer(m.container.querySelector('sp-menu-item[data-mode="ref"]')!, "click");
+    expect(m.patches).toEqual([{ id: { $ref: "#/$params/sku" } }]);
+  });
+
+  test("signals and route params are both offered, and a pointer off the list is accepted", () => {
     const m = mountForm(
       schema,
       { id: { $ref: "#/$params/sku" } },
-      {
-        context: {
-          fieldKeyPrefix: "cfg",
-          params: ["sku"],
-          resolvePointer: () => {
-            // No context data in this test
-          },
-        },
-      },
+      { context: sourced({ signals: ["query"] }) },
     );
-    const stub = m.container.querySelector(".stub-binding") as HTMLElement | null;
-    expect(stub).not.toBeNull();
-    expect(stub?.dataset.key).toBe("id");
-    expect(stub?.dataset.prefix).toBe("cfg");
-    expect(stub?.textContent).toContain("#/$params/sku");
-    expect(stub?.textContent).toContain("sku");
+    const combo = m.container.querySelector("jx-value-selector") as HTMLElement & {
+      value: string;
+      options: { label: string; value: string }[];
+    };
+    expect(combo.options.map((o) => o.value)).toEqual(["#/state/query", "#/$params/sku"]);
+    expect(combo.value).toBe("#/$params/sku");
+    combo.value = "#/state/query/id";
+    combo.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(m.patches).toEqual([{ id: { $ref: "#/state/query/id" } }]);
   });
 
-  test("bind button appears with route params and commits the first param ref", () => {
+  test("an enum field is never offered Mixed text, because its schema forbids one", () => {
     const m = mountForm(
-      schema,
-      { id: "abc" },
-      {
-        context: {
-          params: ["sku", "lang"],
-          resolvePointer: () => {
-            // No context data in this test
-          },
-        },
-        withRerender: true,
-      },
+      { properties: { method: { enum: ["GET", "POST"] } } },
+      {},
+      { context: sourced() },
     );
-    const btn = fieldEl(m.container, "id", "sp-action-button");
-    pointer(btn, "click");
-    expect(m.patches).toEqual([{ id: { $ref: "#/$params/sku" } }]);
-    expect(m.renders.count).toBe(1);
+    expect(
+      [...m.container.querySelectorAll<HTMLElement>("sp-menu-item[data-mode]")].map(
+        (r) => r.dataset.mode,
+      ),
+    ).toEqual(["literal", "ref"]);
   });
 
-  test("no bind button without params", () => {
-    const m = mountForm(schema, { id: "abc" });
-    expect(m.container.querySelector('[data-prop="id"] sp-action-button')).toBeNull();
+  test("fields edited as raw JSON, and fields a ui control owns, keep their whole widget", () => {
+    registerFormControl("owns-it", ({ key }) => html`<div class="owns-it">${key}</div>`);
+    const m = mountForm(
+      {
+        properties: {
+          fields: { type: "object" },
+          shape: { format: "json-schema", type: "object" },
+          token: { type: "string" },
+        },
+      },
+      {},
+      { context: sourced(), ui: { token: { control: "owns-it" } } },
+    );
+    for (const prop of ["fields", "shape", "token"]) {
+      expect(m.container.querySelector(`[data-prop="${prop}"] .dynamic-slot-mode`)).toBeNull();
+    }
+    expect(m.container.querySelector(".owns-it")).not.toBeNull();
   });
 });
 
@@ -585,5 +621,119 @@ describe("ContentCollection enum refs render the same choices as before", () => 
       el.getAttribute("value"),
     );
     expect(values).toEqual(["__none__", "date", "slug", "title"]);
+  });
+});
+
+// ─── Inline validation (§7.1's third tier) ───────────────────────────────────
+/* The form is a REPORTER, not a second implementation of JSON Schema: it makes the checks a
+   property schema can make on its own at commit time, and renders anybody else's verdict — the
+   whole-document `jx-validate` run, a Monaco marker — through `errors`. */
+
+describe("validateFieldValue", () => {
+  test("an empty value is only refused when the host asks for required-ness", () => {
+    expect(validateFieldValue({ type: "string" }, "", false)).toBe("");
+    expect(validateFieldValue({ type: "string" }, undefined, false)).toBe("");
+    expect(validateFieldValue({ type: "string" }, "", true)).toBe("Required.");
+  });
+
+  test("a $ref binding is never judged — it resolves from state the form cannot see", () => {
+    expect(validateFieldValue({ type: "number" }, { $ref: "#/$context/x" }, true)).toBe("");
+  });
+
+  test("enum membership is checked and the choices are named", () => {
+    const schema = { enum: ["a", "b"], type: "string" };
+    expect(validateFieldValue(schema, "a", false)).toBe("");
+    expect(validateFieldValue(schema, "c", false)).toBe("Choose one of: a, b.");
+  });
+
+  test("numbers: non-numeric, non-integer, and the bounds", () => {
+    expect(validateFieldValue({ type: "number" }, "abc", false)).toBe("Enter a number.");
+    expect(validateFieldValue({ type: "integer" }, 1.5, false)).toBe("Enter a whole number.");
+    expect(validateFieldValue({ minimum: 2, type: "number" }, 1, false)).toBe("Must be 2 or more.");
+    expect(validateFieldValue({ maximum: 2, type: "number" }, 3, false)).toBe("Must be 2 or less.");
+    expect(validateFieldValue({ maximum: 9, minimum: 2, type: "number" }, "4", false)).toBe("");
+  });
+
+  test("boolean, array and object shapes", () => {
+    expect(validateFieldValue({ type: "boolean" }, "yes", false)).toBe("Must be true or false.");
+    expect(validateFieldValue({ type: "array" }, "x", false)).toBe("Must be a list.");
+    expect(validateFieldValue({ type: "object" }, [], false)).toBe("Must be an object.");
+    expect(validateFieldValue({ type: "object" }, {}, false)).toBe("");
+  });
+});
+
+describe("renderForm inline errors", () => {
+  test("a fresh form paints nothing red — required-ness is the label's asterisk", () => {
+    const m = mountForm({ properties: { title: { type: "string" } }, required: ["title"] }, {});
+    expect(m.container.querySelector(".style-row-error")).toBeNull();
+    expect(m.container.querySelector("sp-field-label")?.textContent).toContain("*");
+  });
+
+  test("showRequired turns the same form red — what a host does after a rejected submit", () => {
+    const container = document.createElement("div");
+    render(
+      html`${renderForm(
+        { properties: { title: { type: "string" } }, required: ["title"] },
+        {},
+        {
+          onChange: () => {},
+          showRequired: true,
+        },
+      )}`,
+      container,
+    );
+    expect(container.querySelector(".style-row-error")?.textContent).toContain("Required.");
+  });
+
+  test("an intrinsic refusal renders at the field that holds the value", () => {
+    const container = document.createElement("div");
+    render(
+      html`${renderForm(
+        { properties: { count: { type: "integer" } } },
+        { count: 1.5 },
+        {
+          onChange: () => {},
+        },
+      )}`,
+      container,
+    );
+    const row = container.querySelector('[data-prop="count"]') as HTMLElement;
+    expect(row.classList.contains("style-row--invalid")).toBe(true);
+    expect(row.querySelector(".style-row-error")?.textContent).toContain("whole number");
+  });
+
+  test("a host diagnostic wins over the intrinsic check", () => {
+    /* The jx-validate run saw the whole project.json; this form saw one property. The one that
+       saw more is the one that gets to speak. */
+    const container = document.createElement("div");
+    render(
+      html`${renderForm(
+        { properties: { count: { type: "integer" } } },
+        { count: 1.5 },
+        {
+          errors: { count: "must be <= 10" },
+          onChange: () => {},
+        },
+      )}`,
+      container,
+    );
+    expect(container.querySelector(".style-row-error")?.textContent).toContain("must be <= 10");
+  });
+
+  test("errorCounts reach the row's repeat counter", () => {
+    const container = document.createElement("div");
+    render(
+      html`${renderForm(
+        { properties: { count: { type: "integer" } } },
+        {},
+        {
+          errorCounts: { count: 4 },
+          errors: { count: "nope" },
+          onChange: () => {},
+        },
+      )}`,
+      container,
+    );
+    expect(container.querySelector(".style-row-error-count")?.textContent).toBe("×4");
   });
 });

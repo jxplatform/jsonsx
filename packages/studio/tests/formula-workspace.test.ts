@@ -1,31 +1,54 @@
 /**
- * Formula workspace tests (M4). The workspace takes over the canvas area (the renderFunctionEditor
- * precedent) for a single `$expression` identified by TabUi.editingFormula: chips with live badges
- * on top, the recursive expression form for the chip-selected sub-node in the main pane, the
- * dataScope snapshot rail on the right, and the root result footer. Edits immutably replace the
- * selected sub-node inside the root and write the whole node back through transactDoc, so undo
- * restores the previous tree.
+ * ⑪ · Logic — the formula workspace (`panels/formula-workspace.ts`).
+ *
+ * It no longer takes over the canvas: P8.5 moves it into the Bottom dock's Logic tab so the page
+ * whose values it computes stays on screen beside it. These tests render {@link logicPanelBody} —
+ * the tab's body, exactly as `panels/bottom-dock.ts` calls it — and assert what the surface is:
+ * chips with live badges, the recursive expression form for the chip-selected sub-node, the data
+ * column, the root result, and a Close that clears the target. Edits immutably replace the selected
+ * sub-node inside the root and write the whole node back through `transactDoc`, so undo restores
+ * the previous tree. The wiring into the dock (reveal, strip, `afterRender`) is
+ * `tests/bottom-dock.test.ts`.
  */
-import { flush, pointer, resetStudioState, resetWorkspaceWithTab } from "./harness";
+import {
+  flush,
+  pointer,
+  registerPrimaryStage,
+  resetStudioState,
+  resetWorkspaceWithTab,
+} from "./harness";
 import { beforeEach, describe, expect, test } from "bun:test";
-import { canvasPanels, initShellRefs } from "../src/store";
+import { render as litRender } from "lit-html";
+import { initShellRefs } from "../src/store";
+import { activeCanvasSurface } from "../src/canvas/canvas-surface";
 import { undo } from "../src/tabs/transact";
-import { view } from "../src/view";
-import { activeTab } from "../src/workspace/workspace";
+import { activeTab, closeAllTabs } from "../src/workspace/workspace";
+import { shell } from "../src/shell";
 import {
   closeFormulaWorkspace,
   formulaRoot,
-  renderFormulaWorkspace,
+  logicPanelBody,
+  logicTarget,
+  openLogicTarget,
+  revealLogicPanel,
 } from "../src/panels/formula-workspace";
 
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { Tab } from "../src/tabs/tab";
 
-document.body.innerHTML = `<div id="app"><div id="canvas-wrap"></div></div>`;
-initShellRefs();
+/* The panels of the FOCUSED pane's stage. Panels belong to a pane's surface now, not to the
+   app (`src/canvas/canvas-surface.ts`); the array identity is stable, so a module-level
+   binding still sees what the render mutated. */
+const canvasPanels = activeCanvasSurface().panels;
 
-// Destructuring store.canvasWrap would snapshot the pre-initShellRefs null — query instead.
-const canvasWrap = document.querySelector("#canvas-wrap") as HTMLElement;
+document.body.innerHTML = `<div id="app"><div class="pane-stage" data-jx-region="pane.primary"></div><div id="logic"></div></div>`;
+initShellRefs();
+/* The primary pane's stage. It is the `.pane-stage` the fixture above wrote, adopted rather than
+   queried by id: there is no `#canvas-wrap`, and the surface record is what every renderer
+   resolves through. */
+const canvasWrap = registerPrimaryStage().wrap;
+/** Stands in for the dock's `.bd-body`: the element the Logic tab's body is rendered into. */
+const dock = document.querySelector("#logic") as HTMLElement;
 
 function docFixture(): JxMutableNode {
   return {
@@ -59,6 +82,11 @@ function docFixture(): JxMutableNode {
   } as unknown as JxMutableNode;
 }
 
+/** Paint the Logic tab's body into the stand-in dock host, exactly as the dock does. */
+function renderLogic() {
+  litRender(logicPanelBody(renderLogic), dock);
+}
+
 /** Open a fixture tab with a canvas dataScope snapshot and a workspace target. */
 function openWorkspace(
   editing?: Record<string, unknown> | null,
@@ -69,12 +97,12 @@ function openWorkspace(
   tab.session.ui.editingFormula = (
     editing === undefined ? { defName: "total", type: "def" } : editing
   ) as never;
-  renderFormulaWorkspace();
+  renderLogic();
   return tab;
 }
 
 function chipByTitle(title: string): HTMLElement {
-  const chip = [...canvasWrap.querySelectorAll(".formula-chip")].find(
+  const chip = [...dock.querySelectorAll(".formula-chip")].find(
     (c) => c.getAttribute("title") === title,
   );
   if (!chip) {
@@ -85,7 +113,7 @@ function chipByTitle(title: string): HTMLElement {
 
 /** The selected sub-node form's operator picker. */
 function operatorPicker(): HTMLElement & { value: string } {
-  const picker = canvasWrap.querySelector(".fw-editor .expression-editor sp-picker");
+  const picker = dock.querySelector(".fw-editor .expression-editor sp-picker");
   if (!picker) {
     throw new Error("no operator picker in the editor pane");
   }
@@ -103,6 +131,9 @@ function docState(): Record<string, never> {
 
 beforeEach(() => {
   resetStudioState();
+  dock.textContent = "";
+  // @ts-expect-error -- _$litPart$ is Lit's private render-part marker, not in the DOM types
+  delete dock["_$litPart$"];
   canvasWrap.textContent = "";
   // @ts-expect-error -- _$litPart$ is Lit's private render-part marker, not in the DOM types
   delete canvasWrap["_$litPart$"];
@@ -111,46 +142,57 @@ beforeEach(() => {
 // ─── Layout ───────────────────────────────────────────────────────────────────
 
 describe("def-type target", () => {
-  test("renders header, chips with live badges, editor form, data rail, and result footer", () => {
+  test("renders header, chips with live badges, editor form, data column, and result", () => {
     openWorkspace();
 
-    expect(canvasWrap.querySelector(".formula-workspace")).not.toBeNull();
-    expect(canvasWrap.querySelector(".fw-title")?.textContent).toContain("total");
+    expect(dock.querySelector(".formula-workspace")).not.toBeNull();
+    expect(dock.querySelector(".fw-title")?.textContent).toContain("total");
 
     // Chip pipeline: head operand (count), then the + and * operator links.
-    const chips = [...canvasWrap.querySelectorAll(".formula-chip")];
+    const chips = [...dock.querySelectorAll(".formula-chip")];
     expect(chips.map((c) => c.getAttribute("title"))).toEqual(["count", "+", "*"]);
     // Live badges from the dataScope snapshot: count=2 → 2, 3, 30 along the chain.
-    const badges = [...canvasWrap.querySelectorAll(".fw-chips .expr-live-badge")];
+    const badges = [...dock.querySelectorAll(".fw-chips .expr-live-badge")];
     expect(badges.map((b) => b.textContent?.trim())).toEqual(["2", "3", "30"]);
 
     // Main pane: the selected sub-node form (root by default).
-    expect(canvasWrap.querySelector(".fw-editor .expression-editor")).not.toBeNull();
-    expect(canvasWrap.querySelector(".fw-selected")?.textContent).toContain("root");
+    expect(dock.querySelector(".fw-editor .expression-editor")).not.toBeNull();
+    expect(dock.querySelector(".fw-selected")?.textContent).toContain("root");
     expect(operatorPicker().value).toBe("*");
 
-    // Right rail: the dataScope snapshot tree.
-    const rail = canvasWrap.querySelector(".fw-context") as HTMLElement;
+    // The data column: the dataScope snapshot tree.
+    const rail = dock.querySelector(".fw-context") as HTMLElement;
     expect(rail.textContent).toContain("count");
     expect(rail.querySelector(".data-tree")).not.toBeNull();
 
     // Footer: the root result badge.
-    expect(canvasWrap.querySelector(".fw-result")?.textContent).toContain("= 30");
+    expect(dock.querySelector(".fw-result")?.textContent).toContain("= 30");
 
     // Header affordances: catalog browser and Close.
-    expect(canvasWrap.querySelector(".fw-browse-catalog")).not.toBeNull();
-    expect(canvasWrap.querySelector(".fw-close")).not.toBeNull();
+    expect(dock.querySelector(".fw-browse-catalog")).not.toBeNull();
+    expect(dock.querySelector(".fw-close")).not.toBeNull();
+  });
+
+  test("leaves the canvas alone — the page it computes is the whole point of the move", () => {
+    const tab = resetWorkspaceWithTab(docFixture(), { id: "fw-tab" });
+    canvasPanels.push({ ready: true } as never);
+    canvasWrap.textContent = "the rendered page";
+
+    tab.session.ui.editingFormula = { defName: "total", type: "def" } as never;
+    renderLogic();
+
+    // The takeover cleared the stage before drawing itself over it. Nothing here touches the
+    // Mounted panels or the painted DOM, which is what keeps the canvas patchable and on screen.
+    expect(canvasPanels).toHaveLength(1);
+    expect(canvasWrap.textContent).toBe("the rendered page");
+    expect(dock.querySelector(".formula-workspace")).not.toBeNull();
   });
 
   test("renders the preview-unavailable footer and no badges without a scope snapshot", () => {
     openWorkspace({ defName: "total", type: "def" }, null);
-    expect(canvasWrap.querySelector(".fw-result--pending")?.textContent).toContain(
-      "Preview unavailable",
-    );
-    expect(canvasWrap.querySelector(".expr-live-badge")).toBeNull();
-    expect(canvasWrap.querySelector(".fw-context")?.textContent).toContain(
-      "No canvas data snapshot yet",
-    );
+    expect(dock.querySelector(".fw-result--pending")?.textContent).toContain("Preview unavailable");
+    expect(dock.querySelector(".expr-live-badge")).toBeNull();
+    expect(dock.querySelector(".fw-context")?.textContent).toContain("No canvas data snapshot yet");
   });
 
   test("renders the evaluation error in the footer", () => {
@@ -161,14 +203,14 @@ describe("def-type target", () => {
       target: null,
     };
     tab.session.ui.editingFormula = { defName: "total", type: "def" } as never;
-    renderFormulaWorkspace();
-    expect(canvasWrap.querySelector(".fw-result--error")).not.toBeNull();
+    renderLogic();
+    expect(dock.querySelector(".fw-result--error")).not.toBeNull();
   });
 
   test("shows the empty state (with Close) when the target has no expression", () => {
     openWorkspace({ defName: "missing", type: "def" });
-    expect(canvasWrap.querySelector(".empty-state")?.textContent).toContain("No expression found");
-    expect(canvasWrap.querySelector(".fw-close")).not.toBeNull();
+    expect(dock.querySelector(".empty-state")?.textContent).toContain("No expression found");
+    expect(dock.querySelector(".fw-close")).not.toBeNull();
   });
 });
 
@@ -178,28 +220,46 @@ describe("chip selection", () => {
   test("clicking an operator chip selects that sub-node in the form", () => {
     openWorkspace();
     pointer(chipByTitle("+"), "click");
+    renderLogic();
     expect(operatorPicker().value).toBe("+");
-    expect(canvasWrap.querySelector(".fw-selected")?.textContent).toContain("count › +");
+    expect(dock.querySelector(".fw-selected")?.textContent).toContain("count › +");
   });
 
   test("clicking the head operand chip resolves to its enclosing operator node", () => {
     openWorkspace();
     pointer(chipByTitle("count"), "click");
+    renderLogic();
     // The head chip targets a $ref operand; the nearest expression-node ancestor is the + link.
     expect(operatorPicker().value).toBe("+");
   });
 
-  test("the selection resets to root when the workspace retargets", () => {
+  test("the selection does not carry across a retarget", () => {
     const tab = openWorkspace();
     pointer(chipByTitle("+"), "click");
+    renderLogic();
     expect(operatorPicker().value).toBe("+");
     tab.session.ui.editingFormula = {
       eventKey: "onclick",
       path: ["children", 0],
       type: "event",
     } as never;
-    renderFormulaWorkspace();
+    renderLogic();
+    // The stored selection is KEYED by target rather than reset during the render — a render that
+    // Writes the state it reads is a reactive loop once the surface is an effect, which it is now.
     expect(operatorPicker().value).toBe("+=");
+  });
+
+  test("a selection kept for one target does not leak into another tab's identical one", () => {
+    openWorkspace();
+    pointer(chipByTitle("+"), "click");
+    renderLogic();
+    expect(operatorPicker().value).toBe("+");
+
+    const other = resetWorkspaceWithTab(docFixture(), { id: "other-tab" });
+    other.session.canvas.scope = { count: 2 };
+    other.session.ui.editingFormula = { defName: "total", type: "def" } as never;
+    renderLogic();
+    expect(operatorPicker().value).toBe("*");
   });
 });
 
@@ -209,7 +269,9 @@ describe("editing", () => {
   test("editing a sub-node writes the whole root back and preserves the rest of the tree", () => {
     const tab = openWorkspace();
     pointer(chipByTitle("+"), "click");
+    renderLogic();
     changeValue(operatorPicker(), "-");
+    renderLogic();
 
     const expr = (docState().total! as { $expression: Record<string, unknown> }).$expression;
     // The selected sub-node changed…
@@ -218,7 +280,7 @@ describe("editing", () => {
     expect(expr.operator).toBe("*");
     expect(expr.value).toBe(10);
 
-    // The workspace re-rendered against the updated document.
+    // The surface re-rendered against the updated document.
     expect(operatorPicker().value).toBe("-");
 
     // The write went through transactDoc: one undo step restores the previous tree.
@@ -230,7 +292,7 @@ describe("editing", () => {
 
   test("picking a catalog entry replaces the selected sub-node", async () => {
     openWorkspace();
-    pointer(canvasWrap.querySelector(".fw-browse-catalog") as HTMLElement, "click");
+    pointer(dock.querySelector(".fw-browse-catalog") as HTMLElement, "click");
     await flush();
     const item = [...document.querySelectorAll(".quick-search-item")].find(
       (el) => el.querySelector(".quick-search-name")?.textContent === "?:",
@@ -244,7 +306,7 @@ describe("editing", () => {
 
   test("picking a packaged formula vendors its state def before inserting the call", async () => {
     openWorkspace();
-    pointer(canvasWrap.querySelector(".fw-browse-catalog") as HTMLElement, "click");
+    pointer(dock.querySelector(".fw-browse-catalog") as HTMLElement, "click");
     await flush();
     const item = [...document.querySelectorAll(".quick-search-item")].find(
       (el) => el.querySelector(".quick-search-name")?.textContent === "sum",
@@ -265,6 +327,7 @@ describe("editing", () => {
     openWorkspace({ defName: "mathArgs", type: "def" });
     // The first call argument is an expression node → a parenthesized group chip.
     pointer(chipByTitle("(1 › +)"), "click");
+    renderLogic();
     changeValue(operatorPicker(), "-");
 
     const expr = (docState().mathArgs! as { $expression: Record<string, unknown> }).$expression;
@@ -282,19 +345,110 @@ describe("editing", () => {
 describe("close", () => {
   test("the Close button clears editingFormula", () => {
     const tab = openWorkspace();
-    pointer(canvasWrap.querySelector(".fw-close") as HTMLElement, "click");
+    pointer(dock.querySelector(".fw-close") as HTMLElement, "click");
     expect(tab.session.ui.editingFormula).toBeNull();
   });
 
-  test("renderFormulaWorkspace is a no-op without a target", () => {
+  test("with no target the tab says what it is for instead of painting a blank box", () => {
     const tab = openWorkspace();
     closeFormulaWorkspace();
     expect(tab.session.ui.editingFormula).toBeNull();
-    canvasWrap.textContent = "";
-    // @ts-expect-error -- _$litPart$ is Lit's private render-part marker, not in the DOM types
-    delete canvasWrap["_$litPart$"];
-    renderFormulaWorkspace();
-    expect(canvasWrap.querySelector(".formula-workspace")).toBeNull();
+    renderLogic();
+    expect(dock.querySelector(".formula-workspace")).toBeNull();
+    expect(dock.textContent).toContain("Open a formula or a function to edit it here");
+  });
+});
+
+// ─── The target, and the reveal ───────────────────────────────────────────────
+
+describe("logicTarget", () => {
+  test("is null with no tab and null with no target", () => {
+    expect(logicTarget(null)).toBeNull();
+    resetWorkspaceWithTab(docFixture(), { id: "fw-tab" });
+    expect(logicTarget()).toBeNull();
+  });
+
+  test("the function editor wins when both fields are set", () => {
+    const tab = openWorkspace();
+    tab.session.ui.editingFunction = { defName: "count", type: "def" } as never;
+    expect(logicTarget()?.surface).toBe("function");
+    renderLogic();
+    // One tab, two surfaces: the code container replaces the chip pipeline.
+    expect(dock.querySelector(".fw-code")).not.toBeNull();
+    expect(dock.querySelector(".fw-chips")).toBeNull();
+    expect(dock.querySelector(".fw-title")?.textContent).toContain("count");
+  });
+});
+
+describe("revealLogicPanel", () => {
+  // The canvas no longer calls anything when a formula opens: it keeps rendering the page, and the
+  // Dock reveals its own tab. This is the reveal itself, and the stage is untouched by it.
+  test("selects the Logic tab, opens the dock, and leaves the stage alone", () => {
+    openWorkspace();
+    canvasWrap.textContent = "the rendered page";
+    shell.bottomTab = "problems";
+    shell.docks.bottom.collapsed = true;
+
+    revealLogicPanel();
+
+    expect(shell.bottomTab).toBe("logic");
+    expect(shell.docks.bottom.collapsed).toBe(false);
+    expect(canvasWrap.textContent).toBe("the rendered page");
+  });
+});
+
+/**
+ * The one WRITER of the two fields {@link logicTarget} reads, and therefore the one place the "one
+ * tab, one target" rule can be kept. Every opener used to set its own field and leave the other
+ * alone, and `logicTarget` gives the function editor the tie — so "Open in formula workspace" while
+ * a Function body was open did nothing visible at all.
+ */
+describe("openLogicTarget", () => {
+  test("opening a formula takes the target from an open function", () => {
+    const tab = openWorkspace();
+    tab.session.ui.editingFunction = { defName: "count", type: "def" } as never;
+    expect(logicTarget()?.surface).toBe("function");
+
+    openLogicTarget({ editing: { defName: "mathArgs", type: "def" }, surface: "formula" });
+
+    expect(tab.session.ui.editingFunction).toBeNull();
+    expect(tab.session.ui.editingFormula).toEqual({ defName: "mathArgs", type: "def" });
+    expect(logicTarget()?.surface).toBe("formula");
+    renderLogic();
+    expect(dock.querySelector(".fw-title")?.textContent).toContain("mathArgs");
+  });
+
+  test("opening a function takes the target from an open formula", () => {
+    const tab = openWorkspace();
+    expect(logicTarget()?.surface).toBe("formula");
+
+    openLogicTarget({
+      editing: { eventKey: "onclick", path: ["children", 0], type: "event" },
+      surface: "function",
+    });
+
+    expect(tab.session.ui.editingFormula).toBeNull();
+    expect(logicTarget()?.surface).toBe("function");
+  });
+
+  test("reveals the surface itself, so a closed dock is not a dead click", () => {
+    openWorkspace();
+    shell.bottomTab = "problems";
+    shell.docks.bottom.collapsed = true;
+
+    // Same target the tab already holds: nothing CHANGES, so the dock's once-per-target effect has
+    // Nothing to fire on. The gesture is a separate event and says so.
+    openLogicTarget({ editing: { defName: "total", type: "def" }, surface: "formula" });
+
+    expect(shell.bottomTab).toBe("logic");
+    expect(shell.docks.bottom.collapsed).toBe(false);
+  });
+
+  test("is inert with no tab open rather than throwing", () => {
+    closeAllTabs();
+    expect(() =>
+      openLogicTarget({ editing: { defName: "total", type: "def" }, surface: "formula" }),
+    ).not.toThrow();
   });
 });
 
@@ -304,7 +458,7 @@ describe("event-type target", () => {
   test("resolves the element event binding's $expression and edits write through", () => {
     const tab = openWorkspace({ eventKey: "onclick", path: ["children", 0], type: "event" });
 
-    expect(canvasWrap.querySelector(".fw-title")?.textContent).toContain("onclick");
+    expect(dock.querySelector(".fw-title")?.textContent).toContain("onclick");
     expect(operatorPicker().value).toBe("+=");
 
     changeValue(operatorPicker(), "=");
@@ -325,27 +479,5 @@ describe("event-type target", () => {
     // Def target without a defName, and an event target without a path — both fall through.
     expect(formulaRoot(tab, { type: "def" } as never)).toBeNull();
     expect(formulaRoot(tab, { eventKey: "onclick", type: "event" } as never)).toBeNull();
-  });
-});
-
-// ─── Canvas takeover ──────────────────────────────────────────────────────────
-
-describe("canvas takeover", () => {
-  test("rendering runs and clears canvas DnD/event cleanups and panel registrations", () => {
-    const calls: string[] = [];
-    const tab = resetWorkspaceWithTab(docFixture(), { id: "fw-tab" });
-    tab.session.canvas.scope = { count: 2 };
-    tab.session.ui.editingFormula = { defName: "total", type: "def" } as never;
-    view.canvasDndCleanups = [() => calls.push("dnd")];
-    view.canvasEventCleanups = [() => calls.push("event")];
-    canvasPanels.push({} as never);
-
-    renderFormulaWorkspace();
-
-    expect(calls).toEqual(["dnd", "event"]);
-    expect(view.canvasDndCleanups).toEqual([]);
-    expect(view.canvasEventCleanups).toEqual([]);
-    expect(canvasPanels.length).toBe(0);
-    expect(canvasWrap.querySelector(".formula-workspace")).not.toBeNull();
   });
 });

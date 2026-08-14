@@ -1,0 +1,346 @@
+# Lane 2 of the screenshot gate (UX-REDESIGN-PLAN §13.5).
+#
+# Lane 1 (`scripts/check-shot-contract.ts`, in the `checks` job) is semantically blind: a command
+# that still exists and now means something different sails through it green. Nightly-only would
+# mean the wrong picture already shipped; a label would mean opt-in. Both make staleness nobody's
+# job, which is exactly how two shots stayed red on main for weeks under green CI.
+#
+# So this lane is REQUIRED on any PR touching the surfaces a picture is of — and its failure mode is
+# a bot commit, not a red X:
+#
+#   * It re-captures, pushes the changed PNGs AND the updated capture lock to the PR branch, and
+#     posts (or updates) ONE comment: shot, changed-pixel %, before/after thumbnails, and the docs
+#     pages each changed image appears on.
+#   * A visual change reports NEUTRAL, always. Whether a picture is *right* is an aesthetic
+#     judgement CI cannot make, and pretending otherwise is what taught everyone to click past it.
+#   * It goes RED only on a shot error — a failed `expect`, an unknown command id, an unresolvable
+#     region, an `idle()` timeout. Those are regressions, and `bun run screenshots` exits non-zero
+#     for exactly them.
+#
+# Two things this workflow needs that are settings, not code, and must not arrive as a surprise:
+#
+#   1. `contents: write` (below) has to be permitted for the repository's Actions token —
+#      Settings → Actions → General → Workflow permissions. Without it the push step 403s and the
+#      lane degrades to the fork path (artifact only).
+#   2. "Required" is branch protection, not workflow config. Add `screenshots` to the required
+#      checks for `main` when this first goes green.
+#
+# Fork PRs get no credentials by design: the run is read-only, the diff is an artifact, and a
+# maintainer lands the lock with `workflow_dispatch`.
+
+name: Screenshots
+
+on:
+  pull_request:
+    paths:
+      # The surfaces a picture is OF.
+      - "packages/studio/src/**"
+      - "packages/starters/**"
+      # The pipeline itself, and the lock's own definition.
+      - "scripts/screenshots/**"
+      - "scripts/check-image-lock.ts"
+      - "scripts/lib/png.ts"
+      - ".github/workflows/screenshots.yml"
+      # Someone hand-editing bytes: the lane is the fastest way to say so out loud.
+      - "docs/images/**"
+  schedule:
+    # Nightly on main. Not a push gate — it catches drift that no PR caused (a base-image rebuild,
+    # A font package, a dependency bump), which is drift nobody would otherwise see until the next
+    # Studio PR blamed itself for it.
+    - cron: "0 5 * * *"
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "PR number to re-capture and push to (the fork path — needs 'allow edits by maintainers')"
+        required: false
+        type: string
+
+# `contents: write` pushes the re-capture; `pull-requests: write` posts the one comment;
+# `checks: write` publishes the NEUTRAL conclusion that a visual change deserves and that a job
+# Conclusion cannot express.
+permissions:
+  contents: write
+  pull-requests: write
+  checks: write
+
+concurrency:
+  group: screenshots-${{ github.event.pull_request.number || github.event.inputs.pr || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    # A PINNED container, Chromium AND fontconfig. The fontset is not optional: the Spectrum UI
+    # Stack resolves differently on NixOS and on Ubuntu, so a hash lock over bytes rendered with an
+    # Unknown font set is a lock nobody can reproduce — which is why every lock entry records the
+    # Runtime triple (Chromium major · fontset id · OS) that `scripts/check-image-lock.ts` reads.
+    #
+    # PIN THIS BY DIGEST (`docker buildx imagetools inspect <image>:<tag>`) on the first green run.
+    # Until then the tag is the pin and the lock's `runtime` triple is what makes a silent base
+    # Image move visible: the triple changes, and the diff says so on every entry.
+    container:
+      image: ghcr.io/puppeteer/puppeteer:25.4.0
+      options: --user root
+    env:
+      # The image ships Chrome for Testing under /root/.cache, which is NOT on PATH.
+      # `findChromium()` (scripts/screenshots/lib/browser.ts) resolves by PATH NAME, so the
+      # binary has to be handed over as CHROMIUM_BIN — see the step that resolves it below.
+      PUPPETEER_SKIP_DOWNLOAD: "1"
+      TZ: UTC
+      LANG: C.UTF-8
+
+    steps:
+      - name: Resolve the head to capture
+        id: target
+        shell: bash
+        env:
+          INPUT_PR: ${{ github.event.inputs.pr }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "ref=${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+            echo "branch=${{ github.event.pull_request.head.ref }}" >> "$GITHUB_OUTPUT"
+            echo "pr=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+            echo "fork=${{ github.event.pull_request.head.repo.fork }}" >> "$GITHUB_OUTPUT"
+          elif [ -n "${INPUT_PR:-}" ]; then
+            echo "ref=refs/pull/${INPUT_PR}/head" >> "$GITHUB_OUTPUT"
+            echo "pr=${INPUT_PR}" >> "$GITHUB_OUTPUT"
+            echo "fork=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=${{ github.ref }}" >> "$GITHUB_OUTPUT"
+            echo "pr=" >> "$GITHUB_OUTPUT"
+            echo "fork=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # The job runs in a CONTAINER, so the checkout lands owned by a different uid than the one
+      # git runs as, and git's `dubious ownership` guard then refuses every command in this file.
+      # It fails QUIETLY where it matters: `git archive HEAD docs/images` writes nothing to the
+      # pipe, `tar` reports "This does not look like a tar archive", and the lane goes red on a
+      # plumbing error dressed as a capture failure. It had been red that way since P6 — six runs —
+      # which is the whole reason this lane distinguishes a broken pipeline from changed pictures.
+      # Set before the checkout so the action's own post-step is covered too.
+      - name: Trust the container workspace
+        shell: bash
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.target.outputs.ref }}
+          # The report diffs the working tree against the lock as committed, so the merge base has
+          # To exist locally.
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Install fontconfig
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v fc-list >/dev/null; then
+            apt-get update -qq && apt-get install -y -qq fontconfig
+          fi
+          # Recorded in the log so a lock whose `fontset` id moved can be explained without guessing.
+          fc-list --format '%{family[0]}\n' | sort -u | wc -l
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          # Pinned with the rest of CI (see .github/workflows/test.yml).
+          bun-version: 1.3.13
+
+      - run: bun install --frozen-lockfile
+
+      # The picture must be of the working tree's bundle. The runner asserts bundle freshness (S0)
+      # And will refuse a stale dist rather than photograph one.
+      - run: bun run build
+
+      - name: Snapshot the committed images and lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/before
+          git archive HEAD docs/images | tar -x -C /tmp/before
+          git show HEAD:scripts/screenshots/capture.lock.json > /tmp/before/capture.lock.json \
+            || echo '{"lock":1,"manifest":"scripts/screenshots/manifest.json","images":{}}' \
+              > /tmp/before/capture.lock.json
+          echo "BEFORE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      # THE ONLY STEP ALLOWED TO TURN THIS LANE RED. `bun run screenshots` exits non-zero on a
+      # Failed `expect`, an unknown command id, an unresolvable region or an `idle()` timeout — and
+      # On nothing else. It is `continue-on-error` so the comment is still posted when it fails
+      # (a broken shot is exactly when you want to see which pictures went with it); the explicit
+      # Gate at the end of the job re-raises it.
+      # CHROMIUM_BIN is the contract every entry point documents (README, run.ts, thumbnails.ts)
+      # And the first candidate `findChromium()` tries. It was never set here: the env block above
+      # Claimed the path was "given explicitly" and it was not, so the lane would have died with
+      # "No chromium/chrome binary found" the moment anything upstream of it worked. It never got
+      # That far, because the `safe.directory` fault killed it first.
+      #
+      # ASK THE IMAGE, do not guess at it. The first attempt hardcoded /root/.cache/puppeteer and
+      # Found nothing — the image installs browsers under its own `pptruser` home, and Actions runs
+      # Steps with HOME=/github/home, so neither `~` nor root's cache is the answer. The image has
+      # Puppeteer itself installed, and `executablePath()` is the authoritative answer; the search
+      # Is only there for the day that stops being true. Failing loudly beats falling back to a
+      # System browser: the lock records a Chromium major, and bytes from an unrecorded binary are
+      # A lock nobody can reproduce.
+      - name: Resolve the container's Chrome for Testing
+        shell: bash
+        run: |
+          set -uo pipefail
+          bin=$(node -e "try{process.stdout.write(require('puppeteer').executablePath())}catch(e){}" 2>/dev/null || true)
+          if [ ! -x "${bin:-}" ]; then
+            bin=$(find / -xdev -type f -path '*/chrome-linux64/chrome' -perm -u+x 2>/dev/null \
+              | sort | tail -n 1)
+          fi
+          if [ ! -x "${bin:-}" ]; then
+            echo "::error::No Chrome for Testing in this image. Diagnostics follow."
+            echo "HOME=$HOME  PUPPETEER_CACHE_DIR=${PUPPETEER_CACHE_DIR:-unset}"
+            ls -la /home 2>&1 | head -10
+            find / -xdev -maxdepth 6 -type d -name puppeteer 2>/dev/null | head -10
+            exit 1
+          fi
+          echo "CHROMIUM_BIN=$bin" >> "$GITHUB_ENV"
+          # Logged because the lock's runtime triple records the Chromium major: when a lock entry
+          # Changes for no visible reason, this line is what says the browser moved.
+          "$bin" --version
+
+      - name: Capture
+        id: capture
+        continue-on-error: true
+        shell: bash
+        run: bun run screenshots --force
+
+      # Integrity: the runner must have written a lock that names every byte it produced. This
+      # Failing means the pipeline is broken, not that a picture changed — so it is also red.
+      - name: Verify the lock
+        id: verify
+        continue-on-error: true
+        shell: bash
+        run: bun run docs:images:check
+
+      - name: Build the report
+        id: report
+        shell: bash
+        run: |
+          set -euo pipefail
+          # No --after-sha yet: the commit that will hold the new bytes does not exist. The "after"
+          # Column reads "—" rather than pointing at a URL that 404s, and the step after the push
+          # Rebuilds the report with the real sha.
+          bun scripts/check-image-lock.ts --report /tmp/screenshots-report.md \
+            --before-lock /tmp/before/capture.lock.json \
+            --before-images /tmp/before/docs/images \
+            --repo "${{ github.repository }}" \
+            --before-sha "${BEFORE_SHA}" > /dev/null
+          if git diff --quiet -- docs/images scripts/screenshots/capture.lock.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+          cat /tmp/screenshots-report.md >> "$GITHUB_STEP_SUMMARY"
+
+      # ── Push (same-repo PRs only) ──────────────────────────────────────────
+      # A GITHUB_TOKEN push does not re-trigger workflows, which is deliberate here: the lane must
+      # Not chase its own commit round a loop.
+      - name: Push the re-capture
+        id: push
+        if: >-
+          steps.report.outputs.changed == 'true' &&
+          steps.target.outputs.fork != 'true' &&
+          steps.target.outputs.branch != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "jx-screenshots[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/images scripts/screenshots/capture.lock.json
+          git commit -m "chore(screenshots): re-capture for ${{ steps.target.outputs.ref }}" \
+            -m "Written by .github/workflows/screenshots.yml. Review the pictures, not the bytes."
+          git push origin "HEAD:${{ steps.target.outputs.branch }}"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      # The "after" thumbnails can only be addressed once the commit exists, so the report is built
+      # A second time with the real sha. Cheap: it re-reads the PNGs, it does not re-capture.
+      - name: Address the report at the pushed commit
+        if: steps.push.outputs.sha != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          bun scripts/check-image-lock.ts --report /tmp/screenshots-report.md \
+            --before-lock /tmp/before/capture.lock.json \
+            --before-images /tmp/before/docs/images \
+            --repo "${{ github.repository }}" \
+            --before-sha "${BEFORE_SHA}" \
+            --after-sha "${{ steps.push.outputs.sha }}" > /dev/null
+
+      # ── Fork PRs: no credentials, no push ──────────────────────────────────
+      - name: Upload the diff (fork PRs and nightly)
+        if: >-
+          steps.report.outputs.changed == 'true' &&
+          (steps.target.outputs.fork == 'true' || steps.target.outputs.branch == '')
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-recapture
+          path: |
+            /tmp/screenshots-report.md
+            docs/images
+            scripts/screenshots/capture.lock.json
+          retention-days: 14
+
+      # ── One comment, updated in place ──────────────────────────────────────
+      - name: Comment
+        if: steps.target.outputs.pr != '' && steps.target.outputs.fork != 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('node:fs');
+            const marker = '<!-- jx-screenshots-report -->';
+            let body = fs.readFileSync('/tmp/screenshots-report.md', 'utf8');
+            if ('${{ steps.capture.outcome }}' === 'failure') {
+              body += '\n> [!CAUTION]\n> **A shot errored.** That is a regression, not an ' +
+                'aesthetic change — see the job log. The images above are whatever the run ' +
+                'managed to produce before it stopped.\n';
+            } else if ('${{ steps.target.outputs.fork }}' !== 'true') {
+              body += '\n_Pushed by `.github/workflows/screenshots.yml`. ' +
+                'A changed picture is never a failure here._\n';
+            }
+            const { owner, repo } = context.repo;
+            const issue_number = Number('${{ steps.target.outputs.pr }}');
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number, per_page: 100,
+            });
+            const existing = comments.find(
+              (c) => c.user.type === 'Bot' && c.body.startsWith(marker),
+            );
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
+
+      # A job conclusion is only success or failure, so NEUTRAL — the honest answer to "the picture
+      # Changed" — is published as its own check run against the head commit.
+      - name: Publish the neutral conclusion
+        if: steps.report.outputs.changed == 'true' && steps.capture.outcome == 'success'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const head_sha = '${{ steps.push.outputs.sha }}' || context.sha;
+            await github.rest.checks.create({
+              ...context.repo,
+              name: 'screenshots / visual change',
+              head_sha,
+              status: 'completed',
+              conclusion: 'neutral',
+              output: {
+                title: 'Images were re-captured',
+                summary: 'The pictures changed and were pushed with an updated capture lock. ' +
+                  'Whether they are RIGHT is a review judgement, so this is neutral by design.',
+              },
+            });
+
+      # The only two conditions that are allowed to fail this lane.
+      - name: Fail on a shot error
+        if: steps.capture.outcome == 'failure' || steps.verify.outcome == 'failure'
+        shell: bash
+        run: |
+          echo "::error::A shot errored, or the capture lock does not describe what was written."
+          echo "A changed picture is neutral here; a broken shot is not. See the steps above."
+          exit 1

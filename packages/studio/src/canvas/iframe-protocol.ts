@@ -46,6 +46,22 @@ export interface WireMapperCtx {
   arrayPaths: string[];
 }
 
+/**
+ * One live binding, as the frame needs to know it: the chord and the scope that holds it.
+ *
+ * Scopes are carried rather than flattened because the frame picks its own stack per keystroke —
+ * `caret` when an inline-edit session is live, `canvas` when the artboard has a selection, `global`
+ * under both — which is the same ladder `commands/context.ts`'s `keyScopeStack` walks host-side.
+ * Flattening to "chords the parent wants" would lose exactly the distinction that lets ⌘C reach the
+ * browser mid-sentence and the structural copy verb at every other moment.
+ *
+ * The command ID is deliberately absent: the frame decides whether to FORWARD, never what runs.
+ */
+export interface SyncedChord {
+  chord: string;
+  scope: "caret" | "canvas" | "global";
+}
+
 /** Messages the editor (parent) sends into the canvas iframe. */
 export type ParentToIframe =
   | { kind: "init"; gen: number }
@@ -82,6 +98,40 @@ export type ParentToIframe =
   // Flip the forced color-scheme preview on the iframe root without re-rendering — a document-level
   // Idempotent attribute write, deliberately gen-less (like endEdit).
   | { kind: "setColorScheme"; scheme: "light" | "dark" | null }
+  /**
+   * Open the slash menu at the caret, by name rather than by typing "/".
+   *
+   * The gesture is recognised inside the frame (`canvas/iframe-inline-edit.ts`), because that is
+   * where the keystroke is; this is the door for `insert.openSlashMenu` — the palette, a rebound
+   * chord, the automation runner and the assistant. The frame opens it UNANCHORED: there is no "/"
+   * in the document, so the menu carries its own filter field and selecting a block deletes
+   * nothing.
+   *
+   * Gen-less and render-free, like `setColorScheme` above. A frame with no caret session ignores
+   * it, which is the same refusal the record's `requires` sentence states.
+   */
+  | { kind: "openSlash" }
+  /**
+   * The chord table, so the frame forwards exactly what the host's registry binds.
+   *
+   * The frame used to answer "does the parent want this keystroke?" from three hand-written lists —
+   * eight bare keys, four "the editor owns these" chords, three "the browser owns these" chords —
+   * maintained beside a registry that already knew the answer. They disagreed in both directions:
+   * ⌘A was forwarded and `preventDefault`ed by a frame that assumed the host would claim it (no
+   * record binds it, so select-all did nothing AND the native one was suppressed), while ⌘B was
+   * withheld on the assumption the editing engine handled it (it does not — the parent's
+   * block-level keydown listener never fires against a container-level editing host, and
+   * `canvas/editable-actions.ts` rejects the browser's own `formatBold`), so Bold in the canvas did
+   * nothing at all.
+   *
+   * Idempotent and render-free, like `setColorScheme` above, and deliberately gen-less: it
+   * describes the APP, not a document. The host reposts it whenever the keymap changes, which is
+   * what makes a rebinding in Preferences take effect inside the canvas.
+   *
+   * A frame built before this message existed ignores it and keeps its own lists — which is the
+   * compatibility story `dist/iframe-entry.js` shipping prebuilt requires.
+   */
+  | { kind: "keymap"; mac: boolean; chords: readonly SyncedChord[] }
   // Replace the injected site-style sheet in place (live design-token editing) — idempotent and
   // Render-free; the superseding render carries the same style via its own siteStyle.
   | {
@@ -240,6 +290,29 @@ export interface DropPreview {
   edge: "top" | "bottom" | "inside";
 }
 
+/**
+ * A click that landed on LAYOUT chrome — a header, a footer, anything the layout file contributes
+ * that is not the page's own content. Such a node has no page-document path, so it can never be a
+ * {@link NodeHit}; it is addressed by the layout FILE it came from plus its path inside that file.
+ *
+ * This is the message that makes the first click a new author makes do something. On a default
+ * project the two most conspicuous strings on the page ("My Site", "Built with Jx") both come from
+ * `layouts/base.json`, and before this existed clicking either one selected nothing, hovered
+ * nothing and posted nothing.
+ */
+export interface LayoutHit {
+  /** Project-relative path of the layout document, e.g. `layouts/base.json`. */
+  layoutFile: string;
+  /** The clicked node's path WITHIN that layout document (what to select once it is open). */
+  layoutPath: (string | number)[];
+  /** The rendered tag, for the panel's `<header>` label. */
+  tagName: string;
+  /** The rendered class list, shown read-only in the panel. */
+  className: string;
+  /** The node's box, in iframe-viewport coords (same convention as {@link NodeHit}). */
+  rect: SerializableRect;
+}
+
 /** A document path plus the iframe-space rect of the node it resolves to. */
 export interface NodeHit {
   path: (string | number)[];
@@ -308,7 +381,31 @@ export type IframeToParent =
   // Not the parent, now resolves the scope). `gen` lets the parent drop a snapshot from a superseded
   // Render. Posted right after `renderComplete`; values are JSON-safe deep clones (see serialize-scope).
   | { kind: "dataScope"; gen: number; scope: Record<string, unknown> }
-  | { kind: "hit"; hit: NodeHit }
+  // The frame's own quiescence, ANSWERED rather than polled (spec §13.5, plan §13.4 condition 5).
+  // Nothing in the parent realm can see inside a cross-origin frame, so a parent that wanted to
+  // Know whether the canvas had settled could only sleep. The frame samples itself at its own rAF
+  // And posts whenever the tuple changes, ending with the quiet one; the host holds the latest.
+  //
+  // `fonts` is `document.fonts.status === "loaded"` and is NOT sufficient alone — in a blank canvas
+  // Frame it reports "loaded" against an EMPTY font set (measured in S0: `hero` drifted 0.150 RMSE
+  // Because the first capture measured fallback metrics while Plus Jakarta Sans was still in
+  // Flight). It is honest only together with `gen` (a frame that has not acked a render has not
+  // Loaded its fonts either) and the runner's per-frame network count.
+  //
+  // `images` counts images whose load FAILED and whose retry (`installCanvasImageRetry`, re-firing
+  // At 150/300/450 ms) has not resolved. Deliberately NOT "images not yet complete": blocking on
+  // `img.complete` failed 8 of 61 shots — the design canvas renders unresolved bindings as literal
+  // Srcs, several starters ship a 404 favicon, and lazy images below the fold never complete. A
+  // Pending retry is the one image fact only the app knows.
+  | { kind: "idle"; gen: number; fonts: boolean; animations: number; images: number }
+  // `additive` is Ctrl/Cmd being held at the moment of the click — the ACCUMULATE gesture, which
+  // The parent turns into a toggle against `session.selection` (studio §6.5). Absent/false is a
+  // Plain replace, which is what every canvas click was before the selection became a set.
+  | { kind: "hit"; hit: NodeHit; additive?: boolean }
+  // A click on layout chrome (see {@link LayoutHit}). Distinct from `hit` because the target is not
+  // In the page document at all: the parent adopts it as `view.layoutSelection` (which shows the
+  // Read-only layout panel with its "Open Layout →" action) rather than as a document selection.
+  | { kind: "layoutHit"; hit: LayoutHit }
   | { kind: "hover"; hit: NodeHit | null }
   // Candidate insertion "+" zones for the hovered node, recomputed on pointermove (cross-origin
   // Cousin of the legacy insertion-helper). `null` clears the "+" (cursor mid-element / left the
@@ -417,7 +514,17 @@ export type IframeToParent =
   // The engine (in the iframe) detected "/" in a live edit session; the parent shows the real
   // Lit/Spectrum menu. Re-posted with a new `filter` as the author keeps typing (the engine's
   // UpdateSlashMenu drives it). `rect` is the edited element's bbox in IFRAME-VIEWPORT coords.
-  | { kind: "slashShow"; rect: SerializableRect; filter: string }
+  /**
+   * Show the parent's slash menu at this rect.
+   *
+   * `showFilter` is what an UNANCHORED menu needs — one opened by `insert.openSlashMenu` rather
+   * than by typing "/". There is no "/…" run in the document to narrow the list with, so the menu
+   * has to carry its own field or the only way past fifteen blocks is scrolling. It existed as a
+   * callback option INSIDE the frame and was dropped at this boundary, which is the argument for a
+   * message carrying every fact its receiver needs rather than most of them: the loss was
+   * invisible, because the menu still appeared.
+   */
+  | { kind: "slashShow"; rect: SerializableRect; filter: string; showFilter?: boolean }
   // A menu-navigation key pressed in the iframe while the parent menu is open. The iframe
   // Intercepts these four keys capture-phase (restoring the "menu captures Enter" contract) and the
   // Host drives the parent menu's key handler directly — no synthetic keydown redispatch.
@@ -430,6 +537,21 @@ export type IframeToParent =
   // Browser menu is still suppressed, legacy parity); x/y are IFRAME-VIEWPORT coords for the host
   // To convert via its empirical geometry.
   | { kind: "contextMenu"; path: (string | number)[] | null; x: number; y: number }
+  // ─── Pane focus ─────────────────────────────────────────────────────────────
+  // A pointer went down somewhere in this frame. Nothing else — no path, no coordinates, no
+  // Selection: it says only "the person is working in this pane now", which the parent realm cannot
+  // Observe for itself because a pointer event inside a cross-origin iframe is delivered in the
+  // Frame's own realm and never surfaces above it.
+  //
+  // `hit` used to be the whole seam, and it has two holes. It is not posted in PREVIEW at all — a
+  // Click there is a click on the page, never a selection — so a pane showing Preview could not be
+  // Focused by clicking the thing it is showing; and in edit/design it is only posted when the
+  // Click lands ON a `[data-jx-path]` node, so clicking an artboard's empty margin focused nothing
+  // Either. Both left the keyboard in the other pane while the person was plainly in this one.
+  //
+  // Deliberately NOT in the host's preview block-list: focusing a pane is not an edit, and it is
+  // The one thing preview must still report.
+  | { kind: "paneFocus" }
   // ─── Preview navigation ─────────────────────────────────────────────────────
   // A link was clicked in PREVIEW mode. Preview keeps anchors live (design/edit de-link them onto
   // `data-jx-href`), so the click would navigate the canvas iframe away and destroy the render —

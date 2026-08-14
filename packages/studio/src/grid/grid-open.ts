@@ -19,8 +19,11 @@ import {
 } from "./sources/content-source";
 import { createConnectorSource } from "./sources/connector-source";
 import { makeGridTabId } from "./grid-source";
+import { libraryTabId } from "../browse/library-source";
+import { argsSchema, optionalStringArg, stringArg, stringProperty } from "../commands/command-args";
 import type { GridSource } from "./grid-source";
 import type { Tab } from "../tabs/tab";
+import type { AnyCommand, CommandRegistry } from "../commands/registry";
 
 /** Placeholder document for grid tabs — the grid never reads it; save routes to the controller. */
 const GRID_STUB_DOCUMENT = { children: [], tagName: "div" };
@@ -78,6 +81,32 @@ export function openCollectionGrid(typeName: string): Tab {
     return existing;
   }
   return openVirtualGridTab(createCollectionSource(typeName));
+}
+
+/**
+ * Open (or activate) the Library.
+ *
+ * A real tab, in the primary pane, with `manage` as its only mode — `commands/context.ts` maps that
+ * to the `library` editor kind, so the status bar and the pane context bar can name what is on
+ * screen. It is opened here rather than in `browse/` because this is the module that knows how a
+ * virtual tab is made; the pane itself resolves its own source and its own view state.
+ *
+ * Idempotent by construction, which is what lets a shot say "the Library is open" without caring
+ * whether an earlier step opened it.
+ */
+export function openLibraryTab(): Tab {
+  const id = libraryTabId();
+  const existing = workspace.tabs.get(id);
+  if (existing) {
+    activateTab(id);
+    return existing;
+  }
+  return openTab({
+    capabilities: { modes: ["manage"] },
+    document: structuredClone(GRID_STUB_DOCUMENT),
+    documentPath: null,
+    id,
+  });
 }
 
 /** Open (or activate) the pages metadata grid. */
@@ -165,5 +194,96 @@ export async function openGridSourcePicker(): Promise<void> {
         )}
       </sp-menu>
     </sp-dialog-wrapper>`,
+    { label: "Open Grid" },
   );
+}
+
+// ─── Commands ─────────────────────────────────────────────────────────────────
+
+/**
+ * The grid openers, as commands.
+ *
+ * `collection.editInGrid` used to be a press on the file tree's context-menu row, matched by the
+ * item's rendered label ("Edit Collection in Grid") through an XPath — so the shot that used it
+ * also had to open the menu first, and renaming the row broke both steps. Naming the COLLECTION
+ * instead of the control is what plan §13's R1 asks for: the menu row and the command are the same
+ * action, and only one of them is addressable.
+ *
+ * Both refuse a source the project does not declare. `data.openGrid` is additionally gated on the
+ * platform serving the data routes (`capability.dataRows`), so on a build without them the command
+ * is visible-but-disabled with a reason rather than opening a tab that can never load.
+ *
+ * @returns {AnyCommand[]}
+ */
+export function gridCommands(): AnyCommand[] {
+  return [
+    {
+      args: argsSchema({
+        name: stringProperty("The content collection's name, as project.json declares it."),
+      }),
+      category: "Project",
+      id: "collection.editInGrid",
+      level: "project",
+      menus: ["context/file", "palette"],
+      group: "5_data",
+      requires: "a project that declares content collections",
+      when: (ctx) => ctx.project.open,
+      aiTool: {
+        description: "Open a content collection's entries as an editable grid in a new tab.",
+        name: "open_collection_grid",
+      },
+      run: (_commandCtx, args) => {
+        const name = stringArg("collection.editInGrid", args, "name");
+        const declared = collectionDirs().map((c) => c.name);
+        if (!declared.includes(name)) {
+          throw new RangeError(
+            `command "collection.editInGrid" argument "name": "${name}" is not a content ` +
+              `collection this project declares — it declares: ` +
+              `${declared.length > 0 ? declared.join(", ") : "none"}`,
+          );
+        }
+        openCollectionGrid(name);
+      },
+      title: "Edit Collection in Grid",
+    },
+    {
+      args: {
+        additionalProperties: false,
+        properties: {
+          connection: stringProperty(
+            'The connection name from project.json. Defaults to "default".',
+          ),
+          table: stringProperty("The table to open."),
+        },
+        required: ["table"],
+        type: "object",
+      },
+      category: "Project",
+      id: "data.openGrid",
+      level: "project",
+      menus: ["palette"],
+      group: "5_data",
+      requires: "a platform that serves the data routes",
+      when: (ctx) => ctx.project.open,
+      enablement: (ctx) => ctx.capability.dataRows,
+      aiTool: {
+        description: "Open a connector table as an editable grid in a new tab.",
+        name: "open_data_grid",
+      },
+      run: (_commandCtx, args) => {
+        const table = stringArg("data.openGrid", args, "table");
+        openConnectorGrid(optionalStringArg("data.openGrid", args, "connection"), table);
+      },
+      title: "Open Data Grid",
+    },
+  ];
+}
+
+/**
+ * Register the grid openers.
+ *
+ * @param {CommandRegistry} registry
+ */
+export function registerGridCommands(registry: CommandRegistry): void {
+  registry.registerAll(gridCommands());
 }

@@ -51,6 +51,25 @@ function rowByName(group: HTMLElement, displayName: string): HTMLElement {
   return row as HTMLElement;
 }
 
+/**
+ * The `.css-var-media-overrides` block that belongs to one token — the siblings between its row and
+ * the next one. A `querySelectorAll(...)[0]` would silently attribute one token's rows to another.
+ */
+function overridesFor(
+  container: HTMLElement,
+  groupTitle: string,
+  name: string,
+): HTMLElement | null {
+  let el = rowByName(groupByTitle(container, groupTitle), name).nextElementSibling;
+  while (el && !el.classList.contains("css-var-row")) {
+    if (el.classList.contains("css-var-media-overrides")) {
+      return el as HTMLElement;
+    }
+    el = el.nextElementSibling;
+  }
+  return null;
+}
+
 function setAndFire(el: Element, value: string, type = "change"): void {
   (el as HTMLInputElement).value = value;
   el.dispatchEvent(new Event(type, { bubbles: true }));
@@ -226,20 +245,25 @@ describe("font section", () => {
 describe("size section and media overrides", () => {
   const media = { "--": "1280px", "--sm": "(max-width: 600px)" };
 
-  test("no media names → no overrides UI", () => {
+  test("no declared context → no overrides UI at all, not even the add affordance", () => {
     const { container } = setup(baseStyle());
     expect(container.querySelector(".css-var-media-overrides")).toBeNull();
+    expect(container.querySelector(".css-var-override-add")).toBeNull();
   });
 
-  test("vars with a media-block override show the override row", () => {
+  test("only the var with an @--sm entry shows an override ROW; the rest show only the add picker", () => {
     const { container } = setup(baseStyle(), media);
-    const overrides = container.querySelectorAll(".css-var-media-overrides");
-    expect(overrides.length).toBe(1); // Only --size-gap has an @--sm entry
-    const label = overrides[0]!.querySelector(".css-var-media-label");
-    expect(label?.textContent).toBe("@--sm");
+    const rows = [...container.querySelectorAll(".css-var-media-row")];
+    expect(rows).toHaveLength(1); // Only --size-gap has an @--sm entry
+    expect(rows[0]!.querySelector(".css-var-media-label")?.textContent).toBe("@--sm");
     expect(
-      (overrides[0]!.querySelector("sp-textfield") as HTMLInputElement).getAttribute("value"),
+      (rows[0]!.querySelector("sp-textfield") as HTMLInputElement).getAttribute("value"),
     ).toBeNull(); // Value bound via property, not attribute
+
+    /* Every OTHER token is now reachable too: the block exists for the add picker alone, which is
+       the affordance that was missing — a token with no @media block could not be given one. */
+    const adds = container.querySelectorAll(".css-var-override-add");
+    expect(adds.length).toBe(6); // Seven tokens, minus --size-gap which already has @--sm
   });
 
   test("changing an override writes into the media block and persists", async () => {
@@ -351,37 +375,202 @@ describe("color scheme overrides", () => {
     expect(style()["@--dark"]).toBeUndefined();
   });
 
-  test("scheme queries are excluded from size-token media overrides", () => {
+  test("a size token overridden in a SCHEME shows that row too — one override vocabulary", () => {
+    /* The predecessor filtered scheme queries out of the size group's media rows, so a
+       `"@--dark": { "--size-gap": … }` written by hand was invisible in the form and survived
+       every edit unseen. A context is a context: the row is labelled by its KIND ("Dark" vs the
+       raw "@--sm"), not filtered by it. */
     const { container } = setup(
       { ...baseStyle(), "@--dark": { "--size-gap": "4px" } },
       { "--dark": "(prefers-color-scheme: dark)", "--sm": "(max-width: 600px)" },
     );
-    const sizes = groupByTitle(container, "Sizes & Spacing");
-    const labels = [...sizes.querySelectorAll(".css-var-media-label")].map((l) =>
+    const gapRows = overridesFor(container, "Sizes & Spacing", "Gap")!;
+    const labels = [...gapRows.querySelectorAll(".css-var-media-label")].map((l) =>
       l.textContent?.trim(),
     );
-    expect(labels).toContain("@--sm");
-    expect(labels).not.toContain("@--dark");
+    expect(labels).toEqual(["Dark", "@--sm"]); // Schemes first, then breakpoints
+    expect(gapRows.querySelectorAll(".css-var-scheme-row")).toHaveLength(1);
+    // A size token's scheme row is a plain field — the colour well belongs to colour tokens.
+    expect(gapRows.querySelector('.css-var-scheme-row input[type="color"]')).toBeNull();
   });
 
-  test("Enable dark scheme writes the scheme query into $media", async () => {
+  test("with no scheme declared the section points at Contexts and defines nothing", () => {
+    /* This button used to APPEND `--dark: (prefers-color-scheme: dark)` to $media — the fourth and
+       least discoverable of the four places a $media entry could be created, filed under
+       "variables" and never using the word breakpoint. §2 principle 5: this level overrides, the
+       Contexts section defines. What replaced it can only NAVIGATE. */
     const { container } = setup(baseStyle(), { "--sm": "(max-width: 600px)" });
     const colors = groupByTitle(container, "Colors");
     expect(colors.querySelectorAll(".css-var-scheme-row")).toHaveLength(0);
-    pointer(colors.querySelector(".css-vars-enable-dark")!, "click");
-    await flush();
-    expect((projectState as AnyConfig).projectConfig.$media["--dark"]).toBe(
-      "(prefers-color-scheme: dark)",
+    const link = [...colors.querySelectorAll("sp-action-button")].find((b) =>
+      b.textContent?.includes("Manage contexts"),
     );
-    // The editor re-rendered with the scheme rows now visible.
+    expect(link).toBeDefined();
+    expect(link!.getAttribute("title")).toContain("Project Settings");
+  });
+
+  test("pressing it moves the settings document to Contexts — it never defines one", async () => {
+    const { registerSettingsSection, setSettingsSection, settingsDocumentSection } =
+      await import("../src/settings/section-registry");
+    // Stand in for the two built-ins settings-document registers; this file never loads it.
+    registerSettingsSection({
+      key: "cssVars",
+      label: "CSS Variables",
+      order: 30,
+      render: () => {},
+    });
+    registerSettingsSection({ key: "contexts", label: "Contexts", order: 15, render: () => {} });
+    setSettingsSection("cssVars");
+    const { container } = setup(baseStyle(), { "--sm": "(max-width: 600px)" });
+    const colors = groupByTitle(container, "Colors");
+    const link = [...colors.querySelectorAll("sp-action-button")].find((b) =>
+      b.textContent?.includes("Manage contexts"),
+    )!;
+    pointer(link, "click");
+    await flush(4);
+    expect(settingsDocumentSection()).toBe("contexts");
     expect(
-      groupByTitle(container, "Colors").querySelectorAll(".css-var-scheme-row").length,
-    ).toBeGreaterThan(0);
+      (projectState as { $media?: unknown } & Record<string, any>).projectConfig.$media,
+    ).toEqual({ "--sm": "(max-width: 600px)" });
   });
 
   test("no scheme UI without a declared scheme query", () => {
     const { container } = setup(baseStyle(), { "--sm": "(max-width: 600px)" });
     expect(container.querySelectorAll(".css-var-scheme-row")).toHaveLength(0);
-    expect(container.querySelector(".css-vars-enable-dark")).not.toBeNull();
+    expect(
+      [...container.querySelectorAll("sp-action-button")].some((b) =>
+        b.textContent?.includes("Manage contexts"),
+      ),
+    ).toBe(true);
+  });
+});
+
+// ─── The add-an-override affordance (plan §9.4) ──────────────────────────────
+
+describe("adding an override", () => {
+  const media = {
+    "--": "1280px",
+    "--dark": "(prefers-color-scheme: dark)",
+    "--print": "print",
+    "--sm": "(max-width: 600px)",
+  };
+
+  function addPickerFor(container: HTMLElement, group: string, name: string): HTMLElement {
+    const picker = overridesFor(container, group, name)?.querySelector(
+      ".css-var-override-add sp-picker",
+    );
+    if (!picker) {
+      throw new Error(`no add-override picker for "${name}"`);
+    }
+    return picker as HTMLElement;
+  }
+
+  test("the picker offers every declared context the token has no value in, schemes first", () => {
+    const { container } = setup(baseStyle(), media);
+    const picker = addPickerFor(container, "Sizes & Spacing", "Gap");
+    const offered = [...picker.querySelectorAll("sp-menu-item")].map((i) => [
+      i.getAttribute("value"),
+      i.textContent?.trim(),
+    ]);
+    // --size-gap already has @--sm, so only the scheme and the feature query remain.
+    expect(offered).toEqual([
+      ["--dark", "Dark"],
+      ["--print", "@--print"],
+    ]);
+  });
+
+  test("picking a context seeds the override from the base value and persists it", async () => {
+    const { container, state } = setup(baseStyle(), media);
+    setAndFire(addPickerFor(container, "Sizes & Spacing", "Spacing Lg"), "--sm");
+    expect((style()["@--sm"] as AnyConfig)["--spacing-lg"]).toBe("32px");
+    await flush();
+    expect(JSON.parse(state.files.get("project.json")!).style["@--sm"]["--spacing-lg"]).toBe(
+      "32px",
+    );
+
+    // The row it created is now editable, and the picker no longer offers that context.
+    const offered = [
+      ...addPickerFor(container, "Sizes & Spacing", "Spacing Lg").querySelectorAll("sp-menu-item"),
+    ].map((i) => i.getAttribute("value"));
+    expect(offered).not.toContain("--sm");
+  });
+
+  test("a context name the picker does not offer is ignored rather than written", () => {
+    const { container } = setup(baseStyle(), media);
+    setAndFire(addPickerFor(container, "Sizes & Spacing", "Gap"), "--nonesuch");
+    expect((style()["@--sm"] as AnyConfig)["--size-gap"]).toBe("8px");
+    expect(style()["@--nonesuch"]).toBeUndefined();
+  });
+
+  test("a colour token's scheme rows are shown unprompted, so the picker offers only the rest", () => {
+    const { container } = setup(baseStyle(), media);
+    const picker = addPickerFor(container, "Colors", "Accent");
+    const offered = [...picker.querySelectorAll("sp-menu-item")].map((i) =>
+      i.getAttribute("value"),
+    );
+    expect(offered).toEqual(["--sm", "--print"]);
+  });
+
+  test("a token with no value is not offered an override it could not carry", () => {
+    const { container } = setup({ "--size-empty": "", "--size-gap": "16px" }, media);
+    expect(() => addPickerFor(container, "Sizes & Spacing", "Gap")).not.toThrow();
+    expect(() => addPickerFor(container, "Sizes & Spacing", "Empty")).toThrow();
+  });
+
+  test("clearing the last override drops the block, and the context returns to the picker", () => {
+    const { container } = setup({ "--size-gap": "16px", "@--sm": { "--size-gap": "8px" } }, media);
+    setAndFire(container.querySelector(".css-var-media-row sp-textfield")!, "");
+    expect(style()["@--sm"]).toBeUndefined();
+    const offered = [
+      ...addPickerFor(container, "Sizes & Spacing", "Gap").querySelectorAll("sp-menu-item"),
+    ].map((i) => i.getAttribute("value"));
+    expect(offered).toContain("--sm");
+  });
+});
+
+// ─── Token references render as chips, not as raw var() text ─────────────────
+
+describe("token reference chips", () => {
+  test("an alias colour wears a chip naming its token, and its swatch resolves through it", () => {
+    const { container } = setup({
+      "--color-accent": "var(--color-brand)",
+      "--color-brand": "#00aa55",
+    });
+    const colors = groupByTitle(container, "Colors");
+    const row = rowByName(colors, "Accent");
+    const chip = row.querySelector(".style-token-chip")!;
+    expect(chip.querySelector(".style-token-chip-label")?.textContent?.trim()).toBe("Brand");
+    expect(chip.getAttribute("title")).toBe("var(--color-brand) → #00aa55");
+    expect(chip.querySelector(".style-token-chip-swatch")?.getAttribute("style")).toContain(
+      "#00aa55",
+    );
+    // The well shows the resolved colour rather than an empty square.
+    expect(row.querySelector(".css-var-swatch")?.getAttribute("style")).toContain("#00aa55");
+    expect((row.querySelector('input[type="color"]') as HTMLInputElement).value).toBe("#00aa55");
+  });
+
+  test("a chain of aliases resolves to the value at its end", () => {
+    const { container } = setup({
+      "--color-a": "var(--color-b)",
+      "--color-b": "var(--color-c)",
+      "--color-c": "#123456",
+    });
+    const chip = rowByName(groupByTitle(container, "Colors"), "A").querySelector(
+      ".style-token-chip",
+    )!;
+    expect(chip.getAttribute("title")).toBe("var(--color-b) → #123456");
+  });
+
+  test("a reference that leads nowhere says so instead of inventing a value", () => {
+    const { container } = setup({ "--size-gap": "var(--size-missing)" });
+    const row = rowByName(groupByTitle(container, "Sizes & Spacing"), "Gap");
+    const chip = row.querySelector(".style-token-chip")!;
+    expect(chip.getAttribute("title")).toBe("var(--size-missing) → unresolved");
+    expect(chip.querySelector(".style-token-chip-swatch")).toBeNull(); // Not a colour group
+  });
+
+  test("a plain value wears no chip", () => {
+    const { container } = setup(baseStyle());
+    expect(container.querySelector(".style-token-chip")).toBeNull();
   });
 });

@@ -159,6 +159,11 @@ export async function serveContained(absPath: string, root: string): Promise<Res
  *
  * Mounts come first and are contained against their own directory rather than the project root:
  * they exist precisely to publish directories that may sit outside it (extensions.md §8.5).
+ *
+ * The project's BUILT OUTPUT is deliberately NOT here, nor anywhere else in an editing server's
+ * chain: these paths mean the project's SOURCES, and a built page addresses the same paths meaning
+ * its own output. The built site is served on its own origin instead — see
+ * {@link file://./site-preview.ts}.
  */
 export async function serveProjectFile(
   decodedPath: string,

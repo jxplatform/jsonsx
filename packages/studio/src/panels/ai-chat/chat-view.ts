@@ -6,7 +6,27 @@
  * blocks become chips), assistant messages render sanitized markdown plus tool-call
  * chips, tool messages surface failures only (ADR §11.3), the streaming tail renders
  * as plain text with a cursor (markdown parses once on finalize), and chat errors get
- * a danger row with recovery advice. Pure templates — state lives in ai-panel.
+ * a danger row with recovery advice and a Retry. Templates only — chat state lives in ai-panel, and
+ * the three buttons are records the registry holds (see below).
+ *
+ * §7.4 (AI honesty) is why three things here are not what they were:
+ *
+ * - **A chip renders its OUTCOME.** `ToolCallRecord.result` has always been populated by the loop
+ *   and ignored by this renderer, so a chip that said `update_style: ["children",0]` said exactly
+ *   as much when the edit had been refused as when it had landed.
+ * - **A turn renders what it CHANGED.** The changed-files summary comes off the write ledger
+ *   (`services/ai-writes.ts`), which records whether each change went through a transaction or
+ *   straight to disk — so the undo caveat is rendered to the human holding ⌘Z instead of being
+ *   appended to the model-facing tool summary.
+ * - **An error offers Retry.** `chatState.retryLast()` has been implemented, exported and called by
+ *   nobody; the error row is where it belongs.
+ *
+ * §11.1 is why the three buttons here are not callbacks any more. History, New Chat and Retry were
+ * closures this module received and invoked, so the capabilities existed ONLY as buttons: the
+ * `Assistant` category held zero records, and nothing could reach them from the palette, a chord,
+ * the automation runner or the generated commands sheet. They run {@link commandButton} now, in the
+ * idiom `panels/statusbar.ts` established — the record is the definition site, and this file only
+ * decides where it is drawn.
  *
  * @license MIT
  */
@@ -17,6 +37,8 @@ import { ref } from "lit-html/directives/ref.js";
 import type { Message, ToolCallRecord } from "@jxsuite/ai/chat-state";
 import { splitAttachedContext } from "./attached-context";
 import { renderMarkdown } from "./chat-markdown";
+import { summarizeWrites, writesForTurn } from "../../services/ai-writes";
+import { activeRegistry } from "../../commands/active-registry";
 
 // ─── Helpers (moved from ai-panel.ts) ────────────────────────────────────────
 
@@ -89,33 +111,125 @@ export function formatErrorAdvice(error: string): string {
   return "";
 }
 
+// ─── Commands as buttons ────────────────────────────────────────────────────
+
+/** What {@link commandButton} draws inside the button, and how. */
+export interface CommandButtonOptions {
+  /** Slotted content — an icon element for the header, a label for the error row's Retry. */
+  content: TemplateResult | string;
+  /** Extra class, so the CSS that already targets `.ai-msg-retry` keeps landing. */
+  className?: string;
+  /** Quiet chrome. The header's icon buttons are quiet; the labelled Retry is not. */
+  quiet?: boolean;
+}
+
+/**
+ * One control that IS a command — `panels/statusbar.ts`'s `itemTpl`, for the assistant.
+ *
+ * A command the registry does not hold, or whose `when` is false, renders NOTHING rather than a
+ * dead button; a visible-but-refused one renders disabled with its `requires` sentence in the
+ * tooltip. That is what keeps this file a rendering of the registry instead of a second place the
+ * assistant's capabilities are decided — and it is why `tests/ai-chat-view.test.ts` asserts the
+ * ids, exactly as `tests/statusbar.test.ts` does: an id is not an interface between two files
+ * unless something checks it.
+ *
+ * Before any registry exists (the bootstrap composes one at the END of `studio.ts`, and a reduced
+ * test fixture may compose none) the button is simply absent. The chat is still readable, which is
+ * the same bargain the status bar strikes for the frame it paints early.
+ */
+export function commandButton(
+  id: string,
+  opts: CommandButtonOptions,
+): TemplateResult | typeof nothing {
+  const registry = activeRegistry();
+  const command = registry?.get(id);
+  if (!registry || !command || !registry.isVisible(id)) {
+    return nothing;
+  }
+  const reason = registry.disabledReason(id);
+  const chord = registry.keymap.formatBinding(id);
+  const title = reason
+    ? `${command.title} — requires ${reason}`
+    : chord
+      ? `${command.title} (${chord})`
+      : command.title;
+  return html`<sp-action-button
+    size="s"
+    ?quiet=${opts.quiet ?? false}
+    class=${opts.className ?? ""}
+    ?disabled=${reason !== undefined}
+    title=${title}
+    @click=${() => {
+      /* Re-asked at click time, not trusted from the render: state moves between the two, and
+         `registry.run` THROWS on a refusal. Same bargain `registry.handleKeyEvent` strikes for a
+         chord bound to a disabled command — swallow it here rather than make every surface wrap a
+         dispatch in try/catch. */
+      if (registry.isEnabled(id)) {
+        void registry.run(id);
+      }
+    }}
+  >
+    ${opts.content}
+  </sp-action-button>`;
+}
+
 // ─── Header ─────────────────────────────────────────────────────────────────
 
 export interface ChatHeaderOptions {
   /** The open session's title, or null for a fresh unsaved chat. */
   title: string | null;
   streaming: boolean;
-  onShowSessions: () => void;
-  onNewChat: () => void;
+  /**
+   * The conversation's estimated token count, and whether it is over the warning line.
+   *
+   * `services/context-manager.ts` has computed both on every turn since it was written, and
+   * `chat-state.ts` has stored them — with NO READER anywhere. Plan §11.6: "Context budget manager
+   * → tokenCount / contextWarning actually rendered". So a conversation was silently trimmed, the
+   * assistant forgot what you told it ten turns ago, and the two numbers that would have explained
+   * why sat in the store.
+   */
+  tokens: number;
+  overBudget: boolean;
 }
 
-/** The chat header: history button, session title, streaming spinner, New Chat. */
+/** Compact token count: 18400 → "18.4k". A four-digit number in a 28px header is noise. */
+function tokenLabel(tokens: number): string {
+  return tokens >= 1000 ? `${(tokens / 1000).toFixed(1)}k` : String(tokens);
+}
+
+/** The chat header: history button, session title, the context budget, spinner, New Chat. */
 export function renderChatHeader(opts: ChatHeaderOptions): TemplateResult {
   return html`
     <div class="ai-chat-header">
-      <sp-action-button size="s" quiet title="Chat history" @click=${opts.onShowSessions}>
-        <sp-icon-history slot="icon"></sp-icon-history>
-      </sp-action-button>
+      ${commandButton("assistant.history", {
+        content: html`<sp-icon-history slot="icon"></sp-icon-history>`,
+        quiet: true,
+      })}
       <span class="ai-chat-title">${opts.title ?? "New chat"}</span>
       <span class="ai-header-spacer"></span>
+      ${
+        opts.tokens > 0
+          ? html`<span
+              class=${opts.overBudget ? "ai-tokens ai-tokens--warn" : "ai-tokens"}
+              title=${
+                opts.overBudget
+                  ? `About ${opts.tokens.toLocaleString()} tokens — past half the model's context. ` +
+                    `The oldest turns are dropped as this grows; start a new chat to keep them.`
+                  : `About ${opts.tokens.toLocaleString()} tokens of the model's context in use`
+              }
+              >${tokenLabel(opts.tokens)}</span
+            >`
+          : nothing
+      }
       ${
         opts.streaming
           ? html`<sp-progress-circle size="s" indeterminate></sp-progress-circle>`
           : nothing
       }
-      <sp-action-button size="s" quiet title="New chat" @click=${opts.onNewChat}>
-        <sp-icon-add slot="icon"></sp-icon-add>
-      </sp-action-button>
+      ${commandButton("assistant.newChat", {
+        content: html`<sp-icon-add slot="icon"></sp-icon-add>`,
+        quiet: true,
+      })}
     </div>
   `;
 }
@@ -140,25 +254,125 @@ function renderUserMessage(msg: Message): TemplateResult {
   `;
 }
 
+/**
+ * What became of one tool call: `"pending"` while the loop has not reported, else ok/failed.
+ *
+ * @param {ToolCallRecord} tc
+ * @returns {"pending" | "ok" | "failed"}
+ */
+export function toolOutcome(tc: ToolCallRecord): "pending" | "ok" | "failed" {
+  if (!tc.result) {
+    return "pending";
+  }
+  return tc.result.success ? "ok" : "failed";
+}
+
+/**
+ * The one line a chip says about its outcome — the tool's own words where it has any.
+ *
+ * A tool that succeeded already writes a human sentence into `summary` for the model to read; there
+ * is no reason the human could not have been reading it all along. A tool that failed writes
+ * `error`, which was surfaced only through the separate tool-message row and only after the fact.
+ *
+ * @param {ToolCallRecord} tc
+ * @returns {string}
+ */
+export function toolOutcomeText(tc: ToolCallRecord): string {
+  const { result } = tc;
+  if (!result) {
+    return "";
+  }
+  return (result.success ? result.summary : result.error) ?? "";
+}
+
 function renderToolChips(toolCalls: ToolCallRecord[]): TemplateResult | typeof nothing {
   if (toolCalls.length === 0) {
     return nothing;
   }
   return html`
     <div class="ai-msg-tools">
-      ${toolCalls.map(
-        (tc) => html`
-          <span class="ai-tool-chip">
+      ${toolCalls.map((tc) => {
+        const outcome = toolOutcome(tc);
+        const text = toolOutcomeText(tc);
+        return html`
+          <span class="ai-tool-chip" data-outcome=${outcome} title=${text || formatToolLabel(tc)}>
             <sp-icon-gears size="xs"></sp-icon-gears>
-            ${formatToolLabel(tc)}
+            <span class="ai-tool-chip-name">${formatToolLabel(tc)}</span>
+            ${
+              outcome === "pending"
+                ? nothing
+                : html`<span class="ai-tool-chip-outcome"
+                    >${outcome === "ok" ? "✓" : "✗"} ${text}</span
+                  >`
+            }
           </span>
-        `,
-      )}
+        `;
+      })}
     </div>
   `;
 }
 
-function renderAssistantMessage(msg: Message): TemplateResult | typeof nothing {
+/**
+ * The turn's changed-files summary, with the two things it can honestly offer.
+ *
+ * Rendered only for a turn that changed something — "Changed 0 files" is noise, and a turn that
+ * only read is the common case. **Restore to here** is offered only when every recorded change went
+ * through a transaction: a disk write has no history behind it, so a button that claimed to restore
+ * one would be the same lie the model-facing caveat used to be.
+ */
+function renderChangedFiles(
+  msg: Message,
+  onRestore?: (messageId: string) => void,
+): TemplateResult | typeof nothing {
+  const writes = writesForTurn(msg.id);
+  if (writes.length === 0) {
+    return nothing;
+  }
+  const summary = summarizeWrites(writes);
+  if (!summary) {
+    return nothing;
+  }
+  const restorable = writes.every((w) => !w.disk);
+  return html`
+    <details class="ai-msg-changes">
+      <summary>
+        ${summary}
+        ${
+          onRestore && restorable
+            ? html`<sp-action-button
+                size="xs"
+                quiet
+                title="Undo everything this turn changed"
+                @click=${(e: Event) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onRestore(msg.id);
+                }}
+              >
+                Restore to here
+              </sp-action-button>`
+            : nothing
+        }
+      </summary>
+      <ul class="ai-msg-changes-list">
+        ${writes.map(
+          (w) => html`
+            <li data-disk=${String(w.disk)} data-ok=${String(w.ok)}>
+              <code>${w.path}</code>
+              <span>${w.ok ? w.tool : `failed — ${w.error ?? w.tool}`}</span>
+              ${w.disk ? html`<em>written to disk — undo cannot reach it</em>` : nothing}
+            </li>
+          `,
+        )}
+      </ul>
+    </details>
+  `;
+}
+
+function renderAssistantMessage(
+  msg: Message,
+  onRestore?: (messageId: string) => void,
+): TemplateResult | typeof nothing {
   const toolCalls = msg.toolCalls ?? [];
   if (!msg.content && toolCalls.length === 0) {
     return nothing;
@@ -166,6 +380,7 @@ function renderAssistantMessage(msg: Message): TemplateResult | typeof nothing {
   return html`
     <div class="ai-msg-assistant">
       ${msg.content ? renderMarkdown(msg.id, msg.content) : nothing} ${renderToolChips(toolCalls)}
+      ${renderChangedFiles(msg, onRestore)}
     </div>
   `;
 }
@@ -208,6 +423,8 @@ export interface MessageListOptions {
   onScroll: (e: Event) => void;
   /** Ref to the scrolling element, for stick-to-bottom maintenance. */
   listRef: (el: Element | undefined) => void;
+  /** Undo everything one turn changed. Offered only for turns whose changes are all transactional. */
+  onRestore?: ((messageId: string) => void) | undefined;
 }
 
 /** The scrollable message list — THE scroller of the chat view. */
@@ -237,7 +454,7 @@ export function renderMessageList(opts: MessageListOptions): TemplateResult {
           if (status === "streaming" && i === lastIdx) {
             return renderStreamingTail(msg);
           }
-          return renderAssistantMessage(msg);
+          return renderAssistantMessage(msg, opts.onRestore);
         }
         return nothing;
       })}
@@ -250,6 +467,16 @@ export function renderMessageList(opts: MessageListOptions): TemplateResult {
                   formatErrorAdvice(opts.error)
                     ? html`<div class="ai-msg-error-advice">${formatErrorAdvice(opts.error)}</div>`
                     : nothing
+                }
+                ${
+                  /* `assistant.retry`, not a closure. Its `enablement` reads `ctx.ai.configured`,
+                     so the one error this row cannot recover from — no provider connected, whose
+                     advice line above already says to add a key — draws the button disabled with
+                     that sentence rather than offering a send that will fail identically. */
+                  commandButton("assistant.retry", {
+                    className: "ai-msg-retry",
+                    content: "Retry",
+                  })
                 }
               </div>
             `

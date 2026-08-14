@@ -5,9 +5,12 @@
  * multiple canvas-related modules: element lookup, zoom, panel resolution, inline bubbling.
  */
 
-import { canvasPanels, getNodeAtPath, parentElementPath } from "../store";
-import { activeTab } from "../workspace/workspace";
+import { getNodeAtPath, parentElementPath } from "../store";
+import { displayTagName } from "@jxsuite/schema/guards";
+import { activeCanvasSurface, activeMediaOfPane } from "./canvas-surface";
 import { isInlineInContext } from "../editor/inline-edit";
+import type { CanvasSurface } from "./canvas-surface";
+import type { CanvasPanel } from "../types";
 import type { JxPath } from "../state";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
@@ -22,15 +25,26 @@ export function panelMediaToActiveMedia(mediaName: string | null | undefined) {
   return !mediaName || mediaName === "base" ? null : mediaName;
 }
 
-/** Return the active canvas panel based on the current activeMedia setting. */
-export function getActivePanel() {
+/**
+ * The active canvas panel of ONE pane's stage, from that pane's own `activeMedia`.
+ *
+ * The breakpoint a stage is showing is a fact about the tab in it — `session.ui.activeMedia` — so
+ * this reads it from `surface.paneId`'s tab and never from the focus. {@link getActivePanel} is this
+ * function applied to the focused pane, which is what "the active panel" means when nobody says
+ * which one.
+ *
+ * @param {CanvasSurface} surface
+ * @returns {CanvasPanel | null}
+ */
+export function panelOfSurface(surface: CanvasSurface): CanvasPanel | null {
+  const canvasPanels = surface.panels;
   if (canvasPanels.length === 0) {
     return null;
   }
   if (canvasPanels.length === 1) {
-    return canvasPanels[0];
+    return canvasPanels[0]!;
   }
-  const activeMedia = activeTab.value?.session.ui.activeMedia ?? null;
+  const activeMedia = activeMediaOfPane(surface.paneId);
   for (const p of canvasPanels) {
     if (activeMedia === null && (p.mediaName === "base" || p.mediaName === null)) {
       return p;
@@ -39,7 +53,17 @@ export function getActivePanel() {
       return p;
     }
   }
-  return canvasPanels[0];
+  return canvasPanels[0]!;
+}
+
+/**
+ * Return the active canvas panel of the FOCUSED pane, based on its activeMedia setting.
+ *
+ * Panels belong to a pane's stage (`canvas-surface.ts`), so "the active panel" is only answerable
+ * relative to one — this is the pane whose artboards the person is looking at.
+ */
+export function getActivePanel() {
+  return panelOfSurface(activeCanvasSurface());
 }
 
 /**
@@ -61,8 +85,8 @@ export function bubbleInlinePath(doc: JxMutableNode | undefined, path: JxPath) {
     if (!node || !parentNode) {
       break;
     }
-    const childTag = (node.tagName ?? "div").toLowerCase();
-    const parentTag = (parentNode.tagName ?? "div").toLowerCase();
+    const childTag = (displayTagName(node.tagName) || "div").toLowerCase();
+    const parentTag = (displayTagName(parentNode.tagName) || "div").toLowerCase();
     if (!isInlineInContext(childTag, parentTag)) {
       break;
     }

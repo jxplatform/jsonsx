@@ -13,9 +13,10 @@ import { live } from "lit-html/directives/live.js";
 import { renderFieldRow } from "../ui/field-row";
 import { spNumberField, spTextField } from "../ui/field-input";
 import { renderMediaPicker } from "../ui/media-picker";
-import { activeTab } from "../workspace/workspace";
 import { mutateUpdateFrontmatter, transactDoc } from "../tabs/transact";
 import { findContentTypeSchema } from "../utils/studio-utils";
+import { NULL_FORM_CONTEXT, getFormControl, referenceTarget } from "../ui/schema-form";
+import type { JsonSchema } from "../ui/schema-form";
 
 import type { JsonValue } from "../types";
 import type { Tab } from "../tabs/tab";
@@ -26,6 +27,8 @@ export interface FmSchemaEntry {
   enum?: string[];
   format?: string;
   properties?: Record<string, unknown>;
+  /** `#/content/<type>` — a relationship to another collection (site-architecture.md §6.1). */
+  $ref?: string;
 }
 
 export interface FmField {
@@ -103,8 +106,19 @@ export function collectFmFields(
 
 /**
  * Render one frontmatter field as a typed widget row. Commits through `transactDoc` +
- * `mutateUpdateFrontmatter` on the active tab.
+ * `mutateUpdateFrontmatter` on `tab`.
  *
+ * **`tab` is a parameter because this renderer has two hosts and only one of them follows the
+ * focus.** It committed to `activeTab.value` at each of its seven widgets, which is right for the
+ * Navigator's Document panel (an app-level surface showing the focused document) and wrong for the
+ * Document Header card, which `panels/frontmatter-panel.ts` draws INSIDE a pane's stage, once per
+ * pane. So a collection field edited on the card in one pane wrote into whichever document had the
+ * keyboard: the card went on showing the old value, and a document nobody was looking at changed.
+ * The Document Header's `transact(tab, …)` branch was fixed for JSON documents in an earlier pass
+ * and this — every schema-driven frontmatter field, on every content document — is what that pass
+ * missed.
+ *
+ * @param {Tab | null} tab The document to commit into.
  * @param {string} field
  * @param {FmSchemaEntry} entry
  * @param {JsonValue} value
@@ -112,6 +126,7 @@ export function collectFmFields(
  * @returns {import("lit-html").TemplateResult}
  */
 export function renderFmField(
+  tab: Tab | null,
   field: string,
   entry: FmSchemaEntry,
   value: JsonValue,
@@ -121,7 +136,34 @@ export function renderFmField(
   const label = field.replaceAll(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase());
   const displayLabel = label + (isRequired ? " *" : "");
   const hasVal = value !== undefined && value !== "" && value !== false;
-  const onClear = () => transactDoc(activeTab.value, (t) => mutateUpdateFrontmatter(t, field));
+  const onClear = () => transactDoc(tab, (t) => mutateUpdateFrontmatter(t, field));
+
+  /* A relationship to another collection is the ONE registered `reference` control — the same
+     picker the entry editor and the settings forms draw, reached through the registry rather than
+     reimplemented here. Before this branch a `$ref` field fell through to the textfield at the
+     bottom of this function, so the author typed an entry id from memory with no way to see what
+     ids exist and no sign when the one they typed was wrong. */
+  const referenceControl =
+    referenceTarget(entry) === null ? undefined : getFormControl("reference");
+  if (referenceControl) {
+    return renderFieldRow({
+      hasValue: hasVal,
+      label: displayLabel,
+      onClear,
+      prop: field,
+      widget: referenceControl({
+        // The reference control resolves nothing through the context — its choices are files.
+        ctx: NULL_FORM_CONTEXT,
+        key: field,
+        onChange: (next) =>
+          transactDoc(tab, (t) =>
+            mutateUpdateFrontmatter(t, field, (next ?? undefined) as JsonValue),
+          ),
+        schema: entry as JsonSchema,
+        value,
+      }),
+    });
+  }
 
   if (entry.type === "boolean") {
     return renderFieldRow({
@@ -134,7 +176,7 @@ export function renderFmField(
           size="s"
           .checked=${live(Boolean(value))}
           @change=${(e: Event) =>
-            transactDoc(activeTab.value, (t) =>
+            transactDoc(tab, (t) =>
               mutateUpdateFrontmatter(
                 t,
                 field,
@@ -163,7 +205,7 @@ export function renderFmField(
                 .map((s: string) => s.trim())
                 .filter(Boolean)
             : undefined;
-          transactDoc(activeTab.value, (t) => mutateUpdateFrontmatter(t, field, arr));
+          transactDoc(tab, (t) => mutateUpdateFrontmatter(t, field, arr));
         },
         { placeholder: "comma, separated" },
       ),
@@ -181,7 +223,7 @@ export function renderFmField(
           size="s"
           .value=${live(value || "")}
           @change=${(e: Event) =>
-            transactDoc(activeTab.value, (t) =>
+            transactDoc(tab, (t) =>
               mutateUpdateFrontmatter(t, field, (e.target as HTMLInputElement).value || undefined),
             )}
         >
@@ -198,7 +240,7 @@ export function renderFmField(
       onClear,
       prop: field,
       widget: renderMediaPicker(field, value as string, (v: string) =>
-        transactDoc(activeTab.value, (t) => mutateUpdateFrontmatter(t, field, v || undefined)),
+        transactDoc(tab, (t) => mutateUpdateFrontmatter(t, field, v || undefined)),
       ),
     });
   }
@@ -210,7 +252,7 @@ export function renderFmField(
       onClear,
       prop: field,
       widget: spNumberField(value !== undefined ? Number(value) : undefined, (n) =>
-        transactDoc(activeTab.value, (t) => mutateUpdateFrontmatter(t, field, n)),
+        transactDoc(tab, (t) => mutateUpdateFrontmatter(t, field, n)),
       ),
     });
   }
@@ -223,8 +265,7 @@ export function renderFmField(
     widget: spTextField(
       `fm:${field}`,
       (value as string) || "",
-      (v: string) =>
-        transactDoc(activeTab.value, (t) => mutateUpdateFrontmatter(t, field, v || undefined)),
+      (v: string) => transactDoc(tab, (t) => mutateUpdateFrontmatter(t, field, v || undefined)),
       { placeholder: entry.format === "date" ? "YYYY-MM-DD" : "" },
     ),
   });

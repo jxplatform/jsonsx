@@ -1,28 +1,37 @@
 /// <reference lib="dom" />
 /**
- * New Project modal — a two-step wizard. Step 1 ("Start new project from:") picks the source on one
- * of four tabs: a built-in Template, a Starter Site, an Import of an existing site, or an Agent
- * prompt. Step 2 ("New Project Parameters") collects the project identity plus a design quickstart
- * (colors, fonts, logo, breakpoints — a creation-time subset of the settings modal), prefilled from
- * the chosen source and customizable before anything is written.
+ * New Project modal — a two-step wizard.
+ *
+ * **Step 1 · Choose a starting point.** Starters lead: the first thing offered is a complete site
+ * you can look at. The gallery ends with one **Start from scratch** card — the minimal scaffold —
+ * because a first-run choice between four breakpoint presets described by media-query direction is
+ * a choice nobody can make. Two further sources sit on their own tabs: an **Import** of an existing
+ * site, and an **Agent** prompt.
+ *
+ * **Step 2 · Name your project.** Name and location, nothing else. A project's URL, deployment
+ * adapter and design tokens are settings, not creation-time decisions, so they live in the
+ * project's own settings surface where they can be changed more than once.
  *
  * Import and Agent need working AI, so both are gated until credentials exist — a key stored in
  * this browser, or a backend that holds its own (managed cloud platforms, env-keyed dev servers).
  * While gated they offer the same two paths as the assistant sidebar: connect Cloudflare for
  * Workers AI, or bring a key.
+ *
+ * @docs studio/projects/create
  */
 
 import { html } from "lit-html";
 import { errorMessage } from "@jxsuite/schema/parse";
 import { openModal } from "../ui/layers";
+import { enumArg, enumProperty } from "../commands/command-args";
+import type { AnyCommand, CommandRegistry } from "../commands/registry";
 import { getPlatform } from "../platform";
 import { installUrlOf } from "../platform-errors";
 import { hasAiCredentials } from "../services/ai-models";
 import { setPendingAgentPrompt } from "../services/agent-seed";
+import { initProjectRepo } from "../files/files";
 import { createAiCredentialsForm } from "../ui/ai-credentials-form";
 import { createManagedConnect } from "../ui/ai-managed-connect";
-import { PROJECT_TEMPLATES } from "./templates";
-import { collectDesign, renderDesignFields, resetDesignFields } from "./design-fields";
 import {
   collectDestination,
   loadLocationOptions,
@@ -44,27 +53,20 @@ import type { ProjectConfig } from "@jxsuite/schema/types";
 import type { CreateProjectDestination, StarterInfo } from "../types";
 import type { ImportTabCtx } from "./import-tab";
 
-type NewProjectTab = "template" | "starter" | "import" | "agent";
+type NewProjectTab = (typeof NEW_PROJECT_TABS)[number];
 type WizardStep = "source" | "params";
 
 let _handle: ReturnType<typeof openModal> | null = null;
 
-let _form = {
-  adapter: "static",
-  description: "",
-  directory: "",
-  name: "",
-  url: "",
-};
+let _form = { directory: "", name: "" };
 
-let _tab: NewProjectTab = "template";
+let _tab: NewProjectTab = "starter";
 let _step: WizardStep = "source";
-let _template = "blank";
+/** The step-1 choice on the Starters tab: a starter id, or `""` for "Start from scratch". */
 let _starter = "";
+/** Set once the user picks a card, so an arriving starter list stops overriding their choice. */
+let _starterTouched = false;
 let _agentPrompt = "";
-
-/** Which source the Parameters step was last seeded for — Back/Next keeps user edits intact. */
-let _paramsSeededFor = "";
 
 let _error = "";
 
@@ -93,7 +95,7 @@ function focusNameField() {
 
 let _creating = false;
 
-/** Starter templates offered in the picker (empty until loaded / on platforms without starters). */
+/** Starter templates offered in the gallery (empty until loaded / on platforms without starters). */
 let _starters: StarterInfo[] = [];
 
 let _resolve: ((result: { root: string; config: ProjectConfig } | null) => void) | null = null;
@@ -144,28 +146,22 @@ function aiGateOpen(): boolean {
  * Open the New Project modal. Returns a promise that resolves with the created project info (or
  * null if cancelled).
  *
+ * @param {{ tab?: NewProjectTab }} [options] Which source tab to open on; defaults to Starters.
  * @returns {Promise<{ root: string; config: object } | null>}
  */
-export function openNewProjectModal(options?: { tab?: "template" | "starter" }): Promise<{
+export function openNewProjectModal(options?: { tab?: NewProjectTab }): Promise<{
   root: string;
   config: ProjectConfig;
 } | null> {
   if (_handle) {
     return Promise.resolve(null);
   }
-  _form = {
-    adapter: "static",
-    description: "",
-    directory: "",
-    name: "",
-    url: "",
-  };
-  _tab = options?.tab ?? "template";
+  _form = { directory: "", name: "" };
+  _tab = options?.tab ?? "starter";
   _step = "source";
-  _template = "blank";
   _starter = "";
+  _starterTouched = false;
   _agentPrompt = "";
-  _paramsSeededFor = "";
   _error = "";
   _nameError = "";
   _errorInstallUrl = "";
@@ -173,12 +169,10 @@ export function openNewProjectModal(options?: { tab?: "template" | "starter" }):
   _starters = [];
   _dirDerived = true;
   resetImportTab();
-  resetDesignFields();
   resetLocationFields();
 
   // Load the destination options (repo-mode owners) and starter templates in the background,
-  // Re-rendering when they arrive. Platforms without starters leave the Starter Site tab showing
-  // Its empty note.
+  // Re-rendering when they arrive. A platform without starters shows the scratch card alone.
   const platform = getPlatform();
   loadLocationOptions(() => {
     if (_handle) {
@@ -190,7 +184,8 @@ export function openNewProjectModal(options?: { tab?: "template" | "starter" }):
       .listStarters()
       .then((starters) => {
         _starters = starters;
-        if (!_starter) {
+        // Starters lead: the gallery opens with a real site selected, not an empty scaffold.
+        if (!_starterTouched) {
           _starter = starters[0]?.id ?? "";
         }
         if (_handle) {
@@ -198,7 +193,7 @@ export function openNewProjectModal(options?: { tab?: "template" | "starter" }):
         }
       })
       .catch(() => {
-        /* Non-fatal: the Starter tab keeps its empty note. */
+        /* Non-fatal: the gallery keeps the scratch card. */
       });
   }
 
@@ -208,9 +203,16 @@ export function openNewProjectModal(options?: { tab?: "template" | "starter" }):
   });
 }
 
+/**
+ * Dismiss the wizard. Available from every step, and from the underlay and Escape — a running
+ * import is aborted on the way out rather than trapping the user behind it.
+ */
 export function closeNewProjectModal() {
-  if (!_handle || _creating || isImportRunning()) {
+  if (!_handle || _creating) {
     return;
+  }
+  if (isImportRunning()) {
+    cancelImport(importCtxFor(renderModal));
   }
   _handle.close();
   _handle = null;
@@ -233,6 +235,15 @@ function finish(result: { root: string; config: ProjectConfig }) {
   }
 }
 
+/**
+ * Every path out of the wizard that produced a project: initialise version control for it, then
+ * hand it to the caller. A scaffold is not a repository, and Delete and Rename are one click away.
+ */
+async function finishCreated(result: { root: string; config: ProjectConfig }) {
+  await initProjectRepo(result.root);
+  finish(result);
+}
+
 function deriveSlug(name: string): string {
   return name
     .toLowerCase()
@@ -240,12 +251,9 @@ function deriveSlug(name: string): string {
     .replaceAll(/^-|-$/g, "");
 }
 
-/** The human label of the chosen source, shown as context on the Parameters step. */
+/** The human label of the chosen source, shown as context on the Name step. */
 function sourceLabel(): string {
   switch (_tab) {
-    case "starter": {
-      return `Starter Site · ${_starters.find((s) => s.id === _starter)?.name ?? _starter}`;
-    }
     case "import": {
       return "Import";
     }
@@ -253,54 +261,79 @@ function sourceLabel(): string {
       return "Agent";
     }
     default: {
-      return `Template · ${PROJECT_TEMPLATES.find((t) => t.id === _template)?.name ?? _template}`;
+      return _starter
+        ? `Starter site · ${_starters.find((s) => s.id === _starter)?.name ?? _starter}`
+        : "Start from scratch";
     }
   }
 }
 
-function renderModal() {
-  const platform = getPlatform();
-  const importCtx: ImportTabCtx = {
+/** The import tab's context object — rebuilt per render so it closes over current state. */
+function importCtxFor(rerender: () => void): ImportTabCtx {
+  return {
     aiGateOpen,
     credsForm: credsForm(),
     form: _form,
     managedConnect: managedConnect(),
-    onDone: finish,
-    rerender: renderModal,
+    onDone: (result) => {
+      // See above: the discard is deliberate, and `void` as a statement is what says so.
+      void finishCreated(result);
+    },
+    rerender,
     resolveDestination: () => validateParams(),
   };
+}
 
-  const onInput =
-    (field: "name" | "description" | "url" | "adapter" | "directory") => (e: Event) => {
-      _form[field] = (e.target as HTMLInputElement).value;
-      if (field === "name") {
-        _nameError = "";
-      }
-      if (field === "name" && !_form.directory) {
-        // Auto-derive directory slug from name while user hasn't manually typed one
+/**
+ * Validate the Name step, returning the destination to create at (null when something is missing —
+ * the reason is already rendered inline and the modal re-drawn). The slug is derived from the name
+ * when left blank, but the destination itself is never guessed.
+ */
+function validateParams(): CreateProjectDestination | null {
+  if (!_form.name.trim()) {
+    _nameError = "Project name is required";
+    renderModal();
+    focusNameField();
+    return null;
+  }
+  if (!_form.directory.trim()) {
+    _form.directory = deriveSlug(_form.name);
+  }
+  const destination = collectDestination(_form.directory);
+  if (!destination) {
+    _nameError = "";
+    renderModal();
+    focusNameField();
+    return null;
+  }
+  return destination;
+}
+
+function renderModal() {
+  const platform = getPlatform();
+  const importCtx = importCtxFor(renderModal);
+
+  const onInput = (field: "name" | "directory") => (e: Event) => {
+    _form[field] = (e.target as HTMLInputElement).value;
+    if (field === "name") {
+      _nameError = "";
+      // Auto-derive the directory slug from the name while the user hasn't typed one.
+      if (!_form.directory) {
         _dirDerived = true;
       }
-      if (_dirDerived && field === "name") {
+      if (_dirDerived) {
         _form.directory = deriveSlug(_form.name);
       }
-      if (field === "directory") {
-        _dirDerived = false;
-      }
-      renderModal();
-    };
-
-  const onAdapterChange = (e: Event) => {
-    _form.adapter = (e.target as HTMLInputElement).value;
-    renderModal();
-  };
-
-  const selectTemplate = (id: string) => {
-    _template = id;
+    } else {
+      _dirDerived = false;
+    }
     renderModal();
   };
 
   const selectStarter = (id: string) => {
     _starter = id;
+    _starterTouched = true;
+    _error = "";
     renderModal();
   };
 
@@ -316,11 +349,6 @@ function renderModal() {
   // ─── Step transitions ──────────────────────────────────────────────────────
 
   const goNext = () => {
-    if (_tab === "starter" && !_starter) {
-      _error = "Choose a starter site";
-      renderModal();
-      return;
-    }
     if (_tab === "import" && !validateImportSource(importCtx)) {
       return;
     }
@@ -329,28 +357,6 @@ function renderModal() {
       renderModal();
       return;
     }
-
-    // Seed the Parameters step from the chosen source — only when the source changed, so Back +
-    // Next round-trips keep the user's edits.
-    const seedKey = `${_tab}:${_template}:${_starter}`;
-    if (_paramsSeededFor !== seedKey) {
-      _paramsSeededFor = seedKey;
-      if (_tab === "starter") {
-        const meta = _starters.find((s) => s.id === _starter);
-        if (meta && !_form.description.trim()) {
-          _form.description = meta.tagline;
-        }
-        resetDesignFields({
-          ...(meta?.accent ? { accent: meta.accent } : {}),
-          mediaNote: "Leave empty to keep the starter's breakpoints.",
-        });
-      } else if (_tab === "template" || _tab === "agent") {
-        const templateId = _tab === "agent" ? "blank" : _template;
-        const meta = PROJECT_TEMPLATES.find((t) => t.id === templateId);
-        resetDesignFields(meta ? { media: meta.media } : {});
-      }
-    }
-
     _step = "params";
     _error = "";
     renderModal();
@@ -368,32 +374,11 @@ function renderModal() {
 
   // ─── Submission ────────────────────────────────────────────────────────────
 
-  /**
-   * Validate the Parameters step, returning the destination to create at (null when something is
-   * missing — the reason is already rendered inline and the modal re-drawn). The slug is derived
-   * from the name when left blank, but the destination itself is never guessed.
-   */
-  const validateParams = (): CreateProjectDestination | null => {
-    if (!_form.name.trim()) {
-      _nameError = "Project name is required";
-      renderModal();
-      focusNameField();
-      return null;
-    }
-    if (!_form.directory.trim()) {
-      _form.directory = deriveSlug(_form.name);
-    }
-    const destination = collectDestination(_form.directory);
-    if (!destination) {
-      _nameError = "";
-      renderModal();
-      focusNameField();
-      return null;
-    }
-    return destination;
-  };
-
-  const onSubmit = async () => {
+  /** Create the project from the chosen source, then run `after` with the result. */
+  const create = async (
+    source: { starter: string } | { template: string },
+    after: (result: { root: string; config: ProjectConfig }) => void | Promise<void>,
+  ) => {
     const destination = validateParams();
     if (!destination) {
       return;
@@ -405,14 +390,8 @@ function renderModal() {
     renderModal();
 
     try {
-      const design = collectDesign();
-      const result = await getPlatform().createProject({
-        ..._form,
-        destination,
-        ...(_tab === "starter" && _starter ? { starter: _starter } : { template: _template }),
-        ...(design ? { design } : {}),
-      });
-      finish(result);
+      const result = await getPlatform().createProject({ ..._form, destination, ...source });
+      await after(result);
     } catch (error) {
       _creating = false;
       captureError(error);
@@ -420,81 +399,53 @@ function renderModal() {
     }
   };
 
-  const onAgentSubmit = async () => {
-    const destination = validateParams();
-    if (!destination) {
-      return;
-    }
+  const onSubmit = () =>
+    create(_starter ? { starter: _starter } : { template: "blank" }, finishCreated);
 
-    _creating = true;
-    _error = "";
-    _nameError = "";
-    renderModal();
-
-    try {
-      const design = collectDesign();
-      const result = await getPlatform().createProject({
-        ..._form,
-        destination,
-        template: "blank",
-        ...(design ? { design } : {}),
-      });
+  const onAgentSubmit = () =>
+    create({ template: "blank" }, async (result) => {
       // The window that opens the project consumes this and hands the prompt to the assistant.
       setPendingAgentPrompt(result.root, _agentPrompt.trim());
-      finish(result);
-    } catch (error) {
-      _creating = false;
-      captureError(error);
-      renderModal();
-    }
-  };
+      await finishCreated(result);
+    });
 
   // ─── Step 1: source selection ──────────────────────────────────────────────
 
-  const templateSourceTpl = () => html`
+  const starterSourceTpl = () => html`
+    <div class="new-project-tab-intro">
+      Every starter is a complete site copied in as plain files you own — open it, look at it, then
+      make it yours.
+    </div>
     <div class="new-project-templates">
-      ${PROJECT_TEMPLATES.map(
-        (t) => html`
+      ${_starters.map(
+        (s) => html`
           <button
             type="button"
-            class="new-project-template ${_template === t.id ? "selected" : ""}"
-            @click=${() => selectTemplate(t.id)}
-            title=${t.tagline}
+            class="new-project-template ${_starter === s.id ? "selected" : ""}"
+            @click=${() => selectStarter(s.id)}
+            title=${s.description}
           >
-            <div class="new-project-template-blank">${t.glyph}</div>
+            <img class="new-project-template-thumb" src=${s.thumbnail} alt="" />
             <div class="new-project-template-body">
-              <div class="new-project-template-name">${t.name}</div>
-              <div class="new-project-template-tag">${t.tagline}</div>
+              <div class="new-project-template-name">${s.name}</div>
+              <div class="new-project-template-tag">${s.tagline}</div>
             </div>
           </button>
         `,
       )}
+      <button
+        type="button"
+        class="new-project-template new-project-scratch ${_starter === "" ? "selected" : ""}"
+        @click=${() => selectStarter("")}
+      >
+        <div class="new-project-template-blank">+</div>
+        <div class="new-project-template-body">
+          <div class="new-project-template-name">Start from scratch</div>
+          <div class="new-project-template-tag">An empty site with one page</div>
+        </div>
+      </button>
     </div>
   `;
-
-  const starterSourceTpl = () =>
-    _starters.length > 0
-      ? html`
-          <div class="new-project-templates">
-            ${_starters.map(
-              (s) => html`
-                <button
-                  type="button"
-                  class="new-project-template ${_starter === s.id ? "selected" : ""}"
-                  @click=${() => selectStarter(s.id)}
-                  title=${s.description}
-                >
-                  <img class="new-project-template-thumb" src=${s.thumbnail} alt="" />
-                  <div class="new-project-template-body">
-                    <div class="new-project-template-name">${s.name}</div>
-                    <div class="new-project-template-tag">${s.tagline}</div>
-                  </div>
-                </button>
-              `,
-            )}
-          </div>
-        `
-      : html`<div class="new-project-tab-intro">No starter sites are available.</div>`;
 
   const agentSourceTpl = () => {
     if (!aiGateOpen()) {
@@ -532,9 +483,6 @@ function renderModal() {
 
   const sourceBodyTpl = () => {
     switch (_tab) {
-      case "starter": {
-        return starterSourceTpl();
-      }
       case "import": {
         return renderImportSource(importCtx);
       }
@@ -542,14 +490,15 @@ function renderModal() {
         return agentSourceTpl();
       }
       default: {
-        return templateSourceTpl();
+        return starterSourceTpl();
       }
     }
   };
 
-  // ─── Step 2: parameters ────────────────────────────────────────────────────
+  // ─── Step 2: name + location ───────────────────────────────────────────────
 
-  const nameDirFieldsTpl = () => html`
+  const paramsBodyTpl = () => html`
+    <div class="new-project-step-context">${sourceLabel()}</div>
     <label class="new-project-field">
       <span class="new-project-label">Project Name *</span>
       <sp-textfield
@@ -573,47 +522,14 @@ function renderModal() {
       rerender: renderModal,
       slug: _form.directory,
     })}
-  `;
-
-  const paramsBodyTpl = () => html`
-    <div class="new-project-step-context">${sourceLabel()}</div>
-    <div class="new-project-step-heading">New Project Parameters</div>
-    ${nameDirFieldsTpl()}
     ${
       _tab === "import"
         ? renderImportStatus()
         : html`
-            <label class="new-project-field">
-              <span class="new-project-label">Description</span>
-              <sp-textfield
-                placeholder="A short description of the site"
-                .value=${_form.description}
-                @input=${onInput("description")}
-                style="width: 100%"
-              ></sp-textfield>
-            </label>
-
-            <label class="new-project-field">
-              <span class="new-project-label">Production URL</span>
-              <sp-textfield
-                placeholder="https://example.com"
-                .value=${_form.url}
-                @input=${onInput("url")}
-                style="width: 100%"
-              ></sp-textfield>
-            </label>
-
-            <label class="new-project-field">
-              <span class="new-project-label">Deployment Adapter</span>
-              <sp-picker label="Adapter" .value=${_form.adapter} @change=${onAdapterChange}>
-                <sp-menu-item value="static">Static</sp-menu-item>
-                <sp-menu-item value="cloudflare-pages">Cloudflare Pages</sp-menu-item>
-                <sp-menu-item value="node">Node</sp-menu-item>
-                <sp-menu-item value="bun">Bun</sp-menu-item>
-              </sp-picker>
-            </label>
-
-            ${renderDesignFields({ rerender: renderModal })}
+            <div class="new-project-tab-intro">
+              The site's address, deployment target and design tokens are project settings — set
+              them from Settings once the project is open.
+            </div>
           `
     }
   `;
@@ -621,7 +537,14 @@ function renderModal() {
   // ─── Footer ────────────────────────────────────────────────────────────────
 
   const footerTpl = () => {
+    const cancel = html`
+      <sp-button variant="secondary" ?disabled=${_creating} @click=${closeNewProjectModal}>
+        Cancel
+      </sp-button>
+    `;
     if (isImportRunning()) {
+      // One cancel, not two: the run's own Cancel is the step's Cancel, and dismissing the modal
+      // (Escape, the underlay, the header ✕) aborts the run on the way out.
       return html`
         <sp-button variant="secondary" @click=${() => cancelImport(importCtx)}>
           Cancel Import
@@ -631,7 +554,7 @@ function renderModal() {
     if (_step === "source") {
       const gated = (_tab === "import" || _tab === "agent") && !aiGateOpen();
       return html`
-        <sp-button variant="secondary" @click=${closeNewProjectModal}>Cancel</sp-button>
+        ${cancel}
         ${gated ? "" : html`<sp-button variant="accent" @click=${goNext}>Next</sp-button>`}
       `;
     }
@@ -654,6 +577,7 @@ function renderModal() {
               </sp-button>
             `;
     return html`
+      ${cancel}
       <sp-button variant="secondary" ?disabled=${_creating} @click=${goBack}>Back</sp-button>
       ${primary}
     `;
@@ -668,16 +592,11 @@ function renderModal() {
 
   const tpl = html`
     <sp-underlay open @close=${closeNewProjectModal}></sp-underlay>
-    <div
-      class="new-project-modal"
-      @keydown=${(e: KeyboardEvent) => {
-        if (e.key === "Escape") {
-          closeNewProjectModal();
-        }
-      }}
-    >
+    <div class="new-project-modal" data-jx-region="overlay.dialog:new-project">
       <div class="new-project-modal-header">
-        <h2 class="new-project-modal-title">Start new project from:</h2>
+        <h2 class="new-project-modal-title">
+          ${_step === "source" ? "Choose a starting point" : "Name your project"}
+        </h2>
         <sp-action-button quiet size="s" @click=${closeNewProjectModal} title="Close">
           <sp-icon-close slot="icon"></sp-icon-close>
         </sp-action-button>
@@ -687,8 +606,7 @@ function renderModal() {
           ? html`
               <div class="new-project-tabs">
                 <sp-tabs selected=${_tab} quiet @change=${onTabChange}>
-                  <sp-tab value="template" label="Template"></sp-tab>
-                  <sp-tab value="starter" label="Starter Site"></sp-tab>
+                  <sp-tab value="starter" label="Starters"></sp-tab>
                   ${platform.importSite ? html`<sp-tab value="import" label="Import"></sp-tab>` : ""}
                   <sp-tab value="agent" label="Agent"></sp-tab>
                 </sp-tabs>
@@ -716,10 +634,68 @@ function renderModal() {
   `;
 
   if (!_handle) {
-    _handle = openModal(tpl);
+    _handle = openModal(tpl, { label: "New Project", onDismiss: closeNewProjectModal });
   } else {
     _handle.update(tpl);
   }
 }
 
 let _dirDerived = true;
+
+// ─── Commands ─────────────────────────────────────────────────────────────────
+
+/** The wizard's source tabs, in strip order — the declared values of `project.new`'s `tab`. */
+export const NEW_PROJECT_TABS = ["starter", "import", "agent"] as const;
+
+/**
+ * Open the New Project wizard.
+ *
+ * `tab` is declared as an enum rather than passed through, because the two non-default tabs are AI
+ * gated: naming one that does not exist would open the wizard on Starters and a shot would record
+ * that as "the Import tab". The wizard resolves the returned promise when the project is created or
+ * dismissed; the command deliberately does not await it — opening a modal is the action, and
+ * blocking `run` until a human finishes a wizard would hold the palette open behind it.
+ *
+ * @returns {AnyCommand[]}
+ */
+export function newProjectCommands(): AnyCommand[] {
+  return [
+    {
+      args: {
+        additionalProperties: false,
+        properties: {
+          tab: enumProperty(NEW_PROJECT_TABS, "Which source tab to open on. Defaults to Starters."),
+        },
+        required: [],
+        type: "object",
+      },
+      category: "Project",
+      id: "project.new",
+      level: "application",
+      menus: ["commandbar/overflow", "palette"],
+      group: "1_file",
+      aiTool: {
+        description:
+          "Open the New Project wizard, optionally on the Starters, Import or Agent tab.",
+        name: "open_new_project",
+      },
+      run: (_commandCtx, args) => {
+        const tab =
+          (args as { tab?: unknown }).tab === undefined
+            ? undefined
+            : enumArg("project.new", args, "tab", NEW_PROJECT_TABS);
+        void openNewProjectModal(tab === undefined ? {} : { tab });
+      },
+      title: "New Project…",
+    },
+  ];
+}
+
+/**
+ * Register the New Project verb.
+ *
+ * @param {CommandRegistry} registry
+ */
+export function registerNewProjectCommands(registry: CommandRegistry): void {
+  registry.registerAll(newProjectCommands());
+}

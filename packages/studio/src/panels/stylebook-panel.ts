@@ -1,11 +1,16 @@
 /// <reference lib="dom" />
 /**
- * Stylebook panel — renders the Stylebook mode canvas (element catalog with per-file style
- * defaults) through the IFRAME canvas pipeline: a specimen document is generated parent-side
+ * The **Project Styles** canvas — the element catalogue with its per-file style defaults, rendered
+ * through the IFRAME canvas pipeline: a specimen document is generated parent-side
  * ({@link file://./stylebook-doc.ts}) and mounted per breakpoint panel via `mountStylebookCanvas`,
  * so each panel is a real width-sized viewport and `@media` blocks evaluate for real (no JS
  * flatten). Hits decode to tags in the host and route back here through the injected stylebook-hit
  * handler (`setStylebookHitHandler` in studio.ts).
+ *
+ * Every identifier here still says `stylebook`, and that is deliberate: `"stylebook"` is the
+ * `CANVAS_MODES` wire value this module mounts against, shared with `dist/iframe-entry.js`. The
+ * user-facing name is {@link PROJECT_STYLES_TITLE} and nothing a reader sees may be spelled from
+ * the wire value — see {@link file://../style/project-styles.ts}.
  */
 
 import { html, render as litRender } from "lit-html";
@@ -13,14 +18,17 @@ import { ref } from "lit-html/directives/ref.js";
 import { classMap } from "lit-html/directives/class-map.js";
 import { live } from "lit-html/directives/live.js";
 
-import { canvasPanels, canvasWrap, projectState, updateSession, updateUi } from "../store";
+import { projectState, updateSession } from "../store";
+import type { CanvasSurface } from "../canvas/canvas-surface";
+import { tabOfPane } from "../canvas/canvas-surface";
 import { activeTab } from "../workspace/workspace";
-import { view } from "../view";
+import { shell } from "../shell";
 import { componentRegistry } from "../files/components";
 import { getEffectiveMedia, getEffectiveStyle } from "../site-context";
 import { parseMediaEntries } from "../utils/canvas-media";
 import { mediaDisplayName } from "./shared";
 import { buildStylebookDoc } from "./stylebook-doc";
+import { PROJECT_STYLES_TITLE } from "../style/project-styles";
 import { mountStylebookCanvas, panToStylebookTag } from "../canvas/iframe-host";
 import stylebookMeta from "../../data/stylebook-meta.json";
 import type { TemplateResult } from "lit-html";
@@ -41,9 +49,9 @@ interface StylebookCtx {
     fullWidth: boolean,
     width?: number | null,
   ) => { tpl: TemplateResult; panel: CanvasPanel };
-  applyTransform: () => void;
-  observeCenterUntilStable: () => void;
-  updateActivePanelHeaders: () => void;
+  applyTransform: (surface: CanvasSurface) => void;
+  observeCenterUntilStable: (surface: CanvasSurface) => void;
+  updateActivePanelHeaders: (surface: CanvasSurface) => void;
 }
 
 export { default as stylebookMeta } from "../../data/stylebook-meta.json";
@@ -54,21 +62,27 @@ export { default as stylebookMeta } from "../../data/stylebook-meta.json";
  *
  * @param {StylebookCtx} ctx
  */
-export function renderStylebookMode(ctx: StylebookCtx) {
-  const tab = activeTab.value;
-  const filter = (tab?.session.ui.stylebookFilter || "").toLowerCase();
-  const customizedOnly = tab?.session.ui.stylebookCustomizedOnly;
+export function renderStylebookMode(surface: CanvasSurface, ctx: StylebookCtx) {
+  const canvasWrap = surface.wrap;
+  /* THIS stage's tab. It was `activeTab.value` — the focused pane's — so a Stylebook drawn in the
+     unfocused pane took its `$media` breakpoints from whatever document the keyboard was in, and
+     rebuilt its specimen columns at the other document's widths. Found by the fourth rule in
+     `scripts/check-pane-singletons.ts`, which is the whole reason that rule is per-FUNCTION: this
+     module is not a singleton and its other focus read is legitimate. */
+  const tab = tabOfPane(surface.paneId);
+  const filter = shell.stylebook.filter.toLowerCase();
+  const { customizedOnly } = shell.stylebook;
 
   const effectiveMedia = getEffectiveMedia(tab?.doc.document?.$media);
   const { sizeBreakpoints, baseWidth } = parseMediaEntries(effectiveMedia);
   const hasMedia = sizeBreakpoints.length > 0;
 
   const onFilterInput = (e: Event) => {
-    updateUi("stylebookFilter", (e.target as HTMLInputElement).value);
+    shell.stylebook.filter = (e.target as HTMLInputElement).value;
   };
 
   const onCustomizedToggle = () => {
-    updateUi("stylebookCustomizedOnly", !tab?.session.ui.stylebookCustomizedOnly);
+    shell.stylebook.customizedOnly = !shell.stylebook.customizedOnly;
   };
 
   const chromeBarTpl = html`
@@ -76,19 +90,26 @@ export function renderStylebookMode(ctx: StylebookCtx) {
       class="sb-chrome"
       style="position:absolute;top:0;left:0;right:0;z-index:15;background:var(--bg-panel);border-bottom:1px solid var(--border)"
     >
-      <div style="display:flex;align-items:center;padding:4px 8px;gap:4px">
+      <div
+        style="display:flex;align-items:center;padding:4px 8px;gap:4px"
+        role="toolbar"
+        aria-label=${PROJECT_STYLES_TITLE}
+      >
         <input
           class="field-input"
           style="flex:1;max-width:200px"
           placeholder="Filter…"
-          .value=${live(tab?.session.ui.stylebookFilter)}
+          aria-label="Filter the ${PROJECT_STYLES_TITLE} catalogue"
+          .value=${live(shell.stylebook.filter)}
           @input=${onFilterInput}
         />
         <button
           class=${classMap({
-            active: Boolean(tab?.session.ui.stylebookCustomizedOnly),
+            active: shell.stylebook.customizedOnly,
             "tb-toggle": true,
           })}
+          aria-pressed=${String(shell.stylebook.customizedOnly)}
+          title="Show only the elements this file has already styled"
           @click=${onCustomizedToggle}
         >
           Customized
@@ -144,7 +165,7 @@ export function renderStylebookMode(ctx: StylebookCtx) {
         style="transform-origin:0 0;padding-top:40px"
         ${ref((el) => {
           if (el) {
-            view.panzoomWrap = el as HTMLDivElement;
+            surface.panzoomWrap = el as HTMLDivElement;
           }
         })}
       >
@@ -166,39 +187,43 @@ export function renderStylebookMode(ctx: StylebookCtx) {
     projectRoot: projectState?.projectRoot ?? null,
   });
 
+  const { panels } = surface;
   for (const { panel } of panelEntries) {
-    canvasPanels.push(panel);
+    panels.push(panel);
     mountStylebookCanvas(
-      view.renderGeneration,
+      surface.renderGeneration,
       generated,
       panel.canvas as HTMLElement,
       panel._width,
     );
   }
   if (hasMedia) {
-    ctx.updateActivePanelHeaders();
+    ctx.updateActivePanelHeaders(surface);
   }
 
-  ctx.applyTransform();
-  ctx.observeCenterUntilStable();
+  ctx.applyTransform(surface);
+  ctx.observeCenterUntilStable(surface);
 }
 
 /**
  * Select a tag in the stylebook — shared by the canvas hit handler (via studio's
  * setStylebookHitHandler wiring), the stylebook layers panel, and the style panel. The host's
- * selection watcher tracks `ui.stylebookSelection` and measures the selected tag's card, so no
+ * selection watcher tracks `shell.stylebook.selection` and measures the selected tag's card, so no
  * direct overlay drawing happens here.
  *
  * @param {string} tag
  * @param {string | null} [media]
  */
 export function selectStylebookTag(tag: string, media?: string | null, { panCanvas = false } = {}) {
-  updateSession({
-    selection: [],
+  shell.stylebook.selection = tag;
+  updateSession(activeTab.value, {
+    // The ROOT path, not an empty selection: stylebook mode has always parked the selection on the
+    // Document element while the Style tab edits a TAG, and widening the field to a list changed
+    // Which literal spells that — `[[]]` is one selected path, the root — not what it means.
+    selection: [[]],
     ui: {
       activeSelector: tag,
       rightTab: "style",
-      stylebookSelection: tag,
       ...(media !== undefined ? { activeMedia: media } : {}),
     },
   });

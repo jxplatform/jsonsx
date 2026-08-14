@@ -371,12 +371,55 @@ describe("makeStamper", () => {
     expect(() => stamp(text, ["children", 0], "x")).not.toThrow();
   });
 
-  test("marks layout nodes with data-jx-layout and no path", () => {
+  test("stamps a layout node's ORIGIN (file + path in the layout) and no page path", () => {
+    const stamp = makeStamper({ ...ctx, layoutWrapped: true });
+    const el = document.createElement("div");
+    stamp(el, ["children", 0], {
+      $__layout: { file: "layouts/base.json", path: ["children", 0, "children", 1] },
+    });
+    expect(el.dataset.jxLayoutFile).toBe("layouts/base.json");
+    expect(el.dataset.jxLayoutPath).toBe('["children",0,"children",1]');
+    expect(el.dataset.jxPath).toBeUndefined();
+  });
+
+  test("layout CHROME is marked as a region and frozen so no caret can land in it", () => {
+    // The bug this closes: the canvas root is permanently contenteditable, so a click on the site
+    // Header put a caret there and every keystroke was then silently rejected downstream.
+    const stamp = makeStamper({ ...ctx, canvasMode: "edit", layoutWrapped: true });
+    const el = document.createElement("header");
+    stamp(el, ["children", 0], { $__layout: { file: "layouts/base.json", path: [] } });
+    expect(el.dataset.jxLayoutRegion).toBe("");
+    expect(el.getAttribute("contenteditable")).toBe("false");
+  });
+
+  test("a layout node that WRAPS the page content is neither dimmed nor frozen", () => {
+    const stamp = makeStamper({
+      ...ctx,
+      canvasMode: "edit",
+      layoutWrapped: true,
+      pageContentPrefix: ["children", 1, "children"],
+    });
+    const main = document.createElement("main");
+    stamp(main, ["children", 1], { $__layout: { file: "layouts/base.json", path: [] } });
+    expect(main.dataset.jxLayoutPath).toBe("[]");
+    expect(main.dataset.jxLayoutRegion).toBeUndefined();
+    expect(main.getAttribute("contenteditable")).toBeNull();
+  });
+
+  test("preview leaves layout chrome editable-agnostic (nothing is an editing host there)", () => {
+    const stamp = makeStamper({ ...ctx, canvasMode: "preview", layoutWrapped: true });
+    const el = document.createElement("footer");
+    stamp(el, ["children", 2], { $__layout: { file: "layouts/base.json", path: [] } });
+    expect(el.dataset.jxLayoutRegion).toBe("");
+    expect(el.getAttribute("contenteditable")).toBeNull();
+  });
+
+  test("a legacy boolean marker stamps the region but names no file", () => {
     const stamp = makeStamper({ ...ctx, layoutWrapped: true });
     const el = document.createElement("div");
     stamp(el, ["children", 0], { $__layout: true });
-    expect(el.dataset.jxLayout).toBe("");
-    expect(el.dataset.jxPath).toBeUndefined();
+    expect(el.dataset.jxLayoutPath).toBe("[]");
+    expect(el.dataset.jxLayoutFile).toBeUndefined();
   });
 
   test("stamps data-jx-path on ordinary nodes", () => {

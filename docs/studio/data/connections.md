@@ -11,7 +11,9 @@ code:
 
 # Connections
 
-A connection names a database your project talks to. Most sites need exactly one; you can add more if, say, orders and analytics live in different places. Open the **Settings** gear at the bottom of the activity bar, then _Settings > Connections_: your connections are listed on the left, and selecting one opens its form on the right.
+A connection names a database your project talks to. Most sites need exactly one; you can add more if, say, orders and analytics live in different places.
+
+Connections are a section of your project's configuration document. Press :kbd[⌘K] and run **Open Settings** — or pick it from the **⬢ menu** in the Command Bar — and choose **Connections** from the section list: your connections are listed on the left, and selecting one opens its form on the right. Like every other section of that document, a change here is a step you can take back with :kbd[⌘Z]; see **[Project settings](/docs/studio/projects/settings)**.
 
 ![The Connections section with a connection selected and its provider form open](../../images/connections-section.png)
 
@@ -58,7 +60,7 @@ Select a connection in the list and click **Test Connection** in the action row.
 With a connection selected, **Push Schema** in the same row is scoped to just that connection — table schemas and pushing are covered in **[Data tables](/docs/studio/data/tables)**.
 
 :::doc-note
-This section edits the `connections` section of `project.json` — one entry per connection, holding the provider id and the identifier fields above, never secret values. On backends without database access (see [Databases](/docs/studio/data)), the entries remain editable but the Test, Push, and grid actions are hidden.
+This section edits the `connections` section of `project.json` — one entry per connection, holding the provider id and the identifier fields above, never secret values. It is contributed by the connector extension, so it is listed once `@jxsuite/connector` is one of the project's **Extensions**. On backends without database access (see [Databases](/docs/studio/data)), the entries remain editable but the Test, Push, and grid actions are hidden.
 :::
 
 ## Next

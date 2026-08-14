@@ -131,3 +131,9 @@ without a nested theme. Those surfaces also set `color-scheme: light`.
 `bun test`) **fails** on hard-coded hex colours and **warns** on `font-size` /
 `border-radius` px that have an exact Spectrum token. Add genuinely intentional
 colours to `ALLOWED_HEX` in that script, with a comment.
+
+It also **fails** on a modal card opened beside an `<sp-underlay>` that no rule
+stacks. The scrim paints at `z-index: 1`, so a card left at `auto` sits _under_
+its own overlay: visible through it, and unclickable — which is how the blocking
+progress modal shipped with its only exit button unpressable. Give the card a
+`z-index` (the underlay-bearing cards use `1000`).

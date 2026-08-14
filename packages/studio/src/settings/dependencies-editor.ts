@@ -9,7 +9,7 @@
 import { html, render as litRender } from "lit-html";
 import { getPlatform } from "../platform";
 import { VERSION } from "../version";
-import { statusMessage } from "../panels/statusbar";
+import { notify } from "../services/notify";
 import { showProgressModal } from "../ui/progress-modal";
 import { isComparable, isUpgrade, stripRange } from "../packages/semver";
 import type { PackageInfo } from "../types";
@@ -83,14 +83,14 @@ async function onAdd() {
   await withBusy(async () => {
     await getPlatform().addPackage(name);
     _addName = "";
-    statusMessage(`Added ${name}`);
+    notify.success(`Added ${name}.`);
   });
 }
 
 async function onRemove(p: PackageInfo) {
   await withBusy(async () => {
     await getPlatform().removePackage(p.name);
-    statusMessage(`Removed ${p.name}`);
+    notify.success(`Removed ${p.name}.`);
   });
 }
 
@@ -107,7 +107,7 @@ async function onUpdate(p: PackageInfo, latest: string) {
     if (!res.ok) {
       throw new Error(res.log ?? "Update failed");
     }
-    statusMessage(`Updated ${p.name} to ${target}`);
+    notify.success(`Updated ${p.name} to ${target}.`);
   });
 }
 
@@ -132,7 +132,7 @@ async function onUpdateAll() {
     if (!res.ok) {
       throw new Error(res.log ?? "Update failed");
     }
-    statusMessage(`Updated ${updates.length} package(s)`);
+    notify.success(`Updated ${updates.length} package(s).`);
   });
 }
 
@@ -146,7 +146,7 @@ async function onReinstall() {
     if (!res.ok) {
       throw new Error(res.log ?? "Install failed");
     }
-    statusMessage("Dependencies reinstalled");
+    notify.success("Dependencies reinstalled.");
   });
 }
 
@@ -198,7 +198,7 @@ function render() {
 
   const tpl = html`
     <div class="settings-section">
-      <h3 class="settings-section-title">Dependencies</h3>
+      <h3 class="settings-section-title">Packages</h3>
       <p class="settings-field-desc">Manage this project's npm dependencies.</p>
 
       <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">

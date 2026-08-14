@@ -18,19 +18,21 @@ import {
 import { evaluateExpression, isMutating } from "@jxsuite/runtime/expression";
 import { runStatements } from "@jxsuite/runtime/statements";
 import {
+  bodyReturnsValue,
   childrenContainArray,
   hasStructuredBody,
   isExpressionDef,
   isFunctionDef,
   isMappedArray,
-  bodyReturnsValue,
   isNamedFormulaDef,
   isPrototypeDef,
   isRef,
   isSchemaOnlyDef as isSchemaOnly,
   isServerFnDef,
+  isTagExpression,
   isTemplateString,
   paramNames,
+  tagNameCandidates,
 } from "@jxsuite/schema/guards";
 import type { ExpressionNode } from "@jxsuite/runtime/expression";
 import type {
@@ -54,7 +56,13 @@ export {
   schemeSelectors,
   toCSSText,
 } from "@jxsuite/runtime";
-export { compileExpression, evaluateExpression, isMutating } from "@jxsuite/runtime/expression";
+export {
+  compileExpression,
+  compileOperandSource,
+  evaluateExpression,
+  evaluateOperand,
+  isMutating,
+} from "@jxsuite/runtime/expression";
 export { compileStatements, runStatements } from "@jxsuite/runtime/statements";
 
 /**
@@ -1173,11 +1181,16 @@ export function collectStyles(
     counter.n += 1;
   }
 
+  /* A chosen tag needs a selector that matches every candidate, not the first one.
+     `#id` and `.class` are unaffected — they identify the element regardless of what it turns out
+     to be — but a bare tag selector has to become the union, or styling an `<a>|<div>` wrapper
+     would style exactly one of the two branches and silently miss the other. */
+  const tagSelector = tagNameCandidates(def.tagName).join(", ") || "*";
   const selector = def.id
     ? `#${def.id}`
     : def.className
       ? `.${def.className.split(" ")[0]}`
-      : (def.tagName ?? "*");
+      : tagSelector;
 
   if (def.style) {
     const baseDecls = [];
@@ -1379,6 +1392,40 @@ export const SELF_CLOSING = new Set<string>([
 ]);
 
 /**
+ * A tag for the PRERENDER, resolved against the same scope the attributes are.
+ *
+ * The static renderer produces bytes, so it must commit to one element. Every candidate is a
+ * literal `TagName`, so committing is safe — and it is resolved here rather than left as text
+ * precisely because the old `${…}` form was left as text and then re-resolved against the page
+ * scope, where a component's own state is undefined.
+ *
+ * @param {unknown} tagName
+ * @param {Record<string, unknown>} scope
+ * @returns {string}
+ */
+export function resolveStaticTagName(
+  tagName: unknown,
+  scope: Record<string, unknown> | null,
+): string {
+  if (typeof tagName === "string") {
+    return tagName;
+  }
+  const candidates = tagNameCandidates(tagName);
+  if (candidates.length === 0) {
+    return "div";
+  }
+  if (!isTagExpression(tagName)) {
+    return candidates[0]!;
+  }
+  const expression = tagName.$expression;
+  if (expression.operator === "?:") {
+    return resolveStaticValue(expression.target, scope) ? expression.value : expression.initial;
+  }
+  const key = resolveStaticValue(expression.target, scope);
+  return expression.cases[String(key)] ?? expression.default;
+}
+
+/**
  * Recursively render a Jx node tree to static HTML for pre-rendering.
  *
  * @param {JxElement | JxMutableNode | string} node
@@ -1435,7 +1482,11 @@ export function renderStaticNode(
     return `<${switchTag}${attrs}>${inner}</${switchTag}>`;
   }
 
-  const tag = node.tagName ?? "div";
+  /* Resolved against the SAME scope the attributes are resolved against, so the prerendered markup
+     and the client's first render agree about what element this is. The old `${…}` form could not
+     do this — it re-resolved the emitted string against the page scope, where a component's own
+     state does not exist, so SSR silently emitted the fallback branch's tag. */
+  const tag = resolveStaticTagName(node.tagName, scope);
 
   // Replace <slot> with provided slot content
   if (tag === "slot" && slotContent != null) {

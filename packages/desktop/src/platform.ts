@@ -268,10 +268,14 @@ export function createDesktopPlatform() {
       return res;
     },
 
+    async pickProject() {
+      return rpc.request.pickProject();
+    },
+
     // ─── Multi-window ──────────────────────────────────────────────────────────
 
     async openProjectInNewWindow(root: string) {
-      await rpc.request.openProjectInNewWindow({ root });
+      return rpc.request.openProjectInNewWindow({ root });
     },
 
     async newWindow() {
@@ -373,6 +377,10 @@ export function createDesktopPlatform() {
       return rpc.request.renameFile({ from, to });
     },
 
+    async findReferences(target: { path?: string; tagName?: string }) {
+      return rpc.request.findReferences(target);
+    },
+
     subscribeFileEvents(handler: (events: FsEventPayload[]) => void) {
       fileEventHandler = handler;
       return () => {
@@ -466,12 +474,16 @@ export function createDesktopPlatform() {
       await rpc.request.gitInit();
     },
 
+    async buildSite() {
+      return rpc.request.buildSite();
+    },
+
     async gitAddRemote(name: string, url: string) {
       await rpc.request.gitAddRemote({ name, url });
     },
 
-    async searchFiles(query: string) {
-      return rpc.request.searchFiles({ query });
+    async searchFiles(query: string, extensions?: string[]) {
+      return rpc.request.searchFiles({ query, ...(extensions != null && { extensions }) });
     },
 
     async listFormats() {

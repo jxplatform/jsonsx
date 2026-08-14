@@ -15,8 +15,8 @@ Statements are function bodies built as a vertical list of visual steps instead 
 
 Anywhere a function body appears, a **Statements** / **Code** toggle picks the representation:
 
-- A **Function** entry's **Body** in the **[State panel](/docs/studio/logic/state)**.
-- An **inline** event handler in the **[Events panel](/docs/studio/logic/events)**.
+- A **Function** entry's **Body** in the **[Data panel](/docs/studio/logic/data)**.
+- An **Inline code** event handler in the Inspector's **[Logic tab](/docs/studio/logic/events)** (:kbd[⌘⇧3]).
 
 **Statements** is the structured editor described here; **Code** is a JavaScript text body — see **[Code editing](/docs/studio/logic/code)**.
 
@@ -56,13 +56,13 @@ A **Switch** card matches one value against several cases:
 
 ## Dispatch an event
 
-A **Dispatch event** card sends a custom event from a component — the counterpart of the **Emits** list on a function in the State panel:
+A **Dispatch event** card sends a custom event from a component — the counterpart of the **Emits** list on a function in the Data panel:
 
 - **Event** — the event's name. In a component whose functions declare emitted events, this is a combo box offering the declared names.
 - **Detail** — the data to send along, as an operand (a state value, a literal, or a formula).
 - **Options** — **Bubbles** and **Composed** checkboxes controlling how far the event travels.
 
-Pages using the component can then bind that event in their own **[Events panel](/docs/studio/logic/events)** and read the payload as `event#/detail`.
+Pages using the component can then bind that event in their own **[Logic tab](/docs/studio/logic/events)** and read the payload as `event#/detail`.
 
 :::doc-note
 Statement bodies are saved as a JSON list in the function's `body`, one object per card — the same file the rest of the component lives in, diffable like everything else Studio writes.
@@ -70,6 +70,6 @@ Statement bodies are saved as a JSON list in the function's `body`, one object p
 
 ## Next
 
-- Bind a statement-bodied function to a click in the **[Events panel](/docs/studio/logic/events)**
+- Bind a statement-bodied function to a click in the **[Logic tab](/docs/studio/logic/events)**
 - When a body outgrows steps, switch to **[Code editing](/docs/studio/logic/code)**
 - The formula vocabulary inside each step: **[Formulas and expressions](/docs/studio/logic/formulas)**

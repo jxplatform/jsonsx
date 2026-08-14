@@ -255,6 +255,106 @@ describe("seedPublishConnected — automation seam", () => {
   });
 });
 
+describe("openPublishPanel — the token is not in the DOM", () => {
+  /** Everything the rendered modal could be carrying the secret in. */
+  function serializedPanel(): string {
+    const host = document.querySelector("#layer-modal");
+    const attributes = [...(host?.querySelectorAll("*") ?? [])].flatMap((el) =>
+      [...el.attributes].map((attr) => attr.value),
+    );
+    const values = [...(host?.querySelectorAll("input, sp-textfield") ?? [])].map(
+      (el) => (el as HTMLInputElement).value ?? "",
+    );
+    return [host?.innerHTML ?? "", ...attributes, ...values].join("\n");
+  }
+
+  function installRejecting() {
+    installMockPlatform({
+      cfApi: cfApiMock({}),
+      // A stored token that Cloudflare does not accept — the exact state in which the old panel
+      // Rendered `value=${getCfToken()}` back at the reader.
+      cfConnection: () => Promise.resolve(null),
+    });
+  }
+
+  test("a stored token is reported as stored and never painted", async () => {
+    resetStudioState({ projectConfig: { name: "My Site" } });
+    setCfToken("cf_super_secret_value");
+    installRejecting();
+    openPublishPanel();
+    await flush();
+    expect(serializedPanel()).not.toContain("cf_super_secret_value");
+    expect(bodyText()).toContain("A Cloudflare API token is stored on this machine");
+    // And there is no field at all until one is asked for.
+    expect(document.querySelector("#cf-token-input")).toBeNull();
+    expect(button("Replace token")).toBeTruthy();
+  });
+
+  test("Replace token opens an EMPTY field, and saving it stores what was typed", async () => {
+    resetStudioState({ projectConfig: { name: "My Site" } });
+    setCfToken("cf_old_secret");
+    const { getCfToken } = await import("../src/services/cf-settings");
+    installRejecting();
+    openPublishPanel();
+    await flush();
+    pointer(button("Replace token")!, "click");
+    await flush();
+    const input = document.querySelector("#cf-token-input") as HTMLInputElement;
+    expect(input).toBeTruthy();
+    expect(input.getAttribute("value")).toBe("");
+    expect(serializedPanel()).not.toContain("cf_old_secret");
+
+    input.value = "cf_new_secret";
+    pointer(button("Verify & Connect")!, "click");
+    await flush();
+    expect(getCfToken()).toBe("cf_new_secret");
+    // Read out of the live control on its way to storage, and cleared from it afterwards.
+    expect(serializedPanel()).not.toContain("cf_new_secret");
+  });
+
+  test("an empty submission refuses instead of silently forgetting the stored token", async () => {
+    resetStudioState({ projectConfig: { name: "My Site" } });
+    setCfToken("cf_keep_me");
+    const { getCfToken } = await import("../src/services/cf-settings");
+    installRejecting();
+    openPublishPanel();
+    await flush();
+    pointer(button("Replace token")!, "click");
+    await flush();
+    pointer(button("Verify & Connect")!, "click");
+    await flush();
+    expect(getCfToken()).toBe("cf_keep_me");
+    expect(bodyText()).toContain("Preferences › Accounts to forget the stored one");
+  });
+
+  test("revoking is a link to Preferences › Accounts, not a button here", async () => {
+    resetStudioState({ projectConfig: { name: "My Site" } });
+    setCfToken("cf_stored");
+    installRejecting();
+    const { createCommandRegistry } = await import("../src/commands/registry");
+    const { emptyContext } = await import("../src/commands/context");
+    const { setActiveRegistry } = await import("../src/commands/active-registry");
+    const runs: { id: string; args: unknown }[] = [];
+    const registry = createCommandRegistry({ getContext: emptyContext });
+    registry.register({
+      category: "View",
+      id: "app.preferences",
+      level: "application",
+      run: (_ctx, args) => {
+        runs.push({ args, id: "app.preferences" });
+      },
+      title: "Preferences…",
+    });
+    setActiveRegistry(registry);
+    openPublishPanel();
+    await flush();
+    pointer(button("Preferences › Accounts")!, "click");
+    await flush();
+    expect(runs).toEqual([{ args: { section: "accounts" }, id: "app.preferences" }]);
+    setActiveRegistry(null);
+  });
+});
+
 describe("openPublishPanel — connected status view", () => {
   test("shows the latest deployment and disconnect removes build.deploy", async () => {
     resetStudioState({

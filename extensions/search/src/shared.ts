@@ -7,6 +7,7 @@
  */
 
 import type { JxElement } from "@jxsuite/schema/types";
+import { displayTagName } from "@jxsuite/schema/guards";
 
 /** One collection's index configuration inside the `search` project section. */
 export interface SearchCollectionConfig {
@@ -159,7 +160,7 @@ function headingOf(
   if (typeof node !== "object" || node === null || !node.tagName) {
     return null;
   }
-  const match = HEADING_TAG.exec(node.tagName);
+  const match = HEADING_TAG.exec(displayTagName(node.tagName));
   if (!match) {
     return null;
   }

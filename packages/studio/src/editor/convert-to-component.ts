@@ -1,15 +1,17 @@
 /// <reference lib="dom" />
 // ─── Convert to Component ─────────────────────────────────────────────────────
 import { html, render as litRender } from "lit-html";
+import { displayTagName } from "@jxsuite/schema/guards";
 import { errorMessage } from "@jxsuite/schema/parse";
 import { ref } from "lit-html/directives/ref.js";
 import { childIndex, getNodeAtPath, parentElementPath } from "../store";
+import { primarySelection } from "../tabs/selection";
 import { activeTab } from "../workspace/workspace";
 import { transact } from "../tabs/transact";
 import { componentRegistry, computeRelativePath, loadComponentRegistry } from "../files/components";
 import { getPlatform } from "../platform";
 import { jsonClone } from "../utils/studio-utils";
-import { statusMessage } from "../panels/statusbar";
+import { notify } from "../services/notify";
 import { showDialog } from "../ui/layers";
 import { validateComponentSlots } from "../services/cem-export";
 
@@ -20,11 +22,12 @@ const VALID_NAME = /^[a-z][a-z0-9]*(-[a-z0-9]+)+$/;
 /** Convert the currently selected element into a reusable component. */
 export async function convertToComponent() {
   const tab = activeTab.value;
-  if (!tab?.session.selection || tab.session.selection.length < 2) {
+  const selected = primarySelection(tab?.session.selection);
+  if (!tab || !selected || selected.length < 2) {
     return;
   }
 
-  const node = getNodeAtPath(tab.doc.document, tab.session.selection);
+  const node = getNodeAtPath(tab.doc.document, selected);
   if (!node || !node.tagName) {
     return;
   }
@@ -44,8 +47,8 @@ export async function convertToComponent() {
   const refPath = computeRelativePath(tab.documentPath, componentFile);
 
   // Single atomic mutation: replace node + add $elements ref
-  const selectionPath = tab.session.selection;
-  transact(tab, (doc) => {
+  const selectionPath = selected;
+  const converted = transact(tab, (doc) => {
     // Navigate to parent's children array and replace the node
     const pp = parentElementPath(selectionPath) ?? [];
     const idx = childIndex(selectionPath) as number;
@@ -71,6 +74,15 @@ export async function convertToComponent() {
       doc.$elements.push({ $ref: refPath });
     }
   });
+  /* THE FILE IS WRITTEN ONLY IF THE DOCUMENT TOOK THE REFERENCE.
+     `transact` consults the collab gate, which pauses structural editing while source is canonical.
+     A refusal used to be invisible here: the extraction still wrote `components/<name>.json` to
+     disk and still said "Converted to <name>" — leaving a component file nothing references, in a
+     document the author was told had been changed. The gate raises its own toast saying why the
+     edit is paused; the honest thing to add to it is nothing at all. */
+  if (!converted) {
+    return;
+  }
 
   // Write component file and refresh registry
   try {
@@ -78,13 +90,22 @@ export async function convertToComponent() {
     await platform.writeFile(componentFile, JSON.stringify(componentDef, null, 2));
     await loadComponentRegistry();
     const warning = validateComponentSlots(componentDef);
+    notify.success(`Converted to <${name}>`);
     if (warning) {
-      statusMessage(`Converted to <${name}> — Warning: ${warning}`, 6000);
-    } else {
-      statusMessage(`Converted to <${name}>`);
+      // A slot warning is a thing to FIX, not a thing to read once: the component is written and
+      // Usable, and the defect stays listed until somebody edits it.
+      notify.warn(`<${name}> has a slot problem: ${warning}`, {
+        path: componentFile,
+        source: "Components",
+        tier: "problem",
+      });
     }
   } catch (error) {
-    statusMessage(`Error saving component: ${errorMessage(error)}`);
+    notify.error(`Could not save the <${name}> component.`, {
+      detail: errorMessage(error),
+      path: componentFile,
+      source: "Components",
+    });
   }
 }
 
@@ -98,7 +119,7 @@ function deriveDefaultName(node: JxMutableNode) {
   if (node.$id && node.$id.includes("-")) {
     return node.$id.toLowerCase();
   }
-  const tag = (node.tagName ?? "div").toLowerCase();
+  const tag = (displayTagName(node.tagName) || "div").toLowerCase();
   return tag.includes("-") ? tag : `jx-${tag}`;
 }
 

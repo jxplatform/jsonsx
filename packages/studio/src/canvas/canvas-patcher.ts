@@ -11,31 +11,45 @@
  * Patching is only attempted in design/edit canvas modes, where the canvas renders through
  * prepareForEditMode: runtime reactive bindings are inert there, so the patcher is the only writer
  * to the patched DOM.
+ *
+ * Every question here is asked of ONE PANE — the one showing the edited tab (`canvas-surface.ts`).
+ * The mode, the panel list, the readiness test and the render an escalation schedules are all
+ * properties of a stage, and reading them globally is how a second pane mid-mount would refuse an
+ * edit typed into the first, and how one failed patch would rebuild both.
  */
 
-import { canvasPanels, getNodeAtPath, parentElementPath } from "../store";
-import { isTabActive } from "../workspace/workspace";
-import { view } from "../view";
+import { getNodeAtPath, parentElementPath } from "../store";
+import { canvasModeOfPane, surfacesShowingTab } from "./canvas-surface";
 import { toRaw } from "../reactivity";
 import { postPatchToHosts } from "./iframe-host";
 import { canvasPerf, recordEscalation, SPAN_PATCH_BATCH, timeSpan } from "./canvas-perf";
 import { setPatchConsumer } from "../tabs/patch-ops";
 
+import type { CanvasSurface } from "./surface-registry";
 import type { JxPatchOp, TransactionRecord } from "../tabs/patch-ops";
 import type { Tab } from "../tabs/tab.js";
 import type { JxPath } from "../state";
 
 /** Render-side callbacks injected at init so this module stays free of heavy canvas imports. */
 interface CanvasPatcherCtx {
-  getCanvasMode: () => string;
-  scheduleCanvasRender: () => void;
+  /** Schedule ONE pane's full render — never "the canvas". See {@link escalateToFullRender}. */
+  scheduleCanvasRender: (paneId: string) => void;
   renderOverlays: () => void;
 }
 
 let _ctx: CanvasPatcherCtx | null = null;
 
-/** Document root references whose change was applied surgically (checked by the doc-effect). */
-const _consumed = new WeakSet<object>();
+/**
+ * Document root references whose change was applied surgically, and the PANES it reached.
+ *
+ * A `WeakSet` of references, until one document could be displayed in two panes. Each pane runs its
+ * own doc-effect, both fire on the same root-reference swap, and the first to arrive consumed the
+ * one mark — so the second pane full-rendered every surgically patched edit while
+ * `skippedFullRenders` reported a single skip. That inverts workstream 1's whole result in exactly
+ * the configuration workstream 3 introduces, and reports it as a win. The mark is per pane now, and
+ * each pane deletes only its own.
+ */
+const _consumed = new WeakMap<object, Set<string>>();
 
 /**
  * Initialize the canvas patcher and register it as the transactDoc patch consumer.
@@ -48,33 +62,101 @@ export function initCanvasPatcher(ctx: CanvasPatcherCtx) {
     apply: applyPatchBatch,
     classify: classifyOps,
     escalate: escalateToFullRender,
-    markConsumed: (docRef: object) => {
-      _consumed.add(toRaw(docRef) as object);
+    markConsumed: (docRef: object, tab: Tab) => {
+      markConsumed(
+        docRef,
+        patchableSurfaces(tab).map((surface) => surface.paneId),
+      );
     },
   });
 }
 
 /**
- * One-shot check used by the canvas doc-effect: returns true (and clears the mark) when the given
- * document reference was already applied to the canvas surgically, so the full render can be
- * skipped. One-shot so tab switches and repeat triggers still render fully.
+ * The stages that can actually TAKE a patch: showing the tab, and drawing an editable canvas.
  *
- * @param {object} doc
+ * **One function, because two of them disagreed and the disagreement lost edits.**
+ * {@link classifyOps} SKIPS a showing stage that cannot patch — that is what lets a Code lens open
+ * beside a page without killing surgical patching for the page. `markConsumed` marked every stage
+ * DISPLAYING the tab. So opening Code beside a page and typing marked the lens as patched, its
+ * doc-effect returned before `scheduleCanvasRender`, and `canvas-render.ts`'s source fast path —
+ * the only thing that refreshes a source-mode Monaco — never ran. The Code view sat frozen while
+ * `skippedFullRenders` counted it as a win.
+ *
+ * The panel/readiness half of `classifyOps`' gate is deliberately NOT repeated here: a batch only
+ * reaches `markConsumed` after that gate passed, so every surface this returns had ready panels
+ * when the verdict was taken.
+ *
+ * @param {Tab | null} tab
+ * @returns {CanvasSurface[]}
  */
-export function consumePatchedDocument(doc: object): boolean {
-  const raw = toRaw(doc) as object;
-  if (_consumed.has(raw)) {
-    _consumed.delete(raw);
-    canvasPerf.skippedFullRenders += 1;
-    return true;
-  }
-  return false;
+function patchableSurfaces(tab: Tab | null): CanvasSurface[] {
+  return surfacesShowingTab(tab).filter((candidate) => {
+    const mode = canvasModeOfPane(candidate.paneId);
+    return mode === "design" || mode === "edit";
+  });
 }
 
-/** Schedule the fallback full render and record why. */
-export function escalateToFullRender(reason: string) {
+/**
+ * Record that `docRef`'s change has been applied surgically in each of `paneIds`.
+ *
+ * No empty-list guard, because the list cannot be empty here: `transactDoc` marks only a batch
+ * {@link classifyOps} called patchable, and that function rejects `patchableSurfaces(tab).length
+ * === 0` before it can say so. A guard on an unreachable value is a branch no test can enter — the
+ * gate's own rule — and `_consumed` is a `WeakMap` keyed on a reference `transactDoc` mints fresh
+ * per transaction, so there is nothing for one to protect either.
+ *
+ * @param {object} docRef
+ * @param {readonly string[]} paneIds
+ */
+function markConsumed(docRef: object, paneIds: readonly string[]) {
+  _consumed.set(toRaw(docRef) as object, new Set(paneIds));
+}
+
+/**
+ * One-shot check used by ONE PANE's canvas doc-effect: returns true (and clears that pane's mark)
+ * when the given document reference was already applied to that pane's stage surgically, so its
+ * full render can be skipped. One-shot so tab switches and repeat triggers still render fully.
+ *
+ * @param {object} doc
+ * @param {string} paneId
+ */
+export function consumePatchedDocument(doc: object, paneId: string): boolean {
+  const raw = toRaw(doc) as object;
+  const panes = _consumed.get(raw);
+  if (!panes?.has(paneId)) {
+    return false;
+  }
+  panes.delete(paneId);
+  if (panes.size === 0) {
+    _consumed.delete(raw);
+  }
+  canvasPerf.skippedFullRenders += 1;
+  return true;
+}
+
+/**
+ * Schedule the fallback full render of every pane showing `tab`, and record why.
+ *
+ * An escalation is a statement about a stage whose DOM no longer matches its document, and only a
+ * stage that was handed the patch can be in that state — a global schedule would rebuild the other
+ * pane's iframes (reloading them, losing their scroll and any live edit) because a document it is
+ * not showing failed to patch. That is why this resolves stages from the tab rather than scheduling
+ * "the canvas"; it is now PLURAL for the other half of the same reason: a document displayed in two
+ * panes was handed the patch in both, so both are out of date when it fails.
+ *
+ * With no pane showing the tab (a `patchError` arriving after the pane's tab changed, or an apply
+ * failure on a tab no pane is showing) there is nothing to re-render, so nothing is scheduled — the
+ * reason is still recorded, because a swallowed escalation that no counter saw is exactly the class
+ * of bug `__jxCanvasPerf` exists to make visible.
+ *
+ * @param {string} reason
+ * @param {Tab | null} tab
+ */
+export function escalateToFullRender(reason: string, tab: Tab | null = null) {
   recordEscalation(reason);
-  _ctx?.scheduleCanvasRender();
+  for (const surface of surfacesShowingTab(tab)) {
+    _ctx?.scheduleCanvasRender(surface.paneId);
+  }
 }
 
 // ─── Classification ──────────────────────────────────────────────────────────
@@ -271,20 +353,42 @@ export function classifyOps(tab: Tab, ops: JxPatchOp[]): { patchable: boolean; r
     return { patchable: false, reason };
   };
 
-  if (!isTabActive(tab)) {
+  /*
+   * Every gate below is asked of the PANES showing this tab — not of the app.
+   *
+   * A tab is OWNED by one pane and may be DISPLAYED by two (a derived pane projects the pane it
+   * derives from), so the stages that could apply the patch are exactly those, and their readiness,
+   * their modes and their panel lists are the only ones that can decide the question. Read
+   * globally, the readiness test made the other pane's mid-mount canvas refuse an edit typed into
+   * this one, and the mode test asked what the FOCUSED pane was doing about a document it may not
+   * even be showing.
+   */
+  const showing = surfacesShowingTab(tab);
+  if (showing.length === 0) {
     return reject("inactive-tab");
   }
-  const canvasMode = _ctx ? _ctx.getCanvasMode() : "";
-  if (canvasMode !== "design" && canvasMode !== "edit") {
+  /* A stage not drawing an editable canvas is SKIPPED, not counted as a rejection — and that is the
+     difference between opening a Code lens beside a page and killing surgical patching for the page
+     itself. A Code lens has no artboards and is in no patchable mode; folding it into `every` would
+     have rejected the batch as `mode-source`/`no-panels` and full-rendered both stages on every
+     keystroke. Only when NO showing stage can take the patch is the mode a rejection.
+     The SAME predicate decides what `markConsumed` marks — see {@link patchableSurfaces} for what
+     it cost when these were two filters that had drifted apart. */
+  const patchable = patchableSurfaces(tab);
+  if (patchable.length === 0) {
+    const canvasMode = canvasModeOfPane(showing[0]!.paneId);
     return reject(`mode-${canvasMode || "unknown"}`);
   }
-  if (canvasPanels.length === 0) {
-    return reject("no-panels");
-  }
-  // The iframe canvas keeps its render context inside the iframe, so a panel is patchable as soon as
-  // It has rendered (`ready`) — there is no parent-side `liveCtx`.
-  if (!canvasPanels.every((p) => p.ready)) {
-    return reject("panels-not-ready");
+  for (const surface of patchable) {
+    const { panels } = surface;
+    if (panels.length === 0) {
+      return reject("no-panels");
+    }
+    // The iframe canvas keeps its render context inside the iframe, so a panel is patchable as soon
+    // As it has rendered (`ready`) — there is no parent-side `liveCtx`.
+    if (!panels.every((p) => p.ready)) {
+      return reject("panels-not-ready");
+    }
   }
   // A `set-text` on a node whose CHILDREN are replaced in the same batch is subsumed by that
   // Subtree re-render (the iframe folds every forward op into the shadow doc first, then the
@@ -335,8 +439,24 @@ export function applyPatchBatch(tab: Tab, _ops: JxPatchOp[], record?: Transactio
   // Render then runs), so an edit is never dropped.
   timeSpan(SPAN_PATCH_BATCH, () => {
     const forwardOps = (record?.docOps ?? []).map((pair) => pair.forward);
-    if (postPatchToHosts(forwardOps, view.renderGeneration, tab.id) === 0) {
+    /* ONE call, and no generation. Each host checks the patch against the generation of the stage
+       it is mounted on, resolved inside `postPatchToHosts` — see the note there on why a single
+       number for a multi-pane fan-out is the bug rather than a parameter needing a better value.
+       Posting once per showing surface would post the same patch to the same host twice, because
+       that loop spans stages by design.
+       And no `surfacesShowingTab(tab).length > 0` guard in front of it. There was one, and it was
+       a condition with no false branch: `tabs/transact.ts` calls `apply` only when `classify`
+       returned patchable in the statement above it, and {@link classifyOps} rejects
+       `inactive-tab` for exactly the case the guard was checking. A tab no pane is showing posts
+       to no host anyway, `hosts` falls to 0, and the throw below escalates the batch. */
+    const hosts = postPatchToHosts(forwardOps, tab.id);
+    if (hosts === 0) {
       throw new Error("no-ready-iframe-host");
     }
+    // The counter the escalation count is read against: `patchedOps` versus `escalations` is how
+    // Much of an authoring session avoided a render at all. It is the OPS, not ops×hosts — one
+    // Mutation posted to six artboards is one mutation, and counting the fan-out here would make
+    // A wide canvas look like it was doing more work than a narrow one.
+    canvasPerf.patchedOps += forwardOps.length;
   });
 }

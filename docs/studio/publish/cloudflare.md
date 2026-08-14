@@ -21,6 +21,10 @@ The first time you open the panel, it asks for a Cloudflare connection. What you
 - **Connect Cloudflare** — click it and sign in to Cloudflare in the window that opens. Done.
 - **API token form** — some platforms ask you to paste a Cloudflare API token instead (create one in the Cloudflare dashboard with the permissions the panel names: Account Settings Read, Pages Read/Write), then click **Verify & Connect**. The token stays on your machine.
 
+:::doc-note
+Once a token is stored, the panel reports that it is stored — it never renders the token back into the field. The box is drawn empty, and only when you ask to replace the token. Revoking lives with every other credential, in **[Preferences › Accounts](/docs/studio/interface/preferences)**.
+:::
+
 If the panel instead says it can't reach the Cloudflare API on this platform, you don't need it at all — set up Pages once in Cloudflare's own dashboard and publishing still works the same way: commit and sync, your host builds.
 
 ## Create and connect a Pages project

@@ -209,12 +209,56 @@ Handlers receive the DOM event, and the `event#/` reference scheme reads it with
 
 ## Where expressions appear
 
-An `$expression` is valid in two positions:
+An `$expression` is valid in three positions:
 
 1. **As a `state` entry** — a named, reusable operation. A pure entry is a computed value; a mutating entry is a handler you bind with `"onclick": { "$ref": "#/state/toggleTheme" }`, exactly like a Function entry.
 2. **Inline as an event handler value** on any element, in place of a `$ref` to a function.
+3. **As an element's `tagName`** — see [Choosing an element's tag](#choosing-an-elements-tag) below.
 
 Prefer the named form when reused; the inline form for single-use handlers.
+
+## Choosing an element's tag
+
+Sometimes one element should be a link when it has somewhere to go and a plain box when it doesn't — wrapping the same content either way. Write the choice in `tagName`:
+
+```json
+{
+  "tagName": {
+    "$expression": {
+      "operator": "?:",
+      "target": { "$ref": "#/state/href" },
+      "value": "a",
+      "initial": "div"
+    }
+  },
+  "attributes": { "href": "${state.href}" },
+  "children": ["…your content, written once…"]
+}
+```
+
+Use `switch` when there are more than two, and give it a `default` — an element with no tag can't exist:
+
+```json
+{
+  "tagName": {
+    "$expression": {
+      "operator": "switch",
+      "target": { "$ref": "#/state/level" },
+      "cases": { "1": "h1", "2": "h2", "3": "h3" },
+      "default": "p"
+    }
+  }
+}
+```
+
+Two rules make this different from every other formula:
+
+- **Every branch is a tag name, not a formula.** You choose _between_ tags; you don't compute one. That's what lets Studio tell you at authoring time that `"A LINK"` isn't a tag, instead of the page breaking in a browser.
+- **The tag is decided once, when the element is created**, and isn't re-read afterwards. Changing it later would mean throwing the element away and building a new one, taking your content's focus, typed-in values and scroll position with it. If a tag needs to change in response to something, that's a `$switch` — which swaps content, not the element itself.
+
+:::doc-note
+A component's own `tagName` — the name at the top of the file — is always a plain name, as is a `$head` entry's. Those become a custom element's registered name and a tag in the page head, which can't vary per instance.
+:::
 
 ## How it works
 

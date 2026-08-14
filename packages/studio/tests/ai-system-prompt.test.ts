@@ -183,3 +183,76 @@ describe("ai-system-prompt — tool-table/gating consistency", () => {
     expect([...registered].toSorted()).toEqual([...tiered].toSorted());
   });
 });
+
+describe("the agent's gate is the human's gate", () => {
+  /*
+   * `Command.aiTool`'s contract, in `commands/registry.ts`, is "the human's gate and the agent's
+   * gate stay one predicate". They were two. The registry's `selection.delete` / `duplicate` /
+   * `moveUp` require `editor.kind === "canvas"` because the Outline renders whatever the active
+   * tab's document is — with Project Settings open, that is `project.json` drawn as a layer tree.
+   * The assistant's `document` tier asked only whether a tab existed, so in that exact state the
+   * agent was advertised `remove_node` and `move_node` and executed them against the file that
+   * defines the project, while the person's `delete_node` was refused.
+   *
+   * `remove_node` self-refuses only the document ROOT (`path.length < 2`), which is a weaker test
+   * than `structurallyEditable`, so a repeater template or a `$switch` case was removable by the
+   * agent and not by the person.
+   */
+  const TREE_WRITERS = [
+    "add_child",
+    "move_node",
+    "remove_node",
+    "set_property",
+    "set_style",
+    "set_text",
+    "add_state",
+    "update_state",
+  ];
+
+  test("every element-tree WRITER is document-tree; the read is not", async () => {
+    const { AI_TOOL_TIERS } = await import("../src/services/ai-system-prompt");
+    const tierOf = new Map(AI_TOOL_TIERS.map((t) => [t.name, t.tier]));
+    for (const name of TREE_WRITERS) {
+      expect([name, tierOf.get(name)]).toEqual([name, "document-tree"]);
+    }
+    // Reading a document you cannot restructure is still perfectly sensible.
+    expect(tierOf.get("read_document")).toBe("document");
+  });
+
+  test("with a document open but no tree to edit, the writers are inactive and the read is not", async () => {
+    const { tierActive } = await import("../src/services/ai-system-prompt");
+    const settingsOpen = { hasDocument: true, hasProject: true, treeEditable: false };
+    expect(tierActive("document-tree", settingsOpen)).toBe(false);
+    expect(tierActive("document", settingsOpen)).toBe(true);
+
+    const canvasOpen = { hasDocument: true, hasProject: true, treeEditable: true };
+    expect(tierActive("document-tree", canvasOpen)).toBe(true);
+  });
+
+  test("no document at all still refuses both, tree-editable or not", async () => {
+    const { tierActive } = await import("../src/services/ai-system-prompt");
+    const none = { hasDocument: false, hasProject: true, treeEditable: true };
+    expect(tierActive("document-tree", none)).toBe(false);
+    expect(tierActive("document", none)).toBe(false);
+  });
+
+  test("the prompt advertises exactly what the gate will honour", () => {
+    // A model told about a tool that is then refused burns a round trip learning it. The prompt's
+    // Filter and the gate's predicate are the same function over the same facts.
+    const withTree = buildSystemPrompt({
+      document: { children: [], tagName: "x-a" } as unknown as JxMutableNode,
+      hasProject: true,
+      treeEditable: true,
+    });
+    const withoutTree = buildSystemPrompt({
+      document: { children: [], tagName: "x-a" } as unknown as JxMutableNode,
+      hasProject: true,
+      treeEditable: false,
+    });
+    for (const name of TREE_WRITERS) {
+      expect([name, withTree.includes(`${name}(`)]).toEqual([name, true]);
+      expect([name, withoutTree.includes(`${name}(`)]).toEqual([name, false]);
+    }
+    expect(withoutTree).toContain("read_document(");
+  });
+});

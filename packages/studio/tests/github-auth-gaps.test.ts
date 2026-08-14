@@ -5,7 +5,9 @@
  */
 import "./with-dom.js";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { notifyModule } from "./notify-mock";
 import { render as litRender } from "lit-html";
+import type { NotifyCall } from "./notify-mock";
 
 if (globalThis.localStorage === undefined) {
   const store = new Map();
@@ -38,7 +40,12 @@ void mock.module("../src/ui/layers.js", () => ({
     }),
 }));
 
-const { authenticateGithub } = await import("../src/github/github-auth.js");
+const notifications: NotifyCall[] = [];
+void mock.module("../src/services/notify.js", () =>
+  notifyModule((call) => notifications.push(call)),
+);
+
+const { authenticateGithub, MAX_POLL_FAILURES } = await import("../src/github/github-auth.js");
 
 // ─── Fetch stub with deferred responses ──────────────────────────────────────
 
@@ -101,6 +108,7 @@ beforeEach(() => {
   }
   dialogHosts = [];
   fetchQueue = [];
+  notifications.length = 0;
   installFetch();
 });
 
@@ -197,5 +205,62 @@ describe("authenticateGithub dialog", () => {
     expect(result).toBeNull();
     expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
     expect(dialogHosts.at(-1)!.isConnected).toBe(false);
+    // It rests rather than persisting: the state is CORRECT — there is no token because the user
+    // Declined to grant one — and a Problems row promises something still needs fixing.
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0]!.severity).toBe("warn");
+    expect(notifications[0]!.options.detail).toBe("The authorization was declined on GitHub.");
+  });
+
+  test("expired_token says the code expired, and offers the same Retry", async () => {
+    fetchQueue = [deviceResp(0), jsonResp({ error: "expired_token" })];
+    expect(await authenticateGithub()).toBeNull();
+    expect(notifications[0]!.options.detail).toBe("The device code expired before it was entered.");
+    expect(notifications[0]!.options.action).toBe("git.signInToGithub");
+  });
+
+  test("an unrecognised error quotes back what GitHub actually said", async () => {
+    fetchQueue = [deviceResp(0), jsonResp({ error: "unsupported_grant_type" })];
+    expect(await authenticateGithub()).toBeNull();
+    expect(notifications[0]!.options.detail).toContain("unsupported_grant_type");
+  });
+
+  test("an answer with no error field at all still reports rather than hanging", async () => {
+    fetchQueue = [deviceResp(0), jsonResp({})];
+    expect(await authenticateGithub()).toBeNull();
+    expect(notifications[0]!.options.detail).toContain("an unrecognised response");
+  });
+
+  test("consecutive poll failures give up as a Problem instead of retrying forever", async () => {
+    // The old loop's `catch {}` re-armed the timer with no budget: against a network that never
+    // Answers, the dialog said "Waiting for authorization…" until the window closed.
+    fetchQueue = [
+      deviceResp(0),
+      ...Array.from(
+        { length: MAX_POLL_FAILURES },
+        () => (() => Promise.reject(new TypeError("Failed to fetch"))) as FetchImpl,
+      ),
+    ];
+    expect(await authenticateGithub()).toBeNull();
+    expect(fetchCalls).toHaveLength(1 + MAX_POLL_FAILURES);
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0]!.severity).toBe("error");
+    expect(notifications[0]!.message).toBe("Could not reach GitHub to sign in.");
+
+    // And nothing was scheduled after it gave up.
+    await sleep(20);
+    expect(fetchCalls).toHaveLength(1 + MAX_POLL_FAILURES);
+  });
+
+  test("a failure that recovers resets the budget rather than accumulating", async () => {
+    fetchQueue = [
+      deviceResp(0),
+      () => Promise.reject(new TypeError("Failed to fetch")),
+      jsonResp({ error: "authorization_pending" }),
+      () => Promise.reject(new TypeError("Failed to fetch")),
+      jsonResp({ access_token: "ghp_recovered" }),
+    ];
+    expect(await authenticateGithub()).toBe("ghp_recovered");
+    expect(notifications).toHaveLength(0);
   });
 });

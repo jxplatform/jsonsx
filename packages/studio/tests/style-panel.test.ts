@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import * as storeActual from "../src/store";
 import { activeTab, closeAllTabs } from "../src/workspace/workspace";
 import type { JxMutableNode, JxStyle } from "@jxsuite/schema/types";
+import { shell } from "../src/shell";
 
 // Make debounced style commits synchronous so @input handlers fire without real 400ms timers.
 void mock.module("../src/store", () => ({
@@ -26,7 +27,15 @@ void mock.module("../src/panels/stylebook-panel", () => ({
   selectStylebookTag: selectStylebookTagMock,
 }));
 
-const { _fieldRow, renderStylePanelTemplate } = await import("../src/panels/style-panel");
+// The Target Line's segments route to commands rather than growing their own selectors, so the
+// Registry is what the tests assert against — the segment's job is to name the right verb.
+const runMock = mock((..._args: unknown[]) => {});
+void mock.module("../src/commands/active-registry", () => ({
+  activeRegistry: () => ({ run: runMock }),
+}));
+
+const { renderStylePanelTemplate, resetSelectorMenu } = await import("../src/panels/style-panel");
+const { openSelectorMenu } = await import("../src/panels/target-line");
 const { initCssData } = await import("../src/panels/style-utils");
 const { initLayers } = await import("../src/ui/layers");
 const { getNodeAtPath } = await import("../src/store");
@@ -57,7 +66,7 @@ function setupTab(style: JxStyle | undefined, opts: { media?: boolean } = {}) {
     ...(opts.media ? { $media: MEDIA } : {}),
   } as unknown as JxMutableNode;
   const tab = resetWorkspaceWithTab(doc);
-  tab.session.selection = ["children", 0];
+  tab.session.selection = [["children", 0]];
   return tab;
 }
 
@@ -92,6 +101,26 @@ function fire(el: Element | null | undefined, type: string, value?: string) {
   el!.dispatchEvent(new Event(type, { bubbles: true }));
 }
 
+/** One segment of the Target Line, addressed by the axis it states. */
+function segment(container: HTMLElement, key: string) {
+  return container.querySelector(`.target-line [data-seg="${key}"]`) as HTMLElement | null;
+}
+
+/** The trailing scope chip — "this element" / "all <h1> in this document". */
+function scopeChip(container: HTMLElement) {
+  return container.querySelector(".target-line .tl-scope") as HTMLElement | null;
+}
+
+/** A row's provenance chip, whatever state it is in. */
+function chip(container: HTMLElement, prop: string) {
+  return row(container, prop)?.querySelector(".provenance-chip") as HTMLElement | null;
+}
+
+/** Pick a value-source rung from the dynamic slot's picker (§6.3 turned the ring into a menu). */
+function chooseSlotMode(container: HTMLElement, prop: string, mode: string) {
+  click(row(container, prop)!.querySelector(`sp-menu-item[data-mode="${mode}"]`));
+}
+
 function toggleAccordion(item: HTMLElement | undefined, open: boolean) {
   expect(item).toBeTruthy();
   (item as HTMLElement & { open: boolean }).open = open;
@@ -106,6 +135,8 @@ beforeEach(() => {
     ],
   });
   selectStylebookTagMock.mockClear();
+  runMock.mockClear();
+  resetSelectorMenu();
   resetSlotModeMemory();
 });
 
@@ -116,48 +147,80 @@ afterEach(() => {
 // ─── Empty states ────────────────────────────────────────────────────────────
 
 describe("renderStylePanelTemplate empty states", () => {
-  test("no open tab → No document loaded", async () => {
+  test("no open tab → the shared open-a-page state, with the button that does it", async () => {
     resetStudioState();
     closeAllTabs();
     const c = await renderPanel();
-    expect(c.textContent).toContain("No document loaded");
+    expect(c.querySelector(".empty-state-message")?.textContent).toBe(
+      "Open a page to style what you click.",
+    );
+    expect((c.querySelector(".empty-state-action") as HTMLElement).textContent?.trim()).toBe(
+      "Open a page…",
+    );
   });
 
-  test("tab without selection → prompt to select", async () => {
+  test("tab without selection → the one shared canvas verb", async () => {
     resetStudioState();
     resetWorkspaceWithTab();
     const c = await renderPanel();
-    expect(c.textContent).toContain("Select an element to style");
+    // The rail must not read as three different requirements: Properties, Events and Style all
+    // Ask for a selection with the same sentence.
+    expect(c.querySelector(".empty-state-message")?.textContent).toBe(
+      "Click anything on the canvas to style it.",
+    );
   });
 
-  test("selection pointing at a missing node → prompt to select", async () => {
+  test("selection pointing at a missing node → names the loss, then the shared verb", async () => {
     const tab = setupTab({});
-    tab.session.selection = ["children", 9];
+    tab.session.selection = [["children", 9]];
     const c = await renderPanel();
-    expect(c.textContent).toContain("Select an element to style");
+    expect(c.querySelector(".empty-state-message")?.textContent).toBe(
+      "That element is no longer on the page. Click anything on the canvas to pick another one.",
+    );
   });
 
-  test("stylebook mode with null document → No document loaded", async () => {
+  test("stylebook mode with null document → the same open-a-page state", async () => {
     const tab = setupTab({});
-    tab.session.ui.stylebookSelection = "h1";
+    shell.stylebook.selection = "h1";
     (tab.doc as unknown as Record<string, unknown>).document = null;
     const c = await renderPanel("stylebook");
-    expect(c.textContent).toContain("No document loaded");
+    expect(c.querySelector(".empty-state-message")?.textContent).toBe(
+      "Open a page to style what you click.",
+    );
   });
 });
 
 // ─── Stylebook mode ──────────────────────────────────────────────────────────
 
 describe("stylebook mode", () => {
-  test("renders header and merges site style into effective style", async () => {
-    const tab = setupTab({});
+  test("the scope chip states the blast radius, and site style shows through as a donor", async () => {
+    setupTab({});
     resetStudioState({ projectConfig: { style: { textAlign: "center" } } });
-    tab.session.ui.stylebookSelection = "h1";
+    shell.stylebook.selection = "h1";
     const c = await renderPanel("stylebook");
-    expect(c.querySelector(".stylebook-style-header")?.textContent).toContain("h1");
+    // The `Styling: <h1>` caption is gone; the scope chip says the same thing before you type,
+    // And says how far it reaches.
+    expect(c.querySelector(".stylebook-style-header")).toBeNull();
+    expect(segment(c, "element")?.textContent).toContain("h1");
+    expect(scopeChip(c)?.textContent).toContain("all <h1> in this document");
+    // The value comes from the project's site style, not from this document — so it is inherited,
+    // With the donor named, rather than an accent dot whose "clear" would do nothing.
     const r = row(c, "textAlign");
     expect(r).not.toBeNull();
-    expect(r!.querySelector(".set-dot")).not.toBeNull();
+    expect(r!.querySelector(".set-dot")).toBeNull();
+    expect(chip(c, "textAlign")?.textContent).toContain("from site tokens");
+  });
+
+  test("a layout's stylebook rule is project-wide, and the band says how wide", async () => {
+    setupTab({});
+    resetStudioState();
+    activeTab.value!.documentPath = "layouts/base.json";
+    shell.stylebook.selection = "h1";
+    const c = await renderPanel("stylebook");
+    expect(scopeChip(c)?.textContent).toContain("all <h1> in this project");
+    // The harness platform answers no `findReferences`, so the honest count is "unknown" — never
+    // A confident zero.
+    expect(c.querySelector(".tl-warning-text")?.textContent).toContain("unknown");
   });
 });
 
@@ -206,13 +269,16 @@ describe("base style rows", () => {
 // ─── Style value dynamic slots (fx affordance) ───────────────────────────────
 
 describe("style value dynamic slots", () => {
-  test("style rows cycle between literal and template only (no $ref in JxStyle)", async () => {
+  test("style rows offer literal and template only (no $ref in JxStyle)", async () => {
     setupTab({ display: "flex" });
     const c = await renderPanel();
     const mode = row(c, "display")!.querySelector(".style-row-label .dynamic-slot-mode")!;
     expect(mode).not.toBeNull();
-    expect(mode.textContent!.trim()).toBe("abc");
-    expect(mode.getAttribute("title")).toBe("Field mode: static — click for template literal");
+    expect(mode.textContent!.trim()).toBe("Fixed value");
+    const rungs = [...row(c, "display")!.querySelectorAll("sp-menu-item[data-mode]")].map(
+      (m) => (m as HTMLElement).dataset.mode,
+    );
+    expect(rungs).toEqual(["literal", "template"]);
   });
 
   test("switching to template mode seeds a state-based template string", async () => {
@@ -223,9 +289,9 @@ describe("style value dynamic slots", () => {
       tagName: "div",
     } as unknown as JxMutableNode;
     const tab = resetWorkspaceWithTab(doc);
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     const c = await renderPanel();
-    click(row(c, "display")!.querySelector(".dynamic-slot-mode"));
+    chooseSlotMode(c, "display", "template");
     expect(selectedNode().style?.display).toBe("${state.mode}");
   });
 
@@ -233,7 +299,7 @@ describe("style value dynamic slots", () => {
     setupTab({ display: "${state.mode}" });
     const c = await renderPanel();
     const r = row(c, "display")!;
-    expect(r.querySelector(".dynamic-slot-mode")!.textContent!.trim()).toBe("${}");
+    expect(r.querySelector(".dynamic-slot-mode")!.textContent!.trim()).toBe("Mixed text");
     const tf = r.querySelector("sp-textfield") as HTMLInputElement;
     expect(tf.value).toBe("${state.mode}");
     fire(tf, "change", "${state.other}");
@@ -243,67 +309,130 @@ describe("style value dynamic slots", () => {
   test("de-escalating a template value to literal clears the property", async () => {
     setupTab({ display: "${state.mode}" });
     const c = await renderPanel();
-    click(row(c, "display")!.querySelector(".dynamic-slot-mode"));
+    chooseSlotMode(c, "display", "literal");
     expect(selectedNode().style).toBeUndefined();
   });
 
   test("cycling back to literal restores the stashed style value", async () => {
     setupTab({ display: "flex" });
     let c = await renderPanel();
-    click(row(c, "display")!.querySelector(".dynamic-slot-mode"));
+    chooseSlotMode(c, "display", "template");
     expect(selectedNode().style?.display).toBe("${}");
 
     c = await renderPanel();
-    click(row(c, "display")!.querySelector(".dynamic-slot-mode"));
+    chooseSlotMode(c, "display", "literal");
     expect(selectedNode().style?.display).toBe("flex");
   });
 });
 
-// ─── Media tabs ──────────────────────────────────────────────────────────────
+// ─── The Target Line (§6.1) ──────────────────────────────────────────────────
 
-describe("media tabs", () => {
-  test("absent without $media; present with breakpoint labels", async () => {
+describe("the Target Line", () => {
+  test("states the element and the base breakpoint, and scopes to the element", async () => {
     setupTab({});
-    const noMedia = await renderPanel();
-    expect(noMedia.querySelector("sp-tabs")).toBeNull();
-
-    setupTab({}, { media: true });
     const c = await renderPanel();
-    const tabsEl = c.querySelector("sp-tabs");
-    expect(tabsEl).not.toBeNull();
-    const labels = [...c.querySelectorAll("sp-tab")].map((t) => t.getAttribute("label"));
-    expect(labels).toEqual(["Base", "Sm", "Md"]);
+    expect(segment(c, "element")?.textContent?.trim()).toBe("section");
+    expect(segment(c, "media")?.textContent?.trim()).toBe("Base");
+    expect(segment(c, "scheme")).toBeNull();
+    expect(scopeChip(c)?.textContent?.trim()).toBe("this element");
+    expect(c.querySelector(".tl-warning")).toBeNull();
   });
 
-  test("changing the selected tab updates activeMedia, base maps to null", async () => {
+  test("names the active breakpoint, and every segment is a control", async () => {
     const tab = setupTab({}, { media: true });
-    let c = await renderPanel();
-    const tabsEl = c.querySelector("sp-tabs") as HTMLElement & { selected: string };
-    tabsEl.selected = "sm";
-    fire(tabsEl, "change");
-    expect(tab.session.ui.activeMedia).toBe("sm");
-
-    c = await renderPanel();
-    const tabsEl2 = c.querySelector("sp-tabs") as HTMLElement & { selected: string };
-    // Re-selecting the current value is a no-op branch
-    tabsEl2.selected = "sm";
-    fire(tabsEl2, "change");
-    expect(tab.session.ui.activeMedia).toBe("sm");
-
-    tabsEl2.selected = "base";
-    fire(tabsEl2, "change");
-    expect(tab.session.ui.activeMedia).toBeNull();
+    tab.session.ui.activeMedia = "md";
+    const c = await renderPanel();
+    expect(segment(c, "media")?.textContent?.trim()).toBe("@Md");
+    // A segment is a button, and it routes rather than offering a third selector of its own.
+    click(segment(c, "media"));
+    expect(runMock).toHaveBeenCalledWith("settings.open", { section: "contexts" });
+    click(segment(c, "element"));
+    expect(runMock).toHaveBeenCalledWith("view.setActivity", { tab: "layers" });
   });
 
-  test("media tab edits write into the @media block and clean up when emptied", async () => {
-    const tab = setupTab({ "@sm": { textTransform: "uppercase" }, color: "blue" }, { media: true });
-    tab.session.ui.activeMedia = "sm";
+  test("the breakpoint segment reads Base while no breakpoint is declared", async () => {
+    const tab = setupTab({});
+    tab.session.ui.activeMedia = "md";
     const c = await renderPanel();
-    const r = row(c, "textTransform");
-    expect(r).not.toBeNull();
-    click(r!.querySelector(".set-dot"));
-    expect(selectedNode().style?.["@sm"]).toBeUndefined();
-    expect(selectedNode().style?.color).toBe("blue");
+    expect(segment(c, "media")?.textContent?.trim()).toBe("Base");
+  });
+
+  test("the selector segment names the rule and lists what the element declares", async () => {
+    const tab = setupTab({ "&.active": { color: "red" } });
+    tab.session.ui.activeSelector = "&.custom";
+    const c = await renderPanel();
+    expect(segment(c, "selector")?.textContent).toContain("&.custom");
+    const values = [...c.querySelectorAll(".tl-selector-menu sp-menu-item")].map((m) =>
+      m.getAttribute("value"),
+    );
+    expect(values).toContain("&.active");
+    expect(values).toContain("&.custom");
+    expect(values).toContain("__base__");
+    // A declared selector is marked, so the menu says which rules already exist.
+    const active = [...c.querySelectorAll(".tl-selector-menu sp-menu-item")].find(
+      (m) => m.getAttribute("value") === "&.active",
+    );
+    expect(active?.textContent).toContain("●");
+  });
+
+  test("choosing a menu entry sets the selector; the base entry clears it", async () => {
+    const tab = setupTab({});
+    const c = await renderPanel();
+    const item = (value: string) =>
+      [...c.querySelectorAll(".tl-selector-menu sp-menu-item")].find(
+        (m) => m.getAttribute("value") === value,
+      );
+    click(item(":focus"));
+    expect(tab.session.ui.activeSelector).toBe(":focus");
+    click(item("__base__"));
+    expect(tab.session.ui.activeSelector).toBeNull();
+  });
+
+  test("+ Add custom… opens a validated dialog, not an imperative input", async () => {
+    const tab = setupTab({});
+    let c = await renderPanel();
+    const addCustom = (container: HTMLElement) =>
+      click(
+        [...container.querySelectorAll(".tl-selector-menu sp-menu-item")].find(
+          (m) => m.getAttribute("value") === "__add_custom__",
+        ),
+      );
+
+    addCustom(c);
+    await flush();
+    expect(topDialog()).not.toBeNull();
+    expect(topDialog()!.getAttribute("headline")).toBe("Add Selector");
+    // A value that is not a nested selector is refused in place.
+    await answerPromptDialog("notASelector");
+    expect(topDialog()!.querySelector("sp-help-text")?.textContent).toContain(
+      'must start with ":"',
+    );
+    await answerPromptDialog(".fancy");
+    expect(tab.session.ui.activeSelector).toBe(".fancy");
+    expect(c.querySelector(".selector-custom-input")).toBeNull();
+
+    // Cancelling changes nothing.
+    c = await renderPanel();
+    addCustom(c);
+    await flush();
+    await answerPromptDialog(null);
+    expect(tab.session.ui.activeSelector).toBe(".fancy");
+  });
+
+  test("style.openSelectorMenu opens the Target Line's own menu, and refuses when unrendered", async () => {
+    setupTab({});
+    // Connected, because the command asks the element whether it is still in the document.
+    const host = document.createElement("div");
+    document.body.append(host);
+    const c = await renderInto(renderStylePanelTemplate({ getCanvasMode: () => "edit" }), host);
+    const trigger = c.querySelector("overlay-trigger") as HTMLElement & { open?: string };
+    expect(trigger).not.toBeNull();
+    openSelectorMenu();
+    expect(trigger.open).toBe("click");
+
+    resetSelectorMenu();
+    expect(() => openSelectorMenu()).toThrow("needs the Inspector's Style tab rendered");
+    host.remove();
   });
 });
 
@@ -323,15 +452,15 @@ describe("color-scheme layer routing", () => {
       tagName: "div",
     } as unknown as JxMutableNode;
     const tab = resetWorkspaceWithTab(doc);
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     return tab;
   }
 
-  test("forced Dark shows the variant badge and routes base-context edits into @--dark", async () => {
+  test("forced Dark shows the variant segment and routes base-context edits into @--dark", async () => {
     const tab = setupSchemeTab({ "@--dark": { textTransform: "uppercase" }, color: "blue" });
     tab.session.ui.previewColorScheme = "dark";
     const c = await renderPanel();
-    expect(c.querySelector(".style-scheme-badge")?.textContent).toContain("Dark variant");
+    expect(segment(c, "scheme")?.textContent).toContain("Dark variant");
     // The scheme block is the active context: its props render, and clearing edits it in place.
     const r = row(c, "textTransform");
     expect(r).not.toBeNull();
@@ -340,11 +469,21 @@ describe("color-scheme layer routing", () => {
     expect(selectedNode().style?.color).toBe("blue");
   });
 
-  test("Auto keeps base-context editing and shows no badge", async () => {
+  test("the base value shows through as an inherited donor, and the chip goes back to it", async () => {
+    const tab = setupSchemeTab({ color: "blue" });
+    tab.session.ui.previewColorScheme = "dark";
+    tab.session.ui.styleSections = { typography: true };
+    const c = await renderPanel();
+    expect(chip(c, "color")?.textContent).toContain("from Base");
+    click(chip(c, "color"));
+    expect(tab.session.ui.previewColorScheme as string).toBe("auto");
+  });
+
+  test("Auto keeps base-context editing and shows no variant segment", async () => {
     const tab = setupSchemeTab({ color: "blue" });
     tab.session.ui.previewColorScheme = "auto";
     const c = await renderPanel();
-    expect(c.querySelector(".style-scheme-badge")).toBeNull();
+    expect(segment(c, "scheme")).toBeNull();
     click(row(c, "color")!.querySelector(".set-dot"));
     expect(selectedNode().style?.color).toBeUndefined();
   });
@@ -354,7 +493,7 @@ describe("color-scheme layer routing", () => {
     tab.session.ui.previewColorScheme = "dark";
     tab.session.ui.activeMedia = "sm";
     const c = await renderPanel();
-    expect(c.querySelector(".style-scheme-badge")).toBeNull();
+    expect(segment(c, "scheme")).toBeNull();
     click(row(c, "textTransform")!.querySelector(".set-dot"));
     expect(selectedNode().style?.["@sm"]).toBeUndefined();
     expect(selectedNode().style?.color).toBe("blue");
@@ -364,24 +503,82 @@ describe("color-scheme layer routing", () => {
     const tab = setupSchemeTab({ color: "blue" }, MEDIA);
     tab.session.ui.previewColorScheme = "dark";
     const c = await renderPanel();
-    expect(c.querySelector(".style-scheme-badge")).toBeNull();
+    expect(segment(c, "scheme")).toBeNull();
     click(row(c, "color")!.querySelector(".set-dot"));
     expect(selectedNode().style?.color).toBeUndefined();
   });
 });
 
-// ─── Selector modes ──────────────────────────────────────────────────────────
+// ─── Provenance chips (§6.2) ─────────────────────────────────────────────────
 
+describe("provenance chips", () => {
+  test("a value set here is an accent dot that clears it", async () => {
+    setupTab({ color: "blue" });
+    const c = await renderPanel();
+    const dot = chip(c, "color")!;
+    expect(dot.classList.contains("provenance-chip--set")).toBe(true);
+    expect(dot.classList.contains("set-dot")).toBe(true);
+    click(dot);
+    expect(selectedNode().style?.color).toBeUndefined();
+  });
+
+  test("an inherited value names its donor breakpoint and jumps there", async () => {
+    const tab = setupTab({ color: "blue" }, { media: true });
+    tab.session.ui.activeMedia = "md";
+    tab.session.ui.styleSections = { typography: true };
+    const c = await renderPanel();
+    const inherited = chip(c, "color")!;
+    expect(inherited.textContent).toContain("from Base");
+    expect(inherited.getAttribute("title")).toContain("click to go there");
+    click(inherited);
+    expect(tab.session.ui.activeMedia).toBeNull();
+  });
+
+  test("a lower breakpoint is named as the donor, not just 'Base'", async () => {
+    const tab = setupTab({ "@sm": { color: "red" }, color: "blue" }, { media: true });
+    tab.session.ui.activeMedia = "md";
+    tab.session.ui.styleSections = { typography: true };
+    const c = await renderPanel();
+    expect(chip(c, "color")?.textContent).toContain("from Sm");
+    click(chip(c, "color"));
+    expect(tab.session.ui.activeMedia).toBe("sm");
+  });
+
+  test("a ${} value is bound, names its signal and opens it", async () => {
+    resetStudioState();
+    const doc = {
+      children: [{ style: { color: "${state.brand}" }, tagName: "section" }],
+      state: { brand: { default: "red" } },
+      tagName: "div",
+    } as unknown as JxMutableNode;
+    const tab = resetWorkspaceWithTab(doc);
+    tab.session.selection = [["children", 0]];
+    const c = await renderPanel();
+    const bound = chip(c, "color")!;
+    expect(bound.classList.contains("provenance-chip--bound")).toBe(true);
+    expect(bound.textContent).toContain("brand");
+    click(bound);
+    // The Data panel, and the row for that entry — both verbs, because the chip's promise is "show
+    // Me where this comes from" and the rail tab alone leaves you looking at a collapsed list.
+    expect(runMock).toHaveBeenCalledWith("view.setActivity", { tab: "data" });
+    expect(runMock).toHaveBeenCalledWith("data.expandRow", { name: "brand" });
+  });
+
+  test("an unset property carries no chip at all — absence is the ghost", async () => {
+    setupTab({ display: "flex" });
+    const c = await renderPanel();
+    expect(chip(c, "flexDirection")).toBeNull();
+  });
+});
 describe("selector style editing", () => {
   test("pseudo selector: rows come from the nested block; clearing removes the block", async () => {
     const tab = setupTab({ ":hover": { textTransform: "uppercase" } });
     tab.session.ui.activeSelector = ":hover";
     const c = await renderPanel();
-    const picker = c.querySelector(".selector-select") as HTMLInputElement;
-    expect(picker.value).toBe(":hover");
-    // Existing selector is marked in the menu
-    const hoverItem = [...c.querySelectorAll("sp-menu-item")].find((m) =>
-      m.textContent?.includes(":hover"),
+    expect(segment(c, "selector")?.textContent).toContain(":hover");
+    // The declared selector is marked in the menu
+    const hoverItem = [...c.querySelectorAll(".tl-selector-menu sp-menu-item")].find(
+      (m) => m.getAttribute("value") === ":hover",
     );
     expect(hoverItem?.textContent).toContain("●");
     click(row(c, "textTransform")!.querySelector(".set-dot"));
@@ -427,94 +624,17 @@ describe("selector style editing", () => {
   });
 });
 
-// ─── Selector picker ─────────────────────────────────────────────────────────
-
-describe("selector picker", () => {
-  test("changing the picker sets and clears the active selector", async () => {
-    const tab = setupTab({});
-    const c = await renderPanel();
-    const picker = c.querySelector(".selector-select") as HTMLInputElement;
-    fire(picker, "change", ":focus");
-    expect(tab.session.ui.activeSelector).toBe(":focus");
-    fire(picker, "change", "__base__");
-    expect(tab.session.ui.activeSelector).toBeNull();
-  });
-
-  test("non-common existing and active selectors appear as extra menu items", async () => {
-    const tab = setupTab({ "&.active": { color: "red" } });
-    tab.session.ui.activeSelector = "&.custom";
-    const c = await renderPanel();
-    const values = [...c.querySelectorAll("sp-menu-item")].map((m) => m.getAttribute("value"));
-    expect(values).toContain("&.active");
-    expect(values).toContain("&.custom");
-  });
-
-  test("add-custom flow commits a valid selector on Enter", async () => {
-    const tab = setupTab({});
-    const c = await renderPanel();
-    const picker = c.querySelector(".selector-select") as HTMLElement & { value: string };
-    fire(picker, "change", "__add_custom__");
-    const inp = c.querySelector(".selector-custom-input") as HTMLInputElement;
-    expect(inp).not.toBeNull();
-    expect(picker.style.display).toBe("none");
-    inp.value = ".fancy";
-    inp.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }));
-    expect(tab.session.ui.activeSelector).toBe(".fancy");
-    expect(c.querySelector(".selector-custom-input")).toBeNull();
-    expect(picker.style.display).toBe("");
-    // Second keydown after finish is guarded
-    inp.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }));
-    expect(tab.session.ui.activeSelector).toBe(".fancy");
-  });
-
-  test("add-custom flow: Escape cancels, invalid selectors are rejected", async () => {
-    const tab = setupTab({});
-    let c = await renderPanel();
-    let picker = c.querySelector(".selector-select") as HTMLElement;
-    fire(picker, "change", "__add_custom__");
-    let inp = c.querySelector(".selector-custom-input") as HTMLInputElement;
-    inp.value = ".whatever";
-    inp.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Escape" }));
-    expect(tab.session.ui.activeSelector).toBeNull();
-
-    c = await renderPanel();
-    picker = c.querySelector(".selector-select") as HTMLElement;
-    fire(picker, "change", "__add_custom__");
-    inp = c.querySelector(".selector-custom-input") as HTMLInputElement;
-    inp.value = "notASelector";
-    inp.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }));
-    expect(tab.session.ui.activeSelector).toBeNull();
-  });
-
-  test("add-custom flow: blur accepts non-empty input, cancels empty input", async () => {
-    const tab = setupTab({});
-    let c = await renderPanel();
-    fire(c.querySelector(".selector-select"), "change", "__add_custom__");
-    let inp = c.querySelector(".selector-custom-input") as HTMLInputElement;
-    inp.value = "[disabled]";
-    inp.dispatchEvent(new Event("blur"));
-    expect(tab.session.ui.activeSelector).toBe("[disabled]");
-
-    tab.session.ui.activeSelector = null;
-    c = await renderPanel();
-    fire(c.querySelector(".selector-select"), "change", "__add_custom__");
-    inp = c.querySelector(".selector-custom-input") as HTMLInputElement;
-    inp.value = "   ";
-    inp.dispatchEvent(new Event("blur"));
-    expect(tab.session.ui.activeSelector).toBeNull();
-  });
-});
-
 // ─── Filter bar ──────────────────────────────────────────────────────────────
 
 describe("filter bar", () => {
-  test("filter input and active toggle update session ui", async () => {
+  test("the filter input updates session ui, and the Active toggle is gone", async () => {
     const tab = setupTab({});
     const c = await renderPanel();
     fire(c.querySelector(".style-filter-input"), "input", "flex");
     expect(tab.session.ui.styleFilter).toBe("flex");
-    click(c.querySelector(".style-filter-toggle"));
-    expect(tab.session.ui.styleFilterActive).toBe(true);
+    // Retired by the heading's provenance dots (§6.2): it existed only because a closed section
+    // Could not say whether anything inside it was set.
+    expect(c.querySelector(".style-filter-toggle")).toBeNull();
   });
 
   test("text filter shows matching rows only and drops empty sections", async () => {
@@ -535,14 +655,16 @@ describe("filter bar", () => {
     expect(row(c, "display")).toBeNull();
   });
 
-  test("active-only filter keeps set props and shorthands with set longhands", async () => {
-    const tab = setupTab({ display: "flex", paddingTop: "4px" });
-    tab.session.ui.styleFilterActive = true;
+  test("a section heading tallies what is set, inherited and bound inside it", async () => {
+    const tab = setupTab({ display: "flex", paddingTop: "4px" }, { media: true });
+    tab.session.ui.activeMedia = "md";
     const c = await renderPanel();
-    expect(row(c, "display")).not.toBeNull();
-    expect(row(c, "padding")).not.toBeNull();
-    expect(row(c, "margin")).toBeNull();
-    expect(row(c, "flexDirection")).toBeNull();
+    const layout = accordionItem(c, "Layout");
+    const dots = layout!.querySelector(".provenance-dots");
+    expect(dots).not.toBeNull();
+    // Nothing is set on @md, so the tally is what shows through from Base — which is exactly the
+    // Question the retired "Active" toggle could only answer by hiding everything else.
+    expect(dots!.getAttribute("title")).toContain("inherited");
   });
 });
 
@@ -655,7 +777,7 @@ describe("section accordion", () => {
     setupTab({ padding: "4px", paddingTop: "1px" });
     const c = await renderPanel();
     const spacing = accordionItem(c, "Spacing");
-    click(spacing!.querySelector(".set-dot--section"));
+    click(spacing!.querySelector(".provenance-dots .set-dot"));
     expect(selectedNode().style).toBeUndefined();
   });
 
@@ -677,14 +799,14 @@ describe("section accordion", () => {
     let c = await renderPanel();
     const layout = accordionItem(c, "Layout");
     expect(row(c, "display")).toBeNull(); // Section is closed → no rows
-    click(layout!.querySelector(".set-dot--section"));
+    click(layout!.querySelector(".provenance-dots .set-dot"));
     const hover = selectedNode().style?.[":hover"] as Record<string, unknown>;
     expect(hover.display).toBeUndefined();
     expect(hover.paddingTop).toBeDefined();
 
     c = await renderPanel();
     const spacing = accordionItem(c, "Spacing");
-    click(spacing!.querySelector(".set-dot--section"));
+    click(spacing!.querySelector(".provenance-dots .set-dot"));
     expect(selectedNode().style).toBeUndefined();
   });
 
@@ -839,35 +961,10 @@ describe("relative styling section", () => {
     expect(accordionItem(c, "Relative Styling")).toBeUndefined();
 
     tab.session.ui.activeSelector = "table";
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     const tab2 = nestedTab();
     c = await renderPanel();
     toggleAccordion(accordionItem(c, "Relative Styling"), true);
     expect(tab2.session.ui.styleSections.nested).toBe(true);
-  });
-});
-
-// ─── _fieldRow helper ────────────────────────────────────────────────────────
-
-describe("_fieldRow", () => {
-  test("text type renders a textfield with the live value", async () => {
-    const c = await renderInto(_fieldRow("Name", "text", "hello", () => {}, "dl-1"));
-    const field = c.querySelector("sp-textfield") as HTMLInputElement;
-    expect(field.value).toBe("hello");
-    expect(c.querySelector("sp-field-label")?.textContent).toContain("Name");
-  });
-
-  test("textarea type renders a multiline textfield", async () => {
-    const c = await renderInto(_fieldRow("Body", "textarea", "line", () => {}, "dl-2"));
-    expect(c.querySelector("sp-textfield[multiline]")).not.toBeNull();
-  });
-
-  test("checkbox type commits the checked state synchronously", async () => {
-    const seen: (string | boolean)[] = [];
-    const c = await renderInto(_fieldRow("Flag", "checkbox", "yes", (v) => seen.push(v), "dl-3"));
-    const box = c.querySelector("sp-checkbox") as unknown as HTMLElement & { checked: boolean };
-    box.checked = true;
-    box.dispatchEvent(new Event("change", { bubbles: true }));
-    expect(seen).toEqual([true]);
   });
 });

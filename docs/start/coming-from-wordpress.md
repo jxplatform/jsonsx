@@ -33,7 +33,7 @@ A WordPress theme bundles templates, default styles, and options into something 
 
 ## Blocks and the editor
 
-Gutenberg's blocks split into two ideas. **Elements** are the building parts — headings, images, sections, buttons — placed from the [Elements panel](/docs/studio/design/elements) by click or drag. **[Components](/docs/studio/design/components)** are your reusable patterns: select something you built, turn it into a component, and reuse it with per-use properties — closer to block patterns, except you make them from your own work instead of registering them with code.
+Gutenberg's blocks split into two ideas. **Elements** are the building parts — headings, images, sections, buttons — placed from the [Insert palette](/docs/studio/design/elements) by click or drag. **[Components](/docs/studio/design/components)** are your reusable patterns: select something you built, turn it into a component, and reuse it with per-use properties — closer to block patterns, except you make them from your own work instead of registering them with code.
 
 Writing feels like the part of Gutenberg you liked. Open a content page in [Edit mode](/docs/studio/editing) and the canvas becomes the page itself: click any text and type, use slash commands for headings, lists, images, and tables. It saves as Markdown files, not rows in a `posts` table.
 
@@ -47,7 +47,7 @@ Entries are files in a folder instead of database rows: Markdown, CSV, or JSON. 
 
 ## Media
 
-Drag files into the Manage view and they land in your project's `public/` folder — no attachment posts, no uploads table. When the site builds, every image is optimized automatically into multiple sizes and modern formats, which is the job you used to install an optimizer plugin for. See **[Media](/docs/studio/projects/media)**.
+Drag files into the Library and they land in your project's `public/` folder — no attachment posts, no uploads table. When the site builds, every image is optimized automatically into multiple sizes and modern formats, which is the job you used to install an optimizer plugin for. See **[Media](/docs/studio/projects/media)**.
 
 ## Plugins
 

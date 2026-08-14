@@ -11,21 +11,44 @@ import type { TransactionRecord } from "../src/tabs/patch-ops";
 import type { Tab } from "../src/tabs/tab";
 import type { WireDocOp } from "../src/canvas/iframe-protocol";
 
-// Capture what the parent posts to the bridge instead of reaching a real (cross-origin) iframe host.
-let captured: { forwardOps: WireDocOp[]; gen: number } | null = null;
+/* Capture what the parent posts to the bridge instead of reaching a real (cross-origin) iframe host.
+
+   There is no `gen` here any more, and its absence is the point: the generation a frame checks a
+   patch against belongs to the STAGE that frame is mounted on, and `postPatchToHosts` deliberately
+   spans stages, so it resolves one per host inside its own loop. The caller hands over the ops and
+   the tab whose hosts may have them. */
+let captured: { forwardOps: WireDocOp[]; tabId: string | null } | null = null;
+/** How many ready hosts the fake bridge reports having fanned the patch out to. */
+let readyHosts = 1;
 void mock.module("../src/canvas/iframe-host", () => ({
-  postPatchToHosts: (forwardOps: WireDocOp[], gen: number) => {
-    captured = { forwardOps, gen };
-    return 1; // Pretend one ready host received it.
+  postPatchToHosts: (forwardOps: WireDocOp[], tabId: string | null) => {
+    captured = { forwardOps, tabId };
+    return readyHosts;
   },
   setIframePatchEscalation: () => {},
 }));
 
 const { applyPatchBatch } = await import("../src/canvas/canvas-patcher");
+const { canvasPerf, resetCanvasPerf } = await import("../src/canvas/canvas-perf");
+const { closeAllTabs, openTab } = await import("../src/workspace/workspace");
+
+/**
+ * A tab some pane is actually SHOWING.
+ *
+ * `{} as Tab` used to be enough, because the patch was posted with "the canvas's" generation. It is
+ * posted to every stage displaying the tab now (`surfacesShowingTab`), and a tab no pane holds has
+ * no host to post to — which is the correct answer and the reason the cast stopped working. The
+ * fixture has to put the tab somewhere.
+ */
+function showingTab(): Tab {
+  closeAllTabs();
+  return openTab({ document: { tagName: "div" }, documentPath: "/p/index.json", id: "wire-tab" });
+}
 
 describe("parent → iframe patch wire format", () => {
   test("posts value-carrying forward ops — the values cross, not just paths", () => {
     captured = null;
+    const tab = showingTab();
     const record: TransactionRecord = {
       docOps: [
         {
@@ -50,7 +73,7 @@ describe("parent → iframe patch wire format", () => {
       ],
     };
 
-    applyPatchBatch({} as Tab, record.ops, record);
+    applyPatchBatch(tab, record.ops, record);
 
     expect(captured).not.toBeNull();
     // The bridge receives the forward (value-carrying) ops, NOT the path-only `record.ops`.
@@ -65,17 +88,56 @@ describe("parent → iframe patch wire format", () => {
       tagName: "b",
       textContent: "hi",
     });
-    expect(typeof captured!.gen).toBe("number");
+    // Addressed by TAB, not by generation: every host rendering this document gets it, each
+    // Checking it against its own stage's number.
+    expect(captured!.tabId).toBe(tab.id);
   });
 
   test("posts an empty op list when the transaction recorded no docOps", () => {
     captured = null;
-    applyPatchBatch({} as Tab, [{ op: "set-text", path: ["children", 0] }], {
+    applyPatchBatch(showingTab(), [{ op: "set-text", path: ["children", 0] }], {
       docOps: [],
       fmOps: [],
       invertible: true,
       ops: [{ op: "set-text", path: ["children", 0] }],
     });
     expect(captured!.forwardOps).toEqual([]);
+  });
+
+  test("a patch counts once however many artboards it reaches", () => {
+    // `patchedOps` versus `escalations` is how much of a session avoided a render at all, so it
+    // Must count MUTATIONS. Counting the fan-out would make a six-breakpoint canvas look six times
+    // Busier than a single-artboard one for exactly the same edit.
+    resetCanvasPerf();
+    const tab = showingTab();
+    const batch = (): [Tab, TransactionRecord["ops"], TransactionRecord] => [
+      tab,
+      [{ op: "set-text", path: ["children", 0] }],
+      {
+        docOps: [
+          {
+            forward: { key: "textContent", op: "set-key", path: ["children", 0], value: "X" },
+            inverse: { key: "textContent", op: "set-key", path: ["children", 0], value: "y" },
+          },
+        ],
+        fmOps: [],
+        invertible: true,
+        ops: [{ op: "set-text", path: ["children", 0] }],
+      },
+    ];
+
+    readyHosts = 1;
+    applyPatchBatch(...batch());
+    expect(canvasPerf.patchedOps).toBe(1);
+
+    readyHosts = 6;
+    applyPatchBatch(...batch());
+    expect(canvasPerf.patchedOps).toBe(2);
+
+    // No host could take it: the batch escalates, and nothing is recorded as patched.
+    readyHosts = 0;
+    expect(() => applyPatchBatch(...batch())).toThrow(/no-ready-iframe-host/);
+    expect(canvasPerf.patchedOps).toBe(2);
+    readyHosts = 1;
   });
 });

@@ -247,6 +247,26 @@ describe("applyCommitResult", () => {
     expect(buffer.state.stale.has("r1")).toBeTrue();
   });
 
+  /**
+   * The invariant every `GridSource.commit` owes, stated once here so the cost of breaking it is
+   * legible: silence is not success. `redirects-grid.ts` wrote the file and reported no insert
+   * outcome, and its rows stayed pending forever with the table permanently unsavable.
+   */
+  test("a row the result never names stays pending — silence is not success", () => {
+    const { buffer } = makeBuffer({ r1: { t: "x" } });
+    const insertKey = buffer.insertRow({ t: "new" });
+    buffer.setCell("r1", "t", "y");
+    buffer.deleteRow("r1");
+
+    buffer.applyCommitResult({ cells: [], deletes: [], inserts: [] });
+
+    expect(buffer.state.inserts.has(insertKey)).toBeTrue();
+    expect(buffer.rowState(insertKey)).toBe("pending-insert");
+    expect(buffer.rowState("r1")).toBe("pending-delete");
+    expect(buffer.isDirty()).toBeTrue();
+    expect(buffer.cellError(insertKey, "t")).toBeNull();
+  });
+
   test("cell history survives a commit — post-save undo re-dirties against the new baseline", () => {
     const { buffer, committed } = makeBuffer({ r1: { t: "old" } });
     buffer.setCell("r1", "t", "new");

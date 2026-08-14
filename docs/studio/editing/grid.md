@@ -1,8 +1,9 @@
 ---
 title: "Grid mode"
-description: "Edit collections, CSV files, and page metadata as a spreadsheet in Jx Studio: typed cells, fill down, find & replace, and one batched Save."
+description: "Edit collections, CSV files, redirects and page metadata as a spreadsheet in Jx Studio: typed cells, saved views, find & replace, one batched Save."
 code:
   - packages/studio/src/grid/grid-panel.ts
+  - packages/studio/src/grid/grid-layout.ts
   - packages/studio/src/grid/grid-view.ts
   - packages/studio/src/grid/grid-controller.ts
   - packages/studio/src/grid/grid-open.ts
@@ -21,6 +22,7 @@ Grid turns tabular content into a spreadsheet on the canvas: rows and columns, r
 - **A CSV file** — open it from **Files** (or Quick Access); spreadsheet files open straight into Grid.
 - **A content collection** — right-click the collection's folder in **Files** and choose **Edit Collection in Grid**.
 - **All pages** — right-click the `pages` folder and choose **Edit Pages in Grid**.
+- **The redirect table** — press :kbd[⌘K] and run **Edit Redirects**. Your site's redirect rules are a table, so they open as one; everything on this page applies to them. The rules themselves are described in **[Project settings](/docs/studio/projects/settings)**.
 - **From Project settings** — the **Open Data Grid** button in the data sections opens a picker that lists pages, every collection, and connected database tables in one place.
 
 ## Edit cells
@@ -30,7 +32,7 @@ Double-click a cell to edit it. Columns are typed, so each kind gets the right c
 - Text and number cells — type; number cells clean up currency symbols and commas for you.
 - On/off cells — a checkbox; choice cells — a dropdown; date cells — a date field.
 - List cells — chips: :kbd[Enter] or a comma adds one, :kbd[Backspace] removes the last, and each chip has its own remove button.
-- Image cells open the media picker, and relationship cells — a field that points at another collection — open a picker of that collection's entries.
+- Image cells open the media picker, and relationship cells — a field that points at another collection — open a picker of that collection's entries, with a box beneath it for an id that isn't in the list.
 
 Edited cells are highlighted, and nothing touches your files yet — everything waits for **Save**. Undo and redo (:kbd[⌘Z] / :kbd[Ctrl+Z]) work on grid edits like anywhere else.
 
@@ -40,8 +42,39 @@ Edited cells are highlighted, and nothing touches your files yet — everything 
 - :kbd[Delete] or :kbd[Backspace] clears the selected cells, as one undoable step.
 - **Fill Down** copies the range's first row into every row below it (:kbd[⌘D] / :kbd[Ctrl+D]).
 - **Replace** opens find & replace across all text cells; **Replace All** buffers the whole replacement as one undoable change — save to apply it.
-- **Filter rows** searches across every column; each column header also has its own filter box and click-to-sort.
-- Drag column headers to reorder them and drag their edges to resize — each grid remembers its column layout.
+- **Filter rows** searches across every column, including ones you've hidden — the rows still carry those values.
+- Each column header has its own filter box, and clicking a header re-sorts what's on screen — quick looks, not part of the arrangement Studio remembers.
+- Drag column headers to reorder them and drag their edges to resize. Those do stick, along with everything in the next section.
+
+## Arrange the table
+
+The **View** button in the toolbar holds everything about how the table is arranged. Each choice takes effect as you make it — there's no Apply step, so the popover never shows something the grid isn't already doing.
+
+- **Columns** — tick a column to show it, untick it to hide it. A hidden column isn't drawn, but its values are still loaded and still searched by **Filter rows**.
+- **Sort** — choose a column and a direction, or **Source order** for none. Empty cells sort last in both directions, and a row you just added stays at the bottom where you added it until you save.
+- **Group by** — choose a column and rows sharing a value are gathered together, in the order those values first appear. The toolbar then reads "Grouped by Status · 3 groups", because grouping is a row order and the rows themselves don't announce it.
+
+Studio remembers all of this per grid — plus your column widths and order and the **Filter rows** text — so a table looks the way you left it when you come back to it, whether or not you ever name the arrangement.
+
+## Saved views
+
+Name an arrangement and it becomes a **saved view** you can return to:
+
+1. Arrange the table, then click **View** and **Save view…** — **Save as…**, once a view is applied.
+2. Give it a name — "Recent drafts", "Price check". A blank name is refused in the field, and reusing a name updates that view.
+3. The name appears in the popover's **Saved views** list. Click it to apply it; the ✕ beside it deletes it, after a confirmation that says the table keeps whatever it is currently showing.
+
+A view holds all six facets at once: which columns are shown, their order, their widths, the sort, the group-by column, and the filter text.
+
+The **View** button shows the applied view's name, with a dot after it — `Recent drafts •` — as soon as you change something the view doesn't hold. Saving under that same name folds the change in; applying the view again goes back to it. **Reset** returns the grid to how it comes — columns, sort, grouping and filter — and keeps every named view.
+
+:::doc-note
+Views belong to the table they were saved on: each collection, each CSV file, each database table and the redirect table keep their own list. They're remembered by Studio on this computer rather than written into your project, so they don't travel with a commit and a teammate opening the same collection starts from its defaults.
+:::
+
+:::doc-tip
+The same four verbs are in the Command Bar (:kbd[⌘K]) whenever a grid is on screen: **Save Grid View…**, **Apply Grid View**, **Delete Grid View** and **Reset Grid View**. **Apply Grid View** takes the name, and naming one that doesn't exist tells you which views the table does have. You can also ask the assistant to save the current arrangement, or to apply a view by name.
+:::
 
 ## Add and remove rows
 
@@ -73,6 +106,10 @@ Saving a collection or pages row rewrites that file's frontmatter block from scr
 ## CSV grids
 
 A CSV file opens as a grid tab with **Code** as its raw-text alternate, and saves as one atomic step: if the file changed on disk underneath you, the save stops instead of overwriting it. Only the cells you actually edited are rewritten — untouched cells keep their exact original text, so a one-cell fix produces a one-cell diff.
+
+## The redirect table
+
+Redirects open as a grid over three columns — **Source**, **Destination**, **Status** — and inherit the whole surface: inline editing, **Add Row** and **Delete Rows**, find & replace, undo, one batched **Save**, and views you can save. Saving writes the rules into `project.json` all together, or refuses the batch and says why, so the site never ends up with half its old URLs working. **[Project settings](/docs/studio/projects/settings)** covers what the rules mean and how they're checked.
 
 ## Next
 

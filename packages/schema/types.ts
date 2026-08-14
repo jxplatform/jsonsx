@@ -240,8 +240,26 @@ export interface JxStyle {
   [property: string]: string | number | JxStyle | undefined;
 }
 
+/**
+ * A tag chosen when the element is created, from a set the schema enumerates.
+ *
+ * Both branches resolve to a `TagName`, so the candidates are readable without evaluating anything
+ * — which is what lets the compiler emit one template per candidate and `jx validate` refuse an
+ * illegal name at authoring time. See `defs/tag-expression.schema.ts` for why this is not a `${…}`
+ * template and not a third `$switch` spelling.
+ */
+export type JxTagExpression =
+  | { operator: "?:"; target: unknown; value: string; initial: string }
+  | { operator: "switch"; target: unknown; cases: Record<string, string>; default: string };
+
+/**
+ * An ELEMENT's tag. The document root's and a head entry's stay `string` — see
+ * `defs/tag-expression.schema.ts`.
+ */
+export type JxElementTagName = string | { $expression: JxTagExpression };
+
 export interface JxElement {
-  tagName?: string;
+  tagName?: JxElementTagName;
   textContent?: string | null | JxRef;
   innerHTML?: string;
   /**
@@ -285,6 +303,15 @@ export interface JxMappedArray {
 }
 
 export interface JxDocument extends JxElement {
+  /**
+   * The custom element's NAME, always a literal.
+   *
+   * Narrowed from {@link JxElement.tagName} deliberately: this string becomes
+   * `customElements.define(…)`, the emitted module's file name and a CSS selector prefix, none of
+   * which can be chosen per instance. Carrying the rule in the type means `defineElement` and the
+   * compiler keep receiving a string without a positional guard anyone can forget to write.
+   */
+  tagName?: string;
   state?: Record<string, JxStateDefinition>;
   $layout?: string | false;
   $paths?: JxPathsDef;
@@ -550,7 +577,7 @@ export type JxPathsDef =
  * `@jxsuite/schema/guards` before use.
  */
 export interface JxMutableNode {
-  tagName?: string;
+  tagName?: JxElementTagName;
   textContent?: string | null | JxRef;
   innerHTML?: string;
   /**

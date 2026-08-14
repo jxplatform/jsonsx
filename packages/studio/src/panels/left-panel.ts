@@ -1,91 +1,74 @@
 /// <reference lib="dom" />
 /**
- * Left panel — orchestrator that delegates to per-tab render functions.
+ * Left panel — the Navigator dock's host.
  *
- * Each sub-panel exports a render function that takes its dependencies as arguments and returns a
- * TemplateResult — the same pattern as imports-panel, signals-panel, etc. Only this orchestrator
- * uses mount/render/unmount because it owns the DOM root and error boundary.
+ * It no longer knows what a panel is. The eight-branch `if (tab === …)` chain, the eight-key
+ * no-document copy table and the two post-render special cases are gone: this file resolves ONE
+ * record from the panel registry, draws its header, calls its `render`, and calls its
+ * `afterRender`. Everything a panel is — its name, its level, its empty state, its drag
+ * registrations — is declared beside the state it writes (plan §2 principle 1).
+ *
+ * What stays here is what genuinely belongs to the host: the DOM root, the focus-aware scheduler,
+ * the error boundary with its Lit-marker recovery, and the region stamp.
  */
 
-import { html, render as litRender, nothing } from "lit-html";
+import { html, render as litRender } from "lit-html";
 import type { TemplateResult } from "lit-html";
-import { leftPanel, updateSession } from "../store";
+import { leftPanel } from "../store";
 import { effect, effectScope } from "../reactivity";
 import { createPanelScheduler } from "./panel-scheduler";
 import type { PanelScheduler } from "./panel-scheduler";
 import { activeTab } from "../workspace/workspace";
-import { view } from "../view";
-import { mutateUpdateFrontmatter, transact } from "../tabs/transact";
-import type { GitDiffState, JsonValue } from "../types";
-import type { JxHeadEntry, JxMutableNode } from "@jxsuite/schema/types";
+import { shell } from "../shell";
 
-import { renderLayersTemplate } from "./layers-panel";
-import { renderStylebookLayersTemplate } from "./stylebook-layers-panel";
-import { renderElementsTemplate } from "./elements-panel";
-import { selectStylebookTag, stylebookMeta } from "./stylebook-panel";
-import type { renderImportsTemplate } from "./imports-panel";
-import type { renderSignalsTemplate } from "./signals-panel";
-import type { renderDataExplorerTemplate } from "./data-explorer";
-import type { renderHeadTemplate } from "./head-panel";
-import type { renderGitPanel } from "./git-panel";
+import { navigatorPanelRegion } from "../ui/regions";
+import { openPageAction, renderEmptyState } from "./empty-state";
+import { getPanel, isPanelVisible, panelContext } from "./panel-registry";
+import { registerNavigatorPanels } from "./navigator-panels";
+import type {
+  NavigatorDocument,
+  NavigatorPanelContext,
+  NavigatorPanelDeps,
+  PanelRecord,
+} from "./panel-registry";
 import type { EffectScope } from "@vue/reactivity";
 
-interface LeftPanelCtx {
-  getCanvasMode: () => string;
-  setCanvasMode: (mode: string) => void;
-  // Renderers injected from studio.ts (dependency inversion avoids circular imports);
-  // Typed against their implementations so call sites stay checked.
-  renderImportsTemplate: typeof renderImportsTemplate;
-  renderFilesTemplate: () => TemplateResult;
-  renderSignalsTemplate: typeof renderSignalsTemplate;
-  renderDataExplorerTemplate: typeof renderDataExplorerTemplate;
-  renderHeadTemplate: typeof renderHeadTemplate;
-  renderGitPanel: typeof renderGitPanel;
-  renderCanvas: () => void;
-  /** Canvas re-render that also lets automatic `Request` entries fetch (Data panel Refresh). */
-  refreshData: () => void;
-  defCategory: (def: unknown) => string;
-  defBadgeLabel: (def: unknown) => string;
-  navigateToComponent: (path: string) => void;
-  webdata: Record<string, unknown>;
-  defaultDef: (tag: string) => Record<string, unknown>;
-  registerLayersDnD: () => void;
-  registerElementsDnD: () => void;
-  registerComponentsDnD: () => void;
-  setupTreeKeyboard: (tree: HTMLElement) => void;
-  registerFileTreeDnD: (ctx: { renderLeftPanel: () => void }) => void;
-  setGitDiffState: (state: GitDiffState | null) => void;
-  cloneRepository?: () => void;
-}
-
-let _ctx: LeftPanelCtx | null = null;
+let _deps: NavigatorPanelDeps | null = null;
 
 let _scope: EffectScope | null = null;
 
 let _scheduler: PanelScheduler | null = null;
 
 /**
- * Mount the left panel orchestrator.
+ * Mount the Navigator dock.
  *
- * @param {LeftPanelCtx} ctx
+ * @param {NavigatorPanelDeps} deps
  */
-export function mount(ctx: LeftPanelCtx) {
-  _ctx = ctx;
+export function mount(deps: NavigatorPanelDeps) {
+  _deps = deps;
+  registerNavigatorPanels();
   _scheduler = createPanelScheduler({ render: _doRender, root: leftPanel });
   _scheduler.bindFocus();
   _scope = effectScope();
   _scope.run(() => {
     effect(() => {
+      // Shell state is tracked with no tab open — which panel is showing, and the project-level
+      // State the project-level panels draw from. A document-less rail tab still repaints.
+      void shell.leftTab;
+      void shell.settingsTab;
+      void shell.git.status;
+      void shell.git.loading;
+      void shell.git.error;
+      void shell.git.subTab;
+      void shell.git.logEntries;
       const tab = activeTab.value;
       if (tab) {
-        // Track properties the left panel reads
+        // Track properties the Navigator's panels read
         void tab.doc.document;
         void tab.doc.mode;
-        void tab.session.selection;
-        void tab.session.ui.settingsTab;
-        void tab.session.ui.gitStatus;
-        void tab.session.ui.gitLoading;
-        void tab.session.ui.gitError;
+        // The whole SET, joined — a bare property read would not re-trigger when the selection
+        // Changes WITHIN the array, and §6.5's helpers always replace it but nothing enforces that.
+        void tab.session.selection.map((path) => path.join("/")).join("|");
       }
       render();
     });
@@ -95,7 +78,7 @@ export function mount(ctx: LeftPanelCtx) {
 export function unmount() {
   _scope?.stop();
   _scope = null;
-  _ctx = null;
+  _deps = null;
   _scheduler?.unbind();
   _scheduler = null;
 }
@@ -110,7 +93,7 @@ export function render() {
 
 /** Actual DOM paint, invoked by the scheduler. Includes a Lit-marker-corruption recovery retry. */
 function _doRender() {
-  if (!_ctx) {
+  if (!_deps) {
     return;
   }
   try {
@@ -126,162 +109,84 @@ function _doRender() {
       console.error("left-panel retry failed:", retryError);
     }
   }
-
-  if (view.leftTab === "layers") {
-    const sel = leftPanel.querySelector(".layer-row.selected");
-    if (sel) {
-      sel.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    }
-  }
 }
 
-/** Overlay content-mode frontmatter title/$head onto the document for the head panel. */
-function buildHeadDoc(doc: JxMutableNode, fm: Record<string, unknown>): JxMutableNode {
-  const title = fm.title as string | undefined;
-  const $head = fm.$head as JxHeadEntry[] | undefined;
-  return {
-    ...doc,
-    ...(title !== undefined ? { title } : {}),
-    ...($head !== undefined ? { $head } : {}),
-  };
+/**
+ * The panel header — the fix for "which panel am I in?".
+ *
+ * Six of eight panels had no header at all, and the Imports panel silently changed meaning based on
+ * whether the focused document was `project.json`. Every panel now renders under its title AND its
+ * level ("FILES · project"), so the containment model is legible from the screen rather than only
+ * from the matrix: a badge on a `project` panel does not go away when the last tab closes, and a
+ * `document` panel says out loud that it is about the file in front of you.
+ */
+function panelHeader(panel: PanelRecord): TemplateResult {
+  return html`
+    <header class="panel-header">
+      <span class="panel-header-title">${panel.title}</span>
+      <span class="panel-header-level">${panel.level}</span>
+    </header>
+  `;
+}
+
+/**
+ * The Navigator's one panel host.
+ *
+ * Every panel renders through this, which is what makes `navigator/panel:<id>` **derived**: the
+ * region is stamped once, from the same id the rail routes by, so every panel is addressable
+ * without anyone authoring an id — and renaming a panel renames its region in the same edit,
+ * instead of leaving a stale selector that photographs the wrong box.
+ */
+function panelBody(panel: PanelRecord, content: unknown): TemplateResult {
+  return html`<div class="panel-body" data-jx-region=${navigatorPanelRegion(panel.id)}>
+    ${panelHeader(panel)}
+    <div class="panel-content">${content}</div>
+  </div>`;
+}
+
+/** The whole Navigator when `shell.leftTab` names nothing the registry declares. */
+function unknownPanel(id: string): void {
+  litRender(
+    html`<div class="panel-body">
+      ${renderEmptyState({ message: `No Navigator panel is registered as "${id}".` })}
+    </div>`,
+    leftPanel,
+  );
 }
 
 function _render() {
-  const ctx = _ctx as LeftPanelCtx;
-  const tab = view.leftTab;
-
-  // ── Project-level panels: render based on projectState, independent of active tab ──
-
-  if (tab === "files") {
-    litRender(html`<div class="panel-body">${ctx.renderFilesTemplate()}</div>`, leftPanel);
-    const tree = leftPanel.querySelector(".file-tree") as HTMLElement | null;
-    if (tree) {
-      ctx.setupTreeKeyboard(tree);
-    }
-    ctx.registerFileTreeDnD({ renderLeftPanel: render });
+  const deps = _deps as NavigatorPanelDeps;
+  const panel = getPanel(shell.leftTab);
+  if (!panel || !isPanelVisible(panel, panelContext())) {
+    unknownPanel(shell.leftTab);
     return;
   }
-
-  if (tab === "git") {
-    const aTab = activeTab.value;
-    const ui: Parameters<LeftPanelCtx["renderGitPanel"]>[0]["ui"] = aTab ? aTab.session.ui : {};
-    litRender(html`<div class="panel-body">${ctx.renderGitPanel({ ui }, ctx)}</div>`, leftPanel);
-    return;
-  }
-
-  if (tab === "blocks") {
-    const content = renderElementsTemplate({
-      defaultDef: ctx.defaultDef,
-      rerender: render,
-      webdata: ctx.webdata,
-    } as Parameters<typeof renderElementsTemplate>[0]);
-    litRender(html`<div class="panel-body">${content}</div>`, leftPanel);
-    ctx.registerElementsDnD();
-    ctx.registerComponentsDnD();
-    return;
-  }
-
-  // ── Document-level panels: require an active tab ──
 
   const aTab = activeTab.value;
-  if (!aTab) {
-    litRender(html`<div class="panel-body"></div>`, leftPanel);
-    return;
-  }
+  const doc: NavigatorDocument | null = aTab
+    ? {
+        canvas: aTab.session.canvas as Record<string, unknown> | null,
+        content: aTab.doc.content,
+        document: aTab.doc.document,
+        documentPath: aTab.documentPath,
+        mode: aTab.doc.mode,
+        selection: aTab.session.selection,
+        ui: aTab.session.ui,
+      }
+    : null;
 
-  const S = /**
-   * @type {{
-   *   ui: unknown;
-   *   document: JxMutableNode;
-   *   mode: string;
-   *   selection: JxPath | null;
-   *   canvas: { scope?: object } | null;
-   *   content?: { frontmatter?: Record<string, unknown> };
-   *   documentPath?: string;
-   * }}
-   */ {
-    canvas: aTab.session.canvas,
-    content: aTab.doc.content,
-    document: aTab.doc.document,
-    documentPath: aTab.documentPath,
-    mode: aTab.doc.mode,
-    selection: aTab.session.selection,
-    ui: aTab.session.ui,
-  };
+  const ctx: NavigatorPanelContext = { deps, doc, rerender: render };
 
-  /** @type {TemplateResult | typeof nothing} */
-  let content;
-  if (tab === "layers") {
-    content =
-      ctx.getCanvasMode() === "stylebook"
-        ? renderStylebookLayersTemplate({
-            selectStylebookTag,
-            stylebookMeta,
-          } as Parameters<typeof renderStylebookLayersTemplate>[0])
-        : renderLayersTemplate({
-            navigateToComponent: ctx.navigateToComponent,
-            rerender: render,
-          });
-  } else if (tab === "imports") {
-    content = ctx.renderImportsTemplate({
-      applyMutation: (fn: (doc: JxMutableNode) => void) => {
-        transact(activeTab.value, fn);
-      },
-      documentElements: S.document.$elements || [],
-      documentPath: S.documentPath,
-      renderLeftPanel: render,
-    });
-  } else if (tab === "state") {
-    content = ctx.renderSignalsTemplate(S, {
-      renderCanvas: ctx.renderCanvas,
-      renderLeftPanel: render,
-      updateSession,
-    });
-  } else if (tab === "data") {
-    content = ctx.renderDataExplorerTemplate(S.document.state ?? {}, S.canvas?.scope ?? null, {
-      defBadgeLabel: ctx.defBadgeLabel,
-      defCategory: ctx.defCategory,
-      refreshData: ctx.refreshData,
-      renderCanvas: ctx.renderCanvas,
-      renderLeftPanel: render,
-    });
-  } else if (tab === "head") {
-    const isContent = S.mode === "content";
-    const fm = S.content?.frontmatter ?? {};
-    const headDoc = isContent ? buildHeadDoc(S.document, fm) : S.document;
-    content = ctx.renderHeadTemplate({
-      applyMutation: isContent
-        ? (fn: (doc: JxMutableNode) => void) => {
-            const tabNow = activeTab.value!;
-            const fmNow = (tabNow.doc.content?.frontmatter ?? {}) as Record<string, unknown>;
-            const fmHead = fmNow.$head as JxHeadEntry[] | undefined;
-            const tmp: JxMutableNode = {
-              ...(typeof fmNow.title === "string" ? { title: fmNow.title } : {}),
-              ...(fmHead ? { $head: [...fmHead] } : {}),
-            };
-            fn(tmp);
-            if (tmp.title !== fmNow.title) {
-              mutateUpdateFrontmatter(tabNow, "title", tmp.title as JsonValue);
-            }
-            const newHead = tmp.$head && tmp.$head.length > 0 ? tmp.$head : undefined;
-            // JxHeadEntry[] is JSON document content by construction.
-            mutateUpdateFrontmatter(tabNow, "$head", newHead as JsonValue);
-            render();
-          }
-        : (fn: (doc: JxMutableNode) => void) => {
-            transact(activeTab.value, fn);
-          },
-      document: headDoc,
-      renderLeftPanel: render,
-    });
-  } else {
-    content = nothing;
-  }
+  // A panel that declares what it needs renders the sentence instead of an empty box.
+  const content =
+    doc === null && panel.requiresDocument
+      ? renderEmptyState({ actions: [openPageAction()], message: panel.requiresDocument })
+      : panel.render(ctx);
 
-  litRender(html`<div class="panel-body">${content}</div>`, leftPanel);
+  litRender(panelBody(panel, content), leftPanel);
 
-  // Post-render side effects
-  if (tab === "layers" && ctx.getCanvasMode() !== "stylebook") {
-    ctx.registerLayersDnD();
+  const host = leftPanel.querySelector(".panel-body") as HTMLElement | null;
+  if (host && (doc !== null || !panel.requiresDocument)) {
+    panel.afterRender?.(ctx, host);
   }
 }

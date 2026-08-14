@@ -1,0 +1,1454 @@
+/* Jx Studio — inspector.
+   Load after tokens.css, after shell.css, canvas.css and panels.css.
+
+   Owns everything rendered inside the inspector rail: the field list, the
+   key-value style editor, the Spectrum-accordion style sidebar and its
+   grid Size panel, the signals tab, the data explorer, the binding toggle
+   and the events section. */
+
+/* ─── The Inspector dock: header, four tabs, one scrolling body ──────────────
+   #right-panel is a flex column (shell.css). The header and the tab strip are
+   fixed; exactly one tab body is displayed and it is the only scroller. The
+   Assistant's body is the exception — the chat owns its own scrolling, so its
+   container is a nested flex column with overflow hidden. */
+#right-panel > .panel-header,
+#right-panel > .panel-tabs {
+  flex: 0 0 auto;
+}
+#right-panel > .panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+#right-panel > .panel-body[data-jx-region="inspector/tab:assistant"] {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.ai-panel-host {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* Text labels, not icons: four words in a 280px dock, allowed to compress rather
+   than to become anonymous. */
+.inspector-tabs sp-tabs {
+  --mod-tabs-font-size: var(--spectrum-font-size-50, 11px);
+
+  width: 100%;
+}
+
+/* ─── Inspector ──────────────────────────────── */
+.inspector-fields {
+  padding: 4px 8px 8px;
+}
+.inspector-fields.hidden {
+  display: none;
+}
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.field-label {
+  width: 80px;
+  flex-shrink: 0;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.field-input {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  font: inherit;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg);
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.field-input:focus {
+  border-color: var(--accent);
+}
+.field-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+.field-input[type="checkbox"] {
+  width: auto;
+  flex: none;
+}
+textarea.field-input {
+  resize: vertical;
+  min-height: 60px;
+  font-family: var(--font-mono);
+}
+/* Spectrum components inside field rows */
+.field-row sp-textfield,
+.field-row sp-picker {
+  flex: 1;
+  min-width: 0;
+}
+.field-row sp-textfield {
+  --spectrum-textfield-height: 26px;
+}
+.field-row sp-picker {
+  --spectrum-picker-min-width: 0;
+}
+.field-row sp-checkbox {
+  flex: none;
+}
+.field-row sp-field-label {
+  width: 80px;
+  flex-shrink: 0;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+  text-align: right;
+}
+.signal-editor .field-row sp-field-label {
+  width: 65px;
+  font-size: 10px;
+}
+.signal-editor .field-row sp-textfield {
+  --spectrum-textfield-height: 24px;
+}
+
+/* ─── Style editor (key-value list) ──────────── */
+.kv-row {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 3px;
+}
+.kv-key {
+  width: 90px;
+  flex-shrink: 0;
+}
+.kv-val {
+  flex: 1;
+  min-width: 0;
+}
+.kv-del {
+  width: 20px;
+  text-align: center;
+  cursor: pointer;
+  color: var(--danger);
+  font-size: 13px;
+  line-height: 24px;
+}
+.kv-add {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  cursor: pointer;
+  color: var(--accent);
+}
+.kv-add:hover {
+  text-decoration: underline;
+}
+
+/* ─── The Target Line (plan §6.1) ─────────────────────────────────────────────
+   One sentence at the top of the Style tab, stating the compound coordinate an
+   edit lands in: element · breakpoint · scheme variant · selector, then the
+   scope chip. Every segment is a control, so every segment is a button with the
+   chrome taken off — the row must read as a sentence, not as a toolbar, which is
+   exactly what the three widgets it replaces failed to do. */
+.target-line {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--spectrum-font-size-50, 11px);
+  line-height: 1.4;
+}
+.tl-glyph {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+.tl-segments {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.tl-sep {
+  color: var(--fg-dim);
+  opacity: 0.6;
+}
+.tl-seg {
+  padding: 1px 3px;
+  border: none;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  font-family: var(--font-mono);
+  cursor: pointer;
+}
+button.tl-seg:hover {
+  background: var(--hover-bg);
+  color: var(--accent);
+}
+button.tl-seg:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+.tl-seg--element {
+  color: var(--tag);
+}
+.tl-seg--media,
+.tl-seg--scheme {
+  color: var(--fg-dim);
+}
+.tl-seg--selector {
+  color: var(--signal);
+}
+.tl-selector-popover {
+  max-height: 320px;
+  overflow-y: auto;
+}
+.tl-selector-menu {
+  min-width: 160px;
+}
+/* The scope chip. Element scope is ambient and reads as ambient; the two tag-wide
+   scopes are the ones a reader has to notice before typing, so they carry weight. */
+.tl-scope {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--fg-dim);
+  white-space: nowrap;
+}
+.tl-scope--document {
+  border-color: var(--accent-50);
+  color: var(--accent);
+}
+.tl-scope--project {
+  border-color: var(--warning);
+  color: var(--warning);
+}
+.tl-warning {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  border-left: 2px solid var(--warning);
+  background: var(--bg-panel);
+  font-size: var(--spectrum-font-size-50, 11px);
+}
+.tl-warning-text {
+  margin: 0;
+  color: var(--warning);
+}
+.tl-warning-action {
+  margin-top: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.tl-affected {
+  margin: 4px 0 0;
+  padding: 0;
+  max-height: 140px;
+  overflow-y: auto;
+  list-style: none;
+}
+.tl-affected-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 1px 0;
+  color: var(--fg-dim);
+}
+.tl-affected-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+}
+.tl-affected-count {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+}
+.tl-affected-empty {
+  margin: 4px 0 0;
+  color: var(--fg-dim);
+}
+
+/* ─── Provenance dots on a section heading (plan §6.2) ────────────────────────
+   The chip itself is styled with the rest of the row vocabulary further down —
+   one block, because Style and Component Props are the same chip in two
+   cascades. What is only needed here is the DOT form: a collapsed accordion
+   heading has room for a tally, not for three labelled chips, so the two states
+   that normally carry text collapse to coloured dots beside the accent one.
+   That tally is what retired the Style tab's "Active" filter toggle. */
+.set-dot.provenance-chip--inherited {
+  background: var(--warning);
+  border: none;
+  cursor: default;
+}
+.set-dot.provenance-chip--bound {
+  background: var(--handler);
+  border: none;
+  cursor: default;
+}
+/* `mixed` (§6.5) — the multi-selection's own state. Neutral on purpose: unlike the other three it
+   says nothing about WHERE the value came from, only that the selected elements disagree, so it
+   must not borrow the accent that means "set here" or the amber that means "inherited". */
+.set-dot.provenance-chip--mixed {
+  background: var(--text-secondary);
+  border: none;
+  cursor: default;
+}
+.provenance-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+/* Heading dots are the 7x7 size `.set-dot--section` established, so a section heading reads at the
+   same weight it always did — it just now has up to three of them and a tally on hover. */
+.provenance-dots .set-dot {
+  width: 7px;
+  height: 7px;
+}
+.style-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ─── Style sidebar (Spectrum accordion) ──────── */
+.style-sidebar sp-accordion {
+  border: none;
+}
+.style-sidebar sp-accordion-item {
+  --spectrum-accordion-item-header-font-size: var(--spectrum-font-size-50, 11px);
+}
+.style-sidebar sp-accordion-item [slot="heading"] {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.style-row {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  padding: 2px 0;
+}
+.style-row--child {
+  padding-left: 16px;
+}
+/* removed: .style-row--horizontal — all rows use top labels now */
+.style-row-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--fg-dim);
+}
+.set-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+.set-dot:hover {
+  background: var(--danger);
+}
+.style-row--warning .style-row-label {
+  color: var(--warning);
+}
+.style-row--warning .style-row-label::before {
+  content: "⚠ ";
+}
+/* §7.1's third notification tier: a bad value, said AT the control that refuses it, for exactly as
+   long as the value stays bad. A toast expires and a problem is a list entry somewhere else; this
+   one is a property of the field, so it is styled as part of the row rather than as a floating
+   surface. The left rule is what makes it read as belonging to the widget above it. */
+.style-row--invalid .style-row-label {
+  color: var(--danger);
+}
+.style-row-error {
+  margin: 2px 0 0;
+  padding-left: 6px;
+  border-left: 2px solid var(--danger);
+  font-size: 10px;
+  line-height: 1.35;
+  color: var(--danger);
+}
+/* The repeat counter — "it refused me AGAIN" is otherwise indistinguishable from "the field is
+   still red from last time" when the second attempt fails the same way. */
+.style-row-error-count {
+  margin-left: 4px;
+  font-family: var(--font-mono);
+  opacity: 0.75;
+}
+.style-row > sp-textfield,
+.style-row > sp-number-field,
+.style-row > sp-picker,
+.style-row > sp-combobox,
+.style-row > textarea {
+  width: 100%;
+}
+.style-input-color {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+.style-input-color sp-swatch {
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.style-input-color sp-textfield {
+  flex: 1;
+  min-width: 0;
+}
+.color-popover-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 200px;
+  overflow: hidden;
+}
+.color-popover-inner sp-textfield {
+  width: 100%;
+}
+.color-popover-swatches-label {
+  font-size: 10px;
+  color: var(--spectrum-gray-600);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.color-popover-inner sp-swatch-group {
+  --mod-swatch-border-color: var(--spectrum-gray-400);
+}
+.font-token-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.font-token-preview {
+  font-size: var(--spectrum-font-size-75, 12px);
+  line-height: 1.3;
+}
+.font-token-name {
+  font-size: 9px;
+  color: var(--spectrum-gray-600);
+  font-family: monospace;
+}
+/* jx-styled-combobox — dual-mode styled combobox component */
+jx-styled-combobox {
+  display: contents;
+}
+jx-styled-combobox sp-picker {
+  width: 100%;
+}
+.jx-combobox-group {
+  display: inline-flex;
+  position: relative;
+  width: 100%;
+}
+.jx-combobox-group sp-textfield {
+  flex: 1 1 auto;
+  min-width: 0;
+  --mod-textfield-border-start-end-radius: 0;
+  --mod-textfield-border-end-end-radius: 0;
+  margin-inline-end: calc(-1 * var(--spectrum-border-width-100, 1px));
+}
+.jx-combobox-group sp-picker-button {
+  flex: 0 0 auto;
+  --mod-picker-button-border-start-start-radius: 0;
+  --mod-picker-button-border-end-start-radius: 0;
+  --mod-picker-button-border-color: var(--spectrum-gray-400);
+}
+/* Number-unit compound input: textfield + picker-button */
+.style-input-number-unit {
+  flex: 1;
+  min-width: 0;
+}
+/* Combobox-like composite: textfield + picker-button, matching sp-combobox visually */
+.input-group {
+  display: inline-flex;
+  position: relative;
+  width: 100%;
+}
+.input-group sp-textfield {
+  flex: 1 1 auto;
+  min-width: 0;
+  /* Zero out the inline-end corners so the textfield abuts the picker-button */
+  --mod-textfield-border-start-end-radius: 0;
+  --mod-textfield-border-end-end-radius: 0;
+  /* Pull textfield's border into the picker-button so they share one line */
+  margin-inline-end: calc(-1 * var(--spectrum-border-width-100, 1px));
+}
+.input-group sp-picker-button {
+  flex: 0 0 auto;
+  /* Zero out the inline-start corners to abut the textfield */
+  --mod-picker-button-border-start-start-radius: 0;
+  --mod-picker-button-border-end-start-radius: 0;
+  --mod-picker-button-border-color: var(--spectrum-gray-400);
+}
+.input-group.is-expression sp-picker-button {
+  display: none;
+}
+.input-group.is-expression sp-textfield {
+  --mod-textfield-text-color-default: var(--spectrum-accent-color-800);
+  --mod-textfield-border-start-end-radius: var(--spectrum-corner-radius-100);
+  --mod-textfield-border-end-end-radius: var(--spectrum-corner-radius-100);
+  margin-inline-end: 0;
+}
+.style-shorthand-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.style-shorthand-header sp-textfield {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Button-group + overflow picker-button combo */
+.button-group-combo {
+  display: inline-flex;
+  align-items: stretch;
+}
+.button-group-combo.has-overflow sp-action-group {
+  --mod-actionbutton-border-radius: 0;
+}
+.button-group-combo sp-picker-button {
+  flex: 0 0 auto;
+  --mod-picker-button-border-start-start-radius: 0;
+  --mod-picker-button-border-end-start-radius: 0;
+  --mod-picker-button-border-color: var(--spectrum-gray-400);
+  margin-inline-start: calc(-1 * var(--spectrum-border-width-100, 1px));
+}
+.button-group-combo sp-picker-button.has-selection {
+  --mod-picker-button-background-color: var(--spectrum-accent-background-color-default);
+}
+
+/* ─── Grid section layout (Size panel) ─── */
+.style-section-body--grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 6px 8px;
+}
+.style-section-body--grid .style-row {
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* ─── Signals tab ────────────────────────────── */
+.signal-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-left: 2px solid transparent;
+  user-select: none;
+}
+.signal-row:hover {
+  background: var(--hover-bg);
+}
+.signal-row.expanded {
+  background: var(--accent-10);
+  border-left-color: var(--accent);
+}
+.signal-badge {
+  padding: 0 4px;
+  font-size: 10px;
+  border-radius: var(--spectrum-corner-radius-75, 2px);
+  font-weight: 600;
+  flex-shrink: 0;
+  min-width: 18px;
+  text-align: center;
+}
+.signal-badge.state {
+  background: color-mix(in srgb, var(--signal) 25%, transparent);
+  color: var(--signal);
+}
+.signal-badge.computed {
+  background: color-mix(in srgb, var(--success) 25%, transparent);
+  color: var(--success);
+}
+.signal-badge.data {
+  background: color-mix(in srgb, var(--tag) 25%, transparent);
+  color: var(--tag);
+}
+.signal-badge.handler {
+  background: color-mix(in srgb, var(--handler) 25%, transparent);
+  color: var(--handler);
+}
+/* The NAME is what you came for, so it is the last thing to be elided. It used to sit at `flex: 1`
+   beside a hint pinned at `flex-shrink: 0`, so a long-prototype row rendered as `re… ContentCollect…`
+   — the summary intact and the identity gone. */
+.signal-name {
+  flex: 1 1 auto;
+  min-width: 8em;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: var(--spectrum-font-size-50, 11px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.signal-hint {
+  font-size: 10px;
+  color: var(--fg-dim);
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 64px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.signal-del {
+  visibility: hidden;
+  cursor: pointer;
+  color: var(--danger);
+  font-size: var(--spectrum-font-size-50, 11px);
+  flex-shrink: 0;
+}
+.signal-row:hover .signal-del {
+  visibility: visible;
+}
+.signal-editor {
+  padding: 4px 8px 8px 26px;
+  border-bottom: 1px solid var(--border);
+}
+/* Signals panel accordion (matches style-sidebar pattern) */
+.signals-panel sp-accordion {
+  border: none;
+}
+.signals-panel sp-accordion-item {
+  --spectrum-accordion-item-header-font-size: var(--spectrum-font-size-50, 11px);
+}
+.signals-add {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+}
+
+/* ─── Data explorer ──────────────────────────── */
+.data-explorer-toolbar {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+}
+.data-refresh-btn {
+  font-size: var(--spectrum-font-size-50, 11px);
+  padding: 2px 8px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--fg);
+  cursor: pointer;
+}
+.data-refresh-btn:hover {
+  border-color: var(--accent);
+}
+/* The Data panel's own row list is gone — the definition rows carry the resolved value now
+   (plan §11.2). `.data-row`, `.data-row-header` and `.data-name` went with it; what is left here
+   dresses the value INSIDE a `.signal-editor`. */
+.data-type {
+  font-size: 10px;
+  color: var(--fg-dim);
+  flex-shrink: 0;
+}
+/* A truncation marker is a control, not a caption — it shows more of what the panel already has.
+   Styled as the text it replaced so the tree does not sprout buttons, but focusable and hoverable
+   so it reads as pressable. */
+.data-more {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.data-more:hover,
+.data-more:focus-visible {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+/* The resolved value, under the fields that define it. The rule above it is the seam between
+   "what this is" and "what it became" — the two halves that used to be two panels. */
+.signal-live {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+.signal-live-label {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-dim);
+  margin-bottom: 2px;
+}
+.data-tree {
+  padding: 2px 0;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.data-leaf,
+.data-branch {
+  font-size: var(--spectrum-font-size-50, 11px);
+  font-family: var(--font-mono, monospace);
+  padding: 1px 8px;
+  line-height: 1.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.data-key {
+  color: var(--data-key);
+}
+.data-value {
+  color: var(--fg);
+}
+.data-null {
+  color: var(--fg-dim);
+  font-style: italic;
+}
+.data-string {
+  color: var(--data-string);
+}
+.data-number {
+  color: var(--data-number);
+}
+.data-boolean {
+  color: var(--data-boolean);
+}
+.data-object-label {
+  color: var(--fg-dim);
+  font-style: italic;
+}
+.data-ellipsis {
+  color: var(--fg-dim);
+  font-style: italic;
+}
+/* PENDING IS A RESTING STATE, not progress. While you are editing, an automatic `Request` is
+   deliberately not fetched — so a value that has not arrived is dim and STILL, and the pulse is
+   kept for the one moment something is actually in flight. An animation that never stops is a
+   spinner for a thing that is not loading, and it is why `probe.idle()` could never call this panel
+   quiet: the screenshot lane timed out on "2 animation(s) running" in a panel at rest. */
+.data-pending {
+  opacity: 0.55;
+}
+.signals-panel.is-refreshing .data-pending {
+  opacity: 1;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+.field-check {
+  width: auto;
+  margin: 0;
+}
+
+/* ─── Binding toggle ─────────────────────────── */
+.bind-toggle {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--spectrum-font-size-50, 11px);
+  cursor: pointer;
+  color: var(--fg-dim);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  flex-shrink: 0;
+}
+.bind-toggle:hover {
+  color: var(--fg);
+  background: var(--hover-bg);
+}
+.bind-toggle.bound {
+  color: var(--accent);
+}
+
+/* ─── Events section ─────────────────────────── */
+.events-panel {
+  padding: 8px;
+}
+.events-section {
+  margin-bottom: 8px;
+}
+.declared-event-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 2px 0;
+  font-size: var(--spectrum-font-size-50, 11px);
+}
+.event-code {
+  font-family: monospace;
+  color: var(--accent);
+}
+.event-source {
+  color: var(--fg-dim);
+  font-size: 10px;
+}
+.event-type {
+  margin-left: auto;
+  color: var(--fg-dim);
+  font-size: 10px;
+}
+.event-binding {
+  margin-bottom: 8px;
+}
+.event-row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.event-name {
+  flex: 1;
+  min-width: 0;
+}
+.event-mode {
+  width: 72px;
+  flex-shrink: 0;
+}
+.event-handler {
+  width: 100%;
+}
+.event-body-row {
+  display: flex;
+  gap: 4px;
+  align-items: start;
+  margin-top: 3px;
+}
+.event-body-row sp-textfield {
+  flex: 1;
+  font-size: var(--spectrum-font-size-50, 11px);
+}
+
+/* ── Usage ("Used on N pages →") ──────────────────────────────────────────────
+   The reference index rendered in the inspector. The heading carries the count, so the rows are
+   the answer's detail rather than its headline — collapsed by default, one row per referencing
+   file, each a button that opens it. */
+.usage-note {
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-50, 11px);
+  line-height: 1.5;
+  padding: 2px 0;
+}
+.usage-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  width: 100%;
+  padding: 3px 4px;
+  border: none;
+  border-radius: var(--radius);
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: var(--spectrum-font-size-50, 11px);
+  text-align: left;
+  cursor: pointer;
+}
+.usage-row:hover,
+.usage-row:focus-visible {
+  background: var(--hover-bg);
+}
+.usage-row-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.usage-row-count {
+  flex-shrink: 0;
+  color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── P5 · Provenance chips (UX-REDESIGN-PLAN §6.2) ─────────────────────────
+   Four states, one vocabulary, reused in every cascade: `set` keeps the accent
+   dot it has always been (see .set-dot above); `inherited` is amber and names
+   its donor; `bound` is violet and names the signal or formula; `default`
+   renders nothing at all, because a ghost dot on every unset row is 138 dots
+   on the Style tab. Rendered by panels/provenance.ts:renderProvenanceChip, which
+   ui/field-row.ts calls for every row that states its provenance. */
+.provenance-chip {
+  flex-shrink: 0;
+}
+button.provenance-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 14ch;
+  overflow: hidden;
+  padding: 0 5px;
+  border: 1px solid currentcolor;
+  border-radius: var(--radius);
+  background: transparent;
+  font: inherit;
+  font-size: 9px;
+  line-height: 14px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: default;
+}
+button.provenance-chip:not(:disabled) {
+  cursor: pointer;
+}
+.provenance-chip--inherited {
+  color: var(--warning);
+}
+.provenance-chip--bound {
+  color: var(--handler);
+}
+.provenance-chip--mixed {
+  color: var(--text-secondary);
+}
+button.provenance-chip:hover,
+button.provenance-chip:focus-visible {
+  background: var(--hover-bg);
+}
+/* The collapsed-header dot is an INDICATOR, not a control: it inherited
+   .set-dot's pointer cursor and danger hover and had no handler behind either.
+   §6.2 keeps the dot (a closed section must still say whether anything in it is
+   set) and drops the affordance. */
+.set-dot--section {
+  width: 7px;
+  height: 7px;
+  cursor: default;
+}
+.set-dot--section:hover {
+  background: var(--accent);
+}
+
+/* ─── The read-only name/value line ─────────────────────────────────────────
+   Observed Attributes, CSS Properties and CSS Parts were three copies of the
+   same inline-styled flex row. One row, one rule, and it responds to the theme
+   now that it has a class at all. */
+.kv-static-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 2px 0;
+  font-size: var(--spectrum-font-size-50, 11px);
+}
+.kv-static-name {
+  font-family: var(--font-mono);
+  color: var(--accent);
+}
+.kv-static-detail {
+  color: var(--fg-dim);
+}
+.kv-static-value {
+  margin-left: auto;
+  color: var(--fg-dim);
+}
+.kv-static-tag {
+  padding: 1px 4px;
+  border-radius: var(--radius);
+  background: var(--hover-bg);
+  font-size: 9px;
+}
+.kv-static-value + .kv-static-tag,
+.kv-static-detail + .kv-static-tag {
+  margin-left: auto;
+}
+.kv-static-value ~ .kv-static-tag {
+  margin-left: 0;
+}
+
+/* ─── Logic tab structure ───────────────────────────────────────────────────
+   The Repeater and Switch sections used to carry their layout in inline style=
+   attributes, which is how they also ended up as the last rows in the inspector
+   without a set-dot or a clear affordance. */
+.logic-edit-template {
+  margin-top: 8px;
+  width: 100%;
+}
+.logic-subhead {
+  margin: 8px 0 4px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  font-weight: 600;
+  color: var(--fg-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.logic-case-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.logic-case-name {
+  flex: 1;
+  min-width: 0;
+}
+.logic-case-open {
+  flex-shrink: 0;
+}
+
+/* ─── The Layout-element card ───────────────────────────────────────────────
+   What the inspector says when you click page chrome — §8.2's first click. */
+.layout-origin {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.layout-origin-badge {
+  padding: 2px 6px;
+  border-radius: var(--radius);
+  background: var(--map);
+  color: var(--accent-fg);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.layout-origin-tag {
+  font-family: var(--font-mono);
+  font-size: var(--spectrum-font-size-75, 12px);
+}
+.layout-origin-class {
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+  word-break: break-all;
+}
+.layout-origin-note {
+  margin: 0;
+  padding: 4px 0;
+  font-size: 10px;
+  font-style: italic;
+  color: var(--fg-dim);
+}
+
+/* ─── P6 · Project Styles: token chips and the override affordance (§9.4) ────
+   A style value that is exactly `var(--token)` is a REFERENCE, and raw text is
+   the one rendering that hides which token and what it currently is. The chip
+   reuses the provenance-chip vocabulary above — same border, same 9px, same
+   radius — because "this value comes from somewhere else" is the same sentence
+   in both places; only the donor differs. It is a <span>, not a button: it
+   states, it does not navigate (§6.2). */
+.style-token-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  max-width: 14ch;
+  overflow: hidden;
+  padding: 0 5px;
+  border: 1px solid currentcolor;
+  border-radius: var(--radius);
+  color: var(--handler);
+  font-size: 9px;
+  line-height: 14px;
+  white-space: nowrap;
+}
+.style-token-chip-swatch {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--spectrum-corner-radius-75, 2px);
+}
+.style-token-chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The add-an-override picker, under a token's existing context rows. It aligns
+   with them rather than with the token name, because it belongs to the override
+   list and not to the token — the affordance that was missing is "give this
+   token a value in a context it has none in", and a control that lined up with
+   the base value would read as a second base value. */
+.css-var-override-add {
+  display: flex;
+  align-items: center;
+  padding: 2px 0;
+}
+.css-var-override-add sp-picker {
+  font-size: var(--spectrum-font-size-50, 11px);
+}
+
+/* ─── The reference control (ui/form-controls.ts) ────────────────────────────
+   A property whose `$ref` names another collection. One registration, so this
+   is the only block that styles a relationship field wherever it is drawn — the
+   entry editor, a settings form, the frontmatter card. The note carries the two
+   states a dropdown alone cannot express: "no entries yet" and "the read
+   failed", and the failed one is coloured because it is a fault, not a fact. */
+.reference-control {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+.reference-field {
+  flex: 1;
+  min-width: 0;
+}
+.reference-note {
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-50, 11px);
+  line-height: 1.4;
+}
+.reference-note--failed {
+  color: var(--spectrum-red-600, #e34850);
+}
+/* The entry the value names is not on disk. Kept in the list — see the control's
+   note on dangling references — and marked so it cannot be mistaken for one. */
+.reference-missing {
+  color: var(--spectrum-red-600, #e34850);
+}
+
+/* ─── The statement editor (studio-ui-guidelines.md §4.6) ────────────────────────────────────────
+   A Function body as cards on a connector line — `panels/statement-editor.ts`.
+   Until this block existed the surface had NO stylesheet at all: every frame,
+   indent and connector was an inline `style=` attribute, and twenty class names
+   sat in check-styles.ts's orphan list.
+
+   An attribute cannot carry the one declaration the layout needs. A flex item's
+   automatic minimum size is its min-content width, so a chain with no
+   `min-width: 0` on it refuses to shrink: an operand row asking for a 112px
+   picker + a 56px picker + a Spectrum field (192px by default) is wider than a
+   280px Inspector, and Operator, Target and Value were clipped by the right
+   edge of the WINDOW. The editor is drawn in three docks of very different
+   widths — the Navigator's State panel, the Inspector's Events tab and the
+   Bottom dock's Logic tab — so a pixel layout is wrong by construction.
+
+   Colours here are the ones the attributes already carried: this is a layout
+   change and nothing else. */
+.statement-editor {
+  min-width: 0;
+}
+/* One indent per nesting level, drawn once. The lane used to add a 6px margin of
+   its own on top of the list's 4px + 2px + 8px, so a three-deep branch spent
+   48px of a 240px panel on indentation alone. */
+.statement-list {
+  min-width: 0;
+  padding: 2px 0 0 8px;
+  border-left: 2px solid var(--spectrum-gray-300, #3c3c3c);
+}
+.statement-lane {
+  min-width: 0;
+  margin: 4px 0;
+}
+.statement-lane-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+/* The card is the draggable object, so its frame is what carries the weight. */
+.statement-card {
+  min-width: 0;
+  margin: 0 0 6px;
+  padding: 4px 6px;
+  border: 1px solid var(--spectrum-gray-300, #3c3c3c);
+  border-radius: var(--radius);
+  background: var(--spectrum-gray-75, #1e1e1e);
+}
+.statement-card-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.statement-card-body {
+  min-width: 0;
+}
+.statement-drag-handle {
+  flex-shrink: 0;
+  color: var(--spectrum-gray-500, #6e6e6e);
+  font-size: var(--spectrum-font-size-50, 11px);
+  line-height: 1;
+  cursor: grab;
+  user-select: none;
+}
+/* The kind label and a lane's name are the same 10px caption. */
+.statement-kind-label,
+.statement-lane-label {
+  min-width: 0;
+  color: var(--fg-dim);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+/* "Dispatch event" beside a drag handle and a delete button is already most of a
+   narrow header, so the kind ellipsizes rather than widening the card. */
+.statement-kind-label {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* A `$switch` case renames itself in the lane header, so this label slot holds a
+   text FIELD rather than a word — hence a flex row and no `overflow: hidden`,
+   which would clip the field's focus ring. */
+.statement-lane-label {
+  display: flex;
+  align-items: center;
+}
+/* The uppercase and the 10px belong to the label, not to the value: inherited
+   properties cross the shadow boundary, so `case 1` rendered as `CASE 1` in the
+   field you were about to type into. */
+.statement-case-key {
+  /* It may not GROW: the lane's remove button shares this header, and a key
+     field that takes the whole line pushes it onto one of its own. */
+  flex: 0 1 6rem;
+  min-width: 0;
+  font-size: var(--spectrum-font-size-50, 11px);
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+}
+/* Hard right, and it used to take a `<span style="flex:1">` spacer to get there. */
+.statement-delete {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.statement-lane-remove {
+  flex-shrink: 0;
+}
+.statement-add,
+.statement-add-case,
+.statement-add-else {
+  max-width: 100%;
+}
+/* A direct child of `.style-row`, which is a flex COLUMN — so `flex: 1` here was
+   never a width, it was permission to grow TALL, and a flex-basis would have been
+   a height outright. That is the empty column the bug report photographed. Width
+   comes from the `.style-row > sp-textfield` stretch rule above; all this row
+   needs of its own is permission to shrink. */
+.statement-dispatch-name {
+  min-width: 0;
+}
+/* `bubbles` and `composed` read as one row and stack when they cannot. */
+.statement-dispatch-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  min-width: 0;
+}
+.statement-dispatch-bubbles,
+.statement-dispatch-composed {
+  flex: 0 0 auto;
+  max-width: 100%;
+}
+/* Drag feedback. `dragging`, `drop-above` and `drop-below` are toggled by
+   registerStatementsDnD and had no rule anywhere, so a drag showed the cursor
+   moving and nothing else until the drop landed. */
+.statement-card.dragging {
+  opacity: 0.4;
+}
+.statement-card.drop-above {
+  box-shadow: inset 0 2px 0 0 var(--accent);
+}
+.statement-card.drop-below {
+  box-shadow: inset 0 -2px 0 0 var(--accent);
+}
+
+/* ─── The expression editor ──────────────────────────────────────────────────
+   `ui/expression-editor.ts`, drawn inside a statement card, inside the Data
+   panel's signal editor, and on its own in the Bottom dock's formula workspace.
+   Same story as above: no stylesheet, so no `min-width: 0`, so the operand
+   controls could not shrink to the dock they were in. */
+.expression-editor {
+  min-width: 0;
+}
+/* Nesting depth, from CSS rather than from a `style=` string built in TS. */
+.expression-editor--nested {
+  margin-left: 4px;
+  padding-left: 6px;
+  border-left: 2px solid var(--spectrum-gray-300, #3c3c3c);
+}
+.expr-subsection {
+  min-width: 0;
+  margin-top: 4px;
+}
+.expr-error {
+  padding: 2px 0;
+  color: var(--danger);
+  font-size: 10px;
+}
+/* Two of the editor's three row primitives — the operand is the third, just
+   below, and differs only in how it aligns a tall widget. Between them they are
+   the rule that makes the whole thing hold at any width: a row when there is
+   room for one, a stack when there is not. The break is decided by a flex-basis,
+   never by a fixed width, so the same markup is two columns in a 600px dock and
+   two lines in a 240px rail and neither is a special case. */
+.expr-widget,
+.expr-literal {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+/* An operand may be a nested editor several rows tall; its mode picker belongs
+   at the top of that block, not at the middle of it. */
+.expr-operand {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+.expr-operand-mode {
+  flex: 0 1 6.5rem;
+}
+.expr-literal {
+  flex: 1 1 8rem;
+}
+/* The operator is two or three glyphs, so it may compress a long way before the
+   Browse-catalog button beside it is pushed onto a line of its own. */
+.expr-operator {
+  flex: 1 1 4rem;
+}
+.expr-ref {
+  flex: 1 1 6rem;
+}
+/* A nested formula is a BLOCK of rows, not a control, so it always takes a line
+   of its own under the mode picker that names it. Sizing it as a sibling instead
+   is what put a lone "Formula ▾" at the top of a tall empty column in the bug
+   report — the picker labels what follows it, and a label does not want a column
+   to itself. A `flex-basis: 100%` is the wrap, said once. */
+.expr-operand > .expression-editor {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+.expr-literal-type {
+  flex: 0 1 4rem;
+}
+.expr-literal-value {
+  flex: 1 1 4.5rem;
+}
+.expr-browse-catalog,
+.expr-literal-bool {
+  flex: 0 0 auto;
+}
+.expr-literal-null {
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-75, 12px);
+}
+/* The live value (spec §19.9). A resolved formula is arbitrary text — an object,
+   a URL, a paragraph — so it ellipsizes inside the row it annotates and never
+   sets the row's width. The same badge is drawn on the chip strip
+   (ui/formula-chips.ts), which still carries its own inline copy. */
+.expr-live-badge {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 0 5px;
+  border-radius: var(--radius);
+  background: var(--spectrum-gray-200, #323232);
+  color: var(--spectrum-seafoam-900, #35a690);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 16px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* Positional args (`splice`, `call`) — also drawn by ui/schema-form.ts, which
+   still passes its own inline flex; the wrap and the shrink are what it gains. */
+.array-object-field {
+  min-width: 0;
+}
+.array-object-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  margin-bottom: 4px;
+}
+.array-object-label {
+  flex: 0 0 auto;
+  min-width: 30px;
+  color: var(--fg-dim);
+  font-size: 10px;
+}
+.array-object-row sp-action-button {
+  flex: 0 0 auto;
+}
+/* `switch` cases: matched value → result operand, plus the default row. The
+   default's label keeps the key column's width so the two align. */
+.switch-cases {
+  min-width: 0;
+  margin-top: 4px;
+}
+.switch-case-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+  margin-bottom: 4px;
+}
+.switch-case-key {
+  flex: 0 1 5rem;
+  min-width: 0;
+}
+.switch-case-default {
+  color: var(--fg-dim);
+  font-size: 10px;
+  line-height: 24px;
+}
+.switch-cases sp-action-button {
+  flex: 0 0 auto;
+}
+/* The belt, for both editors. A Spectrum field is `--spectrum-field-width` wide
+   by default (192px) and declares its own min-inline-size; a field row that
+   never says otherwise is therefore ~200px of demand per control, which is the
+   whole width of the rail. Outer-tree rules win over a shadow root's `:host`,
+   so this is where that demand is answered. */
+.statement-editor .style-row,
+.expression-editor .style-row {
+  min-width: 0;
+}
+.statement-editor sp-picker,
+.statement-editor sp-textfield,
+.statement-editor sp-number-field,
+.statement-editor sp-combobox,
+.expression-editor sp-picker,
+.expression-editor sp-textfield,
+.expression-editor sp-number-field,
+.expression-editor sp-combobox {
+  min-width: 0;
+  max-width: 100%;
+}

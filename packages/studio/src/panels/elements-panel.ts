@@ -5,9 +5,12 @@ import { html, nothing } from "lit-html";
 import { childList, getNodeAtPath } from "../store";
 import { activeTab } from "../workspace/workspace";
 import { mutateInsertNode, transactDoc } from "../tabs/transact";
+import { primarySelection } from "../tabs/selection";
 import { view } from "../view";
 import { getEffectiveElements } from "../site-context";
 import { buildComponentInstance, componentRegistry } from "../files/components";
+import { renderEmptyState } from "./empty-state";
+import { registerPanel } from "./panel-registry";
 
 import type { ComponentEntry } from "../files/components";
 import type { JxElement, JxMutableNode } from "@jxsuite/schema/types";
@@ -56,7 +59,7 @@ export function renderElementsTemplate(ctx: {
                 data-block-tag=${tag}
                 @click=${() => {
                   const t = activeTab.value;
-                  const parentPath = t?.session.selection || [];
+                  const parentPath = primarySelection(t?.session.selection) ?? [];
                   const parent = getNodeAtPath(t!.doc.document, parentPath);
                   const idx = childList(parent).length;
                   transactDoc(t!, (tr) =>
@@ -131,7 +134,7 @@ export function renderElementsTemplate(ctx: {
                     }
                     @click=${() => {
                       const t = activeTab.value;
-                      const parentPath = t?.session.selection || [];
+                      const parentPath = primarySelection(t?.session.selection) ?? [];
                       const parent = getNodeAtPath(t!.doc.document, parentPath);
                       const idx = childList(parent).length;
                       const instanceDef = buildComponentInstance(comp);
@@ -155,6 +158,9 @@ export function renderElementsTemplate(ctx: {
         `
       : nothing;
 
+  const nothingToShow =
+    componentsAccordion === nothing && categories.every((entry) => entry === nothing);
+
   return html`
     <sp-search
       size="s"
@@ -165,8 +171,66 @@ export function renderElementsTemplate(ctx: {
         ctx.rerender();
       }}
     ></sp-search>
+    ${
+      nothingToShow
+        ? renderEmptyState(
+            view.elementsFilter
+              ? {
+                  actions: [
+                    {
+                      label: "Clear the filter",
+                      run: () => {
+                        view.elementsFilter = "";
+                        ctx.rerender();
+                      },
+                    },
+                  ],
+                  message: `Nothing here matches “${view.elementsFilter}”.`,
+                }
+              : {
+                  message:
+                    "Elements you can drop onto the page live here — " +
+                    "text, images, layout containers and your own components.",
+                },
+          )
+        : nothing
+    }
     <sp-accordion class="elements-list" allow-multiple
       >${componentsAccordion}${categories}</sp-accordion
     >
   `;
+}
+
+/**
+ * Contribute the Insert panel — **off the rail** (`rail: false`).
+ *
+ * §3.2 ② removes Elements from the Navigator rail because it is not a view of anything: it is an
+ * insert palette, and a palette belongs at the caret (slash menu), on the canvas (`+`) and behind
+ * ⌘⇧A, all of which are P3.5's Insert command family. The record survives that interval so the
+ * surface stays reachable — `view.setActivity {tab:"insert"}`, the palette, and the screenshot
+ * pipeline all still address it — and giving up its rail slot is what keeps the DOCUMENT group at
+ * four.
+ *
+ * `level: "document"`, per principle 3's own worked example: it READS the project's component
+ * registry and WRITES the document tree.
+ */
+export function registerInsertPanel(): void {
+  registerPanel({
+    id: "insert",
+    title: "Insert",
+    level: "document",
+    dock: "navigator",
+    icon: "sp-icon-view-grid",
+    rail: false,
+    render: (ctx) =>
+      renderElementsTemplate({
+        defaultDef: ctx.deps.defaultDef,
+        rerender: ctx.rerender,
+        webdata: ctx.deps.webdata,
+      } as Parameters<typeof renderElementsTemplate>[0]),
+    afterRender: (ctx) => {
+      ctx.deps.registerElementsDnD();
+      ctx.deps.registerComponentsDnD();
+    },
+  });
 }

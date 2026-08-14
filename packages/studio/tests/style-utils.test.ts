@@ -249,7 +249,7 @@ describe("currentFontFamily", () => {
       children: [{ style: { fontFamily: "Georgia, serif" }, tagName: "p" }],
       tagName: "div",
     } as unknown as JxMutableNode);
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     expect(currentFontFamily()).toBe("Georgia, serif");
   });
 
@@ -259,7 +259,7 @@ describe("currentFontFamily", () => {
       style: { "--font-body": "Inter, sans-serif" },
       tagName: "div",
     } as unknown as JxMutableNode);
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     expect(currentFontFamily()).toBe("Inter, sans-serif");
   });
 
@@ -268,7 +268,7 @@ describe("currentFontFamily", () => {
       children: [{ style: { fontFamily: "var(--font-missing)" }, tagName: "p" }],
       tagName: "div",
     } as unknown as JxMutableNode);
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     expect(currentFontFamily()).toBe("");
   });
 
@@ -277,7 +277,7 @@ describe("currentFontFamily", () => {
       children: [{ style: { color: "red" }, tagName: "p" }],
       tagName: "div",
     } as unknown as JxMutableNode);
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     expect(currentFontFamily()).toBe("");
   });
 });

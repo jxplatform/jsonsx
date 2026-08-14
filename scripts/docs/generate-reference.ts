@@ -11,6 +11,7 @@ import { generateImplementationStatus } from "./generators/implementation-status
 import { generateOperators } from "./generators/operators.ts";
 import { generateSpecChangelog } from "./generators/spec-changelog.ts";
 import { generateStarters } from "./generators/starters.ts";
+import { generateCommands, generateShortcuts } from "./generators/studio-commands.ts";
 import { generateStudioRoutes } from "./generators/studio-routes.ts";
 
 const ROOT = resolve(import.meta.dir, "../..");
@@ -22,6 +23,8 @@ const PAGES: Record<string, () => string> = {
   "docs/framework/reference/formulas.md": generateFormulas,
   "docs/framework/reference/operators.md": generateOperators,
   "docs/studio/projects/starters.md": generateStarters,
+  "docs/studio/interface/commands.md": generateCommands,
+  "docs/studio/interface/shortcuts.md": generateShortcuts,
 };
 
 const written: string[] = [];

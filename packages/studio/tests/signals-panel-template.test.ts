@@ -16,42 +16,41 @@ import { render } from "lit-html";
 import { activeTab } from "../src/workspace/workspace";
 import { setExtensions } from "../src/format/format-host";
 import { renderSignalsTemplate } from "../src/panels/signals-panel";
+import { shell } from "../src/shell";
 import { pluginSchemaCache } from "../src/services/code-services";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
 
+/**
+ * The ctx is one field wide now, and that is the assertion.
+ *
+ * It used to carry `renderCanvas` (dead since the takeovers went — nothing in the panel called it)
+ * and `updateSession` (dead since the Logic buttons started going through `openLogicTarget`, which
+ * addresses the focused tab itself). The tests that watched those spies now read the tab and the
+ * shell, which is where the effect actually lands.
+ */
 interface Mounted {
   container: HTMLElement;
-  calls: { canvas: number; left: number; session: Record<string, unknown>[] };
-  ctx: {
-    renderLeftPanel: () => void;
-    renderCanvas: () => void;
-    updateSession: (p: Record<string, unknown>) => void;
-  };
+  calls: { left: number };
+  ctx: { renderLeftPanel: () => void };
   S: Record<string, unknown>;
 }
 
 /** Mount the signals template against the active tab with a re-rendering ctx. */
 function mountSignals(extra: Record<string, unknown> = {}): Mounted {
   const container = document.createElement("div");
-  const calls = { canvas: 0, left: 0, session: [] as Record<string, unknown>[] };
+  const calls = { left: 0 };
   const tab = activeTab.value;
   if (!tab) {
     throw new Error("no active tab");
   }
   const S: Record<string, unknown> = { document: tab.doc.document, ...extra };
   const ctx = {
-    renderCanvas: () => {
-      calls.canvas += 1;
-    },
     renderLeftPanel: () => {
       calls.left += 1;
       S.document = activeTab.value?.doc.document;
       render(renderSignalsTemplate(S as never, ctx), container);
-    },
-    updateSession: (patch: Record<string, unknown>) => {
-      calls.session.push(patch);
     },
   };
   ctx.renderLeftPanel();
@@ -93,9 +92,13 @@ async function expand(h: Mounted, name: string): Promise<HTMLElement> {
   }
   row = findRow(h.container, name);
   expect(row?.classList.contains("expanded")).toBe(true);
-  const editor = h.container.querySelector(".signal-editor");
-  if (!editor) {
-    throw new Error("no editor rendered");
+  // THIS row's editor — its next sibling. Rows stay open now (`ui.dataRows` is a set, per tab), so
+  // `querySelector(".signal-editor")` returns whichever row was expanded first, and every field
+  // Assertion after the second `expand()` would read the wrong entry's editor and still pass or
+  // Fail for the wrong reason.
+  const editor = row?.nextElementSibling;
+  if (!editor?.classList.contains("signal-editor")) {
+    throw new Error(`no editor rendered for ${name}`);
   }
   return editor as HTMLElement;
 }
@@ -184,10 +187,16 @@ describe("renderSignalsTemplate structure", () => {
     expect(findRow(h.container, "plain")?.querySelector(".signal-badge")?.textContent).toBe("S");
   });
 
-  test("no state → empty-state message and no accordion items", () => {
+  test("no state → the empty state teaches, and its button adds the same def the picker does", () => {
     const h = setup(undefined);
-    expect(h.container.querySelector(".empty-state")?.textContent).toBe("No state defined");
+    expect(h.container.querySelector(".empty-state-message")?.textContent).toContain(
+      "Data lives here",
+    );
     expect(h.container.querySelectorAll("sp-accordion-item").length).toBe(0);
+
+    (h.container.querySelector(".empty-state-action") as HTMLElement).click();
+    expect(docState().$newSignal).toEqual({ default: "", type: "string" } as never);
+    expect(h.calls.left).toBeGreaterThan(0);
   });
 
   test("accordion toggle collapses and re-expands a category", async () => {
@@ -360,12 +369,45 @@ describe("state signal editor", () => {
     expect(docState().$renamed).toEqual({ default: "v" } as never);
   });
 
-  test("rename to an existing name is rejected", async () => {
+  test("rename to an existing name is rejected, AND says so", async () => {
+    // The rejection used to be a silent `return`: the document kept `$a`, the field showed `$b`,
+    // And the only way to learn which had won was to look at the canvas. Plan §11.2 asks for a
+    // "collision-checked rename with a visible error" and only the check had shipped.
     const h = setup({ $a: { default: 1 }, $b: { default: 2 } });
-    const editor = await expand(h, "$a");
+    let editor = await expand(h, "$a");
     commitValue(fieldEl(editor, "Name", "sp-textfield"), "$b");
     expect(docState().$a).toEqual({ default: 1 } as never);
     expect(docState().$b).toEqual({ default: 2 } as never);
+
+    editor = await expand(h, "$a");
+    const alert = editor.querySelector('[data-prop="Name"] [role="alert"]');
+    expect(alert?.textContent?.trim()).toBe('"$b" is already defined by this document.');
+  });
+
+  test("an empty name is refused with its own message", async () => {
+    const h = setup({ $a: { default: 1 } });
+    let editor = await expand(h, "$a");
+    commitValue(fieldEl(editor, "Name", "sp-textfield"), "   ");
+    expect(docState().$a).toEqual({ default: 1 } as never);
+    editor = await expand(h, "$a");
+    expect(editor.querySelector('[data-prop="Name"] [role="alert"]')?.textContent?.trim()).toBe(
+      "A name is required.",
+    );
+  });
+
+  test("an accepted rename clears the error and keeps the row open under the new name", async () => {
+    const h = setup({ $a: { default: 1 }, $b: { default: 2 } });
+    let editor = await expand(h, "$a");
+    commitValue(fieldEl(editor, "Name", "sp-textfield"), "$b");
+    editor = await expand(h, "$a");
+    commitValue(fieldEl(editor, "Name", "sp-textfield"), "$c");
+    await flush(1);
+    expect(docState().$c).toEqual({ default: 1 } as never);
+    // The editor followed the rename rather than collapsing out from under the cursor…
+    const renamed = findRow(h.container, "$c");
+    expect(renamed?.classList.contains("expanded")).toBe(true);
+    // …and the refusal it replaced is gone.
+    expect(renamed?.nextElementSibling?.querySelector('[role="alert"]')).toBeNull();
   });
 
   test("type picker updates the def", async () => {
@@ -613,7 +655,7 @@ describe("data source editors", () => {
     const h = setup({ $ext: { $prototype: "Widget", $src: "./w.js" } });
     const editor = await expand(h, "$ext");
     expect(editor.querySelector('[data-prop="Source"]')).not.toBeNull();
-    expect(editor.querySelector('[data-prop="Prototype"]')).not.toBeNull();
+    expect(editor.querySelector('[data-prop="Kind"]')).not.toBeNull();
   });
 });
 
@@ -631,14 +673,19 @@ describe("function editor", () => {
     inputValue(body, "console.log(1)");
     expect((docState().save! as { body: string }).body).toBe("console.log(1)");
 
+    shell.docks.bottom.collapsed = true;
     pointer(
       editor.querySelector('sp-action-button[title="Open in code editor"]') as Element,
       "click",
     );
-    expect(h.calls.session).toEqual([
-      { ui: { editingFunction: { defName: "save", type: "def" } } },
-    ]);
-    expect(h.calls.canvas).toBe(1);
+    expect(activeTab.value!.session.ui.editingFunction).toEqual({
+      defName: "save",
+      type: "def",
+    });
+    // The click is a GESTURE: it puts the surface on screen itself rather than leaning on the
+    // Dock's once-per-target effect, which is what made a second click on a closed dock a no-op.
+    expect(shell.bottomTab).toBe("logic");
+    expect(shell.docks.bottom.collapsed).toBe(false);
   });
 
   test("external function shows Source/Export fields instead of a body", async () => {
@@ -1026,16 +1073,28 @@ describe("expression editor", () => {
     expect(editor.querySelector('[data-prop="target"]')).not.toBeNull();
   });
 
-  test("formula-workspace button updates the session and re-renders the canvas", async () => {
+  test("formula-workspace button sets the Logic target and repaints nothing", async () => {
     const h = setup({
       $inc: { $expression: { operator: "=", target: { $ref: "#/state/$count" } } },
     });
     const editor = await expand(h, "$inc");
-    pointer(
-      editor.querySelector('sp-action-button[title="Open in formula workspace"]') as Element,
-      "click",
-    );
-    expect(h.calls.session).toEqual([{ ui: { editingFormula: { defName: "$inc", type: "def" } } }]);
-    expect(h.calls.canvas).toBe(1);
+    const button = editor.querySelector(
+      'sp-action-button[title="Open in formula workspace"]',
+    ) as Element;
+    // "Open below", not "go full-screen": the affordance opens the Bottom dock's Logic tab, and
+    // `panels/toolbar.ts`'s dock toggle already spells that glyph `sp-icon-align-bottom`.
+    expect(button.querySelector("sp-icon-align-bottom")).not.toBeNull();
+    // A function body is open in the same tab: one Logic tab holds ONE target, so opening the
+    // Formula has to take it — this used to leave both set, and `logicTarget` gives the function
+    // The tie, so the click showed nothing and changed nothing.
+    activeTab.value!.session.ui.editingFunction = { defName: "other", type: "def" } as never;
+    shell.docks.bottom.collapsed = true;
+
+    pointer(button, "click");
+
+    expect(activeTab.value!.session.ui.editingFormula).toEqual({ defName: "$inc", type: "def" });
+    expect(activeTab.value!.session.ui.editingFunction).toBeNull();
+    expect(shell.bottomTab).toBe("logic");
+    expect(shell.docks.bottom.collapsed).toBe(false);
   });
 });

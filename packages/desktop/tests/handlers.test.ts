@@ -23,12 +23,14 @@ const {
   handleWriteFile,
   handleDeleteFile,
   handleRenameFile,
+  findReferences,
   handleCreateDirectory,
   handleUploadFile,
   handleResolveSiteContext,
   discoverComponents,
   codeService,
   locateFile,
+  searchFiles,
   fetchPluginSchema,
   openProject,
   createProject,
@@ -37,7 +39,8 @@ const {
 
 // The folder picker lives on the session object (the legacy handlers shim does not re-export
 // PickDirectory), so the picker tests below drive it through a session of their own.
-const { createProjectSession } = await import("../src/project-session");
+// `pickProjectFile` is module-level for the same reason it exists: it belongs to no session.
+const { createProjectSession, pickProjectFile } = await import("../src/project-session");
 
 const FIXTURES = join(import.meta.dir, "_fixtures_handlers");
 
@@ -318,6 +321,60 @@ describe("handleRenameFile", () => {
   });
 });
 
+// ─── findReferences ─────────────────────────────────────────────────────────
+
+describe("findReferences", () => {
+  test("answers who refers to a component, as a file and as a tag", async () => {
+    setup();
+    try {
+      mkdirSync(join(FIXTURES, "pages"), { recursive: true });
+      mkdirSync(join(FIXTURES, "components"), { recursive: true });
+      writeFileSync(
+        join(FIXTURES, "components/card.json"),
+        JSON.stringify({ children: [], tagName: "desk-card" }),
+      );
+      writeFileSync(
+        join(FIXTURES, "pages/index.json"),
+        JSON.stringify({
+          children: [{ $ref: "../components/card.json" }, { tagName: "desk-card" }],
+        }),
+      );
+
+      const result = await findReferences({ path: "components/card.json" });
+      expect(result.tagName).toBe("desk-card");
+      expect(result.files.map((f) => f.path)).toEqual(["pages/index.json"]);
+      expect(result.refsTotal).toBe(2);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("a tag-only query needs no path", async () => {
+    setup();
+    try {
+      mkdirSync(join(FIXTURES, "pages"), { recursive: true });
+      writeFileSync(
+        join(FIXTURES, "pages/solo.json"),
+        JSON.stringify({ children: [{ tagName: "desk-solo" }] }),
+      );
+      const result = await findReferences({ tagName: "desk-solo" });
+      expect(result.path).toBeNull();
+      expect(result.files.map((f) => f.path)).toEqual(["pages/solo.json"]);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("refuses a path outside the project root", async () => {
+    setup();
+    try {
+      await expect(findReferences({ path: "../../etc/passwd" })).rejects.toThrow();
+    } finally {
+      cleanup();
+    }
+  });
+});
+
 // ─── handleCreateDirectory ──────────────────────────────────────────────────
 
 describe("handleCreateDirectory", () => {
@@ -555,6 +612,71 @@ describe("locateFile", () => {
     } finally {
       cleanup();
     }
+  });
+});
+
+// ─── searchFiles (Quick Access ⌘P) ─────────────────────────────────────────
+
+describe("searchFiles", () => {
+  function seed() {
+    setup();
+    mkdirSync(join(FIXTURES, "pages", "blog"), { recursive: true });
+    mkdirSync(join(FIXTURES, "node_modules", "pkg"), { recursive: true });
+    mkdirSync(join(FIXTURES, "dist"), { recursive: true });
+    writeFileSync(join(FIXTURES, "pages", "about.json"), "{}");
+    writeFileSync(join(FIXTURES, "pages", "blog", "about-us.md"), "# About");
+    writeFileSync(join(FIXTURES, "pages", "contact.json"), "{}");
+    writeFileSync(join(FIXTURES, "node_modules", "pkg", "about.json"), "{}");
+    writeFileSync(join(FIXTURES, "dist", "about.json"), "{}");
+  }
+
+  test("matches .json files anywhere under the root, project-relative", async () => {
+    seed();
+    try {
+      const hits = await searchFiles({ query: "about" });
+      expect(hits.map((h) => h.path)).toEqual(["pages/about.json"]);
+      const [hit] = hits;
+      expect(hit!.name).toBe("about.json");
+      expect(hit!.type).toBe("file");
+      expect(hit!.size).toBe(2);
+      expect(typeof hit!.modified).toBe("string");
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("widens the search with the format registry's extensions (leading dot tolerated)", async () => {
+    seed();
+    try {
+      const hits = await searchFiles({ extensions: [".md"], query: "about" });
+      expect(hits.map((h) => h.path).toSorted()).toEqual([
+        "pages/about.json",
+        "pages/blog/about-us.md",
+      ]);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("skips node_modules and dist, and returns [] for a query that matches nothing", async () => {
+    seed();
+    try {
+      const all = await searchFiles({ query: "" });
+      const paths = all.map((h) => h.path);
+      expect(paths).toContain("pages/about.json");
+      expect(paths).toContain("pages/contact.json");
+      expect(paths.some((p) => p.includes("node_modules"))).toBe(false);
+      expect(paths.some((p) => p.startsWith("dist/"))).toBe(false);
+
+      expect(await searchFiles({ query: "no-such-document" })).toEqual([]);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("throws when no project is open", async () => {
+    setProjectRoot(null);
+    await expect(searchFiles({ query: "x" })).rejects.toThrow("No project open");
   });
 });
 
@@ -979,6 +1101,64 @@ describe("openProject", () => {
       expect(result!.handle.name).toBe("_fixtures_handlers");
     } finally {
       setFileDialog(null as unknown as () => Promise<string | null>);
+      cleanup();
+    }
+  });
+});
+
+// ─── pickProjectFile ────────────────────────────────────────────────────────
+// The same picker, minus the binding. `openProject` above IS this plus the bind, which is what
+// Makes "open the project I'm about to choose somewhere ELSE" expressible: the window that asks
+// The question must not be re-rooted by asking it.
+
+describe("pickProjectFile", () => {
+  test("names the project without binding any session to it", async () => {
+    setup();
+    setProjectRoot("/somewhere/else");
+    try {
+      writeFileSync(join(FIXTURES, "project.json"), JSON.stringify({ name: "My Project" }));
+      setFileDialog(async () => join(FIXTURES, "project.json"));
+
+      const picked = await pickProjectFile();
+
+      expect(picked).toEqual({
+        config: { name: "My Project" },
+        name: "My Project",
+        root: FIXTURES,
+      });
+      // THE POINT OF THE FUNCTION: the process-global root is where it was.
+      expect(getProjectRoot()).toBe("/somewhere/else");
+    } finally {
+      setFileDialog(null as unknown as () => Promise<string | null>);
+      cleanup();
+    }
+  });
+
+  test("falls back to the directory basename, and validates like openProject does", async () => {
+    setup();
+    try {
+      writeFileSync(join(FIXTURES, "project.json"), JSON.stringify({}));
+      setFileDialog(async () => join(FIXTURES, "project.json"));
+      expect((await pickProjectFile())!.name).toBe("_fixtures_handlers");
+
+      writeFileSync(join(FIXTURES, "other.json"), "{}");
+      setFileDialog(async () => join(FIXTURES, "other.json"));
+      await expect(pickProjectFile()).rejects.toThrow("not a project.json");
+    } finally {
+      setFileDialog(null as unknown as () => Promise<string | null>);
+      cleanup();
+    }
+  });
+
+  test("returns null when the picker is cancelled, and refuses without one", async () => {
+    setup();
+    try {
+      setFileDialog(async () => null);
+      expect(await pickProjectFile()).toBeNull();
+
+      setFileDialog(null as unknown as () => Promise<string | null>);
+      await expect(pickProjectFile()).rejects.toThrow("No file dialog configured");
+    } finally {
       cleanup();
     }
   });

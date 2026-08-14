@@ -25,7 +25,9 @@ A hard rule runs through everything database-related: **secret values never ente
 - **Locally**, values are stored in `.dev.vars` at your project root — a plain name-equals-value file that is ignored by git, so a commit can never carry a credential. The dev server and the desktop app read it automatically whenever a database or auth feature needs the value.
 - **Deployed**, the same names are looked up in your host's environment. You set the values there once — for Cloudflare, with `wrangler secret put` or the dashboard's environment settings.
 
-In Studio you meet this as the **secret field**: settings that hold something sensitive (a Supabase URL in **[Connections](/docs/studio/data/connections)**, the auth signing secret below) render as a password-style box. Paste the value and press :kbd[Enter]; Studio sends it to the backend's secret store, the box empties, and from then on it just reads "Stored as MAIN_URL" — the value is write-only and is never displayed or sent back to the browser again. The derived name is what gets written into `project.json`. To replace a value, paste a new one; to inspect what's stored, open `.dev.vars` itself — Studio will only ever show you the names.
+In Studio you meet this as the **secret field**: settings that hold something sensitive (a Supabase URL in **[Connections](/docs/studio/data/connections)**, the auth signing secret below) render as a password-style box. Paste the value and press :kbd[Enter] or click away; Studio sends it to the backend's secret store, the box empties, and from then on it just reads "Stored as MAIN_URL" — the value is write-only and is never displayed or sent back to the browser again. The derived name is what gets written into `project.json`. To replace a value, paste a new one; to inspect what's stored, open `.dev.vars` itself — Studio will only ever show you the names.
+
+It is one field, registered once, so every setting that holds a secret behaves identically — including the ones an extension contributes. Where Studio is running against a host with nowhere to keep secrets, the box is disabled rather than taking a value it couldn't store.
 
 :::doc-warning
 `.dev.vars` is the one place your local secret values exist — it is deliberately not committed, so back it up your own way, and re-enter the values (or copy the file) when moving to another machine.
@@ -62,6 +64,8 @@ The section is a single form, and every field is optional — the defaults below
 
 Auth keeps its users and sessions in ordinary database tables (`user`, `session`, `account`, `verification`) on the connection you chose, and they show up in the **[data grid](/docs/studio/data/grid)** like any other table. That grid _is_ the user-management surface today: to make someone an `admin`, open the `user` table and set their `role` cell. Sign-up can never set a role, so roles only come from you.
 
+Since a `user` table carries more columns than that job needs, hide the rest and save the arrangement as a named view — "Roles", say — and the table opens that way every time. **[Saved views](/docs/studio/editing/grid)** are per table.
+
 The tables are created for you two ways: `jx dev` creates them the first time anything touches `/_jx/auth`, and **[Push Schema](/docs/studio/data/tables)** plans them as its own steps after the connector's, so a dry run shows them before anything runs.
 
 :::doc-warning
@@ -80,7 +84,7 @@ Without the auth extension these rules simply deny — the door fails closed, ne
 
 ### Sign-in pages
 
-There are no ready-made sign-in components to drop in. You build the pages yourself, from ordinary elements plus two sources the extension adds to the **+ Add…** picker in the **[State panel](/docs/studio/logic/state)**, alongside every other **[data source](/docs/studio/logic/data-sources)**.
+There are no ready-made sign-in components to drop in. You build the pages yourself, from ordinary elements plus two sources the extension adds to the **+ Add…** picker in the **[Data panel](/docs/studio/logic/data)**, alongside every other **[data source](/docs/studio/logic/data-sources)**.
 
 **Session** — who is signed in, kept up to date as that changes. It gives you the signed-in user's **id**, their whole **user** record (email, name, and anything else the account carries), and their **role** when they have one — or nothing at all when no one is signed in. Bind a greeting to the email, and hide the "Sign in" link when a session exists.
 
@@ -100,7 +104,7 @@ An input named anything else is invisible to the handler, and the attempt goes o
 On success a handler stops the browser's own form submission, refreshes the session, re-runs the page's table queries — so a list scoped to `owner` fills in the moment someone signs in — and sends the visitor to the matching **redirect** if you configured one. On failure (wrong password, an address that already has an account) the page is simply left as it was; surfacing a message is up to you.
 
 :::doc-note
-The wiring is two state entries and one property on the form. The **[Events panel](/docs/studio/logic/events)** picker only offers plain functions, so point the form at its handler in **[Code mode](/docs/studio/logic/code)**:
+The wiring is two state entries and one property on the form. The **[Events](/docs/studio/logic/events)** section of the Inspector's **Logic** tab (:kbd[⌘⇧3]) lists plain functions in its handler picker, and an auth handler is one key inside a state entry rather than a function of its own — so point the form at it in **[Code mode](/docs/studio/logic/code)**:
 
 ```json
 {
@@ -127,7 +131,7 @@ The wiring is two state entries and one property on the form. The **[Events pane
 }
 ```
 
-`Session` resolves to `{ userId, role?, user }` or `null`, so `${state.session?.userId}` and `${state.session?.role === 'admin'}` are the expressions to reach for. `AuthActions` resolves to a map of the four handlers, which is why the reference is `#/state/auth/signInEmail`. Both belong to the browser — `"timing": "client"` is what the State panel writes for them, and it keeps the build from trying to resolve a session that can't exist yet. Both also accept an optional `baseUrl`; without one they talk to the site's own `/_jx/auth`.
+`Session` resolves to `{ userId, role?, user }` or `null`, so `${state.session?.userId}` and `${state.session?.role === 'admin'}` are the expressions to reach for. `AuthActions` resolves to a map of the four handlers, which is why the reference is `#/state/auth/signInEmail`. Both belong to the browser — `"timing": "client"` is what the Data panel writes for them, and it keeps the build from trying to resolve a session that can't exist yet. Both also accept an optional `baseUrl`; without one they talk to the site's own `/_jx/auth`.
 :::
 
 ### Social sign-in

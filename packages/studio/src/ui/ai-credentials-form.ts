@@ -2,9 +2,18 @@
 /**
  * Ai-credentials-form.ts — reusable AI provider credentials form (key / model / endpoint).
  *
- * Extracted from the ai-panel key gate so other hosts (e.g. the New Project modal) can embed the
- * same form. All draft/model-list state lives inside the closure, so multiple instances never
- * share state. Persists via src/services/ai-settings.ts on Save.
+ * Embedded by every host that needs a provider configured — **Preferences › Assistant** (⌘,) and the
+ * New Project modal's Import/Agent gates. All draft/model-list state lives inside the closure, so
+ * multiple instances never share state. Persists via src/services/ai-settings.ts on Save.
+ *
+ * The interim `Assistant: Settings…` dialog that used to host it is deleted: a provider key is an
+ * application setting, and the surface that owns application settings is also the one that can list
+ * it and revoke it (plan §9.3). Nothing about this form changed for the move, which is the argument
+ * for it having been a reusable form rather than a section of a dialog.
+ *
+ * Built from Spectrum controls with its layout in `styles/shell.css`: a roaming credential the user
+ * configures once does not get its own bespoke inputs, and it certainly does not get 200-character
+ * inline `style=` strings that stop responding the moment the theme changes.
  *
  * @license MIT
  */
@@ -118,35 +127,34 @@ export function createAiCredentialsForm(opts: AiCredentialsFormOptions): AiCrede
   function render(): TemplateResult {
     const haveKey = hasOpenAiKey();
     return html`
-      <div
-        class="ai-creds-form"
-        style="display:flex;flex-direction:column;gap:10px;max-width:320px;text-align:left"
-      >
-        <div style="font-weight:600;align-self:center">AI provider key</div>
-        ${
-          opts.intro === undefined
-            ? html`
-                <div style="font-size:11px;color:var(--fg-dim)">
+      <div class="ai-creds-form">
+        <div class="ai-creds-title">AI provider key</div>
+        <div class="ai-creds-note">
+          ${
+            opts.intro === undefined
+              ? html`
                   Any OpenAI-compatible key works. Stored locally in this browser; sent only to the
                   Studio proxy (never to a third party except your chosen endpoint).
-                </div>
-              `
-            : html`<div style="font-size:11px;color:var(--fg-dim)">${opts.intro}</div>`
-        }
-        <input
+                `
+              : opts.intro
+          }
+        </div>
+        <sp-textfield
+          class="ai-creds-field"
           type="password"
-          style="width:100%;box-sizing:border-box;padding:6px 8px;border-radius:4px;border:1px solid var(--border);background:var(--bg-input);color:var(--fg);font-size:12px"
+          size="s"
           placeholder="sk-… or any compatible key"
           .value=${keyDraft}
           @input=${(e: Event) => {
             keyDraft = (e.target as HTMLInputElement).value;
           }}
-        />
-        <div style="font-weight:500;font-size:11px;margin-top:4px">Model</div>
+        ></sp-textfield>
+        <div class="ai-creds-label">Model</div>
         ${
           availableModels.length > 0
             ? html`
                 <sp-combobox
+                  class="ai-creds-field"
                   size="s"
                   allows-custom-value
                   .value=${modelDraft}
@@ -163,18 +171,18 @@ export function createAiCredentialsForm(opts: AiCredentialsFormOptions): AiCrede
                 </sp-combobox>
               `
             : html`
-                <input
-                  type="text"
-                  style="width:100%;box-sizing:border-box;padding:6px 8px;border-radius:4px;border:1px solid var(--border);background:var(--bg-input);color:var(--fg);font-size:12px"
+                <sp-textfield
+                  class="ai-creds-field"
+                  size="s"
                   placeholder="Model ID (e.g. gpt-4o, claude-sonnet-4-20250514, etc.)"
                   .value=${modelDraft}
                   @input=${(e: Event) => {
                     modelDraft = (e.target as HTMLInputElement).value;
                   }}
-                />
+                ></sp-textfield>
               `
         }
-        <div style="display:flex;gap:8px;align-items:center">
+        <div class="ai-creds-models">
           <sp-button size="s" variant="secondary" ?disabled=${modelsLoading} @click=${fetchModels}>
             ${
               modelsLoading
@@ -184,22 +192,18 @@ export function createAiCredentialsForm(opts: AiCredentialsFormOptions): AiCrede
                   : "Fetch models"
             }
           </sp-button>
-          ${
-            modelsError
-              ? html`<span style="font-size:10px;color:var(--danger)">${modelsError}</span>`
-              : nothing
-          }
+          ${modelsError ? html`<span class="ai-creds-error">${modelsError}</span>` : nothing}
         </div>
-        <input
-          type="text"
-          style="width:100%;box-sizing:border-box;padding:6px 8px;border-radius:4px;border:1px solid var(--border);background:var(--bg-input);color:var(--fg);font-size:12px"
+        <sp-textfield
+          class="ai-creds-field"
+          size="s"
           placeholder="Endpoint (optional, e.g. http://localhost:11434/v1)"
           .value=${baseUrlDraft}
           @input=${(e: Event) => {
             baseUrlDraft = (e.target as HTMLInputElement).value;
           }}
-        />
-        <div style="display:flex;gap:8px;align-self:flex-end">
+        ></sp-textfield>
+        <div class="ai-creds-actions">
           ${
             haveKey
               ? html`<sp-button size="s" variant="secondary" @click=${cancel}>Cancel</sp-button>`

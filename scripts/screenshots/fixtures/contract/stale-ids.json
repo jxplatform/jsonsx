@@ -1,0 +1,26 @@
+{
+  "contract": 1,
+  "outDir": "docs/images",
+  "server": { "studioPath": "packages/studio", "url": "http://127.0.0.1:3000" },
+  "defaults": {},
+  "shots": [
+    {
+      "name": "quick-access",
+      "clip": "none",
+      "actions": [
+        { "do": "run", "id": "view.setActivty", "args": { "tab": "page" } },
+        { "do": "run", "id": "view.toggleAssistant" },
+        { "do": "run", "id": "view.setStatus", "args": { "text": "Ready" } },
+        { "do": "run", "id": "canvas.setZoom", "args": { "zoom": "1.5" } },
+        { "do": "run", "id": "view.setAssistant", "args": { "open": true, "dock": "right" } },
+        { "do": "run", "id": "file.open" }
+      ],
+      "variants": [
+        {
+          "suffix": "cleanup",
+          "actions": [{ "do": "run", "id": "project.browse" }, { "seed": "publish" }]
+        }
+      ]
+    }
+  ]
+}

@@ -11,6 +11,8 @@ code:
 
 The document assistant is what the **[AI sidebar](/docs/studio/ai/chat)** becomes when a page or component is open on the canvas: the same chat, now scoped to that document. It isn't a separate panel — opening a document simply hands the assistant that page's full structure and a set of precise editing abilities it doesn't have otherwise. This is the mode to use when you want to _see_ the assistant work and be able to take it back.
 
+The sidebar starts closed and stays however you last left it, so open it with **Toggle Assistant** first; provider setup lives in its **Assistant: Settings…** dialog rather than in the column itself.
+
 ![The sidebar with an assistant reply carrying edit chips beside the open page on the canvas](../../images/ai-document-assistant.png)
 
 ## What it can do on the open page
@@ -21,7 +23,9 @@ With a document active, the assistant edits the page the way you would, one chan
 - restyle elements property by property — the same styles you'd set in the **[style inspector](/docs/studio/design/style-inspector)**,
 - change element properties: tags, classes, attributes, component options,
 - add new elements, move them, and remove them,
-- add or update the page's state entries — the same ones the **[State panel](/docs/studio/logic/state)** shows.
+- add or update the page's state entries — the same ones the **[Data panel](/docs/studio/logic/data)** shows.
+
+These abilities follow the canvas. Project Settings and the grid editors are documents too, but they aren't element trees to restructure — with one of those in front of you the assistant can still read and answer, and the editing tools step back, exactly as **Delete** and **Duplicate** do for you in the Outline. It is one rule, not two: the assistant is held to the same condition you are.
 
 Every change lands on the canvas the moment it's made, so the page updates in front of you while the reply streams. To aim the assistant at one specific element, select it on the canvas and attach it with the composer's paperclip menu — see **[Attach context](/docs/studio/ai/chat#attach-context)**.
 
@@ -37,7 +41,7 @@ If the assistant runs out of working rounds before everything is fixed, it stops
 
 Document edits follow Studio's normal editing rules:
 
-- They go into the page's undo history as **one step per request** — :kbd[⌘Z] (macOS) or :kbd[Ctrl+Z] (Windows/Linux) rolls back the assistant's whole last reply on that page. If a request switched between pages, each page gets its own single step.
+- They go into the page's undo history as **one step per request** — :kbd[⌘Z] (macOS) or :kbd[Ctrl+Z] (Windows/Linux) rolls back the assistant's whole last reply on that page. If a request switched between pages, each page gets its own single step, including the second page.
 - They live in the open editor, not on disk: the tab is marked unsaved until you save it, and closing without saving discards them.
 
 The full review workflow — including the file-level changes that _don't_ work this way — is covered in **[Review and undo edits](/docs/studio/ai/chat#review-and-undo-edits)**.
@@ -56,4 +60,4 @@ A simple habit: if you'd want to press undo afterwards, open the page before you
 
 - The chat itself — composer, history, reviewing edits: **[The AI sidebar](/docs/studio/ai/chat)**
 - What the assistant can do in every state, and provider setup: **[AI assistant](/docs/studio/ai)**
-- The state entries it adds are explained in the **[State panel](/docs/studio/logic/state)**
+- The state entries it adds are explained in the **[Data panel](/docs/studio/logic/data)**

@@ -229,7 +229,15 @@ function pathFieldsTpl(ctx: {
         ${
           platform.pickDirectory
             ? html`
-                <sp-button variant="secondary" ?disabled=${_browsing} @click=${() => void browse()}>
+                <sp-button
+                  variant="secondary"
+                  ?disabled=${_browsing}
+                  @click=${() => {
+                    // `void`, as a STATEMENT: `browse()` is async and nothing here awaits it, so
+                    // Dropping the marker turns a deliberate discard into a floating promise.
+                    void browse();
+                  }}
+                >
                   ${_browsing ? "Choosing…" : "Browse…"}
                 </sp-button>
               `

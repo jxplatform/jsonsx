@@ -42,7 +42,15 @@ export interface SpecStatus {
   badForms: { line: number; text: string; reason: string }[];
 }
 
-const NUMBERED_HEADING = /^#{2,6}\s+(\d+(?:\.\d+)*[a-z]?)\s+(.*)$/;
+/*
+ * The dot after a top-level number is OPTIONAL, because the specs write both forms: `### 12.3
+ * Incremental Builds` and `## 13. Internationalization`. Requiring whitespace straight after the
+ * number made every `## N.` heading invisible — 141 of them across 13 specs — so a marker under a
+ * top-level section was silently credited to the last SUBSECTION above it. `site-architecture.md`
+ * §15's "Implemented" was being reported against §14.2, which carries no marker at all.
+ * `check-doc-refs.ts:80` has always used `\b` here and resolved the same headings correctly.
+ */
+const NUMBERED_HEADING = /^#{2,6}\s+(\d+(?:\.\d+)*[a-z]?)\.?\s+(.*)$/;
 const BLOCKQUOTE_STATUS = /^>\s*\*\*Status:\s*([A-Za-z]+)/;
 const HEADER_VERSION = /^\*\*Version:\*\*\s*(.+)$/;
 const HEADER_STATUS = /^\*\*Status:\*\*\s*(.+)$/;

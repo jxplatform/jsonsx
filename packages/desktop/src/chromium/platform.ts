@@ -8,6 +8,7 @@ import type {
   ImportProgressEvent,
   ImportSiteOptions,
   RecentProjectEntry,
+  ReferencesResult,
   RenameResult,
   StarterInfo,
   StudioPlatform,
@@ -202,6 +203,10 @@ export function createDesktopPlatform() {
       return request("renameFile", { from, to }) as Promise<RenameResult>;
     },
 
+    async findReferences(target: { path?: string; tagName?: string }) {
+      return request("findReferences", target) as Promise<ReferencesResult>;
+    },
+
     async createDirectory(path: string) {
       return request("createDirectory", { path }) as Promise<void>;
     },
@@ -293,8 +298,8 @@ export function createDesktopPlatform() {
       await request("gitAddRemote", { name, url });
     },
 
-    async searchFiles(query: string) {
-      return request("searchFiles", { query }) as Promise<DirEntry[]>;
+    async searchFiles(query: string, extensions?: string[]) {
+      return request("searchFiles", { extensions, query }) as Promise<DirEntry[]>;
     },
 
     async listFormats() {

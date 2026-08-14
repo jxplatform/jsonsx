@@ -7,15 +7,16 @@
 
 import { RESERVED_KEYS, camelToKebab } from "@jxsuite/runtime";
 import {
+  PREFORMATTED_TAGS,
   collectStyles,
   compileExpression,
+  compileOperandSource,
   compileStatements,
   emitFormulaFn,
   emitRequestFetch,
   escapeHtml,
   isMutating,
   isSchemaOnly,
-  PREFORMATTED_TAGS,
   srcImportBinding,
   tagNameToClassName,
 } from "../shared.ts";
@@ -27,6 +28,7 @@ import {
   isMappedArray,
   isNamedFormulaDef,
   isRef,
+  isTagExpression,
   paramNames,
 } from "@jxsuite/schema/guards";
 import { parseJxDocument } from "@jxsuite/schema/parse";
@@ -388,6 +390,8 @@ export function emitElementModule(
   const functionEntries: [string, JxExpressionDef | JxFunctionDef][] = [];
 
   const formulaEntries: [string, JxExpressionDef][] = [];
+  /** `"${…}"` state entries — computed, exactly as the runtime treats them. */
+  const templateEntries: [string, string][] = [];
   const callableRefs = collectCallableRefs(doc);
   for (const [key, def] of Object.entries(defs)) {
     const d = def as JxMutableNode;
@@ -415,6 +419,20 @@ export function emitElementModule(
       } else {
         functionEntries.push([key, d]);
       }
+    } else if (typeof def === "string" && def.includes("${")) {
+      /* A TEMPLATE STRING IS A COMPUTED, and the runtime has always said so — `runtime.ts`'s
+         second state pass is `if (typeof def === "string" && def.includes("${")) state[key] =
+         computed(() => evaluateTemplate(def, state))`, and `StateEntry`'s own schema description
+         reads "string with ${} → computed". This branch did not exist, so the compiler fell
+         through to `extractInitialValue` and emitted the template as a LITERAL.
+
+         The consequence is the worst shape a bug can take: the same component behaved one way in
+         Studio's canvas, which runs the runtime, and another way on the deployed site, which runs
+         this. A real site's `$switch` discriminant (`imageKey: "${state.image ? 'set' : ''}"`)
+         evaluated correctly in the editor and shipped as the literal text of its own expression,
+         so the case never matched and the image silently never rendered in production. Found by
+         building that site and reading the emitted component. */
+      templateEntries.push([key, def]);
     } else {
       // Use extractInitialValue to get the correct initial value
       const initVal = extractInitialValue(d);
@@ -494,6 +512,16 @@ export function emitElementModule(
       statePrefix: "this.state",
     });
     lines.push(`    this.state.${key} = ${emitFormulaFn(def, compiled)};`);
+  }
+
+  /* Emitted with the same `state.` → `this.state.` rewrite the inline-body path below uses, into a
+     template literal — which is what `evaluateTemplate` is, so the result is a string on both
+     sides rather than a string here and a raw value there. */
+  for (const [key, template] of templateEntries) {
+    lines.push(
+      "",
+      `    this.state.${key} = computed(() => \`${template.replaceAll("state.", "this.state.")}\`);`,
+    );
   }
 
   // Emit computed signals — $src or inline body
@@ -711,7 +739,7 @@ function emitLitNode(
   indent: string,
   preformatted = false,
   inMap = false,
-) {
+): string {
   // String children are text nodes
   if (typeof def === "string") {
     if (def.includes("${")) {
@@ -724,6 +752,58 @@ function emitLitNode(
   }
   if (!def || typeof def !== "object") {
     return "";
+  }
+
+  /* A CHOSEN TAG BECOMES ONE TEMPLATE PER CANDIDATE, keyed by the discriminant — the same shape
+     this function already emits for `$switch` twenty lines down, because it is the same problem:
+     lit cannot bind a tag name, and the alternative (`lit-html/static.js`'s `unsafeStatic`) is an
+     HTML-injection primitive with an unbounded template cache, deliberately avoided in this repo.
+
+     The candidates are literal `TagName`s by schema, so this terminates and every branch is a legal
+     element. The subtree is emitted once per candidate in the BUNDLE; it is written once in the
+     DOCUMENT, which is the thing that was wrong. Hoisting the shared subtree into a preamble const
+     would fix the bundle too, and would shrink every existing `$switch` while it was at it —
+     tracked separately, because it is a refactor of this function's return shape rather than part
+     of this feature. */
+  if (isTagExpression(def.tagName)) {
+    const expression = def.tagName.$expression;
+    // The same two shapes `$switch` accepts: a pointer, or an expression node.
+    // `compileOperandSource` — the compiler's counterpart to the runtime's `evaluateOperand`, so
+    // Both sides read the discriminant the same way.
+    const discriminant = compileOperandSource(expression.target, {
+      eventParam: "e",
+      statePrefix: "s",
+    });
+    const branches =
+      expression.operator === "?:"
+        ? [
+            [true, expression.value],
+            [false, expression.initial],
+          ]
+        : [...Object.entries(expression.cases), ["__default__", expression.default]];
+    const rendered: [string | boolean | undefined, string][] = branches.map(([key, candidate]) => {
+      const asLiteral = { ...def, tagName: candidate as string };
+      return [key, emitLitNode(asLiteral, `${indent}  `, preformatted, inMap)];
+    });
+    if (expression.operator === "?:") {
+      const [, yes] = rendered[0]!;
+      const [, no] = rendered[1]!;
+      return `${indent}\${${discriminant}
+  ? html\`
+${yes}
+  \`
+  : html\`
+${no}
+  \`}`;
+    }
+    const entries = rendered
+      .filter(([key]) => key !== "__default__")
+      .map(([key, text]) => `  ${JSON.stringify(key)}: html\`\n${text}\n  \``);
+    const [, fallback] = rendered.at(-1)!;
+    return (
+      `${indent}${"$"}{{\n${entries.join(",\n")}\n}` +
+      `[String(${discriminant})] ?? html\`\n${fallback}\n\`}`
+    );
   }
 
   const tag = def.tagName ?? "div";

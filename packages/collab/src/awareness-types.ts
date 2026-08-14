@@ -21,8 +21,14 @@ export interface CollabAwarenessState {
   focusedPath: string | null;
   /** Which representation the client is editing (drives the Phase-B canonical lock). */
   mode?: "structure" | "source";
-  /** The client's structural (canvas) selection in the focused document. */
-  structuralSelection?: JxPath | null;
+  /**
+   * The client's structural (canvas) selection in the focused document — the whole SET.
+   *
+   * A list because `session.selection` is one (studio §6.5): a peer who has selected six cards
+   * publishes six paths, and the remote canvas draws a presence box for each. A peer with one node
+   * selected publishes a one-entry list, which draws exactly the one box it always did.
+   */
+  structuralSelection?: JxPath[] | null;
   /**
    * RESERVED for y-monaco: the in-buffer text cursor as {anchor, head} Y.RelativePosition JSON.
    * MonacoBinding owns this field via setLocalStateField("selection", …) while a code view is

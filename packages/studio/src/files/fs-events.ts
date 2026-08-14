@@ -9,6 +9,7 @@
  */
 
 import { getPlatform } from "../platform";
+import { invalidateUsages } from "../services/references";
 import { projectState } from "../store";
 import type { DirEntry, FsEvent } from "../types";
 
@@ -116,6 +117,15 @@ export interface FsSyncContext {
   renderLeftPanel: () => void;
   /** Optional hook for an external content change to an open file (e.g. reload a clean tab). */
   onContentChange?: (path: string) => void;
+  /**
+   * Drop every cache keyed on "what files the project contains".
+   *
+   * Passed in rather than imported, for the reason `renderLeftPanel` is: the caches live in panels,
+   * and this module is imported BY the file layer those panels sit on top of — reaching up would be
+   * a cycle. The bootstrap owns the list because the bootstrap is where the panels are already in
+   * scope.
+   */
+  invalidateDerivedCaches?: () => void;
 }
 
 /**
@@ -153,6 +163,17 @@ export function startFsSync(ctx: FsSyncContext): () => void {
   };
 
   return platform.subscribeFileEvents((events) => {
+    // Before the echo filter, deliberately. `isRecentLocal` drops the events Studio caused, which
+    // Is right for the tree (it already repainted) and wrong for a DERIVED cache — Studio's own
+    // Write changes what the project contains exactly as much as anyone else's does.
+    //
+    // Every cache keyed on "what files exist" is dropped here, in one place, because they answer
+    // One event. Each one had an invalidator and no caller, and each stale answer is visible: the
+    // Link-target picker offering a route whose page was deleted, the layout picker attributing a
+    // Removed layout's `$head` to the open page, a `$paths` enumeration listing entries that are
+    // Gone.
+    invalidateUsages();
+    ctx.invalidateDerivedCaches?.();
     pending.push(...events);
     if (timer) {
       clearTimeout(timer);

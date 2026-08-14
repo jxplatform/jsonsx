@@ -33,6 +33,53 @@ export function isTextInput(el: Element | null): boolean {
   return false;
 }
 
+/**
+ * Every bound scheduler, so "is any panel still owing a repaint?" has one answer.
+ *
+ * Condition 2 of the `probe.idle()` predicate (`services/idle.ts`, spec §13.5). Each scheduler
+ * already knew whether it had a frame queued or a render withheld; nothing could ask all of them at
+ * once. P4.4 makes the withheld case visible to the author too — a panel silently showing stale
+ * state is a bug whichever consumer notices it first.
+ */
+const boundSchedulers = new Set<TrackedScheduler>();
+
+interface TrackedScheduler {
+  /** The panel root, for the human-readable blocker string. */
+  root: HTMLElement;
+  /** A coalescing frame is queued and will paint. */
+  hasFrame: () => boolean;
+  /** A render was requested and is being WITHHELD because a field in the panel has focus. */
+  isDeferring: () => boolean;
+}
+
+/** `#right-panel`, `.frontmatter-panel`, `div` — the most specific handle the root offers. */
+function describeRoot(root: HTMLElement): string {
+  if (root.id) {
+    return `#${root.id}`;
+  }
+  const first = root.className.split(/\s+/).find(Boolean);
+  return first ? `.${first}` : root.tagName.toLowerCase();
+}
+
+/**
+ * One line per panel that still owes a repaint — empty when every panel's DOM matches its state.
+ *
+ * A withheld render is reported separately from a queued one because they end differently: a queued
+ * frame lands on its own, a withheld one waits for a focusout that may never come. A predicate that
+ * conflated them would either hang or lie.
+ */
+export function pendingSchedulers(): string[] {
+  const blockers: string[] = [];
+  for (const entry of boundSchedulers) {
+    if (entry.hasFrame()) {
+      blockers.push(`${describeRoot(entry.root)} has a frame queued`);
+    } else if (entry.isDeferring()) {
+      blockers.push(`${describeRoot(entry.root)} is withholding a render (a field has focus)`);
+    }
+  }
+  return blockers;
+}
+
 export interface PanelScheduler {
   /** Request a render. Coalesced; deferred while a text input in the panel is focused. */
   schedule: () => void;
@@ -72,6 +119,23 @@ export function createPanelScheduler(opts: {
 
   const blocked = () => editing || (blockWhile ? blockWhile() : false);
 
+  /**
+   * Publish the withheld render to the person looking at the panel.
+   *
+   * A deferred render is the panel deciding, correctly, that finishing your sentence matters more
+   * than being current — but until P4 it made that trade in silence, so a panel showing state from
+   * before your last edit was indistinguishable from a panel that had stopped working. The
+   * attribute is the whole mechanism: `styles/overlays.css` hangs the hint off it, so every panel
+   * that already routes through this scheduler inherits it without a line of its own.
+   */
+  function markStale(stale: boolean) {
+    if (stale) {
+      root.dataset.jxStale = "";
+    } else {
+      delete root.dataset.jxStale;
+    }
+  }
+
   function flush() {
     scheduled = false;
     rafId = 0;
@@ -81,9 +145,11 @@ export function createPanelScheduler(opts: {
     // Defer while a field is focused — flushed later by focusout (or the next schedule()).
     if (blocked()) {
       pending = true;
+      markStale(true);
       return;
     }
     pending = false;
+    markStale(false);
     rendering = true;
     try {
       render();
@@ -114,6 +180,13 @@ export function createPanelScheduler(opts: {
     }
   }
 
+  const tracked: TrackedScheduler = {
+    hasFrame: () => scheduled,
+    isDeferring: () => pending,
+    root,
+  };
+  boundSchedulers.add(tracked);
+
   return {
     bindFocus() {
       root.addEventListener("focusin", onFocusIn);
@@ -130,6 +203,7 @@ export function createPanelScheduler(opts: {
     isEditing: () => blocked(),
     schedule,
     unbind() {
+      boundSchedulers.delete(tracked);
       root.removeEventListener("focusin", onFocusIn);
       root.removeEventListener("focusout", onFocusOut);
       if (rafId) {
@@ -138,6 +212,7 @@ export function createPanelScheduler(opts: {
       scheduled = false;
       pending = false;
       editing = false;
+      markStale(false);
       rendering = false;
     },
   };

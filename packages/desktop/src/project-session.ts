@@ -23,7 +23,8 @@ import {
   testDataConnection,
   updateDataRow,
 } from "@jxsuite/server/data";
-import { applyRename, createFsWatcher } from "@jxsuite/server/refactor";
+import { applyRename, createFsWatcher, findReferences } from "@jxsuite/server/refactor";
+import { startSitePreview } from "@jxsuite/server/site-preview";
 import {
   buildExtensionsPayload,
   buildProjectExtensionRegistry,
@@ -31,8 +32,13 @@ import {
 import { readBundledProjectSchemas } from "@jxsuite/compiler/schema-command";
 import type { ExtensionsPayloadEntry } from "@jxsuite/compiler/format-host";
 import type { ExtensionRegistry } from "@jxsuite/schema/extension-registry";
-import type { FsEventPayload, FsWatcherHandle, RenameReport } from "@jxsuite/server/refactor";
-import { openExternal } from "./utils.ts";
+import type {
+  FsEventPayload,
+  FsWatcherHandle,
+  ReferencesResult,
+  RenameReport,
+} from "@jxsuite/server/refactor";
+import { openExternal as handUrlToOs } from "./utils.ts";
 import type {
   ComponentSlotMeta,
   DataPushRequest,
@@ -162,6 +168,40 @@ let directoryDialogFn: (() => Promise<string | null>) | null = null;
 
 export function setDirectoryDialog(fn: () => Promise<string | null>) {
   directoryDialogFn = fn;
+}
+
+/**
+ * Ask the user for a project.json and answer with the project it names — WITHOUT binding any
+ * session to it.
+ *
+ * Session-free on purpose, and that is the whole point of it existing beside `openProject()`.
+ * Picking and binding were one operation, so "open this in a NEW window" had no way to ask the
+ * question: the only picker Studio could reach re-rooted the asking window as a side effect of
+ * being asked, which is exactly what opening a project elsewhere must not do. `openProject()` is
+ * this function plus the binding, so both paths validate identically.
+ */
+export async function pickProjectFile(): Promise<{
+  root: string;
+  name: string;
+  config: SiteConfig;
+} | null> {
+  if (!fileDialogFn) {
+    throw new Error("No file dialog configured");
+  }
+  const selectedPath = await fileDialogFn();
+  if (!selectedPath) {
+    return null;
+  }
+
+  const filePath = resolve(selectedPath);
+  if (!existsSync(filePath) || basename(filePath) !== "project.json") {
+    throw new Error("Selected file is not a project.json");
+  }
+
+  const raw = await readFile(filePath, "utf8");
+  const config = JSON.parse(raw) as SiteConfig;
+  const root = dirname(filePath);
+  return { config, name: config.name || basename(root), root };
 }
 
 // ─── Pure helpers (no session state) ──────────────────────────────────────────
@@ -361,6 +401,42 @@ export function createProjectSession(initialRoot: string | null) {
     return projectRoot;
   }
 
+  /**
+   * Build the site to its output directory.
+   *
+   * `View: Open in Browser` runs this before it opens anything, so what the reader sees is what the
+   * author is looking at. The compiler is imported dynamically for the same reason the dev server
+   * does it: this is the one call that needs the build pipeline, and the desktop process should not
+   * carry it for every window that never previews.
+   *
+   * Errors are RETURNED. A partial build still wrote pages, and refusing to open the one the author
+   * asked for would trade a readable page plus a sentence for a sentence.
+   *
+   * The reply names the ORIGIN the result is browsable at. The built site is served on its own port
+   * rather than on this window's project server, because that server's paths mean the project's
+   * SOURCES and a built page means its output by the very same paths (`@jxsuite/server`'s
+   * `site-preview.ts` has the whole argument).
+   */
+  async function buildSite(): Promise<{
+    routes: number;
+    files: number;
+    errors: string[];
+    url?: string;
+  }> {
+    const root = requireRoot();
+    const { buildSite: build } = await import("@jxsuite/compiler/site");
+    // `clean: false` — the reader is on their way to a page, and wiping the output first would
+    // Mean every asset 404s for as long as the build takes.
+    const result = await build(root, { clean: false, verbose: false });
+    const preview = startSitePreview(root);
+    return {
+      errors: result.errors,
+      files: result.files,
+      routes: result.routes,
+      ...(preview ? { url: preview.origin } : {}),
+    };
+  }
+
   async function getExtensionRegistry(): Promise<ExtensionRegistry> {
     const root = requireRoot();
     if (extensionRegistry?.root === root) {
@@ -469,8 +545,20 @@ export function createProjectSession(initialRoot: string | null) {
     try {
       return await readBundledProjectSchemas(projectRoot);
     } catch (error) {
-      // Editor degradation: the studio keeps its bundled core schemas.
-      console.error("[desktop] fetchProjectSchemas failed:", error);
+      /*
+       * Editor degradation, and it is worth saying WHICH: Studio keeps its bundled core schemas,
+       * so `project.json` and documents still validate against the core — what is lost is the
+       * per-project extras each enabled extension contributes.
+       *
+       * One line, not a stack. The failure that actually reaches users here is a host missing an
+       * extension package, and its two-deep `cause` chain printed a screenful that named the
+       * consequence nowhere. The stack stays available behind the cause.
+       */
+      const detail = error instanceof Error ? error.message : String(error);
+      console.error(
+        `[desktop] per-project schemas unavailable — Studio falls back to the bundled core ` +
+          `schemas, so extension-contributed fields will not autocomplete or validate. ${detail}`,
+      );
       return {};
     }
   }
@@ -503,34 +591,25 @@ export function createProjectSession(initialRoot: string | null) {
   }
 
   async function openProject(): Promise<OpenProjectResult | null> {
-    if (!fileDialogFn) {
-      throw new Error("No file dialog configured");
-    }
-    const selectedPath = await fileDialogFn();
-    if (!selectedPath) {
+    const picked = await pickProjectFile();
+    if (!picked) {
       return null;
     }
 
-    const filePath = resolve(selectedPath);
-    if (!existsSync(filePath) || basename(filePath) !== "project.json") {
-      throw new Error("Selected file is not a project.json");
-    }
-
-    const raw = await readFile(filePath, "utf8");
-    const config = JSON.parse(raw) as SiteConfig;
-    projectRoot = dirname(filePath);
+    // Binding is the part `pickProjectFile` deliberately leaves out — see its docstring.
+    projectRoot = picked.root;
     extensionRegistry = null;
     startWatching();
 
     return {
-      config,
+      config: picked.config,
       handle: {
-        name: config.name || basename(projectRoot),
-        projectConfig: config,
+        name: picked.name,
+        projectConfig: picked.config,
         // Absolute project path: the canonical, re-openable identity used for the recent-projects
         // List and multi-window dedup. File I/O is unaffected (handlers resolve relative paths
         // Against this session's root regardless of the studio-side value).
-        root: projectRoot,
+        root: picked.root,
       },
     };
   }
@@ -698,6 +777,28 @@ export function createProjectSession(initialRoot: string | null) {
     }
   }
 
+  /**
+   * Where a file or a component tag is used, over the same walker `renameFile` writes through. The
+   * engine caches the sweep and drops it from this session's own fs watcher, so the inspector's
+   * count, Find Usages and a delete confirmation all read one answer about one moment on disk.
+   */
+  async function referencesTo(params: {
+    path?: string;
+    tagName?: string;
+  }): Promise<ReferencesResult> {
+    const root = requireRoot();
+    if (params.path) {
+      assertUnderRoot(resolve(root, params.path), root);
+    }
+    const registry = await getFormatRegistry();
+    return findReferences({
+      path: params.path ?? null,
+      registry,
+      root,
+      tagName: params.tagName ?? null,
+    });
+  }
+
   async function createDirectory(params: { path: string }): Promise<void> {
     const root = requireRoot();
     const abs = resolve(root, params.path);
@@ -809,6 +910,15 @@ export function createProjectSession(initialRoot: string | null) {
     return null;
   }
 
+  /**
+   * Hand a URL to the OS (Studio's Preview link clicks). Wrapped in the RPC's params/response shape
+   * rather than re-exporting utils' bare `(url) => boolean`, so both launchers can register it
+   * straight into their handler map.
+   */
+  async function openExternal(params: { url: string }): Promise<{ ok: boolean }> {
+    return { ok: handUrlToOs(params.url) };
+  }
+
   async function locateFile(params: { name: string }): Promise<string | null> {
     const root = requireRoot();
     const glob = new Bun.Glob(`**/${params.name}`);
@@ -823,6 +933,42 @@ export function createProjectSession(initialRoot: string | null) {
     }
 
     return matches.length > 0 ? matches[0] : null;
+  }
+
+  /**
+   * Fuzzy filename search behind Studio's Quick Access (⌘P) — the desktop twin of the dev server's
+   * GET /__studio/files?glob=… . `extensions` carries the format registry's document extensions on
+   * top of the always-searched .json; a leading dot is tolerated on each. Directories never match
+   * (the glob ends in an extension), and paths come back project-relative like everywhere else.
+   */
+  async function searchFiles(params: {
+    query: string;
+    extensions?: string[];
+  }): Promise<DirEntry[]> {
+    const root = requireRoot();
+    const exts = ["json", ...(params.extensions ?? []).map((e) => e.replace(/^\./, ""))];
+    const glob = new Bun.Glob(`**/*${params.query}*.{${exts.join(",")}}`);
+    const results: DirEntry[] = [];
+
+    for await (const rawMatch of glob.scan({ cwd: root, dot: false })) {
+      const match = toPosix(rawMatch);
+      if (match.includes("node_modules") || match.includes("dist/")) {
+        continue;
+      }
+      const absPath = resolve(root, match);
+      try {
+        const s = await stat(absPath);
+        results.push({
+          modified: s.mtime.toISOString(),
+          name: basename(match),
+          path: match,
+          size: s.size,
+          type: "file",
+        });
+      } catch {}
+    }
+
+    return results;
   }
 
   async function fetchPluginSchema(params: {
@@ -981,6 +1127,7 @@ export function createProjectSession(initialRoot: string | null) {
     formatAction,
     openProject,
     openExternal,
+    buildSite,
     createProject,
     pickDirectory,
     listDirectory,
@@ -988,12 +1135,14 @@ export function createProjectSession(initialRoot: string | null) {
     handleWriteFile: writeFileHandler,
     handleDeleteFile: deleteFile,
     handleRenameFile: renameFile,
+    findReferences: referencesTo,
     handleCreateDirectory: createDirectory,
     handleUploadFile: uploadFile,
     handleResolveSiteContext: resolveSiteContext,
     discoverComponents,
     codeService,
     locateFile,
+    searchFiles,
     fetchPluginSchema,
     jxResolve,
     jxServerFunction,

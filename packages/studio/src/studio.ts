@@ -12,11 +12,9 @@
  * registration) on first use by source mode, the function editor, or the formula workspace.
  */
 import { errorMessage } from "@jxsuite/schema/parse";
+import { getPanel } from "./panels/panel-registry";
 
 import {
-  canvasWrap,
-  chatPanelEl,
-  getNodeAtPath,
   initShellRefs,
   projectState,
   registerRenderer,
@@ -25,36 +23,61 @@ import {
   setProjectState,
   toolbarEl,
   updateSession,
-  updateUi,
 } from "./store";
 
 import {
+  PRIMARY_PANE,
   activeTab,
   closeAllTabs,
   openTab,
+  paneById,
+  receivingPane,
+  registerTabCommands,
   setWorkspaceProject,
   workspace,
 } from "./workspace/workspace";
-import { mutateUpdateDef, mutateUpdateProperty, transactDoc } from "./tabs/transact";
-import { effect } from "./reactivity";
+import { derivationCommands, installDerivationEffects } from "./workspace/pane-derive";
+import type { DerivationDeps } from "./workspace/pane-derive";
+import { effect, effectScope } from "./reactivity";
+import type { EffectScope } from "@vue/reactivity";
 
-import { view } from "./view";
+import {
+  flushSession,
+  markSessionRestored,
+  mountShell,
+  registerShellViewCommands,
+  resetProjectShell,
+  setActivityTab,
+  shell,
+} from "./shell";
 
 import { isEditing } from "./editor/inline-edit";
-import { applyTransform, initCanvasUtils } from "./canvas/canvas-utils";
+import { applyTransform, registerCanvasViewCommands } from "./canvas/canvas-utils";
+import type { CanvasSurface } from "./canvas/canvas-surface";
 import {
   initCanvasRender,
+  registerSelectionSetCommand,
   renderCanvas,
   renderOverlays,
   scheduleCanvasRender,
 } from "./canvas/canvas-render";
+import {
+  canvasModeOfPane,
+  canvasModeOfTab,
+  stageContaining,
+  surfaceForPane,
+  tabOfPane,
+} from "./canvas/canvas-surface";
 import { consumePatchedDocument, initCanvasPatcher } from "./canvas/canvas-patcher";
 import {
+  setKeymapSource,
   commitActiveEditSession,
   allowAutoRequestsOnNextRender,
   getEditSnapshot,
+  isCaretActive,
   postColorSchemeToLiveHosts,
   setCanvasContextMenuHandler,
+  setCanvasPointerDownHandler,
   setCanvasSlashHandler,
   setIframePatchEscalation,
   setFileDropHandler,
@@ -65,13 +88,11 @@ import {
 import { runInsertZoneAction } from "./editor/insert-zone-action";
 import { canvasSlashHandler } from "./editor/canvas-slash-bridge";
 import { makeCanvasContextMenuHandler } from "./editor/canvas-context-menu";
-import { initCanvasLiveRender } from "./canvas/canvas-live-render";
-import {
-  mountStatusbar,
-  renderStatusbar,
-  setStatusbarRenderer,
-  statusMessage,
-} from "./panels/statusbar";
+import { mountStatusbar, renderStatusbar } from "./panels/statusbar";
+import { mountJumpBar } from "./panels/jump-bar";
+import { cellForPane } from "./panels/pane-grid";
+import { notify } from "./services/notify";
+import { beginActivity } from "./panels/activity-panel";
 import { exportFile, parseSourceForPath, saveFile, serializeDocument } from "./files/file-ops";
 import {
   formatForPath,
@@ -85,37 +106,41 @@ import {
   renderFilesTemplate as _renderFilesTemplate,
   findHomePage,
   loadDirectory,
+  openFileInPane,
   openFileInTab,
-  openHomePage,
+  openLastSessionOrHome,
   registerFileTreeDnD,
   reloadCleanTab,
   setupTreeKeyboard,
 } from "./files/files";
 import { startFsSync } from "./files/fs-events";
+import { invalidateParamValues } from "./page-params";
 import {
   configureCollabNotifier,
   configureCollabParser,
   configureCollabSerializer,
 } from "./collab/collab-session";
 import { renderImportsTemplate } from "./panels/imports-panel";
-import { renderHeadTemplate } from "./panels/head-panel";
+import { invalidateLayoutPickerCache, renderHeadTemplate } from "./panels/head-panel";
 import { exportCemManifest as _exportCemManifest } from "./services/cem-export";
 import { installAutomationHook } from "./services/automation";
-import { openBrowseModal } from "./browse/browse-modal";
-import { invalidateBrowseCache } from "./browse/browse";
+import { invalidateLibrary } from "./browse/library-pane";
 import { invalidateMediaCache } from "./ui/media-picker";
 import { setMediaChangedHandler } from "./files/media-upload";
 import { applyFileDrop } from "./editor/file-drop-action";
-import { seedAssistantMessages } from "./panels/ai-panel";
+import { assistantCommands, isAssistantStreaming, seedAssistantMessages } from "./panels/ai-panel";
 import { seedPublishConnected } from "./publish/publish-panel";
-import { openConnectorGrid } from "./grid/grid-open";
 
 import { getPlatform, hasPlatform, registerPlatform } from "./platform";
 import { parseMediaEntries } from "./utils/canvas-media";
 import { resolveDefaultPlatform } from "./platforms/default-platform";
 import { mountResizeEdges } from "./resize-edges";
-import { codeService } from "./services/code-services";
-import { defBadgeLabel, defCategory, renderSignalsTemplate } from "./panels/signals-panel";
+import {
+  defBadgeLabel,
+  defCategory,
+  registerSignalsCommands,
+  renderSignalsTemplate,
+} from "./panels/signals-panel";
 import { loadComponentRegistry } from "./files/components";
 import { ensureDependenciesInstalled } from "./packages/ensure-deps";
 import { maybePromptJxsuiteUpdate } from "./packages/jxsuite-update";
@@ -124,8 +149,14 @@ import { autoSyncProjectOnOpen } from "./packages/pull-package-sync";
 import { html, render as litRender } from "lit-html";
 
 import webdata from "../data/webdata.json";
-import { renderDataExplorerTemplate } from "./panels/data-explorer";
-import { cloneRepository, renderGitPanel } from "./panels/git-panel";
+import { registerDataExplorerCommands } from "./panels/data-explorer";
+import {
+  cleanupGitPanel,
+  cloneRepository,
+  loadDiffForLens,
+  registerSourceControlCommands,
+  renderGitPanel,
+} from "./panels/git-panel";
 
 // ─── Spectrum Web Components ──────────────────────────────────────────────────
 // Explicit class imports + registration — bare side-effect imports are tree-shaken
@@ -134,31 +165,42 @@ import { components as _swc } from "./ui/spectrum";
 import "./ui/panel-resize.js";
 // Built-in schema-form controls (schema-builder, secret) register on import
 import "./ui/form-controls.js";
-import { initLayers, showSaveDiscardDialog } from "./ui/layers";
-import { initShortcuts } from "./editor/shortcuts";
-import { renderActivityBar, mount as mountActivityBar } from "./panels/activity-bar";
+import { initLayers, isModalOpen } from "./ui/layers";
+import { initShortcuts, registerStudioCommands } from "./editor/shortcuts";
+import type { ProjectOpenOutcome, ProjectOpenTarget } from "./editor/shortcuts";
+import { createCommandRegistry } from "./commands/registry";
+import { chordsInScopes } from "./commands/keymap";
+import { FRAME_KEY_SCOPES } from "./canvas/iframe-keys";
+import { createLiveContext } from "./commands/live-context";
+import { hasAiCredentials } from "./services/ai-models";
+import { mount as mountActivityBar } from "./panels/activity-bar";
 import * as toolbarPanel from "./panels/toolbar";
 import * as overlaysPanel from "./panels/overlays";
 import * as frontmatterPanelMod from "./panels/frontmatter-panel";
 import * as rightPanelMod from "./panels/right-panel";
 import * as chatPanelMod from "./panels/chat-panel";
 import { setProjectAdopter } from "./services/project-adoption";
+import { tabBufferUnsaved } from "./services/monaco-buffer";
 import * as leftPanelMod from "./panels/left-panel";
 import * as tabStrip from "./panels/tab-strip";
-import * as tabBar from "./panels/tab-bar";
+import * as paneContext from "./panels/pane-context";
 import { selectStylebookTag } from "./panels/stylebook-panel";
 import { registerLayersDnD, registerComponentsDnD, registerElementsDnD } from "./panels/dnd";
 import { registerCanvasDndBridge } from "./panels/canvas-dnd-bridge";
 import { defaultDef } from "./panels/shared";
-import { closeFormulaWorkspace } from "./panels/formula-workspace";
+import { registerFormulaEditorCommands } from "./panels/formula-workspace";
+import { closeFunctionEditor } from "./panels/editors";
 import {
+  formatCommands,
   initBlockActionBar,
   isEditChromeTarget,
+  registerSelectionCommands,
+  releaseBlockActionBar,
   renderBlockActionBar,
+  suppressBlockActionBar,
 } from "./panels/block-action-bar";
 import { initCssData } from "./panels/style-utils";
-import { initQuickSearch, openQuickSearch } from "./panels/quick-search";
-import { openSettingsModal } from "./settings/settings-modal";
+import { initQuickSearch } from "./panels/quick-search";
 import { hydrateAccountStatus } from "./account-status";
 import { hydrateProjectList } from "./project-list";
 import { addRecentProject, hydrateRecentProjects, removeRecentProject } from "./recent-projects";
@@ -169,199 +211,145 @@ import {
   openProjectPickerModal,
   platformUsesRepoPicker,
 } from "./new-project/add-repo-modal";
-import { openNewProjectModal } from "./new-project/new-project-modal";
-import type { DocumentStackEntry, GitDiffState } from "./types";
+import { openNewProjectModal, registerNewProjectCommands } from "./new-project/new-project-modal";
+import { invalidatePageRouteCache, registerInspectorCommands } from "./panels/properties-panel";
+import { liveElementCommands, setContextMenuNavigate } from "./editor/context-menu";
+import { registerSeoCommands, renderSeoModal } from "./panels/seo-modal";
+import { registerStyleCommands } from "./panels/style-panel";
+import { registerGridCommands } from "./grid/grid-open";
+import { registerSettingsCommands } from "./settings/settings-document";
+import { registerPreferencesCommands } from "./settings/preferences-dialog";
+import { registerAboutCommands } from "./about/about-modal";
+import { registerCollabCommands } from "./collab/collab-commands";
+import { registerLibraryCommands } from "./browse/library-commands";
+import { registerPublishCommands } from "./publish/publish-commands";
+import { registerGridViewCommands } from "./grid/grid-panel";
+import { registerRedirectsCommands } from "./grid/redirects-grid";
+import { registerContentCommands } from "./content/entry-commands";
+import { convertToComponent } from "./editor/convert-to-component";
+import type { GitDiffState } from "./types";
 import type { Tab } from "./tabs/tab";
-import type { JxPath } from "./state";
 import type { JxMutableNode, ProjectConfig } from "@jxsuite/schema/types";
 
 void _swc;
+
+/**
+ * What the derivation's commands and follows need from the rest of Studio: an opener, and a reader
+ * for the one preset whose subject is not a document at all.
+ *
+ * `loadDiff` is here rather than in `workspace/pane-derive.ts` because that module owns no I/O —
+ * which is what lets its whole decision-making half be tested with no platform. It is the same pair
+ * of reads `panels/git-panel.ts` makes for a row click; an added file has no `HEAD` copy, so its
+ * "original" is the empty string rather than a `gitShow` that would throw.
+ */
+const derivationDeps: DerivationDeps = { loadDiff: loadDiffForLens, openFileInPane };
 
 // ─── Globals ──────────────────────────────────────────────────────────────────
 // These mutable variables are local to studio.js for now. As sections are extracted
 // Into their own modules, they will migrate to ctx in store.js.
 
-// Effective canvas mode: the per-tab preview toggle composes with an edit/design base mode and
-// Presents as "preview" to every downstream gate (doc resolution, iframe flags, interaction
-// Surfaces). Consumers needing the base mode (toolbar switcher selection, canvas host layout)
-// Read tab.session.ui.canvasMode directly.
+// The FOCUSED pane's effective canvas mode. The composition itself (the per-tab preview toggle over
+// An edit/design base) lives in `canvas/canvas-surface.ts`, beside the panes, because the answer is
+// A property of a pane's tab and every other pane has its own — this is just the focused one, which
+// Is what a panel drawn once for the whole shell means by "the canvas mode".
+//
+// It is a READ, and it is injected only into surfaces the shell draws once: the toolbar, the
+// Inspector, the block bar, the overlays, the live-render context and the canvas view commands.
+// `panels/pane-context.ts` used to take it too and is the reason this comment exists — a bar drawn
+// Once per pane asking "what mode is the canvas in" got the answer for a pane it was not drawing,
+// So the Export button appeared in BOTH bars the moment either pane entered Code. A pane-scoped
+// Caller asks `canvasModeOfPane(paneId)` or `canvasModeOfTab(tab)`, and
+// `scripts/check-pane-singletons.ts`'s fourth rule is what says so mechanically.
 function getCanvasMode() {
-  const ui = activeTab.value?.session.ui;
-  const base = ui?.canvasMode ?? "design";
-  return ui?.preview && (base === "edit" || base === "design") ? "preview" : base;
-}
-
-/** @param {string} mode */
-function setCanvasMode(mode: string) {
-  if (getCanvasMode() === "git-diff" && mode !== "git-diff") {
-    gitDiffState = null;
-  }
-  const tab = activeTab.value;
-  if (tab) {
-    tab.session.ui.canvasMode = mode;
-  }
-}
-
-let gitDiffState: GitDiffState | null = null;
-
-// ─── Component registry ───────────────────────────────────────────────────────
-
-/** @param {string} componentPath */
-async function navigateToComponent(componentPath: string) {
-  try {
-    const platform = getPlatform();
-    const content = await platform.readFile(componentPath);
-    if (!content) {
-      return;
-    }
-    const parsed = JSON.parse(content) as JxMutableNode;
-    const tab = activeTab.value;
-    if (!tab) {
-      return;
-    }
-
-    // Push current state onto the document stack
-    const frame = {
-      dirty: tab.doc.dirty,
-      document: tab.doc.document,
-      documentPath: tab.documentPath,
-      mode: tab.doc.mode,
-      selection: tab.session.selection,
-      sourceFormat: tab.doc.sourceFormat,
-    };
-    if (!tab.session.documentStack) {
-      tab.session.documentStack = [];
-    }
-    tab.session.documentStack.push(frame);
-
-    // Load the component
-    tab.doc.document = parsed;
-    tab.doc.dirty = false;
-    tab.doc.mode = null as unknown as string;
-    tab.doc.sourceFormat = null;
-    tab.documentPath = componentPath;
-    tab.session.selection = null;
-    view.leftTab = "layers";
-    tab.session.ui.activeMedia = null;
-    tab.session.ui.activeSelector = null;
-
-    render();
-    statusMessage(`Editing component: ${parsed.tagName || componentPath}`);
-  } catch (error) {
-    const err = error as Error;
-    statusMessage(`Error: ${err.message}`);
-  }
+  return canvasModeOfPane(workspace.activePaneId);
 }
 
 /**
- * Leaving a drilled-in component discards its edits (the pop restores the parent). Because saving
- * is explicit, prompt when the child is dirty: Save writes it, Discard drops it, Cancel stays.
- * Returns false to abort navigation.
+ * Write a tab's BASE canvas mode. **The only writer, and it cannot find a tab on its own.**
  *
- * @param {Tab} tab
+ * It used to open with `const tab = activeTab.value` and every injected `setCanvasMode` was `(mode:
+ * string) => void`, which is how the pane context bar's Editor picker — drawn per pane, from
+ * `tabOfPane(paneId)` — moved the FOCUSED pane's tab into Code: click "Code" in the side bar and
+ * the primary became a Code editor while the side pane went on drawing Design. There is no
+ * zero-argument variant anywhere in the graph now; a caller drawn once for the shell passes
+ * `activeTab.value` where a reviewer can see it, and a caller drawn for a pane passes that pane's
+ * tab.
+ *
+ * No pane check. It used to refuse a mode the tab's pane could not host, because the side pane was
+ * capped to the cheap editor kinds and a cap enforced only at the split is one a context-bar click
+ * walks straight back out of. Both panes host every kind, so the only thing that can refuse a mode
+ * is the document not declaring it — which `canvas.setMode` checks by name.
+ *
+ * @param {Tab | null} tab — the tab to move. `null` is a no-op.
+ * @param {string} mode
  */
-async function confirmLeaveDirtyChild(tab: Tab): Promise<boolean> {
-  if (!tab.doc.dirty || !tab.documentPath) {
-    return true;
+function setCanvasMode(tab: Tab | null, mode: string) {
+  if (!tab) {
+    return;
   }
-  const name = tab.documentPath.split("/").pop() || "component";
-  const choice = await showSaveDiscardDialog("Unsaved Changes", `"${name}" has unsaved changes.`);
-  if (choice === "cancel") {
-    return false;
+  /* THIS tab's mode, not the focused pane's. `getCanvasMode()` here meant that leaving git-diff in
+     the side pane kept `shell.git.diffState` alive whenever the primary was in some other mode —
+     and, worse, that changing the PRIMARY's mode cleared the diff the side pane was still showing. */
+  if (canvasModeOfTab(tab) === "git-diff" && mode !== "git-diff") {
+    shell.git.diffState = null;
   }
-  if (choice === "save") {
-    try {
-      await getPlatform().writeFile(tab.documentPath, await serializeDocument(tab));
-    } catch (error) {
-      statusMessage(`Save error: ${(error as Error).message}`);
-      return false;
-    }
-  }
-  // "discard": leave without writing — the child's edits are dropped with the popped frame.
-  return true;
+  tab.session.ui.canvasMode = mode;
 }
 
-async function navigateBack() {
-  const tab = activeTab.value;
-  if (!tab?.session.documentStack || tab.session.documentStack.length === 0) {
-    return;
-  }
-  if (!(await confirmLeaveDirtyChild(tab))) {
-    return;
-  }
+// ─── Component registry ───────────────────────────────────────────────────────
 
-  // Pop the stack
-  const frame = tab.session.documentStack.pop() as Record<string, unknown> | undefined;
-  if (!frame) {
-    return;
+/**
+ * Drill into a component (or a layout) — as a REAL TAB, not a document swapped in under the current
+ * tab's id, and BESIDE the page rather than over it.
+ *
+ * The old implementation rewrote `tab.documentPath` and left `tab.id` alone, and everything
+ * downstream believed the id: `openFileInTab`'s dedupe stopped matching, so re-opening the page
+ * from the tree called `openTab` with an id that was already in the map — overwriting the entry
+ * without disposing the old tab's effect scope and pushing a SECOND copy of the id into `tabOrder`,
+ * which is a duplicate lit `repeat` key and a lost document stack.
+ *
+ * What the drill-in keeps is the RELATIONSHIP: the new tab records the document it was opened from
+ * and the strip prints it. The parent stays open, right where it was.
+ *
+ * Four deliberate properties, three of them new and each with a failure behind it:
+ *
+ * 1. **To the side.** §8.2 has promised this since P3 and it never shipped — the chain ran
+ *    `openFileInTab` → `openTab` → `activePane()`, so "open the layout that wraps this page" opened
+ *    it ON TOP of the page it was teaching about.
+ * 2. **Focus stays in the page.** An assistant pane that takes the keyboard means the author's next
+ *    keystroke edits the definition instead of the document they are looking at — and a following
+ *    pane would immediately have nothing to follow.
+ * 3. **A PREVIEW tab**, because drilling in is browsing: the second drill-in takes the same slot
+ *    instead of littering the side strip, and an edit promotes it (`promoteDirtyPreviewTabs`).
+ * 4. **An ordinary tab, not a derivation.** "Edit definition" is a commitment to edit one component; a
+ *    following pane would yank to a different one on the author's next canvas click. The following
+ *    form is `pane.derive { preset: "component" }`, opted into by name.
+ *
+ * `openedFrom` is unchanged — §14.2's relationship, which nothing pops and nothing restores from.
+ *
+ * @param {string} componentPath
+ */
+async function navigateToComponent(componentPath: string) {
+  const from = activeTab.value;
+  /* {@link receivingPane}, not `sidePane`: the pane beside this one may be a LENS, which owns no
+     tab. The open then landed in a `tabOrder` `tabOfPane` hops straight past, so the read below got
+     the SOURCE tab back, `opened.documentPath !== componentPath`, and the one relationship this
+     function exists to record (§14.2) was skipped without a sound. */
+  const target = receivingPane();
+  const alreadyOpen = [...workspace.tabs.values()].some((t) => t.documentPath === componentPath);
+  await openFileInTab(componentPath, { focus: false, paneId: target.id, preview: true });
+  const opened = tabOfPane(target.id);
+  if (!alreadyOpen && from && opened && opened.documentPath === componentPath) {
+    opened.session.openedFrom = { documentPath: from.documentPath, tabId: from.id };
   }
-  tab.doc.document = frame.document as JxMutableNode;
-  tab.doc.dirty = frame.dirty as boolean;
-  tab.doc.mode = frame.mode as string;
-  tab.doc.sourceFormat = frame.sourceFormat as string | null;
-  tab.documentPath = frame.documentPath as string | null;
-  tab.session.selection = frame.selection as JxPath | null;
-  view.leftTab = "layers";
-
-  render();
-  statusMessage("Returned to parent document");
+  setActivityTab("layers");
 }
 
-/** @param {number} targetIndex */
-async function navigateToLevel(targetIndex: number) {
-  const tab = activeTab.value;
-  const stack = tab?.session.documentStack;
-  if (!stack || targetIndex < 0 || targetIndex >= stack.length) {
-    return;
-  }
-  if (!(await confirmLeaveDirtyChild(tab))) {
-    return;
-  }
-
-  const frame = stack[targetIndex] as DocumentStackEntry;
-  tab.session.documentStack = stack.slice(0, targetIndex);
-  tab.doc.document = frame.document as JxMutableNode;
-  tab.doc.dirty = frame.dirty as boolean;
-  tab.doc.mode = frame.mode as string;
-  tab.doc.sourceFormat = frame.sourceFormat as string | null;
-  tab.documentPath = frame.documentPath as string | null;
-  tab.session.selection = frame.selection as JxPath | null;
-  view.leftTab = "layers";
-
-  render();
-  statusMessage("Returned to parent document");
-}
-
-async function closeFunctionEditor() {
-  const tab = activeTab.value;
-  const editing =
-    /** @type {{ type: string; defName?: string; path?: JxPath; eventKey?: string } | null} */ tab
-      ?.session.ui.editingFunction;
-  if (!editing || !tab) {
-    return;
-  }
-  if (view.functionEditor) {
-    const currentCode = view.functionEditor.getValue();
-    const minResult = await codeService("minify", { code: currentCode });
-    const bodyToStore = minResult?.code ?? currentCode;
-    if (editing.type === "def") {
-      transactDoc(tab, (t) => mutateUpdateDef(t, editing.defName as string, { body: bodyToStore }));
-    } else if (editing.type === "event") {
-      const node = getNodeAtPath(tab.doc.document, editing.path as JxPath);
-      const current = node?.[editing.eventKey as string] || {};
-      transactDoc(tab, (t) =>
-        mutateUpdateProperty(t, editing.path as JxPath, editing.eventKey as string, {
-          .../** @type {object} */ current,
-          $prototype: "Function",
-          body: bodyToStore,
-        }),
-      );
-    }
-    view.functionEditor.dispose();
-    view.functionEditor = null;
-  }
-  updateUi("editingFunction", null);
-}
+// There is no `navigateBack` / `navigateToLevel` here any more, and no `confirmLeaveDirtyChild`
+// Beneath them. All three served the sub-document stack, which nothing could push onto — see
+// `tabs/tab.ts`. The dirty prompt they shared was about a POPPED frame discarding a child's edits;
+// A drilled-in component is a real tab now, and `panels/tab-strip.ts` owns the prompt for closing
+// One. That prompt is two-way where this was three-way — see `showSaveDiscardDialog`'s ledger entry.
 
 // ─── Webdata: datalists for autocomplete ──────────────────────────────────────
 
@@ -405,28 +393,13 @@ if (!hasPlatform()) {
   registerPlatform(resolveDefaultPlatform());
 }
 
-// Screenshot/automation runners (scripts/screenshots/) await window.__jxAutomation right after
-// Navigation, so the gated hook must install before the async deep-link project load below.
-installAutomationHook({
-  getCanvasMode,
-  openBrowseModal,
-  openConnectorGrid,
-  openNewProjectModal,
-  openQuickSearchPalette: openQuickSearch,
-  openSettingsModal,
-  render,
-  renderActivityBar,
-  seedAssistantMessages,
-  seedPublishConnected,
-  setCanvasMode,
-  statusMessage,
-});
-
 mountResizeEdges();
 
 // ─── Render loop ──────────────────────────────────────────────────────────────
 
 initShellRefs();
+// One effect projects the dock record onto the shell grid — collapse classes and column widths.
+mountShell();
 
 // Mount extracted panel modules
 toolbarPanel.mount(toolbarEl, {
@@ -443,20 +416,22 @@ toolbarPanel.mount(toolbarEl, {
 initLayers();
 initQuickSearch({ openRecentProject: (root: string) => openRecentProject(root) });
 
-tabStrip.mount(document.querySelector("#tab-strip") as HTMLElement);
+/* The pane's four surfaces come from its CELL, not from `document.querySelector`.
+   `panels/pane-grid.ts` mounted through `mountShell()` above, so the primary's cell exists by now;
+   each of these three modules still holds one host, which is exactly right while the grid draws one
+   cell and is what `mountForPane` replaces when it draws two. */
+const primaryCell = cellForPane(PRIMARY_PANE);
 
-tabBar.mount(document.querySelector("#tab-bar") as HTMLElement, {
-  closeFormulaWorkspace: () => closeFormulaWorkspace(),
-  closeFunctionEditor: () => closeFunctionEditor(),
+tabStrip.mount(primaryCell?.strip ?? document.createElement("div"));
+
+paneContext.mount(primaryCell?.chrome ?? document.createElement("div"), {
   exportFile,
-  getCanvasMode,
-  navigateBack: () => navigateBack(),
-  navigateToLevel: (i: number) => navigateToLevel(i),
+  // No `getCanvasMode`: the bar is drawn once per pane and asks its own pane. See `PaneContextCtx`.
   parseMediaEntries,
+  setCanvasMode,
 });
 
 overlaysPanel.mount({
-  getCanvasMode,
   isEditing,
   renderBlockActionBar,
 });
@@ -467,6 +442,10 @@ initBlockActionBar({
 });
 // The iframe's re-emitted selection snapshot drives the parent format toolbar refresh (4b-2).
 setToolbarRefresh(renderBlockActionBar);
+// The other half of that seam: a pointerdown inside a canvas frame ends the bar's suppression (the
+// Canvas is in play again). It is the only signal that can, because clicking the SAME
+// Already-selected element changes nothing the render path can compare.
+setCanvasPointerDownHandler(releaseBlockActionBar);
 // The cross-origin insertion "+" click runs the parent-realm slash-menu → mutateInsertNode flow.
 setInsertZoneClickHandler(runInsertZoneAction);
 // Files dragged from the OS onto a canvas: upload, then replace an image's source or insert.
@@ -475,32 +454,55 @@ setFileDropHandler(applyFileDrop);
 // Files afterwards. Injected here because all three modules import from media-upload.
 setMediaChangedHandler(async (dir) => {
   invalidateMediaCache();
-  invalidateBrowseCache();
+  invalidateLibrary();
   await loadDirectory(dir);
   renderLeftPanel();
 });
 // The in-iframe "/" trigger drives the parent-realm Spectrum slash menu across the bridge.
 setCanvasSlashHandler(canvasSlashHandler);
 // Canvas right-clicks show the parent-realm Jx element context menu across the bridge.
-setCanvasContextMenuHandler(makeCanvasContextMenuHandler({ navigateToComponent }));
+setCanvasContextMenuHandler(makeCanvasContextMenuHandler());
 // Stylebook hits decode to a TAG in the host and route here (null = clicked chrome/empty space).
 setStylebookHitHandler((tag, media) => {
   if (tag) {
     selectStylebookTag(tag, media);
   } else {
-    updateSession({ ui: { activeSelector: null, stylebookSelection: null } });
+    shell.stylebook.selection = null;
+    updateSession(activeTab.value, { ui: { activeSelector: null } });
   }
 });
-// Commit-on-parent-click: a pointerdown in PARENT chrome outside the edit-session chrome (format
-// Toolbar / link popover / slash menu) ends the live inline-edit session — the iframe can't observe
-// Parent-realm pointer events (layers panel, tab strip, right panel…). Pointerdowns over the canvas
-// Land inside the cross-origin iframe and never reach this listener, so it can't double-fire with
-// The iframe's own click-away commit.
+/* Two duties, one listener, because both answer the same question: intent has left the canvas.
+   Pointerdowns over the canvas land inside the cross-origin iframe and never reach this listener,
+   so a hit here IS parent chrome — which is why the listener can be this blunt and why it cannot
+   double-fire with the iframe's own click-away commit.
+
+   1. Commit-on-parent-click: it ends the live inline-edit session, which the iframe cannot observe
+      itself (layers panel, tab strip, right panel…).
+   2. The block action bar goes with it. The bar is `position: fixed` and clamped into the window,
+      so it can sit over the Document Header card, the pane context bar and the docks; an author
+      working in the Inspector's Logic tab reported it "blocking a part of the interface that the
+      user needs to utilize". It is SUPPRESSED, not dismissed — a plain dismiss flashes back on the
+      next snapshot or overlay repaint — and it comes back the moment the canvas takes a pointer or
+      the selection moves. Nothing here touches the selection: the Inspector edits the selected
+      node, so a click into it must keep the thing it is about to edit.
+
+   Both spare the edit-session chrome (`isEditChromeTarget`: the bar, its `⋮` menu, the link
+   popover, the slash menu) — those surfaces act ON the session and the bar rather than away from
+   them. Only the suppression spares the canvas STAGE, whose margins, artboard headers and insertion
+   "+" are parent-realm elements around the frame: they are the canvas, not somewhere else in the
+   shell, and hiding the bar to pan or to nudge the zoom would be the app losing the author's place
+   for them. */
 document.addEventListener(
   "pointerdown",
   (e) => {
-    if (getEditSnapshot().editing && !isEditChromeTarget(e.target)) {
+    if (isEditChromeTarget(e.target)) {
+      return;
+    }
+    if (getEditSnapshot().editing) {
       commitActiveEditSession();
+    }
+    if (!(e.target instanceof Node) || stageContaining(e.target) === null) {
+      suppressBlockActionBar();
     }
   },
   true,
@@ -509,9 +511,19 @@ document.addEventListener(
 // Unsaved-changes guard: saving is explicit (no idle autosave), so warn before the window unloads
 // While any open tab has unsaved edits. For collab tabs, `dirty` reflects the room-level unsaved
 // State; closing loses in-memory edits that were never flushed to disk.
+/*
+ * `dirty` alone could not see a Monaco buffer, and quitting is the one exit no disposer follows.
+ *
+ * A keystroke in the source view or the dock's Logic tab reaches the document on a 600ms / 500ms
+ * debounce, and nothing marks the tab dirty in the meantime — so typing the last character of a
+ * handler and pressing ⌘Q left with no prompt at all. There is no flush to make here: `beforeunload`
+ * cannot await, and the source view's commit parses through the format host before it assigns, so
+ * the answer would arrive after the window is gone. The buffer is asked directly instead —
+ * `tabBufferUnsaved` is the author's own typing that the document has not been given.
+ */
 export function hasUnsavedTabs(): boolean {
   for (const tab of workspace.tabs.values()) {
-    if (tab.doc.dirty) {
+    if (tab.doc.dirty || tabBufferUnsaved(tab)) {
       return true;
     }
   }
@@ -519,6 +531,9 @@ export function hasUnsavedTabs(): boolean {
 }
 
 window.addEventListener("beforeunload", (e: BeforeUnloadEvent) => {
+  // The session, so a relaunch reopens what was open (§4.4). Before the prompt, not after: the
+  // Author may cancel the close, and the record is the same either way.
+  flushSession();
   if (hasUnsavedTabs()) {
     e.preventDefault();
     // Legacy browsers require a truthy returnValue to trigger the native confirm prompt.
@@ -526,20 +541,22 @@ window.addEventListener("beforeunload", (e: BeforeUnloadEvent) => {
   }
 });
 
-initCanvasUtils({
-  getCanvasMode,
-  getZoom: () => activeTab.value?.session.ui.zoom ?? 1,
-  setZoomDirect: (zoom) => {
-    if (activeTab.value) {
-      activeTab.value.session.ui.zoom = zoom;
-    }
-  },
-});
-initCanvasLiveRender({
-  getCanvasMode,
-});
+/* No `initCanvasUtils` any more, and the three functions it injected are why.
+   `getZoom` and `setZoomDirect` were `activeTab.value?.session.ui.zoom` — the FOCUSED pane's tab —
+   while every geometry function in `canvas/canvas-utils.ts` already took an explicit
+   `CanvasSurface`. So the pan and the wrap were per-stage and the SCALE was not: the unfocused pane
+   drew at the focused tab's scale, the side pane's `+` zoomed the primary's document, and the side
+   pane entering Design snapped the primary to whatever it had fitted itself to. `getCanvasMode`
+   was the same shape one layer down. The module reaches all three through the surface it is given
+   (`tabOfPane(surface.paneId)`), so there is nothing left to inject.
+
+   No `initCanvasLiveRender` either, and it went for the same reason one layer further down again.
+   `getCanvasMode` was the ONLY thing that context carried, and `resolveCanvasDocument` used it
+   while ALSO reading `activeTab.value` for the document path, the layout toggle and the preview
+   params — so the pane the render had already been resolved for was discarded and the focused
+   pane's answers substituted for all six. It takes the tab now, and the injection point had
+   nothing else in it. */
 initCanvasPatcher({
-  getCanvasMode,
   renderOverlays,
   scheduleCanvasRender,
 });
@@ -548,14 +565,13 @@ setIframePatchEscalation(scheduleCanvasRender);
 // One global coordinator monitor drives cross-frame palette→canvas drops (Phase 4c).
 registerCanvasDndBridge();
 initCanvasRender({
-  getCanvasMode,
   get gitDiffState() {
-    return gitDiffState;
+    return shell.git.diffState;
   },
   openFileFromTree,
   setCanvasMode,
   setGitDiffState: (state: GitDiffState | null) => {
-    gitDiffState = state;
+    shell.git.diffState = state;
   },
 });
 
@@ -581,59 +597,148 @@ initWelcome({
   openRecentProject: (root: string) => openRecentProject(root),
 });
 
-// Effect-driven canvas rendering, split into two triggers so document changes can be
-// Distinguished from mode/UI changes:
-// - doc-effect: tracks only the document root reference. Document mutations that were
-//   Consumed surgically by the canvas patcher skip the full render here.
-// - ui-effect: tracks canvas mode and UI flags; always schedules a full render.
-// Scheduling is deduped inside scheduleCanvasRender (double-RAF).
+/* There is no stage-handover effect here any more.
+   It existed because the shell had one `#canvas-wrap` and a pane is the unit of render, so "which
+   pane owns the stage" had to be re-answered every time focus moved. `panels/pane-grid.ts` builds a
+   cell per pane and registers its stage with it; nothing moves, and nothing has to be repainted
+   because it changed hands. */
+
+/**
+ * One pane's render subscriptions.
+ *
+ * Effect-driven canvas rendering, split into three triggers so document changes can be
+ * distinguished from mode/UI changes:
+ *
+ * - Doc-effect: tracks only the document root reference. Document mutations that were consumed
+ *   surgically by the canvas patcher skip the full render here.
+ * - Ui-effect: tracks canvas mode and UI flags; always schedules a full render.
+ * - The colour-scheme post, which is a document-level attribute flip inside the iframe and
+ *   deliberately never part of the ui-effect: flipping the scheme must not re-render.
+ *
+ * Scheduling is deduped inside `scheduleCanvasRender` (double-RAF).
+ *
+ * **Keyed on the PANE, not on `activeTab`, and this is what makes `⌘\` and Unsplit work at all.**
+ * Both effects used to read the focused pane's tab and schedule "the" canvas. A split moves a tab
+ * between panes without changing which tab is active, so neither effect re-ran: the pane the tab
+ * LEFT went on displaying it, and Unsplit — where the survivor's `activeTabId` changes but
+ * `activeTab` does not — left the primary showing document A while the strip, the jump bar and the
+ * Inspector all said B. `tabOfPane` tracks the pane's own `activeTabId`, so the pane that changed
+ * is the pane that repaints.
+ *
+ * @param {string} paneId
+ */
+function installPaneRenderEffects(paneId: string): void {
+  /* The FOLLOW, in this pane's own scope so it stops when the pane leaves the grid.
+     No preset subscribes nothing: `installDerivationEffects` declares this pane's own
+     `activeTabId` and `tabOfPane(sourcePaneId)` for EVERY derivation, and `diff` and `breakpoint`
+     are the two that add nothing beyond that — a lens follows STRUCTURALLY, through `tabOfPane`'s
+     hop, which the three effects below already read. A comment here claimed the opposite of
+     `pane-derive.ts`'s own docstring for a release; the inputs are listed once, at the effect that
+     declares them, and this line points at it rather than restating it. */
+  installDerivationEffects(paneId, derivationDeps);
+  effect(() => {
+    const tab = tabOfPane(paneId);
+    if (tab) {
+      const doc = tab.doc.document;
+      if (doc && consumePatchedDocument(doc, paneId)) {
+        return;
+      }
+    }
+    scheduleCanvasRender(paneId);
+  });
+  effect(() => {
+    const tab = tabOfPane(paneId);
+    /* A derived pane's own view axes. A preset change and a breakpoint change are render inputs
+       that live on the DERIVATION rather than on the tab, so without these a lens would keep
+       drawing whatever it was created with. Accepted cost, stated: the shared `ui.canvasMode` read
+       below means a mode flip in the source pane also re-runs the lens's ui-effect — one extra
+       full render per human mode flip, which is not a per-keystroke path. */
+    const derived = paneById(paneId)?.derived;
+    void derived?.status;
+    /* …and the SENTENCE, because the stage draws it. `canvas/canvas-render.ts` prints
+       `derived.reason` for an unavailable derivation, and `status` alone does not move when the
+       reason does: a diff lens that could not read its comparison, whose file the author then
+       saves back to HEAD, stays `unavailable` while the sentence becomes "Nothing to compare".
+       Untracked, the stage would keep the old sentence until something else repainted it. */
+    void derived?.reason;
+    if (derived?.kind === "lens") {
+      void derived.mode;
+      void derived.media;
+    }
+    if (tab) {
+      void tab.doc.mode;
+      void tab.session.ui.canvasMode;
+      void tab.session.ui.editingFormula;
+      void tab.session.ui.editingFunction;
+      void tab.session.ui.featureToggles;
+      void tab.session.ui.preview;
+      void tab.session.ui.previewParams;
+      void tab.session.ui.previewProps;
+      void tab.session.ui.showLayout;
+    }
+    // Project-level render inputs: the stylebook catalogue's filters and the settings section are
+    // Shell state, so a change repaints the canvas with or without a document focused.
+    void shell.settingsTab;
+    void shell.stylebook.tab;
+    void shell.stylebook.filter;
+    void shell.stylebook.customizedOnly;
+    scheduleCanvasRender(paneId);
+  });
+  effect(() => {
+    const scheme = tabOfPane(paneId)?.session.ui.previewColorScheme;
+    // Scoped to THIS pane's stage: the scheme is a per-tab choice, and an unscoped post flipped
+    // Both documents from one pane's control.
+    postColorSchemeToLiveHosts(
+      scheme === "light" || scheme === "dark" ? scheme : null,
+      surfaceForPane(paneId).wrap,
+    );
+  });
+}
+
+/**
+ * Subscribe every drawn pane, and unsubscribe one that leaves the grid.
+ *
+ * A scope per pane rather than one loop over `workspace.panes`, because the distinction the two
+ * effects above draw only survives if each pane is tracked separately: an effect that read both
+ * panes' documents would re-render BOTH whenever either moved, and `consumePatchedDocument` would
+ * skip both whenever one was patched.
+ */
+const _paneRenderScopes = new Map<string, EffectScope>();
+
 effect(() => {
-  const tab = activeTab.value;
-  if (tab) {
-    const doc = tab.doc.document;
-    if (doc && consumePatchedDocument(doc)) {
-      return;
+  const wanted = new Set(workspace.panes.map((pane) => pane.id));
+  for (const [paneId, scope] of _paneRenderScopes) {
+    if (!wanted.has(paneId)) {
+      scope.stop();
+      _paneRenderScopes.delete(paneId);
     }
   }
-  scheduleCanvasRender();
-});
-effect(() => {
-  const tab = activeTab.value;
-  if (tab) {
-    void tab.doc.mode;
-    void tab.session.ui.canvasMode;
-    void tab.session.ui.editingFormula;
-    void tab.session.ui.editingFunction;
-    void tab.session.ui.featureToggles;
-    void tab.session.ui.preview;
-    void tab.session.ui.previewParams;
-    void tab.session.ui.previewProps;
-    void tab.session.ui.settingsTab;
-    void tab.session.ui.showLayout;
-    void tab.session.ui.stylebookTab;
-    void tab.session.ui.stylebookFilter;
-    void tab.session.ui.stylebookCustomizedOnly;
+  for (const paneId of wanted) {
+    if (_paneRenderScopes.has(paneId)) {
+      continue;
+    }
+    const scope = effectScope();
+    _paneRenderScopes.set(paneId, scope);
+    scope.run(() => {
+      installPaneRenderEffects(paneId);
+    });
   }
-  scheduleCanvasRender();
-});
-// Color-scheme preview is a document-level attribute flip inside the iframe — deliberately its
-// Own effect, never part of the ui-effect above: flipping the scheme must not re-render.
-effect(() => {
-  const s = activeTab.value?.session.ui.previewColorScheme;
-  postColorSchemeToLiveHosts(s === "light" || s === "dark" ? s : null);
 });
 
 rightPanelMod.mount({
   getCanvasMode,
+  // The Assistant tab's body is built by the Inspector and handed to the module that owns the
+  // Chat. Injected rather than imported so the dependency runs one way: chat-panel.ts calls back
+  // Into right-panel.ts to select its own tab, and this is what keeps that from being a cycle.
+  mountAssistant: (host) => chatPanelMod.mount(host),
   navigateToComponent,
   renderCanvas: () => renderCanvas(),
 });
 
-// Above-canvas frontmatter Properties panel (content-collection docs, edit mode).
-frontmatterPanelMod.mount({ getCanvasMode });
+// The Document Header card — every document with frontmatter or `$head`. It has no host of its own:
+// The stage hands one over (`canvas-render.ts`), and this only starts the reactive subscription.
+frontmatterPanelMod.mount();
 
-// The persistent AI chat sidebar — mounts once, available with or without a project/document.
-chatPanelMod.mount(chatPanelEl);
 // The assistant's create_project tool adopts freshly scaffolded projects through the same
 // Flow as the recent-projects list.
 setProjectAdopter(openRecentProject);
@@ -654,10 +759,22 @@ leftPanelMod.mount({
   // Fetch. Edit/design suppress them (a full render re-resolves every entry, so authoring would
   // Refetch constantly); re-firing them on demand is what that button is for.
   refreshData: () => {
-    allowAutoRequestsOnNextRender();
-    renderCanvas();
+    // ONE read of the focus, shared by the arm and the render. The Data panel is a Navigator
+    // Surface, so its subject genuinely is the focused pane — but `allowAutoRequestsOnNextRender()`
+    // And `renderCanvas()` each used to resolve that for themselves, and two resolutions of the
+    // Same fact are two facts: arming a pane and then rendering a different one is a Refresh that
+    // Refreshes nothing.
+    const paneId = workspace.activePaneId;
+    allowAutoRequestsOnNextRender(paneId);
+    // Say so BEFORE the render, and let the iframe's `dataScope` reply be what stops saying it.
+    // The button used to fire and repaint 200ms later on a timer, which reported "done" over the
+    // Old values for anything slower than that — a Refresh that visibly did nothing.
+    const tab = activeTab.value;
+    if (tab) {
+      tab.session.canvas.refreshing = true;
+    }
+    renderCanvas(paneId);
   },
-  renderDataExplorerTemplate,
   renderFilesTemplate,
   renderGitPanel,
   renderHeadTemplate,
@@ -665,7 +782,7 @@ leftPanelMod.mount({
   renderSignalsTemplate,
   setCanvasMode,
   setGitDiffState: (state: GitDiffState | null) => {
-    gitDiffState = state;
+    shell.git.diffState = state;
   },
   setupTreeKeyboard,
   webdata,
@@ -677,22 +794,21 @@ registerRenderer("leftPanel", () => leftPanelMod.render());
 registerRenderer("canvas", () => renderCanvas());
 registerRenderer("rightPanel", () => rightPanelMod.render());
 registerRenderer("frontmatterPanel", () => frontmatterPanelMod.render());
+registerRenderer("seoModal", renderSeoModal);
 registerRenderer("chatPanel", () => chatPanelMod.render());
 registerRenderer("overlays", () => overlaysPanel.render());
-setStatusbarRenderer(() => renderStatusbar());
+renderStatusbar();
 mountStatusbar();
+// ⑥ The jump bar, in the pane's own grid cell above the context bar. It renders the whole address
+// — project › file › node › node — and it is the only breadcrumb in the shell: the pane context
+// Bar drew a second one, and it named a sub-document stack nothing could push onto.
+mountJumpBar(primaryCell?.jump ?? document.createElement("div"));
 mountActivityBar();
 
-// Clicking on the canvas-wrap background (outside any canvas panel) deselects the current element
-canvasWrap.addEventListener("click", (e: MouseEvent) => {
-  if (e.target !== canvasWrap && e.target !== view.panzoomWrap) {
-    return;
-  }
-  if (!activeTab.value?.session.selection) {
-    return;
-  }
-  activeTab.value.session.selection = null;
-});
+/* The background-click deselect moved into `editor/shortcuts.ts`'s `installStageGestures`, beside
+   the wheel and the middle-drag, because it is a STAGE gesture: it compared against the app's one
+   `#canvas-wrap` and one `view.panzoomWrap` and cleared `activeTab`'s selection, all three of which
+   name the focused pane rather than the pane that was clicked. */
 
 function safeRenderRightPanel() {
   rightPanelMod.render();
@@ -712,13 +828,33 @@ configureCollabParser(async (tab, text) => {
   }
   return { document: JSON.parse(text) as JxMutableNode };
 });
-configureCollabNotifier(statusMessage);
+// The source-canonical freeze is a STATE the author is being held in, not an error: a toast that
+// Says so, keyed so a run of freezes is one message rather than a stack of identical ones.
+configureCollabNotifier((message) => {
+  notify.warn(message, { key: "collab.freeze", source: "Collaboration" });
+});
 
 let fsUnsub: (() => void) | null = null;
 /** (Re)subscribe the sidebar to backend filesystem events for the active project. */
 function ensureFsSync() {
   fsUnsub?.();
-  fsUnsub = startFsSync({ onContentChange: reloadCleanTab, renderLeftPanel });
+  fsUnsub = startFsSync({
+    /* The four caches keyed on the project's file listing. Each one is derived — the pages tree
+       behind the Link-target picker, the layouts listing plus the effective layout's `$head`, the
+       `$paths` value enumerations, and the context bar's own memo of the enumerations it has
+       already asked for — so a file appearing or disappearing is the only event that can make any
+       of them wrong, and it is the same event for all four. The bar's memo is separate from
+       `page-params`' because it is keyed per DOCUMENT rather than globally; leaving it behind kept
+       a stale candidate list in the picker after the collection changed. */
+    invalidateDerivedCaches: () => {
+      invalidatePageRouteCache();
+      invalidateLayoutPickerCache();
+      invalidateParamValues();
+      paneContext.resetParamValues();
+    },
+    onContentChange: reloadCleanTab,
+    renderLeftPanel,
+  });
 }
 
 const _urlParams = new URLSearchParams(location.search);
@@ -751,13 +887,19 @@ if (_projectParam) {
     _projectParam.startsWith("~") ||
     /^[A-Za-z]:[/\\]/.test(_projectParam);
   if (!isAbsPath) {
-    statusMessage(`Error: ?project= requires an absolute path (got "${_projectParam}")`);
+    notify.error(`?project= requires an absolute path (got "${_projectParam}").`, {
+      key: "startup.projectParam",
+      source: "Startup",
+    });
     render();
   } else {
     render();
     const platform = getPlatform();
     // oxlint-disable-next-line unicorn/prefer-top-level-await -- deliberate fire-and-forget: project probing must not block the initial render
     void (async () => {
+      // Hoisted out of the try so the failure can NAME what it failed to open. The catch used to
+      // Report a bare `Error: <message>` because the only identifying fact was still block-scoped.
+      let fileRelPath = _urlParams.get("file") || _projectParam;
       try {
         const siteCtx = platform.resolveSiteContext
           ? await platform.resolveSiteContext(_projectParam)
@@ -817,9 +959,39 @@ if (_projectParam) {
           void maybePromptJxsuiteUpdate(siteCtx.sitePath);
         }
 
+        /*
+         * THE SESSION — unless the URL named a document.
+         *
+         * A named document is an instruction and wins, whether it came from `?file=` or from a
+         * `?project=` that pointed INTO the project. A bare `?project=<dir>` is "open this
+         * project", and what that means is the documents it was last left with (§4.4) — the
+         * `project.json → home page` redirect below is the answer this replaces.
+         *
+         * This branch opens inline and never went near `openHomePage`, so it was the one door of
+         * four the session work would have missed, and it is the door a browser reload comes
+         * through.
+         *
+         * It returns when something LANDED — a restored session, or the home page
+         * `openLastSessionOrHome` falls back to. A project with neither (no session, no
+         * `pages/index.*`) falls through to the inline open below, which is what opens
+         * `project.json` itself for a project that has nothing else to show.
+         */
+        const named =
+          _urlParams.get("file") ||
+          (siteCtx.fileRelPath && !siteCtx.fileRelPath.endsWith("project.json")
+            ? siteCtx.fileRelPath
+            : null);
+        if (!named) {
+          await openLastSessionOrHome();
+          if (activeTab.value) {
+            render();
+            renderLeftPanel();
+            return;
+          }
+        }
+
         // Read and open the file
-        const _fileParam = _urlParams.get("file");
-        let fileRelPath = _fileParam || siteCtx.fileRelPath || _projectParam;
+        fileRelPath = named ?? siteCtx.fileRelPath ?? _projectParam;
 
         // When opening project.json, default to home page instead (listing-based, no 404 probes).
         if (fileRelPath === "project.json" || fileRelPath.endsWith("/project.json")) {
@@ -828,7 +1000,9 @@ if (_projectParam) {
 
         const content = await platform.readFile(fileRelPath);
         if (content) {
-          let frontmatter, parsedDoc, parsedMode;
+          let frontmatter;
+          let parsedDoc;
+          let parsedMode;
           await loadFormats();
           const fileFormat = formatForPath(fileRelPath);
           if (fileFormat || !fileRelPath.endsWith(".json")) {
@@ -859,10 +1033,19 @@ if (_projectParam) {
           }
 
           render();
-          statusMessage(`Opened ${fileRelPath}`);
+          // Opening a file is stated by the tab strip and the status bar's DOCUMENT field.
         }
+        /* This window may now write its session (§4.4). The `?file=` branch above opens inline and
+           never reaches `openLastSessionOrHome`, which is the other place that says this — so
+           without it a window opened at a named file would restore other windows' sessions and
+           never record its own. */
+        markSessionRestored(workspace.projectRoot);
       } catch (error) {
-        statusMessage(`Error: ${errorMessage(error)}`);
+        notify.error(`Could not open ${fileRelPath || "the project"}.`, {
+          detail: errorMessage(error),
+          path: fileRelPath,
+          source: "Open File",
+        });
       }
     })();
   }
@@ -911,28 +1094,73 @@ function renderLeftPanel() {
 function loadProject() {
   return _loadProject();
 }
-async function openProject() {
+/**
+ * Open a project, in the window the user asked for, and report what actually happened.
+ *
+ * THE TARGET IS HONOURED HERE OR NOWHERE. `openProjectFlow` asks the question and this is the
+ * bootstrap's side of that contract — which it did not hold up: the hook was wired as `openProject:
+ * () => openProject()` against a function that took no target, so "New Window" was collected,
+ * dropped on the floor, and fell through to the line below that re-roots THIS window. The dialog
+ * worked, the answer was discarded, and picking a project in the file browser replaced the project
+ * the user had just said to keep.
+ */
+async function openProject(target: ProjectOpenTarget = "thisWindow"): Promise<ProjectOpenOutcome> {
   // Repo-list platforms (cloud) pick from the user's writable repositories instead of a
   // Backend dialog; the choice opens through the same path as a recent project.
   if (platformUsesRepoPicker()) {
     const picked = await openProjectPickerModal();
-    if (picked) {
-      // The catalogue may have gained an entry; refresh it before navigating into the project.
-      void hydrateProjectList().then(() => {
-        render();
-      });
-      void openRecentProject(picked.root);
+    if (!picked) {
+      return "cancelled";
     }
-    return;
+    // The catalogue may have gained an entry; refresh it before navigating into the project.
+    void hydrateProjectList().then(() => {
+      render();
+    });
+    void openRecentProject(picked.root);
+    return "opened";
   }
-  const result = await _openProject({
-    renderActivityBar: () => renderActivityBar(),
-    renderLeftPanel,
-  });
+  const platform = getPlatform();
+  // ELSEWHERE, and nothing here closes: no `confirmCloseAll`, no `replaceAllTabs`, no re-rooting.
+  // `pickProject` exists precisely so this branch can ask which project without `openProject()`'s
+  // Side effect of binding the asking window to the answer. The window that opens loads it, adds
+  // Its own recent-projects entry, and this one carries on untouched.
+  if (target === "newWindow" && platform.pickProject && platform.openProjectInNewWindow) {
+    const picked = await platform.pickProject();
+    if (!picked) {
+      return "cancelled";
+    }
+    const { focused } = await platform.openProjectInNewWindow(picked.root);
+    return focused ? "focused" : "newWindow";
+  }
+  // The SECOND destroyer, and it was ungated for as long as the first one was. `openRecentProject`
+  // Below asks `confirmCloseAll` and then calls `closeAllTabs`; this branch reaches
+  // `files.ts`'s `replaceAllTabs`, which throws the same documents away by a different name — so an
+  // Enumeration of "who calls closeAllTabs" reported the matrix complete while ⌘O, the toolbar
+  // Button and the welcome screen all discarded unsaved work in silence. `platformUsesRepoPicker()`
+  // Is true only for the cloud platform, so desktop and browser both arrived here.
+  if (!(await tabStrip.confirmCloseAll("Opening another project"))) {
+    return "cancelled";
+  }
+  const opened = await _openProject({ renderLeftPanel });
   ensureFsSync();
-  return result;
+  return opened ? "opened" : "cancelled";
 }
 async function openRecentProject(root: string) {
+  // One entry for the whole sequence, not three surfaces for its three phases. Opening a project
+  // Used to chain a blocking spinner (dependencies), a transient status line (git sync) and a
+  // Confirm-plus-spinner (@jxsuite update), none of them cancellable and none of them surviving
+  // The frame they were drawn in — so an open that took forty seconds was indistinguishable from
+  // One that had silently failed. Spec studio.md §16.4.
+  const activity = beginActivity({
+    title: `Opening ${root.split("/").pop() || root}`,
+    source: "Open Project",
+    steps: [
+      "Sync with the remote",
+      "Install dependencies",
+      "Read the project",
+      "Open the home page",
+    ],
+  });
   try {
     const platform = getPlatform();
 
@@ -940,6 +1168,24 @@ async function openRecentProject(root: string) {
     // Window (focusing an existing window if it's already open) rather than replacing this project.
     if (projectState && platform.openProjectInNewWindow) {
       await platform.openProjectInNewWindow(root);
+      activity.done("Opened in another window");
+      return;
+    }
+
+    /* THE LAST UNGUARDED DESTROYER, and it is the biggest one.
+       Past this point the window replaces its project, and `closeAllTabs()` below disposes every
+       open document — dirty or not, with no prompt anywhere on the path. ⌘W, the tab ×, quitting
+       and the preview slot's replacement each acquired a gate; this one, which throws away the
+       whole workspace at once, never had one.
+       Asked HERE rather than lower down because everything below it is one-way: `setWindowProject`
+       binds this window's backend to the new root, `platform.projectRoot` moves the base every
+       relative path resolves against, and `resetProjectShell` drops the surfaces that describe the
+       project being left. A prompt after any of those can be answered "keep editing" and leave the
+       app pointing at a project it is not showing. The one cost of asking first is the
+       already-open-elsewhere case just below, where the switch turns out to be a window focus and
+       nothing is closed: a redundant question, and never a lost document. */
+    if (!(await tabStrip.confirmCloseAll("Opening another project"))) {
+      activity.done("Kept the current project");
       return;
     }
 
@@ -948,11 +1194,17 @@ async function openRecentProject(root: string) {
     if (platform.setWindowProject) {
       const res = await platform.setWindowProject(root);
       if (res.deduped) {
+        activity.done("Already open in another window");
         return;
       }
     }
 
     platform.projectRoot = root;
+    // Source control, the stylebook selection and the settings tab describe the project being
+    // Left behind; carrying them over showed the previous repository's branch and file count
+    // Under the new project's name. The poll timer is re-armed by the panel's next render.
+    cleanupGitPanel();
+    resetProjectShell();
     // The format registry is cached per project — the previous root's registry (often empty on a
     // Fresh desktop launch) must not answer for this project, or non-JSON documents fail with
     // "No format class imported" until a reload. Mirrors openProject in files.ts.
@@ -977,8 +1229,11 @@ async function openRecentProject(root: string) {
     });
     setWorkspaceProject(root, config);
 
+    activity.step("Sync with the remote");
     await autoSyncProjectOnOpen();
+    activity.step("Install dependencies");
     await ensureDependenciesInstalled();
+    activity.step("Read the project");
     await loadDirectory(".");
     await loadComponentRegistry();
 
@@ -1000,13 +1255,14 @@ async function openRecentProject(root: string) {
     }
 
     addRecentProject(requireProjectState().name, root);
-    view.leftTab = "files";
-    renderActivityBar();
+    setActivityTab("files");
     renderLeftPanel();
-    statusMessage(`Opened project: ${requireProjectState().name}`);
+    // The project's name is now permanent state in the status bar's PROJECT field.
 
-    await openHomePage();
+    activity.step("Open the home page");
+    await openLastSessionOrHome();
     ensureFsSync();
+    activity.done(`Opened ${requireProjectState().name}`);
     void maybePromptJxsuiteUpdate(root);
   } catch (error) {
     // The project likely moved or was deleted — drop the stale entry so it stops cluttering the
@@ -1014,7 +1270,10 @@ async function openRecentProject(root: string) {
     removeRecentProject(root);
     toolbarPanel.render();
     render();
-    statusMessage(`Error: ${errorMessage(error)}`);
+    // `fail` raises the Problem, so this path does NOT also notify: an operation with an Activity
+    // Entry reports once (`studio-ui-guidelines.md` §13.3 rule 3).
+    activity.log(errorMessage(error));
+    activity.fail(`Could not open the project at ${root}.`, { path: root });
   }
 }
 function renderFilesTemplate() {
@@ -1028,17 +1287,166 @@ function openFileFromTree(path: string) {
   return openFileInTab(path);
 }
 
-// ─── Keyboard shortcuts ───────────────────────────────────────────────────────
-initShortcuts(() => ({
-  applyTransform,
-  canvasMode: getCanvasMode(),
-  openProject,
-  panX: view.panX,
-  panY: view.panY,
-  saveFile,
-  setPan: (x, y) => {
-    view.panX = x;
-    view.panY = y;
-    view.needsCenter = false;
+// ─── Commands and the keyboard ────────────────────────────────────────────────
+
+/**
+ * Pointer/pan state for ONE pane's stage, read fresh on every gesture.
+ *
+ * Takes the surface rather than resolving `view.panX` / `getCanvasMode()`, both of which answered
+ * for the focused pane: a wheel over the side pane wrote the primary's pan offsets and asked the
+ * primary's mode whether panning was even allowed.
+ */
+const stageContext = (surface: CanvasSurface) => ({
+  applyTransform: () => applyTransform(surface),
+  canvasMode: canvasModeOfPane(surface.paneId),
+  panX: surface.panX,
+  panY: surface.panY,
+  setPan: (x: number, y: number) => {
+    surface.panX = x;
+    surface.panY = y;
+    surface.needsCenter = false;
   },
-}));
+});
+
+/**
+ * The registry the keyboard dispatches through.
+ *
+ * Built here, in the bootstrap, because `createCommandRegistry` deliberately has no module-level
+ * singleton: the context it closes over is this window's, and a second window gets its own.
+ */
+const commandRegistry = createCommandRegistry({
+  getContext: createLiveContext({
+    aiConfigured: hasAiCredentials,
+    // The probe `live-context.ts` declared optional and nobody ever passed, so `ctx.ai.streaming`
+    // Read false forever. `assistant.stop` is gated on it.
+    aiStreaming: isAssistantStreaming,
+    canvasMode: getCanvasMode,
+    isCaretActive,
+    isModalOpen,
+    platform: () => (hasPlatform() ? getPlatform() : null),
+  }),
+});
+
+registerStudioCommands(
+  commandRegistry,
+  {
+    // The toolbar owns this, and the difference matters on the desktop: its `openUrlExternally`
+    // Hands the URL to the launcher's preview-navigate handler — the OS browser — where a bare
+    // `window.open` would open a webview with no address bar. The browser build falls back to a
+    // New tab either way.
+    openInBrowser: () => toolbarPanel.runOpenInBrowser(),
+    openProject,
+    // Wrapped rather than passed by reference: `saveFile` takes an optional tab and reports
+    // Whether the bytes landed, and a hook that neither supplies one nor reads the answer must not
+    // Silently forward its own first argument as the tab to save.
+    saveDocument: async () => {
+      await saveFile();
+    },
+  },
+  stageContext,
+);
+
+// Tab navigation (⌃Tab MRU cycling, ⌘⇧T reopen-closed) is defined beside the tab model it drives.
+registerTabCommands(commandRegistry, { openFile: openFileInTab, openFileInPane });
+
+/* The derivation's own two verbs (§18.4), beside the `PaneDerivation` they read and write rather
+   than in `paneCommands()`. `tests/app-commands-composition.test.ts` is the guard that this line
+   and `appCommandSet()`'s entry stay in step. */
+commandRegistry.registerAll(derivationCommands(derivationDeps));
+
+/*
+ * The rest of the app's contribution points, each defined beside the state it writes.
+ *
+ * This block is the bootstrap's whole share of plan §13's registry work: every record below lives
+ * in the module that implements it, and this is the ONE place that composes them into the registry
+ * `__jxAutomation.run` projects. Nothing here decides what a command is called, when it is
+ * available or what it does — that would be the second definition site the design exists to
+ * prevent (plan §2, principle 1).
+ */
+registerShellViewCommands(commandRegistry, {
+  // The registry's own answer, so a gated-off panel cannot be persisted as a showing tab.
+  panelAvailable: (id) => {
+    const panel = getPanel(id);
+    return panel ? (panel.when?.(commandRegistry.context()) ?? true) : true;
+  },
+  inspectorTab: () => rightPanelMod.inspectorTab(),
+  setInspectorTab: (tab) => rightPanelMod.setInspectorTab(tab),
+});
+registerCanvasViewCommands(commandRegistry, {
+  getCanvasMode,
+  renderPane: renderCanvas,
+  setCanvasMode,
+  setResolvingOpen: paneContext.setResolvingOpen,
+});
+registerSelectionSetCommand(commandRegistry);
+registerInspectorCommands(commandRegistry);
+/* Search appearance, behind one record with two buttons: the Document Header card's and the Page
+   panel's. A surface that IS the capability is one the palette cannot reach. */
+registerSeoCommands(commandRegistry);
+/* The element menu's eight verbs, in the APP registry rather than only in the popover's own. They
+   have always declared `menus: ["context/element", "palette"]`; the palette has never listed one,
+   because the only registry holding them was the one `editor/context-menu.ts` builds for itself.
+   Their target falls back to the selection when no menu is open (`commandTarget`), which is what
+   makes "Paste Style" a keyboard-reachable verb rather than a right-click-only one. */
+commandRegistry.registerAll(liveElementCommands());
+/* …and the navigation seam for the popover's FALLBACK registry, which it uses only in the window
+   before this line runs (`contextMenuRegistry()` returns the app's registry once one exists). A
+   fallback holding a no-op where navigation belongs is a registry that lies. */
+setContextMenuNavigate(navigateToComponent);
+registerDataExplorerCommands(commandRegistry, { renderLeftPanel });
+registerSignalsCommands(commandRegistry);
+registerFormulaEditorCommands(commandRegistry);
+registerGridCommands(commandRegistry);
+registerSettingsCommands(commandRegistry);
+registerPreferencesCommands(commandRegistry);
+registerLibraryCommands(commandRegistry);
+registerContentCommands(commandRegistry);
+registerNewProjectCommands(commandRegistry);
+registerStyleCommands(commandRegistry);
+registerSourceControlCommands(commandRegistry);
+registerPublishCommands(commandRegistry);
+registerGridViewCommands(commandRegistry);
+registerRedirectsCommands(commandRegistry);
+registerAboutCommands(commandRegistry);
+registerCollabCommands(commandRegistry);
+/* The `Assistant:` family (§11.1) — Focus Composer, New Chat, Chat History, Attach Selection, Retry
+   and Stop. Every one existed as a button in the chat view and as nothing else, so the category held
+   zero records and none of them was in the palette, bindable, or reachable by name. The chat header
+   and the error row render these ids through the registry now, which is what makes this line the
+   definition site rather than a second copy. */
+commandRegistry.registerAll(assistantCommands());
+/*
+ * The structural selection verbs — Move Up/Down/In/Out, Convert to Component, Edit Component.
+ *
+ * They were already defined in `panels/block-action-bar.ts` beside the mutations they perform, but
+ * only ever registered into that panel's OWN registry, so the palette, the keyboard and
+ * `__jxAutomation` could not see them. `commandTargetPath()` falls back to the current selection
+ * when no menu is open, which is precisely the app-wide meaning of these verbs.
+ */
+registerSelectionCommands(commandRegistry, { convertToComponent, navigateToComponent });
+/* The format family — Bold, Italic, Code, Link and the four with no chord.
+   Same story as the structural verbs above, one wave later: they were the block action bar's own,
+   as a hand-written keydown switch rather than records, and the switch returned early whenever
+   focus was inside the canvas iframe — which is the only place a canvas caret can be. */
+commandRegistry.registerAll(formatCommands());
+
+initShortcuts(commandRegistry, stageContext);
+
+/* Hand the canvas frames the chord table.
+   The iframe cannot see the registry, so it used to answer "does the parent want this keystroke?"
+   from three hand-written lists that disagreed with the registry in both directions — ⌘A forwarded
+   and prevented with nothing to run it, ⌘B withheld for an engine that never handled it. It
+   resolves against this table instead, and `publishKeymap()` reposts it whenever a rebinding lands,
+   which is what makes Preferences › Keyboard reach inside the page. */
+setKeymapSource(
+  () => ({
+    chords: chordsInScopes(commandRegistry.keymap, FRAME_KEY_SCOPES),
+    mac: commandRegistry.keymap.mac,
+  }),
+  (listener) => commandRegistry.keymap.onChange(listener),
+);
+
+// The gated scripting surface (`?automation=1` only) is a PROJECTION of the registry above, so it
+// Installs after it — still inside this module's synchronous body, which is what the screenshot
+// Runner's `waitForFunction(() => window.__jxAutomation)` and every deferred project load depend on.
+installAutomationHook({ registry: commandRegistry, seedAssistantMessages, seedPublishConnected });

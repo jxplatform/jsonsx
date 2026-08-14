@@ -27,7 +27,7 @@ export function runInsertZoneAction(btn: HTMLElement, zone: InsertZone): void {
       const newPath = [...insertPath, "children", idx];
       transactDoc(activeTab.value, (t) => {
         mutateInsertNode(t, insertPath, idx, def);
-        t.session.selection = newPath;
+        t.session.selection = [newPath];
       });
     },
     showFilter: true,

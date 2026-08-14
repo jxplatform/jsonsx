@@ -14,7 +14,7 @@ code:
 
 # Data tables
 
-A data table is like a content type for live data: a name, a set of fields, and the connection its rows are stored in. You define tables here; **Push Schema** then creates them in the actual database. Open the **Settings** gear at the bottom of the activity bar, then _Settings > Data Tables_ — tables on the left, the selected table's editor on the right.
+A data table is like a content type for live data: a name, a set of fields, and the connection its rows are stored in. You define tables here; **Push Schema** then creates them in the actual database. Open **[Project settings](/docs/studio/projects/settings)** — press :kbd[⌘K] and run **Open Settings**, or pick it from the **⬢ menu** in the Command Bar — then choose _Data Tables_: tables on the left, the selected table's editor on the right.
 
 ![The Data Tables editor pane showing the connection picker and field schema builder](../../images/data-table-editor.png)
 
@@ -30,6 +30,8 @@ The new table starts empty, readable by everyone and writable by no one. First p
 The **schema** editor is the same visual field builder as **[content types](/docs/studio/projects/content-types)**: each field has a name, a type (string, number, boolean, array, object, reference), an optional format for string and array fields, and a **Req** toggle. Required fields must be provided whenever a row is inserted.
 
 A **reference** field links a row to something else — its **Target** picker lists your content types, and the row stores the target entry's id. How references resolve is the same story as content **[relationships](/docs/framework/site/relationships)**.
+
+Studio draws one picker for every field that points at a collection, wherever that field appears — a schema-driven settings form, a content entry's **[frontmatter](/docs/studio/editing/frontmatter)**, a row inside a repeatable group. It lists that collection's entries, and it never quietly hides a problem: an id that no longer matches an entry stays in the field marked "— not found", and if the entries can't be listed at all the field keeps editing as plain text with the reason beside it and a **Retry**.
 
 :::doc-note
 Under the hood a table's fields are ordinary Jx field schemas in the `data` section of `project.json`. The schema format also allows table-to-table references — a to-one reference becomes a `<field>_id` column, and a to-many reference between two tables materializes a junction table on push — but the visual Target picker currently offers content types; table targets are written in the JSON directly.
@@ -58,7 +60,7 @@ A terminal or CI can push too: `jx db push` applies the same additive rules and 
 
 ## Using tables from pages
 
-Rows never pass through your project files — pages talk to the tables live. In the **[State panel](/docs/studio/logic/state)**, the connector's sources appear in the **+ Add…** picker alongside the built-in **[data sources](/docs/studio/logic/data-sources)**:
+Rows never pass through your project files — pages talk to the tables live. In the **[Data panel](/docs/studio/logic/data)**, the connector's sources appear in the **+ Add…** picker alongside the built-in **[data sources](/docs/studio/logic/data-sources)**:
 
 - **Table query** — a list of rows. **filter** and **sort** take the same rules as a content collection query; **limit** and **offset** page through a longer list; **include** names reference fields to expand, so a query on `comments` can come back with each row's linked `post` filled in — the whole row, not just its id — and to-many references expand into arrays the same way.
 - **Table entry** — one row by **id**. The id can be a fixed value, a `${…}` expression, or the current route's parameter, which is how a detail page like `pages/posts/[id].json` fetches exactly the row its URL names.
@@ -69,7 +71,7 @@ Filtering, sorting, and paging all happen in the database rather than in the bro
 :::doc-note
 Compiled pages carry no extension code. Each source is lowered at build time into a plain request to your site's own `/_jx/data` routes — `GET /_jx/data/comments?filter=…&sort=…&limit=…&offset=…&include=…` for a query, `GET /_jx/data/comments/<id>` for an entry, `POST`/`PATCH`/`DELETE` for the actions — and each write action into an inline handler that reads the submitted form. Permission rules are evaluated on the server for every one of those requests.
 
-In the JSON, a route parameter binds as `{ "$ref": "#/$params/id" }` (the same way a **[dynamic route](/docs/framework/site/routing)** binds a content entry), and a form points at a write action with `"onsubmit": { "$ref": "#/state/addComment" }`. That last one is written in **[Code mode](/docs/studio/logic/code)** today — the **[Events panel](/docs/studio/logic/events)** picker offers plain functions only.
+In the JSON, a route parameter binds as `{ "$ref": "#/$params/id" }` (the same way a **[dynamic route](/docs/framework/site/routing)** binds a content entry), and a form points at a write action with `"onsubmit": { "$ref": "#/state/addComment" }`. That last one is written in **[Code mode](/docs/studio/logic/code)** today — the **[Events](/docs/studio/logic/events)** section of the Inspector's **Logic** tab (:kbd[⌘⇧3]) lists plain functions in its handler picker, and a write action is not one.
 :::
 
 To see and fix the rows by hand, open the **[Data grid](/docs/studio/data/grid)**.

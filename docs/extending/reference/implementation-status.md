@@ -14,26 +14,27 @@ This page is generated from the `> **Status: …**` markers in the specification
 
 | Spec                      | Version      | Status      | Updated    |
 | ------------------------- | ------------ | ----------- | ---------- |
-| `ai.md`                   | 0.1.2-draft  | Partial     | 2026-07-25 |
-| `collab.md`               | 0.2.0-draft  | Partial     | 2026-07-28 |
+| `ai.md`                   | 0.1.4-draft  | Partial     | 2026-08-12 |
+| `collab.md`               | 0.2.2-draft  | Partial     | 2026-08-05 |
 | `compiler.md`             | 0.1.25-draft | Partial     | 2026-07-30 |
-| `desktop.md`              | 0.3.4-draft  | Pending     | 2026-07-31 |
-| `extensions.md`           | 0.3.3-draft  | Partial     | 2026-07-25 |
-| `imports.md`              | 0.1.6-draft  | Partial     | 2026-07-22 |
+| `desktop.md`              | 0.3.8-draft  | Pending     | 2026-08-13 |
+| `extensions.md`           | 0.3.4-draft  | Partial     | 2026-08-08 |
+| `imports.md`              | 0.1.7-draft  | Partial     | 2026-08-02 |
 | `jx-markdown.md`          | 0.1.7-draft  | Partial     | 2026-07-22 |
 | `parser.md`               | 0.2.4-draft  | Partial     | 2026-07-23 |
 | `relationships.md`        | 0.1.3-draft  | Partial     | 2026-07-22 |
-| `schema.md`               | 0.2.8-draft  | Partial     | 2026-07-22 |
+| `schema.md`               | 0.3.1-draft  | Partial     | 2026-08-10 |
 | `server.md`               | 0.2.1        | Implemented | 2026-07-25 |
-| `site-architecture.md`    | 0.1.40-draft | Pending     | 2026-07-30 |
-| `spec.md`                 | 0.4.27-draft | Partial     | 2026-07-30 |
-| `studio-ui-guidelines.md` | 0.2.1        | Implemented | 2026-07-28 |
-| `studio.md`               | 0.3.7-draft  | Partial     | 2026-07-29 |
+| `site-architecture.md`    | 0.1.44-draft | Partial     | 2026-08-12 |
+| `spec.md`                 | 0.4.28-draft | Partial     | 2026-08-10 |
+| `studio-ui-guidelines.md` | 0.3.8        | Implemented | 2026-08-13 |
+| `studio.md`               | 0.9.24-draft | Partial     | 2026-08-13 |
 
 ## Sections not yet implemented
 
 ### Partial
 
+- `ai.md` §2 — Provider Contract
 - `site-architecture.md` §9.4 — Studio Media Browser
 - `spec.md` §5.6 — Private State (`#` prefix)
 - `spec.md` §11.4 — Server Timing — RPC Function Boundary
@@ -42,13 +43,12 @@ This page is generated from the `> **Status: …**` markers in the specification
 ### Pending
 
 - `desktop.md` §4.3 — Single File Mode
-- `site-architecture.md` §7.4 — Content Entry Editor
-- `site-architecture.md` §8.6 — Studio SEO Panel
-- `site-architecture.md` §11.4 — Studio Redirect Editor
+- `site-architecture.md` §12.3 — Incremental Builds
+- `site-architecture.md` §13 — Internationalization
 
 ### Future
 
-- `desktop.md` §9.3 — Nix Package
+- `desktop.md` §10 — SaaS / Cloud Mode
 
 ### Removed
 

@@ -1,23 +1,26 @@
 /// <reference lib="dom" />
 /**
- * Definitions Editor — visual editor for project-level $defs (JSON Schema type definitions).
+ * Definitions — the visual editor for project-level `$defs` (JSON Schema type definitions).
  *
  * Manages entries in project.json `$defs` — reusable type schemas for external datasets, API
- * responses, CMS payloads, etc. Same concept as component-level $defs but scoped to the entire
- * project.
+ * responses, CMS payloads, etc. Same concept as component-level `$defs` but scoped to the entire
+ * project. The on-disk key stays `$defs` and the section key stays `definitions`.
+ *
+ * **The reference field type is complete here for the first time.** `schema-field-ui.ts` has always
+ * been able to draw the target picker, and `ui/form-controls.ts` (the content-types builder) has
+ * always passed it the available content types — this editor never did, so choosing "reference"
+ * emitted a bare `#/content/` that pointed at nothing and offered no way to say what it pointed at.
+ * The list is read straight off the live config's `content` map, which is where a
+ * `#/content/<type>` pointer resolves.
  */
 
 import { html, render as litRender } from "lit-html";
-import { getPlatform } from "../platform";
 import { projectState } from "../store";
+import { commitProjectConfig } from "../tabs/project-config";
 import { addFieldFormTpl, detectFieldFormat, fieldCardTpl, schemaForType } from "./schema-field-ui";
 
 import type { FieldHandlers, SchemaProperty } from "./schema-field-ui.js";
-import type {
-  ContentTypeSchema,
-  ContentTypeSchemaField,
-  ProjectConfig,
-} from "@jxsuite/schema/types";
+import type { ContentTypeSchema, ContentTypeSchemaField } from "@jxsuite/schema/types";
 
 // ─── Module state ─────────────────────────────────────────────────────────────
 
@@ -29,10 +32,21 @@ let newDefName = "";
 
 // ─── Persistence ──────────────────────────────────────────────────────────────
 
-async function saveProjectConfig() {
-  const platform = getPlatform();
-  const config = (projectState as { projectConfig: ProjectConfig }).projectConfig;
-  await platform.writeFile("project.json", JSON.stringify(config, null, "\t"));
+/**
+ * Commit the configuration this editor has just mutated in place.
+ *
+ * Every handler below edits `projectState.projectConfig.$defs` directly and then says so here. The
+ * predecessor was this module's own writer — `JSON.stringify(config, null, "\t")` straight to
+ * `platform.writeFile`, called as `void saveProjectConfig()` at fourteen sites. It re-indented the
+ * whole file (every `project.json` on disk uses two spaces), it recorded nothing an undo could
+ * reach, and a rejected write became an unhandled rejection while the form went on showing a data
+ * shape that was never saved.
+ *
+ * `commitProjectConfig` transacts the mutation onto the configuration document and reports its own
+ * failures as Problems, so there is nothing left here to await or to swallow.
+ */
+function persist(): void {
+  void commitProjectConfig();
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -41,6 +55,20 @@ async function saveProjectConfig() {
 function getSelectedDef(): ContentTypeSchema | undefined {
   const config = projectState?.projectConfig;
   return config?.$defs?.[selectedDef as string] as ContentTypeSchema | undefined;
+}
+
+/**
+ * The content types a `reference` field can point at — the same list the content-types builder
+ * resolves through `#/$context/content`, read here without a schema-form context to go through.
+ *
+ * @returns {string[]}
+ */
+function contentTypeNames(): string[] {
+  const content = (projectState?.projectConfig as Record<string, unknown> | null | undefined)
+    ?.content;
+  return content && typeof content === "object" && !Array.isArray(content)
+    ? Object.keys(content)
+    : [];
 }
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
@@ -73,7 +101,7 @@ function handleNewDef(rerender: () => void) {
   showNewDef = false;
   newDefName = "";
   rerender();
-  void saveProjectConfig();
+  persist();
 }
 
 /** @param {() => void} rerender */
@@ -105,7 +133,7 @@ function handleAddField(rerender: () => void) {
   showAddField = false;
   newFieldState = { format: "", name: "", required: false, type: "string" };
   rerender();
-  void saveProjectConfig();
+  persist();
 }
 
 /**
@@ -124,7 +152,7 @@ function handleDeleteField(fieldName: string, rerender: () => void) {
   }
 
   rerender();
-  void saveProjectConfig();
+  persist();
 }
 
 /**
@@ -148,7 +176,7 @@ function handleToggleRequired(fieldName: string, rerender: () => void) {
   }
 
   rerender();
-  void saveProjectConfig();
+  persist();
 }
 
 /**
@@ -173,7 +201,7 @@ function handleRenameField(oldName: string, newName: string, rerender: () => voi
   }
 
   rerender();
-  void saveProjectConfig();
+  persist();
 }
 
 /**
@@ -193,7 +221,26 @@ function handleChangeType(fieldName: string, newType: string, rerender: () => vo
       : undefined;
   def.properties[fieldName] = schemaForType(newType, oldFormat || undefined);
   rerender();
-  void saveProjectConfig();
+  persist();
+}
+
+/**
+ * Point a reference field at a content type. The pointer form is `#/content/<type>` — the same one
+ * `ui/form-controls.ts` writes, so a reference authored here and one authored in the content-types
+ * builder are the same value.
+ *
+ * @param {string} fieldName
+ * @param {string} target
+ * @param {() => void} rerender
+ */
+function handleChangeRefTarget(fieldName: string, target: string, rerender: () => void) {
+  const def = getSelectedDef();
+  if (!def?.properties?.[fieldName]) {
+    return;
+  }
+  def.properties[fieldName] = { $ref: `#/content/${target}` } as ContentTypeSchemaField;
+  rerender();
+  persist();
 }
 
 /**
@@ -211,7 +258,7 @@ function handleChangeFormat(fieldName: string, format: string, rerender: () => v
   const type = prop.type || "string";
   def.properties[fieldName] = schemaForType(type, format || undefined);
   rerender();
-  void saveProjectConfig();
+  persist();
 }
 
 // ─── Nested field handlers ───────────────────────────────────────────────────
@@ -247,7 +294,7 @@ function handleAddNestedField(
   }
 
   rerender();
-  void saveProjectConfig();
+  persist();
 }
 
 /**
@@ -268,7 +315,7 @@ function handleDeleteNested(parentName: string, childName: string, rerender: () 
   }
 
   rerender();
-  void saveProjectConfig();
+  persist();
 }
 
 /**
@@ -294,7 +341,7 @@ function handleToggleNestedRequired(parentName: string, childName: string, reren
   }
 
   rerender();
-  void saveProjectConfig();
+  persist();
 }
 
 /**
@@ -326,7 +373,7 @@ function handleRenameNested(
   }
 
   rerender();
-  void saveProjectConfig();
+  persist();
 }
 
 /**
@@ -353,7 +400,7 @@ function handleChangeNestedType(
       : undefined;
   parent.properties[childName] = schemaForType(newType, oldFormat || undefined);
   rerender();
-  void saveProjectConfig();
+  persist();
 }
 
 /**
@@ -378,7 +425,7 @@ function handleChangeNestedFormat(
   const type = prop.type || "string";
   parent.properties[childName] = schemaForType(type, format || undefined);
   rerender();
-  void saveProjectConfig();
+  persist();
 }
 
 /** @param {() => void} rerender */
@@ -395,13 +442,13 @@ function handleDeleteDef(rerender: () => void) {
   selectedDef = null;
 
   rerender();
-  void saveProjectConfig();
+  persist();
 }
 
 // ─── Render ───────────────────────────────────────────────────────────────────
 
 /**
- * Render the definitions editor.
+ * Render the Data Shapes editor.
  *
  * @param {HTMLElement} container
  */
@@ -435,7 +482,7 @@ export function renderDefsEditor(container: HTMLElement) {
               <div class="settings-inline-form">
                 <sp-textfield
                   size="s"
-                  placeholder="TypeName"
+                  placeholder="ProductReview"
                   .value=${newDefName}
                   @input=${(e: Event) => {
                     newDefName = (e.target as HTMLInputElement).value;
@@ -464,7 +511,7 @@ export function renderDefsEditor(container: HTMLElement) {
                   rerender();
                 }}
               >
-                <sp-icon-add slot="icon"></sp-icon-add> New Definition
+                <sp-icon-add slot="icon"></sp-icon-add> New Data Shape
               </sp-action-button>
             `
       }
@@ -474,7 +521,9 @@ export function renderDefsEditor(container: HTMLElement) {
   // Right column — schema editor
   let editorTpl;
   if (!selectedDef || !defs[selectedDef]) {
-    editorTpl = html`<div class="settings-empty-state">Select or create a type definition</div>`;
+    editorTpl = html`<div class="settings-empty-state">
+      Pick a data shape on the left, or create one.
+    </div>`;
   } else {
     const def = defs[selectedDef] as ContentTypeSchema;
     const properties = def.properties || {};
@@ -488,6 +537,7 @@ export function renderDefsEditor(container: HTMLElement) {
         handleChangeNestedFormat(p, c, f, rerender),
       onChangeNestedType: (p: string, c: string, t: string) =>
         handleChangeNestedType(p, c, t, rerender),
+      onChangeRefTarget: (n: string, t: string) => handleChangeRefTarget(n, t, rerender),
       onChangeType: (n: string, t: string) => handleChangeType(n, t, rerender),
       onDelete: (n: string) => handleDeleteField(n, rerender),
       onDeleteNested: (p: string, c: string) => handleDeleteNested(p, c, rerender),
@@ -497,8 +547,9 @@ export function renderDefsEditor(container: HTMLElement) {
       onToggleRequired: (n: string) => handleToggleRequired(n, rerender),
     };
 
+    const targets = contentTypeNames();
     const fieldCards = Object.entries(properties).map(([name, fieldDef]) =>
-      fieldCardTpl(name, fieldDef as SchemaProperty, required.includes(name), handlers),
+      fieldCardTpl(name, fieldDef as SchemaProperty, required.includes(name), handlers, targets),
     );
 
     editorTpl = html`
@@ -508,7 +559,7 @@ export function renderDefsEditor(container: HTMLElement) {
           <sp-action-button
             size="xs"
             quiet
-            title="Delete definition"
+            title="Delete data shape"
             @click=${() => handleDeleteDef(rerender)}
           >
             <sp-icon-delete slot="icon"></sp-icon-delete>
@@ -551,7 +602,15 @@ export function renderDefsEditor(container: HTMLElement) {
     `;
   }
 
-  const tpl = html` <div class="settings-two-col">${listTpl} ${editorTpl}</div> `;
+  // Every section names itself in an <h3> matching its nav entry (Overview, Contexts, Head,
+  // Packages, Extensions, Deploy, Raw JSON). This one did not, so it was the only section whose
+  // Body never said what the reader had clicked.
+  const tpl = html`
+    <div class="settings-section">
+      <h3 class="settings-section-title">Data Shapes</h3>
+      <div class="settings-two-col">${listTpl} ${editorTpl}</div>
+    </div>
+  `;
 
   litRender(tpl, container);
 }

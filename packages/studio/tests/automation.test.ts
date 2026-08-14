@@ -1,54 +1,95 @@
+/**
+ * `window.__jxAutomation` — three members, and every one of them a projection.
+ *
+ * The surface this replaces had 25 bespoke methods, 16 of which resolved a CSS/XPath selector for
+ * the runner to press, one of which staged the status bar, and one of which carried a compatibility
+ * branch (`setRightTab`'s assistant redirect) that existed purely to keep a manifest verb alive.
+ * These tests assert the deletions as hard as the additions.
+ */
 import { resetWorkspaceWithTab } from "./harness";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { createCommandRegistry } from "../src/commands/registry";
+import { makeContext } from "../src/commands/context";
+import type { AnyCommand, CommandRegistry } from "../src/commands/registry";
+import type { CommandContext } from "../src/commands/context";
 import type { AutomationDeps } from "../src/services/automation";
 
 const { happyDOM } = globalThis as unknown as { happyDOM: { setURL: (u: string) => void } };
 
-const { createAutomationApi, installAutomationHook, shouldInstallAutomation } =
-  await import("../src/services/automation");
-const { initCanvasUtils } = await import("../src/canvas/canvas-utils");
-const { view } = await import("../src/view");
-const { activeTab, closeAllTabs } = await import("../src/workspace/workspace");
-const { updateCanvas } = await import("../src/store");
+void mock.module("../src/panels/stylebook-panel", () => ({
+  renderComponentPreview: async () => document.createElement("div"),
+}));
 
-function makeDeps(): AutomationDeps & {
-  openBrowseModal: ReturnType<typeof mock>;
-  openConnectorGrid: ReturnType<typeof mock>;
-  openNewProjectModal: ReturnType<typeof mock>;
-  openQuickSearchPalette: ReturnType<typeof mock>;
-  openSettingsModal: ReturnType<typeof mock>;
-  render: ReturnType<typeof mock>;
-  renderActivityBar: ReturnType<typeof mock>;
-  seedAssistantMessages: ReturnType<typeof mock>;
-  seedPublishConnected: ReturnType<typeof mock>;
-  setCanvasMode: ReturnType<typeof mock>;
-  statusMessage: ReturnType<typeof mock>;
-} {
-  return {
-    getCanvasMode: () => "design",
-    openBrowseModal: mock(() => {}),
-    openConnectorGrid: mock(() => {}),
-    openNewProjectModal: mock(() => {}),
-    openQuickSearchPalette: mock(() => {}),
-    openSettingsModal: mock(() => {}),
-    render: mock(() => {}),
-    renderActivityBar: mock(() => {}),
+const {
+  AUTOMATION_COMMANDS,
+  AutomationRefusedError,
+  createAutomationApi,
+  installAutomationHook,
+  isScriptable,
+  scriptableCommands,
+  setterFor,
+  shouldInstallAutomation,
+} = await import("../src/services/automation");
+const { closeAllTabs } = await import("../src/workspace/workspace");
+const { shell } = await import("../src/shell");
+
+/** The rejection reason, as a value — `expect(...).rejects` is typed `void` here. */
+async function rejection(promise: Promise<unknown>): Promise<Error> {
+  return (await promise.catch((error: unknown) => error)) as Error;
+}
+
+interface Fixture {
+  deps: AutomationDeps & {
+    seedAssistantMessages: ReturnType<typeof mock>;
+    seedPublishConnected: ReturnType<typeof mock>;
+  };
+  registry: CommandRegistry;
+  ctx: CommandContext;
+  ran: { id: string; args: unknown }[];
+}
+
+function makeFixture(patch: Partial<CommandContext> = {}): Fixture {
+  const ctx = { ...makeContext(), ...patch };
+  const ran: { id: string; args: unknown }[] = [];
+  const registry = createCommandRegistry({ getContext: () => ctx });
+  const record = (id: string, extra: Partial<AnyCommand> = {}): AnyCommand =>
+    ({
+      category: "View",
+      id,
+      level: "application",
+      run: (_context, args) => {
+        ran.push({ args, id });
+      },
+      title: id,
+      ...extra,
+    }) as AnyCommand;
+
+  registry.registerAll([
+    record("view.setColorScheme", {
+      args: { properties: { scheme: { type: "string" } }, type: "object" },
+    }),
+    record("view.toggleZen"),
+    record("selection.delete", {
+      category: "Selection",
+      enablement: (context: CommandContext) => context.selection.count > 0,
+      level: "selection",
+      menus: ["palette"],
+      requires: "an element selection",
+    }),
+    record("project.hidden", { category: "Project", level: "project", when: () => false }),
+  ]);
+
+  const deps = {
+    registry,
     seedAssistantMessages: mock(() => {}),
     seedPublishConnected: mock(() => {}),
-    setCanvasMode: mock(() => {}),
-    statusMessage: mock(() => {}),
   };
+  return { ctx, deps, ran, registry };
 }
 
 beforeEach(() => {
   closeAllTabs();
   delete (globalThis as Record<string, unknown>).__jxAutomation;
-  // SetEditZoom runs the real canvas-utils path, which needs the module context initialized.
-  initCanvasUtils({
-    getCanvasMode: () => "edit",
-    getZoom: () => 1,
-    setZoomDirect: () => {},
-  });
 });
 
 describe("shouldInstallAutomation", () => {
@@ -64,272 +105,205 @@ describe("shouldInstallAutomation", () => {
 describe("installAutomationHook", () => {
   test("does not install without the flag", () => {
     happyDOM.setURL("http://localhost:3000/packages/studio/index.html");
-    expect(installAutomationHook(makeDeps())).toBe(false);
+    expect(installAutomationHook(makeFixture().deps)).toBe(false);
     expect((globalThis as Record<string, unknown>).__jxAutomation).toBeUndefined();
   });
 
-  test("installs the api with the flag", () => {
+  test("installs exactly three members with the flag", () => {
     happyDOM.setURL("http://localhost:3000/packages/studio/index.html?automation=1");
-    expect(installAutomationHook(makeDeps())).toBe(true);
-    const api = (globalThis as Record<string, unknown>).__jxAutomation;
-    expect(api).toBeDefined();
-    expect(typeof (api as { getState: unknown }).getState).toBe("function");
+    expect(installAutomationHook(makeFixture().deps)).toBe(true);
+    const api = (globalThis as Record<string, unknown>).__jxAutomation as Record<string, unknown>;
+    expect(Object.keys(api).toSorted()).toEqual(["probe", "run", "seed"]);
   });
 });
 
-describe("createAutomationApi", () => {
-  test("getState reflects tab, canvas, and view state", () => {
-    resetWorkspaceWithTab(undefined, { id: "shot-tab" });
-    view.leftTab = "files";
-    const api = createAutomationApi(makeDeps());
-    const state = api.getState();
-    expect(state.activeTabId).toBe("shot-tab");
-    expect(state.canvasMode).toBe("design");
-    expect(state.canvasStatus).toBe("idle");
-    expect(state.leftTab).toBe("files");
+describe("run is registry.run", () => {
+  test("a registered command runs with its arguments", async () => {
+    const { deps, ran } = makeFixture();
+    await createAutomationApi(deps).run("view.setColorScheme", { scheme: "dark" });
+    expect(ran).toEqual([{ args: { scheme: "dark" }, id: "view.setColorScheme" }]);
   });
 
-  test("getState with no tab reports null canvas status", () => {
-    const api = createAutomationApi(makeDeps());
-    expect(api.getState().canvasStatus).toBeNull();
-    expect(api.getState().activeTabId).toBeNull();
+  test("args default to an empty object", async () => {
+    const { deps, ran } = makeFixture();
+    await createAutomationApi(deps).run("view.setColorScheme");
+    expect(ran[0]!.args).toEqual({});
   });
 
-  test("select mutates the active tab selection and rerenders", () => {
-    resetWorkspaceWithTab();
-    const deps = makeDeps();
+  test("a refused command FAILS rather than silently capturing the wrong state", async () => {
+    const { deps } = makeFixture();
     const api = createAutomationApi(deps);
-    api.select(["children", 0]);
-    expect(activeTab.value?.session.selection).toEqual(["children", 0]);
-    api.select(null);
-    expect(activeTab.value?.session.selection).toBeNull();
-    expect(deps.render).toHaveBeenCalledTimes(2);
+    const error = await rejection(api.run("selection.delete"));
+    expect(error.message).toBe(
+      'Command "selection.delete" is not available right now — it requires an element selection.',
+    );
   });
 
-  test("select without a tab is a no-op", () => {
-    const api = createAutomationApi(makeDeps());
-    expect(() => {
-      api.select(["children", 0]);
-    }).not.toThrow();
+  test("a command whose `when` hides it is not runnable either", async () => {
+    const { deps } = makeFixture();
+    const error = await rejection(createAutomationApi(deps).run("project.hidden"));
+    expect(error.message).toContain("is not available right now");
   });
 
-  test("setActivity switches the left panel tab and uncollapses", () => {
-    const deps = makeDeps();
+  test("a toggle id is refused at runtime, naming the setter it should have been", async () => {
+    // §13.5's idempotence rule. A delta against unstated state is what silently inverted 23
+    // Manifest steps when the assistant's default flipped — and an agent calling it is guessing.
+    const { deps, ran } = makeFixture();
     const api = createAutomationApi(deps);
-    view.leftPanelCollapsed = true;
-    api.setActivity("layers");
-    expect(view.leftTab).toBe("layers");
-    expect(view.leftPanelCollapsed).toBe(false);
-    expect(deps.renderActivityBar).toHaveBeenCalledTimes(1);
+    const refusal = await rejection(api.run("view.toggleZen"));
+    expect(refusal).toBeInstanceOf(AutomationRefusedError);
+    expect(refusal.message).toContain('call "view.setZen"');
+    expect(ran).toEqual([]);
   });
 
-  test("setCanvasMode delegates to studio and rerenders", () => {
-    const deps = makeDeps();
+  test("an id with a registry gap says which phase lands it", async () => {
+    const { deps } = makeFixture();
+    const error = await rejection(createAutomationApi(deps).run("media.browse"));
+    expect(error.message).toContain("has no command record yet (P7.5 — media.browse)");
+  });
+
+  test("an id whose record has landed leaves the countdown entirely", async () => {
+    // `element.insertData` was the P5 entry. It is now `insert.data` in `canvas/canvas-render.ts`,
+    // So the old id is not a gap with a phase attached — it is simply not a command, and the
+    // Countdown must not keep answering for ids that have been superseded.
+    const { deps } = makeFixture();
+    const error = await rejection(createAutomationApi(deps).run("element.insertData"));
+    expect(error.message).toContain('unknown command "element.insertData"');
+    expect(Object.keys(AUTOMATION_COMMANDS)).not.toContain("element.insertData");
+  });
+
+  test("an id §13.5 refuses says WHY, not 'unknown'", async () => {
+    const { deps } = makeFixture();
     const api = createAutomationApi(deps);
-    api.setCanvasMode("preview");
-    expect(deps.setCanvasMode).toHaveBeenCalledWith("preview");
-    expect(deps.render).toHaveBeenCalledTimes(1);
+    // `setStatus` was 53 manifest steps of staging the word "Ready" over the status bar.
+    const staged = await rejection(api.run("view.setStatus", { text: "Ready" }));
+    expect(staged.message).toContain("the status bar is not staged");
+    // `layers.contextMenu` matched RENDERED TEXT, which R1 forbids outright.
+    const byText = await rejection(api.run("layers.contextMenu", { label: "x" }));
+    expect(byText.message).toContain("matched RENDERED TEXT");
   });
 
-  test("setRightTab, setZoom, and editFunction mutate session ui", () => {
-    resetWorkspaceWithTab();
-    const api = createAutomationApi(makeDeps());
-    api.setRightTab("style");
-    api.setZoom(1.5);
-    api.editFunction(["children", 1], "onclick");
-    const ui = activeTab.value?.session.ui as unknown as Record<string, unknown>;
-    expect(ui.rightTab).toBe("style");
-    expect(ui.zoom).toBe(1.5);
-    expect(ui.editingFunction).toEqual({
-      eventKey: "onclick",
-      path: ["children", 1],
-      type: "event",
+  test("a seed id is not runnable — it is seeded", async () => {
+    const { deps } = makeFixture();
+    const error = await rejection(createAutomationApi(deps).run("seed.collab"));
+    expect(error.message).toContain('is a seed, not a command — call seed("seed.collab"');
+  });
+
+  test("an id nothing declares reports how many the registry does declare", async () => {
+    const { deps } = makeFixture();
+    const error = await rejection(createAutomationApi(deps).run("view.doesNotExist"));
+    expect(error.message).toBe(
+      'unknown command "view.doesNotExist" — the registry declares 3 scriptable id(s)',
+    );
+  });
+});
+
+describe("the scriptable projection", () => {
+  test("every registry command except a toggle projects", () => {
+    expect(isScriptable({ id: "view.setDock" } as AnyCommand)).toBe(true);
+    expect(isScriptable({ id: "view.toggleAssistant" } as AnyCommand)).toBe(false);
+    expect(setterFor("view.toggleAssistant")).toBe("view.setAssistant");
+  });
+
+  test("probe.commands() carries each command's gate and schema, already evaluated", () => {
+    const { deps } = makeFixture();
+    const commands = createAutomationApi(deps).probe.commands();
+    expect(commands.map((c) => c.id)).toEqual(["view.setColorScheme", "selection.delete"]);
+    expect(commands[0]).toEqual({
+      args: { properties: { scheme: { type: "string" } }, type: "object" },
+      enabled: true,
+      id: "view.setColorScheme",
+      title: "view.setColorScheme",
+    });
+    expect(commands[1]).toEqual({
+      enabled: false,
+      id: "selection.delete",
+      requires: "an element selection",
+      title: "selection.delete",
     });
   });
 
-  test("setEditZoom clamps and persists the edit zoom without re-rendering the canvas", () => {
-    resetWorkspaceWithTab();
-    const deps = makeDeps();
-    const api = createAutomationApi(deps);
-    api.setEditZoom(2);
-    expect(activeTab.value?.session.ui.editZoom).toBe(2);
-    api.setEditZoom(99);
-    expect(activeTab.value?.session.ui.editZoom).toBe(3);
-    // Live edit zoom must never re-render (it would rebuild the iframe DOM mid-edit).
-    expect(deps.render).not.toHaveBeenCalled();
+  test("the projection follows the context, with no second list to update", () => {
+    const { deps, ctx, registry } = makeFixture();
+    ctx.selection.count = 1;
+    const enabled = scriptableCommands(registry).find((c) => c.id === "selection.delete");
+    expect(enabled).toEqual({ enabled: true, id: "selection.delete", title: "selection.delete" });
+    expect(createAutomationApi(deps).probe.commands()).toContainEqual(enabled!);
   });
+});
 
-  test('setRightTab("assistant") opens the chat sidebar instead of a right-panel tab', () => {
-    resetWorkspaceWithTab();
-    const deps = makeDeps();
-    const api = createAutomationApi(deps);
-    api.setRightTab("style");
-    view.chatPanelCollapsed = true;
-    api.setRightTab("assistant");
-    // The retired tab value maps to the persistent chat sidebar…
-    expect(view.chatPanelCollapsed).toBe(false);
-    // …and the right panel's own tab selection is untouched.
-    const ui = activeTab.value?.session.ui as unknown as Record<string, unknown>;
-    expect(ui.rightTab).toBe("style");
-    expect(deps.render).toHaveBeenCalled();
-  });
-
-  test("editDef targets a named state function", () => {
-    resetWorkspaceWithTab();
-    const api = createAutomationApi(makeDeps());
-    api.editDef("addItem");
-    const ui = activeTab.value?.session.ui as unknown as Record<string, unknown>;
-    expect(ui.editingFunction).toEqual({ defName: "addItem", type: "def" });
-  });
-
-  test("openBrowse delegates to the browse modal opener", () => {
-    const deps = makeDeps();
-    createAutomationApi(deps).openBrowse();
-    expect(deps.openBrowseModal).toHaveBeenCalledTimes(1);
-  });
-
-  test("openQuickSearch delegates to the palette opener", () => {
-    const deps = makeDeps();
-    createAutomationApi(deps).openQuickSearch();
-    expect(deps.openQuickSearchPalette).toHaveBeenCalledTimes(1);
-  });
-
-  test("openSettings delegates with the optional section", () => {
-    const deps = makeDeps();
-    const api = createAutomationApi(deps);
-    api.openSettings();
-    api.openSettings("css-variables");
-    expect(deps.openSettingsModal).toHaveBeenCalledTimes(2);
-    expect(deps.openSettingsModal.mock.calls).toEqual([[undefined], ["css-variables"]]);
-  });
-
-  test("openNewProject delegates to the new-project modal opener", () => {
-    const deps = makeDeps();
-    createAutomationApi(deps).openNewProject();
-    expect(deps.openNewProjectModal).toHaveBeenCalledTimes(1);
-  });
-
-  test("openDataGrid delegates connection and table to the connector-grid opener", () => {
-    const deps = makeDeps();
-    const api = createAutomationApi(deps);
-    api.openDataGrid({ connection: "main", table: "comments" });
-    api.openDataGrid({ table: "posts" });
-    expect(deps.openConnectorGrid.mock.calls).toEqual([
-      ["main", "comments"],
-      [undefined, "posts"],
+describe("probe.state", () => {
+  test("returns the full CommandContext, not four ad-hoc fields", () => {
+    const { deps, ctx } = makeFixture();
+    ctx.project.open = true;
+    ctx.canvas.view = "preview";
+    const state = createAutomationApi(deps).probe.state();
+    expect(state).toBe(ctx);
+    expect(state.project.open).toBe(true);
+    expect(state.canvas.view).toBe("preview");
+    expect(Object.keys(state).toSorted()).toEqual([
+      "ai",
+      "canvas",
+      "capability",
+      "caret",
+      "collab",
+      "document",
+      "editor",
+      "focus",
+      "git",
+      "modal",
+      "pane",
+      "project",
+      "selection",
     ]);
   });
+});
 
-  test("seedAssistant delegates the canned transcript to the ai-panel seam", () => {
-    const deps = makeDeps();
-    const messages = [
-      { content: "hello", role: "user" as const },
-      {
-        content: "done",
-        role: "assistant" as const,
-        toolCalls: [{ arguments: '{"path":["children",0]}', name: "set_text" }],
-      },
-    ];
-    createAutomationApi(deps).seedAssistant({ messages });
-    expect(deps.seedAssistantMessages).toHaveBeenCalledWith(messages);
+describe("the registry-gap declaration", () => {
+  test("holds ids only — no handlers, no selectors, no rendered text", () => {
+    for (const [id, entry] of Object.entries(AUTOMATION_COMMANDS)) {
+      expect(Object.keys(entry).toSorted(), id).toEqual(["disposition", "note"]);
+      expect(["command", "seed", "refused"], id).toContain(entry.disposition);
+      expect(entry.note.length, id).toBeGreaterThan(0);
+    }
   });
 
-  test("seedPublish delegates the canned deployment to the publish-panel seam", () => {
-    const deps = makeDeps();
-    const options = {
-      deployment: {
-        createdOn: "2026-07-01T00:00:00Z",
-        environment: "production",
-        id: "d1",
-        stage: "deploy",
-        status: "success",
-        url: "https://demo.pages.dev",
-      },
-    };
-    createAutomationApi(deps).seedPublish(options);
-    expect(deps.seedPublishConnected).toHaveBeenCalledWith(options);
+  test("names every refusal §13.5 makes normative", () => {
+    const refused = Object.entries(AUTOMATION_COMMANDS)
+      .filter(([, entry]) => entry.disposition === "refused")
+      .map(([id]) => id);
+    // The `refused` half is NOT a countdown — these are things the app will never provide, and
+    // They stay so that reaching for one gets the reason rather than "unknown command".
+    expect(refused).toContain("view.setStatus");
+    expect(refused).toContain("layers.contextMenu");
+    expect(refused).toContain("file.contextMenu");
+    expect(refused).toContain("project.showWelcome");
+    expect(refused).toContain("settings.setSection");
+    // The three `toggle*` refusals left: `TOGGLE_ID` rejects them before this map is consulted, so
+    // An entry for each was a second answer to a question already answered.
+    for (const id of ["canvas.togglePreview", "inspector.toggleSection", "view.toggleActivity"]) {
+      expect(Object.keys(AUTOMATION_COMMANDS)).not.toContain(id);
+    }
   });
 
-  test("seedCollab marks the active tab synced with peers, defaulting focusedPath", async () => {
-    const { collabState } = await import("../src/collab/collab-state");
-    const tab = resetWorkspaceWithTab(undefined, { documentPath: "pages/index.md" });
-    const deps = makeDeps();
-    createAutomationApi(deps).seedCollab({
-      peers: [
-        {
-          clientId: 7,
-          state: {
-            focusedPath: null,
-            structuralSelection: ["children", 0],
-            user: { color: "#30a46c", login: "maya" },
-          },
-        },
-        {
-          clientId: 8,
-          state: { focusedPath: "pages/about.md", user: { color: "#f5a524", login: "jon" } },
-        },
-      ],
-    });
-    const state = collabState(tab);
-    expect(state.status).toBe("synced");
-    expect(state.active).toBe(true);
-    expect(state.peers).toHaveLength(2);
-    expect(state.peers[0]!.state.focusedPath).toBe("pages/index.md");
-    expect(state.peers[1]!.state.focusedPath).toBe("pages/about.md");
-    expect(deps.render).toHaveBeenCalledTimes(1);
+  test("no gap id is served by a handler of any kind", async () => {
+    // The old table answered 39 ids. This one answers none: `run` projects the registry and only
+    // Consults this map to EXPLAIN, so every entry here must reject.
+    const { deps } = makeFixture();
+    const api = createAutomationApi(deps);
+    for (const id of Object.keys(AUTOMATION_COMMANDS)) {
+      const error = await rejection(api.run(id));
+      expect(error.message, id).toBeTruthy();
+    }
   });
+});
 
-  test("seedCollab without a tab is a no-op", () => {
-    const deps = makeDeps();
-    expect(() => {
-      createAutomationApi(deps).seedCollab({ peers: [] });
-    }).not.toThrow();
-    expect(deps.render).not.toHaveBeenCalled();
-  });
-
-  test("setStatus delegates to statusMessage", () => {
-    const deps = makeDeps();
-    createAutomationApi(deps).setStatus("Ready");
-    expect(deps.statusMessage).toHaveBeenCalledWith("Ready");
-  });
-
-  test("setTheme flips the sp-theme color attribute", () => {
-    const theme = document.createElement("sp-theme");
-    theme.setAttribute("color", "dark");
-    document.body.append(theme);
-    const api = createAutomationApi(makeDeps());
-    api.setTheme("light");
-    expect(theme.getAttribute("color")).toBe("light");
-    theme.remove();
-  });
-
-  test("setTheme without an sp-theme element is a no-op", () => {
-    const api = createAutomationApi(makeDeps());
-    expect(() => {
-      api.setTheme("light");
-    }).not.toThrow();
-  });
-
-  test("waitForCanvasReady resolves once the canvas reports ready", async () => {
+describe("no shell state is written behind the app's back", () => {
+  test("running a command leaves the dock record to the command", async () => {
     resetWorkspaceWithTab();
-    const api = createAutomationApi(makeDeps());
-    setTimeout(() => {
-      updateCanvas({ status: "ready" });
-    }, 60);
-    await api.waitForCanvasReady(5000);
-    expect(activeTab.value?.session.canvas.status).toBe("ready");
-  });
-
-  test("waitForCanvasReady resolves immediately when already ready", async () => {
-    resetWorkspaceWithTab();
-    updateCanvas({ status: "ready" });
-    const api = createAutomationApi(makeDeps());
-    await api.waitForCanvasReady(10);
-  });
-
-  test("waitForCanvasReady rejects on timeout", async () => {
-    resetWorkspaceWithTab();
-    const api = createAutomationApi(makeDeps());
-    expect(api.waitForCanvasReady(1)).rejects.toThrow("canvas not ready");
+    const before = shell.docks.right.collapsed;
+    const { deps } = makeFixture();
+    await createAutomationApi(deps).run("view.setColorScheme", { scheme: "light" });
+    expect(shell.docks.right.collapsed).toBe(before);
   });
 });

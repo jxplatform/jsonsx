@@ -25,10 +25,12 @@
  */
 
 import { monitorForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
+import { displayTagName } from "@jxsuite/schema/guards";
 import {
   beginDragSession,
   clearDropIndicator,
   currentDragSession,
+  dragHostTab,
   endDragSession,
   hostDragGeometry,
   liveDragHostAt,
@@ -41,6 +43,7 @@ import { clearDragGhost, moveDragGhost, setDragGhost } from "./drag-ghost";
 import { getNodeAtPath } from "../store";
 import { activeTab } from "../workspace/workspace";
 import type { DragHost } from "../canvas/iframe-host";
+import type { Tab } from "../tabs/tab";
 import type { DragSrcKind, ParentToIframe } from "../canvas/iframe-protocol";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
@@ -106,17 +109,32 @@ function dragSrcOf(data: Record<string, unknown>): DragSrcKind | null {
 
 /**
  * The ghost label for a drag (Phase 4c). A block source uses its fragment's tag (the card label); a
- * tree-node source uses the tag of the node at its path in the live doc (a node chip). Falls back
- * to a generic label when the tag is unknown.
+ * tree-node source uses the tag of the node at its path in `tab`'s document (a node chip). Falls
+ * back to a generic label when the tag is unknown.
+ *
+ * **`tab` is a parameter because the path is only meaningful in one document.** It read `activeTab`
+ * and the ghost is raised over the pane the drag is IN, so dragging the side pane's ⠿ handle
+ * resolved the source path against the focused pane's document and chipped the label with whatever
+ * tag happened to sit at that index there — `<section>` for an `<img>`, `node` when the path did
+ * not exist. Cosmetic, and visible for the whole length of every drag.
+ *
+ * @param {Tab | null} tab The document the source path is addressed in.
+ * @param {DragSrcKind} src
+ * @param {Record<string, unknown>} data
+ * @returns {string}
  */
-export function ghostLabel(src: DragSrcKind, data: Record<string, unknown>): string {
+export function ghostLabel(
+  tab: Tab | null,
+  src: DragSrcKind,
+  data: Record<string, unknown>,
+): string {
   if (src.type === "block") {
     const fragment = data.fragment as JxMutableNode | undefined;
-    return fragment?.tagName ?? "block";
+    return displayTagName(fragment?.tagName) || "block";
   }
-  const doc = activeTab.value?.doc.document as JxMutableNode | undefined;
+  const doc = tab?.doc.document as JxMutableNode | undefined;
   const node = doc ? (getNodeAtPath(doc, src.path) as JxMutableNode | undefined) : undefined;
-  return node?.tagName ?? "node";
+  return displayTagName(node?.tagName) || "node";
 }
 
 /**
@@ -148,7 +166,9 @@ function startSession(
   srcData: Record<string, unknown>,
 ): CoordSession {
   const seq = beginDragSession(host, src, srcData);
-  return { host, label: ghostLabel(src, srcData), seq, src, srcData };
+  // The label names a node in the TARGET pane's document — `host` is the artboard the cursor is
+  // Over, and its tab is the only document the source path indexes into meaningfully.
+  return { host, label: ghostLabel(dragHostTab(host), src, srcData), seq, src, srcData };
 }
 
 /**
@@ -316,7 +336,16 @@ export function registerCanvasDndBridge(): () => void {
       // Bind the session to the host under the cursor (if any). The ghost shows immediately and
       // Follows the pointer even before it enters a canvas (lazy bind happens in onDrag otherwise).
       session = host ? startSession(host, src, source.data) : null;
-      setDragGhost(ghostLabel(src, source.data), cursor.x, cursor.y);
+      /* Reuse the bound session's label rather than recomputing it — `startSession` already
+         resolved it against the target pane's document, and recomputing here is what used to
+         resolve it against the focused one instead. With no host under the cursor the drag began
+         outside every artboard, and the focused document is then the right answer: that is where
+         the Navigator layer row the drag started from is showing. */
+      setDragGhost(
+        session ? session.label : ghostLabel(activeTab.value, src, source.data),
+        cursor.x,
+        cursor.y,
+      );
     },
     onDrop({ source, location }: MonitorDragArgs) {
       const src = dragSrcOf(source.data);

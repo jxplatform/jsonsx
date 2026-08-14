@@ -15,6 +15,7 @@ import {
   discoverComponents,
   fetchPluginSchema,
   fetchProjectSchemas,
+  findReferences,
   formatAction,
   getProjectRoot,
   handleCreateDirectory,
@@ -31,8 +32,10 @@ import {
   listFormats,
   listSecrets,
   locateFile,
+  buildSite,
   openExternal,
   openProject,
+  searchFiles,
   setDirectoryDialog,
   setFileDialog,
   setProjectRoot,
@@ -51,6 +54,7 @@ import {
   gitLog,
   gitPull,
   gitPush,
+  gitShow,
   gitStage,
   gitStatus,
   gitUnstage,
@@ -80,7 +84,10 @@ setDirectoryDialog(openDirectoryDialog);
 
 // ─── RPC handler dispatch map ────────────────────────────────────────────────
 
-const handlers: Record<string, (params: unknown) => Promise<unknown>> = {
+/* Exported so the schema↔handler parity test can enumerate the registered method names without
+   standing up a browser: a request declared in rpc-schema.ts with no entry here reaches Studio as a
+   silent empty result (that is exactly how searchFiles shipped unhandled). */
+export const handlers: Record<string, (params: unknown) => Promise<unknown>> = {
   addPackage: (params) => addPackage(params as { name: string }),
   codeService: (params) => codeService(params),
   dependenciesNeedInstall: () => dependenciesNeedInstall(),
@@ -101,6 +108,8 @@ const handlers: Record<string, (params: unknown) => Promise<unknown>> = {
     ),
   gitAddRemote: (params) => gitAddRemote(params as { name: string; url: string }),
   gitBranches: () => gitBranches(),
+  // `View: Open in Browser` builds before it opens, so the reader sees what the author sees.
+  buildSite: () => buildSite(),
   gitCheckout: (params) => gitCheckout(params as { branch: string }),
   gitCommit: (params) => gitCommit(params as { message: string }),
   gitCreateBranch: (params) => gitCreateBranch(params as { name: string }),
@@ -111,6 +120,7 @@ const handlers: Record<string, (params: unknown) => Promise<unknown>> = {
   gitLog: (params) => gitLog(params as { limit?: number }),
   gitPull: () => gitPull(),
   gitPush: (params) => gitPush(params as { setUpstream?: boolean }),
+  gitShow: (params) => gitShow(params as { path: string; ref?: string }),
   gitStage: (params) => gitStage(params as { files: string[] }),
   gitStatus: () => gitStatus(),
   gitUnstage: (params) => gitUnstage(params as { files: string[] }),
@@ -121,6 +131,7 @@ const handlers: Record<string, (params: unknown) => Promise<unknown>> = {
   installDependencies: () => installDependencies(),
   listPackages: () => listPackages(),
   locateFile: (params) => locateFile(params as { name: string }),
+  searchFiles: (params) => searchFiles(params as { query: string; extensions?: string[] }),
   outdatedPackages: () => outdatedPackages(),
   setPackageVersions: (params) =>
     setPackageVersions(params as { updates: { name: string; version: string; dev?: boolean }[] }),
@@ -180,6 +191,7 @@ const handlers: Record<string, (params: unknown) => Promise<unknown>> = {
   readFile: (params) => handleReadFile(params as { path: string }),
   removePackage: (params) => removePackage(params as { name: string }),
   renameFile: (params) => handleRenameFile(params as { from: string; to: string }),
+  findReferences: (params) => findReferences(params as { path?: string; tagName?: string }),
   resolveSiteContext: (params) => handleResolveSiteContext(params as { filePath: string }),
   uploadFile: (params) => handleUploadFile(params as { path: string; data: string }),
   writeFile: (params) => handleWriteFile(params as { path: string; content: string }),

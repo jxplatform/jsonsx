@@ -6,6 +6,7 @@
  */
 
 import type { JxMutableNode } from "@jxsuite/schema/types";
+import { displayTagName } from "@jxsuite/schema/guards";
 
 const mediaTags = new Set(["img", "video", "source", "iframe", "audio"]);
 const TRANSPARENT_PX =
@@ -103,10 +104,10 @@ export function computeEmptyPlaceholderClass(node: JxMutableNode): string | null
   if (Array.isArray(node.children) && node.children.length > 0) {
     return null;
   }
-  if (textTags.has(node.tagName)) {
+  if (textTags.has(displayTagName(node.tagName))) {
     return "empty-text-placeholder";
   }
-  if (containerTags.has(node.tagName)) {
+  if (containerTags.has(displayTagName(node.tagName))) {
     return "empty-container-placeholder";
   }
   return null;

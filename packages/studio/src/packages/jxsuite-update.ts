@@ -1,84 +1,112 @@
 /// <reference lib="dom" />
 /**
- * On project open, compare the project's `@jxsuite/*` dependency ranges to the version this Studio
- * build embeds (`VERSION`). If the project is behind, prompt the user to bump them to match and —
- * on confirm — rewrite the ranges and reinstall. The target is the embedded version (not npm
- * latest) so a project always lines up with the runtime/compiler the running app actually uses.
+ * On project open, offer to bring the project's `@jxsuite/*` dependencies up to their newest
+ * PUBLISHED versions — each package to its own latest, asked of the npm registry.
+ *
+ * It used to target `VERSION`, the version this Studio build embeds, and bump every `@jxsuite/*`
+ * range to `^VERSION` in one move. That was right exactly once: when the whole suite released
+ * together, so "the version Studio is" and "the newest version of each package" were the same
+ * string. They are not any more — the packages release on their own cadences, and `@jxsuite/parser`
+ * being at 1.2.0 while Studio is 2.0.1 is the normal case, not a fault. Targeting the embedded
+ * version therefore proposed a version that may never have been published, for a package whose real
+ * latest it had not looked at.
+ *
+ * **Studio's own copies are not involved.** The app resolves `@jxsuite/*` from its own install
+ * (that is the hermetic host rule the schema loader enforces), so the project's ranges govern `jx
+ * build` and the project's types — not the running app. There is no reason for them to match
+ * Studio, and pinning them to it was the residue of an assumption that is no longer true.
+ *
+ * The registry lookup is `platform.outdatedPackages()`, the same seam the dependencies editor uses.
+ * A host that does not offer it (the cloud session, which manages dependencies server-side) simply
+ * gets no prompt: without the registry there is no honest target, and guessing is what this
+ * replaced.
  */
 
 import { html } from "lit-html";
 import { getPlatform } from "../platform";
-import { VERSION } from "../version";
 import { showConfirmDialog } from "../ui/layers";
 import { showProgressModal } from "../ui/progress-modal";
-import { statusMessage } from "../panels/statusbar";
-import { isComparable, isUpgrade } from "./semver";
-import type { PackageInfo } from "../types";
+import { notify } from "../services/notify";
+import { isUpgrade } from "./semver";
 
 const JXSUITE_PREFIX = "@jxsuite/";
 
 export interface JxsuiteUpdate {
   name: string;
+  /** The range pinned in package.json, e.g. `^1.2.0`. */
   current: string;
+  /** THIS package's newest published version — not a suite-wide number. */
+  latest: string;
   dev: boolean;
 }
 
 /**
- * Compare the project's @jxsuite/* deps to the embedded version. Returns the packages behind the
- * target plus the target version, or null when there's nothing to do (dev build, no project, or all
- * already current/ahead).
+ * The project's `@jxsuite/*` dependencies that are behind their own newest published version.
+ *
+ * Empty when there is nothing to do, when the host cannot reach the registry, or when it offers no
+ * lookup at all. Every failure path is empty rather than thrown: this runs on project open, and a
+ * registry that is unreachable on a train is not an error the author needs to see.
  */
-export async function checkJxsuiteUpdate(): Promise<{
-  target: string;
-  outdated: JxsuiteUpdate[];
-} | null> {
-  const target = VERSION;
-  if (!isComparable(target)) {
-    return null; // "dev" / non-semver build — no reliable target
-  }
+export async function checkJxsuiteUpdate(): Promise<JxsuiteUpdate[]> {
   const platform = getPlatform();
-  let pkgs: PackageInfo[];
+  if (!platform.outdatedPackages) {
+    return [];
+  }
+  let reported;
   try {
-    pkgs = await platform.listPackages();
+    reported = await platform.outdatedPackages();
   } catch {
-    return null;
+    return [];
   }
   const outdated: JxsuiteUpdate[] = [];
-  for (const p of pkgs) {
-    if (!p.name.startsWith(JXSUITE_PREFIX) || !isComparable(p.version)) {
-      continue;
-    }
-    if (isUpgrade(p.version, target)) {
-      outdated.push({ current: p.version, dev: Boolean(p.dev), name: p.name });
+  for (const p of reported) {
+    /*
+     * `isUpgrade`, not merely "differs from latest". `outdatedPackages` reports any difference, and
+     * a project deliberately pinned AHEAD of the registry — a prerelease, or a range bumped before
+     * the publish landed — would otherwise be offered a downgrade described as an update.
+     */
+    if (p.name.startsWith(JXSUITE_PREFIX) && isUpgrade(p.current, p.latest)) {
+      outdated.push({ current: p.current, dev: Boolean(p.dev), latest: p.latest, name: p.name });
     }
   }
-  return outdated.length > 0 ? { outdated, target } : null;
+  return outdated;
 }
 
-function dismissKey(root: string, target: string): string {
-  return `jx:jxsuite-update-dismissed:${root}:${target}`;
+/**
+ * The dismissal is remembered against the exact set of versions declined.
+ *
+ * It used to be keyed on the single target version, which no longer exists. Keying on the set means
+ * a later publish of any one package asks again — which is the behaviour you want from "not now",
+ * and the reason this is not keyed on the project alone.
+ */
+function dismissKey(root: string, outdated: JxsuiteUpdate[]): string {
+  const signature = outdated
+    .map((p) => `${p.name}@${p.latest}`)
+    .toSorted()
+    .join(",");
+  return `jx:jxsuite-update-dismissed:${root}:${signature}`;
 }
 
-function isDismissed(root: string, target: string): boolean {
+function isDismissed(root: string, outdated: JxsuiteUpdate[]): boolean {
   try {
-    return localStorage.getItem(dismissKey(root, target)) === "1";
+    return localStorage.getItem(dismissKey(root, outdated)) === "1";
   } catch {
     return false;
   }
 }
 
-function setDismissed(root: string, target: string): void {
+function setDismissed(root: string, outdated: JxsuiteUpdate[]): void {
   try {
-    localStorage.setItem(dismissKey(root, target), "1");
+    localStorage.setItem(dismissKey(root, outdated), "1");
   } catch {
     /* Ignore storage errors */
   }
 }
 
-/** Apply a set of @jxsuite bumps to `^target` and reinstall, behind a progress modal. */
-export async function applyJxsuiteUpdate(outdated: JxsuiteUpdate[], target: string): Promise<void> {
+/** Pin each package to `^<its own latest>` and reinstall, behind a progress modal. */
+export async function applyJxsuiteUpdate(outdated: JxsuiteUpdate[]): Promise<void> {
   const platform = getPlatform();
-  if (!platform.setPackageVersions) {
+  if (!platform.setPackageVersions || outdated.length === 0) {
     return;
   }
   const progress = showProgressModal({
@@ -87,11 +115,13 @@ export async function applyJxsuiteUpdate(outdated: JxsuiteUpdate[], target: stri
   });
   try {
     const result = await platform.setPackageVersions(
-      outdated.map((p) => ({ dev: p.dev, name: p.name, version: `^${target}` })),
+      // Per package. One shared `^${target}` for all of them is the bug this module was refactored
+      // To remove.
+      outdated.map((p) => ({ dev: p.dev, name: p.name, version: `^${p.latest}` })),
     );
     if (result.ok) {
       progress.done();
-      statusMessage(`Updated ${outdated.length} @jxsuite package(s) to ${target}`);
+      notify.success(`Updated ${outdated.length} @jxsuite package(s) to their latest versions.`);
     } else {
       progress.fail(result.log ?? "Update failed");
     }
@@ -101,22 +131,22 @@ export async function applyJxsuiteUpdate(outdated: JxsuiteUpdate[], target: stri
 }
 
 /**
- * Prompt to update @jxsuite packages on open. Skips when there's nothing to do or the user already
- * declined this exact target for this project (remembered in localStorage).
+ * Prompt to update on open. Skips when there is nothing to do or the user already declined this
+ * exact set of versions for this project (remembered in localStorage).
  */
 export async function maybePromptJxsuiteUpdate(projectRoot: string): Promise<void> {
   const platform = getPlatform();
   if (!platform.setPackageVersions) {
     return;
   }
-  const check = await checkJxsuiteUpdate();
-  if (!check || isDismissed(projectRoot, check.target)) {
+  const outdated = await checkJxsuiteUpdate();
+  if (outdated.length === 0 || isDismissed(projectRoot, outdated)) {
     return;
   }
-  const list = check.outdated.map((p) => `${p.name} ${p.current} → ^${check.target}`).join("\n");
+  const list = outdated.map((p) => `${p.name} ${p.current} → ^${p.latest}`).join("\n");
   const confirmed = await showConfirmDialog(
     "Update @jxsuite packages?",
-    html`This project uses older @jxsuite packages. Update them to match Studio ${check.target}?
+    html`Newer versions of these packages have been published. Update the project to them?
       <br /><br /><span
         style="font-size:var(--spectrum-font-size-75, 12px);color:var(--fg-dim);white-space:pre-line"
         >${list}</span
@@ -124,8 +154,8 @@ export async function maybePromptJxsuiteUpdate(projectRoot: string): Promise<voi
     { cancelLabel: "Not now", confirmLabel: "Update" },
   );
   if (!confirmed) {
-    setDismissed(projectRoot, check.target);
+    setDismissed(projectRoot, outdated);
     return;
   }
-  await applyJxsuiteUpdate(check.outdated, check.target);
+  await applyJxsuiteUpdate(outdated);
 }

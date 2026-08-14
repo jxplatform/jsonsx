@@ -16,8 +16,8 @@ import { activeTab } from "../src/workspace/workspace";
 import {
   renderExternalPrototypeEditorTemplate,
   renderSchemaFieldsTemplate,
-  resetBindingUiState,
 } from "../src/panels/signals-panel";
+import { resetSlotModeMemory } from "../src/ui/dynamic-slot";
 import { pluginSchemaCache } from "../src/services/code-services";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
@@ -94,7 +94,7 @@ beforeEach(() => {
   resetStudioState();
   installMockPlatform();
   pluginSchemaCache.clear();
-  resetBindingUiState();
+  resetSlotModeMemory();
 });
 
 // ─── renderSchemaFieldsTemplate basics ───────────────────────────────────────
@@ -541,24 +541,43 @@ describe("array-of-objects fields", () => {
   });
 });
 
-// ─── Param binding fields ─────────────────────────────────────────────────────
+// ─── Binding a config field (§6.6's one ladder) ──────────────────────────────
 
-describe("param binding fields", () => {
+describe("binding a config field", () => {
   const stringSchema = { properties: { id: { type: "string" } } };
   const skuDoc = "pages/products/[sku].json";
 
-  test("$ref value renders a binding picker instead of [object Object]", () => {
+  function rungs(container: HTMLElement, prop: string): string[] {
+    return [
+      ...container.querySelectorAll<HTMLElement>(`[data-prop="${prop}"] sp-menu-item[data-mode]`),
+    ].map((el) => el.dataset.mode!);
+  }
+
+  test("the rungs are the ladder's own words, not a private Static / param / Custom… list", () => {
+    const container = mountSchema(stringSchema, { id: "abc" }, null, skuDoc);
+    const chip = container.querySelector('[data-prop="id"] .dynamic-slot-mode')!;
+    expect(chip.textContent!.trim()).toBe("Fixed value");
+    expect(rungs(container, "id")).toEqual(["literal", "ref", "template"]);
+    const labels = [
+      ...container.querySelectorAll<HTMLElement>('[data-prop="id"] sp-menu-item[data-mode]'),
+    ].map((el) => el.textContent!.trim().split("\n")[0]!.trim());
+    expect(labels).toEqual(["Fixed value", "From data…", "Mixed text"]);
+  });
+
+  test("a plain string field can START a binding — the gesture that did not exist", () => {
+    const container = mountSchema(stringSchema, { id: "abc" }, null, skuDoc);
+    pointer(container.querySelector('[data-prop="id"] sp-menu-item[data-mode="ref"]')!, "click");
+    expect((pluginDef() as { id: unknown }).id).toEqual({ $ref: "#/$params/sku" } as never);
+  });
+
+  test("a $ref value renders the pointer, never [object Object]", () => {
     const container = mountSchema(stringSchema, { id: { $ref: "#/$params/sku" } }, null, skuDoc);
-    const picker = fieldEl<ValueEl>(container, "id", "sp-picker");
-    expect(picker.value).toBe("#/$params/sku");
-    const values = [...container.querySelectorAll('[data-prop="id"] sp-menu-item')].map((el) =>
-      el.getAttribute("value"),
-    );
-    expect(values).toEqual(["__static__", "#/$params/sku", "__custom__"]);
-    expect(container.textContent).toContain("$params/sku");
+    const combo = fieldEl<ValueEl>(container, "id", "jx-value-selector");
+    expect(combo.value).toBe("#/$params/sku");
+    expect(
+      container.querySelector('[data-prop="id"] .dynamic-slot-mode')!.textContent!.trim(),
+    ).toBe("From data…");
     expect(container.textContent).not.toContain("[object Object]");
-    // Known param selected → no freeform textfield
-    expect(container.querySelector('[data-prop="id"] sp-textfield')).toBeNull();
   });
 
   test("picking another param commits the new $ref", () => {
@@ -568,89 +587,78 @@ describe("param binding fields", () => {
       null,
       "pages/[a]/[b].json",
     );
-    commitValue(fieldEl(container, "id", "sp-picker"), "#/$params/b");
+    commitValue(fieldEl(container, "id", "jx-value-selector"), "#/$params/b");
     expect((pluginDef() as { id: unknown }).id).toEqual({ $ref: "#/$params/b" } as never);
   });
 
-  test("Static value clears the binding", () => {
+  test("a pointer outside the offered list is still accepted, and blank clears the key", () => {
     const container = mountSchema(stringSchema, { id: { $ref: "#/$params/sku" } }, null, skuDoc);
-    commitValue(fieldEl(container, "id", "sp-picker"), "__static__");
-    expect((pluginDef() as { id?: unknown }).id).toBeUndefined();
-  });
-
-  test("ref outside the param list opens custom mode with an editable textfield", () => {
-    const container = mountSchema(
-      stringSchema,
-      { id: { $ref: "#/$params/sku" } },
-      null,
-      "pages/index.json",
-    );
-    expect(fieldEl<ValueEl>(container, "id", "sp-picker").value).toBe("__custom__");
-    const tf = fieldEl<ValueEl>(container, "id", "sp-textfield");
-    expect(tf.value).toBe("#/$params/sku");
-    commitValue(tf, "#/other/path");
+    commitValue(fieldEl(container, "id", "jx-value-selector"), "#/other/path");
     expect((pluginDef() as { id: unknown }).id).toEqual({ $ref: "#/other/path" } as never);
-  });
 
-  test("custom textfield committed blank deletes the key", () => {
-    const container = mountSchema(stringSchema, { id: { $ref: "#/custom/ref" } }, null, skuDoc);
-    commitValue(fieldEl(container, "id", "sp-textfield"), "  ");
+    const blank = mountSchema(stringSchema, { id: { $ref: "#/custom/ref" } }, null, skuDoc);
+    commitValue(fieldEl(blank, "id", "jx-value-selector"), "  ");
     expect((pluginDef() as { id?: unknown }).id).toBeUndefined();
   });
 
-  test("selecting Custom… re-renders into freeform mode without committing", () => {
-    let renders = 0;
-    const ctx = {
-      renderLeftPanel: () => {
-        renders += 1;
-      },
-    };
-    let container = mountSchema(stringSchema, { id: { $ref: "#/$params/sku" } }, ctx, skuDoc);
-    commitValue(fieldEl(container, "id", "sp-picker"), "__custom__");
-    expect(renders).toBe(1);
-    expect((pluginDef() as { id: unknown }).id).toEqual({ $ref: "#/$params/sku" } as never);
-    // Custom mode persists across re-mounts via ephemeral UI state
-    container = mountSchema(stringSchema, { id: { $ref: "#/$params/sku" } }, ctx, skuDoc);
-    expect(fieldEl<ValueEl>(container, "id", "sp-picker").value).toBe("__custom__");
-    expect(fieldEl<ValueEl>(container, "id", "sp-textfield").value).toBe("#/$params/sku");
+  test("going back to Fixed value drops the binding", () => {
+    const container = mountSchema(stringSchema, { id: { $ref: "#/$params/sku" } }, null, skuDoc);
+    pointer(
+      container.querySelector('[data-prop="id"] sp-menu-item[data-mode="literal"]')!,
+      "click",
+    );
+    expect((pluginDef() as { id?: unknown }).id).toBeUndefined();
   });
 
-  test("bind button converts a plain string field into a param binding", () => {
-    let renders = 0;
-    const ctx = {
-      renderLeftPanel: () => {
-        renders += 1;
-      },
-    };
-    const container = mountSchema(stringSchema, { id: "abc" }, ctx, skuDoc);
-    expect(fieldEl<ValueEl>(container, "id", "sp-textfield").value).toBe("abc");
-    const btn = fieldEl(container, "id", "sp-action-button");
-    pointer(btn, "click");
-    expect((pluginDef() as { id: unknown }).id).toEqual({ $ref: "#/$params/sku" } as never);
-    expect(renders).toBe(1);
-  });
-
-  test("no bind button on documents without route params", () => {
+  test("a document with no route params and no other signal offers no source", () => {
     const container = mountSchema(stringSchema, { id: "abc" }, null, "pages/index.json");
-    expect(container.querySelector('[data-prop="id"] sp-action-button')).toBeNull();
-    const bare = mountSchema(stringSchema, { id: "abc" });
-    expect(bare.querySelector('[data-prop="id"] sp-action-button')).toBeNull();
+    expect(container.querySelector('[data-prop="id"] .dynamic-slot-mode')).toBeNull();
+    expect(fieldEl<ValueEl>(container, "id", "sp-textfield").value).toBe("abc");
   });
 
-  test("enum prop with a $ref value renders the binding picker, not the enum", () => {
+  test("a sibling signal is a source too, and the def never offers itself", () => {
+    resetWorkspaceWithTab({
+      children: [],
+      state: { count: { default: 0, type: "number" }, plugin: { id: "abc" } },
+      tagName: "div",
+    } as unknown as JxMutableNode);
+    const container = document.createElement("div");
+    const tab = activeTab.value!;
+    render(
+      html`${renderSchemaFieldsTemplate(
+        stringSchema as never,
+        (tab.doc.document.state as Record<string, unknown>).plugin as never,
+        "plugin",
+        { document: tab.doc.document } as never,
+        null,
+      )}`,
+      container,
+    );
+    pointer(container.querySelector('[data-prop="id"] sp-menu-item[data-mode="ref"]')!, "click");
+    expect(
+      (
+        (tab.doc.document.state as Record<string, Record<string, unknown>>).plugin as {
+          id: unknown;
+        }
+      ).id,
+    ).toEqual({ $ref: "#/state/count" } as never);
+  });
+
+  test("an enum prop keeps its choices and gains the binding rung, but never Mixed text", () => {
     const container = mountSchema(
       { properties: { layout: { enum: ["grid", "list"] } } },
-      { layout: { $ref: "#/$params/sku" } },
+      { layout: "grid" },
       null,
       skuDoc,
     );
-    const values = [...container.querySelectorAll('[data-prop="layout"] sp-menu-item')].map((el) =>
-      el.getAttribute("value"),
-    );
-    expect(values).toEqual(["__static__", "#/$params/sku", "__custom__"]);
+    expect(rungs(container, "layout")).toEqual(["literal", "ref"]);
+    const values = [
+      ...container.querySelectorAll('[data-prop="layout"] sp-picker sp-menu-item'),
+    ].map((el) => el.getAttribute("value"));
+    expect(values).toEqual(["__none__", "grid", "list"]);
   });
 
-  test("json-schema format props keep their editor even with a $ref value", () => {
+  test("json-schema format props keep their editor and get no chip", () => {
     const container = mountSchema(
       { properties: { shape: { format: "json-schema", type: "object" } } },
       { shape: { $ref: "#/defs/thing" } },
@@ -658,7 +666,7 @@ describe("param binding fields", () => {
       skuDoc,
     );
     expect(container.querySelector('[data-prop="shape"] .schema-param-editor')).not.toBeNull();
-    expect(container.querySelector('[data-prop="shape"] sp-picker')).toBeNull();
+    expect(container.querySelector('[data-prop="shape"] .dynamic-slot-mode')).toBeNull();
   });
 
   test("array-of-objects cell with a $ref shows the ref string and preserves the shape", () => {
@@ -711,7 +719,6 @@ function mountExternal(
     ...(opts.documentPath != null && { documentPath: opts.documentPath }),
   } as never;
   const ctx = {
-    renderCanvas: () => {},
     renderLeftPanel: () => {
       calls.left += 1;
       render(
@@ -719,7 +726,6 @@ function mountExternal(
         container,
       );
     },
-    updateSession: () => {},
   };
   const rerender = () =>
     render(
@@ -731,14 +737,14 @@ function mountExternal(
 }
 
 describe("renderExternalPrototypeEditorTemplate", () => {
-  test("shows Source/Prototype fields when the prototype is not imported", () => {
+  test("shows Source/Kind fields when the prototype is not imported", () => {
     const m = mountExternal({ $prototype: "Widget", $src: "./w.js" });
     expect(m.container.querySelector('[data-prop="Source"]')).not.toBeNull();
-    expect(m.container.querySelector('[data-prop="Prototype"]')).not.toBeNull();
+    expect(m.container.querySelector('[data-prop="Kind"]')).not.toBeNull();
     expect(m.container.querySelector('[data-prop="Export"]')).toBeNull();
   });
 
-  test("Source/Prototype commits update the def and invalidate the schema cache", () => {
+  test("Source/Kind commits update the def and invalidate the schema cache", () => {
     pluginSchemaCache.set("./w.js::Widget", null);
     pluginSchemaCache.set("./new.js::Widget", { properties: {} });
     const m = mountExternal({ $prototype: "Widget", $src: "./w.js" });
@@ -748,7 +754,7 @@ describe("renderExternalPrototypeEditorTemplate", () => {
 
     pluginSchemaCache.set("./new.js::Gadget", { properties: {} });
     m.rerender();
-    commitValue(fieldEl(m.container, "Prototype", "sp-textfield"), "Gadget");
+    commitValue(fieldEl(m.container, "Kind", "sp-textfield"), "Gadget");
     expect((pluginDef() as { $prototype: string }).$prototype).toBe("Gadget");
     expect(pluginSchemaCache.has("./new.js::Gadget")).toBe(false);
   });

@@ -2,9 +2,9 @@
 
 ## Extension Packages, Schema Composition, and the Capability Contract
 
-**Version:** 0.3.3-draft
+**Version:** 0.3.4-draft
 **Status:** Partial
-**Updated:** 2026-07-25
+**Updated:** 2026-08-08
 **License:** MIT
 
 Supersedes v1 ("Format-Extension Classes and the Capability Contract"). The
@@ -357,6 +357,34 @@ names) are emitted by the generator, which is the single aggregation party.
   `pages/blog/`). A pointer with too few names a file that does not exist, and
   fails identically in every consumer — it is an authoring error, not something
   a host compensates for.
+
+- **A first-party schema resolves from the HOST, and a generator that cannot
+  find one stops.** `@jxsuite/*.json` refs are read from the workspace running
+  the generator, before the project-local file at the same path is looked at;
+  everything else keeps resolving project-first, because a project's own
+  extension fragments are what the loader is FOR. There is no fallback in the
+  first-party direction: if the host has no such package the composition fails,
+  naming the ref and the specifier.
+
+  **Refusing is the point.** A starter pins PUBLISHED `@jxsuite/*` versions
+  because it is a template a user scaffolds from, so iterating one inside the
+  studio runs `bun install` in its root and materialises a real
+  `@jxsuite/schema` beside a workspace far ahead of it. Both the file shortcut
+  and the project-first require preferred that copy, and one starter's committed
+  document schema was composed from a core nine minor versions behind — not
+  merely stale but NARROWER than its own content: `ChildrenValue.oneOf` lost its
+  computed-children branch, which made that starter's own pages invalid against
+  its own schema. Nothing noticed for six weeks, because the artifact was only
+  ever regenerated on the machine that had the shadow. A fallback would restore
+  exactly that failure, silently, on whichever machine happened to carry a
+  stray install.
+
+- **A validator does not write what it is checking.** `jx validate` composes a
+  stale entry document in memory and leaves the committed file untouched;
+  `jx schema` is the command that writes. Regenerating during validation made
+  the check green on a machine with a shadowed core precisely because it
+  validated against the narrower artifact it had just written over the
+  repository's.
 
 - `jx validate` (compiler CLI) validates the WHOLE project tree: `project.json`
   against `./project.schema.json` (ajv-2020; a restricted file loader with a
@@ -981,6 +1009,7 @@ requiring changes to any core package.
 
 ## Changelog
 
+- **0.3.4-draft** (2026-08-08) — §5.4 states first-party schema resolution — an @jxsuite/*.json ref reads from the host workspace before any project-local file at the same path, with no fallback in that direction, so a stray install inside a starter can no longer answer for the core; and a validator composes a stale entry document in memory rather than writing over the one it is checking.
 - **0.3.3-draft** (2026-07-25) — Composition is host-agnostic: one pure function with an injected loader, so the cloud session composes the same entry documents in-Worker with no filesystem (§5.5).
 - **0.3.2-draft** (2026-07-25) — $schema bindings must be satisfied by by-id registration, never fetching — an in-document $schema overrides fileMatch and an unresolvable one voids validation entirely (§5.4).
 - **0.3.1-draft** (2026-07-25) — $paths validates against the source union instead of accepting any object (§5.3).
@@ -999,4 +1028,4 @@ requiring changes to any core package.
 
 ---
 
-_Jx Extensions Specification v0.3.3-draft_
+_Jx Extensions Specification v0.3.4-draft_

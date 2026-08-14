@@ -7,11 +7,15 @@
 import { flush, resetWorkspaceWithTab } from "./harness";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { mount, render, unmount } from "../src/panels/overlays";
-import { canvasPanels } from "../src/store";
+import { activeCanvasSurface } from "../src/canvas/canvas-surface";
 import { activeTab, closeAllTabs } from "../src/workspace/workspace";
 import type { CanvasPanel } from "../src/types";
 
-let canvasMode = "design";
+/* The panels of the FOCUSED pane's stage. Panels belong to a pane's surface now, not to the
+   app (`src/canvas/canvas-surface.ts`); the array identity is stable, so a module-level
+   binding still sees what the render mutated. */
+const canvasPanels = activeCanvasSurface().panels;
+
 let isEditingFlag = false;
 let renderBlockActionBar: ReturnType<typeof mock>;
 
@@ -35,7 +39,6 @@ function makePanel(mediaName = "base"): CanvasPanel {
 
 async function mountAndFlush() {
   mount({
-    getCanvasMode: () => canvasMode,
     isEditing: () => isEditingFlag,
     renderBlockActionBar: renderBlockActionBar as unknown as () => void,
   });
@@ -44,7 +47,6 @@ async function mountAndFlush() {
 
 beforeEach(() => {
   document.body.innerHTML = "";
-  canvasMode = "design";
   isEditingFlag = false;
   renderBlockActionBar = mock(() => {});
   resetWorkspaceWithTab({
@@ -78,7 +80,7 @@ describe("overlays — header sync", () => {
     const panel = makePanel();
     const marker = document.createElement("div");
     panel.canvas.append(marker);
-    activeTab.value!.session.selection = ["children", 0];
+    activeTab.value!.session.selection = [["children", 0]];
     await mountAndFlush();
     expect(panel.canvas.contains(marker)).toBe(true);
   });
@@ -90,7 +92,7 @@ describe("overlays — lifecycle", () => {
     await mountAndFlush();
     renderBlockActionBar.mockClear();
     // A selection change re-runs the tracked effect, which schedules another flush.
-    activeTab.value!.session.selection = ["children", 0];
+    activeTab.value!.session.selection = [["children", 0]];
     await flush();
     expect(renderBlockActionBar).toHaveBeenCalled();
   });

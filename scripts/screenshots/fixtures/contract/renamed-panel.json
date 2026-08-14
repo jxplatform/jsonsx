@@ -1,0 +1,19 @@
+{
+  "contract": 1,
+  "outDir": "docs/images",
+  "server": { "studioPath": "packages/studio", "url": "http://127.0.0.1:3000" },
+  "defaults": {},
+  "shots": [
+    {
+      "name": "properties-bar",
+      "docs": ["studio/interface/inspector"],
+      "clip": "none",
+      "actions": [
+        { "do": "run", "id": "view.setAssistant", "args": { "open": false } },
+        { "do": "run", "id": "file.open", "args": { "path": "pages/index.md" } },
+        { "do": "setActivity", "value": "head" },
+        { "do": "run", "id": "view.setActivity", "args": { "tab": "blocks" } }
+      ]
+    }
+  ]
+}

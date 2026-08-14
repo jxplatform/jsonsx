@@ -54,24 +54,24 @@ describe("renderer error guards", () => {
 });
 
 describe("updateSession", () => {
-  test("writes hover, clipboard, and canvas patches to the active tab", () => {
+  test("writes hover, clipboard, and canvas patches to the tab it is GIVEN", () => {
     const tab = resetWorkspaceWithTab();
     const clip = { tagName: "p", textContent: "copied" } as JxMutableNode;
-    updateSession({
+    updateSession(tab, {
       canvas: { error: "boom", status: "error" },
       clipboard: clip,
       hover: ["children", 0],
-      selection: ["children", 1],
+      selection: [["children", 1]],
     });
     expect(tab.session.hover).toEqual(["children", 0]);
-    expect(tab.session.selection).toEqual(["children", 1]);
+    expect(tab.session.selection).toEqual([["children", 1]]);
     expect(tab.session.clipboard).toEqual(clip);
     expect(tab.session.canvas.status).toBe("error");
     expect(tab.session.canvas.error).toBe("boom");
   });
 
-  test("is a no-op without an active tab", () => {
+  test("is a no-op with no tab", () => {
     closeAllTabs();
-    expect(() => updateSession({ hover: ["children", 0] })).not.toThrow();
+    expect(() => updateSession(null, { hover: ["children", 0] })).not.toThrow();
   });
 });

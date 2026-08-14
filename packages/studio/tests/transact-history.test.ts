@@ -18,6 +18,8 @@ import {
   mutateUpdateStyle,
   mutateWrapNode,
   redo,
+  setTransactGate,
+  transact,
   transactDoc,
   undo,
 } from "../src/tabs/transact";
@@ -150,6 +152,92 @@ describe("coalescing a typing run", () => {
     // Not `midRun` — the whole run is one edit.
     expect(docJson(tab)).not.toBe(midRun);
     expect((toRaw(tab.doc.document).children as JxMutableNode[])[0]!.textContent).toBe("one");
+  });
+});
+
+/**
+ * A REFUSED TRANSACTION IS NOT A TRANSACTION, and `transactDoc` is the only thing that knows.
+ *
+ * The collab gate blocks structural edits while anyone holds source-canonical — the lock holder
+ * included, since the CRDT owns the text the tree is derived from. It returned `undefined` for that
+ * refusal and `undefined` for a write that landed, so every caller downstream had to guess. They
+ * all guessed "it worked".
+ */
+describe("a gate that refuses", () => {
+  test("transactDoc says whether it wrote", () => {
+    const tab = makeTab();
+    expect(transactDoc(tab, (t) => mutateUpdateStyle(t, ["children", 0], "color", "blue"))).toBe(
+      true,
+    );
+
+    setTransactGate(() => "source-canonical");
+    try {
+      const before = docJson(tab);
+      expect(transactDoc(tab, (t) => mutateUpdateStyle(t, ["children", 0], "color", "green"))).toBe(
+        false,
+      );
+      expect(docJson(tab)).toBe(before);
+    } finally {
+      setTransactGate(null);
+    }
+
+    // No tab is not a write either — the answer is about the document, not about the attempt.
+    expect(transactDoc(null, () => {})).toBe(false);
+  });
+
+  test("transact forwards the answer", () => {
+    const tab = makeTab();
+    expect(transact(tab, (doc) => (doc.className = "yes"))).toBe(true);
+    setTransactGate(() => "source-canonical");
+    try {
+      expect(transact(tab, (doc) => (doc.className = "no"))).toBe(false);
+    } finally {
+      setTransactGate(null);
+    }
+    expect(toRaw(tab.doc.document).className).toBe("yes");
+  });
+
+  /**
+   * `"history"` is not `"remote"`, so a replay is refused exactly as a direct edit is — and undo
+   * used to move its index anyway. The log then stopped describing the tree: the next redo replays
+   * a forward op onto a state it was never the inverse of, and `doc.dirty` claims an edit nobody
+   * made. Undo that cannot run does nothing, which is the only honest answer.
+   */
+  test("undo and redo leave the history index alone when the replay is refused", () => {
+    const tab = makeTab();
+    transactDoc(tab, (t) => mutateUpdateProperty(t, ["children", 0], "textContent", "edited"));
+    const afterEdit = docJson(tab);
+    const indexAfterEdit = tab.history.index;
+    tab.doc.dirty = false;
+
+    setTransactGate(() => "source-canonical");
+    try {
+      undo(tab);
+      expect(tab.history.index).toBe(indexAfterEdit);
+      expect(docJson(tab)).toBe(afterEdit);
+      expect(tab.doc.dirty).toBe(false);
+    } finally {
+      setTransactGate(null);
+    }
+
+    // And the log is intact: undo still works once the freeze lifts, and redo returns the edit.
+    undo(tab);
+    expect((toRaw(tab.doc.document).children as JxMutableNode[])[0]!.textContent).toBe("one");
+    const indexAfterUndo = tab.history.index;
+    tab.doc.dirty = false;
+
+    setTransactGate(() => "source-canonical");
+    try {
+      redo(tab);
+      expect(tab.history.index).toBe(indexAfterUndo);
+      expect((toRaw(tab.doc.document).children as JxMutableNode[])[0]!.textContent).toBe("one");
+      expect(tab.doc.dirty).toBe(false);
+    } finally {
+      setTransactGate(null);
+    }
+
+    redo(tab);
+    expect(docJson(tab)).toBe(afterEdit);
   });
 });
 

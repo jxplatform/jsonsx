@@ -45,15 +45,15 @@
     "upgrade": "bunx npm-check-updates -u && bun install"
   },
   "dependencies": {
-    "@apidevtools/json-schema-ref-parser": "^15.5.0",
+    "@apidevtools/json-schema-ref-parser": "^15.5.1",
     "@jxsuite/create": "workspace:^",
     "@jxsuite/runtime": "workspace:^",
     "@jxsuite/schema": "workspace:^",
-    "esbuild": "^0.28.1",
+    "esbuild": "^0.28.2",
     "sharp": "^0.35.3"
   },
   "devDependencies": {
-    "@happy-dom/global-registrator": "^20.11.1",
+    "@happy-dom/global-registrator": "^20.11.2",
     "@jxsuite/connector": "workspace:^",
     "@jxsuite/parser": "workspace:^",
     "@types/mdast": "^4.0.4"

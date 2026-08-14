@@ -49,6 +49,11 @@ void mock.module("@atlaskit/pragmatic-drag-and-drop/element/adapter", () => ({
 
 const { registerFileTreeDnD, renderFilesTemplate, setupTreeKeyboard } =
   await import("../src/files/files");
+const { createCommandRegistry } = await import("../src/commands/registry");
+const { emptyContext } = await import("../src/commands/context");
+const { setActiveRegistry } = await import("../src/commands/active-registry");
+const { gridCommands } = await import("../src/grid/grid-open");
+const { registerContentCommands } = await import("../src/content/entry-commands");
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
 
@@ -197,6 +202,9 @@ beforeEach(() => {
 afterEach(async () => {
   await dismissOutside();
   host.remove();
+  // The tree's context menu renders `forPlacement("context/file")`; a registry left published
+  // Would leak declared rows into every later case.
+  setActiveRegistry(null);
 });
 
 // ─── renderFilesTemplate — empty / welcome states ─────────────────────────────
@@ -270,7 +278,16 @@ describe("file tree listing", () => {
       "omega.js",
       "zeta.json",
     ]);
-    expect(out.querySelector('[role="group"]')).not.toBeNull();
+    // The tree is FLAT — one windowed row list, not a `role="group"` per level (R5). A child of an
+    // Expanded directory says where it sits with aria-level/posinset/setsize instead, which is the
+    // Only account that stays true when the tree draws a window rather than all of itself.
+    expect(out.querySelector('[role="group"]')).toBeNull();
+    expect(rowFor(out, "pages/index.json").getAttribute("aria-level")).toBe("2");
+    expect(rowFor(out, "pages/index.json").getAttribute("aria-posinset")).toBe("1");
+    expect(rowFor(out, "pages/index.json").getAttribute("aria-setsize")).toBe("1");
+    expect(rowFor(out, "pages").getAttribute("aria-level")).toBe("1");
+    expect(rowFor(out, "pages").getAttribute("aria-posinset")).toBe("2");
+    expect(rowFor(out, "pages").getAttribute("aria-setsize")).toBe("9");
     expect(rowFor(out, "pages").getAttribute("aria-expanded")).toBe("true");
     expect(rowFor(out, "assets").getAttribute("aria-expanded")).toBe("false");
   });
@@ -587,19 +604,61 @@ describe("file context menu", () => {
     ]);
   });
 
-  test("collection and pages directories offer grid bulk-edit entries", async () => {
-    const handle = installFsPlatform();
+  /**
+   * The tree with a project that declares a `posts` collection, and the app registry published.
+   *
+   * The registry is the point of these cases. `context/file` is a DECLARED placement, and until now
+   * the tree drew a hand-built list beside it — so `content.openEntry` shipped with a menu entry no
+   * surface rendered, and "Edit Collection in Grid" existed twice: once as `collection.editInGrid`
+   * and once as a literal string here. Every row below comes out of `forPlacement`.
+   */
+  async function renderTreeWithRegistry() {
+    const handle = installFsPlatform({
+      "posts/first.md": "---\ntitle: First\n---\n",
+      "styles/site.css": "body{}",
+    });
     siteState({
       projectConfig: {
-        content: { posts: { format: "Markdown", schema: {}, source: "./posts/" } },
+        content: {
+          posts: {
+            format: "Markdown",
+            schema: { properties: { title: { type: "string" } } },
+            source: "./posts/",
+          },
+        },
         name: "Demo",
       },
     });
     seedTreeState();
-    requireProjectState().dirs.get(".")!.push({ name: "posts", path: "posts", type: "directory" });
+    requireProjectState()
+      .dirs.get(".")!
+      .push(
+        { name: "posts", path: "posts", type: "directory" },
+        { name: "styles", path: "styles", type: "directory" },
+      );
+    requireProjectState().dirs.set("posts", [
+      { name: "first.md", path: "posts/first.md", type: "file" },
+    ]);
+    requireProjectState().dirs.set("styles", [
+      { name: "site.css", path: "styles/site.css", type: "file" },
+    ]);
+    requireProjectState().expanded.add("posts");
+    requireProjectState().expanded.add("styles");
+
+    const registry = createCommandRegistry({
+      getContext: () => ({ ...emptyContext(), project: { open: true } }) as never,
+    });
+    registry.registerAll(gridCommands());
+    registerContentCommands(registry);
+    setActiveRegistry(registry);
+
     const tree = makeTreeCtx();
     const out = await renderInto(renderFilesTemplate(tree.ctx), host);
-    void handle;
+    return { ...tree, handle, out, registry };
+  }
+
+  test("a collection directory offers the DECLARED collection.editInGrid row", async () => {
+    const { out } = await renderTreeWithRegistry();
 
     pointer(rowFor(out, "posts"), "contextmenu");
     await flush();
@@ -608,12 +667,94 @@ describe("file context menu", () => {
     );
     await clickMenuItem("Edit Collection in Grid");
     expect(workspace.tabs.has("grid://collection/posts")).toBeTrue();
+  });
+
+  test("a content entry offers Open Entry Form; a file in no collection does not", async () => {
+    const { out } = await renderTreeWithRegistry();
+
+    pointer(rowFor(out, "posts/first.md"), "contextmenu");
+    await flush();
+    expect(popoverMenuItems().map((el) => el.textContent?.trim())).toContain("Open Entry Form");
+
+    // `styles/site.css` states no `path` fact, because it is an entry of no collection — so the
+    // Command that requires one is not offered rather than being offered and refusing.
+    pointer(rowFor(out, "styles/site.css"), "contextmenu");
+    await flush();
+    expect(popoverMenuItems().map((el) => el.textContent?.trim())).not.toContain("Open Entry Form");
+  });
+
+  test("Open Entry Form opens the tab in entry mode — the route the palette could not offer", async () => {
+    const { out } = await renderTreeWithRegistry();
+
+    pointer(rowFor(out, "posts/first.md"), "contextmenu");
+    await flush();
+    await clickMenuItem("Open Entry Form");
+    await flush();
+    await flush();
+
+    const tab = [...workspace.tabs.values()].find((t) => t.documentPath === "posts/first.md")!;
+    expect(tab).toBeDefined();
+    expect(tab.session.ui.canvasMode).toBe("entry");
+  });
+
+  test("the declared rows come from the registry — with none published, they are absent", async () => {
+    const { out } = await renderTreeWithRegistry();
+    setActiveRegistry(null);
+
+    pointer(rowFor(out, "posts"), "contextmenu");
+    await flush();
+    const labels = popoverMenuItems().map((el) => el.textContent?.trim());
+    expect(labels).not.toContain("Edit Collection in Grid");
+    // The tree's own verbs are unaffected: they are what the TREE does, not what a command does.
+    expect(labels).toEqual(["New File…", "Upload Files…", "Rename…", "Delete"]);
+  });
+
+  test("the pages directory keeps its hand-built grid row — no command declares one", async () => {
+    const { out } = await renderTreeWithRegistry();
 
     pointer(rowFor(out, "pages"), "contextmenu");
     await flush();
     expect(popoverMenuItems().map((el) => el.textContent?.trim())).toContain("Edit Pages in Grid");
     await clickMenuItem("Edit Pages in Grid");
     expect(workspace.tabs.has("grid://pages")).toBeTrue();
+  });
+
+  test("a declared row whose command is disabled is shown, greyed, with its reason", async () => {
+    const { out } = await renderTreeWithRegistry();
+    const registry = createCommandRegistry({
+      getContext: () => ({ ...emptyContext(), project: { open: true } }) as never,
+    });
+    registry.register({
+      args: {
+        additionalProperties: false,
+        properties: { path: { type: "string" } },
+        required: ["path"],
+        type: "object",
+      },
+      category: "File",
+      enablement: () => false,
+      id: "content.demoDisabled",
+      level: "project",
+      menus: ["context/file"],
+      requires: "a reason the author can act on",
+      run: () => {},
+      title: "Demo Disabled",
+      when: () => true,
+    });
+    setActiveRegistry(registry);
+
+    pointer(rowFor(out, "posts/first.md"), "contextmenu");
+    await flush();
+    const item = popoverMenuItems().find((el) => el.textContent?.includes("Demo Disabled"))!;
+    expect(item).toBeDefined();
+    expect(item.hasAttribute("disabled")).toBeTrue();
+    expect(item.textContent).toContain("Needs a reason the author can act on");
+
+    // Clicking it does nothing AND does not close the menu — a row that explains itself has to
+    // Stay on screen long enough to be read.
+    pointer(item, "click");
+    await flush();
+    expect(document.querySelector("#layer-popover sp-popover")).not.toBeNull();
   });
 
   test("opening a second menu dismisses the first", async () => {
@@ -789,7 +930,9 @@ describe("delete flow", () => {
     requireProjectState().selectedPath = "beta.md";
 
     const wrapper = await openDeleteDialog(out, "beta.md");
-    expect(wrapper.textContent).toContain('Delete "beta.md"?');
+    // The name is now emphasised markup rather than a quoted string, and the dialog carries the
+    // Consequence line beneath it — see tests/destructive-confirmations.test.ts for the sentence.
+    expect(wrapper.textContent).toContain("Delete beta.md?");
     wrapper.dispatchEvent(new Event("confirm"));
     await flush();
 
@@ -843,38 +986,46 @@ describe("delete flow", () => {
 // ─── Keyboard navigation ──────────────────────────────────────────────────────
 
 describe("setupTreeKeyboard", () => {
-  function buildManualTree() {
-    const panel = document.createElement("div");
-    panel.className = "panel-body";
-    const tree = document.createElement("div");
-    tree.className = "file-tree";
-    for (const [path, type] of [
-      ["pages", "directory"],
-      ["a.json", "file"],
-      ["b.json", "file"],
-    ]) {
-      const item = document.createElement("div");
-      item.className = "file-tree-item";
-      item.tabIndex = -1;
-      item.dataset.path = path;
-      item.dataset.type = type;
-      item.textContent = path!;
-      tree.append(item);
-    }
-    panel.append(tree);
-    host.append(panel);
-    setupTreeKeyboard(tree);
-    const items = [...tree.querySelectorAll(".file-tree-item")] as HTMLElement[];
-    return { items, tree };
+  /**
+   * The keyboard is driven against the REAL rendered tree, not a hand-built one.
+   *
+   * It used to be three divs assembled by this file, which was equivalent while every row was drawn
+   * and stopped being equivalent when the tree windowed: ↑/↓ now step through the row MODEL
+   * `renderFilesTemplate` builds, so a fixture that never went through the renderer has no rows to
+   * step through. Rendering the template is also the only way the tab stop, the aria attributes and
+   * the walk are asserted about the same thing.
+   */
+  async function renderTree(seed: Record<string, string> = {}) {
+    const handle = installFsPlatform(seed);
+    siteState();
+    const st = requireProjectState();
+    st.dirs.set(".", [
+      { name: "pages", path: "pages", type: "directory" },
+      { name: "a.json", path: "a.json", type: "file" },
+      { name: "b.json", path: "b.json", type: "file" },
+    ]);
+    st.dirs.set("pages", [{ name: "index.json", path: "pages/index.json", type: "file" }]);
+    const tree = makeTreeCtx();
+    const out = await renderInto(renderFilesTemplate(tree.ctx), host);
+    const el = out.querySelector(".file-tree") as HTMLElement;
+    setupTreeKeyboard(el);
+    const items = [...el.querySelectorAll(".file-tree-item")] as HTMLElement[];
+    return { ...tree, handle, items, tree: el };
   }
 
-  test("marks the first item focusable", () => {
-    const { items } = buildManualTree();
+  test("the first row is the tab stop, and the selected row takes it over", async () => {
+    const { items } = await renderTree();
     expect(items[0]!.getAttribute("tabindex")).toBe("0");
+    expect(items[1]!.getAttribute("tabindex")).toBe("-1");
+
+    requireProjectState().selectedPath = "b.json";
+    const out = await renderInto(renderFilesTemplate(makeTreeCtx().ctx), host);
+    expect(rowFor(out, "b.json").getAttribute("tabindex")).toBe("0");
+    expect(rowFor(out, "pages").getAttribute("tabindex")).toBe("-1");
   });
 
-  test("ArrowDown / ArrowUp move focus and clamp at the edges", () => {
-    const { items, tree } = buildManualTree();
+  test("ArrowDown / ArrowUp move focus and clamp at the edges", async () => {
+    const { items, tree } = await renderTree();
     items[0]!.focus();
 
     key(tree, "ArrowDown");
@@ -889,8 +1040,8 @@ describe("setupTreeKeyboard", () => {
     expect(document.activeElement).toBe(items[0]!);
   });
 
-  test("Enter clicks the focused row; unhandled keys are not prevented", () => {
-    const { items, tree } = buildManualTree();
+  test("Enter clicks the focused row; unhandled keys are not prevented", async () => {
+    const { items, tree } = await renderTree();
     let clicks = 0;
     items[1]!.addEventListener("click", () => {
       clicks += 1;
@@ -917,54 +1068,65 @@ describe("setupTreeKeyboard", () => {
     expect(handled.defaultPrevented).toBe(true);
   });
 
-  test("keystrokes without a focused item are ignored", () => {
-    const { items, tree } = buildManualTree();
+  test("keystrokes without a focused item are ignored", async () => {
+    const { items, tree } = await renderTree();
     (document.activeElement as HTMLElement | null)?.blur?.();
 
     key(tree, "ArrowDown");
     expect(document.activeElement).not.toBe(items[1]);
   });
 
-  test("ArrowRight expands a collapsed directory and re-clicks the focused row", async () => {
-    const { state } = installFsPlatform({ "pages/index.json": "{}" });
-    siteState();
-    const { items, tree } = buildManualTree();
-    let dirClicks = 0;
-    items[0]!.addEventListener("click", () => {
-      dirClicks += 1;
-    });
+  test("one listener per tree, however many times the panel re-renders", async () => {
+    const { items, tree } = await renderTree();
+    setupTreeKeyboard(tree);
+    setupTreeKeyboard(tree);
+    items[0]!.focus();
+
+    key(tree, "ArrowDown");
+    // Three registrations of the same handler would walk three rows for one keystroke — which is
+    // What `afterRender` calling this on every repaint used to build up to.
+    expect(document.activeElement).toBe(items[1]!);
+  });
+
+  test("ArrowRight expands a collapsed directory and repaints the panel", async () => {
+    const { counters, handle, items, tree } = await renderTree({ "pages/index.json": "{}" });
+    requireProjectState().dirs.delete("pages");
+    const before = counters.left;
     items[0]!.focus();
 
     key(tree, "ArrowRight");
     await flush();
 
     expect(requireProjectState().expanded.has("pages")).toBe(true);
-    expect(state.calls).toContainEqual(["listDirectory", "pages"]);
-    expect(dirClicks).toBe(1);
+    expect(handle.state.calls).toContainEqual(["listDirectory", "pages"]);
+    // The repaint used to be a synthesised click on the focused row, which ran that row's own
+    // Toggle a second time; the panel is asked directly now.
+    expect(counters.left).toBeGreaterThan(before);
   });
 
   test("ArrowRight on an expanded directory does not reload", async () => {
-    const { state } = installFsPlatform({ "pages/index.json": "{}" });
-    siteState();
+    const { handle, items, tree } = await renderTree({ "pages/index.json": "{}" });
     requireProjectState().expanded.add("pages");
-    const { items, tree } = buildManualTree();
+    handle.state.calls.length = 0;
     items[0]!.focus();
 
     key(tree, "ArrowRight");
     await flush();
 
-    expect(state.calls.filter(([name]) => name === "listDirectory")).toHaveLength(0);
+    expect(handle.state.calls.filter(([name]) => name === "listDirectory")).toHaveLength(0);
   });
 
-  test("ArrowLeft collapses an expanded directory and ignores files", () => {
-    installFsPlatform();
-    siteState();
+  test("ArrowLeft collapses an expanded directory, repaints, and ignores files", async () => {
+    const { counters, items, tree } = await renderTree();
     requireProjectState().expanded.add("pages");
-    const { items, tree } = buildManualTree();
+    const before = counters.left;
     items[0]!.focus();
 
     key(tree, "ArrowLeft");
     expect(requireProjectState().expanded.has("pages")).toBe(false);
+    // It used to change the state and leave the children on screen — the collapse was invisible
+    // Until something else happened to redraw the panel.
+    expect(counters.left).toBeGreaterThan(before);
 
     items[1]!.focus();
     key(tree, "ArrowLeft"); // File row — nothing to collapse

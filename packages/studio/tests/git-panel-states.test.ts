@@ -14,21 +14,34 @@ void mock.module("../src/workspace/workspace.js", () => ({
   activeTab: { value: null },
   closeTab: () => {},
   openTab: () => {},
+  // `store.ts` registers the primary pane's canvas stage at `initShellRefs`, and
+  // `canvas/canvas-surface.ts` resolves a pane through `paneById` — both reached transitively
+  // From this panel's imports, neither called by it.
+  // `shell.ts` persists the session (§4.4) through `workspace/session.ts`, which reads the pane
+  // Grid and moves the focus on restore. Reached transitively; never called by this panel.
+  focusPane: () => {},
+  paneById: () => {},
+  PRIMARY_PANE: "primary",
+  SECONDARY_PANE: "secondary",
   renameTab: () => {},
-}));
-
-void mock.module("../src/view.js", () => ({
-  view: { leftTab: "git" },
+  setWorkspaceProject: () => {},
+  // `shell.ts` reads the project root from this store to load that project's named layouts, so
+  // The stand-in has to carry it — an absent export is a module-resolution error, not a null.
+  // `panes`/`activePaneId` are here for the same reason: a canvas surface addresses a pane.
+  workspace: { activePaneId: "primary", panes: [], projectRoot: null },
 }));
 
 void mock.module("../src/ui/layers.js", () => ({
+  // Reached transitively (progress-modal, quick-search); the panel never calls them.
+  getLayerSlot: (_kind: string, id: string) => {
+    const el = document.createElement("div");
+    el.id = id;
+    return el;
+  },
+  openModal: () => Promise.resolve(null),
   showConfirmDialog: async () => true,
   showDialog: async () => null,
   showPromptDialog: async () => null,
-}));
-
-void mock.module("../src/panels/statusbar.js", () => ({
-  statusMessage: () => {},
 }));
 
 void mock.module("../src/packages/pull-package-sync.js", () => ({
@@ -39,7 +52,15 @@ void mock.module("../src/packages/pull-package-sync.js", () => ({
 }));
 
 const { setProjectState } = (await import("../src/state.js")) as any;
+const { resetProjectShell, shell } = await import("../src/shell.js");
 const { renderGitPanel, platformSupportsClone } = await import("../src/panels/git-panel.js");
+
+/** Stage project-level source-control state — the panel reads nothing else. */
+function stageGit(patch: Record<string, unknown>) {
+  resetProjectShell();
+  shell.leftTab = "git";
+  Object.assign(shell.git, patch);
+}
 
 /** @param {any} templateResult */
 function renderToString(templateResult: any) {
@@ -51,6 +72,7 @@ function renderToString(templateResult: any) {
 describe("renderGitPanel — state rendering", () => {
   beforeEach(() => {
     setProjectState(null);
+    stageGit({});
     mockPlatform = {
       gitBranches: async () => ({ branches: ["main"], current: "main" }),
       gitLog: async () => [],
@@ -67,7 +89,7 @@ describe("renderGitPanel — state rendering", () => {
 
   test("no project — shows 'Open a project' message", () => {
     setProjectState(null);
-    const result = renderGitPanel({ ui: {} }, {});
+    const result = renderGitPanel({});
     const output = renderToString(result);
     expect(output).toContain("Open a project");
   });
@@ -78,7 +100,7 @@ describe("renderGitPanel — state rendering", () => {
       root: "/tmp/cloned",
     });
     setProjectState(null);
-    const result = renderGitPanel({ ui: {} }, {});
+    const result = renderGitPanel({});
     const output = renderToString(result);
     expect(output).toContain("Clone Git Repository");
   });
@@ -86,15 +108,15 @@ describe("renderGitPanel — state rendering", () => {
   test("no project without clone support — no Clone button", () => {
     delete (mockPlatform as Record<string, unknown>).gitClone;
     setProjectState(null);
-    const result = renderGitPanel({ ui: {} }, {});
+    const result = renderGitPanel({});
     const output = renderToString(result);
     expect(output).not.toContain("Clone Git Repository");
   });
 
   test("project loaded, not a git repo — shows init + publish buttons", () => {
     setProjectState({ name: "test-project" });
-    const ui = {
-      gitStatus: {
+    stageGit({
+      status: {
         ahead: 0,
         behind: 0,
         branch: "",
@@ -102,19 +124,19 @@ describe("renderGitPanel — state rendering", () => {
         isRepo: false,
         remotes: [],
       },
-    };
-    const result = renderGitPanel({ ui }, {});
+    });
+    const result = renderGitPanel({});
     const output = renderToString(result);
-    expect(output).toContain("not yet a git repository");
+    expect(output).toContain("not tracked by git yet");
     expect(output).toContain("Initialize Repository");
-    expect(output).toContain("Publish to GitHub");
+    expect(output).toContain("Create GitHub repository");
   });
 
   test("git repo with no remotes — shows 'Local only' sync bar with publish", () => {
     setProjectState({ name: "test-project" });
-    const ui = {
-      gitBranches: { branches: ["main"], current: "main" },
-      gitStatus: {
+    stageGit({
+      branches: { branches: ["main"], current: "main" },
+      status: {
         ahead: 0,
         behind: 0,
         branch: "main",
@@ -122,19 +144,19 @@ describe("renderGitPanel — state rendering", () => {
         isRepo: true,
         remotes: [],
       },
-    };
-    const result = renderGitPanel({ ui }, {});
+    });
+    const result = renderGitPanel({});
     const output = renderToString(result);
     expect(output).toContain("Local only");
-    expect(output).toContain("Publish to GitHub");
+    expect(output).toContain("Create GitHub repository");
     expect(output).not.toContain("Up to date");
   });
 
   test("git repo with remote — shows normal sync bar without publish", () => {
     setProjectState({ name: "test-project" });
-    const ui = {
-      gitBranches: { branches: ["main"], current: "main" },
-      gitStatus: {
+    stageGit({
+      branches: { branches: ["main"], current: "main" },
+      status: {
         ahead: 0,
         behind: 0,
         branch: "main",
@@ -142,19 +164,19 @@ describe("renderGitPanel — state rendering", () => {
         isRepo: true,
         remotes: ["origin"],
       },
-    };
-    const result = renderGitPanel({ ui }, {});
+    });
+    const result = renderGitPanel({});
     const output = renderToString(result);
     expect(output).toContain("Up to date");
-    expect(output).not.toContain("Publish to GitHub");
+    expect(output).not.toContain("Create GitHub repository");
     expect(output).not.toContain("Local only");
   });
 
   test("git repo with ahead/behind — shows sync counts", () => {
     setProjectState({ name: "test-project" });
-    const ui = {
-      gitBranches: { branches: ["main"], current: "main" },
-      gitStatus: {
+    stageGit({
+      branches: { branches: ["main"], current: "main" },
+      status: {
         ahead: 3,
         behind: 1,
         branch: "main",
@@ -162,8 +184,8 @@ describe("renderGitPanel — state rendering", () => {
         isRepo: true,
         remotes: ["origin"],
       },
-    };
-    const result = renderGitPanel({ ui }, {});
+    });
+    const result = renderGitPanel({});
     const output = renderToString(result);
     expect(output).toContain("3 ahead");
     expect(output).toContain("1 behind");
@@ -171,9 +193,9 @@ describe("renderGitPanel — state rendering", () => {
 
   test("git repo with changed files — shows file list", () => {
     setProjectState({ name: "test-project" });
-    const ui = {
-      gitBranches: { branches: ["main"], current: "main" },
-      gitStatus: {
+    stageGit({
+      branches: { branches: ["main"], current: "main" },
+      status: {
         ahead: 0,
         behind: 0,
         branch: "main",
@@ -184,8 +206,8 @@ describe("renderGitPanel — state rendering", () => {
         isRepo: true,
         remotes: ["origin"],
       },
-    };
-    const result = renderGitPanel({ ui }, {});
+    });
+    const result = renderGitPanel({});
     const output = renderToString(result);
     expect(output).toContain("index.js");
     expect(output).toContain("util.js");
@@ -194,8 +216,8 @@ describe("renderGitPanel — state rendering", () => {
 
   test("loading state with no status yet — shows loading indicator", () => {
     setProjectState({ name: "test-project" });
-    const ui = { gitLoading: true, gitStatus: null };
-    const result = renderGitPanel({ ui }, {});
+    stageGit({ loading: true, status: null });
+    const result = renderGitPanel({});
     const output = renderToString(result);
     expect(output).toContain("Loading");
   });

@@ -7,9 +7,11 @@
  */
 import { flush, installMockPlatform } from "./harness";
 import { expect, mock, test } from "bun:test";
+import { notifyModule } from "./notify-mock";
+import { nothing } from "lit-html";
 import { hasPlatform, getPlatform } from "../src/platform";
 import { renderOnly, setProjectState } from "../src/store";
-import { view } from "../src/view";
+import { shell } from "../src/shell";
 
 (globalThis as unknown as { happyDOM: { setURL: (u: string) => void } }).happyDOM.setURL(
   "http://localhost:3000/",
@@ -47,7 +49,7 @@ document.body.innerHTML = `
     <div id="activity-bar"></div>
     <div id="left-panel"></div>
     <div id="resize-left" class="resize-handle"></div>
-    <div id="canvas-wrap"></div>
+    <div class="pane-stage" data-jx-region="pane.primary"></div>
     <div id="resize-right" class="resize-handle"></div>
     <div id="right-panel"></div>
     <div id="statusbar"></div>
@@ -72,16 +74,15 @@ void mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
 }));
 
 const renderStatusbarMock = mock(() => {});
-const statusbarRenderers: (() => void)[] = [];
 void mock.module("../src/panels/statusbar.ts", () => ({
+  forgetSavedTimes: mock(() => {}),
   mountStatusbar: mock(() => {}),
+  noteDocumentSaved: mock(() => {}),
   renderStatusbar: renderStatusbarMock,
-  setStatusbarRenderer: (fn: () => void) => {
-    statusbarRenderers.push(fn);
-  },
-  statusMessage: mock(() => {}),
   unmountStatusbar: mock(() => {}),
 }));
+
+void mock.module("../src/services/notify.ts", () => notifyModule(() => {}));
 
 void mock.module("../src/panels/toolbar.ts", () => ({
   mount: mock(() => {}),
@@ -96,33 +97,57 @@ void mock.module("../src/panels/welcome-screen.ts", () => ({
 
 void mock.module("../src/editor/shortcuts.ts", () => ({
   initShortcuts: mock(() => {}),
+  // The grid installs one stage-gesture disposer per cell; without it the boot fails at import.
+  installStageGestures: () => () => {},
+  registerStudioCommands: mock(() => {}),
 }));
 
+// `panels/layers-panel.ts` renders its row verbs from the bar's command records, so this mock has
+// To carry them too or the boot fails at import time.
 void mock.module("../src/panels/block-action-bar.ts", () => ({
+  commandIcon: mock(() => nothing),
+  commandTooltip: mock(() => ""),
   dismissBlockActionBar: mock(() => {}),
   dismissLinkPopover: mock(() => {}),
   initBlockActionBar: mock(() => {}),
+  // The inline-format family, composed into the app-wide registry by the bootstrap. A mock that
+  // Stops at the exports one caller uses fails the boot at IMPORT time.
+  formatCommands: mock(() => []),
   isEditChromeTarget: mock(() => false),
+  registerSelectionCommands: mock(() => {}),
+  releaseBlockActionBar: mock(() => {}),
   renderBlockActionBar: mock(() => {}),
+  runCommand: mock(() => {}),
+  selectionCommandRegistry: () => ({
+    disabledReason: () => {},
+    forPlacement: () => [],
+    keymap: { formatBinding: () => {} },
+  }),
+  showCommandOverflow: mock(() => {}),
+  suppressBlockActionBar: mock(() => {}),
+  withCommandTarget: <T>(_path: unknown, fn: () => T) => fn(),
 }));
 
-interface TabBarCtx {
-  closeFormulaWorkspace: () => void;
-  closeFunctionEditor: () => Promise<void> | void;
-  navigateBack: () => Promise<void> | void;
-  navigateToLevel: (i: number) => Promise<void> | void;
+interface PaneContextCtx {
+  exportFile: () => Promise<void> | void;
+  parseMediaEntries: (media: Record<string, string> | null | undefined) => unknown;
+  setCanvasMode: (tab: unknown, mode: string) => void;
 }
-let tabBarCtx: TabBarCtx | null = null;
-void mock.module("../src/panels/tab-bar.ts", () => ({
-  mount: (_host: HTMLElement, ctx: TabBarCtx) => {
-    tabBarCtx = ctx;
+let paneCtx: PaneContextCtx | null = null;
+void mock.module("../src/panels/pane-context.ts", () => ({
+  // The grid hands every cell its chrome host, so this is on the boot's import graph.
+  attachPaneChromeHost: mock(() => {}),
+  mount: (_host: HTMLElement, ctx: PaneContextCtx) => {
+    paneCtx = ctx;
   },
   render: mock(() => {}),
   unmount: mock(() => {}),
 }));
 
 void mock.module("../src/canvas/canvas-render.ts", () => ({
+  handOverCanvasStage: mock(() => {}),
   initCanvasRender: mock(() => {}),
+  registerSelectionSetCommand: mock(() => {}),
   renderCanvas: mock(() => {}),
   renderOverlays: mock(() => {}),
   scheduleCanvasRender: mock(() => {}),
@@ -164,25 +189,33 @@ test("the idle css-props filler is a no-op once the datalist is gone", () => {
   expect(document.querySelector("#css-props")).toBeNull();
 });
 
-test("the tab-bar context wires studio's navigation callbacks", async () => {
-  expect(tabBarCtx).not.toBeNull();
-  // With no active tab (or nothing being edited) every callback is a guarded no-op.
-  expect(() => tabBarCtx!.closeFormulaWorkspace()).not.toThrow();
-  await tabBarCtx!.closeFunctionEditor();
-  await tabBarCtx!.navigateBack();
-  await tabBarCtx!.navigateToLevel(0);
+test("the pane-context bar is wired to the three callbacks it still takes", async () => {
+  expect(paneCtx).not.toBeNull();
+  /* It took four more — `navigateBack`, `navigateToLevel` and the two logic-editor closes — for a
+     breadcrumb and a Back this bar no longer draws. `getCanvasMode` is the fifth to go, and it went
+     for a different reason: it answered for the FOCUSED pane, and this bar is drawn once per pane.
+     What is left is the axes' own wiring, and with no active tab every one of them is a guarded
+     no-op. */
+  expect(Object.keys(paneCtx!).toSorted()).toEqual([
+    "exportFile",
+    "parseMediaEntries",
+    "setCanvasMode",
+  ]);
+  await paneCtx!.exportFile();
+  // The write takes its target: no tab, nothing written, and no throw.
+  expect(() => paneCtx!.setCanvasMode(null, "edit")).not.toThrow();
 });
 
-test("the statusbar renderer wiring delegates to renderStatusbar", () => {
-  expect(statusbarRenderers).toHaveLength(1);
-  statusbarRenderers[0]!();
-  expect(renderStatusbarMock).toHaveBeenCalledTimes(1);
+test("the bootstrap paints the statusbar once, directly", () => {
+  // `setStatusbarRenderer` went with `statusMessage`: it existed only so a transient message could
+  // Ask the bar to repaint, and the bar's own effect owns that now.
+  expect(renderStatusbarMock).toHaveBeenCalled();
 });
 
 test("the files tab renders through studio's renderFilesTemplate wiring", async () => {
   installMockPlatform();
   setProjectState(null);
-  view.leftTab = "files";
+  shell.leftTab = "files";
   renderOnly("leftPanel");
   await rafTurn();
   await flush();

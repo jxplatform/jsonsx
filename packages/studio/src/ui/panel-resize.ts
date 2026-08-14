@@ -1,76 +1,88 @@
 /// <reference lib="dom" />
 /**
- * Panel-resize.js — Draggable resize handles for left and right sidebars.
+ * Panel-resize.js — Draggable resize handles for the three docks.
  *
- * Self-initializing module. Import it and the resize handles become interactive. Persists widths to
- * localStorage so they survive page reloads.
+ * Self-initializing module. Import it and the resize handles become interactive.
+ *
+ * The handles are the only thing here: dock sizes, their persistence and their projection onto the
+ * grid's CSS custom properties all belong to the reactive `shell` record (`../shell`). A drag
+ * writes `setDockSize()` and the shell's own effect moves the track; release persists once.
  */
 
-import { applyPanelCollapse, view } from "../view";
-
-const STORAGE_KEY = "jx-studio-panel-widths";
-const MIN_WIDTH = 160;
-const MAX_RATIO = 0.5; // Max 50% of viewport
-const DEFAULT_LEFT = 240;
-const DEFAULT_RIGHT = 280;
-const DEFAULT_CHAT = 320;
-
-const root = document.documentElement;
-
-/** Read a px-valued CSS custom property as a number (e.g. "320px" → 320). */
-function readPxVar(cssVar: string): number {
-  return Number(getComputedStyle(root).getPropertyValue(cssVar).replace(/px$/, ""));
-}
-
-// ─── Restore saved widths & collapse state ──────────────────────────────────
-
-try {
-  const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}") as {
-    left?: number;
-    right?: number;
-    chat?: number;
-    leftCollapsed?: boolean;
-    rightCollapsed?: boolean;
-    chatCollapsed?: boolean;
-  };
-  if (saved.left) {
-    root.style.setProperty("--panel-w-left", `${saved.left}px`);
-  }
-  if (saved.right) {
-    root.style.setProperty("--panel-w-right", `${saved.right}px`);
-  }
-  if (saved.chat) {
-    root.style.setProperty("--panel-w-chat", `${saved.chat}px`);
-  }
-  if (saved.leftCollapsed) {
-    view.leftPanelCollapsed = true;
-  }
-  if (saved.rightCollapsed) {
-    view.rightPanelCollapsed = true;
-  }
-  if (saved.chatCollapsed) {
-    view.chatPanelCollapsed = true;
-  }
-  applyPanelCollapse();
-} catch {
-  // Ignore
-}
-
-// ─── Setup handles ───────────────────────────────────────────────────────────
+import {
+  DOCK_DEFAULT_SIZES,
+  persistDocks,
+  registerShellSurface,
+  setDockSize,
+  shell,
+} from "../shell";
+import type { DockId } from "../shell";
 
 /**
- * @param {HTMLElement} handle
- * @param {string} cssVar
- * @param {"left" | "right"} side
- * @param {number} defaultWidth
+ * What a handle drags.
+ *
+ * Generalised out of the three dock rows so the pane splitter can be the fourth. A dock is sized in
+ * px and a pane split is a ratio, which is the whole of the difference: `scale` converts a pointer
+ * delta in px into the target's own units, and everything else — capture, the dragging class, the
+ * text-selection suppression, the double-click reset, the one persist on release — is identical and
+ * was worth having once.
  */
-function setupHandle(
-  handle: HTMLElement,
-  cssVar: string,
-  side: "left" | "right",
-  defaultWidth: number,
-) {
-  let drag: { startX: number; startWidth: number } | null = null;
+export interface ResizeTarget {
+  /** Which coordinate the drag reads. */
+  axis: "x" | "y";
+  /** The current value. */
+  read: () => number;
+  /** Set it. Called on every pointermove, so it must be cheap and idempotent. */
+  write: (value: number) => void;
+  /** The value a double-click restores. */
+  reset: () => number;
+  /** Lower and upper bounds, read fresh because both can depend on the viewport. */
+  min: () => number;
+  max: () => number;
+  /** Target units per pixel of pointer movement, signed: negative grows toward the origin. */
+  scale: () => number;
+  /** Persist. Called once on release and once on reset — never during the drag. */
+  settle: () => void;
+}
+
+/**
+ * The smallest a dock may be dragged to, per axis.
+ *
+ * The Bottom dock's floor is lower because its content is rows of text: 120px is four problems or
+ * two activity rows, which is a useful dock, where 160px of a 24-row list is not meaningfully
+ * more.
+ */
+const MIN_SIZE: Readonly<Record<"x" | "y", number>> = { x: 160, y: 120 };
+
+/** The largest, as a fraction of the viewport along the dragged axis. */
+const MAX_RATIO = 0.5;
+
+/**
+ * Which handle drives which dock, and which direction grows it.
+ *
+ * Three rows, and the third resizes on the other axis: `grow` is the sign a pointer moving in the
+ * positive direction of `axis` contributes, so the Navigator grows rightward, and the Inspector and
+ * the Bottom dock grow back toward the pointer's origin. The assistant is not here and never will
+ * be — it is an Inspector TAB, resized by resizing the Inspector.
+ */
+const HANDLES: { selector: string; dock: DockId; axis: "x" | "y"; grow: 1 | -1 }[] = [
+  { axis: "x", dock: "left", grow: 1, selector: "#resize-left" },
+  { axis: "x", dock: "right", grow: -1, selector: "#resize-right" },
+  { axis: "y", dock: "bottom", grow: -1, selector: "#resize-bottom" },
+];
+
+/**
+ * Wire one handle to one dock.
+ *
+ * @param {HTMLElement} handle
+ * @param {DockId} dock
+ * @param {"x" | "y"} axis — which coordinate the drag reads
+ * @param {1 | -1} grow — the sign a positive move along `axis` contributes to the dock's size
+ */
+export function setupHandle(handle: HTMLElement, target: ResizeTarget) {
+  const { axis } = target;
+  let drag: { start: number; startSize: number } | null = null;
+  const coord = (e: { clientX: number; clientY: number }) => (axis === "x" ? e.clientX : e.clientY);
 
   handle.addEventListener("pointerdown", (e) => {
     e.preventDefault();
@@ -81,19 +93,17 @@ function setupHandle(
     }
     handle.classList.add("dragging");
     document.body.style.userSelect = "none";
-
-    const current = readPxVar(cssVar) || defaultWidth;
-    drag = { startWidth: current, startX: e.clientX };
+    drag = { start: coord(e), startSize: target.read() };
   });
 
   handle.addEventListener("pointermove", (e) => {
     if (!drag) {
       return;
     }
-    const delta = side === "left" ? e.clientX - drag.startX : drag.startX - e.clientX;
-    const maxWidth = window.innerWidth * MAX_RATIO;
-    const newWidth = Math.round(Math.min(maxWidth, Math.max(MIN_WIDTH, drag.startWidth + delta)));
-    root.style.setProperty(cssVar, `${newWidth}px`);
+    const delta = (coord(e) - drag.start) * target.scale();
+    const wanted = drag.startSize + delta;
+    const floored = Math.max(target.min(), wanted);
+    target.write(Math.min(target.max(), floored));
   });
 
   handle.addEventListener("pointerup", (e) => {
@@ -108,38 +118,46 @@ function setupHandle(
     }
     handle.classList.remove("dragging");
     document.body.style.userSelect = "";
-    persistWidths();
+    target.settle();
   });
 
   handle.addEventListener("dblclick", () => {
-    root.style.setProperty(cssVar, `${defaultWidth}px`);
-    persistWidths();
+    target.write(target.reset());
+    target.settle();
   });
 }
 
-function persistWidths() {
-  const left = readPxVar("--panel-w-left") || DEFAULT_LEFT;
-  const right = readPxVar("--panel-w-right") || DEFAULT_RIGHT;
-  const chat = readPxVar("--panel-w-chat") || DEFAULT_CHAT;
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ chat, left, right }));
-  } catch {
-    // Storage full or unavailable
+/** The largest a dock may be dragged to along `axis`. */
+function maxDockSize(axis: "x" | "y"): number {
+  const viewport = axis === "x" ? window.innerWidth : window.innerHeight;
+  return viewport * MAX_RATIO;
+}
+
+/** A dock, as a {@link ResizeTarget}. The three rows of {@link HANDLES}, given the shared shape. */
+function dockTarget(dock: DockId, axis: "x" | "y", grow: 1 | -1): ResizeTarget {
+  return {
+    axis,
+    max: () => maxDockSize(axis),
+    min: () => MIN_SIZE[axis],
+    read: () => shell.docks[dock].size,
+    reset: () => DOCK_DEFAULT_SIZES[dock],
+    scale: () => grow,
+    settle: () => persistDocks(),
+    write: (value) => setDockSize(dock, Math.round(value)),
+  };
+}
+
+/** Attach every handle present in the document. Idempotent per element by construction. */
+export function mountPanelResize(): void {
+  for (const { axis, dock, grow, selector } of HANDLES) {
+    const handle = document.querySelector<HTMLElement>(selector);
+    if (handle) {
+      setupHandle(handle, dockTarget(dock, axis, grow));
+    }
   }
 }
 
-// ─── Initialize ──────────────────────────────────────────────────────────────
-
-const resizeLeft = document.querySelector<HTMLElement>("#resize-left");
-const resizeRight = document.querySelector<HTMLElement>("#resize-right");
-const resizeChat = document.querySelector<HTMLElement>("#resize-chat");
-
-if (resizeLeft) {
-  setupHandle(resizeLeft, "--panel-w-left", "left", DEFAULT_LEFT);
-}
-if (resizeRight) {
-  setupHandle(resizeRight, "--panel-w-right", "right", DEFAULT_RIGHT);
-}
-if (resizeChat) {
-  setupHandle(resizeChat, "--panel-w-chat", "right", DEFAULT_CHAT);
-}
+/* Mounted through the shell's own lifecycle rather than by a bare `mountPanelResize()` at module
+   scope. The import-time call read `document` before anything had said the tree existed, which is
+   the one part of `registerShellSurface`'s bargain this module was not keeping. */
+registerShellSurface({ mount: mountPanelResize, unmount: () => {} });

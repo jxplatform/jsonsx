@@ -357,7 +357,7 @@ describe("registerLayersDnD — monitor", () => {
   test("onDrop applies the instruction and persists collapse for expanded sources", async () => {
     const { rows } = await setupLayers();
     const tab = resetWorkspaceWithTab(makeDoc());
-    tab.session.selection = ["children", 2];
+    tab.session.selection = [["children", 2]];
     monitors[0]!.onDrop({
       location: {
         current: {
@@ -378,7 +378,7 @@ describe("registerLayersDnD — monitor", () => {
   test("onDrop from a non-expanded source does not touch the collapsed set", async () => {
     const { rows } = await setupLayers();
     const tab = resetWorkspaceWithTab(makeDoc());
-    tab.session.selection = ["children", 2];
+    tab.session.selection = [["children", 2]];
     monitors[0]!.onDrop({
       location: {
         current: {
@@ -592,10 +592,12 @@ describe("applyDropInstruction — uncovered branches", () => {
     expect(tab.doc.document.$elements).toEqual([{ $ref: "../components/card.json" }]);
   });
 
-  test("local component already imported by exact ref or filename is not duplicated", () => {
+  test("a local component already imported by the same ref is not duplicated", () => {
     const doc = makeDoc();
-    doc.$elements = [{ $ref: "./components/card.json" }];
-    let tab = resetWorkspaceWithTab(doc);
+    // The ref this document would WRITE for that component — the fixture and the resolver agree,
+    // Which is the only way this test says anything about deduplication.
+    doc.$elements = [{ $ref: "../components/card.json" }];
+    const tab = resetWorkspaceWithTab(doc, { documentPath: "pages/index.json" });
     componentRegistry.push({ path: "components/card.json", tagName: "my-card" } as never);
     dnd.applyDropInstruction(
       activeTab.value,
@@ -603,18 +605,31 @@ describe("applyDropInstruction — uncovered branches", () => {
       { fragment: { tagName: "my-card" }, type: "block" },
       ["children", 0],
     );
-    expect(tab.doc.document.$elements).toHaveLength(1);
+    expect(tab.doc.document.$elements).toEqual([{ $ref: "../components/card.json" }]);
+  });
 
-    const doc2 = makeDoc();
-    doc2.$elements = [{ $ref: "../shared/card.json" }];
-    tab = resetWorkspaceWithTab(doc2);
+  test("…but a DIFFERENT file with the same name is a different component", () => {
+    /*
+     * This asserted the opposite. The drop matched a local component by `ref.endsWith(basename)`,
+     * so a page importing `../shared/card.json` counted `./components/card.json` as already
+     * imported, skipped the import, and left `<my-card>` resolving to the other card — or to
+     * nothing. `files/elements.ts` compares resolved paths, which is the one rule all four writers
+     * of this array now share (plan §11.2).
+     */
+    const doc = makeDoc();
+    doc.$elements = [{ $ref: "../shared/card.json" }];
+    const tab = resetWorkspaceWithTab(doc, { documentPath: "pages/index.json" });
+    componentRegistry.push({ path: "components/card.json", tagName: "my-card" } as never);
     dnd.applyDropInstruction(
       activeTab.value,
       { type: "make-child" },
       { fragment: { tagName: "my-card" }, type: "block" },
       ["children", 0],
     );
-    expect(tab.doc.document.$elements).toHaveLength(1);
+    expect(tab.doc.document.$elements).toEqual([
+      { $ref: "../shared/card.json" },
+      { $ref: "../components/card.json" },
+    ]);
   });
 
   test("local component without a path is not imported", () => {

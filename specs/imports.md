@@ -1,8 +1,8 @@
 # Imports
 
-**Version:** 0.1.6-draft
+**Version:** 0.1.7-draft
 **Status:** Partial
-**Updated:** 2026-07-22
+**Updated:** 2026-08-02
 **License:** MIT
 
 ---
@@ -145,7 +145,7 @@ Body: `{ "name": "<package-name>" }`. Runs `bun remove <name>`.
 
 The left sidebar "Imports" tab provides three sections:
 
-1. **Class Imports** - Name-to-path mappings from `project.json` `imports`. Add/remove with write-back.
+1. **Imported Modules** - Name-to-path mappings from `project.json` `imports`. Add/remove with write-back.
 2. **Components** - JX custom elements (`source: "jx"`) with live preview and drag-drop.
 3. **Packages** - npm web components (`source: "npm"`) grouped by package, with drag-drop of individual tags and package add/remove.
 
@@ -180,6 +180,7 @@ The compiler's `injectContext()` also merges site-level `$elements` into page-le
 
 ## Changelog
 
+- **0.1.7-draft** (2026-08-02) — Imports panel section renamed to Imported Modules in the UI.
 - **0.1.6-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.1.5-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
 - **0.1.4-draft** (2026-06-10) — Consolidate markdown and csv handling to the parser package (`8b1ba6da`).

@@ -4,6 +4,7 @@ import { watch as chokidarWatch } from "chokidar";
 import { relative } from "node:path";
 import { rebuild } from "./build.ts";
 import { coalesceFsEvents, toFsEvent } from "./refactor/fs-events.ts";
+import { invalidateReferenceCache } from "./refactor/find-refs.ts";
 import type { BuildEntry } from "./types.ts";
 import type { FsEventPayload } from "./refactor/fs-events.ts";
 
@@ -164,6 +165,10 @@ export function createWatcher(
     if (!filename || filename.startsWith("..")) {
       return;
     }
+
+    // The usage query's cache is invalidated by the filesystem, never by a timer — a delete
+    // Confirmation that says "used on 7 pages" must be answering about the tree as it is now.
+    invalidateReferenceCache(root);
 
     // Structured FS events for the studio sidebar (coalesced + batched), emitted as a named "fs"
     // SSE event so the preview iframe ignores them while the studio shell subscribes to them.

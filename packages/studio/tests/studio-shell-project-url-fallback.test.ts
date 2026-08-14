@@ -4,7 +4,7 @@
  */
 import "./harness";
 import { describe, expect, test } from "bun:test";
-import { bootStudio, statusMessages, waitFor } from "./studio-shell-fixture";
+import { bootStudio, waitFor } from "./studio-shell-fixture";
 import { activeTab } from "../src/workspace/workspace";
 
 const SITE = "/abs/empty-site";
@@ -23,11 +23,10 @@ await bootStudio({
   url: `http://localhost/?project=${SITE}`,
 });
 
-await waitFor(() => statusMessages.includes("Opened project.json"));
+await waitFor(() => activeTab.value?.id === "project.json");
 
 describe("?project= with no home page", () => {
   test("opens project.json itself when no pages/index.* candidate exists", () => {
-    expect(statusMessages).toContain("Opened project.json");
     expect(activeTab.value?.id).toBe("project.json");
     expect((activeTab.value!.doc.document as any).name).toBe("EmptySite");
   });

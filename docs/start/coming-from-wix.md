@@ -39,7 +39,7 @@ The day-to-day loop is: edit in Studio, click **Commit and sync**, and a minute 
 
 Honestly: some one-time setup that Wix or Squarespace did for you.
 
-- **Connecting the pieces.** You'll create a GitHub account and connect a host. Studio walks you through the repository part with **[Publish to GitHub](/docs/studio/publish/github)**, has a built-in flow for **[Cloudflare Pages](/docs/studio/publish/cloudflare)**, and the **[other hosts](/docs/studio/publish/other-hosts)** guide covers the rest — the host setup is two fields, once.
+- **Connecting the pieces.** You'll create a GitHub account and connect a host. Studio walks you through the repository part in **[GitHub](/docs/studio/publish/github)**, has a built-in flow for **[Cloudflare Pages](/docs/studio/publish/cloudflare)**, and the **[other hosts](/docs/studio/publish/other-hosts)** guide covers the rest — the host setup is two fields, once.
 - **Your domain.** Domains come from a registrar or your host, not from the builder, and you connect one in the host's settings.
 - **No single support desk.** If something on the host's side misbehaves, it's their documentation you'll read — there's no one company renting you the whole stack.
 

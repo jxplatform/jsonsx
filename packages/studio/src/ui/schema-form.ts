@@ -5,9 +5,17 @@
  * Maps schema property types to Spectrum controls (enum → picker, boolean → checkbox,
  * number/integer → number-field, `json-schema` format → multiline JSON editor, array-of-objects →
  * multi-row inline form, other array/object → JSON text field, default → textfield). Hosts commit
- * edits through a single `onChange(patch)` callback; dynamic enum choices and `$ref` bindings
- * resolve through a {@link SchemaFormContext}. Custom controls register by name via
- * {@link registerFormControl} and are consulted first for `ui` overrides.
+ * edits through a single `onChange(patch)` callback; dynamic enum choices resolve through a
+ * {@link SchemaFormContext}. Custom controls register by name via {@link registerFormControl} and
+ * are consulted first for `ui` overrides.
+ *
+ * **Binding is the same ladder as everywhere else** (§6.6). A host that names somewhere a value can
+ * come from — route params, the document's signals — gets a Value Source chip on every scalar
+ * field, drawn by `ui/dynamic-slot.ts` and named by `ui/value-source.ts`. It replaces two things: a
+ * private `Static value / $params/… / Custom…` picker that mounted only when the field ALREADY held
+ * a `$ref` (so no form had a gesture for starting a binding at all), and a link button beside the
+ * textfield that silently committed the first route param. A host that names no source — the
+ * project settings forms — draws no chip and edits fixed values, exactly as before.
  */
 
 import { html, nothing } from "lit-html";
@@ -16,7 +24,11 @@ import { live } from "lit-html/directives/live.js";
 import { styleMap } from "lit-html/directives/style-map.js";
 import { isRef } from "@jxsuite/schema/guards";
 import { renderFieldRow } from "./field-row";
+import { renderDynamicSlot } from "./dynamic-slot";
+import { configFieldSchema } from "./value-source";
 import type { TemplateResult } from "lit-html";
+import type { SignalOption } from "./dynamic-slot";
+import type { JsonValue } from "../types";
 
 /** A (possibly nested) JSON Schema node, covering both object and property level keys. */
 export interface JsonSchema {
@@ -32,6 +44,12 @@ export interface JsonSchema {
   examples?: string[];
   name?: string;
   items?: JsonSchema;
+  /**
+   * A pointer to another schema. `#/content/<type>` is the one this engine acts on: it is how
+   * site-architecture.md §6.1 declares a relationship between collections, and it is what the
+   * schema-builder writes (`form-controls.ts`'s `onChangeRefTarget`).
+   */
+  $ref?: string;
 }
 
 /** Host-provided context threaded to every control. */
@@ -40,7 +58,13 @@ export interface SchemaFormContext {
   resolvePointer: (pointer: string, scope?: Record<string, unknown>) => unknown;
   /** Route params available for `$ref` bindings (e.g. from the document path). */
   params?: string[] | undefined;
-  /** Unique prefix for per-field ephemeral UI state (e.g. the binding control's custom mode). */
+  /**
+   * State keys a field may bind to. Together with {@link params} this is the whole answer to "where
+   * could this value come from" — and naming none of them is how a host says the form edits fixed
+   * values only, which is why the settings forms show no Value Source chip.
+   */
+  signals?: string[] | undefined;
+  /** Unique prefix for the dynamic slot's per-field, per-rung value memory. */
   fieldKeyPrefix?: string | undefined;
   /**
    * Commit hook for the "secret" control: stores the VALUE in the platform's secret store (never
@@ -73,6 +97,30 @@ export interface RenderFormOptions {
    */
   ui?: Record<string, { control?: string; enum?: unknown }> | undefined;
   rerender?: (() => void) | undefined;
+  /**
+   * Externally-produced diagnostics, keyed by property name — §7.1's inline tier, sourced.
+   *
+   * This is how a validator that runs over the WHOLE document reaches the one field it is about:
+   * `jx-validate`'s `project.json` errors (until now wired only to the AI's `write_project_config`,
+   * so a human editing the same file through Settings got no validation at all), Monaco's markers
+   * for the same file open in the code view, and a host's own commit-time rejection.
+   *
+   * A host message wins over {@link validateFieldValue}'s intrinsic check, because the host knows
+   * things the property schema alone does not — that this enum value names a connector that was
+   * just deleted, say. An empty string means "no error", so a host can pass a lookup result
+   * straight through.
+   */
+  errors?: Record<string, string> | undefined;
+  /** How many times each field has been refused in a row; drives the row's repeat counter. */
+  errorCounts?: Record<string, number> | undefined;
+  /**
+   * Report required-but-empty fields inline. Off by default, and that default is §7.1's rule
+   * literally applied: a form the user has not touched yet has not committed anything, so painting
+   * every required field red the moment it renders is telling them they got something wrong before
+   * they did anything. Required-ness is already shown — the label carries a `*`. A host that
+   * validates on submit turns this on for the render that follows the rejected submit.
+   */
+  showRequired?: boolean | undefined;
 }
 
 // ─── Control registry ────────────────────────────────────────────────────────
@@ -89,8 +137,30 @@ export function getFormControl(name: string): SchemaFormControl | undefined {
   return controlRegistry.get(name);
 }
 
-/** Inert context used when a host renders a form without one. */
-const NULL_CONTEXT: SchemaFormContext = {
+// ─── References between collections ──────────────────────────────────────────
+
+/** `#/content/<type>` — a property whose value is the id of an entry in another collection. */
+const CONTENT_REF = /^#\/content\/([^/]+)$/;
+
+/**
+ * The collection a property references, or null when it references nothing.
+ *
+ * Exported because it is the ONE test for "is this field a relationship", and three surfaces have
+ * to agree on it: this engine, the frontmatter renderer, and the grid's relationship cell. A fourth
+ * reading of `$ref` is how the picker ends up existing three times with three behaviours.
+ */
+export function referenceTarget(schema: { $ref?: string } | undefined): string | null {
+  const match = typeof schema?.$ref === "string" ? CONTENT_REF.exec(schema.$ref) : null;
+  return match ? match[1]! : null;
+}
+
+/**
+ * Inert context used when a host renders a form without one.
+ *
+ * Exported because a host with genuinely nowhere to resolve from — the frontmatter renderer, whose
+ * one registered control reads FILES — should name this rather than write a second empty closure.
+ */
+export const NULL_FORM_CONTEXT: SchemaFormContext = {
   resolvePointer: () => {
     // Nothing to resolve against without a host context
   },
@@ -173,6 +243,9 @@ function refTextField(key: string, refVal: string, onChange: (next: unknown) => 
  * @param {(val: unknown) => void} onChange
  * @param {SchemaFormContext | undefined} ctx
  * @param {Record<string, unknown>} [scope] - Scope for dependent enum refs (the parent form value)
+ * @param {() => void} [rerender] - Repaint hook, threaded so an inline reference can show its
+ *   choices once they load — an async control with no way to ask for a second frame renders its
+ *   loading state forever.
  */
 export function renderInlineField(
   key: string,
@@ -181,9 +254,22 @@ export function renderInlineField(
   onChange: (val: unknown) => void,
   ctx?: SchemaFormContext,
   scope?: Record<string, unknown>,
+  rerender?: () => void,
 ) {
   if (isRef(value)) {
     return refTextField(key, value.$ref, onChange);
+  }
+  const referenceControl =
+    referenceTarget(schema) === null ? undefined : controlRegistry.get("reference");
+  if (referenceControl) {
+    return referenceControl({
+      ctx: ctx ?? NULL_FORM_CONTEXT,
+      key,
+      onChange,
+      rerender,
+      schema,
+      value,
+    });
   }
   const enumValues = resolveFormEnum(schema.enum, ctx, scope);
 
@@ -287,17 +373,24 @@ function renderPropertyControl(
     }
   }
 
-  if (
-    isRef(currentValue) &&
-    ps.format !== "json-schema" &&
-    ps.type !== "object" &&
-    ps.type !== "array"
-  ) {
-    const binding = controlRegistry.get("binding");
-    if (binding) {
-      return binding(controlArgs);
-    }
+  /* A ref left in a form whose host named nowhere to bind: no ladder is drawn, so the pointer is
+     edited as the string it is rather than rendered as "[object Object]" in a typed widget. */
+  if (isRef(currentValue) && isBindableField(ps)) {
     return refTextField(prop, currentValue.$ref, commit);
+  }
+
+  /* A relationship to another collection (`$ref: "#/content/<type>"`) is the registered `reference`
+     control, wherever the form is drawn — §9.2's "one picker" is this dispatch plus the single
+     `registerFormControl("reference", …)` in `ui/form-controls.ts`. It is deliberately NOT an enum:
+     the choices are entry files on disk, so they are read asynchronously and can be stale, and a
+     schema `enum` is a closed set the document itself declares. When the control is not registered
+     (a bare-Bun import of this engine), the field falls through to the plain textfield below rather
+     than rendering nothing. */
+  if (referenceTarget(ps) !== null) {
+    const referenceControl = controlRegistry.get("reference");
+    if (referenceControl) {
+      return referenceControl(controlArgs);
+    }
   }
 
   const enumValues = resolveFormEnum(opts.ui?.[prop]?.enum ?? ps.enum, ctx, value);
@@ -425,6 +518,7 @@ function renderPropertyControl(
                   },
                   ctx,
                   value,
+                  opts.rerender,
                 ),
               )}
               <sp-action-button
@@ -466,35 +560,99 @@ function renderPropertyControl(
 
   /** @type {ReturnType<typeof setTimeout> | undefined} */
   let debounce: ReturnType<typeof setTimeout> | undefined;
-  const params = ctx.params ?? [];
   const ph = ps.default !== undefined ? String(ps.default) : (ps.examples?.[0] ?? "");
-  return html`<div style="display:flex;gap:4px;align-items:center">
-    <sp-textfield
-      size="s"
-      style="flex:1"
-      .value=${currentValue ?? ""}
-      placeholder=${ph || nothing}
-      title=${ps.description || nothing}
-      @input=${(e: Event) => {
-        clearTimeout(debounce);
-        debounce = setTimeout(() => commit((e.target as HTMLInputElement).value || undefined), 400);
-      }}
-    ></sp-textfield>
-    ${
-      params.length > 0
-        ? html`<sp-action-button
-            quiet
-            size="s"
-            title="Bind to route param"
-            @click=${() => {
-              commit({ $ref: `#/$params/${params[0]}` });
-              opts.rerender?.();
-            }}
-            ><sp-icon-link slot="icon"></sp-icon-link
-          ></sp-action-button>`
-        : nothing
+  return html`<sp-textfield
+    size="s"
+    style="flex:1"
+    .value=${currentValue ?? ""}
+    placeholder=${ph || nothing}
+    title=${ps.description || nothing}
+    @input=${(e: Event) => {
+      clearTimeout(debounce);
+      debounce = setTimeout(() => commit((e.target as HTMLInputElement).value || undefined), 400);
+    }}
+  ></sp-textfield>`;
+}
+
+// ─── The Value Source ladder (§6.6) ──────────────────────────────────────────
+
+/**
+ * Whether a property is edited as a single value at all. The three that are not — a nested JSON
+ * Schema, an object and an array — are edited as raw JSON or as a multi-row sub-form, and a chip
+ * offering to replace that editor with a signal pointer would be offering to delete the user's
+ * work.
+ */
+function isBindableField(ps: JsonSchema): boolean {
+  return ps.format !== "json-schema" && ps.type !== "object" && ps.type !== "array";
+}
+
+/** Every pointer this form's host says a value may come from. */
+function refSourcesFor(ctx: SchemaFormContext): SignalOption[] {
+  return [
+    ...(ctx.signals ?? []).map((name) => ({ label: name, value: `#/state/${name}` })),
+    ...(ctx.params ?? []).map((name) => ({ label: `$params/${name}`, value: `#/$params/${name}` })),
+  ];
+}
+
+// ─── Field validation (§7.1, inline tier) ────────────────────────────────────
+
+/**
+ * Why this value is not acceptable for this property schema, or `""` when it is.
+ *
+ * Deliberately narrow: the checks a _property_ schema can make on its own, at the moment the value
+ * is committed. Anything cross-field, cross-document or extension-defined belongs to whoever ran
+ * the real validator and arrives through {@link RenderFormOptions.errors} — a form control is not a
+ * second implementation of JSON Schema, it is the place a verdict gets rendered.
+ *
+ * A `$ref` binding is never judged here. Its value is resolved at render time from state the form
+ * cannot see, so type-checking the reference itself would refuse every correct binding.
+ *
+ * @param {JsonSchema} schema
+ * @param {unknown} value
+ * @param {boolean} isRequired
+ * @returns {string}
+ */
+export function validateFieldValue(
+  schema: JsonSchema,
+  value: unknown,
+  isRequired: boolean,
+): string {
+  if (isRef(value)) {
+    return "";
+  }
+  const empty = value === undefined || value === null || value === "";
+  if (empty) {
+    return isRequired ? "Required." : "";
+  }
+  if (Array.isArray(schema.enum) && !schema.enum.includes(value)) {
+    return `Choose one of: ${schema.enum.map(String).join(", ")}.`;
+  }
+  if (schema.type === "number" || schema.type === "integer") {
+    const n = typeof value === "number" ? value : Number(value);
+    if (!Number.isFinite(n)) {
+      return "Enter a number.";
     }
-  </div>`;
+    if (schema.type === "integer" && !Number.isInteger(n)) {
+      return "Enter a whole number.";
+    }
+    if (schema.minimum !== undefined && n < schema.minimum) {
+      return `Must be ${schema.minimum} or more.`;
+    }
+    if (schema.maximum !== undefined && n > schema.maximum) {
+      return `Must be ${schema.maximum} or less.`;
+    }
+    return "";
+  }
+  if (schema.type === "boolean" && typeof value !== "boolean") {
+    return "Must be true or false.";
+  }
+  if (schema.type === "array" && !Array.isArray(value)) {
+    return "Must be a list.";
+  }
+  if (schema.type === "object" && (typeof value !== "object" || Array.isArray(value))) {
+    return "Must be an object.";
+  }
+  return "";
 }
 
 // ─── Form rendering ──────────────────────────────────────────────────────────
@@ -514,15 +672,41 @@ export function renderForm(
   opts: RenderFormOptions,
 ): TemplateResult {
   const required = new Set(schema.required);
-  const ctx = opts.context ?? NULL_CONTEXT;
+  const ctx = opts.context ?? NULL_FORM_CONTEXT;
+  const refSources = refSourcesFor(ctx);
 
   const propertyFields = Object.entries(schema.properties ?? {}).map(([prop, ps]) => {
     const labelText = prop + (required.has(prop) ? " *" : "");
+    // Host diagnostics win over the intrinsic check — see RenderFormOptions.errors.
+    const error =
+      opts.errors?.[prop] ||
+      validateFieldValue(ps, value[prop], Boolean(opts.showRequired) && required.has(prop));
+    const count = opts.errorCounts?.[prop];
+    const staticWidget = renderPropertyControl(prop, ps, value, required, opts, ctx);
+    /* A `ui.control` override owns its whole field — the secret control writes an env-var NAME
+       rather than the value it was handed, so a rung switch above it would be editing a different
+       thing than the one on screen. */
+    const laddered =
+      refSources.length > 0 && isBindableField(ps) && !opts.ui?.[prop]?.control
+        ? renderDynamicSlot({
+            allowCustomRef: true,
+            caps: { schema: configFieldSchema(ps) },
+            extraSignals: refSources,
+            fieldKey: `${ctx.fieldKeyPrefix ?? ""}.${prop}`,
+            onChange: (v?: JsonValue) => opts.onChange({ [prop]: v }),
+            staticWidget,
+            stateDefs: [],
+            value: value[prop],
+          })
+        : null;
     return renderFieldRow({
       hasValue: false,
       label: labelText,
       prop: ps.name || prop,
-      widget: renderPropertyControl(prop, ps, value, required, opts, ctx),
+      widget: laddered ? laddered.widget : staticWidget,
+      ...(laddered ? { labelExtra: laddered.modeButton } : {}),
+      ...(error ? { error } : {}),
+      ...(count === undefined ? {} : { errorCount: count }),
     });
   });
 

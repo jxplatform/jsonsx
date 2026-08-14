@@ -1,6 +1,6 @@
 ---
 title: "Coming from Lovable or Builder.io"
-description: "How Jx compares to AI site builders — the assistant edits inspectable documents you can see in Layers and State, review in git, and edit by hand."
+description: "How Jx compares to AI site builders — the assistant edits inspectable documents you can see in Outline and State, review in git, and edit by hand."
 ---
 
 # Coming from Lovable or Builder.io
@@ -9,7 +9,7 @@ AI builders have settled the question of whether a machine can build a page. The
 
 ## What the assistant edits
 
-A Jx page or component is a structured document — readable JSON describing its elements, styles, and state, in a format that's [fully documented](/docs/framework). Studio's assistant works on those documents, the same files you edit on the canvas. Ask it for a pricing section and the result isn't a wall of generated code: the structure appears in **Layers**, the values and behavior in **State**, and the styles in the Style inspector — the same panels, showing the same file, whether you built it or the assistant did.
+A Jx page or component is a structured document — readable JSON describing its elements, styles, and state, in a format that's [fully documented](/docs/framework). Studio's assistant works on those documents, the same files you edit on the canvas. Ask it for a pricing section and the result isn't a wall of generated code: the structure appears in **Outline**, the values and behavior in **State**, and the styles in the Style inspector — the same panels, showing the same file, whether you built it or the assistant did.
 
 | In an AI builder                    | In Jx                                                  |
 | ----------------------------------- | ------------------------------------------------------ |

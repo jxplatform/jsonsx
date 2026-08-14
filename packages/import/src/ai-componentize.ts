@@ -279,8 +279,11 @@ function rewriteCallSites(
 ): JxElement {
   const result: JxElement = { ...node };
 
-  if (result.tagName && tagRenames.has(result.tagName)) {
-    const oldTag = result.tagName;
+  /* Import builds every node from parsed HTML, so a tag here is always a literal — the narrow is
+     the type saying so rather than a cast pretending the other shape cannot arrive. */
+  const literalTag = typeof result.tagName === "string" ? result.tagName : null;
+  if (literalTag && tagRenames.has(literalTag)) {
+    const oldTag = literalTag;
     result.tagName = tagRenames.get(oldTag)!;
 
     const propRenames = propRenamesByTag.get(oldTag);

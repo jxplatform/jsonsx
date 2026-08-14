@@ -16,7 +16,9 @@
               "type": "array"
             }
           },
-          "required": ["values"],
+          "required": [
+            "values"
+          ],
           "type": "object"
         },
         {
@@ -36,7 +38,9 @@
               "type": "string"
             }
           },
-          "required": ["$ref"],
+          "required": [
+            "$ref"
+          ],
           "type": "object"
         },
         {
@@ -112,16 +116,24 @@
               "not": {
                 "anyOf": [
                   {
-                    "required": ["$prototype"]
+                    "required": [
+                      "$prototype"
+                    ]
                   },
                   {
-                    "required": ["default"]
+                    "required": [
+                      "default"
+                    ]
                   },
                   {
-                    "required": ["type"]
+                    "required": [
+                      "type"
+                    ]
                   },
                   {
-                    "required": ["$expression"]
+                    "required": [
+                      "$expression"
+                    ]
                   }
                 ]
               },
@@ -132,7 +144,9 @@
         "TypedStateDef": {
           "description": "A typed reactive state variable with explicit type and default value. The type property is a JSON Schema or $ref to a $defs type definition. The default property is the initial runtime value.",
           "not": {
-            "required": ["$prototype"]
+            "required": [
+              "$prototype"
+            ]
           },
           "properties": {
             "$ref": {
@@ -179,7 +193,9 @@
               ]
             }
           },
-          "required": ["default"],
+          "required": [
+            "default"
+          ],
           "type": "object"
         },
         "PureTypeDef": {
@@ -187,10 +203,14 @@
           "not": {
             "anyOf": [
               {
-                "required": ["default"]
+                "required": [
+                  "default"
+                ]
               },
               {
-                "required": ["$prototype"]
+                "required": [
+                  "$prototype"
+                ]
               }
             ]
           },
@@ -235,7 +255,9 @@
               "$ref": "#/$defs/v1/$defs/JsonSchemaType"
             }
           },
-          "required": ["type"],
+          "required": [
+            "type"
+          ],
           "type": "object"
         },
         "FunctionDef": {
@@ -252,12 +274,20 @@
             },
             "$src": {
               "description": "External module specifier. Mutually exclusive with body.",
-              "examples": ["./counter.js", "npm:@myorg/validators"],
+              "examples": [
+                "./counter.js",
+                "npm:@myorg/validators"
+              ],
               "type": "string"
             },
             "arguments": {
               "description": "Legacy alias for parameters: bare string parameter names (state may be listed explicitly as the first name). Superseded by parameters.",
-              "examples": [["state", "event"]],
+              "examples": [
+                [
+                  "state",
+                  "event"
+                ]
+              ],
               "items": {
                 "type": "string"
               },
@@ -311,7 +341,9 @@
             "parameters": {
               "description": "Function parameters (after the implicit state parameter). Accepts CEM-compatible parameter objects or bare string names for backward compatibility.",
               "examples": [
-                ["event"],
+                [
+                  "event"
+                ],
                 [
                   {
                     "name": "event",
@@ -346,7 +378,9 @@
               "description": "Return type for tooling (JSON Schema or CEM { text } format)."
             }
           },
-          "required": ["$prototype"],
+          "required": [
+            "$prototype"
+          ],
           "type": "object"
         },
         "ClassDef": {
@@ -425,7 +459,9 @@
                       "type": "string"
                     }
                   },
-                  "required": ["$ref"],
+                  "required": [
+                    "$ref"
+                  ],
                   "type": "object"
                 }
               ]
@@ -444,7 +480,10 @@
               "type": "string"
             }
           },
-          "required": ["$prototype", "title"],
+          "required": [
+            "$prototype",
+            "title"
+          ],
           "type": "object"
         },
         "ClassParameterDef": {
@@ -466,7 +505,9 @@
             },
             "type": {}
           },
-          "required": ["identifier"],
+          "required": [
+            "identifier"
+          ],
           "type": "object"
         },
         "ClassFieldDef": {
@@ -477,7 +518,11 @@
               "type": "string"
             },
             "access": {
-              "enum": ["public", "private", "protected"],
+              "enum": [
+                "public",
+                "private",
+                "protected"
+              ],
               "type": "string"
             },
             "default": {},
@@ -496,7 +541,10 @@
               "type": "string"
             },
             "scope": {
-              "enum": ["instance", "static"],
+              "enum": [
+                "instance",
+                "static"
+              ],
               "type": "string"
             },
             "type": {}
@@ -536,7 +584,9 @@
                         "type": "string"
                       }
                     },
-                    "required": ["$ref"],
+                    "required": [
+                      "$ref"
+                    ],
                     "type": "object"
                   },
                   {
@@ -572,7 +622,11 @@
               "type": "string"
             },
             "access": {
-              "enum": ["public", "private", "protected"],
+              "enum": [
+                "public",
+                "private",
+                "protected"
+              ],
               "type": "string"
             },
             "body": {
@@ -612,7 +666,9 @@
                         "type": "string"
                       }
                     },
-                    "required": ["$ref"],
+                    "required": [
+                      "$ref"
+                    ],
                     "type": "object"
                   },
                   {
@@ -645,7 +701,10 @@
               "type": "string"
             },
             "scope": {
-              "enum": ["instance", "static"],
+              "enum": [
+                "instance",
+                "static"
+              ],
               "type": "string"
             },
             "setter": {
@@ -662,7 +721,11 @@
             "timing": {
               "description": "Execution environments allowed to call this capability directly. Hosts outside the list round-trip through the dev server.",
               "items": {
-                "enum": ["compiler", "server", "client"],
+                "enum": [
+                  "compiler",
+                  "server",
+                  "client"
+                ],
                 "type": "string"
               },
               "type": "array"
@@ -676,7 +739,11 @@
             "documentKinds": {
               "description": "\"page\"/\"component\" allow the extension in pages/components discovery; \"content\" allows it as a content-type source.",
               "items": {
-                "enum": ["page", "component", "content"],
+                "enum": [
+                  "page",
+                  "component",
+                  "content"
+                ],
                 "type": "string"
               },
               "type": "array"
@@ -703,7 +770,9 @@
               "type": "boolean"
             }
           },
-          "required": ["extensions"],
+          "required": [
+            "extensions"
+          ],
           "type": "object"
         },
         "ProjectBlockDef": {
@@ -725,7 +794,9 @@
               "type": "string"
             }
           },
-          "required": ["key"],
+          "required": [
+            "key"
+          ],
           "type": "object"
         },
         "ServerBlockDef": {
@@ -734,7 +805,10 @@
           "properties": {
             "basePath": {
               "description": "Route subtree this class mounts — must be under /_jx/ (exclusive per project).",
-              "examples": ["/_jx/data", "/_jx/auth"],
+              "examples": [
+                "/_jx/data",
+                "/_jx/auth"
+              ],
               "type": "string"
             },
             "module": {
@@ -746,7 +820,9 @@
               "type": "number"
             }
           },
-          "required": ["basePath"],
+          "required": [
+            "basePath"
+          ],
           "type": "object"
         },
         "ConnectorBlockDef": {
@@ -754,7 +830,10 @@
           "properties": {
             "kind": {
               "description": "SQL dialect family the provider speaks.",
-              "enum": ["sqlite", "postgres"],
+              "enum": [
+                "sqlite",
+                "postgres"
+              ],
               "type": "string"
             },
             "local": {
@@ -774,7 +853,10 @@
               "type": "string"
             }
           },
-          "required": ["provider", "kind"],
+          "required": [
+            "provider",
+            "kind"
+          ],
           "type": "object"
         },
         "StudioHints": {
@@ -795,7 +877,10 @@
                   "type": "object"
                 },
                 "default": {
-                  "enum": ["content", "component"],
+                  "enum": [
+                    "content",
+                    "component"
+                  ],
                   "type": "string"
                 }
               },
@@ -904,7 +989,11 @@
             },
             "$src": {
               "description": "External module specifier. Required when $prototype is not a built-in.",
-              "examples": ["@jxsuite/md", "./lib/my-parser.js", "npm:@myorg/data"],
+              "examples": [
+                "@jxsuite/md",
+                "./lib/my-parser.js",
+                "npm:@myorg/data"
+              ],
               "type": "string"
             },
             "autoIncrement": {
@@ -929,7 +1018,23 @@
               "type": "string"
             },
             "filter": {
-              "$ref": "#/$defs/v1/$defs/RefObject"
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/v1/$defs/RefObject"
+                },
+                {
+                  "description": "A single filter object, e.g. an equality shorthand.",
+                  "type": "object"
+                },
+                {
+                  "description": "Ordered filter rules, e.g. [{ field: \"Slug\", op: \"not empty\" }].",
+                  "items": {
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              ],
+              "description": "Filter configuration: a reactive $ref binding, a single filter object, or an ordered array of rules."
             },
             "headers": {
               "additionalProperties": {
@@ -960,7 +1065,10 @@
                     "type": "boolean"
                   }
                 },
-                "required": ["name", "keyPath"],
+                "required": [
+                  "name",
+                  "keyPath"
+                ],
                 "type": "object"
               },
               "type": "array"
@@ -982,7 +1090,15 @@
               "type": "integer"
             },
             "method": {
-              "enum": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"],
+              "enum": [
+                "GET",
+                "POST",
+                "PUT",
+                "PATCH",
+                "DELETE",
+                "HEAD",
+                "OPTIONS"
+              ],
               "type": "string"
             },
             "name": {
@@ -992,11 +1108,22 @@
               "type": "string"
             },
             "responseType": {
-              "enum": ["json", "text", "blob", "arraybuffer", "document", ""],
+              "enum": [
+                "json",
+                "text",
+                "blob",
+                "arraybuffer",
+                "document",
+                ""
+              ],
               "type": "string"
             },
             "sameSite": {
-              "enum": ["strict", "lax", "none"],
+              "enum": [
+                "strict",
+                "lax",
+                "none"
+              ],
               "type": "string"
             },
             "secure": {
@@ -1029,7 +1156,11 @@
               "type": "string"
             },
             "timing": {
-              "enum": ["compiler", "server", "client"],
+              "enum": [
+                "compiler",
+                "server",
+                "client"
+              ],
               "type": "string"
             },
             "url": {
@@ -1040,7 +1171,9 @@
               "type": "integer"
             }
           },
-          "required": ["$prototype"],
+          "required": [
+            "$prototype"
+          ],
           "type": "object"
         },
         "ExpressionPointer": {
@@ -1052,7 +1185,9 @@
               "type": "string"
             }
           },
-          "required": ["$ref"],
+          "required": [
+            "$ref"
+          ],
           "type": "object"
         },
         "ExpressionLiteral": {
@@ -1083,10 +1218,14 @@
               "not": {
                 "anyOf": [
                   {
-                    "required": ["$ref"]
+                    "required": [
+                      "$ref"
+                    ]
                   },
                   {
-                    "required": ["operator"]
+                    "required": [
+                      "operator"
+                    ]
                   }
                 ]
               },
@@ -1110,10 +1249,28 @@
           "description": "Anything that may appear in target or value: a pointer, a literal, or a nested expression node."
         },
         "UnaryOperator": {
-          "enum": ["!", "-"]
+          "enum": [
+            "!",
+            "-"
+          ]
         },
         "BinaryOperator": {
-          "enum": ["+", "-", "*", "/", "%", "===", "!==", "<", "<=", ">", ">=", "&&", "||", "??"]
+          "enum": [
+            "+",
+            "-",
+            "*",
+            "/",
+            "%",
+            "===",
+            "!==",
+            "<",
+            "<=",
+            ">",
+            ">=",
+            "&&",
+            "||",
+            "??"
+          ]
         },
         "ConditionalOperator": {
           "const": "?:"
@@ -1161,13 +1318,25 @@
           ]
         },
         "AssignmentOperator": {
-          "enum": ["=", "+=", "-=", "*=", "/="]
+          "enum": [
+            "=",
+            "+=",
+            "-=",
+            "*=",
+            "/="
+          ]
         },
         "NoArgMethod": {
-          "enum": ["pop", "shift"]
+          "enum": [
+            "pop",
+            "shift"
+          ]
         },
         "OneArgMethod": {
-          "enum": ["push", "unshift"]
+          "enum": [
+            "push",
+            "unshift"
+          ]
         },
         "SpliceMethod": {
           "const": "splice"
@@ -1176,7 +1345,10 @@
           "const": "reduce"
         },
         "MapFilterMethod": {
-          "enum": ["map", "filter"]
+          "enum": [
+            "map",
+            "filter"
+          ]
         },
         "ExpressionNode": {
           "additionalProperties": false,
@@ -1186,10 +1358,14 @@
               "not": {
                 "anyOf": [
                   {
-                    "required": ["value"]
+                    "required": [
+                      "value"
+                    ]
                   },
                   {
-                    "required": ["initial"]
+                    "required": [
+                      "initial"
+                    ]
                   }
                 ]
               },
@@ -1198,24 +1374,33 @@
                   "$ref": "#/$defs/v1/$defs/UnaryOperator"
                 }
               },
-              "required": ["operator"],
+              "required": [
+                "operator"
+              ],
               "title": "Unary — target only, no value"
             },
             {
               "not": {
-                "required": ["initial"]
+                "required": [
+                  "initial"
+                ]
               },
               "properties": {
                 "operator": {
                   "$ref": "#/$defs/v1/$defs/BinaryOperator"
                 }
               },
-              "required": ["operator", "value"],
+              "required": [
+                "operator",
+                "value"
+              ],
               "title": "Binary — left in target, right in value"
             },
             {
               "not": {
-                "required": ["initial"]
+                "required": [
+                  "initial"
+                ]
               },
               "properties": {
                 "operator": {
@@ -1225,17 +1410,24 @@
                   "$ref": "#/$defs/v1/$defs/ExpressionPointer"
                 }
               },
-              "required": ["operator", "value"],
+              "required": [
+                "operator",
+                "value"
+              ],
               "title": "Assignment — writable target, value required"
             },
             {
               "not": {
                 "anyOf": [
                   {
-                    "required": ["value"]
+                    "required": [
+                      "value"
+                    ]
                   },
                   {
-                    "required": ["initial"]
+                    "required": [
+                      "initial"
+                    ]
                   }
                 ]
               },
@@ -1247,12 +1439,16 @@
                   "$ref": "#/$defs/v1/$defs/ExpressionPointer"
                 }
               },
-              "required": ["operator"],
+              "required": [
+                "operator"
+              ],
               "title": "pop / shift — array receiver, no value"
             },
             {
               "not": {
-                "required": ["initial"]
+                "required": [
+                  "initial"
+                ]
               },
               "properties": {
                 "operator": {
@@ -1262,12 +1458,17 @@
                   "$ref": "#/$defs/v1/$defs/ExpressionPointer"
                 }
               },
-              "required": ["operator", "value"],
+              "required": [
+                "operator",
+                "value"
+              ],
               "title": "push / unshift — array receiver, single value argument"
             },
             {
               "not": {
-                "required": ["initial"]
+                "required": [
+                  "initial"
+                ]
               },
               "properties": {
                 "operator": {
@@ -1284,7 +1485,10 @@
                   "type": "array"
                 }
               },
-              "required": ["operator", "value"],
+              "required": [
+                "operator",
+                "value"
+              ],
               "title": "splice — array receiver, [start, deleteCount, ...items]"
             },
             {
@@ -1306,12 +1510,18 @@
                   "$ref": "#/$defs/v1/$defs/ExpressionNode"
                 }
               },
-              "required": ["operator", "value", "initial"],
+              "required": [
+                "operator",
+                "value",
+                "initial"
+              ],
               "title": "reduce — pure fold over a pointer or derived array; seed in initial"
             },
             {
               "not": {
-                "required": ["initial"]
+                "required": [
+                  "initial"
+                ]
               },
               "properties": {
                 "operator": {
@@ -1331,7 +1541,10 @@
                   "$ref": "#/$defs/v1/$defs/ExpressionNode"
                 }
               },
-              "required": ["operator", "value"],
+              "required": [
+                "operator",
+                "value"
+              ],
               "title": "map / filter — pure over a pointer or derived array; per-item expression in value"
             },
             {
@@ -1341,7 +1554,11 @@
                   "$ref": "#/$defs/v1/$defs/ConditionalOperator"
                 }
               },
-              "required": ["operator", "value", "initial"],
+              "required": [
+                "operator",
+                "value",
+                "initial"
+              ],
               "title": "?: — pure conditional; test in target, consequent in value, alternate in initial"
             },
             {
@@ -1349,10 +1566,14 @@
               "not": {
                 "anyOf": [
                   {
-                    "required": ["value"]
+                    "required": [
+                      "value"
+                    ]
                   },
                   {
-                    "required": ["initial"]
+                    "required": [
+                      "initial"
+                    ]
                   }
                 ]
               },
@@ -1370,26 +1591,35 @@
                   "$ref": "#/$defs/v1/$defs/SwitchOperator"
                 }
               },
-              "required": ["operator", "cases"],
+              "required": [
+                "operator",
+                "cases"
+              ],
               "title": "switch — pure value-keyed selection; discriminant in target, results in cases/default"
             },
             {
               "description": "A pure standard-library method call: target is the receiver (any operand — never mutated; change-by-copy names replace the mutating originals), value the optional argument (bare scalar) or argument list (array). A missing receiver or method yields undefined, matching null-safe path reads.",
               "not": {
-                "required": ["initial"]
+                "required": [
+                  "initial"
+                ]
               },
               "properties": {
                 "operator": {
                   "$ref": "#/$defs/v1/$defs/PureMethod"
                 }
               },
-              "required": ["operator"],
+              "required": [
+                "operator"
+              ],
               "title": "Pure method — genuine prototype methods; receiver in target, args in value"
             },
             {
               "description": "Invoke a callable, pure in formula position: target is the callee pointer — a named formula entry (#/state/…) or a blessed pure global via window#/ (Math.*, JSON.*, Object.keys/values/entries, and the Intl helpers Intl/formatNumber, Intl/formatDate, Intl/formatRelativeTime) — and value is the positional argument list (the splice args-in-value precedent). Argument order follows the callee's declared parameters.",
               "not": {
-                "required": ["initial"]
+                "required": [
+                  "initial"
+                ]
               },
               "properties": {
                 "operator": {
@@ -1405,7 +1635,9 @@
                   "type": "array"
                 }
               },
-              "required": ["operator"],
+              "required": [
+                "operator"
+              ],
               "title": "call — invoke a named formula or blessed global; callee in target, args in value"
             }
           ],
@@ -1434,7 +1666,10 @@
               "$ref": "#/$defs/v1/$defs/ExpressionOperand"
             }
           },
-          "required": ["operator", "target"],
+          "required": [
+            "operator",
+            "target"
+          ],
           "type": "object"
         },
         "ExpressionEntry": {
@@ -1465,7 +1700,9 @@
               "type": "array"
             }
           },
-          "required": ["$expression"],
+          "required": [
+            "$expression"
+          ],
           "type": "object"
         },
         "Statement": {
@@ -1493,7 +1730,10 @@
                   "type": "array"
                 }
               },
-              "required": ["if", "then"],
+              "required": [
+                "if",
+                "then"
+              ],
               "title": "if / then / else — conditional branch (JSON Schema keyword triple)",
               "type": "object"
             },
@@ -1519,7 +1759,10 @@
                   "type": "array"
                 }
               },
-              "required": ["$switch", "cases"],
+              "required": [
+                "$switch",
+                "cases"
+              ],
               "title": "$switch / cases — multiway branch (element-level convention, ECMA switch semantics)",
               "type": "object"
             },
@@ -1540,7 +1783,9 @@
                   "type": "string"
                 }
               },
-              "required": ["dispatchEvent"],
+              "required": [
+                "dispatchEvent"
+              ],
               "title": "dispatchEvent — emit a CustomEvent (WHATWG naming, CustomEventInit members)",
               "type": "object"
             }
@@ -1604,7 +1849,11 @@
               "$ref": "#/$defs/v1/$defs/StringOrRef"
             },
             "dir": {
-              "enum": ["ltr", "rtl", "auto"],
+              "enum": [
+                "ltr",
+                "rtl",
+                "auto"
+              ],
               "type": "string"
             },
             "disabled": {
@@ -1647,7 +1896,7 @@
               "$ref": "#/$defs/v1/$defs/NumberOrRef"
             },
             "tagName": {
-              "$ref": "#/$defs/v1/$defs/TagName"
+              "$ref": "#/$defs/v1/$defs/ElementTagName"
             },
             "textContent": {
               "$ref": "#/$defs/v1/$defs/StringOrRef"
@@ -5834,7 +6083,9 @@
               ]
             }
           },
-          "required": ["tagName"],
+          "required": [
+            "tagName"
+          ],
           "type": "object"
         },
         "ChildrenValue": {
@@ -5842,9 +6093,12 @@
           "oneOf": [
             {
               "items": {
-                "oneOf": [
+                "anyOf": [
                   {
                     "$ref": "#/$defs/v1/$defs/ElementDef"
+                  },
+                  {
+                    "$ref": "#/$defs/v1/$defs/SwitchNode"
                   },
                   {
                     "$ref": "#/$defs/v1/$defs/ArrayNamespace"
@@ -5897,7 +6151,11 @@
               "$ref": "#/$defs/v1/$defs/RefObject"
             }
           },
-          "required": ["$prototype", "items", "map"],
+          "required": [
+            "$prototype",
+            "items",
+            "map"
+          ],
           "type": "object"
         },
         "SwitchDef": {
@@ -5908,7 +6166,9 @@
               "$ref": "#/$defs/v1/$defs/StateRef"
             }
           },
-          "required": ["$ref"],
+          "required": [
+            "$ref"
+          ],
           "type": "object"
         },
         "SwitchNode": {
@@ -5933,7 +6193,10 @@
               "$ref": "#/$defs/v1/$defs/TagName"
             }
           },
-          "required": ["$switch", "cases"],
+          "required": [
+            "$switch",
+            "cases"
+          ],
           "type": "object"
         },
         "StyleObject": {
@@ -7532,6 +7795,26 @@
                 }
               ]
             },
+            "animation-delay-end": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            },
+            "animation-delay-start": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            },
             "animation-direction": {
               "oneOf": [
                 {
@@ -7673,6 +7956,26 @@
               ]
             },
             "animationDelay": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            },
+            "animationDelayEnd": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            },
+            "animationDelayStart": {
               "oneOf": [
                 {
                   "type": "string"
@@ -22279,7 +22582,9 @@
               "$ref": "#/$defs/v1/$defs/AnyRef"
             }
           },
-          "required": ["$ref"],
+          "required": [
+            "$ref"
+          ],
           "type": "object"
         },
         "AnyRef": {
@@ -22307,19 +22612,30 @@
         },
         "InternalRef": {
           "description": "Reference to a $defs type definition in the current component.",
-          "examples": ["#/$defs/Count", "#/$defs/TodoItem", "#/$defs/Status"],
+          "examples": [
+            "#/$defs/Count",
+            "#/$defs/TodoItem",
+            "#/$defs/Status"
+          ],
           "pattern": "^#/\\$defs/",
           "type": "string"
         },
         "StateRef": {
           "description": "Reference to a state entry (runtime variable) in the current component.",
-          "examples": ["#/state/count", "#/state/addTask", "#/state/items"],
+          "examples": [
+            "#/state/count",
+            "#/state/addTask",
+            "#/state/items"
+          ],
           "pattern": "^#/state/",
           "type": "string"
         },
         "ExternalRef": {
           "description": "Reference to an external Jx component file.",
-          "examples": ["./card.json", "https://cdn.example.com/button.json"],
+          "examples": [
+            "./card.json",
+            "https://cdn.example.com/button.json"
+          ],
           "pattern": "^(\\./|\\.\\./).*\\.json$|^https?://",
           "type": "string"
         },
@@ -22332,24 +22648,37 @@
               "$ref": "#/$defs/v1/$defs/ExternalRef"
             }
           },
-          "required": ["$ref"],
+          "required": [
+            "$ref"
+          ],
           "type": "object"
         },
         "GlobalRef": {
           "description": "Reference to a window or document global.",
-          "examples": ["window#/currentUser", "document#/appConfig"],
+          "examples": [
+            "window#/currentUser",
+            "document#/appConfig"
+          ],
           "pattern": "^(window|document)#/",
           "type": "string"
         },
         "ParentRef": {
           "description": "Reference to a named state entry passed via $props from a parent component.",
-          "examples": ["parent#/sharedState", "parent#/theme"],
+          "examples": [
+            "parent#/sharedState",
+            "parent#/theme"
+          ],
           "pattern": "^parent#/",
           "type": "string"
         },
         "MapRef": {
           "description": "Reference to the current Array map iteration context.",
-          "examples": ["$map/item", "$map/index", "$map/item/text", "$map/item/done"],
+          "examples": [
+            "$map/item",
+            "$map/index",
+            "$map/item/text",
+            "$map/item/done"
+          ],
           "pattern": "^\\$map/(item|index)(/.*)?$",
           "type": "string"
         },
@@ -22424,7 +22753,9 @@
               "description": "Parameter type (JSON Schema or CEM { text } format)."
             }
           },
-          "required": ["name"],
+          "required": [
+            "name"
+          ],
           "type": "object"
         },
         "CemEvent": {
@@ -22453,12 +22784,15 @@
               "description": "Event type (e.g. { text: 'CustomEvent' })."
             }
           },
-          "required": ["name"],
+          "required": [
+            "name"
+          ],
           "type": "object"
         },
         "TagName": {
-          "description": "HTML element tag name or custom element name (must contain a hyphen per Web Components spec).",
+          "description": "HTML element tag name or custom element name (must contain a hyphen per Web Components spec). A NAME, never an expression: no `${…}` position in the pipeline evaluates a tagName. Use `$switch`/`cases` to vary the element.",
           "minLength": 1,
+          "pattern": "^[a-zA-Z][a-zA-Z0-9._-]*$",
           "type": "string",
           "examples": [
             "a",
@@ -22674,8 +23008,95 @@
             "user-card"
           ]
         },
+        "TagExpression": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "description": "Two-way: `target` is the test, `value` the tag when it is truthy, `initial` the tag when it is not.",
+              "properties": {
+                "initial": {
+                  "$ref": "#/$defs/v1/$defs/TagName"
+                },
+                "operator": {
+                  "const": "?:",
+                  "type": "string"
+                },
+                "target": {
+                  "$ref": "#/$defs/v1/$defs/ExpressionOperand"
+                },
+                "value": {
+                  "$ref": "#/$defs/v1/$defs/TagName"
+                }
+              },
+              "required": [
+                "operator",
+                "target",
+                "value",
+                "initial"
+              ],
+              "title": "?: — the tag when the test holds, and the tag when it does not"
+            },
+            {
+              "additionalProperties": false,
+              "description": "Multiway: `target` is the discriminant, matched against case keys by its string form. `default` is required — an element with no tag cannot exist.",
+              "properties": {
+                "cases": {
+                  "additionalProperties": {
+                    "$ref": "#/$defs/v1/$defs/TagName"
+                  },
+                  "type": "object"
+                },
+                "default": {
+                  "$ref": "#/$defs/v1/$defs/TagName"
+                },
+                "operator": {
+                  "const": "switch",
+                  "type": "string"
+                },
+                "target": {
+                  "$ref": "#/$defs/v1/$defs/ExpressionOperand"
+                }
+              },
+              "required": [
+                "operator",
+                "target",
+                "cases",
+                "default"
+              ],
+              "title": "switch — one tag per discriminant value, with a required fallback"
+            }
+          ],
+          "description": "A tag name chosen at element creation. Every branch resolves to a `TagName`, so the candidate set is enumerable without evaluating anything."
+        },
+        "ElementTagName": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/v1/$defs/TagName"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "$expression": {
+                  "$ref": "#/$defs/v1/$defs/TagExpression"
+                }
+              },
+              "required": [
+                "$expression"
+              ],
+              "type": "object"
+            }
+          ]
+        },
         "JsonSchemaType": {
-          "enum": ["string", "number", "integer", "boolean", "array", "object", "null"],
+          "enum": [
+            "string",
+            "number",
+            "integer",
+            "boolean",
+            "array",
+            "object",
+            "null"
+          ],
           "type": "string"
         },
         "HeadEntry": {
@@ -22708,7 +23129,9 @@
               "type": "string"
             }
           },
-          "required": ["tagName"],
+          "required": [
+            "tagName"
+          ],
           "type": "object"
         },
         "ImageConfig": {
@@ -22752,7 +23175,10 @@
             },
             "service": {
               "description": "How images are optimized: \"build\" runs Sharp at build time; \"cloudflare\" emits /cdn-cgi/image transform URLs served by Cloudflare Image Transformations (requires the feature to be enabled on the serving zone).",
-              "enum": ["build", "cloudflare"],
+              "enum": [
+                "build",
+                "cloudflare"
+              ],
               "type": "string"
             },
             "sizes": {
@@ -22782,7 +23208,9 @@
                   "type": "array"
                 }
               },
-              "required": ["values"],
+              "required": [
+                "values"
+              ],
               "type": "object"
             },
             {
@@ -22802,7 +23230,9 @@
                   "type": "string"
                 }
               },
-              "required": ["$ref"],
+              "required": [
+                "$ref"
+              ],
               "type": "object"
             },
             {
@@ -22845,7 +23275,9 @@
                     "type": "string"
                   }
                 },
-                "required": ["$ref"],
+                "required": [
+                  "$ref"
+                ],
                 "type": "object"
               },
               {
@@ -22857,20 +23289,26 @@
           "type": "array"
         },
         "$head": {
-          "description": "Page-level <head> entries. Array of element definitions for meta tags, link tags, script tags, etc. Merged with layout and site-level $head entries.",
+          "description": "Page-level <head> entries. Array of head entries for meta tags, link tags, script tags, etc. Merged with layout and site-level $head entries.",
           "items": {
-            "$ref": "#/$defs/v1/$defs/ElementDef"
+            "$ref": "#/$defs/v1/$defs/HeadEntry"
           },
           "type": "array"
         },
         "$id": {
           "description": "Component identifier string. Used by tooling and the builder.",
-          "examples": ["Counter", "TodoApp", "UserCard"],
+          "examples": [
+            "Counter",
+            "TodoApp",
+            "UserCard"
+          ],
           "type": "string"
         },
         "$layout": {
           "description": "Layout reference for pages. String path to a layout JSON file, or false to opt out of the default layout.",
-          "examples": ["./layouts/base.json"],
+          "examples": [
+            "./layouts/base.json"
+          ],
           "oneOf": [
             {
               "type": "string"
@@ -22901,7 +23339,9 @@
         },
         "$schema": {
           "description": "URI identifying the Jx dialect version. Enables schema-aware IDE tooling.",
-          "examples": ["https://jxsuite.com/schema/v1"],
+          "examples": [
+            "https://jxsuite.com/schema/v1"
+          ],
           "type": "string"
         },
         "attributes": {

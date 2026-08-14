@@ -177,7 +177,9 @@ function repoRowTpl(repo: RepoInfo) {
       class="add-repo-row"
       ?disabled=${Boolean(_importing)}
       title=${repo.fullName}
-      @click=${() => void chooseRepo(repo)}
+      @click=${() => {
+        void chooseRepo(repo);
+      }}
     >
       <span class="add-repo-name">${repo.fullName}</span>
       <span class="add-repo-meta">
@@ -290,14 +292,7 @@ function accessTpl() {
 function renderModal() {
   const tpl = html`
     <sp-underlay open @close=${closeAddRepoModal}></sp-underlay>
-    <div
-      class="new-project-modal add-repo-modal"
-      @keydown=${(e: KeyboardEvent) => {
-        if (e.key === "Escape") {
-          closeAddRepoModal();
-        }
-      }}
-    >
+    <div class="new-project-modal add-repo-modal">
       <div class="new-project-modal-header">
         <h2 class="new-project-modal-title">
           ${_mode === "open" ? "Open Project" : "Add existing repository"}
@@ -324,6 +319,9 @@ function renderModal() {
   if (_handle) {
     _handle.update(tpl);
   } else {
-    _handle = openModal(tpl);
+    _handle = openModal(tpl, {
+      label: _mode === "open" ? "Open Project" : "Add existing repository",
+      onDismiss: closeAddRepoModal,
+    });
   }
 }

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { renderStylebookLayersTemplate } from "../src/panels/stylebook-layers-panel";
 import { componentRegistry } from "../src/files/components";
 import type { JxMutableNode } from "@jxsuite/schema/types";
+import { resetProjectShell, shell } from "../src/shell";
 
 const meta = {
   $sections: [
@@ -38,6 +39,7 @@ function makeTab(style: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   resetStudioState();
+  resetProjectShell();
   selectStylebookTag.mockClear();
   componentRegistry.length = 0;
 });
@@ -71,8 +73,8 @@ describe("elements tab", () => {
   });
 
   test("marks the selected leaf tag, including compound selections", async () => {
-    const tab = makeTab();
-    tab.session.ui.stylebookSelection = "ul li";
+    makeTab();
+    shell.stylebook.selection = "ul li";
     const el = await renderInto(renderStylebookLayersTemplate(ctx));
     const selected = [...el.querySelectorAll(".layer-row.selected")];
     expect(selected.length).toBe(1);
@@ -105,9 +107,9 @@ describe("elements tab", () => {
   });
 
   test("renders component registry rows and selects by tagName", async () => {
-    const tab = makeTab();
+    makeTab();
     componentRegistry.push({ tagName: "x-card" } as never, { tagName: "x-nav" } as never);
-    tab.session.ui.stylebookSelection = "x-nav";
+    shell.stylebook.selection = "x-nav";
     const el = await renderInto(renderStylebookLayersTemplate(ctx));
     const compRows = [...el.querySelectorAll(".layer-row")].filter((r) =>
       r.querySelector(".component-tag"),
@@ -121,8 +123,8 @@ describe("elements tab", () => {
 
 describe("variables tab", () => {
   test("lists CSS custom properties with values", async () => {
-    const tab = makeTab({ "--accent": "#f00", "--gap": "8px", h1: { color: "red" } });
-    tab.session.ui.stylebookTab = "variables";
+    makeTab({ "--accent": "#f00", "--gap": "8px", h1: { color: "red" } });
+    shell.stylebook.tab = "variables";
     const el = await renderInto(renderStylebookLayersTemplate(ctx));
     const rows = [...el.querySelectorAll(".layer-row")];
     expect(rows.length).toBe(2);
@@ -134,15 +136,15 @@ describe("variables tab", () => {
   });
 
   test("shows empty state when no variables are defined", async () => {
-    const tab = makeTab({ h1: { color: "red" } });
-    tab.session.ui.stylebookTab = "variables";
+    makeTab({ h1: { color: "red" } });
+    shell.stylebook.tab = "variables";
     const el = await renderInto(renderStylebookLayersTemplate(ctx));
     expect(el.textContent).toContain("No variables defined");
   });
 
   test("handles a missing document style gracefully", async () => {
-    const tab = resetWorkspaceWithTab({ children: [], tagName: "div" } as unknown as JxMutableNode);
-    tab.session.ui.stylebookTab = "variables";
+    resetWorkspaceWithTab({ children: [], tagName: "div" } as unknown as JxMutableNode);
+    shell.stylebook.tab = "variables";
     const el = await renderInto(renderStylebookLayersTemplate(ctx));
     expect(el.textContent).toContain("No variables defined");
   });

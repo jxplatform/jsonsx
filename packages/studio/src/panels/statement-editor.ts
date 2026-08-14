@@ -9,6 +9,13 @@
  * editor's `border-left` nesting idiom) with their own add-statement pickers. Cards drag-reorder
  * within their lane via the pragmatic-drag-and-drop tree-item pattern (see panels/dnd.ts). All
  * edits flow through `onChange(next)` immutably — no statement object is mutated in place.
+ *
+ * **The layout is CSS, in `styles/inspector.css` (§ "The statement editor").** Every frame, indent
+ * and connector here used to be an inline `style=` attribute, so nothing in the chain could set
+ * `min-width: 0` and the operand controls refused to shrink: in a 280px Inspector an If/Else card
+ * pushed Operator, Target and Value past the right edge of the window. This editor has two hosts of
+ * very different widths — the Navigator's State panel and the Inspector's Events tab — plus the
+ * Bottom dock, so a fixed pixel layout is wrong by construction and only a stylesheet can say so.
  */
 
 import { html, nothing } from "lit-html";
@@ -42,6 +49,24 @@ export interface StatementEditorOpts {
   allowEventRef: boolean;
   /** The entry's declared CEM events — offered as dispatchEvent name completions. */
   emits?: CemEvent[];
+  /**
+   * The region id of THIS editor, supplied by the surface that is drawing it.
+   *
+   * Required, and required of every host, which is the point. The editor used to hard-stamp
+   * `navigator/statements` on itself, and it has two hosts that can be open at the same time — the
+   * Navigator's State panel (`signals-panel.ts`) and the INSPECTOR's Events tab
+   * (`events-panel.ts`). `resolveRegion` takes the last match in document order and `#right-panel`
+   * follows `#left-panel`, so the id resolved to the Inspector's editor while saying Navigator, and
+   * the shot that crops it cropped the wrong control.
+   *
+   * A shared control cannot know where it is, so it may not claim to. This is the same verdict
+   * `ui/regions.ts`'s `DERIVED_RESOLVERS` records for the media picker's Browse button — _an
+   * `inspector/…` id on an element outside the Inspector is not a pane-scoping problem, it is a
+   * wrong id_ — reached the other way round: the picker's id is derived from the Inspector because
+   * nothing addresses the card's copies, whereas both statement editors are real surfaces that
+   * deserve names, so the HOST names them.
+   */
+  region: string;
 }
 
 /**
@@ -292,9 +317,6 @@ function registerStatementsDnD(
 
 // ─── Small shared widgets ────────────────────────────────────────────────────
 
-const laneLabelStyle =
-  "font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:var(--spectrum-gray-600, #808080)";
-
 function operandOpts(opts: StatementEditorOpts) {
   return {
     allowEventRef: opts.allowEventRef,
@@ -346,9 +368,9 @@ function renderLane(
   extras: { onRemove?: () => void } = {},
 ): TemplateResult {
   return html`
-    <div class="statement-lane" style="margin:4px 0 4px 6px">
-      <div class="statement-lane-header" style="display:flex;align-items:center;gap:4px">
-        <span style=${laneLabelStyle}>${label}</span>
+    <div class="statement-lane">
+      <div class="statement-lane-header">
+        <span class="statement-lane-label">${label}</span>
         ${
           extras.onRemove
             ? html`
@@ -453,7 +475,6 @@ function renderSwitchBody(
           <sp-textfield
             size="s"
             class="statement-case-key"
-            style="width:96px"
             placeholder="value"
             .value=${live(key)}
             @change=${(e: Event) => {
@@ -543,7 +564,6 @@ function renderDispatchBody(
                 size="s"
                 allows-custom-value
                 class="statement-dispatch-name"
-                style="flex:1"
                 .value=${live(stmt.dispatchEvent ?? "")}
                 @change=${commitName}
               >
@@ -554,7 +574,6 @@ function renderDispatchBody(
               <sp-textfield
                 size="s"
                 class="statement-dispatch-name"
-                style="flex:1"
                 placeholder="event-name"
                 .value=${live(stmt.dispatchEvent ?? "")}
                 @input=${commitName}
@@ -576,7 +595,7 @@ function renderDispatchBody(
       label: "Options",
       prop: "eventInit",
       widget: html`
-        <div style="display:flex;gap:12px;align-items:center">
+        <div class="statement-dispatch-options">
           <sp-checkbox
             size="s"
             class="statement-dispatch-bubbles"
@@ -641,17 +660,10 @@ function renderStatementCard(
       data-stmt-kind=${kind}
       data-stmt-lane=${JSON.stringify(lanePath)}
       data-stmt-index=${index}
-      style="border:1px solid var(--spectrum-gray-300, #3c3c3c);border-radius:4px;padding:4px 6px;margin:0 0 6px;background:var(--spectrum-gray-75, #1e1e1e)"
     >
-      <div class="statement-card-header" style="display:flex;align-items:center;gap:6px">
-        <span
-          class="statement-drag-handle"
-          title="Drag to reorder"
-          style="cursor:grab;color:var(--spectrum-gray-500, #6e6e6e);font-size:11px;line-height:1;user-select:none"
-          >⠿</span
-        >
-        <span class="statement-kind-label" style=${laneLabelStyle}>${kindLabel(stmt)}</span>
-        <span style="flex:1"></span>
+      <div class="statement-card-header">
+        <span class="statement-drag-handle" title="Drag to reorder">⠿</span>
+        <span class="statement-kind-label">${kindLabel(stmt)}</span>
         <sp-action-button
           quiet
           size="xs"
@@ -675,10 +687,7 @@ function renderStatementList(
   lanePath: LanePath,
 ): TemplateResult {
   return html`
-    <div
-      class="statement-list"
-      style="margin-left:4px;border-left:2px solid var(--spectrum-gray-300, #3c3c3c);padding:2px 0 0 8px"
-    >
+    <div class="statement-list">
       ${list.map((stmt, index) =>
         renderStatementCard(stmt, index, list, commitList, opts, lanePath),
       )}
@@ -702,6 +711,7 @@ export function renderStatementEditor(
   return html`
     <div
       class="statement-editor"
+      data-jx-region=${opts.region}
       ${ref((el) => {
         if (el) {
           registerStatementsDnD(el as HTMLElement, safe, onChange);

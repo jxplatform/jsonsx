@@ -19,7 +19,7 @@ void mock.module("../src/panels/style-panel", () => ({
 const store = await import("../src/store");
 const { initShellRefs, updateUi } = store;
 const { mount, render, unmount } = await import("../src/panels/right-panel");
-const { closeAllTabs } = await import("../src/workspace/workspace");
+const { activeTab, closeAllTabs } = await import("../src/workspace/workspace");
 
 // Panel scheduler coalesces via requestAnimationFrame; make it a plain macrotask so a pending
 // Frame survives unmount (cancelAnimationFrame cannot cancel a timeout id).
@@ -31,6 +31,7 @@ const origRaf = globalThis.requestAnimationFrame;
 function makeCtx() {
   return {
     getCanvasMode: mock(() => "design"),
+    mountAssistant: mock(() => {}),
     navigateToComponent: mock(() => {}),
     renderCanvas: mock(() => {}),
   };
@@ -39,7 +40,7 @@ function makeCtx() {
 beforeEach(() => {
   document.body.innerHTML = `<div id="app">
     <div id="toolbar"></div><div id="activity-bar"></div><div id="left-panel"></div>
-    <div id="canvas-wrap"></div><div id="right-panel"></div><div id="chat-panel"></div>
+    <div id="canvas-wrap"></div><div id="right-panel"></div>
     <div id="statusbar"></div>
   </div>`;
   initShellRefs();
@@ -68,9 +69,9 @@ describe("right panel gaps", () => {
       state: { greet: { $prototype: "Function", body: "return 1" } },
       tagName: "my-widget",
     } as never);
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     mount(makeCtx() as never);
-    updateUi("rightTab", "events");
+    updateUi(activeTab.value, "rightTab", "events");
     render();
     await flush(4);
     const visible = [...store.rightPanel.querySelectorAll(".panel-body")].filter(
@@ -85,7 +86,7 @@ describe("right panel gaps", () => {
     resetWorkspaceWithTab();
     styleThrows = true;
     mount(makeCtx() as never);
-    updateUi("rightTab", "style");
+    updateUi(activeTab.value, "rightTab", "style");
     render();
     await flush(4);
     // The tabs header still rendered; the style body simply stayed empty.

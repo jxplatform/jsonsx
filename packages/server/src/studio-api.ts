@@ -20,7 +20,9 @@ import {
 import { readBundledProjectSchemas } from "@jxsuite/compiler/schema-command";
 import { handleDataApi } from "./data-api.ts";
 import { containedPath } from "./net-guard.ts";
+import { startSitePreview } from "./site-preview.ts";
 import { applyRename } from "./refactor/apply.ts";
+import { findReferences } from "./refactor/find-refs.ts";
 import {
   bunExecutable,
   dependenciesNeedInstall,
@@ -886,6 +888,45 @@ export async function handleStudioApi(
     }
   }
 
+  // ─── Site build ──────────────────────────────────────────────────────────────
+
+  /**
+   * Build the site, so `View: Open in Browser` opens what the author is looking at.
+   *
+   * The compiler is imported dynamically for the same reason `dev.ts` does it: the server depends
+   * on the compiler for this one call, and a static import would pull the whole build pipeline into
+   * every server process that never builds anything.
+   *
+   * Build errors come back in the payload rather than as a 500. A partial build still produced
+   * pages, and the author is better served by opening the page they asked for with the failures
+   * named beside it than by a preview that refuses and says only "500".
+   *
+   * The reply carries the ORIGIN to open the result at, not just the counts, because the built site
+   * is served on its own port ({@link file://./site-preview.ts}) rather than on this one — the
+   * caller has no way to know that port and no business guessing it.
+   */
+  if (path === "/__studio/build" && req.method === "POST") {
+    const dir = activeProjectRoot ?? root;
+    if (!existsSync(resolve(dir, "project.json"))) {
+      return Response.json({ error: "Not a site project" }, { status: 400 });
+    }
+    try {
+      const { buildSite } = await import("@jxsuite/compiler/site");
+      // `clean: false` — this runs on the way to opening a page, and wiping the output directory
+      // First would mean every asset 404s for as long as the build takes.
+      const result = await buildSite(dir, { clean: false, verbose: false });
+      const preview = startSitePreview(dir);
+      return Response.json({
+        errors: result.errors,
+        files: result.files,
+        routes: result.routes,
+        ...(preview ? { url: preview.origin } : {}),
+      });
+    } catch (error) {
+      return Response.json({ error: errorMessage(error) }, { status: 500 });
+    }
+  }
+
   // ─── Package management ──────────────────────────────────────────────────────
 
   // List CEM-bearing npm packages
@@ -1210,6 +1251,31 @@ export async function handleStudioApi(
         ok: true,
         to: fwd(relative(root, absTo)),
       });
+    }
+  }
+
+  // Where a file / component tag is used (the read side of the rename refactor's walker)
+  if (path === "/__studio/references" && req.method === "GET") {
+    const target = url.searchParams.get("path");
+    const tag = url.searchParams.get("tag");
+    if (!target && !tag) {
+      return new Response("Missing path or tag", { status: 400 });
+    }
+    const scanRoot = activeProjectRoot ?? root;
+    if (target) {
+      try {
+        assertAccessible(resolve(scanRoot, target), root, activeProjectRoot);
+      } catch (error) {
+        return new Response(errorMessage(error), { status: 400 });
+      }
+    }
+    try {
+      const registry = await getFormatRegistry(scanRoot);
+      return Response.json(
+        await findReferences({ path: target, registry, root: scanRoot, tagName: tag }),
+      );
+    } catch (error) {
+      return Response.json({ error: errorMessage(error) }, { status: 500 });
     }
   }
 

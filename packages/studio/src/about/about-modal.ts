@@ -14,6 +14,7 @@ import { openModal } from "../ui/layers";
 import { getPlatform } from "../platform";
 import { APP_NAME, BUILD_DATE, GIT_COMMIT, LINKS, VERSION } from "../version";
 import type { AppInfo, PackageInfo } from "../types";
+import type { Command, CommandRegistry } from "../commands/registry";
 
 let _handle: ReturnType<typeof openModal> | null = null;
 
@@ -106,16 +107,7 @@ function renderPackages(): TemplateResult {
 function renderModal() {
   const tpl = html`
     <sp-underlay open @close=${closeAboutModal}></sp-underlay>
-    <div
-      class="about-modal"
-      role="dialog"
-      aria-label="About ${APP_NAME}"
-      @keydown=${(e: KeyboardEvent) => {
-        if (e.key === "Escape") {
-          closeAboutModal();
-        }
-      }}
-    >
+    <div class="about-modal">
       <div class="settings-modal-header">
         <h2 class="settings-modal-title">About ${APP_NAME}</h2>
         <sp-action-button quiet size="s" @click=${closeAboutModal} title="Close">
@@ -151,6 +143,45 @@ function renderModal() {
   if (_handle) {
     _handle.update(tpl);
   } else {
-    _handle = openModal(tpl);
+    _handle = openModal(tpl, { label: `About ${APP_NAME}`, onDismiss: closeAboutModal });
   }
+}
+
+/**
+ * `Help: About` — the record the rail footer's hand-authored button used to be.
+ *
+ * The rail foot carries **Preferences** and nothing else (plan §3.2 ②). About is not a view you
+ * switch to and it is opened roughly once in an app's lifetime, so it costs a rail slot it cannot
+ * repay; as a record it stays reachable by name from the palette, which is where a thing you look
+ * for by name belongs.
+ */
+export function aboutCommands(): Command[] {
+  return [
+    {
+      id: "help.about",
+      title: `About ${APP_NAME}`,
+      category: "Help",
+      level: "application",
+      menus: ["palette"],
+      group: "9_help",
+      run: () => {
+        openAboutModal();
+      },
+    },
+  ];
+}
+
+/**
+ * Register the About verb on the app registry.
+ *
+ * `appCommandSet()` is the projection CI counts and `docs/studio/interface/commands.md` is
+ * generated from — it is NOT what the running app registers. P4 composed `help.about` into that set
+ * only, and deleted the rail's About button in the same change, so About became unreachable in the
+ * app while every check reported it present. The two roots have to agree.
+ *
+ * @param {CommandRegistry} registry
+ * @returns {void}
+ */
+export function registerAboutCommands(registry: CommandRegistry): void {
+  registry.registerAll(aboutCommands());
 }

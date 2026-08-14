@@ -1,11 +1,12 @@
 import { installMockPlatform, resetStudioState } from "./harness";
-import { describe, expect, test } from "bun:test";
+import { describe, expect, mock, test } from "bun:test";
 import {
   applyFsEvents,
   isRecentLocal,
   markLocalMutation,
   startFsSync,
 } from "../src/files/fs-events";
+import { invalidateUsages, loadUsages } from "../src/services/references";
 import type { DirEntry, FsEvent } from "../src/types";
 
 const entry = (path: string, type: "file" | "directory" = "file"): DirEntry => ({
@@ -118,6 +119,69 @@ describe("startFsSync", () => {
     await sleep(70);
     expect(renders).toHaveLength(1);
     expect(changed).toEqual(["burst/a.json"]);
+    stop();
+  });
+
+  test("drops the usage cache on any event, including the ones the tree suppresses", async () => {
+    let handler: (events: FsEvent[]) => void = () => {};
+    const findReferences = mock(async () => ({
+      errors: [],
+      files: [],
+      filesReferencing: 0,
+      path: "a.json",
+      refsTotal: 0,
+      tagName: null,
+    }));
+    installMockPlatform({
+      findReferences: findReferences as never,
+      subscribeFileEvents: (h) => {
+        handler = h;
+        return () => {};
+      },
+    });
+    resetStudioState({ dirs: new Map(), expanded: new Set() });
+    invalidateUsages();
+    const stop = startFsSync({ renderLeftPanel: () => {} });
+
+    await loadUsages({ path: "a.json" });
+    await loadUsages({ path: "a.json" });
+    expect(findReferences).toHaveBeenCalledTimes(1);
+
+    // A LOCAL mutation: the tree ignores its echo (it already repainted), but the reference count
+    // Must not — Studio's own write changes who refers to what as much as anyone else's.
+    markLocalMutation("a.json");
+    handler([{ isDir: false, path: "a.json", type: "change" }]);
+    await loadUsages({ path: "a.json" });
+    expect(findReferences).toHaveBeenCalledTimes(2);
+    stop();
+  });
+
+  test("drops the derived caches on every event, echoes included", () => {
+    let handler: (events: FsEvent[]) => void = () => {};
+    installMockPlatform({
+      subscribeFileEvents: (h) => {
+        handler = h;
+        return () => {};
+      },
+    });
+    resetStudioState({ dirs: new Map(), expanded: new Set() });
+    let drops = 0;
+    const stop = startFsSync({
+      invalidateDerivedCaches: () => {
+        drops += 1;
+      },
+      renderLeftPanel: () => {},
+    });
+
+    // Same argument as the usage counts above, and the same placement — BEFORE the echo filter.
+    // The page-route list, the layout picker and the `$paths` enumerations are all derived from
+    // Which files exist, and Studio's own write changes that as much as anyone else's does.
+    markLocalMutation("pages/new.md");
+    handler([{ isDir: false, path: "pages/new.md", type: "add" }]);
+    expect(drops).toBe(1);
+
+    handler([{ isDir: false, path: "layouts/base.json", type: "unlink" }]);
+    expect(drops).toBe(2);
     stop();
   });
 

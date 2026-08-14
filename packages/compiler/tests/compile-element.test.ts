@@ -42,6 +42,138 @@ describe("compileElement", () => {
     expect(content).toContain("items: [1,2,3]");
   });
 
+  describe("a tag chosen at element creation", () => {
+    /*
+     * Lit cannot bind a tag name, and `lit-html/static.js`'s `unsafeStatic` — an HTML-injection
+     * primitive with an unbounded template cache — is deliberately avoided in this repo. So a
+     * chosen tag becomes one TEMPLATE per candidate, keyed by the discriminant: the same shape
+     * this emitter already uses for `$switch`, and the reason the schema insists every branch is a
+     * literal `TagName` rather than an arbitrary expression.
+     */
+    const conditional = {
+      $expression: {
+        initial: "div",
+        operator: "?:" as const,
+        target: { $ref: "#/state/href" },
+        value: "a",
+      },
+    };
+
+    test("the two-way form emits both branches, each with the subtree", async () => {
+      const result = await compileElement({
+        children: [
+          {
+            attributes: { href: "${state.href}" },
+            children: [{ tagName: "span" }],
+            tagName: conditional,
+          },
+        ],
+        state: { href: "" },
+        tagName: "test-chosen-tag",
+      });
+      const { content } = result.files[0]!;
+      expect(content).toContain("${s.href");
+      expect(content).toContain("<a");
+      expect(content).toContain("</a>");
+      expect(content).toContain("<div");
+      // In both branches of the bundle the SUBTREE appears; it is written once in the DOCUMENT, which
+      // The thing that was wrong. Hoisting it into a preamble const would shrink the bundle here
+      // And in every existing `$switch` — a refactor of this emitter's return shape, tracked apart.
+      expect(content.split("<span").length - 1).toBe(2);
+      expect(content).not.toContain("[object Object]");
+    });
+
+    test("the multiway form emits a keyed lookup with the fallback", async () => {
+      const result = await compileElement({
+        children: [
+          {
+            tagName: {
+              $expression: {
+                cases: { "1": "h1", "2": "h2" },
+                default: "p",
+                operator: "switch",
+                target: { $ref: "#/state/level" },
+              },
+            },
+          },
+        ],
+        state: { level: 1 },
+        tagName: "test-chosen-heading",
+      });
+      const { content } = result.files[0]!;
+      expect(content).toContain('"1": html');
+      expect(content).toContain('"2": html');
+      expect(content).toContain("<h1");
+      // The required fallback is the `??` arm, not a case key.
+      expect(content).toContain("?? html");
+      expect(content).toContain("<p");
+    });
+
+    test("a plain tag still emits a plain tag", async () => {
+      const result = await compileElement({
+        children: [{ tagName: "section" }],
+        state: {},
+        tagName: "test-plain-tag",
+      });
+      expect(result.files[0]!.content).toContain("<section");
+      expect(result.files[0]!.content).not.toContain("?? html");
+    });
+  });
+
+  describe("a `${…}` state entry is a COMPUTED, the same as at runtime", () => {
+    /*
+     * The runtime has always said so — `runtime.ts`'s second state pass is
+     * `if (typeof def === "string" && def.includes("${")) state[key] = computed(…)` — and
+     * `StateEntry`'s schema description reads "string with ${} → computed". The compiler had no
+     * such branch and emitted the template as a literal, so ONE component behaved two ways: right
+     * in Studio's canvas, which runs the runtime, and wrong on the deployed site, which runs this.
+     *
+     * Found by building a real site: a `$switch` discriminant shipped as the literal text of its
+     * own expression, so the case never matched and the element silently never rendered.
+     */
+    test("it is emitted as a computed, not as an initial value", async () => {
+      const result = await compileElement({
+        children: [],
+        state: { href: "", linkKey: "${state.href ? 'link' : 'plain'}" },
+        tagName: "test-template-state",
+      });
+      const { content } = result.files[0]!;
+      expect(content).toContain(
+        "this.state.linkKey = computed(() => `${this.state.href ? 'link' : 'plain'}`)",
+      );
+      // …and NOT sitting in the initial reactive() block as its own source text.
+      expect(content).not.toContain('linkKey: "${state.href');
+    });
+
+    test("a plain string with no interpolation stays an initial value", async () => {
+      const result = await compileElement({
+        children: [],
+        state: { label: "hello" },
+        tagName: "test-plain-state",
+      });
+      const { content } = result.files[0]!;
+      expect(content).toContain('label: "hello"');
+      expect(content).not.toContain("this.state.label = computed");
+    });
+
+    test("the discriminant of a $switch resolves, which is what made this visible", async () => {
+      const result = await compileElement({
+        children: [
+          {
+            $switch: { $ref: "#/state/imageKey" },
+            cases: { set: { tagName: "img" } },
+          },
+        ],
+        state: { image: "", imageKey: "${state.image ? 'set' : ''}" },
+        tagName: "test-switch-discriminant",
+      });
+      const { content } = result.files[0]!;
+      expect(content).toContain("this.state.imageKey = computed(");
+      // The case lookup reads the computed, so a truthy `image` now selects `set`.
+      expect(content).toContain("imageKey]");
+    });
+  });
+
   test("functions become methods on state", async () => {
     const result = await compileElement({
       children: [],

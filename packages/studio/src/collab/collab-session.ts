@@ -20,9 +20,10 @@
  * evaluation defers until a collab session actually attaches.
  */
 
-import { effect, onScopeDispose, toRaw } from "../reactivity";
+import { effect, onScopeDispose, reactive, toRaw } from "../reactivity";
 import { getPlatform } from "../platform";
 import { jsonClone } from "../utils/studio-utils";
+import { cloneSelection } from "../tabs/selection";
 import {
   applyExternalDocOps,
   isBatching,
@@ -32,6 +33,7 @@ import {
   setTransactObserver,
   transactDoc,
 } from "../tabs/transact";
+import { PROJECT_CONFIG_PATH } from "../tabs/tab";
 import type { TransactOrigin } from "../tabs/transact";
 import type { TransactionRecord } from "../tabs/patch-ops";
 import type { Tab } from "../tabs/tab";
@@ -40,6 +42,7 @@ import type { CollabHandle } from "@jxsuite/collab/provider";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import type * as CollabNS from "@jxsuite/collab";
 import { collabState, registerCollabPath, unregisterCollabPath } from "./collab-state";
+import { notify } from "../services/notify";
 
 type CollabModule = typeof CollabNS;
 
@@ -116,13 +119,26 @@ interface ActiveSession {
   applyingRemoteFrontmatter: boolean;
   synced: boolean;
   canWrite: boolean;
-  /** True while THIS client is in the code view (its structural freeze exempts itself). */
-  inSourceMode: boolean;
   mirrorTimer: ReturnType<typeof setTimeout> | null;
   /** When the shared source text was last brought up to date; bounds the debounce's max lag. */
   lastMirrorAt?: number;
   /** Debounce for the source reconciler's Y.Text → structure parse mirror. */
   sourceParseTimer: ReturnType<typeof setTimeout> | null;
+  /**
+   * Which source surface currently speaks for this client's canonical lock.
+   *
+   * The lock is a room-level fact with no owner, and `leave()` reaches it from exactly one place —
+   * the cleanup {@link canvas/canvas-render.ts}'s `createSourceCollabBinding` returns. Toggling Code
+   * view off and on inside one round trip runs two mounts that overlap: the second `enter()` has
+   * already re-flipped the lock by the time the first mount's cleanup fires, and that cleanup
+   * released a lock the live mount was holding — leaving a co-edited buffer bound to a Y.Text that
+   * the room no longer treats as canonical, with the structure mirror free to serialize over it.
+   *
+   * A token, minted synchronously by each `enter()`, is the identity the release checks. Call
+   * order, not resolution order: `enter()` awaits a serialization, so the last mount to be ASKED
+   * must win regardless of which round trip returns first.
+   */
+  sourceLockOwner: object | null;
   disposers: (() => void)[];
 }
 
@@ -132,6 +148,14 @@ interface TabRuntime {
   generation: number;
   session: ActiveSession | null;
   attaching: Promise<void> | null;
+  /**
+   * The user asked to leave this document's session.
+   *
+   * Reactive, because the watcher effect that owns attach/detach has to re-run when it changes —
+   * which is also why leaving is a STATE rather than a teardown verb: the effect stays the single
+   * owner of the session lifecycle, and `Collaborate: Stop sharing` sets a flag it reads.
+   */
+  optedOut: { value: boolean };
 }
 
 const runtimes = new WeakMap<Tab, TabRuntime>();
@@ -149,7 +173,13 @@ function runtimeFor(tab: Tab): TabRuntime {
   const key = rawTab(tab);
   let runtime = runtimes.get(key);
   if (!runtime) {
-    runtime = { attaching: null, generation: 0, session: null, watcherInstalled: false };
+    runtime = {
+      attaching: null,
+      generation: 0,
+      optedOut: reactive({ value: false }),
+      session: null,
+      watcherInstalled: false,
+    };
     runtimes.set(key, runtime);
   }
   return runtime;
@@ -166,11 +196,25 @@ function installGlobalHooks(): void {
   hooksInstalled = true;
   setTransactObserver(onTransact);
   setBatchEndNotifier(onBatchEnd);
-  // Soft-freeze structural editing while a peer holds source-canonical (remote origins pass —
-  // They ARE the reconciler's mirror of the frozen representation).
+  /* Soft-freeze structural editing while ANYONE holds source-canonical (remote origins pass — they
+     ARE the reconciler's mirror of the frozen representation).
+     **Including the client holding the lock, which used to be exempt** (`&& !session.inSourceMode`).
+     The exemption assumed a carrier that does not exist: a structural edit made by the lock holder
+     never reaches the shared `Y.Text`, because `scheduleMirror` returns early while canonical is
+     `"source"`, and nothing notices, because the source observer fires on TEXT changes only. So the
+     tree and the text diverged, held apart until `leave()` — which runs `sourceParseNow` before
+     releasing the lock, parses the UNCHANGED text back into a tree, and reverts the author's edit
+     under `MIRROR_ORIGIN`. It then arrives at every peer through `applyExternalDocOps` (origin
+     `"remote"`, which passes this gate by design), so the layer they deleted in the Outline
+     reappeared seconds later with no explanation — and they were the one client this toast was
+     never shown to.
+     Mirroring the other way while source is canonical is not the alternative: it is exactly the
+     round trip `services/monaco-buffer.ts`'s clause 5 exists to refuse. Clause 5's own reasoning
+     settles this one — if the CRDT owns that text and the tree is DERIVED from it, then nobody may
+     edit the tree directly, and "nobody" includes whoever is holding the pen. */
   setTransactGate((tab) => {
     const session = runtimeOf(tab)?.session;
-    if (session?.synced && collabState(tab).sourceCanonical && !session.inSourceMode) {
+    if (session?.synced && collabState(tab).sourceCanonical) {
       _notify("Source editing in progress — structural edits are paused");
       return "source-canonical";
     }
@@ -424,10 +468,20 @@ export function collabSourceContext(tab: Tab): {
     return null;
   }
   const { collab, handle } = session;
+  /* THIS CONTEXT'S CLAIM ON THE LOCK, and the reason a release needs one.
+     One context object is handed to one mount, and `leave()` is called by that mount's cleanup —
+     but the lock it releases is the SESSION's, shared by every mount this client makes. Toggling
+     Code view off and on inside one round trip overlaps two of them, and the first one's cleanup
+     handed back a lock the second one had just taken. The token is minted synchronously at
+     `enter()` so the ordering is the order the surfaces were asked for, not the order two
+     serializations happened to resolve in. */
+  let claim: object | null = null;
+  const holdsClaim = () => claim !== null && session.sourceLockOwner === claim;
   return {
     awareness: handle.awareness,
     enter: async () => {
-      session.inSourceMode = true;
+      claim = {};
+      session.sourceLockOwner = claim;
       const local = handle.awareness.getLocalState();
       if (local) {
         handle.awareness.setLocalState({ ...local, mode: "source" });
@@ -443,6 +497,11 @@ export function collabSourceContext(tab: Tab): {
           serialized = null;
         }
       }
+      // Asked again across the await: a later mount owns the surface now, and seeding the shared
+      // Text from THIS mount's serialization would push a stale document at the room.
+      if (!holdsClaim()) {
+        return;
+      }
       collab.acquireSourceCanonical(
         handle.doc,
         serialized ?? collab.sourceText(handle.doc).toString(),
@@ -450,19 +509,44 @@ export function collabSourceContext(tab: Tab): {
       );
     },
     leave: () => {
-      session.inSourceMode = false;
+      // Not this mount's lock to hand back, and not its awareness state to reset either — the live
+      // Mount is in source mode and says so.
+      if (!holdsClaim()) {
+        claim = null;
+        return;
+      }
+      claim = null;
+      session.sourceLockOwner = null;
       const local = handle.awareness.getLocalState();
       if (local) {
         handle.awareness.setLocalState({ ...local, mode: "structure" });
       }
+      /* A client with no write access never reached `acquireSourceCanonical` above, so it holds
+         nothing to hand back — and `releaseSourceCanonical` is itself a write to shared state,
+         which the relay drops from a read-only socket anyway. The guard is right; it was never the
+         asymmetry. See below for the one that was. */
       if (!session.canWrite) {
         return;
       }
-      const others = collab.otherSourceEditors(
-        handle.awareness,
-        session.path,
-        handle.awareness.clientID,
-      );
+      /* AND A READ-ONLY VIEWER MUST NOT COUNT AS SOMEONE STILL HOLDING THE LOCK.
+         `otherSourceEditors` answers "who else has Code view open", per awareness, which is a
+         different question from the one asked here: who else could be the reason not to release.
+         A read-only guest publishes `mode: "source"` when they open Code view and then returns at
+         the guard above — they can neither acquire the lock nor hand it back. Counted, they made
+         the LAST WRITE-CAPABLE editor's departure release nothing, and their own departure release
+         nothing: `meta.canonical` stayed `"source"` for the whole room, forever, and with the
+         lock-holder exemption gone from the transact gate that is every client frozen out of every
+         structural edit, with only the keyed "structural edits are paused" toast to explain it.
+         The same `canWrite !== false` filter the reconciler election above uses, for the same
+         reason: a client that cannot write cannot be the one holding a write. */
+      const others = collab
+        .otherSourceEditors(handle.awareness, session.path, handle.awareness.clientID)
+        .filter((clientId) => {
+          const peer = handle.awareness.getStates().get(clientId) as
+            | { canWrite?: boolean }
+            | undefined;
+          return peer?.canWrite !== false;
+        });
       if (others.length === 0) {
         // Freshen the structure mirror once more, then hand the lock back.
         void sourceParseNow(session).then(() => {
@@ -477,21 +561,42 @@ export function collabSourceContext(tab: Tab): {
 }
 
 /**
+ * Whether this client is in `tab`'s session **without write access**.
+ *
+ * The single spelling of "this tab cannot be saved by me". A read-only client edits its local
+ * reactive document freely — nothing blocks structural editing, and `transactDoc` still marks the
+ * tab dirty — but `onTransact` gates BOTH `publishRecord` and `scheduleMirror` behind `canWrite`,
+ * so those edits exist in this browser and nowhere else: not in the Y-doc, not on the relay, not on
+ * disk. Every question that turns on "is this work recoverable from somewhere?" has to ask this
+ * one, which is why it is exported rather than re-derived per caller.
+ */
+export function collabReadOnly(tab: Tab): boolean {
+  const state = collabState(tab);
+  return state.active && state.readOnly;
+}
+
+/**
  * Cmd+S for a collab tab: refresh the source mirror and ask the provider to persist now. Returns
- * false when the tab has no active session (caller saves through the file path as usual).
+ * false when the tab has no active session (caller saves through the file path as usual), and false
+ * when this client cannot write to the session it does have.
+ *
+ * **The read-only `false` is the load-bearing one.** This used to skip `mirrorNow` for a read-only
+ * client and then flush and return `true` anyway — flushing a Y-doc that had received none of the
+ * edits, and reporting the result as a save. `saveFile` stamped "Saved just now" on it and the tab
+ * strip's Save button closed the tab on top of work that was still only in the browser. Answering
+ * `false` is the truth; `saveFile` is where the read-only tab is refused outright, so this never
+ * becomes a licence to write the file behind the room's back.
  */
 export async function collabSave(tab: Tab): Promise<boolean> {
   const session = runtimeOf(tab)?.session;
-  if (!session?.synced) {
+  if (!session?.synced || !session.canWrite) {
     return false;
   }
   if (session.mirrorTimer) {
     clearTimeout(session.mirrorTimer);
     session.mirrorTimer = null;
   }
-  if (session.canWrite) {
-    await mirrorNow(session);
-  }
+  await mirrorNow(session);
   await session.handle.flush();
   return true;
 }
@@ -513,12 +618,26 @@ const liveTabs = new Set<Tab>();
 
 /**
  * Idempotently wire collaboration for a tab. Installs a per-tab watcher that attaches a session for
- * the tab's file while it is at the top of its document stack, detaches while drilled into a
- * component, and tears everything down when the tab's scope is disposed.
+ * the tab's file unless the author has opted out, and tears everything down when the tab's scope is
+ * disposed.
+ *
+ * The watcher used to carry a second condition — detach while the tab is "drilled into" a
+ * sub-document — guarding a `session.documentStack` that nothing could ever push onto. It never
+ * fired, and a tab holds one document now: drilling in opens a tab of its own, which gets its own
+ * watcher for its own file.
+ *
+ * **`project.json` is out of replication.** It is the one document whose edits arrive from surfaces
+ * that are not the canvas — every settings form, the imports panel, the deploy flow — and whose
+ * value the studio ITSELF reads to configure formats, extensions, schemas and the style cascade. A
+ * shared Y.Doc over it would mean a peer's extension list reconfiguring your editor mid-keystroke,
+ * and the source-canonical freeze would pause configuration edits that have nothing to do with
+ * text. Returning here is the whole gate: no session is attached, so `setHistoryDelegate` is never
+ * called for this tab and its history stays the local op log `tabs/project-config.ts` transacts
+ * on.
  */
 export function ensureCollab(tab: Tab): void {
   const platform = maybePlatform();
-  if (!platform?.collab || !tab.documentPath) {
+  if (!platform?.collab || !tab.documentPath || tab.documentPath === PROJECT_CONFIG_PATH) {
     return;
   }
   const runtime = runtimeFor(tab);
@@ -530,8 +649,7 @@ export function ensureCollab(tab: Tab): void {
   liveTabs.add(tab);
   tab.scope.run(() => {
     effect(() => {
-      const drilled = (tab.session.documentStack?.length ?? 0) > 0;
-      if (drilled) {
+      if (runtime.optedOut.value) {
         detachSession(tab);
       } else {
         void attachSession(tab);
@@ -542,6 +660,33 @@ export function ensureCollab(tab: Tab): void {
       detachSession(tab);
     });
   });
+}
+
+/**
+ * Join or leave this document's collaboration session — the idempotent setter behind `Collaborate:
+ * Share this document` and `Collaborate: Stop sharing` (§7.4).
+ *
+ * Leaving sets a flag the watcher effect reads rather than calling `detachSession` directly, so the
+ * effect remains the one owner of the session lifecycle and re-joining is the same call with the
+ * other value. Calling it twice with the same value does nothing, which is the property the
+ * `app-commands` pairing test checks for.
+ *
+ * @param {Tab} tab @param {boolean} enabled
+ */
+export function setCollabEnabled(tab: Tab, enabled: boolean): void {
+  const runtime = runtimeFor(tab);
+  if (runtime.optedOut.value === !enabled) {
+    return;
+  }
+  runtime.optedOut.value = !enabled;
+  if (!runtime.watcherInstalled && enabled) {
+    ensureCollab(tab);
+  }
+}
+
+/** True while the user has not opted this tab out of collaboration. */
+export function isCollabEnabled(tab: Tab): boolean {
+  return runtimeOf(tab)?.optedOut.value !== true;
 }
 
 /** Re-key after a file rename: tear down and re-attach against the new path. */
@@ -563,15 +708,20 @@ async function attachSession(tab: Tab): Promise<void> {
   const { documentPath: path } = tab;
   const platform = maybePlatform();
   if (!path || !platform?.collab) {
+    /* Not a failure and not a session: this build/platform has no collaboration to offer. Saying
+       so is the difference between "nobody else is here" and "something broke" (§7.4). */
+    collabState(tab).status = "unavailable";
     return;
   }
   const { generation } = runtime;
   const state = collabState(tab);
   state.status = "connecting";
+  state.attachError = "";
   const attempt = (async () => {
     try {
       const [collab, handle] = await Promise.all([loadCollab(), platform.collab!(path)]);
       if (!handle) {
+        // The platform offers collaboration; this document is simply not shared. Solo, not broken.
         state.status = "detached";
         return;
       }
@@ -598,10 +748,20 @@ async function attachSession(tab: Tab): Promise<void> {
       state.active = true;
       state.status = "synced";
       state.readOnly = !runtime.session.canWrite;
+      state.attachError = "";
       registerCollabPath(path);
-    } catch {
-      state.status = "detached";
+    } catch (error) {
+      /* An attach that threw is a FAILURE, and it used to be reported as "detached" — the same
+         value a solo document carries. A relay that is down, a token that expired and a document
+         nobody shared were one indistinguishable state (§7.4). */
+      state.status = "failed";
       state.active = false;
+      state.attachError = error instanceof Error ? error.message : String(error);
+      notify.warn(`Live collaboration is not available for "${path}" — ${state.attachError}`, {
+        key: `collab:${path}`,
+        path,
+        source: "Collaboration",
+      });
     } finally {
       runtime.attaching = null;
     }
@@ -621,6 +781,7 @@ function detachSession(tab: Tab): void {
   const state = collabState(tab);
   state.active = false;
   state.status = "detached";
+  state.attachError = "";
   state.peers = [];
   if (!session) {
     return;
@@ -644,7 +805,7 @@ function detachSession(tab: Tab): void {
   tab.history.snapshots = [
     {
       document: jsonClone(toRaw(tab.doc.document)) as Record<string, unknown>,
-      selection: tab.session.selection ? [...tab.session.selection] : null,
+      selection: cloneSelection(tab.session.selection),
     },
   ];
   tab.history.index = 0;
@@ -667,10 +828,10 @@ function createSession(
     collab,
     disposers: [],
     handle,
-    inSourceMode: false,
     lastSeenRef: toRaw(tab.doc.document) as object,
     mirrorTimer: null,
     path,
+    sourceLockOwner: null,
     sourceParseTimer: null,
     synced: false,
     tab,
@@ -742,11 +903,11 @@ function createSession(
   );
   session.undoManager = undoManager;
   const onStackAdd = ({ stackItem }: { stackItem: { meta: Map<unknown, unknown> } }) => {
-    stackItem.meta.set("selection", tab.session.selection ? [...tab.session.selection] : null);
+    stackItem.meta.set("selection", cloneSelection(tab.session.selection));
   };
   const onStackPop = ({ stackItem }: { stackItem: { meta: Map<unknown, unknown> } }) => {
-    const selection = stackItem.meta.get("selection") as (string | number)[] | null | undefined;
-    tab.session.selection = selection ? [...selection] : null;
+    const selection = stackItem.meta.get("selection") as (string | number)[][] | undefined;
+    tab.session.selection = cloneSelection(selection ?? []);
   };
   undoManager.on("stack-item-added", onStackAdd);
   undoManager.on("stack-item-popped", onStackPop);
@@ -882,7 +1043,12 @@ function createSession(
     // FocusedPath, so per-doc boxes come free from the one project-level awareness state). The
     // Plain `selection` field is y-monaco's (in-buffer text cursors) — never write it here.
     effect(() => {
-      const structuralSelection = tab.session.selection ? [...tab.session.selection] : null;
+      // The whole selection SET crosses awareness, so a peer's canvas draws every node the author
+      // Has selected. A selection of one publishes a one-entry list, which is the same box.
+      // Empty stays `null` rather than `[]`: "this peer is not pointing at anything" is one fact
+      // With one wire value, and every consumer already tests it by presence.
+      const structuralSelection =
+        tab.session.selection.length > 0 ? cloneSelection(tab.session.selection) : null;
       const local = handle.awareness.getLocalState();
       if (local) {
         handle.awareness.setLocalState({ ...local, structuralSelection });

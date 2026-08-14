@@ -27,16 +27,61 @@ describe("classifyRenderNode", () => {
     });
   });
 
-  test("flags layout-originated nodes only when layout-wrapped", () => {
+  test("flags layout-originated nodes only when layout-wrapped, carrying their origin", () => {
     const ctx = { ...plain, layoutWrapped: true };
-    expect(classifyRenderNode(["children", 0], { $__layout: true }, ctx)).toEqual({
+    const marker = { $__layout: { file: "layouts/base.json", path: ["children", 0] } };
+    expect(classifyRenderNode(["children", 0], marker, ctx)).toEqual({
+      chrome: true,
       kind: "layout",
+      layoutFile: "layouts/base.json",
+      layoutPath: ["children", 0],
     });
     // Not layout-wrapped → the $__layout marker is ignored.
-    expect(classifyRenderNode(["children", 0], { $__layout: true }, plain)).toEqual({
+    expect(classifyRenderNode(["children", 0], marker, plain)).toEqual({
       kind: "path",
       path: ["children", 0],
     });
+  });
+
+  test("a legacy boolean marker still classifies, with an empty origin", () => {
+    // The marker was a bare `true` before it carried an origin; degrade to "layout, unaddressable"
+    // Rather than mistaking the node for page content and stamping it with a page path.
+    const ctx = { ...plain, layoutWrapped: true };
+    expect(classifyRenderNode(["children", 0], { $__layout: true }, ctx)).toEqual({
+      chrome: true,
+      kind: "layout",
+      layoutFile: "",
+      layoutPath: [],
+    });
+  });
+
+  test("the nodes on the way down to the page content are NOT chrome", () => {
+    // Dimming/freezing them would dim and freeze the page itself: they wrap it.
+    const ctx: PathMapCtx = {
+      ...plain,
+      layoutWrapped: true,
+      pageContentPrefix: ["children", 1, "children"],
+    };
+    const marker = (path: (string | number)[]) => ({ $__layout: { file: "l.json", path } });
+    // The layout root and the <main> that holds the slot.
+    expect(classifyRenderNode([], marker([]), ctx)).toMatchObject({ chrome: false });
+    expect(classifyRenderNode(["children", 1], marker(["children", 1]), ctx)).toMatchObject({
+      chrome: false,
+    });
+    // A sibling header, and a layout <noscript> sitting BEFORE the slot inside <main>.
+    expect(classifyRenderNode(["children", 0], marker(["children", 0]), ctx)).toMatchObject({
+      chrome: true,
+    });
+    expect(classifyRenderNode(["children", 1, "children", 0], marker(["c"]), ctx)).toMatchObject({
+      chrome: true,
+    });
+  });
+
+  test("with no page content distributed, only the root escapes chrome", () => {
+    const ctx = { ...plain, layoutWrapped: true };
+    const marker = { $__layout: { file: "l.json", path: [] } };
+    expect(classifyRenderNode([], marker, ctx)).toMatchObject({ chrome: false });
+    expect(classifyRenderNode(["children", 0], marker, ctx)).toMatchObject({ chrome: true });
   });
 
   test("strips the layout prefix and subtracts the page-content offset", () => {

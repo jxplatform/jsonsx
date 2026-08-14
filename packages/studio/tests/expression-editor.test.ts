@@ -2,6 +2,7 @@ import "./harness";
 import { describe, expect, test } from "bun:test";
 import { render } from "lit-html";
 import { expressionHint, renderExpressionEditor } from "../src/ui/expression-editor";
+import { emittedClassesOf, inlineStyledOwn, unstyledClassesOf } from "./styled-surface";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -151,14 +152,16 @@ describe("renderExpressionEditor structure", () => {
     const { container } = mount({ operator: "+", target: { operator: "-", target: 4 }, value: 1 });
     const editors = container.querySelectorAll(".expression-editor");
     expect(editors.length).toBe(2);
-    expect(editors[0]!.getAttribute("style") ?? "").not.toContain("border-left");
-    expect(editors[1]!.getAttribute("style")).toContain("border-left");
+    // The indent rule is `.expression-editor--nested` in styles/inspector.css; depth chooses the
+    // Class, never a `style=` string — an attribute cannot be restyled by theme or by dock width.
+    expect(editors[0]!.classList.contains("expression-editor--nested")).toBe(false);
+    expect(editors[1]!.classList.contains("expression-editor--nested")).toBe(true);
   });
 
   test("explicit depth > 0 applies the nesting border on the root", () => {
     const { container } = mount({ operator: "!", target: null }, { depth: 2 });
     const editor = container.querySelector(".expression-editor")!;
-    expect(editor.getAttribute("style")).toContain("border-left");
+    expect(editor.classList.contains("expression-editor--nested")).toBe(true);
   });
 
   test("unary operator renders no value row", () => {
@@ -406,11 +409,41 @@ describe("ref picker", () => {
     expect(items[0]!.textContent!.trim()).toBe("count");
   });
 
-  test("empty stateDefs shows a disabled placeholder item", () => {
+  test("nothing to bind to → the shared empty state replaces the picker entirely", () => {
     const { container } = mount({ operator: "=", target: { $ref: "" } }, { stateDefs: [] });
-    const item = row(container, "target").querySelector("sp-menu-item")!;
-    expect(item.textContent).toContain("No state defined");
-    expect(item.hasAttribute("disabled")).toBe(true);
+    const target = row(container, "target");
+    // A picker whose only entry was a disabled "No state defined" was a dead end; the region now
+    // Says what a binding IS, in the same voice as every other empty region in the shell.
+    expect(target.querySelector("sp-picker[placeholder='Select…']")).toBeNull();
+    const empty = target.querySelector(".empty-state")!;
+    expect(empty.classList.contains("empty-state--compact")).toBe(true);
+    expect(empty.querySelector(".empty-state-message")?.textContent).toBe(
+      "A binding points at a value this page holds.",
+    );
+    expect(empty.querySelector(".empty-state-detail")?.textContent).toBe(
+      "Add one in the State panel and it shows up here.",
+    );
+  });
+
+  test("no state but event refs available → the picker still renders, with no dead entry", () => {
+    const { container } = mount(
+      { operator: "=", target: { $ref: "" } },
+      { allowEventRef: true, stateDefs: [] },
+    );
+    const target = row(container, "target");
+    expect(target.querySelector(".empty-state")).toBeNull();
+    const values = [...target.querySelectorAll("sp-menu-item")].map((i) => i.getAttribute("value"));
+    expect(values).toEqual(["event#/detail", "event#/target/value"]);
+  });
+
+  test("an existing ref keeps the picker even with no state defined", () => {
+    const { container } = mount(
+      { operator: "=", target: { $ref: "#/state/gone" } },
+      { stateDefs: [] },
+    );
+    const target = row(container, "target");
+    expect(target.querySelector(".empty-state")).toBeNull();
+    expect(target.querySelector("sp-picker")).not.toBeNull();
   });
 
   test("allowEventRef adds event refs after a divider", () => {
@@ -821,5 +854,111 @@ describe("switch cases editor", () => {
     addBtn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     // One existing entry → tries "case 2" (taken) → lands on "case 3"
     expect((changes[0] as { cases: unknown }).cases).toEqual({ "case 2": null, "case 3": null });
+  });
+});
+
+// ─── The layout is a stylesheet's, not an attribute's ────────────────────────
+
+describe("every row is addressable by CSS", () => {
+  /*
+   * The editor drew itself with inline `display:flex;…` attributes and hard `min-width`s — 112px
+   * for the value-source picker, 56px for the literal type, 80px for a switch key — and no rung of
+   * that chain could set `min-width: 0`. A flex item's automatic minimum is its min-content width,
+   * so one operand row demanded more than a 280px Inspector has and the controls were clipped by
+   * the right edge of the window. `styles/inspector.css` owns the layout now; these tests assert
+   * the structure that lets it work, because happy-dom lays nothing out and a pixel assertion here
+   * would be a fiction.
+   */
+  const SOURCE = "src/ui/expression-editor.ts";
+  const preview = {
+    error: null,
+    mutating: false,
+    values: new Map([
+      ["", "6"],
+      ["target", "2 × 3 = 6 — a value long enough to need the ellipsis"],
+    ]),
+  };
+
+  test("no element the editor names carries an inline style attribute", async () => {
+    const { container } = mount(
+      { cases: { a: 1 }, default: null, operator: "switch", target: { $ref: "#/state/count" } },
+      { preview },
+    );
+    // The chip strip is `ui/formula-chips.ts`'s subtree, and it still hand-writes the badge's
+    // Declarations inline — it now inherits the `.expr-live-badge` rule and overrides it. Its
+    // Inline copy is that module's to delete, so it is not swept here.
+    container.querySelector(".formula-chips")?.remove();
+    expect(inlineStyledOwn(container, await emittedClassesOf(SOURCE))).toEqual([]);
+  });
+
+  test("every class the editor emits is one a stylesheet defines", async () => {
+    expect(await unstyledClassesOf(SOURCE)).toEqual([]);
+  });
+
+  test("an operand is a mode picker and a widget in one wrapping row", () => {
+    const { container } = mount({ operator: "+", target: "hello", value: 1 });
+    const operand = row(container, "target").querySelector(".expr-operand")!;
+    expect(pickerValue(operand.querySelector(".expr-operand-mode"))).toBe("literal");
+    // The literal editor is the operand's second half: its own row, which wraps in its own right.
+    const literal = operand.querySelector(".expr-literal")!;
+    expect(pickerValue(literal.querySelector(".expr-literal-type"))).toBe("string");
+    expect(literal.querySelector("sp-textfield.expr-literal-value")).toBeTruthy();
+  });
+
+  test("a ref-only operand is one named picker, with no mode picker beside it", () => {
+    const { container } = mount({ operator: "=", target: { $ref: "#/state/count" }, value: 1 });
+    const operand = row(container, "target").querySelector(".expr-operand")!;
+    expect(operand.querySelector(".expr-operand-mode")).toBeNull();
+    expect(operand.querySelector("sp-picker.expr-ref")).toBeTruthy();
+  });
+
+  test("the null literal and the operator picker are named, not anonymous spans", () => {
+    const { container } = mount({ operator: "+", target: null, value: 1 });
+    expect(row(container, "target").querySelector(".expr-literal-null")!.textContent).toBe("null");
+    expect(pickerValue(row(container, "operator").querySelector(".expr-operator"))).toBe("+");
+  });
+
+  test("a live value is a badge inside the row it annotates, free to ellipsize", () => {
+    const { container } = mount({ operator: "+", target: 2, value: 3 }, { preview });
+    // The chip strip draws badges of its own (ui/formula-chips.ts); these are the editor's rows.
+    const badges = [...container.querySelectorAll(".expr-live-badge")].filter(
+      (b) => b.closest(".formula-chips") === null,
+    );
+    // One for the root result, one for the target operand — each inside its own `.expr-widget`,
+    // Which is the flex line that gives it something to shrink against.
+    expect(badges.length).toBe(2);
+    for (const badge of badges) {
+      expect(badge.closest(".expr-widget")).not.toBeNull();
+      // The title is the untruncated text: the ellipsis is CSS, so the value must stay readable.
+      expect(badge.getAttribute("title")).toBe(badge.textContent);
+    }
+  });
+
+  test("the preview error is a named line, not a coloured div", () => {
+    const { container } = mount(
+      { operator: "+", target: 1, value: 2 },
+      { preview: { error: "boom", mutating: false, values: new Map() } },
+    );
+    expect(container.querySelector(".expr-error")!.textContent!.trim()).toBe("boom");
+  });
+
+  test("an arg label and a switch key are named cells in a wrapping row", () => {
+    const args = mount({ operator: "splice", target: { $ref: "#/state/items" }, value: [0, 1] });
+    const argRow = args.container.querySelector(".array-object-row")!;
+    expect(argRow.querySelector(".array-object-label")!.textContent!.trim()).toBe("start");
+
+    const sw = mount({
+      cases: { a: 1 },
+      default: null,
+      operator: "switch",
+      target: { $ref: "#/state/count" },
+    });
+    const rows = [...sw.container.querySelectorAll(".switch-case-row")];
+    expect(rows.length).toBe(2);
+    expect(rows[0]!.querySelector("sp-textfield.switch-case-key")).toBeTruthy();
+    // The default's label keeps the key column's class so the two line up at any width.
+    const label = rows[1]!.querySelector(".switch-case-default")!;
+    expect(label.classList.contains("switch-case-key")).toBe(true);
+    expect(label.textContent).toBe("default");
   });
 });

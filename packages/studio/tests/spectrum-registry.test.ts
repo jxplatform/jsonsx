@@ -24,6 +24,21 @@ describe("spectrum component registry", () => {
     }
   });
 
+  test("sp-tooltip is registered, and NOT by us", () => {
+    /* The one tag this file deliberately does not own.
+       Registering it here from the class-only module made Studio the first definer, and Spectrum's
+       own registering entry — reached later by the textfield's dynamically-imported truncated-value
+       controller — then called `customElements.define` for a name already taken and threw
+       `NotSupportedError` into the console during ordinary panel use. The loop's
+       `customElements.get` guard could never help: the second define is Spectrum's own call inside
+       node_modules. A bare side-effect import of `sp-tooltip.js` puts THEIR module in the static
+       graph, so it is the single definer and the later dynamic import hits the module cache.
+
+       Both halves are asserted, because either one alone passes on the broken arrangement. */
+    expect(components.map(([tag]) => tag)).not.toContain("sp-tooltip");
+    expect(customElements.get("sp-tooltip")).toBeDefined();
+  });
+
   test("widgets, icons, and studio elements are all reachable by tag", () => {
     for (const tag of [
       "sp-theme",

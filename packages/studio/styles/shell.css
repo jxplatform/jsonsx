@@ -1,0 +1,1423 @@
+/* Jx Studio — app shell.
+   Load after tokens.css.
+
+   Owns the #app grid and the regions it lays out: the Command Bar, the pane's
+   tab strip and chrome layer, the Navigator and Inspector docks, the statusbar,
+   the collapsed-sidebar variants, the tab strip and the drag-to-resize
+   handles. */
+
+/* ─── Layout ─────────────────────────────────── */
+/* Four columns: rail | navigator | pane | inspector. The assistant's fifth column is gone —
+   it shares the inspector's cell, because folding it in costs zero additional width (spec §12
+   region ⑨). The rail is 56px, not 48px, because every button now carries a text label.
+
+   Five rows: command bar | pane tabs | stage | BOTTOM DOCK | status bar. The dock's row is a
+   full-width track but the dock occupies only the pane's COLUMN, which is the whole of §12
+   region ⑪'s claim — it sits under the pane grid, not under the window, so opening it never
+   narrows the Navigator or the Inspector. The two side docks span rows 2–4 across it. */
+/* The Bottom dock's track, declared on :root for the reason tokens.css gives for the two panel
+   widths: `src/shell.ts`'s applyDockLayout() writes it as an inline style on
+   document.documentElement, and a definition on any closer ancestor of #app would shadow that
+   override and freeze the dock. It must also be declared SOMEWHERE — an unset custom property
+   inside the grid-template-rows shorthand invalidates the whole declaration at computed-value
+   time, and the shell would paint one frame with no grid at all. */
+:root {
+  --dock-h-bottom: 220px;
+}
+/* FOUR rows, not five. The pane's tab strip used to own row 2 of the APPLICATION grid, which is
+   the one thing a per-pane surface can never be — so it is a row of the pane's own cell now and
+   this grid is one row shorter.
+
+   The columns are NAMED. Every rule below addressed them by index, so the four surfaces that left
+   this grid would have meant re-counting `grid-column: 4` at seven sites and getting it wrong at
+   one of them. A name survives an insertion; a number does not. */
+#app {
+  display: grid;
+  grid-template-rows: 36px minmax(0, 1fr) var(--dock-h-bottom) 24px;
+  grid-template-columns:
+    [rail] 56px
+    [nav] var(--panel-w-left)
+    [pane] 1fr
+    [insp] var(--panel-w-right);
+  height: 100%;
+}
+#toolbar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+  min-width: 0;
+  /* Drive the responsive collapse below off the toolbar's own width. */
+  container-type: inline-size;
+  container-name: toolbar;
+}
+#toolbar > :not(.window-controls) {
+  min-width: 0;
+  flex-shrink: 1;
+  overflow: hidden;
+}
+#toolbar > .tb-spacer {
+  flex-shrink: 999;
+}
+#toolbar.electrobun-webkit-app-region-drag {
+  -webkit-app-region: drag;
+}
+#toolbar sp-action-group,
+#toolbar sp-action-button {
+  -webkit-app-region: no-drag;
+}
+/* An icon that means the same thing on the other side.
+   Spectrum's workflow set ships `rail-right-open`/`rail-right-close` and no left-hand pair, so the
+   Navigator's dock toggle reflects the Inspector's rather than inventing a third glyph — which is
+   also what keeps the two buttons reading as a pair. */
+.window-controls {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* ─── ①b Layout tabs ─────────────────────────── */
+/* Plain text, not a segmented control: a layout is a place you are, and the Command Bar says which
+   one the same way the tab strip says which document. Every panel stays reachable from every
+   layout — these tabs reconfigure, they never remove. */
+.tb-layouts {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.tb-layout,
+.tb-layout-add {
+  padding: 2px 8px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: var(--spectrum-font-size-75, 12px);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tb-layout:hover,
+.tb-layout-add:hover {
+  background: var(--hover-bg);
+  color: var(--fg);
+}
+.tb-layout.active {
+  color: var(--fg);
+  background: var(--hover-bg);
+}
+.tb-layout-add {
+  padding: 2px 6px;
+}
+.window-controls .csd-close:hover {
+  background: var(--spectrum-negative-background-color-default, #e34850);
+  color: white;
+}
+/* macOS traffic-light buttons */
+.window-controls.mac {
+  margin-left: 0;
+  margin-right: 8px;
+  order: -1;
+  gap: 8px;
+}
+.window-controls.mac sp-action-button {
+  /* explicit min/max needed: as a flex item the button's auto min-width
+     is the inner shadow-DOM button's min-content size (~28px), which
+     would override width and squash the circle into an oval */
+  --spectrum-actionbutton-min-width: 12px;
+  --mod-actionbutton-min-width: 12px;
+  --mod-actionbutton-height: 12px;
+  --mod-actionbutton-edge-to-text: 0px;
+  --mod-actionbutton-edge-to-visual-only: 0px;
+  width: 12px;
+  min-width: 12px;
+  max-width: 12px;
+  height: 12px;
+  min-height: 12px;
+  max-height: 12px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: none;
+  padding: 0;
+}
+.window-controls.mac .csd-close {
+  background: #ff5f57;
+}
+.window-controls.mac .csd-minimize {
+  background: #febc2e;
+}
+.window-controls.mac .csd-maximize {
+  background: #28c840;
+}
+.window-controls.mac sp-action-button:hover {
+  filter: brightness(0.85);
+}
+.window-controls.mac sp-action-button sp-icon-remove,
+.window-controls.mac sp-action-button sp-icon-rectangle,
+.window-controls.mac sp-action-button sp-icon-close {
+  display: none;
+}
+.window-controls.mac:hover sp-action-button sp-icon-remove,
+.window-controls.mac:hover sp-action-button sp-icon-rectangle,
+.window-controls.mac:hover sp-action-button sp-icon-close {
+  display: inline-flex;
+  color: rgba(0, 0, 0, 0.5);
+  width: 8px;
+  height: 8px;
+}
+/* Resize edge zones */
+.resize-edge {
+  position: fixed;
+  z-index: 9999;
+  -webkit-app-region: no-drag;
+}
+.resize-edge.top {
+  top: 0;
+  left: 6px;
+  right: 6px;
+  height: 4px;
+  cursor: ns-resize;
+}
+.resize-edge.bottom {
+  bottom: 0;
+  left: 6px;
+  right: 6px;
+  height: 4px;
+  cursor: ns-resize;
+}
+.resize-edge.left {
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 4px;
+  cursor: ew-resize;
+}
+.resize-edge.right {
+  right: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 4px;
+  cursor: ew-resize;
+}
+.resize-edge.top-left {
+  top: 0;
+  left: 0;
+  width: 6px;
+  height: 6px;
+  cursor: nwse-resize;
+}
+.resize-edge.top-right {
+  top: 0;
+  right: 0;
+  width: 6px;
+  height: 6px;
+  cursor: nesw-resize;
+}
+.resize-edge.bottom-left {
+  bottom: 0;
+  left: 0;
+  width: 6px;
+  height: 6px;
+  cursor: nesw-resize;
+}
+.resize-edge.bottom-right {
+  bottom: 0;
+  right: 0;
+  width: 6px;
+  height: 6px;
+  cursor: nwse-resize;
+}
+
+/* ─── The pane grid ──────────────────────────── */
+/* One track per pane, laid out by `panels/pane-grid.ts` — the reconciler writes
+   `grid-template-columns` because the track count depends on `workspace.panes.length`, which the
+   shell's own layout effect must not read. */
+#pane-grid {
+  grid-row: 2;
+  grid-column: pane;
+  display: grid;
+  grid-template-rows: 1fr;
+  min-width: 0;
+  min-height: 0;
+}
+/* One PANE. Its own two-row grid: the strip, then everything stacked in the cell below it.
+
+   ONE COLUMN, declared. Three children name `grid-row: 2` in order to share the lower cell, and
+   auto-placement answers that by inventing an implicit column each: the jump bar, the chrome layer
+   and the stage lined up side by side, the stage taking a third of the pane and pinning the
+   document to the right edge. `grid-template-columns` is what makes "share the cell" mean it, and
+   every row-2 child restates `grid-column: 1` so a future fourth one cannot re-open the same hole.
+
+   No unit test can see this: happy-dom does no layout, so every rect is zero and the grid the
+   assertions describe is the one they were written from. The screenshot lane is what caught it. */
+.pane {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+}
+.pane-strip {
+  grid-row: 1;
+  grid-column: 1;
+  min-height: 0;
+  min-width: 0;
+}
+.pane-strip:empty {
+  display: none;
+}
+/* ⑥ The jump bar. Like `.pane-chrome` below it, this shares the pane's lower cell rather than
+   owning a row, so the two bars stack over the stage instead of pushing it down. `align-self:
+   start` is what keeps it the height of its own content instead of the height of the cell, so the
+   bar never covers the stage it sits above. */
+.pane-jump {
+  grid-row: 2;
+  grid-column: 1;
+  align-self: start;
+  position: relative;
+  z-index: 3;
+  min-width: 0;
+  max-width: 100%;
+}
+/* The pane's chrome layer — regions ⑦ and ⑩. It shares the stage's cell; the layer itself is
+   inert and only its two children take the pointer. `canvas.css` owns their looks.
+
+   Offset by `--jump-bar-h` for the same reason `.pane-stage` is: the jump bar is stacked over the
+   same cell, and one projection per bar is what keeps "no tab open" costing no dead band. */
+.pane-chrome {
+  grid-row: 2;
+  grid-column: 1;
+  margin-top: var(--jump-bar-h, 0px);
+  position: relative;
+  z-index: 2;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: none;
+}
+.pane-chrome > * {
+  pointer-events: auto;
+}
+/* The stage. Offset by the SUM of the two bars stacked over this cell — `--jump-bar-h` (written by
+   `panels/jump-bar.ts`) and `--pane-context-h` (by `panels/pane-context.ts`) — so neither ever
+   covers the document, and by zero when no tab is open, so the welcome screen does not sit under a
+   band nothing explains. Two variables rather than one total: each bar owns its own answer, and a
+   bar that renders nothing writes 0 without knowing the other exists. */
+.pane-stage {
+  grid-row: 2;
+  grid-column: 1;
+  margin-top: calc(var(--jump-bar-h, 0px) + var(--pane-context-h, 0px));
+  position: relative;
+  overflow: auto;
+  background: var(--bg-panel);
+  min-width: 0;
+}
+#activity-bar {
+  grid-row: 2 / 4;
+  grid-column: rail;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border-right: 1px solid var(--border);
+}
+#left-panel {
+  grid-row: 2 / 4;
+  grid-column: nav;
+  overflow-y: auto;
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border);
+}
+/* The Inspector dock. A flex COLUMN, not a scroll box: the header and the four-tab strip are
+   fixed, and the selected tab's body is the only thing that scrolls — which is what lets the
+   Assistant tab (whose chat owns its own scrolling) share the dock at zero extra width. */
+#right-panel {
+  grid-row: 2 / 4;
+  grid-column: insp;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+  border-left: 1px solid var(--border);
+}
+
+/* ─── ⑪ Bottom dock ───────────────────────────── */
+/* A flex COLUMN in the pane's own grid column: the tab strip is fixed and the selected tab's body
+   is the only thing that scrolls. It borders on the top only — the sides are the pane's, and a
+   box drawn inside the stage's column would read as a second panel rather than as the floor. */
+#bottom-dock {
+  grid-row: 3;
+  grid-column: pane;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg-panel);
+  border-top: 1px solid var(--border);
+}
+#bottom-dock:empty {
+  display: none;
+}
+.bd-strip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  padding: 0 4px;
+  border-bottom: 1px solid var(--border);
+}
+.bd-tabs {
+  flex: 1;
+  min-width: 0;
+}
+.bd-close {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  border: none;
+  border-radius: var(--spectrum-corner-radius-75, 2px);
+  background: none;
+  color: var(--fg-dim);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+.bd-close:hover {
+  background: var(--hover-bg);
+  color: var(--fg);
+}
+/* The one scrolling region. `min-height: 0` because a flex item's auto minimum is its content,
+   which would push the dock past its own track instead of scrolling inside it. */
+.bd-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* ─── Collapsed sidebars ──────────────────────── */
+#app.left-collapsed {
+  --panel-w-left: 0px;
+}
+#app.left-collapsed #left-panel,
+#app.left-collapsed #resize-left {
+  display: none;
+}
+#app.right-collapsed {
+  --panel-w-right: 0px;
+}
+#app.right-collapsed #right-panel,
+#app.right-collapsed #resize-right {
+  display: none;
+}
+#app.bottom-collapsed {
+  --dock-h-bottom: 0px;
+}
+#app.bottom-collapsed #bottom-dock,
+#app.bottom-collapsed #resize-bottom {
+  display: none;
+}
+
+/* ─── AI Panel Chat UI ──────────────────────────── */
+.ai-tab-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.ai-chat-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  min-width: 0;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--spectrum-font-size-75, 12px);
+}
+.ai-chat-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+/* The conversation's share of the model's context. Quiet until it matters: past half the window
+   the assistant starts dropping the oldest turns, and this is the only thing that says so. */
+.ai-tokens {
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-dim);
+  padding: 0 4px;
+  border-radius: var(--radius);
+}
+.ai-tokens--warn {
+  color: var(--warning, #d98b28);
+  background: color-mix(in srgb, var(--warning, #d98b28) 14%, transparent);
+}
+.ai-header-spacer {
+  flex: 1;
+}
+/* THE chat scroller — bounded by min-height:0 at every flex level above. */
+.ai-chat-messages {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  font-size: var(--spectrum-font-size-75, 12px);
+  line-height: 1.5;
+}
+.ai-chat-empty {
+  color: var(--fg-dim);
+  text-align: center;
+  padding: 24px 12px;
+}
+.ai-msg-user {
+  align-self: flex-end;
+  max-width: 85%;
+  background: var(--accent-15);
+  border-radius: 8px 8px 2px 8px;
+  padding: 6px 10px;
+}
+.ai-msg-user-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ai-msg-assistant {
+  align-self: stretch;
+  min-width: 0;
+}
+.ai-msg-md {
+  overflow-wrap: anywhere;
+}
+.ai-msg-md > *:first-child {
+  margin-top: 0;
+}
+.ai-msg-md > *:last-child {
+  margin-bottom: 0;
+}
+.ai-msg-md code {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 1px 4px;
+  border-radius: var(--radius);
+  font-size: var(--spectrum-font-size-50, 11px);
+  font-family: var(--font-mono);
+}
+.ai-msg-md pre {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 8px;
+  border-radius: var(--radius);
+  overflow-x: auto;
+  margin: 6px 0;
+}
+.ai-msg-md pre code {
+  background: none;
+  padding: 0;
+}
+.ai-msg-md table {
+  border-collapse: collapse;
+  margin: 6px 0;
+}
+.ai-msg-md th,
+.ai-msg-md td {
+  border: 1px solid var(--border);
+  padding: 2px 6px;
+}
+.ai-msg-streaming {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ai-msg-streaming::after {
+  content: "▋";
+  color: var(--accent);
+  animation: ai-cursor-blink 1s steps(2) infinite;
+}
+@keyframes ai-cursor-blink {
+  50% {
+    opacity: 0;
+  }
+}
+.ai-msg-typing {
+  display: flex;
+  gap: 4px;
+  padding: 4px 2px;
+}
+.ai-msg-typing span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--fg-dim);
+  animation: ai-typing-bounce 1.2s infinite;
+}
+.ai-msg-typing span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.ai-msg-typing span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+@keyframes ai-typing-bounce {
+  0%,
+  60%,
+  100% {
+    opacity: 0.3;
+  }
+  30% {
+    opacity: 1;
+  }
+}
+.ai-msg-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+}
+.ai-tool-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--hover-bg);
+  border-left: 2px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 3px 8px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+  font-family: var(--font-mono);
+}
+.ai-msg-tool-error {
+  background: var(--hover-bg);
+  border-left: 2px solid var(--danger);
+  border-radius: var(--radius);
+  padding: 4px 8px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+}
+.ai-msg-error {
+  border-left: 2px solid var(--danger);
+  border-radius: var(--radius);
+  background: var(--hover-bg);
+  padding: 6px 8px;
+  color: var(--danger);
+}
+.ai-msg-error-advice {
+  margin-top: 4px;
+  color: var(--fg-dim);
+}
+.ai-msg-context-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+.ai-context-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1px 6px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+}
+/* Sticky composer */
+.ai-composer {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-top: 1px solid var(--border);
+}
+.ai-composer-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.ai-composer-input {
+  width: 100%;
+  box-sizing: border-box;
+  resize: none;
+  min-height: 30px;
+  max-height: 120px;
+  overflow-y: auto;
+  background: var(--bg-input);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 8px;
+  font-size: var(--spectrum-font-size-75, 12px);
+  font-family: inherit;
+  line-height: 1.4;
+}
+/* Pointer focus gets the accent border only; keyboard focus additionally gets a real ring.
+   `outline: none` on plain `:focus` is what makes a control untraversable by keyboard, so the
+   suppression is scoped to `:focus:not(:focus-visible)` and never applies to the caret's own path. */
+.ai-composer-input:focus {
+  border-color: var(--accent);
+}
+.ai-composer-input:focus:not(:focus-visible) {
+  outline: none;
+}
+.ai-composer-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.ai-composer-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.ai-model-picker {
+  max-width: 140px;
+  min-width: 0;
+}
+/* Sessions list */
+.ai-sessions {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  font-size: var(--spectrum-font-size-75, 12px);
+}
+.ai-sessions-empty {
+  color: var(--fg-dim);
+  text-align: center;
+  padding: 24px 12px;
+}
+.ai-session-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  min-width: 0;
+}
+.ai-session-row:hover {
+  background: var(--hover-bg);
+}
+.ai-session-text {
+  flex: 1;
+  min-width: 0;
+}
+.ai-session-title {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ai-session-meta {
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-50, 11px);
+}
+.ai-session-delete {
+  visibility: hidden;
+}
+.ai-session-row:hover .ai-session-delete {
+  visibility: visible;
+}
+/* The in-panel residue of the retired credentials gate: one sentence and the action that
+   fixes it, sitting between the transcript and the composer. */
+.ai-setup-notice {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border-top: 1px solid var(--border);
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-50, 11px);
+}
+.ai-managed-connect {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+.ai-managed-connect-error {
+  color: var(--danger);
+  font-size: var(--spectrum-font-size-50, 11px);
+  max-width: 260px;
+}
+.ai-managed-connect-divider {
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-50, 11px);
+  margin-top: 6px;
+}
+
+/* ─── Assistant settings (ui/ai-credentials-form.ts) ──────── */
+/* The provider credentials form. Hosted by the `Assistant: Settings…` dialog and by the New
+   Project modal's Import/Agent gates, so it sizes itself and never assumes a column. */
+.prefs-assistant {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.ai-creds-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 320px;
+  text-align: left;
+}
+.ai-creds-title {
+  align-self: center;
+  font-weight: 600;
+}
+.ai-creds-note {
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-50, 11px);
+}
+.ai-creds-label {
+  margin-top: 4px;
+  font-weight: 500;
+  font-size: var(--spectrum-font-size-50, 11px);
+}
+.ai-creds-field {
+  width: 100%;
+}
+.ai-creds-models {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ai-creds-error {
+  color: var(--danger);
+  font-size: var(--spectrum-font-size-50, 11px);
+}
+.ai-creds-actions {
+  display: flex;
+  align-self: flex-end;
+  gap: 8px;
+}
+/* ─── ⑫ Status bar ────────────────────────────────
+   Three fields in the shell's own level order, separated by a rule rather than by a run of "|"
+   characters: the boundary between PROJECT, DOCUMENT and SELECTION is structural, and the eye
+   should be able to find it without reading. */
+#statusbar {
+  /* Its OWN row, below the Bottom dock's, which collapses to 0px. Sharing that row put the whole
+     bar in a zero-height cell — it rendered its three fields into nothing while the 24px track
+     stood empty, so the app looked like it had lost its status bar the day it gained a dock. */
+  grid-row: 4;
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+  padding: 0 4px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+}
+#statusbar .sb-field {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  padding: 0 6px;
+}
+/* The SELECTION field is the one that grows without bound (a deep tree), so it is the one that
+   scrolls — the project name and the save state must never be pushed out of the window. */
+#statusbar .sb-field:last-child {
+  min-width: 0;
+  overflow: hidden;
+}
+#statusbar .sb-field + .sb-field {
+  border-left: 1px solid var(--border);
+}
+#statusbar .sb-item {
+  max-width: 32ch;
+  overflow: hidden;
+  padding: 0 4px;
+  border: none;
+  border-radius: var(--spectrum-corner-radius-75, 2px);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+#statusbar button.sb-item {
+  cursor: pointer;
+}
+#statusbar button.sb-item:hover:not(:disabled) {
+  color: var(--fg);
+  background: var(--hover-bg);
+}
+#statusbar button.sb-item:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+/* A readout is state, not a control: no hover, no pointer, and no promise that clicking does
+   anything. The two are visually distinguishable only on hover, which is the correct amount. */
+#statusbar .sb-state {
+  cursor: default;
+}
+
+/* ─── ⑥ Jump bar ──────────────────────────────── */
+/* The pane's address: project › file › node › node, every step a command. It reads at a glance
+   because it is ONE line at the top of the pane — the two half-breadcrumbs it replaces were 28px of
+   pane chrome (only while a takeover editor was open) and 11px of status bar (only while something
+   was selected), and neither ever showed the whole chain.
+
+   It scrolls rather than wraps: a deep selection must not push the stage down by a second line, and
+   the LEAF is the part you are reading, so the overflow is taken at the start. */
+.jump-bar {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  height: 24px;
+  padding: 0 6px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  white-space: nowrap;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+}
+.jump-bar::-webkit-scrollbar {
+  display: none;
+}
+.jump-bar .jb-seg {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.jump-bar .jb-crumb {
+  max-width: 28ch;
+  overflow: hidden;
+  padding: 0 4px;
+  border: none;
+  border-radius: var(--spectrum-corner-radius-75, 2px);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.jump-bar button.jb-crumb {
+  cursor: pointer;
+}
+.jump-bar button.jb-crumb:hover:not(:disabled) {
+  color: var(--fg);
+  background: var(--hover-bg);
+}
+.jump-bar button.jb-crumb:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+/* Where you ARE is stated by weight, not by removing the control: the leaf still selects, which is
+   how a stray click in the canvas is undone without leaving the bar. */
+.jump-bar .jb-crumb[aria-current] {
+  color: var(--fg);
+}
+/* A step with no command is a readout, not a dead button — an address with a hole in it would be a
+   lie about containment. No hover, no pointer, no promise. */
+.jump-bar .jb-crumb--static {
+  cursor: default;
+}
+.jump-bar .jb-alts {
+  padding: 0 2px;
+  border: none;
+  border-radius: var(--spectrum-corner-radius-75, 2px);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+.jump-bar .jb-alts:hover {
+  color: var(--fg);
+  background: var(--hover-bg);
+}
+.jump-bar .jb-sep {
+  flex-shrink: 0;
+  color: var(--fg-dim);
+  opacity: 0.6;
+}
+
+/* ─── Tab strip ───────────────────────────────── */
+/* The chevron sits OUTSIDE the scrolling strip, so it stays reachable at any scroll offset —
+   which is the whole point of it: the scrollbar is hidden and the wheel is a mouse affordance. */
+.tab-strip-row {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+}
+.tab-strip-row .tab-strip {
+  flex: 1 1 auto;
+  border-bottom: none;
+}
+.tab-strip-overflow {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  padding: 0;
+  border: none;
+  border-left: 1px solid var(--border);
+  background: none;
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-100, 14px);
+  line-height: 1;
+  cursor: pointer;
+}
+.tab-strip-overflow:hover {
+  background: var(--hover-bg);
+  color: var(--fg);
+}
+/* A LENS pane's strip: one chip naming the projection and the document it projects, where an
+   ordinary pane draws tab chips. It is not a tab and must not look like one — no close ✕ of its
+   own, because a lens owns no document to close. */
+.tab-derivation {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  /* A tab chip's VERTICAL box — `4px` top and bottom plus the 2px underline `.tab-strip-tab`
+     reserves — so the lens's one-chip row sits on the same baseline grid as the tab row in the
+     pane beside it. Horizontally it is 10px rather than a chip's 8px: this row is one chip wide
+     with nothing to sit beside, and a chip's tighter inset exists so several of them read as a
+     series.
+     The row's HEIGHT is set by its tallest child (the 12px `.tab-derivation-preset`, against a
+     chip's 11px), not by a font-size on this box — which is why the numbers above are the only
+     half of this comment a reader can check. The height itself was measured in a browser and
+     cannot be asserted here: happy-dom lays nothing out and returns 0 whether the rule is right
+     or wrong, and a 19px strip against a 28px one is the class of defect only a picture catches. */
+  padding: 4px 10px;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.tab-derivation-preset {
+  color: var(--fg);
+  font-size: var(--spectrum-font-size-75, 12px);
+}
+.tab-derivation-of {
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-50, 11px);
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+/* Drill-in marker: this document was opened FROM another one. */
+.tab-strip-origin {
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-50, 11px);
+  line-height: 1;
+}
+.tab-strip {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  padding: 0 8px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.tab-strip::-webkit-scrollbar {
+  display: none;
+}
+.tab-strip-tab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+  cursor: pointer;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  user-select: none;
+  flex-shrink: 0;
+}
+.tab-strip-tab:hover {
+  color: var(--fg);
+  background: var(--hover-bg);
+}
+.tab-strip-tab.active {
+  color: var(--fg);
+  border-bottom-color: var(--accent);
+}
+.tab-strip-label {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tab-strip-dirty {
+  color: var(--accent);
+  font-size: 8px;
+  line-height: 1;
+}
+.tab-strip-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-100, 14px);
+  line-height: 1;
+  border-radius: var(--radius);
+  cursor: pointer;
+  opacity: 0;
+}
+.tab-strip-tab:hover .tab-strip-close,
+.tab-strip-tab.active .tab-strip-close {
+  opacity: 1;
+}
+.tab-strip-close:hover {
+  background: var(--hover-bg);
+  color: var(--fg);
+}
+
+/* ─── Resize handles ─────────────────────────── */
+/* The two column handles span the stage AND the bottom dock, so the grab target is the dock's
+   full height rather than stopping at the floor of the canvas. */
+.resize-handle {
+  grid-row: 2 / 4;
+  width: 5px;
+  margin-left: -3px;
+  margin-right: -2px;
+  cursor: col-resize;
+  z-index: 10;
+  position: relative;
+}
+.resize-handle:hover,
+.resize-handle.dragging {
+  background: var(--accent, #3b82f6);
+  opacity: 0.5;
+}
+#resize-left {
+  grid-column: pane;
+  justify-self: start;
+}
+#resize-right {
+  grid-column: insp;
+  justify-self: start;
+}
+/* The Bottom dock's handle resizes on the other axis, so every dimension flips: it is a row in
+   the pane's column, full width, five px tall, and it drags up and down. */
+/* The pane splitter. A column handle like the two dock ones, but INSIDE the pane grid rather than
+   on `#app`'s grid — so it takes its own track (`panels/pane-grid.ts` writes the 5px column) and
+   spans the cell's full height rather than naming an application row. */
+/* The splitter between two cells.
+
+   `grid-row: auto`, and it has to be. It inherits `grid-row: 2 / 4` from `.resize-handle` — the
+   APP grid's placement, where the three dock handles live — and any definite row position, that
+   one or the `1 / -1` this rule used to carry, moves the item into an earlier step of CSS Grid's
+   auto-placement: definite-row items are placed before fully-auto ones, so the splitter claimed
+   column 1 and the two cells flowed around it into the 5px track and the second half. DOM order
+   was already correct; the placement algorithm was not reading it. Both axes auto is what makes
+   the DOM order decide. `#pane-grid` has one row, so an auto item still stretches its full height.
+
+   Like the row-1 column declaration above, this is invisible to every test in the package:
+   happy-dom does no layout. */
+.pane-splitter {
+  grid-row: auto;
+  grid-column: auto;
+  justify-self: stretch;
+  margin: 0;
+  width: auto;
+  background: var(--border);
+}
+.resize-handle-row {
+  grid-row: 3;
+  grid-column: pane;
+  align-self: start;
+  width: auto;
+  height: 5px;
+  margin: -3px 0 -2px;
+  cursor: row-resize;
+}
+
+/* ─── Preferences (⌘,) ──────────────────────────
+   The application-preferences sheet: a section list beside one section's body.
+   Distinct from Project Settings, which is a project document (spec §9.3). */
+.prefs-sheet {
+  display: flex;
+  gap: 16px;
+  min-height: 320px;
+}
+.prefs-nav {
+  flex: 0 0 148px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-right: 1px solid var(--border);
+  padding-right: 8px;
+}
+.prefs-nav-item {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--fg-dim);
+  font: inherit;
+  text-align: left;
+  padding: 6px 8px;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.prefs-nav-item:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+.prefs-nav-item.active {
+  background: var(--bg-selected);
+  color: var(--fg);
+}
+.prefs-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.prefs-title {
+  margin: 0;
+  font-size: var(--spectrum-font-size-100, 14px);
+  color: var(--fg);
+}
+.prefs-blurb {
+  margin: 0 0 4px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+}
+.prefs-empty {
+  margin: 0;
+  color: var(--fg-dim);
+}
+.prefs-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.prefs-field-label {
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--fg-dim);
+}
+.prefs-accounts {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.prefs-account {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.prefs-account-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.prefs-account-label {
+  color: var(--fg);
+}
+.prefs-account-detail {
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+}
+.prefs-keys {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.prefs-keys-scope {
+  margin: 10px 0 2px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+}
+.prefs-key {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 2px 0;
+}
+.prefs-key-chord {
+  flex: 0 0 96px;
+  font-family: var(--font-mono);
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg);
+}
+.prefs-key-title {
+  color: var(--fg-dim);
+  min-width: 0;
+}
+
+/* ─── Assistant honesty (§7.4) ──────────────────────────────────────────────
+   A tool chip renders its OUTCOME, a turn renders what it CHANGED, and an error
+   offers Retry. `ToolCallRecord.result` was populated by the loop and ignored by
+   the renderer, so a chip said exactly as much when the edit had been refused as
+   when it had landed. */
+.ai-tool-chip-name {
+  flex: 0 0 auto;
+}
+.ai-tool-chip-outcome {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font);
+}
+.ai-tool-chip[data-outcome="ok"] {
+  border-left-color: var(--success, var(--accent));
+}
+.ai-tool-chip[data-outcome="failed"] {
+  border-left-color: var(--danger);
+  color: var(--danger);
+}
+/* The changed-files summary. Collapsed by default because the headline —
+   "Changed 4 files · 2 written to disk — undo cannot reach them" — is the part
+   that must never be missed; the list is for when it is. */
+.ai-msg-changes {
+  margin-top: 6px;
+  border-left: 2px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--hover-bg);
+  padding: 4px 8px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+}
+.ai-msg-changes > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.ai-msg-changes-list {
+  margin: 6px 0 2px;
+  padding-left: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.ai-msg-changes-list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: baseline;
+}
+.ai-msg-changes-list li[data-ok="false"] {
+  color: var(--danger);
+}
+/* The undo caveat, rendered to the person holding ⌘Z rather than appended to the
+   model-facing tool summary. */
+.ai-msg-changes-list li[data-disk="true"] em {
+  color: var(--warning);
+  font-style: normal;
+}
+.ai-msg-retry {
+  margin-top: 6px;
+}
+
+/* ─── Collaboration presence (§7.4) ─────────────────────────────────────────
+   `.jx-presence*` matched no stylesheet in the repo — the flagship affordance
+   shipped unstyled. The flags are the two states co-editing could not announce:
+   a read-only guest whose edits were dropped at the publish gate, and the
+   source-canonical freeze whose whole rendering was a three-second grey line,
+   which is exactly what a bug looks like. */
+.jx-presence {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.jx-presence-status {
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+  white-space: nowrap;
+}
+.jx-presence-status[data-status="synced"] {
+  color: var(--success, var(--accent));
+}
+.jx-presence-status[data-status="connecting"] {
+  color: var(--fg-dim);
+}
+.jx-presence-status[data-status="offline"] {
+  color: var(--warning);
+}
+.jx-presence-status[data-status="failed"] {
+  color: var(--danger);
+}
+.jx-presence-flag {
+  border-radius: var(--radius);
+  padding: 1px 6px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  white-space: nowrap;
+  border: 1px solid currentcolor;
+}
+.jx-presence-flag[data-flag="read-only"] {
+  color: var(--fg-dim);
+}
+.jx-presence-flag[data-flag="frozen"] {
+  color: var(--warning);
+}
+.jx-presence-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  overflow: hidden;
+  font-size: var(--spectrum-font-size-50, 11px);
+  font-weight: 600;
+  color: var(--spectrum-gray-50, #fff);
+  flex: none;
+}
+.jx-presence-chip img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* A standing statement, not an after-the-fact refusal: a guest without write
+   access used to watch their edits apply locally and vanish at the publish gate. */
+.jx-collab-banner {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--hover-bg);
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-75, 12px);
+}

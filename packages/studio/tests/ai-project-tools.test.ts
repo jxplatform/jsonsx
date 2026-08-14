@@ -282,6 +282,58 @@ describe("ai-project-tools — write_file", () => {
     expect(onProjectConfigWritten).toHaveBeenCalledTimes(1);
   });
 
+  /* `tabs/project-config.ts` owns `project.json`, and an open `project.json` tab IS the
+     configuration document — so adopting the write refreshes that tab. Re-reading the file on top
+     of it would parse a SECOND configuration object and hand it to the same tab, which is the split
+     the adoption just closed; the settings edit after such a reload used to persist the stale
+     document back over the assistant's write. */
+  test("a project.json write refreshes its open tab through the adoption, never a second parse", async () => {
+    const tab = resetWorkspaceWithTab(undefined, { documentPath: "project.json" });
+    const reloadTab = mock(async (_p: string) => {});
+    const adopted: object[] = [];
+    const { registry } = makeHarness(
+      {},
+      {
+        findOpenTab: (p) => (p === "project.json" ? tab : null),
+        onProjectConfigWritten: (config) => {
+          adopted.push(config);
+        },
+        reloadTab,
+      },
+    );
+
+    const res = await registry.execute("write_file", {
+      content: JSON.stringify({ name: "Renamed Site" }),
+      path: "project.json",
+    });
+
+    expect(res.success).toBe(true);
+    expect(res.summary).toContain("refreshed");
+    expect(adopted).toEqual([{ name: "Renamed Site" }]);
+    expect(reloadTab).not.toHaveBeenCalled();
+  });
+
+  test("the adoption is awaited, so the tool never reports a write the app has not taken", async () => {
+    let settled = false;
+    const { registry } = makeHarness(
+      {},
+      {
+        onProjectConfigWritten: async () => {
+          await Promise.resolve();
+          settled = true;
+        },
+      },
+    );
+
+    const res = await registry.execute("write_file", {
+      content: JSON.stringify({ name: "Renamed Site" }),
+      path: "project.json",
+    });
+
+    expect(res.success).toBe(true);
+    expect(settled).toBe(true);
+  });
+
   /* Project.json used to be exempt from the schema gate by construction — syntactically valid JSON
      was written straight to disk, and Monaco flagged it against the per-project entry document the
      moment a human opened the file. The gate has to block BEFORE the write: disk writes have no

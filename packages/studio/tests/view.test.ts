@@ -1,114 +1,57 @@
-/** View state (C7): applyPanelCollapse DOM + localStorage behavior in src/view.ts. */
+/**
+ * What is left of `view` after the split (src/view.ts): render OUTPUTS only.
+ *
+ * UI inputs — dock state, the Navigator tab, the layout selection — moved to the reactive `shell`
+ * record and are covered by shell.test.ts. The assertion that matters here is the negative one:
+ * `view` must not grow reactive state back, because the same object holds a Monaco instance, a live
+ * ResizeObserver and detached DOM nodes.
+ */
 import "./with-dom.js";
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { applyPanelCollapse, view } from "../src/view";
+import { describe, expect, test } from "bun:test";
+import { view } from "../src/view";
+import { surfaceForPane } from "../src/canvas/surface-registry";
 
-const STORAGE_KEY = "jx-studio-panel-widths";
-
-beforeEach(() => {
-  document.body.innerHTML = "";
-  localStorage.removeItem(STORAGE_KEY);
-  view.leftPanelCollapsed = false;
-  view.rightPanelCollapsed = false;
-  view.chatPanelCollapsed = false;
-});
-
-afterEach(() => {
-  localStorage.removeItem(STORAGE_KEY);
-});
-
-function mountApp(): HTMLElement {
-  const app = document.createElement("div");
-  app.id = "app";
-  document.body.append(app);
-  return app;
-}
-
-describe("applyPanelCollapse", () => {
-  test("returns silently when #app does not exist", () => {
-    expect(document.querySelector("#app")).toBeNull();
-    expect(() => applyPanelCollapse()).not.toThrow();
-    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
-  });
-
-  test("toggles collapse classes from view state", () => {
-    const app = mountApp();
-    view.leftPanelCollapsed = true;
-    view.rightPanelCollapsed = false;
-    view.chatPanelCollapsed = true;
-
-    applyPanelCollapse();
-
-    expect(app.classList.contains("left-collapsed")).toBe(true);
-    expect(app.classList.contains("right-collapsed")).toBe(false);
-    expect(app.classList.contains("chat-collapsed")).toBe(true);
-
-    view.chatPanelCollapsed = false;
-    applyPanelCollapse();
-    expect(app.classList.contains("chat-collapsed")).toBe(false);
-  });
-
-  test("removes classes when panels are expanded again", () => {
-    const app = mountApp();
-    view.leftPanelCollapsed = true;
-    view.rightPanelCollapsed = true;
-    applyPanelCollapse();
-    expect(app.classList.contains("left-collapsed")).toBe(true);
-    expect(app.classList.contains("right-collapsed")).toBe(true);
-
-    view.leftPanelCollapsed = false;
-    view.rightPanelCollapsed = false;
-    applyPanelCollapse();
-
-    expect(app.classList.contains("left-collapsed")).toBe(false);
-    expect(app.classList.contains("right-collapsed")).toBe(false);
-  });
-
-  test("persists collapse flags to localStorage", () => {
-    mountApp();
-    view.leftPanelCollapsed = true;
-    view.rightPanelCollapsed = true;
-    view.chatPanelCollapsed = true;
-
-    applyPanelCollapse();
-
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}");
-    expect(saved.leftCollapsed).toBe(true);
-    expect(saved.rightCollapsed).toBe(true);
-    expect(saved.chatCollapsed).toBe(true);
-  });
-
-  test("merges with existing saved panel widths", () => {
-    mountApp();
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ leftWidth: 250 }));
-    view.leftPanelCollapsed = false;
-    view.rightPanelCollapsed = true;
-
-    applyPanelCollapse();
-
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}");
-    expect(saved.leftWidth).toBe(250);
-    expect(saved.leftCollapsed).toBe(false);
-    expect(saved.rightCollapsed).toBe(true);
-  });
-
-  test("corrupt stored JSON is swallowed; classes still applied", () => {
-    const app = mountApp();
-    localStorage.setItem(STORAGE_KEY, "{not valid json");
-    view.leftPanelCollapsed = true;
-
-    expect(() => applyPanelCollapse()).not.toThrow();
-
-    expect(app.classList.contains("left-collapsed")).toBe(true);
-    // The save was aborted by the parse error, leaving the corrupt value in place.
-    expect(localStorage.getItem(STORAGE_KEY)).toBe("{not valid json");
-  });
-});
-
-describe("view defaults", () => {
-  test("exposes expected initial UI state", () => {
-    expect(view.leftTab).toBeString();
+describe("view", () => {
+  test("holds renderer outputs — editor instances, DOM refs and cleanup arrays", () => {
+    expect(surfaceForPane("primary").monacoEditor).toBeNull();
+    expect(surfaceForPane("primary").panzoomWrap).toBeNull();
+    expect(surfaceForPane("primary").centerObserver).toBeNull();
     expect(view.dndCleanups).toBeArray();
     expect(view.elementsCollapsed).toBeInstanceOf(Set);
+  });
+
+  test("carries nothing that belongs to ONE STAGE", () => {
+    /* The pan/zoom wrap, the centering observer, the pan offsets, the source Monaco and the render
+       generation are fields of a `CanvasSurface`. They cannot be type errors here — `ViewState` has
+       an index signature — so the guard is `scripts/check-pane-singletons.ts` and this is its
+       assertion in the unit suite: the keys are GONE from the object, not merely unread. */
+    for (const key of [
+      "panzoomWrap",
+      "centerObserver",
+      "needsCenter",
+      "panX",
+      "panY",
+      "monacoEditor",
+      "renderGeneration",
+      // And the four that were dead outright: written by no `src/` file, cleared on every render.
+      "canvasDndCleanups",
+      "canvasEventCleanups",
+      "forcedStyleTag",
+      "forcedAttrEl",
+    ]) {
+      expect(Object.hasOwn(view, key)).toBe(false);
+    }
+  });
+
+  test("carries no UI inputs", () => {
+    for (const key of [
+      "leftTab",
+      "leftPanelCollapsed",
+      "rightPanelCollapsed",
+      "chatPanelCollapsed",
+      "layoutSelection",
+    ]) {
+      expect(Object.hasOwn(view, key)).toBe(false);
+    }
   });
 });

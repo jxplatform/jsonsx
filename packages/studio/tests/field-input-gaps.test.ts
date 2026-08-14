@@ -2,7 +2,6 @@ import "./harness";
 import { describe, expect, test } from "bun:test";
 import { html, render } from "lit-html";
 import {
-  DEFAULT_DEBOUNCE_MS,
   clearDraft,
   hasDraft,
   getFieldValue,
@@ -36,10 +35,6 @@ function sleep(ms: number) {
 // ─── Draft-store edge cases ──────────────────────────────────────────────────
 
 describe("draft store edge cases", () => {
-  test("DEFAULT_DEBOUNCE_MS is a sane positive number", () => {
-    expect(DEFAULT_DEBOUNCE_MS).toBeGreaterThan(0);
-  });
-
   test("clearDraft cancels a pending debounced commit", async () => {
     let calls = 0;
     setDraft("g1", "abc");

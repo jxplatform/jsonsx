@@ -18,7 +18,20 @@ const desktopDir = join(root, "desktop");
 mkdirSync(join(studioDir, "dist", "workers"), { recursive: true });
 mkdirSync(join(studioDir, "dist", "chunks"), { recursive: true });
 mkdirSync(join(studioDir, "fonts"), { recursive: true });
+mkdirSync(join(studioDir, "styles"), { recursive: true });
 mkdirSync(desktopDir, { recursive: true });
+/** The studio chrome stylesheet, in the order index.html links it. */
+const STYLESHEETS = [
+  "tokens.css",
+  "shell.css",
+  "canvas.css",
+  "panels.css",
+  "inspector.css",
+  "overlays.css",
+];
+for (const sheet of STYLESHEETS) {
+  writeFileSync(join(studioDir, "styles", sheet), `/* ${sheet} */`);
+}
 writeFileSync(join(studioDir, "dist", "studio.css"), "/* css */");
 writeFileSync(join(studioDir, "dist", "studio.js"), "// studio");
 writeFileSync(join(studioDir, "dist", "iframe-entry.js"), "// canvas entry");
@@ -69,6 +82,35 @@ describe("stageStudioAssets", () => {
     expect(await readFile(join(out, "dist", "chunks", "studio-abc123.js"), "utf8")).toBe(
       "// split chunk",
     );
+  });
+
+  /* The chrome stylesheet is plain CSS that index.html <link>s directly — no bundler touches it, so
+     nothing else in the pipeline would carry it into the app. Miss it and the packaged Studio boots
+     with no tokens, no grid and no panel chrome: every surface renders as unstyled boxes. */
+  test("stages the whole styles/ directory, the studio's only chrome CSS", async () => {
+    await stageStudioAssets(desktopDir);
+    const out = join(desktopDir, "assets", "studio");
+
+    for (const sheet of STYLESHEETS) {
+      expect(await readFile(join(out, "styles", sheet), "utf8")).toBe(`/* ${sheet} */`);
+    }
+  });
+
+  /* Same reasoning as the missing-chunks refusal: an app with no chrome CSS is worse than a build
+     that stops and says so. */
+  test("refuses to stage when styles/ is missing", async () => {
+    const bare = mkdtempSync(join(tmpdir(), "jx-stage-nostyles-"));
+    const bareStudio = join(bare, "studio");
+    const bareDesktop = join(bare, "desktop");
+    mkdirSync(join(bareStudio, "dist", "chunks"), { recursive: true });
+    mkdirSync(bareDesktop, { recursive: true });
+    writeFileSync(join(bareStudio, "dist", "studio.js"), "// studio");
+    writeFileSync(join(bareStudio, "dist", "studio.css"), "/* css */");
+    try {
+      await expect(stageStudioAssets(bareDesktop)).rejects.toThrow("no styles/ directory");
+    } finally {
+      rmSync(bare, { force: true, recursive: true });
+    }
   });
 
   /* Studio.js resolves Monaco's workers relative to its OWN url, so they have to land beside it —

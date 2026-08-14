@@ -27,6 +27,7 @@ import {
 } from "../tabs/transact";
 import type { JxNodeValue } from "../tabs/transact";
 import { validateDoc } from "./jx-validate";
+import { recordWrite } from "./ai-writes";
 import { flagHardcodedTokens, formatTokenHints } from "./token-lint";
 
 const PATH_DESCRIPTION =
@@ -127,7 +128,24 @@ async function applyAndValidate(
   const before = new Set(await validate(rawBefore));
   const renderOkBefore = renderCheck ? await renderCheck(rawBefore) : { ok: true };
 
-  transactDoc(tab, mutationFn);
+  /* AND THE WRITE CAN BE REFUSED, in which case the model must be told rather than congratulated.
+     The collab gate pauses structural editing while source is canonical, and this went on to
+     record a ledger entry ("Changed N files") and validate the UNCHANGED document — which produces
+     no new errors, so the tool answered `success: true`. The model then built its next three edits
+     on a change that never existed. A refusal is an ordinary state of the room, so it is an error
+     result with a reason the model can act on (wait, or ask the author), not a thrown exception. */
+  if (!transactDoc(tab, mutationFn)) {
+    return {
+      success: false,
+      error:
+        "The document is frozen: a collaborator is editing its source, so structural edits are " +
+        "paused. Nothing was changed. Try again once source editing ends.",
+    };
+  }
+  /* One ledger entry per mutation, so the panel's "Changed N files" counts documents the model
+     touched rather than sentences it wrote (§7.4). `disk: false` is the load-bearing half: this
+     went through transactDoc, so the tab's history — and "Restore to here" — can reach it. */
+  recordWrite({ disk: false, ok: true, path: tab.documentPath ?? "(untitled)", tool: summary });
 
   const rawAfter = toRaw(tab.doc.document);
   const after = await validate(rawAfter);
@@ -734,14 +752,23 @@ export function registerAiTools(
         }
         try {
           await saveFile(relPath, JSON.stringify(content, null, 2));
+          recordWrite({ disk: true, ok: true, path: relPath, tool: "create_component" });
           return {
             success: true,
             summary: await reconcileAfterWrite(relPath, `Created component at "${relPath}".`),
           };
         } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          recordWrite({
+            disk: true,
+            error: message,
+            ok: false,
+            path: relPath,
+            tool: "create_component",
+          });
           return {
             success: false,
-            error: `Failed to write file: ${error instanceof Error ? error.message : String(error)}`,
+            error: `Failed to write file: ${message}`,
           };
         }
       },
@@ -802,14 +829,23 @@ export function registerAiTools(
         }
         try {
           await saveFile(relPath, JSON.stringify(content, null, 2));
+          recordWrite({ disk: true, ok: true, path: relPath, tool: "create_page" });
           return {
             success: true,
             summary: await reconcileAfterWrite(relPath, `Created page at "${relPath}".`),
           };
         } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          recordWrite({
+            disk: true,
+            error: message,
+            ok: false,
+            path: relPath,
+            tool: "create_page",
+          });
           return {
             success: false,
-            error: `Failed to write file: ${error instanceof Error ? error.message : String(error)}`,
+            error: `Failed to write file: ${message}`,
           };
         }
       },

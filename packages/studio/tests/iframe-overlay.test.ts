@@ -226,3 +226,18 @@ describe("setInsertZone (insertion '+')", () => {
     expect(btn.classList.contains("visible")).toBe(false);
   });
 });
+
+describe("setSuppressed", () => {
+  test("hides the whole layer and restores it", () => {
+    // Preview paints no editing chrome at all — one switch, so no in-flight reply from the previous
+    // Render can leave a box drawn over a page that is supposed to look shipped.
+    const layer = createOverlayLayer(document);
+    layer.setSelection({ height: 10, left: 0, top: 0, width: 10 });
+
+    layer.setSuppressed(true);
+    expect(layer.root.style.display).toBe("none");
+
+    layer.setSuppressed(false);
+    expect(layer.root.style.display).toBe("");
+  });
+});

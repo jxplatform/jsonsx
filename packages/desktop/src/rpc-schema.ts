@@ -1,7 +1,7 @@
 // oxlint-disable typescript/no-invalid-void-type -- Electrobun RPCSchema uses `void` to mark no-payload params/responses
 import type { RPCSchema } from "electrobun/bun";
 import type { ProjectConfig } from "@jxsuite/schema/types";
-import type { FsEventPayload, RenameReport } from "@jxsuite/server/refactor";
+import type { FsEventPayload, ReferencesResult, RenameReport } from "@jxsuite/server/refactor";
 import type { StarterMeta } from "@jxsuite/starters";
 import type {
   ComponentMeta,
@@ -273,10 +273,35 @@ export interface StudioRPC {
         params: { name: string; url: string };
         response: void;
       };
+      /**
+       * Build the site to its output directory, so `View: Open in Browser` opens what the author is
+       * looking at rather than whatever the last build left on disk.
+       *
+       * Errors come back in the payload, not as a rejection: a partial build still produced pages,
+       * and the author is better served by the page they asked for with the failures named beside
+       * it.
+       */
+      buildSite: {
+        params: void;
+        /* `url` is the origin the result is browsable at — its own port, because this window's
+           project server answers for the project's SOURCES and a built page addresses its OUTPUT
+           by the same paths. */
+        response: { routes: number; files: number; errors: string[]; url?: string };
+      };
       // Files
+      /* `extensions` mirrors the PAL's second argument (the format registry's document extensions);
+         declaring only `query` silently dropped it and made Quick Access .json-only on desktop. */
       searchFiles: {
-        params: { query: string };
+        params: { query: string; extensions?: string[] };
         response: DirEntry[];
+      };
+      /* Where a file / component tag is used. Declared AND handled in the same change: this is the
+         request that would otherwise repeat searchFiles' failure — a usage count that silently
+         answers "0" is indistinguishable from a component nobody has placed yet, and a delete
+         confirmation would then promise nothing breaks. The parity test is the guard. */
+      findReferences: {
+        params: { path?: string; tagName?: string };
+        response: ReferencesResult;
       };
       // Formats
       listFormats: {
@@ -460,14 +485,22 @@ export interface StudioRPC {
         params: void;
         response: { path: string | null };
       };
+      // Native project.json picker that binds NOTHING — the choice without the consequence, so
+      // "open it in a new window" can ask which project without re-rooting the window that asked.
+      pickProject: {
+        params: void;
+        response: { root: string; name: string } | null;
+      };
       // Window management (multi-window)
       newWindow: {
         params: void;
         response: void;
       };
       openProjectInNewWindow: {
+        // A window was created for the project, or one already had it and came to the front.
+        // The response says which, so the caller can report what actually happened.
         params: { root: string };
-        response: void;
+        response: { focused: boolean };
       };
       setWindowProject: {
         params: { root: string };

@@ -1,5 +1,6 @@
 import { flush, installMockPlatform, resetStudioState } from "./harness";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { notifyModule } from "./notify-mock";
 import { closeAllTabs, openTab } from "../src/workspace/workspace";
 import { canRedo, canUndo, redo, undo } from "../src/tabs/transact";
 import type { CommitResult, GridEditBatch, GridSource } from "../src/grid/grid-source";
@@ -22,11 +23,11 @@ void mock.module("../src/ui/progress-modal.js", () => ({
     return { done: () => {}, fail: () => {}, setStatus: () => {} };
   },
 }));
-void mock.module("../src/panels/statusbar.js", () => ({
-  statusMessage: (msg: string) => {
-    statusCalls.push(msg);
-  },
-}));
+// `notify` is NOT mocked: it is a reactive store with no I/O, so the honest assertion is what the
+// Controller actually recorded, in the tier it recorded it in.
+void mock.module("../src/services/notify.js", () =>
+  notifyModule((call) => statusCalls.push(call.message)),
+);
 
 const { createGridController, getGridController, ROW_KEY_FIELD } =
   await import("../src/grid/grid-controller");
@@ -280,7 +281,7 @@ describe("save", () => {
     });
     await controller.save();
     expect(progressOpens).toBe(1);
-    expect(statusCalls.at(-1)).toContain("Save error");
+    expect(statusCalls.at(-1)).toContain("Could not save the grid");
     expect(controller.state.saving).toBeFalse();
   });
 });
@@ -425,5 +426,148 @@ describe("refresh and fs staleness", () => {
     // Tab close unsubscribes.
     closeAllTabs();
     expect(fsHandler).toBeNull();
+  });
+});
+
+// ─── Row order: sort and grouping (plan §12 P7.2's saved-view facets) ─────────
+
+/** Four rows whose titles and counts disagree about order, plus a blank, plus a group column. */
+function orderedSource(remoteSort = false): GridSource {
+  const rows = [
+    { cells: { count: 2, status: "draft", title: "Beta" }, key: "b" },
+    { cells: { count: 1, status: "live", title: "Alpha" }, key: "a" },
+    { cells: { count: 3, status: "draft", title: null }, key: "c" },
+    { cells: { count: 0, status: "live", title: "Delta" }, key: "d" },
+  ];
+  return {
+    capabilities: { delete: false, insert: true, remotePaging: false, remoteSort },
+    columns: async () => [
+      { editable: true, field: "title", kind: "string", title: "Title" },
+      { editable: true, field: "count", kind: "number", title: "Count" },
+      { editable: true, field: "status", kind: "string", title: "Status" },
+    ],
+    commit: async () => ({ cells: [], deletes: [], inserts: [] }),
+    id: "grid://collection/ordered",
+    label: "ordered",
+    rows: async () => ({ rows: structuredClone(rows), total: rows.length }),
+  };
+}
+
+const keysOf = (controller: { effectiveRows: () => Record<string, unknown>[] }) =>
+  controller.effectiveRows().map((row) => row[ROW_KEY_FIELD]);
+
+describe("sort", () => {
+  test("a local source is sorted here — the query is no longer silently ignored", async () => {
+    installMockPlatform();
+    const controller = createGridController(openGridTab(), orderedSource());
+    await controller.load();
+    expect(keysOf(controller)).toEqual(["b", "a", "c", "d"]);
+
+    await controller.setSort({ dir: "asc", field: "title" });
+    // Alpha, Beta, Delta — and the blank title last, in BOTH directions.
+    expect(keysOf(controller)).toEqual(["a", "b", "d", "c"]);
+    await controller.setSort({ dir: "desc", field: "title" });
+    expect(keysOf(controller)).toEqual(["d", "b", "a", "c"]);
+
+    await controller.setSort({ dir: "asc", field: "count" });
+    expect(keysOf(controller)).toEqual(["d", "a", "b", "c"]);
+
+    await controller.setSort(null);
+    expect(controller.state.query.orderBy).toBeUndefined();
+    expect(keysOf(controller)).toEqual(["b", "a", "c", "d"]);
+  });
+
+  test("sorting a local source does not re-read it", async () => {
+    installMockPlatform();
+    const source = orderedSource();
+    let reads = 0;
+    const { rows } = source;
+    source.rows = async (query) => {
+      reads += 1;
+      return rows(query);
+    };
+    const controller = createGridController(openGridTab(), source);
+    await controller.load();
+    expect(reads).toBe(1);
+    await controller.setSort({ dir: "asc", field: "title" });
+    expect(reads).toBe(1);
+  });
+
+  test("a remote-sorting source is asked again and its answer is left alone", async () => {
+    installMockPlatform();
+    const source = orderedSource(true);
+    const queries: unknown[] = [];
+    const { rows } = source;
+    source.rows = async (query) => {
+      queries.push(query);
+      return rows(query);
+    };
+    const controller = createGridController(openGridTab(), source);
+    await controller.load();
+    await controller.setSort({ dir: "desc", field: "title" });
+    expect(queries.at(-1)).toEqual({ dir: "desc", orderBy: "title" });
+    // Source order, unchanged: the backend answered the query and re-sorting would second-guess it.
+    expect(keysOf(controller)).toEqual(["b", "a", "c", "d"]);
+  });
+
+  test("a pending insert stays at the bottom however the committed rows are sorted", async () => {
+    installMockPlatform();
+    const controller = createGridController(openGridTab(), orderedSource());
+    await controller.load();
+    const tempKey = controller.addRow({ title: "Aaa" });
+    await controller.setSort({ dir: "asc", field: "title" });
+    expect(keysOf(controller).at(-1)).toBe(tempKey);
+  });
+
+  test("an edited cell sorts by its edited value, not its baseline", async () => {
+    installMockPlatform();
+    const controller = createGridController(openGridTab(), orderedSource());
+    await controller.load();
+    controller.buffer.setCell("d", "title", "Aaa");
+    await controller.setSort({ dir: "asc", field: "title" });
+    expect(keysOf(controller)[0]).toBe("d");
+  });
+
+  test("a boolean column sorts false before true", async () => {
+    installMockPlatform();
+    const source = orderedSource();
+    source.columns = async () => [{ editable: true, field: "flag", kind: "boolean", title: "F" }];
+    source.rows = async () => ({
+      rows: [
+        { cells: { flag: true }, key: "t" },
+        { cells: { flag: false }, key: "f" },
+      ],
+      total: 2,
+    });
+    const controller = createGridController(openGridTab(), source);
+    await controller.load();
+    await controller.setSort({ dir: "asc", field: "flag" });
+    expect(keysOf(controller)).toEqual(["f", "t"]);
+  });
+});
+
+describe("grouping", () => {
+  test("groups are contiguous, in first-appearance order, and counted", async () => {
+    installMockPlatform();
+    const controller = createGridController(openGridTab(), orderedSource());
+    await controller.load();
+    expect(controller.groups()).toEqual([]);
+
+    controller.setGrouping("status");
+    expect(keysOf(controller)).toEqual(["b", "c", "a", "d"]);
+    expect(controller.groups()).toEqual([
+      { count: 2, value: "draft" },
+      { count: 2, value: "live" },
+    ]);
+
+    // Sort runs first, so it orders rows WITHIN each group and, through first appearance, the
+    // Groups themselves: count-0 "d" is live, so live now leads.
+    await controller.setSort({ dir: "asc", field: "count" });
+    expect(keysOf(controller)).toEqual(["d", "a", "b", "c"]);
+    expect(controller.groups().map((group) => group.value)).toEqual(["live", "draft"]);
+
+    controller.setGrouping(null);
+    expect(controller.groups()).toEqual([]);
+    expect(keysOf(controller)).toEqual(["d", "a", "b", "c"]);
   });
 });

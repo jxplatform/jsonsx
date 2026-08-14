@@ -1,0 +1,653 @@
+/* Jx Studio — canvas surface.
+   Load after tokens.css, after shell.css.
+
+   Owns the multi-panel canvas frame (.pane-stage, .panzoom-wrap,
+   .canvas-panel*), the pane's context bar and floating zoom pod, the
+   content-edit-mode canvas column, the selection/hover/layout overlay
+   boxes drawn over the rendered document, and the unified block action
+   bar plus its link popover. */
+
+/* ─── Canvas (multi-panel) ────────────────────── */
+/* The stage's own axis. `shell.css` places the cell; this says what it does with it. Selected by
+   class rather than by `#canvas-wrap`, because there are as many stages as there are panes. */
+.pane-stage {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+.panzoom-wrap {
+  display: inline-flex;
+  gap: 24px;
+  align-items: flex-start;
+  transform-origin: 0 0;
+  margin-block: auto;
+}
+.canvas-panel {
+  flex-shrink: 0;
+}
+.source-wrap {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  flex: 1;
+  min-width: 0;
+}
+/* ─── ⑦ The pane context bar ───────────────────
+   Three separately-LABELLED axes — Editor kind, Canvas view, Rendering context — where five
+   unlabelled ones used to sit in a row styled identically to the tab strip above it. The label is
+   load-bearing: it is what stops the band re-accreting into an anonymous strip of chips. */
+
+/* The pane's top band: the context bar, plus the standing statements that must be readable before
+   the first keystroke (today, collab's read-only banner). One element so `pane-context.ts` can
+   MEASURE what the stage has to clear — a banner's height is its wrapped text, which only layout
+   knows. `min-width: 0` so a long breadcrumb ellipses instead of widening the pane. */
+.pc-band {
+  min-width: 0;
+}
+.pane-context {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 28px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-panel);
+  min-width: 0;
+  overflow: hidden;
+}
+.pane-context .pc-spacer {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+/* §18.4's preset menu trigger, in the bar's leading slot — the one that was empty padding.
+   Sized to the 22px the strip's overflow control uses, so the two rows of pane chrome agree. */
+.pc-derive-trigger {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: none;
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-75, 12px);
+  line-height: 1;
+  cursor: pointer;
+}
+.pc-derive-trigger:hover {
+  background: var(--hover-bg);
+  color: var(--fg);
+}
+.pc-axis {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.pc-axis-label {
+  font-size: var(--spectrum-font-size-50, 11px);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-dim);
+  white-space: nowrap;
+}
+.pc-static {
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--fg);
+  white-space: nowrap;
+}
+.pc-context-trigger {
+  font-variant-numeric: tabular-nums;
+}
+/* The document data a render resolves against, behind its own trigger beside the context one.
+   `.pc-resolving` and `.pc-resolving-label` are gone with the inline strip: the phrase "resolving
+   with" is the popover's group label now, so `.pc-ctx-label` styles it and there is one place a
+   group heading in this bar is described. */
+.pc-resolving-trigger {
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+/* The editor-kind dropdown and the view segments both sit on a 28px band: cap them so a long
+   document name in the breadcrumb cannot push an axis off the end of the bar. */
+.pc-editor-kind {
+  max-width: 140px;
+}
+.pc-view {
+  flex-shrink: 0;
+}
+/* The preview toggle is not a third radio, and must not read as one: it says the canvas is inert.
+   Pressed, it takes the accent so "editing is off" is legible from across the room; unpressed it is
+   as quiet as any other action button. The margin separates the two axes the eye is being asked to
+   read as separate. */
+.pc-preview-toggle {
+  flex-shrink: 0;
+  margin-inline-start: 6px;
+}
+.pc-preview-toggle[selected] {
+  --spectrum-actionbutton-background-color-default: var(--accent);
+  --spectrum-actionbutton-content-color-default: var(--bg);
+  background: var(--accent);
+  color: var(--bg);
+}
+.pc-export {
+  flex-shrink: 0;
+}
+
+/* The rendering-context popover: one column of labelled groups over a footer that leaves for the
+   definition site. This control only SELECTS (§2 principle 5) — nothing in it defines a
+   breakpoint, a scheme or a feature query. */
+.pc-ctx {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px;
+  min-width: 240px;
+  max-width: 340px;
+}
+.pc-ctx-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pc-ctx-label {
+  font-size: var(--spectrum-font-size-50, 11px);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-dim);
+}
+/* The fields, stacked. They were a row on the bar capped at 140px; in the popover each takes the
+   full column so a route value or a JSON test prop is readable while you type it. */
+.pc-ctx-group sp-picker.pc-param,
+.pc-ctx-group sp-textfield.pc-prop {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+}
+.pc-context-popover {
+  max-width: 360px;
+}
+.pc-sizes {
+  flex-wrap: wrap;
+}
+.pc-layout-switch {
+  margin: 0;
+}
+.pc-ctx-manage {
+  align-self: flex-start;
+  padding: 2px 0;
+  border: none;
+  background: none;
+  color: var(--accent, #3b82f6);
+  font-size: var(--spectrum-font-size-75, 12px);
+  cursor: pointer;
+}
+.pc-ctx-manage:hover {
+  text-decoration: underline;
+}
+
+/* ─── ⑩ The floating zoom pod ──────────────────
+   Bottom-right of the pane, over the stage — a viewport control, which is not a document axis and
+   so never belonged in a band beside one. */
+.pane-zoom {
+  align-self: flex-end;
+  margin: 0 12px 12px 0;
+  padding: 2px 4px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 25%);
+}
+.pane-zoom .pc-zoom-label {
+  min-width: 48px;
+  font-family: var(--font-mono);
+}
+.pane-zoom .pc-fit {
+  max-width: 120px;
+}
+.source-editor {
+  flex: 1;
+  min-height: 0;
+}
+
+/* ─── Pane tab strips ──────────────────────────
+   shell.css owns the base `.tab-strip*` rules; these are the states the pane model adds — a pinned
+   head, an italic preview chip, the drag ghost, and the unfocused pane's dimmed strip. */
+.tab-strip-row:not(.focused) .tab-strip-tab.active {
+  border-bottom-color: var(--border);
+}
+.tab-strip-tab.preview .tab-strip-label {
+  font-style: italic;
+}
+.tab-strip-tab.dragging {
+  opacity: 0.4;
+}
+.tab-strip-pin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-75, 12px);
+  line-height: 1;
+  border-radius: var(--radius);
+  cursor: pointer;
+  opacity: 0;
+}
+.tab-strip-tab:hover .tab-strip-pin,
+.tab-strip-tab.active .tab-strip-pin,
+.tab-strip-tab.pinned .tab-strip-pin {
+  opacity: 1;
+}
+.tab-strip-pin:hover {
+  background: var(--hover-bg);
+  color: var(--fg);
+}
+.tab-strip-tab.pinned .tab-strip-pin {
+  color: var(--accent);
+}
+
+/* ─── Document Header card ─────────────────────
+   Region ⑧: the artefact's own header, drawn IN the stage. `#frontmatter-panel` — a fourth
+   full-width band up to 40vh that appeared and vanished as a side effect of the canvas mode — is
+   gone, grid row and all.
+
+   Two placements, because the stage draws a page two ways. In Edit the card is `in-column`: a block
+   of the document's own centered column that scrolls with it, so it is part of the artefact rather
+   than a strip above it. In Design the artboards are under a pan/zoom transform, and a form drawn
+   at 40% is a picture of a form — so the card is `pinned` above the surface at 1:1, and that is the
+   one placement that still needs a cap. */
+.doc-header-host[hidden] {
+  display: none;
+}
+.doc-header-host.in-column {
+  display: block;
+  padding-bottom: 16px;
+}
+.doc-header-host.pinned {
+  flex-shrink: 0;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+.doc-header {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 12px 10px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.doc-header-host.pinned .doc-header {
+  border-width: 0 0 1px;
+  border-radius: 0;
+}
+.doc-header-bar {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding-bottom: 6px;
+}
+.doc-header-title {
+  font-size: var(--spectrum-font-size-50, 11px);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+}
+.doc-header-route {
+  font-family: var(--font-mono);
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+}
+.doc-header-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+/* The card's door to Search appearance. It sits where the SEO disclosure used to, above Raw head
+   tags — same place in the reading order, one line instead of a block that could grow taller than
+   the document it describes. */
+.doc-header-seo {
+  display: flex;
+  padding: 2px 0;
+}
+.doc-header-seo-btn {
+  font-size: var(--spectrum-font-size-50, 11px);
+}
+.doc-header-disclosure > summary {
+  padding: 4px 0;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+  cursor: pointer;
+}
+.doc-header-disclosure > summary:hover {
+  color: var(--fg);
+}
+.doc-header-empty {
+  margin: 0;
+  padding: 4px 0;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+}
+.doc-header-raw {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.doc-header-raw li {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+  font-size: var(--spectrum-font-size-50, 11px);
+}
+.doc-header-raw li span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg-dim);
+}
+/* ─── Content edit mode canvas ─────────────── */
+.content-edit-canvas {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  justify-content: center;
+  padding: 32px 0;
+}
+.content-edit-column {
+  width: 100%;
+  min-height: 100%;
+}
+/* A content PAGE fills the viewport (a document-like surface you can click into below the
+   text). A component DEFINITION is a fragment — flooring its column to the viewport and letting
+   the flex parent vertical-stretch it leaves dead scrollable space below a short component.
+   `is-component` (set by renderCanvas when the doc root is a custom element) makes the column
+   hug its iframe and sit at the top instead. */
+.content-edit-column.is-component {
+  min-height: 0;
+  align-self: flex-start;
+}
+.content-edit-column .canvas-panel.full-width {
+  flex: 1;
+  min-width: 0;
+}
+.content-edit-column .canvas-panel-viewport {
+  border: none;
+  background: transparent;
+}
+.function-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--fg);
+  font-family: var(--font-mono);
+}
+.canvas-panel-header {
+  padding: 4px 8px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: var(--radius) var(--radius) 0 0;
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+  font-family: var(--font-mono);
+}
+.canvas-panel-header.active {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.canvas-panel-viewport {
+  position: relative;
+  background: var(--spectrum-white, #fff);
+  border: 1px solid var(--border);
+  /* The viewport is a light document surface, so pin a light color-scheme
+     for native form controls and scrollbars rendered inside it. */
+  color-scheme: light;
+}
+.canvas-panel-header.active + .canvas-panel-viewport {
+  border-color: var(--accent);
+}
+.canvas-panel-canvas {
+  isolation: isolate;
+}
+.canvas-panel-canvas * {
+  cursor: default;
+}
+.canvas-panel-canvas slot:empty {
+  display: block;
+  min-height: 3rem;
+  border: 2px dashed var(--spectrum-gray-400, #999);
+  border-radius: var(--radius);
+  position: relative;
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 10px,
+    rgba(128, 128, 128, 0.03) 10px,
+    rgba(128, 128, 128, 0.03) 20px
+  );
+}
+.canvas-panel-canvas slot:empty::before {
+  content: "slot";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 0.75rem;
+  color: var(--spectrum-gray-500, #888);
+  font-family: var(--font-mono);
+  pointer-events: none;
+}
+/* Single-canvas fallback (no $media) */
+.canvas-panel.full-width {
+  min-width: 0;
+}
+/* ─── Preview stage ────────────────────────────
+   Preview is the fidelity view: one frame, sized to the pane, scrolling its
+   own document so sticky positioning, scroll-driven animation and
+   IntersectionObserver reveals behave as they will in production. That means
+   no panzoom-wrap and no content-height growth — so every box between the
+   stage and the iframe needs a definite height for the frame's `height:100%`
+   to resolve against, and the artboard chrome (border, page surface) is
+   dropped: this is the page, not a specimen of it. */
+/* Centred, because the stage is now as wide as the chosen breakpoint rather than the pane: a 640px
+   preview pinned to the left edge of a 1400px pane reads as a broken layout rather than a phone. */
+.preview-stage {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  margin: 0 auto;
+}
+.preview-stage .canvas-panel {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+}
+.preview-stage .canvas-panel-viewport {
+  flex: 1;
+  height: 100%;
+  border: none;
+}
+.preview-stage .canvas-panel-canvas {
+  height: 100%;
+}
+.overlay-box {
+  position: absolute;
+  pointer-events: none;
+}
+.overlay-selection {
+  border: 2px solid var(--accent);
+}
+.overlay-hover {
+  border: 1px solid var(--accent-50);
+}
+/* A container only — its children are absolutely positioned against the overlay root, so it must
+   not introduce a box of its own between them and it. */
+.overlay-coselection-group {
+  display: contents;
+}
+/* The other members of a multi-selection (§6.5). Same accent, thinner: one box is the primary —
+   what the Inspector, the block action bar and the status bar address — and the rest are along for
+   the batch. A selection of one draws no co-selection boxes at all. */
+.overlay-coselection {
+  border-width: 1px;
+  border-style: dashed;
+}
+/* Layout-chrome selection: the author clicked a header/footer the LAYOUT file contributes, not
+   page content. Purple + dashed says "selected, but not yours to edit here" — it must never read
+   as the ordinary accent-solid selection, because Backspace and typing do not apply to it.
+
+   This is the PARENT half of a two-realm affordance. The always-on treatment — the dimmed region
+   and its `LAYOUT · layouts/base.json` chip — cannot live here: layout nodes are inside the
+   cross-origin canvas iframe, so their rules ship in the CSS string in `canvas/iframe-render.ts`
+   (EDIT_PLACEHOLDER_CSS), a separate document. These two classes style the parent-drawn selection
+   overlay, which floats above the iframe in canvas space. */
+.overlay-layout {
+  border-style: dashed !important;
+  border-color: var(--spectrum-purple-600, #9256d9) !important;
+}
+.overlay-layout-badge {
+  position: absolute;
+  top: -16px;
+  left: 0;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 9px;
+  padding: 1px 5px;
+  background: var(--spectrum-purple-600, #9256d9);
+  color: white;
+  border-radius: var(--radius);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+.overlay-label {
+  position: absolute;
+  top: -20px;
+  left: -2px;
+  padding: 1px 5px;
+  font-size: 10px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-radius: var(--spectrum-corner-radius-75) var(--spectrum-corner-radius-75) 0 0;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* ─── Unified block action bar ─────────────── */
+.block-action-bar {
+  position: fixed;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  padding: 2px 4px;
+  white-space: nowrap;
+  z-index: 100;
+}
+.block-action-bar .bar-tag {
+  font-size: 10px;
+  padding: 0 4px;
+  border-radius: var(--spectrum-corner-radius-75, 2px);
+  color: var(--accent-fg);
+  background: var(--tag);
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.block-action-bar .bar-tag--interactive {
+  cursor: pointer;
+}
+.block-action-bar .bar-tag--interactive:hover {
+  background: var(--accent);
+  color: var(--bg);
+}
+.block-action-bar .bar-drag-handle {
+  cursor: grab;
+  font-size: var(--spectrum-font-size-100, 14px);
+  padding: 0 4px;
+  opacity: 0.7;
+  user-select: none;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+  transform: translateY(1px);
+}
+.block-action-bar .bar-drag-handle:hover {
+  opacity: 1;
+}
+.block-action-bar .bar-drag-handle:active {
+  cursor: grabbing;
+}
+/* ONE shape (studio-ui-guidelines §8.6): the handle is greyed on the document root, never removed —
+   a toolbar whose controls move under the cursor is worse than one with a dead affordance. */
+.block-action-bar .bar-drag-handle--disabled {
+  cursor: default;
+  opacity: 0.3;
+}
+.block-action-bar sp-divider {
+  height: 20px;
+  margin: 0 2px;
+}
+/* One rule for every registry-rendered verb; `--danger` is the `destructive: true` half. */
+.block-action-bar .bar-cmd,
+.block-action-bar .bar-overflow {
+  flex-shrink: 0;
+}
+.block-action-bar .bar-cmd--danger {
+  color: var(--danger);
+}
+/* A record with no `icon` draws its title instead of a blank button. */
+.block-action-bar .cmd-label {
+  font-size: var(--spectrum-font-size-50, 11px);
+  padding: 0 2px;
+}
+.block-action-bar [data-toolbar-item]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+/* The `⋮` menu: shared by the bar and the Outline rows, so it lives with the bar that owns it. */
+.bar-overflow-menu .cmd-chord {
+  font-family: var(--font-mono);
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+  padding-left: 12px;
+}
+
+.link-popover {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  padding: 8px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}

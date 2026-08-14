@@ -1,0 +1,28 @@
+{
+  "name": "Showcase",
+  "url": "https://showcase.example",
+  "defaults": {
+    "layout": "./layouts/base.json",
+    "lang": "en"
+  },
+  "$media": {
+    "--": "1200px",
+    "--md": "(max-width: 768px)",
+    "--sm": "(max-width: 640px)"
+  },
+  "style": {
+    "--color-bg": "#0f1115",
+    "--color-surface": "#171a21",
+    "--color-border": "#262b36",
+    "--color-text": "#e7eaf0",
+    "--color-muted": "#98a2b3",
+    "--color-accent": "#4f8cff",
+    "--max-width": "1080px",
+    "margin": "0",
+    "padding": "0",
+    "fontFamily": "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    "lineHeight": "1.6",
+    "color": "var(--color-text)",
+    "backgroundColor": "var(--color-bg)"
+  }
+}

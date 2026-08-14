@@ -9,8 +9,10 @@ import type { MockPlatformState } from "./harness";
 import { beforeEach, describe, expect, test } from "bun:test";
 import { convertToComponent } from "../src/editor/convert-to-component";
 import { componentRegistry } from "../src/files/components";
+import { problems, resetNotifications, toasts } from "../src/services/notify";
 import { initLayers } from "../src/ui/layers";
 import { activeTab } from "../src/workspace/workspace";
+import { setTransactGate } from "../src/tabs/transact";
 import type { Tab } from "../src/tabs/tab";
 
 // ─── Environment ──────────────────────────────────────────────────────────────
@@ -77,20 +79,20 @@ function confirmDialog() {
 
 describe("guards", () => {
   test("no selection → resolves without showing a dialog", async () => {
-    tab.session.selection = null;
+    tab.session.selection = [];
     await convertToComponent();
     expect(dialog()).toBeNull();
   });
 
   test("root selection → no dialog", async () => {
-    tab.session.selection = [];
+    tab.session.selection = [[]];
     await convertToComponent();
     expect(dialog()).toBeNull();
   });
 
   test("node without tagName → no dialog", async () => {
     (tab.doc.document.children as unknown[])[0] = { textContent: "bare" };
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     await convertToComponent();
     expect(dialog()).toBeNull();
   });
@@ -100,7 +102,7 @@ describe("guards", () => {
 
 describe("default name", () => {
   test("hyphenated $id becomes the default name", async () => {
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     const done = convertToComponent();
     await flush();
     expect(textfield().getAttribute("value")).toBe("hero-block");
@@ -109,7 +111,7 @@ describe("default name", () => {
   });
 
   test("plain tag gets a jx- prefix", async () => {
-    tab.session.selection = ["children", 1];
+    tab.session.selection = [["children", 1]];
     const done = convertToComponent();
     await flush();
     expect(textfield().getAttribute("value")).toBe("jx-p");
@@ -119,7 +121,7 @@ describe("default name", () => {
 
   test("hyphenated tag is used directly", async () => {
     (tab.doc.document.children as unknown[])[1] = { tagName: "fancy-card" };
-    tab.session.selection = ["children", 1];
+    tab.session.selection = [["children", 1]];
     const done = convertToComponent();
     await flush();
     expect(textfield().getAttribute("value")).toBe("fancy-card");
@@ -132,7 +134,7 @@ describe("default name", () => {
 
 describe("conversion", () => {
   test("confirm replaces the node, adds the $ref, and writes the component file", async () => {
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     const done = convertToComponent();
     await flush();
 
@@ -158,7 +160,7 @@ describe("conversion", () => {
   test("converting a second time does not duplicate the $ref", async () => {
     const doc = tab.doc.document as Record<string, unknown>;
     doc.$elements = [{ $ref: "../components/hero-block.json" }];
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     const done = convertToComponent();
     await flush();
     setName("hero-block");
@@ -168,7 +170,7 @@ describe("conversion", () => {
   });
 
   test("cancel leaves the document untouched", async () => {
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     const done = convertToComponent();
     await flush();
     dialog()!.dispatchEvent(new Event("cancel"));
@@ -180,13 +182,42 @@ describe("conversion", () => {
     expect(platformState.calls.some((c) => c[0] === "writeFile")).toBe(false);
   });
 
+  test("a slot defect is filed as a Problem, not shouted once and lost", async () => {
+    // The component IS written and usable, so this is not an error — but two default slots is a
+    // Thing to FIX, so it persists in Problems until somebody does, rather than expiring as a toast.
+    resetNotifications();
+    tab.doc.document = {
+      children: [
+        {
+          $id: "Hero-Block",
+          children: [{ tagName: "slot" }, { tagName: "slot" }],
+          tagName: "section",
+        },
+      ],
+      tagName: "div",
+    } as never;
+    tab.session.selection = [["children", 0]];
+    const done = convertToComponent();
+    await flush();
+    setName("slotty-block");
+    confirmDialog();
+    await done;
+
+    expect(toasts.some((n) => n.message === "Converted to <slotty-block>")).toBe(true);
+    const problem = problems.find((n) => n.message.includes("slotty-block"));
+    expect(problem?.severity).toBe("warn");
+    expect(problem?.message).toContain("slot problem");
+    expect(problem?.source).toBe("Components");
+    expect(problem?.path).toBe("components/slotty-block.json");
+  });
+
   test("a failing write is caught and still leaves the document converted", async () => {
     installMockPlatform({
       writeFile: async () => {
         throw new Error("disk full");
       },
     });
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     const done = convertToComponent();
     await flush();
     setName("hero-block");
@@ -201,7 +232,7 @@ describe("conversion", () => {
 
 describe("name validation", () => {
   async function startDialog() {
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     const done = convertToComponent();
     await flush();
     return { done };
@@ -278,5 +309,37 @@ describe("name validation", () => {
     const doc = tab.doc.document as Record<string, unknown>;
     expect((doc.children as unknown[])[0]).toEqual({ tagName: "my-widget" });
     expect(activeTab.value!.doc.dirty).toBe(true);
+  });
+});
+
+/**
+ * A DISK WRITE THAT ASSUMED THE DOCUMENT HAD TAKEN THE REFERENCE.
+ *
+ * `transact` consults the collab gate, which pauses structural editing for the whole room while
+ * source is canonical, and returned nothing to say so. The extraction carried on: the component
+ * file was written, the registry reloaded, and "Converted to <name>" appeared — over a document
+ * that still held the original markup. An orphan file, and an author told the opposite.
+ */
+describe("a refused conversion", () => {
+  test("writes no file and claims no success", async () => {
+    resetNotifications();
+    tab.session.selection = [["children", 0]];
+    const before = JSON.stringify(tab.doc.document);
+    const done = convertToComponent();
+    await flush();
+    setName("frozen-widget");
+    setTransactGate(() => "source-canonical");
+    try {
+      confirmDialog();
+      await done;
+    } finally {
+      setTransactGate(null);
+    }
+
+    expect(JSON.stringify(tab.doc.document)).toBe(before);
+    expect(platformState.files.has("components/frozen-widget.json")).toBe(false);
+    // The gate raises its own keyed toast; this path adds no claim of its own beside it.
+    expect(toasts.some((t) => t.message.startsWith("Converted to"))).toBe(false);
+    expect(problems).toHaveLength(0);
   });
 });

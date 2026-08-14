@@ -103,6 +103,8 @@ describe("startInteraction", () => {
     inner.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(posts).toEqual([
       {
+        // Unmodified: the accumulate gesture is off, so this is the plain replace it always was.
+        additive: false,
         hit: { path: ["children", 0], rect: { height: 20, width: 100, x: 10, y: 5 } },
         kind: "hit",
       },
@@ -324,7 +326,14 @@ describe("contextmenu forwarding", () => {
     stop();
   });
 
-  test("right-click on empty space still suppresses the browser menu (path null)", () => {
+  test("right-click on empty space keeps the BROWSER's menu — plan §10's dead zone", () => {
+    /*
+     * It used to `preventDefault()` before looking for a hit, "legacy parity" with a handler that
+     * did the same, and then post `path: null` — which `showContextMenu` returns early on. So the
+     * margin around the artboard suppressed the browser menu and drew nothing in its place: the
+     * one region where a right-click did nothing at all, and the one where a reader reaches for
+     * View Source.
+     */
     const { channel, posts } = fakeChannel();
     const lonely = document.createElement("div");
     document.body.append(lonely);
@@ -333,8 +342,8 @@ describe("contextmenu forwarding", () => {
     const e = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
     lonely.dispatchEvent(e);
 
-    expect(e.defaultPrevented).toBe(true);
-    expect(posts.find((p) => p.kind === "contextMenu")).toMatchObject({ path: null });
+    expect(e.defaultPrevented).toBe(false);
+    expect(posts.find((p) => p.kind === "contextMenu")).toBeUndefined();
     stop();
   });
 
@@ -438,5 +447,106 @@ describe("preview link interception", () => {
     // Scrolling within the previewed page is exactly what preview is for.
     expect(event.defaultPrevented).toBe(false);
     expect(posts.some((p) => p.kind === "previewNavigate")).toBe(false);
+  });
+});
+
+// ─── Preview reports nothing pointable ──────────────────────────────────────────
+// Preview is the shipped page: there is no selection, no hover box, no insertion "+" and no Jx
+// Element menu, so the frame withholds all four. (The host refuses the same messages independently
+// — the canvas bundle ships prebuilt, so neither side relies on the other's build being current.)
+
+describe("preview suppresses the editing affordances", () => {
+  let stop: (() => void) | undefined;
+  afterEach(() => {
+    stop?.();
+    stop = undefined;
+  });
+
+  function startPreview() {
+    const { channel, posts } = fakeChannel();
+    stop = startInteraction(channel, document, {
+      getMode: () => "preview",
+      getShadowDoc: () => ({ children: [{ tagName: "p" }], tagName: "div" }) as JxMutableNode,
+    });
+    return posts;
+  }
+
+  test("a click on a plain element posts no hit", () => {
+    const { inner } = stampedTree('["children",0]', { height: 20, width: 100, x: 0, y: 0 });
+    const posts = startPreview();
+    inner.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    expect(posts).toHaveLength(0);
+  });
+
+  test("a pointermove posts neither hover nor insertion zones", async () => {
+    const { inner } = stampedTree('["children",0]', { height: 20, width: 100, x: 0, y: 0 });
+    const posts = startPreview();
+    await movePointer(inner, { clientX: 5, clientY: 1 });
+    expect(posts).toHaveLength(0);
+  });
+
+  test("leaving the canvas posts nothing either", async () => {
+    const { inner } = stampedTree('["children",0]', { height: 20, width: 100, x: 0, y: 0 });
+    const posts = startPreview();
+    await movePointer(inner, { clientX: 5, clientY: 1 });
+    document.dispatchEvent(new MouseEvent("pointerleave", { bubbles: false }));
+    expect(posts).toHaveLength(0);
+  });
+
+  test("right-click keeps the browser's own menu", () => {
+    const { inner } = stampedTree('["children",0]', { height: 20, width: 100, x: 0, y: 0 });
+    const posts = startPreview();
+    const event = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+    inner.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+    expect(posts.some((p) => p.kind === "contextMenu")).toBe(false);
+  });
+
+  /*
+   * …but the pane still gets the keyboard. The pane grid moves focus on a `pointerdown` anywhere in
+   * a cell, and it cannot see this one: a pointer event inside a cross-origin iframe is delivered
+   * in the frame's own realm. `hit` was the only re-post, and preview posts none — so a Preview
+   * pane could not be focused by clicking the very thing it exists to show.
+   */
+  test("a pointerdown still reports pane focus — and nothing else", () => {
+    const { inner } = stampedTree('["children",0]', { height: 20, width: 100, x: 0, y: 0 });
+    const posts = startPreview();
+    inner.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true }));
+    expect(posts).toEqual([{ kind: "paneFocus" }]);
+  });
+});
+
+// ─── A pointerdown anywhere in the frame is a pane focus ────────────────────────
+
+describe("pane focus is reported from every mode", () => {
+  let stop: (() => void) | undefined;
+  afterEach(() => {
+    stop?.();
+    stop = undefined;
+  });
+
+  test("a pointerdown on empty artboard margin focuses the pane, though no hit follows", () => {
+    const { channel, posts } = fakeChannel();
+    // No `data-jx-path` anywhere on the way up: `nearestHit` answers null and no `hit` is posted,
+    // Which is the second hole — an artboard's own background focused nothing.
+    const bare = document.createElement("div");
+    document.body.append(bare);
+    stop = startInteraction(channel, document);
+
+    bare.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    bare.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    expect(posts).toEqual([{ kind: "paneFocus" }]);
+  });
+
+  test("teardown removes it with the rest", () => {
+    const { channel, posts } = fakeChannel();
+    const bare = document.createElement("div");
+    document.body.append(bare);
+    stop = startInteraction(channel, document);
+    stop();
+    stop = undefined;
+    bare.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    expect(posts).toHaveLength(0);
   });
 });

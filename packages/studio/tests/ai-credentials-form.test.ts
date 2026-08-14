@@ -45,8 +45,9 @@ function makeForm(extra: Partial<AiCredentialsFormOptions> = {}) {
   return { container, form };
 }
 
-function inputByPlaceholder(container: HTMLElement, ph: string) {
-  return container.querySelector(`input[placeholder^="${ph}"]`) as HTMLInputElement | null;
+/** The Spectrum field whose placeholder starts with `ph` (the form is sp-textfield-based). */
+function fieldByPlaceholder(container: HTMLElement, ph: string) {
+  return container.querySelector(`sp-textfield[placeholder^="${ph}"]`) as HTMLInputElement | null;
 }
 
 function byText(container: HTMLElement, label: string) {
@@ -83,22 +84,22 @@ describe("ai-credentials-form", () => {
     expect(container.textContent).toContain("AI provider key");
     expect(container.textContent).toContain("Any OpenAI-compatible key works");
     expect(container.querySelector(".ai-creds-form")).not.toBeNull();
-    fire(inputByPlaceholder(container, "sk-"), "input", "sk-secret");
-    fire(inputByPlaceholder(container, "Model ID"), "input", "gpt-4o-mini");
-    fire(inputByPlaceholder(container, "Endpoint"), "input", "http://localhost:11434/v1");
+    fire(fieldByPlaceholder(container, "sk-"), "input", "sk-secret");
+    fire(fieldByPlaceholder(container, "Model ID"), "input", "gpt-4o-mini");
+    fire(fieldByPlaceholder(container, "Endpoint"), "input", "http://localhost:11434/v1");
     // Re-render from closure state: the typed values round-trip through the drafts.
     render(form.render(), container);
-    expect(inputByPlaceholder(container, "sk-")!.value).toBe("sk-secret");
-    expect(inputByPlaceholder(container, "Model ID")!.value).toBe("gpt-4o-mini");
-    expect(inputByPlaceholder(container, "Endpoint")!.value).toBe("http://localhost:11434/v1");
+    expect(fieldByPlaceholder(container, "sk-")!.value).toBe("sk-secret");
+    expect(fieldByPlaceholder(container, "Model ID")!.value).toBe("gpt-4o-mini");
+    expect(fieldByPlaceholder(container, "Endpoint")!.value).toBe("http://localhost:11434/v1");
   });
 
   test("fetchModels forwards X-Api-Key and X-Api-Base-URL and populates the picker", async () => {
     fetchImpl = async () =>
       Response.json({ models: [{ id: "gpt-4o" }, { id: "x", name: "Model X" }] }, { status: 200 });
     const { container } = makeForm();
-    fire(inputByPlaceholder(container, "sk-"), "input", "sk-fetch-key");
-    fire(inputByPlaceholder(container, "Endpoint"), "input", "http://localhost:9999/v1");
+    fire(fieldByPlaceholder(container, "sk-"), "input", "sk-fetch-key");
+    fire(fieldByPlaceholder(container, "Endpoint"), "input", "http://localhost:9999/v1");
     click(byText(container, "Fetch models"));
     await flush();
     const call = fetchCalls.at(-1)!;
@@ -131,9 +132,9 @@ describe("ai-credentials-form", () => {
   test("Save persists key, endpoint, and model to localStorage and fires onSaved", () => {
     const onSaved = mock(() => {});
     const { container } = makeForm({ onSaved });
-    fire(inputByPlaceholder(container, "sk-"), "input", "sk-saved");
-    fire(inputByPlaceholder(container, "Model ID"), "input", "gpt-4o-mini");
-    fire(inputByPlaceholder(container, "Endpoint"), "input", "http://localhost:11434/v1");
+    fire(fieldByPlaceholder(container, "sk-"), "input", "sk-saved");
+    fire(fieldByPlaceholder(container, "Model ID"), "input", "gpt-4o-mini");
+    fire(fieldByPlaceholder(container, "Endpoint"), "input", "http://localhost:11434/v1");
     click(byText(container, "Save"));
     expect(globalThis.localStorage.getItem("jx.ai.openaiKey")).toBe("sk-saved");
     expect(globalThis.localStorage.getItem("jx.ai.baseUrl")).toBe("http://localhost:11434/v1");
@@ -151,8 +152,8 @@ describe("ai-credentials-form", () => {
     form.startEdit();
     await flush();
     // Drafts preloaded from the stored settings; Cancel offered now that a key exists.
-    expect(inputByPlaceholder(container, "sk-")!.value).toBe("sk-existing");
-    expect(inputByPlaceholder(container, "Model ID")!.value).toBe("gpt-4o");
+    expect(fieldByPlaceholder(container, "sk-")!.value).toBe("sk-existing");
+    expect(fieldByPlaceholder(container, "Model ID")!.value).toBe("gpt-4o");
     expect(byText(container, "Cancel")).toBeDefined();
     // StartEdit auto-fetched the model list.
     expect(fetchCalls.length).toBe(1);
@@ -163,12 +164,38 @@ describe("ai-credentials-form", () => {
   test("two instances keep independent draft state", () => {
     const a = makeForm();
     const b = makeForm();
-    fire(inputByPlaceholder(a.container, "sk-"), "input", "sk-instance-a");
+    fire(fieldByPlaceholder(a.container, "sk-"), "input", "sk-instance-a");
     // Re-render both from their own closures: only A's draft carries the typed key.
     render(a.form.render(), a.container);
     render(b.form.render(), b.container);
-    expect(inputByPlaceholder(a.container, "sk-")!.value).toBe("sk-instance-a");
-    expect(inputByPlaceholder(b.container, "sk-")!.value).toBe("");
+    expect(fieldByPlaceholder(a.container, "sk-")!.value).toBe("sk-instance-a");
+    expect(fieldByPlaceholder(b.container, "sk-")!.value).toBe("");
+  });
+
+  test("is built from Spectrum controls with no inline style attributes", () => {
+    const { container } = makeForm();
+    // The key field masks, and it is a Spectrum control rather than a raw <input>.
+    expect(fieldByPlaceholder(container, "sk-")!.getAttribute("type")).toBe("password");
+    expect(container.querySelector("input")).toBeNull();
+    // Every rule lives in styles/shell.css — check-styles' orphan rule depends on it.
+    expect(container.querySelector("[style]")).toBeNull();
+    for (const cls of [
+      "ai-creds-title",
+      "ai-creds-note",
+      "ai-creds-label",
+      "ai-creds-models",
+      "ai-creds-actions",
+    ]) {
+      expect(container.querySelector(`.${cls}`)).not.toBeNull();
+    }
+  });
+
+  test("a fetch error renders in the styled error slot, not an inline-coloured span", async () => {
+    fetchImpl = async () => new Response("nope", { status: 503 });
+    const { container } = makeForm();
+    click(byText(container, "Fetch models"));
+    await flush();
+    expect(container.querySelector(".ai-creds-error")!.textContent).toContain("HTTP 503");
   });
 
   test("intro replaces the default blurb but keeps the heading", () => {

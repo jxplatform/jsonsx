@@ -3,6 +3,8 @@
  * its own RPC bound to that session, so windows track independent projects. Dedupe by normalized
  * project root: opening an already-open project focuses the existing window instead of
  * duplicating.
+ *
+ * @docs studio/desktop
  */
 
 import { BrowserView, BrowserWindow, Screen } from "electrobun/bun";
@@ -13,7 +15,7 @@ import { createGitOps } from "./git";
 import { createPackageOps } from "./packages";
 import { createProjectServer } from "@jxsuite/server/project-server";
 import { listStarters } from "@jxsuite/starters";
-import { createProjectSession } from "./project-session";
+import { createProjectSession, pickProjectFile } from "./project-session";
 import { readRecents, writeRecents } from "./recent-store";
 import { readSettings, writeSettings } from "./settings-store";
 import { studioDir } from "./canvas-runtime";
@@ -247,6 +249,14 @@ function buildWindowRpc(entry: WindowEntry, getWin: () => BrowserWindow) {
         importSiteUrl: () => importServiceUrl,
         pickDirectory: () => session.pickDirectory(),
 
+        // The picker WITHOUT the binding. `openProject` below re-roots this window's session as
+        // Part of picking, which is the one thing the New Window branch must not do — it asks
+        // Which project, then hands the answer to `openProjectInNewWindow`.
+        pickProject: async () => {
+          const picked = await pickProjectFile();
+          return picked && { name: picked.name, root: picked.root };
+        },
+
         // Files / project (bound to this window's session)
         codeService: (params) => session.codeService(params),
         createDirectory: (params) => session.handleCreateDirectory(params),
@@ -257,10 +267,13 @@ function buildWindowRpc(entry: WindowEntry, getWin: () => BrowserWindow) {
         jxResolve: (params) => session.jxResolve(params),
         jxServerFunction: (params) => session.jxServerFunction(params),
         fetchProjectSchemas: () => session.fetchProjectSchemas(),
+        buildSite: () => session.buildSite(),
         listDirectory: (params) => session.listDirectory(params),
         listExtensions: () => session.listExtensions(),
         listFormats: () => session.listFormats(),
         locateFile: (params) => session.locateFile(params),
+        openExternal: (params) => session.openExternal(params),
+        searchFiles: (params) => session.searchFiles(params),
         openProject: async () => {
           const result = await session.openProject();
           if (result) {
@@ -282,6 +295,7 @@ function buildWindowRpc(entry: WindowEntry, getWin: () => BrowserWindow) {
         listStarters: () => Promise.resolve(listStarters()),
         readFile: (params) => session.handleReadFile(params),
         renameFile: (params) => session.handleRenameFile(params),
+        findReferences: (params) => session.findReferences(params),
         resolveSiteContext: (params) => session.handleResolveSiteContext(params),
         uploadFile: (params) => session.handleUploadFile(params),
         writeFile: (params) => session.handleWriteFile(params),
@@ -310,6 +324,7 @@ function buildWindowRpc(entry: WindowEntry, getWin: () => BrowserWindow) {
         gitLog: (params) => git.gitLog(params),
         gitPull: () => git.gitPull(),
         gitPush: (params) => git.gitPush(params),
+        gitShow: (params) => git.gitShow(params),
         gitStage: (params) => git.gitStage(params),
         gitStatus: () => git.gitStatus(),
         gitUnstage: (params) => git.gitUnstage(params),
@@ -360,7 +375,11 @@ function buildWindowRpc(entry: WindowEntry, getWin: () => BrowserWindow) {
           openProjectWindow(null);
         },
         openProjectInNewWindow: (params) => {
+          // Asked BEFORE opening, because `openProjectWindow` answers both cases with a window and
+          // The caller has to be able to say which one it got.
+          const focused = findWindowByRoot(params.root) !== null;
           openProjectWindow(params.root);
+          return { focused };
         },
         getProjectRoot: () => ({ root: session.projectRoot }),
         // Hand the studio shell this window's cross-origin loopback canvas URL.

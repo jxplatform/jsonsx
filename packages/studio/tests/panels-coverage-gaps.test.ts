@@ -8,10 +8,18 @@
  *   children), stray-toggle clicks, and startLayerTitleEdit guards.
  * - Dnd: the onGenerateDragPreview suppressors for layer and component drags.
  */
-import { flush, renderInto, resetStudioState, resetWorkspaceWithTab } from "./harness";
+import {
+  flush,
+  registerPrimaryStage,
+  renderInto,
+  resetStudioState,
+  resetWorkspaceWithTab,
+} from "./harness";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { JxPath } from "../src/state";
+import type { Tab } from "../src/tabs/tab";
+import { surfaceForPane } from "../src/canvas/surface-registry";
 
 type AnyRec = Record<string, any>;
 
@@ -54,7 +62,7 @@ void mock.module("../src/panels/component-preview", () => ({
 
 const { buildStylebookDoc, hasTagStyle, transposeStylebookStyle } =
   await import("../src/panels/stylebook-doc");
-const tabBar = await import("../src/panels/tab-bar");
+const paneContext = await import("../src/panels/pane-context");
 const { renderLayersTemplate, startLayerTitleEdit } = await import("../src/panels/layers-panel");
 const dnd = await import("../src/panels/dnd");
 const { initShellRefs } = await import("../src/store");
@@ -138,24 +146,20 @@ describe("buildStylebookDoc component filtering", () => {
   });
 });
 
-// ─── Tab bar render catch ────────────────────────────────────────────────────
+// ─── Pane chrome render catch ────────────────────────────────────────────────
 
-describe("tab-bar interaction gaps", () => {
-  function makeTabBarCtx(overrides: Partial<Parameters<typeof tabBar.mount>[1]> = {}) {
+describe("pane-context interaction gaps", () => {
+  function makePaneCtx(overrides: Partial<Parameters<typeof paneContext.mount>[1]> = {}) {
     return {
-      closeFormulaWorkspace: mock(() => {}),
-      closeFunctionEditor: mock(() => {}),
       exportFile: mock(() => {}),
-      getCanvasMode: mock(() => "design"),
-      navigateBack: mock(() => {}),
-      navigateToLevel: mock((_level: number) => {}),
       parseMediaEntries: () => ({ baseWidth: 1280, featureQueries: [], sizeBreakpoints: [] }),
+      setCanvasMode: mock((_tab: Tab | null, _mode: string) => {}),
       ...overrides,
     };
   }
 
   afterEach(() => {
-    tabBar.unmount();
+    paneContext.unmount();
     closeAllTabs();
     document.body.innerHTML = "";
   });
@@ -166,73 +170,58 @@ describe("tab-bar interaction gaps", () => {
     ) as HTMLElement;
   }
 
-  test("design-mode zoom out / reset / Fit run their panzoom actions", async () => {
+  test("the pod's panzoom actions run without a panzoom surface", async () => {
     resetStudioState();
     const tab = resetWorkspaceWithTab();
     tab.session.ui.zoom = 2.4;
-    view.panzoomWrap = null; // Canvas-utils actions guard on this and no-op cleanly.
+    /* THE PANE's mode, not the ctx's. The pod reads `canvasModeOfPane` now — a fixture that named
+       a mode only in the ctx was describing a state the app cannot be in, and a default `.json`
+       tab opens in `edit`, whose "−" drives `editZoom` rather than the panzoom `ui.zoom`. */
+    tab.session.ui.canvasMode = "design";
+    surfaceForPane("primary").panzoomWrap = null; // Canvas-utils actions guard on this and no-op cleanly.
     const root = document.createElement("div");
     document.body.append(root);
-    tabBar.mount(root, makeTabBarCtx() as never);
+    paneContext.mount(root, makePaneCtx() as never);
     await flush();
 
     btnByText(root, "−").click();
     await flush();
     expect(tab.session.ui.zoom).toBeCloseTo(2);
 
-    (root.querySelector(".tb-zoom-label") as HTMLElement).click();
-    btnByText(root, "Fit").click();
+    (root.querySelector(".pc-zoom-label") as HTMLElement).click();
     await flush();
     expect(tab.session.ui.zoom).toBeCloseTo(2); // Guarded no-ops without a panzoom surface.
   });
 
-  test("document-stack breadcrumbs navigate to their level", async () => {
-    resetStudioState();
-    const tab = resetWorkspaceWithTab(undefined, { documentPath: "components/card.json" });
-    tab.session.documentStack = [{ documentPath: "pages/index.json" }] as never;
-    const ctx = makeTabBarCtx();
-    const root = document.createElement("div");
-    document.body.append(root);
-    tabBar.mount(root, ctx as never);
-    await flush();
-
-    const crumb = root.querySelector(".breadcrumb-item.clickable") as HTMLElement;
-    expect(crumb.textContent?.trim()).toBe("index.json");
-    crumb.click();
-    expect(ctx.navigateToLevel).toHaveBeenCalledWith(0);
-  });
-
   test("render after unmount is a guarded no-op", () => {
     expect(() => {
-      tabBar.render();
+      paneContext.render();
     }).not.toThrow();
   });
 });
 
-describe("tab-bar render failure", () => {
+describe("pane-context render failure", () => {
   test("a throwing template is caught and does not break mount", async () => {
     resetStudioState();
     resetWorkspaceWithTab();
     const host = document.createElement("div");
     document.body.append(host);
     expect(() => {
-      tabBar.mount(host, {
-        closeFormulaWorkspace: () => {},
-        closeFunctionEditor: () => {},
+      paneContext.mount(host, {
         exportFile: () => {},
-        getCanvasMode: () => {
-          throw new Error("mode exploded");
+        // `getCanvasMode` used to be the thrower, and it is gone from the ctx — the bar asks its own
+        // Pane's tab. `parseMediaEntries` is the remaining injected call on the render path.
+        parseMediaEntries: () => {
+          throw new Error("media exploded");
         },
-        navigateBack: () => {},
-        navigateToLevel: () => {},
-        parseMediaEntries: () => ({ baseWidth: 1280, featureQueries: [], sizeBreakpoints: [] }),
+        setCanvasMode: () => {},
       });
     }).not.toThrow();
     await flush();
     expect(() => {
-      tabBar.render();
+      paneContext.render();
     }).not.toThrow();
-    tabBar.unmount();
+    paneContext.unmount();
     host.remove();
   });
 });
@@ -269,15 +258,21 @@ describe("layers-panel gaps", () => {
   }
 
   /**
-   * Select the row, re-render, and find its move-in button. Row actions are built for the SELECTED
-   * row only, so selecting first is the real interaction (clicking a row does both).
+   * Select the row, re-render, and report whether "Move Into Previous" can act on it.
+   *
+   * Row actions exist for the selected row (and the hovered one) only, so selecting first is the
+   * real interaction — clicking a row does both. The button itself is always rendered: ONE shape,
+   * so an unavailable verb is disabled rather than removed, and "can this node move in" is read off
+   * `disabled` rather than off the button's presence.
    */
-  async function moveInButton(path: JxPath): Promise<HTMLElement | undefined> {
-    activeTab.value!.session.selection = path;
+  async function canMoveIn(path: JxPath): Promise<boolean> {
+    activeTab.value!.session.selection = [path];
     await renderLayers();
-    return [...(rowByKey(path)?.querySelectorAll("sp-action-button") ?? [])].find(
-      (b) => b.getAttribute("title") === "Move into previous sibling",
-    ) as HTMLElement | undefined;
+    const btn = rowByKey(path)?.querySelector('sp-action-button[data-command="selection.moveIn"]');
+    if (!btn) {
+      throw new Error(`no Move Into Previous button on row ${path.join("/")}`);
+    }
+    return !btn.hasAttribute("disabled");
   }
 
   beforeEach(() => {
@@ -310,8 +305,7 @@ describe("layers-panel gaps", () => {
 
   test("move-in is unavailable after a void sibling", async () => {
     await renderLayers();
-    const btn1 = await moveInButton(["children", 1]);
-    expect(btn1).toBeUndefined();
+    expect(await canMoveIn(["children", 1])).toBe(false);
   });
 
   test("a legacy array-object children sibling still counts as a container", async () => {
@@ -322,16 +316,14 @@ describe("layers-panel gaps", () => {
       map: { tagName: "li", textContent: "item" },
     };
     await renderLayers();
-    const btn3 = await moveInButton(["children", 3]);
-    expect(btn3).toBeDefined();
+    expect(await canMoveIn(["children", 3])).toBe(true);
   });
 
   test("non-array object children (a $ref) do not count as a container", async () => {
     const doc = activeTab.value!.doc.document as AnyRec;
     doc.children[4].children = { $ref: "#/state/body" };
     await renderLayers();
-    const btn5 = await moveInButton(["children", 5]);
-    expect(btn5).toBeUndefined();
+    expect(await canMoveIn(["children", 5])).toBe(false);
   });
 
   test("clicking a stray toggle outside any row is a no-op", async () => {
@@ -403,6 +395,7 @@ describe("dnd drag previews", () => {
     view.dndCleanups = [];
     document.body.innerHTML = `<div id="left-panel"></div>`;
     initShellRefs();
+    registerPrimaryStage();
   });
 
   test("layer-row drags suppress the native drag image", async () => {

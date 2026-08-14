@@ -1,5 +1,7 @@
 import "./with-dom.js";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { notifyModule } from "./notify-mock";
+import type { NotifyCall } from "./notify-mock";
 
 if (globalThis.localStorage === undefined) {
   const store = new Map();
@@ -47,6 +49,12 @@ void mock.module("../src/ui/layers.js", () => ({
     }),
 }));
 
+/** Every outcome the module reports, in order — the device flow's whole job is now to report. */
+const notifications: NotifyCall[] = [];
+void mock.module("../src/services/notify.js", () =>
+  notifyModule((call) => notifications.push(call)),
+);
+
 const { getGithubToken, clearGithubToken, authenticateGithub } =
   await import("../src/github/github-auth.js");
 
@@ -72,7 +80,10 @@ describe("clearGithubToken", () => {
 });
 
 describe("authenticateGithub", () => {
-  beforeEach(() => localStorage.removeItem(STORAGE_KEY));
+  beforeEach(() => {
+    localStorage.removeItem(STORAGE_KEY);
+    notifications.length = 0;
+  });
   afterEach(() => {
     globalThis.fetch = originalFetch;
   });
@@ -83,10 +94,32 @@ describe("authenticateGithub", () => {
     expect(result).toBe("ghp_existing");
   });
 
-  test("throws when device code request fails", async () => {
+  test("an HTTP refusal from GitHub rests as a warning naming the status", async () => {
     setupFetch([{ json: { error: "server_error" }, ok: false, status: 500 }]);
-    // oxlint-disable-next-line typescript/await-thenable -- Bun's expect().rejects.toThrow() returns a real Promise at runtime but is typed `void`; the await must be kept to wait for the rejection.
-    await expect(authenticateGithub()).rejects.toThrow("Failed to initiate GitHub device flow");
+    expect(await authenticateGithub()).toBeNull();
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0]!.severity).toBe("warn");
+    expect(notifications[0]!.message).toBe("GitHub refused to start the sign-in.");
+    expect(notifications[0]!.options.detail).toContain("500");
+    expect(notifications[0]!.options.action).toBe("git.signInToGithub");
+  });
+
+  test("an unreachable endpoint is a Problem naming CORS and offline both", async () => {
+    // The failure the browser build ALWAYS has: `github.com/login/device/code` sends no CORS
+    // Headers, so `fetch` rejects before any response exists. It used to throw out of an
+    // Un-awaited caller and vanish.
+    // @ts-expect-error -- a rejecting fetch is the whole point of this stub
+    globalThis.fetch = async () => {
+      throw new TypeError("Failed to fetch");
+    };
+    expect(await authenticateGithub()).toBeNull();
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0]!.severity).toBe("error");
+    expect(notifications[0]!.message).toBe("Could not reach GitHub to sign in.");
+    expect(notifications[0]!.options.detail).toContain("CORS");
+    expect(notifications[0]!.options.detail).toContain("offline");
+    expect(notifications[0]!.options.detail).toContain("Failed to fetch");
+    expect(notifications[0]!.options.source).toBe("Source Control");
   });
 
   test("sends correct params to device/code endpoint", async () => {

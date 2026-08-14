@@ -10,6 +10,7 @@ import {
   listCollectionEntryIds,
   PATH_FIELD,
 } from "../src/grid/sources/content-source";
+import { setIncludeDrafts } from "../src/content/draft-state";
 import type { StudioPlatform } from "../src/types";
 
 const HELLO_MD = `---
@@ -66,6 +67,7 @@ function setup(seedFiles: Record<string, string> = {}) {
 beforeEach(() => {
   closeAllTabs();
   seedMarkdownFormat();
+  setIncludeDrafts(false);
 });
 
 describe("collection resolution", () => {
@@ -315,6 +317,64 @@ describe("refresh and backing paths", () => {
     const backing = source.backingPaths!();
     expect(backing.get("content/posts/hello.md")).toBe("content/posts/hello.md");
     expect(backing.size).toBe(2);
+  });
+});
+
+describe("the draft perspective (§7.6)", () => {
+  const DRAFTED_MD = "---\ntitle: Drafted\ndraft: true\n---\n\nNot ready\n";
+
+  test("the Draft column sits immediately after Path, and is the schema's own column", async () => {
+    setup();
+    const columns = await createCollectionSource("posts").columns();
+    expect(columns.map((c) => c.field).slice(0, 2)).toEqual([PATH_FIELD, "draft"]);
+    // Moved, never duplicated: still the typed column `columnsFromSchema` built.
+    expect(columns.filter((c) => c.field === "draft")).toHaveLength(1);
+    expect(columns.find((c) => c.field === "draft")!.kind).toBe("boolean");
+  });
+
+  test("a collection with no draft axis gets no Draft column", async () => {
+    setup();
+    // `authors` declares `schema: {}` and none of its entries exist, so there is no axis at all.
+    const columns = await createCollectionSource("authors").columns();
+    expect(columns.map((c) => c.field)).not.toContain("draft");
+  });
+
+  test("an entry that carries `draft: true` without a schema saying so still gets the column", async () => {
+    setup({ "content/authors/ada.md": DRAFTED_MD });
+    const columns = await createCollectionSource("authors").columns();
+    expect(columns.map((c) => c.field).slice(0, 2)).toEqual([PATH_FIELD, "draft"]);
+  });
+
+  test("drafts are hidden by default and listed when the perspective says so", async () => {
+    setup({ "content/posts/drafted.md": DRAFTED_MD });
+    const source = createCollectionSource("posts");
+
+    const hidden = await source.rows();
+    expect(hidden.rows.map((r) => r.key)).not.toContain("content/posts/drafted.md");
+    expect(hidden.total).toBe(2);
+
+    setIncludeDrafts(true);
+    const shown = await source.rows();
+    expect(shown.rows.map((r) => r.key)).toContain("content/posts/drafted.md");
+    expect(shown.total).toBe(3);
+  });
+
+  test("the hidden entry is still LOADED — the filter is on the listing, not the read", async () => {
+    setup({ "content/posts/drafted.md": DRAFTED_MD });
+    const source = createCollectionSource("posts");
+    await source.rows();
+    // A row the listing hides is still committable and still backs a path, which is what lets the
+    // Perspective flip back on without re-walking the directory.
+    expect([...source.backingPaths!().keys()]).toContain("content/posts/drafted.md");
+  });
+
+  test("the pages tree is NOT draft-filtered — a page has no collection to explain the gap", async () => {
+    setup({
+      "pages/hidden.md": DRAFTED_MD,
+      "pages/index.md": "---\ntitle: Home\n---\n",
+    });
+    const { rows } = await createPagesSource().rows();
+    expect(rows.map((r) => r.key)).toEqual(["pages/hidden.md", "pages/index.md"]);
   });
 });
 

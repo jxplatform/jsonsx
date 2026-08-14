@@ -1,11 +1,17 @@
 /**
  * Tests for src/panels/ai-chat/sessions-view.ts — the full-pane chat history list: relativeTime
- * formatting, row rendering, open/delete/new callbacks (delete must not bubble into the row's open
+ * formatting, row rendering, open/delete callbacks (delete must not bubble into the row's open
  * handler), and the empty state.
+ *
+ * New Chat is no longer a callback: it is `assistant.newChat`, the record the chat header runs too
+ * (§11.1), so the header renders it from the registry or renders nothing at all.
  */
 import { pointer, renderInto } from "./harness";
-import { describe, expect, mock, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { relativeTime, renderSessionsList } from "../src/panels/ai-chat/sessions-view";
+import { setActiveRegistry } from "../src/commands/active-registry";
+import { createCommandRegistry } from "../src/commands/registry";
+import { emptyContext } from "../src/commands/context";
 import type { SessionMeta } from "../src/services/ai-session-store";
 
 const NOW = Date.parse("2026-07-06T12:00:00Z");
@@ -49,12 +55,32 @@ describe("relativeTime", () => {
   });
 });
 
+const ran: string[] = [];
+
+beforeEach(() => {
+  ran.length = 0;
+  const registry = createCommandRegistry({ getContext: emptyContext });
+  registry.register({
+    category: "Assistant",
+    id: "assistant.newChat",
+    level: "application",
+    run: () => {
+      ran.push("assistant.newChat");
+    },
+    title: "New Chat",
+  });
+  setActiveRegistry(registry);
+});
+
+afterEach(() => {
+  setActiveRegistry(null);
+});
+
 describe("renderSessionsList", () => {
   test("renders rows with title, relative time, and message count", async () => {
     const el = await renderInto(
       renderSessionsList({
         onDelete: () => {},
-        onNew: () => {},
         onOpen: () => {},
         sessions: [meta(), meta({ id: "s2", messageCount: 1, title: "Second chat" })],
       }),
@@ -71,9 +97,7 @@ describe("renderSessionsList", () => {
   test("row click opens; delete button deletes without opening", async () => {
     const onOpen = mock((_id: string) => {});
     const onDelete = mock((_id: string) => {});
-    const el = await renderInto(
-      renderSessionsList({ onDelete, onNew: () => {}, onOpen, sessions: [meta()] }),
-    );
+    const el = await renderInto(renderSessionsList({ onDelete, onOpen, sessions: [meta()] }));
     const row = el.querySelector(".ai-session-row")!;
     pointer(row, "click");
     expect(onOpen).toHaveBeenCalledWith("s1");
@@ -84,13 +108,22 @@ describe("renderSessionsList", () => {
     expect(onOpen).toHaveBeenCalledTimes(1);
   });
 
-  test("New Chat button fires onNew; empty list shows the empty state", async () => {
-    const onNew = mock(() => {});
+  test("New Chat runs the record; empty list shows the empty state", async () => {
     const el = await renderInto(
-      renderSessionsList({ onDelete: () => {}, onNew, onOpen: () => {}, sessions: [] }),
+      renderSessionsList({ onDelete: () => {}, onOpen: () => {}, sessions: [] }),
     );
     expect(el.querySelector(".ai-sessions-empty")!.textContent).toContain("No previous chats");
-    pointer(el.querySelector("sp-action-button[title='New chat']")!, "click");
-    expect(onNew).toHaveBeenCalledTimes(1);
+    pointer(el.querySelector("sp-action-button[title='New Chat']")!, "click");
+    expect(ran).toEqual(["assistant.newChat"]);
+  });
+
+  test("no record, no button — this header is a rendering of the registry too", async () => {
+    setActiveRegistry(null);
+    const el = await renderInto(
+      renderSessionsList({ onDelete: () => {}, onOpen: () => {}, sessions: [meta()] }),
+    );
+    // The list itself is untouched: reading your history never depended on a registry.
+    expect(el.querySelectorAll(".ai-session-row")).toHaveLength(1);
+    expect(el.querySelector("sp-action-button[title='New Chat']")).toBeNull();
   });
 });

@@ -94,7 +94,13 @@ export function createManagedConnect(opts: ManagedConnectOptions): ManagedConnec
     return html`
       <div class="ai-managed-connect">
         <div>Use Workers AI on your own Cloudflare account — no API key needed.</div>
-        <sp-button size="s" ?disabled=${busy} @click=${() => void connect()}>
+        <sp-button
+          size="s"
+          ?disabled=${busy}
+          @click=${() => {
+            void connect();
+          }}
+        >
           ${busy ? "Connecting…" : "Connect Cloudflare"}
         </sp-button>
         ${connectError ? html`<div class="ai-managed-connect-error">${connectError}</div>` : nothing}

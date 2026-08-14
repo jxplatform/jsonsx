@@ -21,7 +21,7 @@ void mock.module("../src/store", () => ({
 
 const { renderNumberInput, renderTextInput, widgetForType } = await import("../src/ui/widgets");
 const { renderButtonGroup } = await import("../src/ui/button-group");
-const { renderFieldRow } = await import("../src/ui/field-row");
+const { renderFieldRow, renderKvRow, renderStaticKvRow } = await import("../src/ui/field-row");
 const { icons } = await import("../src/ui/icons");
 
 beforeEach(() => {
@@ -335,6 +335,83 @@ describe("renderFieldRow", () => {
     expect(row.getAttribute("style")).toContain("grid-column: 1 / -1");
     expect(row.classList.contains("style-row--warning")).toBe(true);
   });
+
+  /* §7.1's third tier: the error slot. A bad value belongs AT its control. Before this slot the
+     only place to say so was a three-second grey line at the bottom of the window, hundreds of
+     pixels from the field that refused the value — by which time the field had snapped back and
+     the reason was gone. */
+
+  test("an error renders under the widget with role=alert and marks the row invalid", async () => {
+    const container = await renderInto(
+      renderFieldRow({
+        error: "Enter a length, like 16px.",
+        hasValue: false,
+        label: "Width",
+        prop: "width",
+        widget: html`<b class="the-widget"></b>`,
+      }),
+    );
+    const row = container.querySelector(".style-row") as HTMLElement;
+    expect(row.classList.contains("style-row--invalid")).toBe(true);
+    const error = row.querySelector(".style-row-error") as HTMLElement;
+    expect(error.getAttribute("role")).toBe("alert");
+    expect(error.textContent).toContain("Enter a length, like 16px.");
+    // The error follows the widget: the message is about the control above it.
+    expect(error.previousElementSibling?.classList.contains("the-widget")).toBe(true);
+  });
+
+  test("no error means no error line and no invalid class", async () => {
+    for (const error of [undefined, ""]) {
+      const container = await renderInto(
+        renderFieldRow({ error, hasValue: false, label: "W", prop: "w", widget: html`` }),
+      );
+      const row = container.querySelector(".style-row") as HTMLElement;
+      expect(row.classList.contains("style-row--invalid")).toBe(false);
+      expect(row.querySelector(".style-row-error")).toBeNull();
+    }
+  });
+
+  test("invalid wins over warning — refused is not the same as unusual", async () => {
+    const container = await renderInto(
+      renderFieldRow({
+        error: "Refused.",
+        hasValue: false,
+        label: "W",
+        prop: "w",
+        warning: true,
+        widget: html``,
+      }),
+    );
+    const row = container.querySelector(".style-row") as HTMLElement;
+    expect(row.classList.contains("style-row--invalid")).toBe(true);
+    expect(row.classList.contains("style-row--warning")).toBe(false);
+  });
+
+  test("the repeat counter renders from 2 up, never at 1", async () => {
+    const one = await renderInto(
+      renderFieldRow({
+        error: "Refused.",
+        errorCount: 1,
+        hasValue: false,
+        label: "W",
+        prop: "w",
+        widget: html``,
+      }),
+    );
+    expect(one.querySelector(".style-row-error-count")).toBeNull();
+
+    const three = await renderInto(
+      renderFieldRow({
+        error: "Refused.",
+        errorCount: 3,
+        hasValue: false,
+        label: "W",
+        prop: "w",
+        widget: html``,
+      }),
+    );
+    expect(three.querySelector(".style-row-error-count")?.textContent).toBe("×3");
+  });
 });
 
 // ─── icons map ───────────────────────────────────────────────────────────────
@@ -361,5 +438,172 @@ describe("icons", () => {
       const container = await renderInto(html`${icons[name]}`);
       expect(container.querySelector(tag), name).not.toBeNull();
     }
+  });
+});
+
+// ─── renderFieldRow · provenance (§6.2) ──────────────────────────────────────
+
+describe("renderFieldRow provenance", () => {
+  test("an explicit provenance wins over the hasValue/onClear pair", async () => {
+    const container = await renderInto(
+      renderFieldRow({
+        hasValue: true,
+        label: "Padding",
+        onClear: () => {
+          throw new Error("the derived chip must not be used when provenance is given");
+        },
+        prop: "padding",
+        provenance: { donor: "@md", state: "inherited" },
+        widget: html``,
+      }),
+    );
+    const chip = container.querySelector(".provenance-chip")!;
+    expect(chip.classList.contains("provenance-chip--inherited")).toBe(true);
+    expect(chip.textContent!.trim()).toBe("from @md");
+    expect(container.querySelector(".set-dot")).toBeNull();
+  });
+
+  test("a default-state row draws no chip — absence IS the ghost", async () => {
+    const container = await renderInto(
+      renderFieldRow({
+        hasValue: false,
+        label: "Padding",
+        prop: "padding",
+        provenance: { state: "default" },
+        widget: html``,
+      }),
+    );
+    expect(container.querySelector(".provenance-chip")).toBeNull();
+  });
+
+  test("the derived chip keeps the old set-dot markup and its Clear tooltip", async () => {
+    let cleared = 0;
+    const container = await renderInto(
+      renderFieldRow({
+        hasValue: true,
+        label: "W",
+        onClear: () => {
+          cleared += 1;
+        },
+        prop: "width",
+        widget: html``,
+      }),
+    );
+    const dot = container.querySelector(".set-dot")!;
+    expect(dot.tagName.toLowerCase()).toBe("span");
+    expect(dot.getAttribute("title")).toBe("Clear width");
+    pointer(dot, "click");
+    expect(cleared).toBe(1);
+  });
+});
+
+// ─── renderKvRow ─────────────────────────────────────────────────────────────
+
+describe("renderKvRow", () => {
+  const sleep = (ms: number) =>
+    new Promise((resolve) => {
+      setTimeout(resolve, ms);
+    });
+
+  test("renders both cells, the delete affordance, and the resolved placeholder", async () => {
+    const container = await renderInto(
+      renderKvRow({
+        name: "display",
+        onCommit: () => {},
+        onDelete: () => {},
+        placeholderFor: (n) => (n === "display" ? "inline" : ""),
+        value: "flex",
+      }),
+    );
+    const row = container.querySelector(".kv-row")!;
+    expect((row as HTMLElement).dataset.prop).toBe("display");
+    expect((row.querySelector(".kv-key") as HTMLInputElement).value).toBe("display");
+    expect((row.querySelector(".kv-val") as HTMLInputElement).value).toBe("flex");
+    expect(row.querySelector(".kv-val")!.getAttribute("placeholder")).toBe("inline");
+    expect(row.querySelector("sp-action-button")!.getAttribute("title")).toBe("Remove display");
+  });
+
+  test("edits to either cell commit ONE pair after the debounce", async () => {
+    const commits: [string, string][] = [];
+    const container = await renderInto(
+      renderKvRow({
+        debounceMs: 20,
+        name: "data-x",
+        onCommit: (n, v) => commits.push([n, v]),
+        onDelete: () => {},
+        value: "1",
+      }),
+    );
+    const key = container.querySelector(".kv-key") as HTMLInputElement;
+    key.value = "data-y";
+    key.dispatchEvent(new Event("input", { bubbles: true }));
+    const val = container.querySelector(".kv-val") as HTMLInputElement;
+    val.value = "2";
+    val.dispatchEvent(new Event("input", { bubbles: true }));
+    await sleep(60);
+    expect(commits).toEqual([["data-y", "2"]]);
+  });
+
+  test("renaming the key re-resolves the value cell's placeholder in place", async () => {
+    const container = await renderInto(
+      renderKvRow({
+        name: "display",
+        onCommit: () => {},
+        onDelete: () => {},
+        placeholderFor: (n) => (n === "color" ? "canvastext" : "inline"),
+        value: "",
+      }),
+    );
+    const key = container.querySelector(".kv-key") as HTMLInputElement;
+    key.value = "color";
+    key.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(container.querySelector(".kv-val")!.getAttribute("placeholder")).toBe("canvastext");
+  });
+
+  test("delete fires immediately — it is not an edit", async () => {
+    let deleted = 0;
+    const container = await renderInto(
+      renderKvRow({
+        name: "data-x",
+        onCommit: () => {},
+        onDelete: () => {
+          deleted += 1;
+        },
+        value: "1",
+      }),
+    );
+    pointer(container.querySelector(".kv-row sp-action-button")!, "click");
+    expect(deleted).toBe(1);
+  });
+});
+
+// ─── renderStaticKvRow ───────────────────────────────────────────────────────
+
+describe("renderStaticKvRow", () => {
+  test("fills only the slots it is given", async () => {
+    const container = await renderInto(renderStaticKvRow({ name: "--accent", value: "red" }));
+    const row = container.querySelector(".kv-static-row")!;
+    expect((row as HTMLElement).dataset.prop).toBe("--accent");
+    expect(row.querySelector(".kv-static-name")!.textContent).toBe("--accent");
+    expect(row.querySelector(".kv-static-value")!.textContent).toBe("red");
+    expect(row.querySelector(".kv-static-detail")).toBeNull();
+    expect(row.querySelector(".kv-static-tag")).toBeNull();
+  });
+
+  test("detail and tags render in order", async () => {
+    const container = await renderInto(
+      renderStaticKvRow({
+        detail: "→ label",
+        name: "label",
+        tags: ["reflects", "required"],
+        value: "string",
+      }),
+    );
+    const row = container.querySelector(".kv-static-row")!;
+    expect(row.querySelector(".kv-static-detail")!.textContent).toBe("→ label");
+    expect([...row.querySelectorAll(".kv-static-tag")].map((t) => t.textContent)).toEqual([
+      "reflects",
+      "required",
+    ]);
   });
 });

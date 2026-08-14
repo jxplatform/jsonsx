@@ -1,6 +1,10 @@
 /**
- * Tests for src/panels/properties-panel.ts — the inspector panel for element attributes, component
- * props, repeater/switch nodes, media breakpoints, and page layout selection.
+ * Tests for src/panels/properties-panel.ts — the Content tab: the element itself, its HTML
+ * attributes, its link target, its custom attributes and its component props.
+ *
+ * Repeater, Switch and the custom-element contract sections moved to the Logic tab in P5
+ * (`tests/events-panel.test.ts`); the Page section moved to the Document Header card
+ * (`tests/head-panel.test.ts`). What is tested here is what Content still draws.
  */
 import {
   flush,
@@ -10,16 +14,26 @@ import {
   resetStudioState,
   resetWorkspaceWithTab,
 } from "./harness";
+import { capsForPosition } from "../src/ui/value-source";
 import { beforeEach, describe, expect, test } from "bun:test";
 import {
-  invalidateLayoutPickerCache,
   invalidatePageRouteCache,
   renderPropertiesPanelTemplate,
 } from "../src/panels/properties-panel";
 import { componentRegistry } from "../src/files/components";
 import { resetSlotModeMemory } from "../src/ui/dynamic-slot";
 import { view } from "../src/view";
-import { activeTab, closeAllTabs } from "../src/workspace/workspace";
+import { shell } from "../src/shell";
+import { setActiveRegistry } from "../src/commands/active-registry";
+import type { CommandRegistry } from "../src/commands/registry";
+import {
+  PRIMARY_PANE,
+  SECONDARY_PANE,
+  activeTab,
+  closeAllTabs,
+  focusPane,
+  workspace,
+} from "../src/workspace/workspace";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
@@ -33,9 +47,46 @@ async function renderPanel(): Promise<HTMLElement> {
 
 function openDoc(doc: Record<string, unknown>, selection: (string | number)[] | null = []) {
   const tab = resetWorkspaceWithTab(doc as JxMutableNode);
-  tab.session.selection = selection as never;
+  tab.session.selection = selection ? [selection] : [];
   return tab;
 }
+
+describe("drafts belong to a node, not to a field name", () => {
+  /*
+   * `ui/field-input.ts`'s draft map is module-global and these three rows keyed it by field name
+   * alone (`"prop:className"`), so every element shared one slot per field. Type a class name,
+   * click a sibling before blurring, and the sibling's Class row showed your text — and blurring it
+   * there committed to the WRONG element. Plan §11.4: "drafts keyed by node path (today all
+   * elements share one draft slot per field)".
+   */
+  test("a draft on one element does not appear on the next", async () => {
+    const doc = {
+      children: [
+        { className: "first", tagName: "p" },
+        { className: "second", tagName: "p" },
+      ],
+      tagName: "div",
+    };
+    const tab = openDoc(doc, ["children", 0]);
+    let c = await renderPanel();
+    const classField = (root: Element) =>
+      root.querySelector('[data-prop="className"] sp-textfield') as HTMLElement & {
+        value: string;
+      };
+
+    // Type into the first element's Class row WITHOUT blurring — a live draft.
+    const field = classField(c);
+    field.value = "half-typed";
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+    await flush();
+
+    tab.session.selection = [["children", 1]];
+    c = await renderPanel();
+    expect(classField(c).value).toBe("second");
+    // …and the first element is untouched on disk.
+    expect((docNow().children as Record<string, unknown>[])[0]!.className).toBe("first");
+  });
+});
 
 function docNow(): JxMutableNode {
   return activeTab.value!.doc.document as JxMutableNode;
@@ -45,22 +96,21 @@ function section(root: Element, label: string): HTMLElement | null {
   return root.querySelector(`sp-accordion-item[label="${label}"]`);
 }
 
-function fieldRowByLabel(root: Element, label: string): HTMLElement | undefined {
-  return [...root.querySelectorAll(".field-row")].find(
-    (r) => r.querySelector("sp-field-label")?.textContent?.trim() === label,
-  ) as HTMLElement | undefined;
-}
-
 function kvAdd(root: Element, text: string): HTMLElement | undefined {
   return [...root.querySelectorAll(".kv-add")].find((el) => el.textContent?.includes(text)) as
     | HTMLElement
     | undefined;
 }
 
-function actionButtonByText(root: Element, text: string): HTMLElement | undefined {
-  return [...root.querySelectorAll("sp-action-button")].find((b) =>
-    b.textContent?.includes(text),
-  ) as HTMLElement | undefined;
+/**
+ * Pick a rung on a row's Value Source control (§6.3's ladder, `ui/dynamic-slot.ts`).
+ *
+ * The chip opens a picker rather than cycling, so a test names the rung it wants instead of
+ * counting clicks — which is the behaviour change that made "$ref → literal must pass through ${}"
+ * untrue.
+ */
+function chooseValueSource(row: Element, mode: "literal" | "ref" | "template" | "expression") {
+  pointer(row.querySelector(`sp-menu-item[data-mode="${mode}"]`)!, "click");
 }
 
 function sleep(ms: number) {
@@ -71,11 +121,10 @@ function sleep(ms: number) {
 
 beforeEach(() => {
   navCalls.length = 0;
-  view.layoutSelection = null;
+  shell.layoutSelection = null;
   view.showAddBreakpointForm = false;
   view.addBreakpointPreview = "";
   componentRegistry.length = 0;
-  invalidateLayoutPickerCache();
   invalidatePageRouteCache();
   resetSlotModeMemory();
   resetStudioState();
@@ -85,47 +134,140 @@ beforeEach(() => {
 // ─── Empty states ─────────────────────────────────────────────────────────────
 
 describe("empty states", () => {
-  test("no tab open → 'No document loaded'", async () => {
+  test("no tab open → teaches what the inspector needs, with the action that supplies it", async () => {
     closeAllTabs();
     const c = await renderPanel();
-    expect(c.textContent).toContain("No document loaded");
+    expect(c.textContent).toContain("Open a page to inspect and style what you click.");
+    expect((c.querySelector(".empty-state-action") as HTMLElement).textContent?.trim()).toBe(
+      "Open a page…",
+    );
   });
 
-  test("tab open without selection → prompt to select", async () => {
+  test("tab open without selection → the one shared canvas verb", async () => {
     openDoc({ children: [], tagName: "div" }, null);
     const c = await renderPanel();
-    expect(c.textContent).toContain("Select an element to inspect");
+    expect(c.textContent).toContain("Click anything on the canvas to edit its content.");
   });
 
-  test("selection pointing at a missing node → 'Node not found'", async () => {
+  test("selection pointing at a missing node → says it is gone, then repeats the verb", async () => {
     openDoc({ children: [{ tagName: "p" }], tagName: "div" }, ["children", 9, "children", 0]);
     const c = await renderPanel();
-    expect(c.textContent).toContain("Node not found");
+    expect(c.textContent).toContain("no longer on the page");
+    expect(c.textContent).toContain("Click anything on the canvas");
   });
 });
 
 // ─── Layout selection panel ───────────────────────────────────────────────────
 
 describe("layout selection panel", () => {
-  test("shows tag, class, and opens the layout via the context callback", async () => {
+  const headerHit = {
+    className: "site-header",
+    layoutFile: "layouts/base.json",
+    layoutPath: ["children", 0, "children", 0],
+    rect: { height: 40, width: 800, x: 0, y: 0 },
+    tagName: "header",
+  };
+
+  test("shows tag, class, and the layout file the element came from", async () => {
     openDoc({ children: [], tagName: "div" });
-    const el = document.createElement("header");
-    el.className = "site-header";
-    view.layoutSelection = { el, layoutPath: "layouts/base.json" };
+    shell.layoutSelection = headerHit;
 
     const c = await renderPanel();
     expect(section(c, "Layout Element")).not.toBeNull();
     expect(c.textContent).toContain("header");
     expect(c.textContent).toContain("site-header");
-    expect(c.textContent).toContain("part of the page layout");
-
-    pointer(kvAdd(c, "Open Layout")!, "click");
-    expect(navCalls).toEqual(["layouts/base.json"]);
+    expect(c.textContent).toContain("layouts/base.json");
   });
 
-  test("falls back to generic labels when el/path are sparse", async () => {
+  test("a layout selection wins over the document selection (a layout node is not in this doc)", async () => {
+    openDoc({ children: [{ tagName: "p" }], tagName: "div" }, ["children", 0]);
+    shell.layoutSelection = headerHit;
+    const c = await renderPanel();
+    expect(section(c, "Layout Element")).not.toBeNull();
+  });
+
+  test("Open Layout → runs ONE command and does not clear the layout selection", async () => {
+    /* Four assertions INVERTED, and each inversion is the point of the change.
+       `openLayoutAtNode` used to navigate, `setLayoutSelection(null)`, re-select against
+       `activeTab` and `renderOnly("rightPanel")`. It opened the layout OVER the page it was
+       teaching about, and clearing the selection is precisely what killed the follow on its first
+       frame — `shell.layoutSelection` is what the layout companion follows the NODE through. The
+       chip is a control now: it runs `pane.derive { preset: "layout" }` and decides nothing. */
     openDoc({ children: [], tagName: "div" });
-    view.layoutSelection = { el: {} as HTMLElement, layoutPath: "" };
+    shell.layoutSelection = headerHit;
+    const ran: { id: string; args: unknown }[] = [];
+    setActiveRegistry({
+      run: (id: string, args: unknown) => {
+        ran.push({ args, id });
+        return Promise.resolve();
+      },
+    } as unknown as CommandRegistry);
+
+    const c = await renderPanel();
+    pointer(kvAdd(c, "Open Layout")!, "click");
+    await flush();
+
+    expect(ran).toEqual([{ args: { preset: "layout" }, id: "pane.derive" }]);
+    // No `navigate` call of its own — the chip does not know what opening a layout means.
+    expect(navCalls).toEqual([]);
+    // And the layout selection SURVIVES: it is the node the following pane keeps highlighting.
+    expect(shell.layoutSelection).toEqual(headerHit);
+    setActiveRegistry(null);
+  });
+
+  /* FINDING 8. `canvas/iframe-host.ts`'s `layoutHit` handler calls `focusHostPane(state)`, which
+     moves the keyboard into the pane the click landed in — including a LENS, which draws layout
+     chrome because it draws the same document. From there `pane.derive` can only refuse: its
+     enablement is `deriveRefusal(activePane().id)`, and a derived pane cannot derive again. The
+     chip was drawn anyway and its handler is `void activeRegistry()?.run(…)`, so the throw went
+     into a `void` and the author pressed a control that did nothing at all.
+
+       chip drawn in a lens-focused shell = true
+       THREW CommandUnavailableError … requires an open document in a pane that is not itself
+       derived */
+  test("Open Layout → is not drawn in a shell whose focused pane is itself derived", async () => {
+    openDoc({ children: [], tagName: "div" });
+    shell.layoutSelection = headerHit;
+    expect(kvAdd(await renderPanel(), "Open Layout")).not.toBeNull();
+
+    // A lens beside the page, with the keyboard in it — which is where a click on layout chrome
+    // Drawn by that lens leaves it.
+    workspace.panes.push({ activeTabId: null, derived: null, id: SECONDARY_PANE, tabOrder: [] });
+    workspace.panes[1]!.derived = {
+      diff: null,
+      kind: "lens",
+      media: null,
+      mode: "design",
+      preset: "breakpoint",
+      reason: "",
+      sourcePaneId: PRIMARY_PANE,
+      status: "ready",
+      zoom: 1,
+    };
+    focusPane(SECONDARY_PANE);
+
+    const c = await renderPanel();
+    /* By LABEL rather than by element: `expect(<happy-dom element>).toBeUndefined()` prints the
+       element, and a happy-dom element's inspection reaches its `window` — sixty thousand lines of
+       class table for one wrong chip, which is what a reviewer would have to read past. */
+    expect([...c.querySelectorAll(".kv-add")].map((el) => el.textContent?.trim())).not.toContain(
+      "Open Layout →",
+    );
+    // The sentence explaining where the element comes from stays — that is the panel's job, and it
+    // Is true wherever the keyboard is.
+    expect(c.textContent).toContain("layouts/base.json");
+    focusPane(PRIMARY_PANE);
+  });
+
+  test("falls back to generic labels when the hit names no tag, class, or file", async () => {
+    openDoc({ children: [], tagName: "div" });
+    shell.layoutSelection = {
+      className: "",
+      layoutFile: "",
+      layoutPath: [],
+      rect: { height: 0, width: 0, x: 0, y: 0 },
+      tagName: "",
+    };
 
     const c = await renderPanel();
     expect(c.textContent).toContain("element");
@@ -133,8 +275,6 @@ describe("layout selection panel", () => {
     expect([...c.querySelectorAll("sp-field-label")].map((l) => l.textContent)).not.toContain(
       "Class",
     );
-    pointer(kvAdd(c, "Open Layout")!, "click");
-    expect(navCalls).toEqual(["layout"]);
   });
 });
 
@@ -184,7 +324,7 @@ describe("element section", () => {
       ["children", 0],
     );
     let c = await renderPanel();
-    pointer(c.querySelector('[title="Clear $id"]')!, "click");
+    pointer(c.querySelector('[title="Clear ID"]')!, "click");
     expect((docNow().children as JxMutableNode[])[0]!.$id).toBeUndefined();
 
     c = await renderPanel();
@@ -254,228 +394,6 @@ describe("element section", () => {
   });
 });
 
-// ─── Repeater section ─────────────────────────────────────────────────────────
-
-function repeaterDoc(extra: Record<string, unknown> = {}) {
-  return {
-    children: {
-      $prototype: "Array",
-      items: { $ref: "#/state/posts" },
-      map: { tagName: "li" },
-      ...extra,
-    },
-    state: { posts: { default: ["a"] } },
-    tagName: "ul",
-  };
-}
-
-describe("repeater section", () => {
-  test("map node shows the Repeater section and suppresses element rows", async () => {
-    openDoc(repeaterDoc(), ["children", 0]);
-    const c = await renderPanel();
-    expect(section(c, "Repeater")).not.toBeNull();
-    expect(section(c, "Element")).toBeNull();
-    expect(c.querySelector('[data-prop="tagName"]')).toBeNull();
-    expect(fieldRowByLabel(c, "Items")).toBeDefined();
-  });
-
-  test("add filter / add sort links seed $ref values", async () => {
-    openDoc(repeaterDoc(), ["children", 0]);
-    let c = await renderPanel();
-    pointer(kvAdd(c, "+ Add filter")!, "click");
-    expect((docNow().children as any[])[0].filter).toEqual({ $ref: "#/state/" });
-
-    c = await renderPanel();
-    pointer(kvAdd(c, "+ Add sort")!, "click");
-    expect((docNow().children as any[])[0].sort).toEqual({ $ref: "#/state/" });
-
-    // Once present, the add links disappear and rows render instead
-    c = await renderPanel();
-    expect(kvAdd(c, "+ Add filter")).toBeUndefined();
-    expect(kvAdd(c, "+ Add sort")).toBeUndefined();
-    expect(fieldRowByLabel(c, "Filter")).toBeDefined();
-    expect(fieldRowByLabel(c, "Sort")).toBeDefined();
-  });
-
-  test("Edit template button moves the selection into the map node", async () => {
-    const tab = openDoc(repeaterDoc(), ["children", 0]);
-    const c = await renderPanel();
-    pointer(actionButtonByText(c, "Edit template")!, "click");
-    expect(tab.session.selection).toEqual(["children", 0, "map"]);
-  });
-
-  test("bound Items row de-escalates to literal, restoring the signal default", async () => {
-    openDoc(repeaterDoc(), ["children", 0]);
-    const c = await renderPanel();
-    const row = fieldRowByLabel(c, "Items")!;
-    const mode = row.querySelector(".dynamic-slot-mode")!;
-    expect(mode).not.toBeNull();
-    expect(row.querySelector("sp-picker")).not.toBeNull();
-
-    pointer(mode, "click");
-    // Default is an array → JSON stringified static value
-    expect((docNow().children as any[])[0].items).toBe('["a"]');
-  });
-
-  test("static Items row binds to the first available signal via ref mode", async () => {
-    openDoc(repeaterDoc({ items: "static" }), ["children", 0]);
-    const c = await renderPanel();
-    const row = fieldRowByLabel(c, "Items")!;
-    pointer(row.querySelector(".dynamic-slot-mode")!, "click");
-    expect((docNow().children as any[])[0].items).toEqual({ $ref: "#/state/posts" });
-  });
-
-  test("signal picker change rebinds; empty value clears the property", async () => {
-    openDoc(repeaterDoc(), ["children", 0]);
-    let c = await renderPanel();
-    let picker = fieldRowByLabel(c, "Items")!.querySelector("sp-picker") as HTMLInputElement;
-    picker.value = "#/state/posts";
-    picker.dispatchEvent(new Event("change", { bubbles: true }));
-    expect((docNow().children as any[])[0].items).toEqual({ $ref: "#/state/posts" });
-
-    c = await renderPanel();
-    picker = fieldRowByLabel(c, "Items")!.querySelector("sp-picker") as HTMLInputElement;
-    picker.value = "";
-    picker.dispatchEvent(new Event("change", { bubbles: true }));
-    expect((docNow().children as any[])[0].items).toBeUndefined();
-  });
-
-  test("handler and Function state entries are excluded from signal options", async () => {
-    openDoc(
-      {
-        children: { $prototype: "Array", items: { $ref: "#/state/posts" }, map: { tagName: "li" } },
-        state: {
-          fn: { $prototype: "Function", arguments: [], body: "" },
-          onClick: { $handler: "x" },
-          posts: { default: [] },
-        },
-        tagName: "ul",
-      },
-      ["children", 0],
-    );
-    const c = await renderPanel();
-    // The row's only picker is the ref widget (the mode control is a button, not a picker).
-    const items = [
-      ...fieldRowByLabel(c, "Items")!.querySelector("sp-picker")!.querySelectorAll("sp-menu-item"),
-    ].map((m) => m.textContent?.trim());
-    expect(items).toEqual(["posts"]);
-  });
-
-  test("filter and sort rows commit edits and clear when emptied", async () => {
-    openDoc(repeaterDoc({ filter: "a > 1", sort: "name" }), ["children", 0]);
-    let c = await renderPanel();
-    const filterField = fieldRowByLabel(c, "Filter")!.querySelector(
-      "sp-textfield",
-    ) as HTMLInputElement;
-    filterField.value = "a > 2";
-    filterField.dispatchEvent(new Event("change", { bubbles: true }));
-    expect((docNow().children as any[])[0].filter).toBe("a > 2");
-
-    c = await renderPanel();
-    const sortField = fieldRowByLabel(c, "Sort")!.querySelector("sp-textfield") as HTMLInputElement;
-    sortField.value = "";
-    sortField.dispatchEvent(new Event("change", { bubbles: true }));
-    expect((docNow().children as any[])[0].sort).toBeUndefined();
-  });
-
-  test("unbinding from a scalar (non-object) state def clears the value", async () => {
-    openDoc(
-      {
-        children: { $prototype: "Array", items: { $ref: "#/state/n" }, map: { tagName: "li" } },
-        state: { n: 5 },
-        tagName: "ul",
-      },
-      ["children", 0],
-    );
-    const c = await renderPanel();
-    pointer(fieldRowByLabel(c, "Items")!.querySelector(".dynamic-slot-mode")!, "click");
-    expect((docNow().children as any[])[0].items).toBeUndefined();
-  });
-
-  test("unbinding with no default falls back to clearing the property", async () => {
-    openDoc(
-      {
-        children: { $prototype: "Array", items: { $ref: "#/state/posts" }, map: { tagName: "li" } },
-        state: { posts: {} },
-        tagName: "ul",
-      },
-      ["children", 0],
-    );
-    const c = await renderPanel();
-    pointer(fieldRowByLabel(c, "Items")!.querySelector(".dynamic-slot-mode")!, "click");
-    expect((docNow().children as any[])[0].items).toBeUndefined();
-  });
-});
-
-// ─── Switch section ───────────────────────────────────────────────────────────
-
-function switchDoc() {
-  return {
-    children: {
-      $prototype: "Array",
-      items: [],
-      map: {
-        $switch: "${item.type}",
-        cases: { alpha: { tagName: "div" }, beta: { tagName: "span" } },
-        tagName: "li",
-      },
-    },
-    tagName: "ul",
-  };
-}
-
-describe("switch section", () => {
-  test("renders the expression row and case list", async () => {
-    openDoc(switchDoc(), ["children", 0, "map"]);
-    const c = await renderPanel();
-    const sw = section(c, "Switch")!;
-    expect(sw).not.toBeNull();
-    expect(fieldRowByLabel(sw, "Expression")).toBeDefined();
-    const caseInputs = [...sw.querySelectorAll("input.field-input")].map(
-      (i) => (i as HTMLInputElement).value,
-    );
-    expect(caseInputs).toEqual(["alpha", "beta"]);
-  });
-
-  test("edit-case arrow navigates the selection to the case", async () => {
-    const tab = openDoc(switchDoc(), ["children", 0, "map"]);
-    const c = await renderPanel();
-    pointer(c.querySelector('[title="Edit case"]')!, "click");
-    expect(tab.session.selection).toEqual(["children", 0, "map", "cases", "alpha"]);
-  });
-
-  test("✕ removes a case and + Add case appends a numbered one", async () => {
-    openDoc(switchDoc(), ["children", 0, "map"]);
-    let c = await renderPanel();
-    const remove = [...c.querySelectorAll("span")].find((s) => s.textContent === "✕");
-    pointer(remove!, "click");
-    expect(Object.keys((docNow().children as any[])[0].map.cases)).toEqual(["beta"]);
-
-    c = await renderPanel();
-    pointer(kvAdd(c, "+ Add case")!, "click");
-    expect(Object.keys((docNow().children as any[])[0].map.cases)).toEqual(["beta", "case2"]);
-  });
-
-  test("inside a map template, binding the expression offers $map signals", async () => {
-    openDoc(switchDoc(), ["children", 0, "map"]);
-    let c = await renderPanel();
-    const row = fieldRowByLabel(section(c, "Switch")!, "Expression")!;
-    // The Expression row has no literal rung, so the template value cycles straight to ref.
-    // Without state defs the ref rung falls through to the extra $map signals.
-    pointer(row.querySelector(".dynamic-slot-mode")!, "click");
-    expect((docNow().children as any[])[0].map.$switch).toEqual({ $ref: "$map/item" });
-
-    c = await renderPanel();
-    const picker = fieldRowByLabel(section(c, "Switch")!, "Expression")!.querySelector(
-      "sp-picker",
-    )!;
-    const opts = [...picker.querySelectorAll("sp-menu-item")].map((m) => m.getAttribute("value"));
-    expect(opts).toContain("$map/item");
-    expect(opts).toContain("$map/index");
-    expect(picker.querySelector("sp-menu-divider")).not.toBeNull();
-  });
-});
-
 // ─── Component props section ──────────────────────────────────────────────────
 
 function registerCard(overrides: Record<string, unknown> = {}) {
@@ -508,7 +426,7 @@ describe("component props section", () => {
   test("unknown component → 'Component not found'", async () => {
     openDoc(cardDoc(), ["children", 0]);
     const c = await renderPanel();
-    expect(section(c, "Component Props")!.textContent).toContain("Component not found");
+    expect(section(c, "Component Settings")!.textContent).toContain("not in the project's library");
   });
 
   test("empty props list → 'No props defined'", async () => {
@@ -520,14 +438,16 @@ describe("component props section", () => {
     } as never);
     openDoc(cardDoc(), ["children", 0]);
     const c = await renderPanel();
-    expect(section(c, "Component Props")!.textContent).toContain("No props defined");
+    expect(section(c, "Component Settings")!.textContent).toContain(
+      "This component has no settings to fill in yet.",
+    );
   });
 
   test("renders one widget per prop with the right control types", async () => {
     registerCard();
     openDoc(cardDoc({ title: "Hi" }), ["children", 0]);
     const c = await renderPanel();
-    const sec = section(c, "Component Props")!;
+    const sec = section(c, "Component Settings")!;
     expect(sec.querySelector('[data-prop="title"] sp-textfield')).not.toBeNull();
     expect(sec.querySelector('[data-prop="featured"] sp-checkbox')).not.toBeNull();
     expect(sec.querySelector('[data-prop="count"] sp-number-field')).not.toBeNull();
@@ -543,7 +463,7 @@ describe("component props section", () => {
     registerCard();
     openDoc(cardDoc({ title: "Hi" }), ["children", 0]);
     let c = await renderPanel();
-    const sec = section(c, "Component Props")!;
+    const sec = section(c, "Component Settings")!;
     const field = sec.querySelector('[data-prop="title"] sp-textfield') as HTMLInputElement;
     field.value = "Updated";
     field.dispatchEvent(new Event("change", { bubbles: true }));
@@ -558,7 +478,7 @@ describe("component props section", () => {
     registerCard();
     openDoc(cardDoc({ featured: true }), ["children", 0]);
     let c = await renderPanel();
-    let box = section(c, "Component Props")!.querySelector(
+    let box = section(c, "Component Settings")!.querySelector(
       '[data-prop="featured"] sp-checkbox',
     ) as HTMLInputElement;
     box.checked = false;
@@ -566,7 +486,7 @@ describe("component props section", () => {
     expect((docNow().children as JxMutableNode[])[0]!.$props).toBeUndefined();
 
     c = await renderPanel();
-    box = section(c, "Component Props")!.querySelector(
+    box = section(c, "Component Settings")!.querySelector(
       '[data-prop="featured"] sp-checkbox',
     ) as HTMLInputElement;
     box.checked = true;
@@ -578,7 +498,7 @@ describe("component props section", () => {
     registerCard();
     openDoc(cardDoc(), ["children", 0]);
     const c = await renderPanel();
-    const sel = section(c, "Component Props")!.querySelector(
+    const sel = section(c, "Component Settings")!.querySelector(
       '[data-prop="variant"] jx-value-selector',
     )!;
     sel.dispatchEvent(new CustomEvent("change", { bubbles: true, detail: { value: "fancy" } }));
@@ -589,7 +509,7 @@ describe("component props section", () => {
     registerCard();
     openDoc(cardDoc(), ["children", 0]);
     const c = await renderPanel();
-    const field = section(c, "Component Props")!.querySelector(
+    const field = section(c, "Component Settings")!.querySelector(
       '[data-prop="published"] sp-textfield',
     ) as HTMLInputElement;
     field.value = "2026-06-12";
@@ -597,38 +517,35 @@ describe("component props section", () => {
     expect((docNow().children as JxMutableNode[])[0]!.$props!.published).toBe("2026-06-12");
   });
 
-  test("mode button cycles literal → ref → template → back to the stashed literal", async () => {
+  test("the value source picker moves a prop between rungs and remembers the literal", async () => {
     registerCard();
     openDoc(cardDoc({ title: "Hi" }), ["children", 0]);
     let c = await renderPanel();
-    const modeBtn = () =>
-      section(c, "Component Props")!.querySelector('[data-prop="title"] .dynamic-slot-mode')!;
-    pointer(modeBtn(), "click");
+    const titleRow = () =>
+      section(c, "Component Settings")!.querySelector('[data-prop="title"]') as HTMLElement;
+    chooseValueSource(titleRow(), "ref");
     expect((docNow().children as JxMutableNode[])[0]!.$props!.title).toEqual({
       $ref: "#/state/username",
     });
 
     c = await renderPanel();
-    expect(modeBtn().getAttribute("title")).toContain("signal binding");
-    pointer(modeBtn(), "click");
+    expect(titleRow().querySelector(".dynamic-slot-mode")!.textContent!.trim()).toBe("From data…");
+    chooseValueSource(titleRow(), "template");
     expect((docNow().children as JxMutableNode[])[0]!.$props!.title).toBe("${state.username}");
 
     c = await renderPanel();
-    pointer(modeBtn(), "click");
+    chooseValueSource(titleRow(), "literal");
     expect((docNow().children as JxMutableNode[])[0]!.$props!.title).toBe("Hi");
   });
 
-  test("a prop opened already-bound de-escalates to the signal's declared default", async () => {
+  test("a prop opened already-bound drops to the signal's declared default", async () => {
     registerCard();
     openDoc(cardDoc({ title: { $ref: "#/state/username" } }), ["children", 0]);
-    let c = await renderPanel();
-    const modeBtn = () =>
-      section(c, "Component Props")!.querySelector('[data-prop="title"] .dynamic-slot-mode')!;
-    pointer(modeBtn(), "click");
-    expect((docNow().children as JxMutableNode[])[0]!.$props!.title).toBe("${state.username}");
-
-    c = await renderPanel();
-    pointer(modeBtn(), "click");
+    const c = await renderPanel();
+    const titleRow = section(c, "Component Settings")!.querySelector(
+      '[data-prop="title"]',
+    ) as HTMLElement;
+    chooseValueSource(titleRow, "literal");
     expect((docNow().children as JxMutableNode[])[0]!.$props!.title).toBe("kevin");
   });
 
@@ -636,7 +553,7 @@ describe("component props section", () => {
     registerCard();
     openDoc(cardDoc({ title: { $ref: "#/state/username" } }), ["children", 0]);
     let c = await renderPanel();
-    let picker = section(c, "Component Props")!.querySelector(
+    let picker = section(c, "Component Settings")!.querySelector(
       '[data-prop="title"] sp-picker',
     ) as HTMLInputElement;
     expect(picker).not.toBeNull();
@@ -647,7 +564,7 @@ describe("component props section", () => {
     });
 
     c = await renderPanel();
-    picker = section(c, "Component Props")!.querySelector(
+    picker = section(c, "Component Settings")!.querySelector(
       '[data-prop="title"] sp-picker',
     ) as HTMLInputElement;
     picker.value = "";
@@ -666,7 +583,7 @@ describe("component props section", () => {
       0,
     ]);
     let c = await renderPanel();
-    let field = section(c, "Component Props")!.querySelector(
+    let field = section(c, "Component Settings")!.querySelector(
       '[data-prop="label"] sp-textfield',
     ) as HTMLInputElement;
     field.value = "Click me";
@@ -675,7 +592,7 @@ describe("component props section", () => {
 
     // Empty value removes the attribute
     c = await renderPanel();
-    field = section(c, "Component Props")!.querySelector(
+    field = section(c, "Component Settings")!.querySelector(
       '[data-prop="label"] sp-textfield',
     ) as HTMLInputElement;
     field.value = "";
@@ -684,7 +601,7 @@ describe("component props section", () => {
 
     // Npm comp without a path → no Edit definition link
     c = await renderPanel();
-    expect(kvAdd(section(c, "Component Props")!, "Edit definition")).toBeUndefined();
+    expect(kvAdd(section(c, "Component Settings")!, "Edit definition")).toBeUndefined();
   });
 
   test("npm prop cycled to ref stores a real $ref object in attributes", async () => {
@@ -702,9 +619,9 @@ describe("component props section", () => {
       ["children", 0],
     );
     const c = await renderPanel();
-    pointer(
-      section(c, "Component Props")!.querySelector('[data-prop="label"] .dynamic-slot-mode')!,
-      "click",
+    chooseValueSource(
+      section(c, "Component Settings")!.querySelector('[data-prop="label"]')!,
+      "ref",
     );
     expect((docNow().children as JxMutableNode[])[0]!.attributes!.label).toEqual({
       $ref: "#/state/username",
@@ -718,23 +635,249 @@ describe("component props section", () => {
       ["children", 0, "map"],
     );
     let c = await renderPanel();
-    let row = section(c, "Component Props")!.querySelector('[data-prop="title"]')!;
-    pointer(row.querySelector(".dynamic-slot-mode")!, "click");
+    let row = section(c, "Component Settings")!.querySelector('[data-prop="title"]')!;
+    chooseValueSource(row, "ref");
     expect((docNow().children as any[])[0].map.$props.title).toEqual({ $ref: "$map/item" });
 
     c = await renderPanel();
-    row = section(c, "Component Props")!.querySelector('[data-prop="title"]')!;
-    const opts = [...row.querySelectorAll("sp-menu-item")].map((m) => m.getAttribute("value"));
+    row = section(c, "Component Settings")!.querySelector('[data-prop="title"]')!;
+    const refPicker = row.querySelector("sp-picker")!;
+    const opts = [...refPicker.querySelectorAll("sp-menu-item")].map((m) =>
+      m.getAttribute("value"),
+    );
     expect(opts).toEqual(["$map/item", "$map/index"]);
-    expect(row.querySelector("sp-menu-divider")).not.toBeNull();
+    expect(refPicker.querySelector("sp-menu-divider")).not.toBeNull();
   });
 
   test("Edit definition link navigates to the component file", async () => {
     registerCard();
     openDoc(cardDoc(), ["children", 0]);
     const c = await renderPanel();
-    pointer(kvAdd(section(c, "Component Props")!, "Edit definition")!, "click");
+    pointer(kvAdd(section(c, "Component Settings")!, "Edit definition")!, "click");
     expect(navCalls).toEqual(["components/my-card.json"]);
+  });
+});
+
+// ─── The tab re-split (§6.5) ──────────────────────────────────────────────────
+
+describe("what Content no longer draws", () => {
+  test("a repeating list says where its wiring lives and offers the tab that has it", async () => {
+    openDoc(
+      {
+        children: { $prototype: "Array", items: [], map: { tagName: "li" } },
+        tagName: "ul",
+      },
+      ["children", 0],
+    );
+    const c = await renderPanel();
+    expect(c.textContent).toContain("A repeating list has no content of its own.");
+    expect(c.textContent).toContain("live in Logic");
+    expect((c.querySelector(".empty-state-action") as HTMLElement).textContent?.trim()).toBe(
+      "Open Logic",
+    );
+    // And it draws none of the sections it used to.
+    expect(section(c, "Repeating list")).toBeNull();
+    expect(section(c, "Element")).toBeNull();
+  });
+
+  test("the Open Logic button actually selects the Logic tab", async () => {
+    const tab = openDoc(
+      { children: { $prototype: "Array", items: [], map: { tagName: "li" } }, tagName: "ul" },
+      ["children", 0],
+    );
+    const c = await renderPanel();
+    pointer(c.querySelector(".empty-state-action")!, "click");
+    // The dock is reached through a lazy import (Content must not statically depend on its host),
+    // So the tab lands a few turns later.
+    for (let i = 0; i < 20 && tab.session.ui.rightTab !== "events"; i++) {
+      await flush(1);
+    }
+    expect(tab.session.ui.rightTab).toBe("events");
+  });
+
+  test("a $switch node keeps its Content rows and grows no Condition section", async () => {
+    openDoc({ children: [{ $switch: "${x}", cases: {}, tagName: "li" }], tagName: "ul" }, [
+      "children",
+      0,
+    ]);
+    const c = await renderPanel();
+    expect(section(c, "Condition")).toBeNull();
+    expect(section(c, "Element")).not.toBeNull();
+  });
+
+  test("a custom-element root keeps Content rows and loses the outward-contract sections", async () => {
+    openDoc(
+      {
+        attributes: { part: "root" },
+        state: { label: { attribute: "label", default: "x" } },
+        style: { "--accent": "red" },
+        tagName: "my-widget",
+      },
+      [],
+    );
+    const c = await renderPanel();
+    expect(section(c, "Observed Attributes")).toBeNull();
+    expect(section(c, "CSS Properties")).toBeNull();
+    expect(section(c, "CSS Parts")).toBeNull();
+    expect(section(c, "Element")).not.toBeNull();
+  });
+
+  test("no Page section survives, on a site page or anywhere else", async () => {
+    resetStudioState({
+      isSiteProject: true,
+      projectConfig: { defaults: { layout: "./layouts/base.json" } },
+    });
+    installMockPlatform();
+    const tab = resetWorkspaceWithTab({ children: [], tagName: "div" } as never);
+    tab.documentPath = "pages/index.json";
+    tab.session.selection = [[]] as never;
+    const c = await renderPanel();
+    expect(section(c, "Page")).toBeNull();
+    expect(c.querySelector('[data-prop="$layout"]')).toBeNull();
+  });
+});
+
+// ─── Provenance chips on component props (§6.2) ───────────────────────────────
+
+describe("component prop provenance", () => {
+  function registerDefaulted() {
+    componentRegistry.push({
+      path: "components/my-card.json",
+      props: [
+        { default: "Untitled", name: "title", type: "string" },
+        { name: "subtitle", type: "string" },
+      ],
+      source: "local",
+      tagName: "my-card",
+    } as never);
+  }
+
+  function chip(root: Element, prop: string): HTMLElement | null {
+    return root.querySelector(`[data-prop="${prop}"] .provenance-chip`);
+  }
+
+  test("a value set on the instance is the accent dot, and clicking it clears", async () => {
+    registerDefaulted();
+    openDoc(cardDoc({ title: "Mine" }), ["children", 0]);
+    const c = await renderPanel();
+    const dot = chip(c, "title")!;
+    expect(dot.classList.contains("provenance-chip--set")).toBe(true);
+    expect(dot.classList.contains("set-dot")).toBe(true);
+    pointer(dot, "click");
+    expect((docNow().children as JxMutableNode[])[0]!.$props).toBeUndefined();
+  });
+
+  test("an unset prop with a component default names the donor and jumps to it", async () => {
+    registerDefaulted();
+    openDoc(cardDoc(), ["children", 0]);
+    const c = await renderPanel();
+    const inherited = chip(c, "title")!;
+    expect(inherited.classList.contains("provenance-chip--inherited")).toBe(true);
+    expect(inherited.textContent!.trim()).toBe("from the component default");
+    expect(inherited.getAttribute("title")).toContain("Untitled");
+    pointer(inherited, "click");
+    expect(navCalls).toEqual(["components/my-card.json"]);
+  });
+
+  test("an unset prop with NO component default draws no chip at all", async () => {
+    registerDefaulted();
+    openDoc(cardDoc(), ["children", 0]);
+    const c = await renderPanel();
+    expect(chip(c, "subtitle")).toBeNull();
+  });
+
+  test("a bound prop is violet and names the signal, not the pointer", async () => {
+    registerDefaulted();
+    openDoc(cardDoc({ title: { $ref: "#/state/username" } }), ["children", 0]);
+    const c = await renderPanel();
+    const bound = chip(c, "title")!;
+    expect(bound.classList.contains("provenance-chip--bound")).toBe(true);
+    expect(bound.textContent!.trim()).toBe("username");
+  });
+
+  test("…and the chip OPENS it — §6.2 says a bound chip's click opens the source", async () => {
+    /*
+     * The Style tab's bound chip has jumped to the Data panel since P5. The Content tab's two bound
+     * branches returned a `donor` and a `title` and no `onClick`, so `renderProvenanceChip` drew a
+     * handler-less span: the same promise, in the same table, kept on one tab and printed on the
+     * other.
+     */
+    registerDefaulted();
+    const tab = openDoc(cardDoc({ title: { $ref: "#/state/username" } }), ["children", 0]);
+    (tab.doc.document as unknown as Record<string, unknown>).state = { username: { default: "" } };
+    const ran: { id: string; args: unknown }[] = [];
+    setActiveRegistry({
+      run: (id: string, args: unknown) => {
+        ran.push({ args, id });
+        return Promise.resolve();
+      },
+    } as unknown as CommandRegistry);
+
+    pointer(chip(await renderPanel(), "title")!, "click");
+    await flush();
+    expect(ran).toEqual([
+      { args: { tab: "data" }, id: "view.setActivity" },
+      { args: { name: "username" }, id: "data.expandRow" },
+    ]);
+    setActiveRegistry(null);
+  });
+
+  test("a chip whose donor this document does not define does not pretend to jump", async () => {
+    // A `$ref` left over from a rename points at nothing. A chip that opened the Data panel and
+    // Expanded a row that is not there would be a worse answer than one that only names it.
+    registerDefaulted();
+    openDoc(cardDoc({ title: { $ref: "#/state/ghost" } }), ["children", 0]);
+    const bound = chip(await renderPanel(), "title")!;
+    expect(bound.classList.contains("provenance-chip--bound")).toBe(true);
+    expect(bound.tagName).not.toBe("BUTTON");
+  });
+
+  test("a $ref that points nowhere says so rather than naming an empty pointer", async () => {
+    registerDefaulted();
+    openDoc(cardDoc({ title: { $ref: "" } }), ["children", 0]);
+    const c = await renderPanel();
+    expect(chip(c, "title")!.textContent!.trim()).toBe("nothing yet");
+  });
+
+  test("dropping a prop bound to a def with no declared default just clears it", async () => {
+    registerDefaulted();
+    const tab = openDoc(cardDoc({ subtitle: { $ref: "#/state/username" } }), ["children", 0]);
+    (tab.doc.document as unknown as Record<string, unknown>).state = { username: {} };
+    const c = await renderPanel();
+    chooseValueSource(
+      section(c, "Component Settings")!.querySelector('[data-prop="subtitle"]')!,
+      "literal",
+    );
+    expect((docNow().children as JxMutableNode[])[0]!.$props?.subtitle).toBeUndefined();
+  });
+
+  test("an expression-valued prop reads as bound to a formula", async () => {
+    registerDefaulted();
+    openDoc(cardDoc({ title: { $expression: { operator: "=", target: null } } }), ["children", 0]);
+    const c = await renderPanel();
+    expect(chip(c, "title")!.textContent!.trim()).toBe("a formula");
+  });
+
+  test("a template-valued prop reads as bound to a template", async () => {
+    registerDefaulted();
+    openDoc(cardDoc({ title: "${state.username}" }), ["children", 0]);
+    const c = await renderPanel();
+    expect(chip(c, "title")!.textContent!.trim()).toBe("a template");
+  });
+
+  test("a bound HTML attribute names its signal too", async () => {
+    openDoc(
+      {
+        children: [{ attributes: { href: { $ref: "#/state/url" } }, tagName: "link" }],
+        state: { url: { default: "/x" } },
+        tagName: "div",
+      },
+      ["children", 0],
+    );
+    const c = await renderPanel();
+    const bound = c.querySelector('[data-prop="href"] .provenance-chip')!;
+    expect(bound.classList.contains("provenance-chip--bound")).toBe(true);
+    expect(bound.textContent!.trim()).toBe("url");
   });
 });
 
@@ -760,6 +903,28 @@ describe("html attribute sections", () => {
     expect(link).not.toBeNull();
     expect(link.hasAttribute("open")).toBe(true);
     expect(link.querySelector(".set-dot--section")).not.toBeNull();
+  });
+
+  test("the section dot states a count and no longer pretends to be a control", async () => {
+    openDoc(
+      {
+        children: [{ attributes: { href: "/x", target: "_blank" }, tagName: "a" }],
+        tagName: "div",
+      },
+      ["children", 0],
+    );
+    const c = await renderPanel();
+    const dot = section(c, "Link")!.querySelector(".set-dot--section")!;
+    expect(dot.getAttribute("title")).toBe("2 values set in this section");
+    expect(dot.getAttribute("aria-hidden")).toBe("true");
+    // It was a <span class="set-dot"> with a pointer cursor, a danger hover and no handler at all.
+    expect(dot.tagName.toLowerCase()).toBe("span");
+  });
+
+  test("a section with nothing set draws no dot", async () => {
+    openDoc({ children: [{ tagName: "a" }], tagName: "div" }, ["children", 0]);
+    const c = await renderPanel();
+    expect(section(c, "Link")!.querySelector(".set-dot--section")).toBeNull();
   });
 
   test("text attribute commits via its widget and clears via the set-dot", async () => {
@@ -830,14 +995,14 @@ describe("attribute dynamic slots", () => {
     const c = await renderPanel();
     const mode = hrefRow(c).querySelector(".style-row-label .dynamic-slot-mode")!;
     expect(mode).not.toBeNull();
-    expect(mode.textContent!.trim()).toBe("abc");
-    expect(mode.getAttribute("title")).toBe("Field mode: static — click for signal binding");
+    expect(mode.textContent!.trim()).toBe("Fixed value");
+    expect(mode.getAttribute("title")).toBe("Value source: Fixed value — click to change");
   });
 
   test("switching to ref mode binds the first signal; the picker rebinds", async () => {
     openDoc(linkDoc(), ["children", 0]);
     let c = await renderPanel();
-    pointer(hrefRow(c).querySelector(".dynamic-slot-mode")!, "click");
+    chooseValueSource(hrefRow(c), "ref");
     expect((docNow().children as JxMutableNode[])[0]!.attributes!.href).toEqual({
       $ref: "#/state/alt",
     });
@@ -851,31 +1016,23 @@ describe("attribute dynamic slots", () => {
     });
   });
 
-  test("de-escalating a bound attribute cycles through template and clears at literal", async () => {
+  test("a bound attribute drops to a fixed value in ONE action", async () => {
     openDoc(linkDoc({ $ref: "#/state/url" }), ["children", 0]);
-    let c = await renderPanel();
-    pointer(hrefRow(c).querySelector(".dynamic-slot-mode")!, "click");
+    const c = await renderPanel();
+    chooseValueSource(hrefRow(c), "template");
     expect((docNow().children as JxMutableNode[])[0]!.attributes!.href).toBe("${state.alt}");
-
-    c = await renderPanel();
-    pointer(hrefRow(c).querySelector(".dynamic-slot-mode")!, "click");
-    expect((docNow().children as JxMutableNode[])[0]!.attributes?.href).toBeUndefined();
   });
 
-  test("cycling around restores the attribute's former literal value", async () => {
+  test("leaving and re-entering Fixed value restores the attribute's former literal", async () => {
     openDoc(linkDoc(), ["children", 0]);
     let c = await renderPanel();
-    pointer(hrefRow(c).querySelector(".dynamic-slot-mode")!, "click");
+    chooseValueSource(hrefRow(c), "ref");
     expect((docNow().children as JxMutableNode[])[0]!.attributes!.href).toEqual({
       $ref: "#/state/alt",
     });
 
     c = await renderPanel();
-    pointer(hrefRow(c).querySelector(".dynamic-slot-mode")!, "click");
-    expect((docNow().children as JxMutableNode[])[0]!.attributes!.href).toBe("${state.alt}");
-
-    c = await renderPanel();
-    pointer(hrefRow(c).querySelector(".dynamic-slot-mode")!, "click");
+    chooseValueSource(hrefRow(c), "literal");
     expect((docNow().children as JxMutableNode[])[0]!.attributes!.href).toBe("/x");
   });
 
@@ -883,7 +1040,7 @@ describe("attribute dynamic slots", () => {
     openDoc(linkDoc("${state.url}/feed"), ["children", 0]);
     const c = await renderPanel();
     const mode = hrefRow(c).querySelector(".dynamic-slot-mode")!;
-    expect(mode.textContent!.trim()).toBe("${}");
+    expect(mode.textContent!.trim()).toBe("Mixed text");
     const tf = hrefRow(c).querySelector("sp-textfield") as HTMLInputElement;
     expect(tf.value).toBe("${state.url}/feed");
     tf.value = "${state.alt}/feed";
@@ -902,9 +1059,8 @@ describe("attribute dynamic slots", () => {
     );
     const c = await renderPanel();
     const rowEl = section(c, "Form")!.querySelector('[data-prop="required"]')!;
-    const mode = rowEl.querySelector(".dynamic-slot-mode")!;
-    expect(mode).not.toBeNull();
-    pointer(mode, "click");
+    expect(rowEl.querySelector(".dynamic-slot-mode")).not.toBeNull();
+    chooseValueSource(rowEl, "ref");
     expect((docNow().children as JxMutableNode[])[0]!.attributes!.required).toEqual({
       $ref: "#/state/mandatory",
     });
@@ -920,9 +1076,9 @@ describe("attribute dynamic slots", () => {
       ["children", 0],
     );
     let c = await renderPanel();
-    const mode = c.querySelector('[data-prop="textContent"] .dynamic-slot-mode')!;
-    expect(mode).not.toBeNull();
-    pointer(mode, "click");
+    const textRow = c.querySelector('[data-prop="textContent"]')!;
+    expect(textRow.querySelector(".dynamic-slot-mode")).not.toBeNull();
+    chooseValueSource(textRow, "ref");
     expect((docNow().children as JxMutableNode[])[0]!.textContent).toEqual({
       $ref: "#/state/msg",
     });
@@ -1033,7 +1189,7 @@ describe("link-target control", () => {
     const tab = resetWorkspaceWithTab(anchorDoc({ href: "/about/" }) as JxMutableNode, {
       documentPath: "pages/index.json",
     });
-    tab.session.selection = ["children", 0] as never;
+    tab.session.selection = [["children", 0]] as never;
 
     // First pass kicks off the async recursive walk; the route options aren't present yet.
     await renderPanel();
@@ -1055,7 +1211,7 @@ describe("link-target control", () => {
     const tab = resetWorkspaceWithTab(anchorDoc({ href: "/about/" }) as JxMutableNode, {
       documentPath: "pages/index.json",
     });
-    tab.session.selection = ["children", 0] as never;
+    tab.session.selection = [["children", 0]] as never;
     await renderPanel();
     await flush();
 
@@ -1122,7 +1278,7 @@ describe("link-target control", () => {
     const tab = resetWorkspaceWithTab(anchorDoc({ href: "/about/" }) as JxMutableNode, {
       documentPath: "pages/index.json",
     });
-    tab.session.selection = ["children", 0] as never;
+    tab.session.selection = [["children", 0]] as never;
     await renderPanel();
     await flush();
 
@@ -1186,320 +1342,12 @@ describe("custom attributes section", () => {
   });
 });
 
-// ─── Custom element doc sections (root) ───────────────────────────────────────
-
-function widgetDoc(overrides: Record<string, unknown> = {}) {
-  return {
-    attributes: { part: "root" },
-    children: [{ attributes: { part: "icon" }, tagName: "span" }],
-    state: {
-      label: { attribute: "label", default: "x", reflects: true, type: "string" },
-      plain: { default: 1 },
-    },
-    style: { "--accent": "red", color: "blue" },
-    tagName: "my-widget",
-    ...overrides,
-  };
-}
-
-describe("custom element document sections", () => {
-  test("observed attributes lists only state entries with an attribute", async () => {
-    openDoc(widgetDoc(), []);
-    const c = await renderPanel();
-    const observed = section(c, "Observed Attributes")!;
-    expect(observed).not.toBeNull();
-    expect(observed.textContent).toContain("label");
-    expect(observed.textContent).toContain("string");
-    expect(observed.textContent).toContain("reflects");
-    expect(observed.textContent).not.toContain("plain");
-  });
-
-  test("no attribute entries → empty-state hint", async () => {
-    openDoc(widgetDoc({ state: { plain: { default: 1 } } }), []);
-    const c = await renderPanel();
-    expect(section(c, "Observed Attributes")!.textContent).toContain("No attributes declared");
-  });
-
-  test("CSS Properties section lists only custom properties", async () => {
-    openDoc(widgetDoc(), []);
-    const c = await renderPanel();
-    const cssProps = section(c, "CSS Properties")!;
-    expect(cssProps).not.toBeNull();
-    expect(cssProps.textContent).toContain("--accent");
-    expect(cssProps.textContent).toContain("red");
-    expect(cssProps.textContent).not.toContain("blue");
-  });
-
-  test("CSS Properties section is omitted without custom properties", async () => {
-    openDoc(widgetDoc({ style: { color: "blue" } }), []);
-    const c = await renderPanel();
-    expect(section(c, "CSS Properties")).toBeNull();
-  });
-
-  test("CSS Parts section collects part attributes from the tree", async () => {
-    openDoc(widgetDoc(), []);
-    const c = await renderPanel();
-    const parts = section(c, "CSS Parts")!;
-    expect(parts).not.toBeNull();
-    expect(parts.textContent).toContain("root");
-    expect(parts.textContent).toContain("icon");
-    expect(parts.textContent).toContain("span");
-  });
-
-  test("CSS Parts section is omitted when no parts exist", async () => {
-    openDoc(widgetDoc({ attributes: {}, children: [{ tagName: "span" }] }), []);
-    const c = await renderPanel();
-    expect(section(c, "CSS Parts")).toBeNull();
-  });
-
-  test("custom-element sections are omitted for non-root selections", async () => {
-    openDoc(widgetDoc(), ["children", 0]);
-    const c = await renderPanel();
-    expect(section(c, "Observed Attributes")).toBeNull();
-    expect(section(c, "CSS Properties")).toBeNull();
-    expect(section(c, "CSS Parts")).toBeNull();
-    expect(section(c, "Media")).toBeNull();
-  });
-});
-
-// ─── Media breakpoints ────────────────────────────────────────────────────────
-
-describe("media section", () => {
-  test("renders base width and breakpoint rows with friendly names", async () => {
-    openDoc(
-      { $media: { "--": "320px", "--tablet": "(min-width: 768px)" }, children: [], tagName: "div" },
-      [],
-    );
-    const c = await renderPanel();
-    const media = section(c, "Media")!;
-    expect(media).not.toBeNull();
-    const base = media.querySelector(".kv-row input.field-input") as HTMLInputElement;
-    expect(base.value).toBe("320px");
-    // The friendly name lives in the breakpoint name input's value (live directive)
-    const rawLabel = media.querySelector(".bp-raw-label")!;
-    const nameInput = rawLabel.parentElement!.querySelector(
-      "input.field-input",
-    ) as HTMLInputElement;
-    expect(nameInput.value).toBe("Tablet");
-    expect(media.querySelector(".bp-raw-label")!.textContent).toBe("--tablet");
-    expect((media.querySelector(".bp-query-input") as HTMLInputElement).value).toBe(
-      "(min-width: 768px)",
-    );
-  });
-
-  test("✕ deletes the base width and breakpoints", async () => {
-    openDoc(
-      { $media: { "--": "320px", "--tablet": "(min-width: 768px)" }, children: [], tagName: "div" },
-      [],
-    );
-    let c = await renderPanel();
-    const dels = [...section(c, "Media")!.querySelectorAll(".kv-del")];
-    pointer(dels[0]!, "click"); // Base width delete
-    expect((docNow() as any).$media["--"]).toBeUndefined();
-
-    c = await renderPanel();
-    pointer(section(c, "Media")!.querySelector(".kv-del")!, "click"); // Breakpoint delete
-    expect((docNow() as any).$media).toBeUndefined();
-  });
-
-  test("add breakpoint flow: preview, add, and state reset", async () => {
-    openDoc({ children: [], tagName: "div" }, []);
-    let c = await renderPanel();
-    pointer(kvAdd(section(c, "Media")!, "+ Add breakpoint")!, "click");
-    expect(view.showAddBreakpointForm).toBe(true);
-
-    c = await renderPanel();
-    const media = section(c, "Media")!;
-    const nameInput = media.querySelector(
-      'input[placeholder="Name (e.g. Tablet)"]',
-    ) as HTMLInputElement | null;
-    expect(nameInput).not.toBeNull();
-    nameInput!.value = "Wide Screen";
-    nameInput!.dispatchEvent(new Event("input", { bubbles: true }));
-    expect(view.addBreakpointPreview).toBe("--wide-screen");
-
-    const addBtn = [...media.querySelectorAll("button")].find((b) =>
-      b.textContent?.includes("Add"),
-    )!;
-    pointer(addBtn, "click");
-    expect((docNow() as any).$media["--wide-screen"]).toBe("(min-width: 768px)");
-    expect(view.showAddBreakpointForm).toBe(false);
-    expect(view.addBreakpointPreview).toBe("");
-  });
-
-  test("add with an empty name is a no-op and keeps the form open", async () => {
-    openDoc({ children: [], tagName: "div" }, []);
-    view.showAddBreakpointForm = true;
-    const c = await renderPanel();
-    const addBtn = [...section(c, "Media")!.querySelectorAll("button")].find((b) =>
-      b.textContent?.includes("Add"),
-    )!;
-    pointer(addBtn, "click");
-    expect((docNow() as any).$media).toBeUndefined();
-    expect(view.showAddBreakpointForm).toBe(true);
-  });
-
-  test("cancel hides the form without touching the doc", async () => {
-    openDoc({ children: [], tagName: "div" }, []);
-    view.showAddBreakpointForm = true;
-    view.addBreakpointPreview = "--x";
-    const c = await renderPanel();
-    const cancelBtn = [...section(c, "Media")!.querySelectorAll("button")].find((b) =>
-      b.textContent?.includes("Cancel"),
-    )!;
-    pointer(cancelBtn, "click");
-    expect(view.showAddBreakpointForm).toBe(false);
-    expect(view.addBreakpointPreview).toBe("");
-    expect((docNow() as any).$media).toBeUndefined();
-  });
-});
-
-// ─── Page section (site projects) ─────────────────────────────────────────────
-
-function sitePageSetup(layoutFiles = ["base.json", "two.json", "notes.txt"]) {
-  resetStudioState({
-    isSiteProject: true,
-    projectConfig: { defaults: { layout: "./layouts/base.json" } },
-  });
-  installMockPlatform({
-    listDirectory: (async (dir: string) =>
-      dir === "layouts"
-        ? [
-            ...layoutFiles.map((name) => ({ name, type: "file" })),
-            { name: "sub", type: "directory" },
-          ]
-        : []) as never,
-  });
-}
-
-describe("page section", () => {
-  test("loads layout entries async then renders the picker with defaults", async () => {
-    sitePageSetup();
-    const tab = resetWorkspaceWithTab({ children: [], tagName: "div" } as JxMutableNode, {
-      documentPath: "pages/index.json",
-    });
-    tab.session.selection = [] as never;
-
-    let c = await renderPanel();
-    // First pass kicks off the async load; section not yet rendered
-    expect(section(c, "Page")).toBeNull();
-    await flush();
-
-    c = await renderPanel();
-    const page = section(c, "Page")!;
-    expect(page).not.toBeNull();
-    const picker = page.querySelector("sp-picker")!;
-    expect(picker.getAttribute("value")).toBe("__default__");
-    const items = [...page.querySelectorAll("sp-menu-item")].map((m) => m.textContent?.trim());
-    expect(items[0]).toBe("Default (base)");
-    expect(items[1]).toBe("None");
-    expect(items).toContain("base");
-    expect(items).toContain("two");
-    expect(items).not.toContain("notes");
-    expect(items).not.toContain("sub");
-    // Default layout is effective → slot note shown
-    expect(page.textContent).toContain("Wraps page content");
-  });
-
-  test("picker change sets, nulls, and resets $layout", async () => {
-    sitePageSetup();
-    const open = () => {
-      const tab = resetWorkspaceWithTab({ children: [], tagName: "div" } as JxMutableNode, {
-        documentPath: "pages/index.json",
-      });
-      tab.session.selection = [] as never;
-      return tab;
-    };
-    open();
-    await renderPanel();
-    await flush();
-
-    let c = await renderPanel();
-    let picker = section(c, "Page")!.querySelector("sp-picker") as HTMLInputElement;
-    picker.value = "./layouts/two.json";
-    picker.dispatchEvent(new Event("change", { bubbles: true }));
-    expect((docNow() as any).$layout).toBe("./layouts/two.json");
-
-    c = await renderPanel();
-    picker = section(c, "Page")!.querySelector("sp-picker") as HTMLInputElement;
-    expect(picker.getAttribute("value")).toBe("./layouts/two.json");
-    picker.value = "__none__";
-    picker.dispatchEvent(new Event("change", { bubbles: true }));
-    expect((docNow() as any).$layout).toBe(false);
-
-    c = await renderPanel();
-    picker = section(c, "Page")!.querySelector("sp-picker") as HTMLInputElement;
-    expect(picker.getAttribute("value")).toBe("__none__");
-    picker.value = "__default__";
-    picker.dispatchEvent(new Event("change", { bubbles: true }));
-    expect((docNow() as any).$layout).toBeUndefined();
-  });
-
-  test("set-dot resets an explicit layout to the default", async () => {
-    sitePageSetup();
-    const tab = resetWorkspaceWithTab(
-      { $layout: "./layouts/two.json", children: [], tagName: "div" } as never,
-      { documentPath: "pages/index.json" },
-    );
-    tab.session.selection = [] as never;
-    await renderPanel();
-    await flush();
-
-    const c = await renderPanel();
-    pointer(section(c, "Page")!.querySelector('[title="Reset to default"]')!, "click");
-    expect((docNow() as any).$layout).toBeUndefined();
-  });
-
-  test("layout listing failure degrades to an empty list", async () => {
-    resetStudioState({ isSiteProject: true, projectConfig: null });
-    installMockPlatform({
-      listDirectory: (async () => {
-        throw new Error("nope");
-      }) as never,
-    });
-    const tab = resetWorkspaceWithTab({ children: [], tagName: "div" } as JxMutableNode, {
-      documentPath: "./pages/about.json",
-    });
-    tab.session.selection = [] as never;
-    await renderPanel();
-    await flush();
-
-    const c = await renderPanel();
-    const page = section(c, "Page")!;
-    expect(page).not.toBeNull();
-    const items = [...page.querySelectorAll("sp-menu-item")].map((m) => m.textContent?.trim());
-    expect(items).toEqual(["Default", "None"]);
-  });
-
-  test("no Page section for non-page docs or non-site projects", async () => {
-    sitePageSetup();
-    openDoc({ children: [], tagName: "div" }, []); // DocumentPath /project/index.json
-    let c = await renderPanel();
-    await flush();
-    expect(section(c, "Page")).toBeNull();
-
-    resetStudioState({ isSiteProject: false });
-    const tab = resetWorkspaceWithTab({ children: [], tagName: "div" } as JxMutableNode, {
-      documentPath: "pages/index.json",
-    });
-    tab.session.selection = [] as never;
-    c = await renderPanel();
-    await flush();
-    expect(section(c, "Page")).toBeNull();
-  });
-});
-
 // ─── Debounced edits (real timers, consolidated) ──────────────────────────────
 
 describe("debounced edits", () => {
-  test("tag rename, custom attr rename, and media edits commit after their debounce", async () => {
+  test("tag rename and custom attr rename commit after their debounce", async () => {
     openDoc(
       {
-        $media: {
-          "--": "320px",
-          "--desktop": "(min-width: 1200px)",
-          "--tablet": "(min-width: 768px)",
-        },
         attributes: { "data-keep": "old", "data-x": "1" },
         children: [],
         tagName: "div",
@@ -1529,26 +1377,6 @@ describe("debounced edits", () => {
     keepVal.value = "new";
     keepVal.dispatchEvent(new Event("input", { bubbles: true }));
 
-    // Base width (400ms)
-    const media = section(c, "Media")!;
-    const base = media.querySelector(".kv-row input.field-input") as HTMLInputElement;
-    base.value = "375px";
-    base.dispatchEvent(new Event("input", { bubbles: true }));
-
-    // Breakpoint query edit on --desktop (400ms)
-    const queryInputs = [...media.querySelectorAll(".bp-query-input")] as HTMLInputElement[];
-    const desktopQuery = queryInputs.find((q) => q.value.includes("1200"))!;
-    desktopQuery.value = "(min-width: 1440px)";
-    desktopQuery.dispatchEvent(new Event("input", { bubbles: true }));
-
-    // Breakpoint rename Tablet → Phablet (600ms); raw label updates synchronously
-    const rawLabels = [...media.querySelectorAll(".bp-raw-label")];
-    const tabletRow = rawLabels.find((l) => l.textContent === "--tablet")!.parentElement!;
-    const nameInput = tabletRow.querySelector("input.field-input") as HTMLInputElement;
-    nameInput.value = "Phablet";
-    nameInput.dispatchEvent(new Event("input", { bubbles: true }));
-    expect(tabletRow.querySelector(".bp-raw-label")!.textContent).toBe("--phablet");
-
     await sleep(700);
 
     const doc = docNow() as any;
@@ -1556,32 +1384,139 @@ describe("debounced edits", () => {
     expect(doc.attributes["data-x"]).toBeUndefined();
     expect(doc.attributes["data-y"]).toBe("2");
     expect(doc.attributes["data-keep"]).toBe("new");
-    expect(doc.$media["--"]).toBe("375px");
-    expect(doc.$media["--desktop"]).toBe("(min-width: 1440px)");
-    expect(doc.$media["--tablet"]).toBeUndefined();
-    expect(doc.$media["--phablet"]).toBe("(min-width: 768px)");
-  });
-
-  test("switch case rename commits after its 500ms debounce", async () => {
-    openDoc(switchDoc(), ["children", 0, "map"]);
-    const c = await renderPanel();
-    const input = section(c, "Switch")!.querySelector("input.field-input") as HTMLInputElement;
-    input.value = "gamma";
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    await sleep(560);
-    expect(Object.keys((docNow().children as any[])[0].map.cases)).toEqual(["beta", "gamma"]);
   });
 
   test("number prop commits after the number-field debounce", async () => {
     registerCard();
     openDoc(cardDoc(), ["children", 0]);
     const c = await renderPanel();
-    const num = section(c, "Component Props")!.querySelector(
+    const num = section(c, "Component Settings")!.querySelector(
       '[data-prop="count"] sp-number-field',
     ) as HTMLInputElement;
     num.value = "5";
     num.dispatchEvent(new Event("input", { bubbles: true }));
     await sleep(460);
     expect((docNow().children as JxMutableNode[])[0]!.$props!.count).toBe("5");
+  });
+});
+
+describe("the Tag row is a bindable slot like any other", () => {
+  /*
+   * `tagName` may be a literal name or a `TagExpression` choosing between names. It was one
+   * hardcoded textfield, which for a choice rendered `[object Object]` and let the first keystroke
+   * replace the whole expression with whatever was typed. It is now the shared Value Source slot —
+   * the same chip and the same expression editor as `href`, a style declaration or a handler.
+   */
+  const chosen = {
+    $expression: {
+      initial: "div",
+      operator: "?:" as const,
+      target: { $ref: "#/state/href" },
+      value: "a",
+    },
+  };
+  const tagRow = (c: HTMLElement) => c.querySelector('[data-prop="tagName"]')!;
+
+  test("a fixed tag shows Fixed value and a typeable field", async () => {
+    openDoc({ children: [{ children: [], tagName: "section" }], tagName: "x-card" }, [
+      "children",
+      0,
+    ]);
+    const row = tagRow(await renderPanel());
+    expect(row.querySelector(".dynamic-slot-mode")!.textContent!.trim()).toBe("Fixed value");
+    expect((row.querySelector("sp-textfield") as unknown as { value: string }).value).toBe(
+      "section",
+    );
+  });
+
+  test("a chosen tag shows Formula, and never renders the object into a field", async () => {
+    openDoc({ children: [{ children: [], tagName: chosen }], tagName: "x-card" }, ["children", 0]);
+    const row = tagRow(await renderPanel());
+    expect(row.querySelector(".dynamic-slot-mode")!.textContent!.trim()).toBe("Formula");
+    expect(row.textContent).not.toContain("[object Object]");
+  });
+
+  test("the rungs are the two the schema permits — no template rung", async () => {
+    // Derived from `SLOT_POSITION_SCHEMAS.elementTag`, not hand-listed. A `${…}` in tag position is
+    // What the `TagName` pattern exists to reject, so the rung is correctly absent.
+    expect(capsForPosition("elementTag")).toEqual(["literal", "expression"]);
+  });
+});
+
+describe("editing a component definition is not editing an instance of it", () => {
+  /*
+   * A component's own root tag has a hyphen, so the old test — "the tag contains a dash" — said
+   * yes to both. Open the component itself and the panel drew the INSTANCE form over the
+   * definition: fields writing `$props` onto the definition's own root, and a "from the component"
+   * badge whose click opened the document already in front of you.
+   *
+   * The distinguishing fact is whose document this is.
+   */
+  function openAs(documentPath: string) {
+    componentRegistry.length = 0;
+    componentRegistry.push({
+      path: "components/my-card.json",
+      props: [{ default: "Untitled", name: "title", type: "string" }],
+      source: "project",
+      tagName: "my-card",
+    } as never);
+    const tab = resetWorkspaceWithTab({
+      children: [],
+      state: { title: { default: "Untitled", type: "string" } },
+      tagName: "my-card",
+    } as never);
+    tab.documentPath = documentPath;
+    tab.session.selection = [[]] as never;
+    return tab;
+  }
+
+  test("the definition shows DEFAULTS, and offers no jump to itself", async () => {
+    openAs("components/my-card.json");
+    const c = await renderPanel();
+    expect(section(c, "Component Defaults")).not.toBeNull();
+    expect(section(c, "Component Settings")).toBeNull();
+    // "→ Edit definition" from inside the definition is a link to here.
+    expect(c.textContent).not.toContain("Edit definition");
+    // …and the donor badge cannot say "from the component" when it IS the component.
+    expect(c.textContent).not.toContain("the component default");
+  });
+
+  test("an instance keeps the settings form, the donor and the jump", async () => {
+    componentRegistry.length = 0;
+    componentRegistry.push({
+      path: "components/my-card.json",
+      props: [{ default: "Untitled", name: "title", type: "string" }],
+      source: "project",
+      tagName: "my-card",
+    } as never);
+    const tab = resetWorkspaceWithTab({
+      children: [{ children: [], tagName: "my-card" }],
+      tagName: "div",
+    } as never);
+    tab.documentPath = "pages/index.json";
+    tab.session.selection = [["children", 0]] as never;
+    const c = await renderPanel();
+    expect(section(c, "Component Settings")).not.toBeNull();
+    expect(section(c, "Component Defaults")).toBeNull();
+    expect(c.textContent).toContain("Edit definition");
+  });
+
+  test("a default typed in the definition lands on the state entry, not on $props", async () => {
+    const tab = openAs("components/my-card.json");
+    const c = await renderPanel();
+    const field = section(c, "Component Defaults")!.querySelector(
+      "sp-textfield",
+    ) as HTMLInputElement;
+    field.value = "A card";
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+    await new Promise((r) => {
+      setTimeout(r, 450);
+    });
+    const doc = tab.doc.document as JxMutableNode & {
+      state?: Record<string, { default?: unknown }>;
+      $props?: Record<string, unknown>;
+    };
+    expect(doc.state?.title?.default).toBe("A card");
+    expect(doc.$props).toBeUndefined();
   });
 });

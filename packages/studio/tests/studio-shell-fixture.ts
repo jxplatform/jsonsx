@@ -8,6 +8,8 @@
  */
 import { flush, installMockPlatform } from "./harness";
 import { mock } from "bun:test";
+import { notifyModule } from "./notify-mock";
+import { nothing } from "lit-html";
 import type { MockPlatformState } from "./harness";
 import type { StudioPlatform } from "../src/types";
 
@@ -79,11 +81,10 @@ export async function bootStudio(opts: {
   document.body.innerHTML = `
     <div id="app">
       <div id="toolbar"></div>
-      <div id="tab-strip"></div>
+      <div id="pane-grid"></div>
       <div id="activity-bar"></div>
       <div id="left-panel"></div>
       <div id="resize-left" class="resize-handle"></div>
-      <div id="canvas-wrap"></div>
       <div id="resize-right" class="resize-handle"></div>
       <div id="right-panel"></div>
       <div id="statusbar"></div>
@@ -108,14 +109,17 @@ export async function bootStudio(opts: {
   }));
 
   void mock.module("../src/panels/statusbar.ts", () => ({
+    forgetSavedTimes: mock(() => {}),
     mountStatusbar: mock(() => {}),
+    noteDocumentSaved: mock(() => {}),
     renderStatusbar: mock(() => {}),
-    setStatusbarRenderer: mock(() => {}),
-    statusMessage: (msg: string) => {
-      statusMessages.push(msg);
-    },
     unmountStatusbar: mock(() => {}),
   }));
+
+  // Outcomes reach `notify` now; the fixture collects the SENTENCE each one reports.
+  void mock.module("../src/services/notify.ts", () =>
+    notifyModule((call) => statusMessages.push(call.message)),
+  );
 
   void mock.module("../src/panels/toolbar.ts", () => ({
     mount: (_el: HTMLElement, ctx: unknown) => {
@@ -133,25 +137,58 @@ export async function bootStudio(opts: {
   }));
 
   void mock.module("../src/editor/shortcuts.ts", () => ({
-    initShortcuts: (get: () => unknown) => {
+    // The registry is the first argument now; the STAGE-context reader is the second — it takes a
+    // Surface, because a wheel belongs to the stage the pointer is over rather than to the pane
+    // The keyboard is in.
+    initShortcuts: (_registry: unknown, get: () => unknown) => {
       captured.shortcutsGet = get as () => any;
     },
+    // `panels/pane-grid.ts` installs one disposer per cell it builds, so the mock has to carry it
+    // Or the boot fails at import time.
+    installStageGestures: () => () => {},
+    registerStudioCommands: mock(() => {}),
   }));
 
   void mock.module("../src/panels/block-action-bar.ts", () => ({
+    // The bar owns the selection command records, so `panels/layers-panel.ts` imports its verb
+    // Rendering from here too: a mock that stops at the bar's own five exports fails the boot at
+    // Import time ("Export named 'commandIcon' not found"). The registry stub places nothing, so
+    // The row-rendering helpers below are never reached — they exist to satisfy the import.
+    commandIcon: mock(() => nothing),
+    commandTooltip: mock(() => ""),
     dismissBlockActionBar: mock(() => {}),
     dismissLinkPopover: mock(() => {}),
     initBlockActionBar: (ctx: unknown) => {
       captured.blockBarCtx = ctx;
     },
+    // The inline-format family. The bootstrap composes it into the app-wide registry beside the
+    // Structural verbs below — a mock without it fails the boot at import time, which is the same
+    // Lesson the `commandIcon` note above records: this stub tracks the module's EXPORTS, not the
+    // Subset one caller happens to use.
+    formatCommands: mock(() => []),
     isEditChromeTarget: mock(() => false),
+    // The bootstrap composes the bar's structural selection verbs into the app-wide registry so
+    // The palette, the keyboard and `__jxAutomation` can reach them (plan §13.3).
+    registerSelectionCommands: mock(() => {}),
+    releaseBlockActionBar: mock(() => {}),
     renderBlockActionBar: mock(() => {}),
+    runCommand: mock(() => {}),
+    selectionCommandRegistry: () => ({
+      disabledReason: () => {},
+      forPlacement: () => [],
+      keymap: { formatBinding: () => {} },
+    }),
+    showCommandOverflow: mock(() => {}),
+    suppressBlockActionBar: mock(() => {}),
+    withCommandTarget: <T>(_path: unknown, fn: () => T) => fn(),
   }));
 
   void mock.module("../src/canvas/canvas-render.ts", () => ({
+    handOverCanvasStage: mock(() => {}),
     initCanvasRender: (ctx: unknown) => {
       captured.canvasRenderCtx = ctx;
     },
+    registerSelectionSetCommand: mock(() => {}),
     renderCanvas: mock(() => {}),
     renderOverlays: mock(() => {}),
     scheduleCanvasRender: scheduleCanvasRenderMock,

@@ -149,6 +149,7 @@ describe("layers after init", () => {
       const handle = openModal(
         html`<sp-underlay open></sp-underlay>
           <div>settings</div>`,
+        { label: "Settings" },
       );
       expect(isModalOpen()).toBe(true);
       handle.close();
@@ -156,7 +157,7 @@ describe("layers after init", () => {
     });
 
     test("false for a modal-layer body with no underlay (the mouse still gets through)", () => {
-      const handle = openModal(html`<div class="progress">working…</div>`);
+      const handle = openModal(html`<div class="progress">working…</div>`, { label: "Working" });
       expect(isModalOpen()).toBe(false);
       handle.close();
     });
@@ -389,8 +390,20 @@ describe("layers after init", () => {
   });
 
   describe("openModal", () => {
+    /** Dispatch a bubbling key on an element inside the modal body. */
+    function key(el: Element, k: string, shiftKey = false): KeyboardEvent {
+      const event = new KeyboardEvent("keydown", {
+        bubbles: true,
+        cancelable: true,
+        key: k,
+        shiftKey,
+      });
+      el.dispatchEvent(event);
+      return event;
+    }
+
     test("renders into the modal layer, updates, and closes", () => {
-      const handle = openModal(html`<div id="modal-a">one</div>`);
+      const handle = openModal(html`<div id="modal-a">one</div>`, { label: "A" });
       expect(layer("modal").querySelector("#modal-a")).not.toBeNull();
       expect(handle.host.style.pointerEvents).toBe("auto");
       handle.update(html`<div id="modal-b">two</div>`);
@@ -399,6 +412,110 @@ describe("layers after init", () => {
       handle.close();
       expect(layer("modal").querySelector("#modal-b")).toBeNull();
       expect(handle.host.parentElement).toBeNull();
+    });
+
+    test("the wrapper carries role/aria-modal/label so no body can forget them", () => {
+      const handle = openModal(html`<div>body</div>`, { label: "Manage Files" });
+      expect(handle.host.getAttribute("role")).toBe("dialog");
+      expect(handle.host.getAttribute("aria-modal")).toBe("true");
+      expect(handle.host.getAttribute("aria-label")).toBe("Manage Files");
+      handle.close();
+    });
+
+    test("takes the keyboard on open and hands it back to the opener on close", async () => {
+      const opener = document.createElement("button");
+      document.body.append(opener);
+      opener.focus();
+
+      const handle = openModal(
+        html`<button id="modal-first">first</button><button id="modal-second">second</button>`,
+        { label: "Focus" },
+      );
+      await flush();
+      expect(document.activeElement).toBe(layer("modal").querySelector("#modal-first"));
+
+      handle.close();
+      expect(document.activeElement).toBe(opener);
+      opener.remove();
+    });
+
+    test("a body with no focusable content still owns the keyboard", async () => {
+      const handle = openModal(html`<div class="progress">working…</div>`, { label: "Working" });
+      await flush();
+      expect(document.activeElement).toBe(handle.host);
+      // Nothing to cycle to: Tab is swallowed rather than walking into the app behind.
+      expect(key(handle.host, "Tab").defaultPrevented).toBe(true);
+      handle.close();
+    });
+
+    test("Tab and Shift+Tab cycle within the modal", async () => {
+      const handle = openModal(html`<button id="trap-a">a</button><button id="trap-b">b</button>`, {
+        label: "Trap",
+      });
+      await flush();
+      const a = layer("modal").querySelector("#trap-a") as HTMLElement;
+      const b = layer("modal").querySelector("#trap-b") as HTMLElement;
+      expect(document.activeElement).toBe(a);
+
+      expect(key(a, "Tab").defaultPrevented).toBe(true);
+      expect(document.activeElement).toBe(b);
+      // Last → wraps to first.
+      key(b, "Tab");
+      expect(document.activeElement).toBe(a);
+      // First → wraps backwards to last.
+      key(a, "Tab", true);
+      expect(document.activeElement).toBe(b);
+      key(b, "Tab", true);
+      expect(document.activeElement).toBe(a);
+      handle.close();
+    });
+
+    test("disabled controls are skipped by the trap", async () => {
+      const handle = openModal(
+        html`<button id="skip-a">a</button><button id="skip-off" disabled>off</button
+          ><button id="skip-b">b</button>`,
+        { label: "Skip" },
+      );
+      await flush();
+      const a = layer("modal").querySelector("#skip-a") as HTMLElement;
+      key(a, "Tab");
+      expect((document.activeElement as HTMLElement).id).toBe("skip-b");
+      handle.close();
+    });
+
+    test("Escape closes by default and stops the app behind seeing it", async () => {
+      const handle = openModal(html`<button id="esc-btn">x</button>`, { label: "Escapable" });
+      await flush();
+      const event = key(layer("modal").querySelector("#esc-btn") as Element, "Escape");
+      expect(event.defaultPrevented).toBe(true);
+      expect(layer("modal").querySelector("#esc-btn")).toBeNull();
+      expect(handle.host.parentElement).toBeNull();
+    });
+
+    test("Escape runs onDismiss when the call site keeps its own bookkeeping", async () => {
+      const onDismiss = mock(() => {});
+      const handle = openModal(html`<button id="esc-hook">x</button>`, {
+        label: "Hooked",
+        onDismiss,
+      });
+      await flush();
+      key(layer("modal").querySelector("#esc-hook") as Element, "Escape");
+      expect(onDismiss).toHaveBeenCalledTimes(1);
+      // The hook owns closing — the wrapper does not close behind its back.
+      expect(handle.host.parentElement).not.toBeNull();
+      handle.close();
+    });
+
+    test("dismissible:false ignores Escape", async () => {
+      const handle = openModal(html`<button id="esc-no">x</button>`, {
+        dismissible: false,
+        label: "Blocking",
+      });
+      await flush();
+      const event = key(layer("modal").querySelector("#esc-no") as Element, "Escape");
+      expect(event.defaultPrevented).toBe(false);
+      expect(handle.host.parentElement).not.toBeNull();
+      handle.close();
     });
   });
 
@@ -452,12 +569,36 @@ describe("layers after init", () => {
     });
 
     test("dismiss before the rAF tick does not attach a stale listener", async () => {
-      const handle = renderPopover(html`<div id="pop-fast"></div>`);
-      handle.dismiss();
+      const fired: string[] = [];
+      const early = renderPopover(html`<div id="pop-fast"></div>`, {
+        onDismiss: () => fired.push("pop-fast"),
+      });
+      early.dismiss();
+      await new Promise((resolve) => {
+        requestAnimationFrame(() => resolve(null));
+      });
+
+      /* What must be observed is NOT that #pop-fast is gone — `dismiss()` removed it either way,
+         so asserting only that says nothing about the arming. It is that the corpse's listener was
+         never armed: a popover opened afterwards must survive a mousedown INSIDE itself, and the
+         dead popover's `onDismiss` must not run. Otherwise the corpse answers that mousedown by
+         nulling its owner's handle field, and the live popover is stranded with nothing left that
+         can dismiss it. */
+      const live = renderPopover(html`<div id="pop-live"></div>`, {
+        onDismiss: () => fired.push("pop-live"),
+      });
+      await new Promise((resolve) => {
+        requestAnimationFrame(() => resolve(null));
+      });
+      (live.host.querySelector("#pop-live") as HTMLElement).dispatchEvent(
+        new MouseEvent("mousedown", { bubbles: true }),
+      );
       await flush();
-      // No listener should remain; an outside mousedown must not throw or re-dismiss.
-      document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+
+      expect(fired).toEqual([]);
       expect(layer("popover").querySelector("#pop-fast")).toBeNull();
+      expect(layer("popover").querySelector("#pop-live")).not.toBeNull();
+      live.dismiss();
     });
   });
 

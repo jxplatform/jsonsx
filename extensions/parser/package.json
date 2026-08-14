@@ -50,8 +50,8 @@
   "dependencies": {
     "@jxsuite/markup": "workspace:^",
     "@jxsuite/schema": "workspace:^",
-    "@shikijs/langs": "^4.3.1",
-    "@shikijs/themes": "^4.3.1",
+    "@shikijs/langs": "^4.4.3",
+    "@shikijs/themes": "^4.4.3",
     "glob": "^13.0.6",
     "mdast-util-to-string": "^4.0.0",
     "remark-directive": "^4.0.0",
@@ -60,13 +60,13 @@
     "remark-parse": "^11.0.0",
     "remark-parse-frontmatter": "^1.0.3",
     "remark-stringify": "^11.0.0",
-    "shiki": "^4.3.1",
+    "shiki": "^4.4.3",
     "unified": "^11.0.5",
     "unist-util-visit": "^5.1.0",
     "yaml": "^2.9.0"
   },
   "devDependencies": {
-    "@happy-dom/global-registrator": "^20.11.1",
+    "@happy-dom/global-registrator": "^20.11.2",
     "@jxsuite/runtime": "workspace:^",
     "@types/mdast": "^4.0.4",
     "ajv": "^8.20.0"

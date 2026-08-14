@@ -3,6 +3,7 @@
 import { flush, stubRect } from "./harness";
 import { describe, expect, mock, test } from "bun:test";
 import { render } from "lit-html";
+import { emittedClassesOf, inlineStyledOwn, unstyledClassesOf } from "./styled-surface";
 import { extractInstruction } from "@atlaskit/pragmatic-drag-and-drop-hitbox/tree-item";
 import {
   laneListAt,
@@ -10,6 +11,12 @@ import {
   statementKind,
   withLaneList,
 } from "../src/panels/statement-editor";
+import {
+  NAVIGATOR_STATEMENTS_REGION,
+  inspectorStatementsRegion,
+  resolveAllRegions,
+  resolveRegion,
+} from "../src/ui/regions";
 
 import type { JxStatement } from "@jxsuite/schema/types";
 
@@ -47,7 +54,11 @@ void mock.module("@atlaskit/pragmatic-drag-and-drop/element/disable-native-drag-
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const DEFAULT_OPTS = { allowEventRef: true, stateDefs: ["count", "items"] };
+const DEFAULT_OPTS = {
+  allowEventRef: true,
+  region: "navigator/statements",
+  stateDefs: ["count", "items"],
+};
 
 function mount(statements: JxStatement[], opts: Record<string, unknown> = {}) {
   const changes: JxStatement[][] = [];
@@ -261,9 +272,77 @@ describe("renderStatementEditor structure", () => {
     const { container } = mount([{ if: { $ref: "#/state/count" }, then: [] }]);
     const lists = [...container.querySelectorAll(".statement-list")];
     expect(lists.length).toBe(2);
+    // The connector, the indent and the card frame are `.statement-list` / `.statement-card` rules
+    // In styles/inspector.css — asserted as the class, because the rule is not in the markup.
     for (const list of lists) {
-      expect(list.getAttribute("style")).toContain("border-left");
+      expect(list.getAttribute("style")).toBeNull();
     }
+  });
+});
+
+// ─── The layout is a stylesheet's, not an attribute's ────────────────────────
+
+describe("every surface is addressable by CSS", () => {
+  /*
+   * The Logic tab shipped with no stylesheet at all: twenty class names in check-styles.ts's
+   * ALLOWED_ORPHANS and a handful of inline `style="display:flex;…"` attributes doing the layout.
+   * An attribute cannot carry `min-width: 0`, and a flex item's automatic minimum is its
+   * min-content width, so an operand row asking for a 112px picker + a 56px picker + a Spectrum
+   * field simply refused to shrink: in a 280px Inspector the Operator, Target and Value controls
+   * were clipped by the right edge of the WINDOW.
+   *
+   * Under happy-dom nothing lays out, so these tests assert the two things that DO decide it — the
+   * class is on the element, and the element carries no inline style to outrank the stylesheet.
+   * The pixels were checked in Chrome instead, in the Navigator's State panel at 180 / 240 / 280 /
+   * 420 / 600px: from 240px up, no descendant's right edge passes the panel's, and the operand rows
+   * that sit side by side at 600px are stacked at 240px. Below ~200px the panel overflows already,
+   * at `sp-accordion-item`, with these editors hidden — the signals panel's own rows, not this.
+   */
+  const EVERY_KIND: JxStatement[] = [
+    { operator: "=", target: { $ref: "#/state/count" }, value: 1 },
+    { else: [], if: { $ref: "#/state/count" }, then: [{ dispatchEvent: "x" }] },
+    { $switch: { $ref: "#/state/count" }, cases: { a: [] }, default: [] },
+    { dispatchEvent: "saved" },
+  ];
+
+  test("no element the editor names carries an inline style attribute", async () => {
+    const { container } = mount(EVERY_KIND);
+    const own = await emittedClassesOf("src/panels/statement-editor.ts");
+    expect(inlineStyledOwn(container, own)).toEqual([]);
+  });
+
+  test("the card, its header and its body are all named", () => {
+    const { container } = mount([{ dispatchEvent: "x" }]);
+    const card = cards(container)[0]!;
+    expect(card.querySelector(".statement-card-header")).toBeTruthy();
+    expect(card.querySelector(".statement-card-body")).toBeTruthy();
+    // The delete button is pushed right by `margin-left: auto`, not by a spacer element.
+    expect(card.querySelector(".statement-card-header > span:not([class])")).toBeNull();
+  });
+
+  test("a lane's label is a class, and a case key is a field inside it", () => {
+    const { container } = mount([
+      { $switch: { $ref: "#/state/count" }, cases: { a: [] }, default: [] },
+    ]);
+    const labels = [...container.querySelectorAll(".statement-lane-label")];
+    expect(labels.length).toBe(2);
+    // The case key lives INSIDE the label slot, so it resets the label's uppercase itself —
+    // Inherited properties cross the shadow boundary and `case 1` rendered as `CASE 1`.
+    expect(labels[0]!.querySelector(".statement-case-key")).toBeTruthy();
+    expect(labels[1]!.textContent!.trim()).toBe("Default");
+  });
+
+  test("the dispatch options row is one wrapping container, not a bare flex attribute", () => {
+    const { container } = mount([{ dispatchEvent: "x" }]);
+    const options = container.querySelector(".statement-dispatch-options")!;
+    expect(options.querySelector(".statement-dispatch-bubbles")).toBeTruthy();
+    expect(options.querySelector(".statement-dispatch-composed")).toBeTruthy();
+  });
+
+  test("every class the editor emits is one a stylesheet defines", async () => {
+    // The ratchet, at the level that matters to this panel: check-styles.ts fails on a new orphan
+    // Anywhere and reports a count; this fails on one introduced HERE, and names it.
+    expect(await unstyledClassesOf("src/panels/statement-editor.ts")).toEqual([]);
   });
 });
 
@@ -650,5 +729,103 @@ describe("drag reorder", () => {
       { dispatchEvent: "x" },
       { dispatchEvent: "y" },
     ]);
+  });
+});
+
+// ─── The editor has two hosts, so it may not name one ─────────────────────────
+
+describe("the region id names the HOST, not the control", () => {
+  /*
+   * `renderStatementEditor` hard-stamped `data-jx-region="navigator/statements"` on itself, and it
+   * has two hosts that can be open at the same time: the Navigator's State panel
+   * (`panels/signals-panel.ts`) and the INSPECTOR's Events tab (`panels/events-panel.ts`).
+   * `resolveRegion` takes the LAST match in document order and `#right-panel` follows
+   * `#left-panel`, so the id resolved to the Inspector's editor while saying Navigator — and the
+   * `statement-editor` shot cropped a control in the wrong dock.
+   *
+   * The verdict is the one `ui/regions.ts`'s `DERIVED_RESOLVERS` already records for the media
+   * picker's Browse button: an id claiming a surface the element is not in is not a pane-scoping
+   * problem, it is a wrong id.
+   */
+  function bothDocks() {
+    document.body.innerHTML = `<div id="app"><div id="left-panel"></div><div id="right-panel"></div></div>`;
+    const stmts: JxStatement[] = [{ operator: "=", target: { $ref: "#/state/count" }, value: 1 }];
+    render(
+      renderStatementEditor(stmts, () => {}, {
+        ...DEFAULT_OPTS,
+        region: NAVIGATOR_STATEMENTS_REGION,
+      } as never),
+      document.querySelector("#left-panel")!,
+    );
+    render(
+      renderStatementEditor(stmts, () => {}, {
+        ...DEFAULT_OPTS,
+        region: inspectorStatementsRegion("onClick"),
+      } as never),
+      document.querySelector("#right-panel")!,
+    );
+  }
+
+  test("with both editors open, each id resolves to exactly one, in its own dock", () => {
+    bothDocks();
+
+    const navigator = resolveAllRegions(NAVIGATOR_STATEMENTS_REGION);
+    const inspector = resolveAllRegions(inspectorStatementsRegion("onClick"));
+    console.log(
+      `[statement-editor] both docks open: navigator/statements → ${navigator.length} element(s), ` +
+        `inspector/statements:onClick → ${inspector.length}`,
+    );
+    expect(navigator).toHaveLength(1);
+    expect(inspector).toHaveLength(1);
+    // The shot's id crops the NAVIGATOR's editor — the one the docs page is about.
+    expect(resolveRegion(NAVIGATOR_STATEMENTS_REGION)!.closest("#left-panel")).not.toBeNull();
+    expect(
+      resolveRegion(inspectorStatementsRegion("onClick"))!.closest("#right-panel"),
+    ).not.toBeNull();
+  });
+
+  /*
+   * The Inspector's Events tab draws ONE of these per structured handler on the selected node, so a
+   * constant `inspector/statements` was unique only while a node had a single handler. Two handlers
+   * made two elements answer to it and `resolveRegion` took the second — the same defect the
+   * Navigator/Inspector split closed, one level further in.
+   */
+  test("two handlers on one node are two ids, each resolving to its own editor", () => {
+    document.body.innerHTML = `<div id="app"><div id="right-panel"></div></div>`;
+    const host = document.querySelector("#right-panel")!;
+    const stmts: JxStatement[] = [{ operator: "=", target: { $ref: "#/state/count" }, value: 1 }];
+    for (const evKey of ["onClick", "onInput"]) {
+      const slot = document.createElement("div");
+      host.append(slot);
+      render(
+        renderStatementEditor(stmts, () => {}, {
+          ...DEFAULT_OPTS,
+          region: inspectorStatementsRegion(evKey),
+        } as never),
+        slot,
+      );
+    }
+    const clickEditors = resolveAllRegions(inspectorStatementsRegion("onClick"));
+    const inputEditors = resolveAllRegions(inspectorStatementsRegion("onInput"));
+    console.log(
+      `[statement-editor] two handlers: inspector/statements:onClick → ${clickEditors.length}, ` +
+        `inspector/statements:onInput → ${inputEditors.length}`,
+    );
+    expect(clickEditors).toHaveLength(1);
+    expect(inputEditors).toHaveLength(1);
+    expect(clickEditors[0]).not.toBe(inputEditors[0]);
+  });
+
+  test("a third host cannot appear without naming itself", () => {
+    // `region` is required on `StatementEditorOpts`, so the stamp is whatever the host said and
+    // Nothing else. There is no default to fall back to being wrong about.
+    const container = document.createElement("div");
+    render(
+      renderStatementEditor([], () => {}, { ...DEFAULT_OPTS, region: "dock.bottom/statements" }),
+      container,
+    );
+    expect((container.querySelector(".statement-editor") as HTMLElement).dataset.jxRegion).toBe(
+      "dock.bottom/statements",
+    );
   });
 });

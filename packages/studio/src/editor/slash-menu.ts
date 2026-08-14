@@ -174,6 +174,7 @@ function render(showFilter: boolean) {
     html`
       <sp-popover
         open
+        data-jx-region="overlay.menu:slash-menu"
         ${ref((el) => {
           _popoverEl = (el as HTMLElement | undefined) || null;
         })}

@@ -38,6 +38,7 @@ import type {
   ProjectListEntry,
   ProjectSchemasResponse,
   RecentProjectEntry,
+  ReferencesResult,
   RenameResult,
   SecretsSetRequest,
   SecretsSetResponse,
@@ -85,6 +86,9 @@ export type {
   ProjectSchemasResponse,
   PullRequestInfo,
   RecentProjectEntry,
+  ReferenceFile,
+  ReferenceHit,
+  ReferencesResult,
   RenameResult,
   SecretsListResponse,
   SecretsSetRequest,
@@ -130,6 +134,28 @@ export type CreateProjectDestination =
   | { kind: "path"; parent: string }
   | { kind: "repo"; owner: string; repo: string; private: boolean };
 
+/**
+ * What a site build reports back.
+ *
+ * `errors` is a list rather than a thrown exception because a partial build still produced pages:
+ * the author is better served by opening the page they asked for with the failures named beside it
+ * than by a refusal that says only that something went wrong.
+ */
+export interface SiteBuildResult {
+  routes: number;
+  files: number;
+  errors: string[];
+  /**
+   * Origin the built site is browsable at, e.g. `http://127.0.0.1:41234`.
+   *
+   * The backend names it because only the backend knows it: the built site is served on a port of
+   * its own, not on the editor's, since the editor's paths mean the project's SOURCES and a built
+   * page means its own output by the very same paths. Absent when the backend serves no preview,
+   * and `View: Open in Browser` then says so rather than guessing an origin.
+   */
+  url?: string;
+}
+
 export interface StudioPlatform {
   id: string;
   projectRoot: string;
@@ -167,6 +193,20 @@ export interface StudioPlatform {
   uploadFile: (path: string, data: string | File | Blob | ArrayBuffer) => Promise<unknown>;
   deleteFile: (path: string) => Promise<void>;
   renameFile: (from: string, to: string) => Promise<RenameResult>;
+  /**
+   * Where a file or a component tag is used across the project — the read side of the same walker
+   * `renameFile` writes through. Backs `capability.findReferences`, and with it the inspector's
+   * "Used on N pages", `Selection: Find Usages`, and the reference count inside every delete and
+   * rename confirmation.
+   *
+   * Optional so a backend without the route hides those three renderings rather than reporting a
+   * confident zero — the one answer a destructive dialog must never invent. Every shipped host
+   * implements it: the walker lives in `@jxsuite/server`, which desktop and cloud both run.
+   *
+   * At least one of `path` / `tagName` must be given. A `path` naming a component document
+   * contributes its own root tag, so one call answers "as a file AND as an element" together.
+   */
+  findReferences?: (target: { path?: string; tagName?: string }) => Promise<ReferencesResult>;
   createDirectory: (path: string) => Promise<void>;
   /**
    * Subscribe to backend filesystem change events for the active project. Returns an unsubscribe
@@ -266,6 +306,15 @@ export interface StudioPlatform {
   gitDiscard: (files: string[]) => Promise<void>;
   gitClone?: (url: string) => Promise<{ ok: boolean; root: string }>;
   gitInit: () => Promise<void>;
+  /**
+   * Build the site to its output directory, so a reader opens what the author is looking at.
+   *
+   * `View: Open in Browser` runs this first and reports what it says. Optional because it is a
+   * capability, not an assumption: a backend that cannot build (a read-only cloud viewer) simply
+   * does not declare it, and the command says so rather than opening whatever stale output the last
+   * build happened to leave — which for most projects is nothing at all.
+   */
+  buildSite?: () => Promise<SiteBuildResult>;
   gitAddRemote: (name: string, url: string) => Promise<void>;
   /**
    * How the New Project modal collects a destination, and which `CreateProjectDestination` variant
@@ -321,8 +370,23 @@ export interface StudioPlatform {
   /** Stack B AI assistant: URL of the OpenAI-compatible SSE chat proxy (`/__studio/ai/chat`). */
   aiChatUrl: () => string | Promise<string>;
   // ─── Multi-window (desktop only; undefined on dev-server) ───────────────────
-  /** Open a project in a new window, focusing an existing window if it is already open. */
-  openProjectInNewWindow?: (root: string) => Promise<void>;
+  /**
+   * Open a project in a new window, focusing an existing window if it is already open.
+   *
+   * `focused` says which of the two happened, so the caller reports the outcome instead of
+   * announcing the intent — "opened in a new window" is a lie when the project was already open
+   * somewhere and that window merely came to the front.
+   */
+  openProjectInNewWindow?: (root: string) => Promise<{ focused: boolean }>;
+  /**
+   * Pick a project WITHOUT binding this window to it — the answer to "which project", separated
+   * from the act of opening it here. Backs the New Window branch of Open Project: `openProject()`
+   * re-roots this window's backend as a side effect of picking, so it cannot ask a question whose
+   * answer is "not in this window". Resolves null when the user cancels the picker.
+   *
+   * Desktop only. Without it Studio does not offer the choice, because it could not honour it.
+   */
+  pickProject?: () => Promise<{ root: string; name: string } | null>;
   /** Open a fresh welcome window. */
   newWindow?: () => Promise<void>;
   /**
@@ -444,15 +508,6 @@ export interface CanvasPanel {
   renderScope: { stop: () => void; run: <T>(fn: () => T) => T | undefined } | null;
 }
 
-export interface DocumentStackEntry {
-  document: JxMutableNode;
-  documentPath: string | null;
-  selection: JxPath | null;
-  dirty?: boolean;
-  mode?: string;
-  sourceFormat?: string | null;
-}
-
 export interface FunctionEditDef {
   type: string;
   defName?: string;
@@ -464,8 +519,8 @@ export interface FunctionEditDef {
 }
 
 /**
- * Identifies which document position's `$expression` the full-screen formula workspace is editing:
- * a state entry (`type: "def"` + defName) or an element event binding (`type: "event"` + path +
+ * Identifies which document position's `$expression` the Bottom dock's Logic tab is editing: a
+ * state entry (`type: "def"` + defName) or an element event binding (`type: "event"` + path +
  * eventKey). Mirrors FunctionEditDef, the Monaco function editor's target shape.
  */
 export interface FormulaEditDef {

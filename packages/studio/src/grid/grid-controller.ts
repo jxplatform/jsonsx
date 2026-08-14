@@ -13,18 +13,21 @@
  */
 import { effect, onScopeDispose, reactive, toRaw } from "../reactivity";
 import { getPlatform } from "../platform";
+import { notify } from "../services/notify";
 import { setHistoryDelegate } from "../tabs/transact";
 import { isRecentLocal } from "../files/fs-events";
-import { statusMessage } from "../panels/statusbar";
 import { showConfirmDialog } from "../ui/layers";
 import { showProgressModal } from "../ui/progress-modal";
 import { errorMessage } from "@jxsuite/schema/parse";
 import { createEditBuffer } from "./edit-buffer";
+import { cellToText } from "./schema-columns";
 import type { EditBuffer } from "./edit-buffer";
+import type { GridSortSpec } from "./grid-layout";
 import type {
   CommitResult,
   GridCellValue,
   GridColumn,
+  GridColumnKind,
   GridEditBatch,
   GridQuery,
   GridRow,
@@ -41,6 +44,21 @@ export interface GridControllerState {
   saving: boolean;
   error: string | null;
   query: GridQuery;
+  /**
+   * The field whose value gathers rows into contiguous groups, or null.
+   *
+   * Grouping is a ROW ORDER, not a second data set: {@link GridController.effectiveRows} emits the
+   * groups back to back in first-appearance order, so every layer above — the engine, the
+   * clipboard, Fill Down — sees one list and needs to know nothing about groups.
+   */
+  grouping: string | null;
+}
+
+/** One group of the current grouping, in the order {@link GridController.effectiveRows} emits them. */
+export interface GridGroup {
+  /** The group field's text value; `""` for rows where it is empty. */
+  value: string;
+  count: number;
 }
 
 /** What the engine wrapper exposes back to the controller for out-of-band data changes. */
@@ -60,6 +78,20 @@ export interface GridController {
   save: () => Promise<void>;
   /** Query change (connector paging/sorting) — reloads rows. */
   setQuery: (query: GridQuery) => Promise<void>;
+  /**
+   * Set (or clear) the row order.
+   *
+   * ONE sort contract for every source. `GridQuery.orderBy`/`dir` has always been the way a source
+   * is asked for an order, and a remote-sorting source still answers it by reloading; a source that
+   * does not sort remotely is now sorted here instead of the query being silently ignored, which is
+   * what let a saved view record a sort nothing applied. A header click in the engine is a
+   * separate, ad-hoc re-sort of what is already loaded and is deliberately not captured by a view.
+   */
+  setSort: (sort: GridSortSpec | null) => Promise<void>;
+  /** Group rows contiguously by a field's value, or ungroup with null. */
+  setGrouping: (field: string | null) => void;
+  /** The groups the current grouping produces, in emitted order. Empty when ungrouped. */
+  groups: () => GridGroup[];
   /** Plain row objects (committed + pending overlay + pending inserts) for the grid engine. */
   effectiveRows: () => Record<string, GridCellValue>[];
   /** Current file text including pending edits, for source-mode display (file grids only). */
@@ -91,6 +123,7 @@ export function createGridController(tab: Tab, source: GridSource): GridControll
   const state: GridControllerState = reactive({
     columns: [] as GridColumn[],
     error: null as string | null,
+    grouping: null as string | null,
     loading: false,
     query: {} as GridQuery,
     rows: [] as GridRow[],
@@ -138,6 +171,64 @@ export function createGridController(tab: Tab, source: GridSource): GridControll
       return null;
     }
     return { cells, deletes: [], inserts };
+  };
+
+  // ─── Row order: grouping first, then sort ───────────────────────────────────
+
+  /** Whether a cell has nothing in it. Blanks sort LAST in both directions — a hole is not a value. */
+  const isBlank = (value: GridCellValue) =>
+    value === null || value === "" || (Array.isArray(value) && value.length === 0);
+
+  const compareCells = (a: GridCellValue, b: GridCellValue, kind: GridColumnKind | undefined) => {
+    if (kind === "number") {
+      return (typeof a === "number" ? a : 0) - (typeof b === "number" ? b : 0);
+    }
+    if (kind === "boolean") {
+      return (a === true ? 1 : 0) - (b === true ? 1 : 0);
+    }
+    return cellToText(a).localeCompare(cellToText(b));
+  };
+
+  /**
+   * Committed row keys in display order: grouped, then sorted within each group.
+   *
+   * Sorting is skipped for a source that sorts remotely — it already answered the query, and
+   * re-sorting its answer locally would reorder one PAGE of a result set by a rule the other pages
+   * were not subject to. Pending inserts are never in here: a row you just added stays at the
+   * bottom where you added it, rather than sorting itself out of sight while you are still typing
+   * into it.
+   */
+  const orderedKeys = (): string[] => {
+    let keys = state.rows.map((row) => row.key);
+    const { dir, orderBy } = state.query;
+    if (orderBy && !source.capabilities.remoteSort) {
+      const kind = state.columns.find((column) => column.field === orderBy)?.kind;
+      const sign = dir === "desc" ? -1 : 1;
+      keys = keys.toSorted((ka, kb) => {
+        const a = buffer.effectiveValue(ka, orderBy);
+        const b = buffer.effectiveValue(kb, orderBy);
+        if (isBlank(a) !== isBlank(b)) {
+          return isBlank(a) ? 1 : -1;
+        }
+        return sign * compareCells(a, b, kind);
+      });
+    }
+    return state.grouping ? [...groupBuckets(keys).values()].flat() : keys;
+  };
+
+  /** Group key → row keys, in first-appearance order. Called only when `state.grouping` is set. */
+  const groupBuckets = (keys: string[]): Map<string, string[]> => {
+    const buckets = new Map<string, string[]>();
+    for (const key of keys) {
+      const value = cellToText(buffer.effectiveValue(key, state.grouping!));
+      const bucket = buckets.get(value);
+      if (bucket) {
+        bucket.push(key);
+      } else {
+        buckets.set(value, [key]);
+      }
+    }
+    return buckets;
   };
 
   let viewBinding: GridViewBinding | null = null;
@@ -217,11 +308,21 @@ export function createGridController(tab: Tab, source: GridSource): GridControll
         }
         return cells;
       };
-      const rows = state.rows.map((row) => rowObject(row.key));
+      const rows = orderedKeys().map((key) => rowObject(key));
       for (const [tempKey] of buffer.state.inserts) {
         rows.push(rowObject(tempKey));
       }
       return rows;
+    },
+
+    groups() {
+      if (!state.grouping) {
+        return [];
+      }
+      return [...groupBuckets(orderedKeys())].map(([value, keys]) => ({
+        count: keys.length,
+        value,
+      }));
     },
 
     async load() {
@@ -261,13 +362,17 @@ export function createGridController(tab: Tab, source: GridSource): GridControll
       const batch = buffer.buildBatch();
       const changeCount = batch.cells.length + batch.inserts.length + batch.deletes.length;
       if (changeCount === 0) {
-        statusMessage("No grid changes to save");
+        notify.info("No grid changes to save.", { key: "grid.save" });
         return;
       }
       const violations = requiredViolations(batch);
       if (violations) {
         buffer.applyCommitResult(violations);
-        statusMessage("Required cells are empty — fix the marked rows and save again", 5000);
+        notify.warn("Required cells are empty — fix the marked rows, then save again.", {
+          key: "grid.save",
+          source: "Data",
+          tier: "problem",
+        });
         return;
       }
       if (batch.deletes.length > 0) {
@@ -316,14 +421,22 @@ export function createGridController(tab: Tab, source: GridSource): GridControll
         const failed = changeCount - okCount;
         const staleCount =
           result.cells.filter((r) => r.stale).length + result.deletes.filter((r) => r.stale).length;
-        statusMessage(
-          failed === 0
-            ? `Saved ${okCount} change(s)`
-            : `Saved ${okCount} · ${failed} failed${staleCount ? ` (${staleCount} stale)` : ""} — kept pending`,
-          failed === 0 ? 3000 : 6000,
-        );
+        if (failed === 0) {
+          notify.success(`Saved ${okCount} change(s).`, { key: "grid.save" });
+        } else {
+          // A partial commit leaves rows pending on disk: a state to fix, not a line to read.
+          notify.error(
+            `Saved ${okCount} · ${failed} failed${staleCount ? ` (${staleCount} stale)` : ""} — kept pending.`,
+            { action: "file.save", key: "grid.save", source: "Data" },
+          );
+        }
       } catch (error) {
-        statusMessage(`Save error: ${errorMessage(error)}`, 6000);
+        notify.error("Could not save the grid.", {
+          action: "file.save",
+          detail: errorMessage(error),
+          key: "grid.save",
+          source: "Data",
+        });
       } finally {
         state.saving = false;
         progress?.done();
@@ -349,6 +462,30 @@ export function createGridController(tab: Tab, source: GridSource): GridControll
         state.loading = false;
       }
       syncView();
+    },
+
+    setGrouping(field: string | null) {
+      state.grouping = field;
+      syncView();
+    },
+
+    async setSort(sort: GridSortSpec | null) {
+      const query: GridQuery = { ...state.query };
+      if (sort) {
+        query.orderBy = sort.field;
+        query.dir = sort.dir;
+      } else {
+        delete query.orderBy;
+        delete query.dir;
+      }
+      // A local sort is a reordering of rows already in hand: reloading would re-walk a directory
+      // Or re-parse a file to receive the same rows back in the same order.
+      if (!source.capabilities.remoteSort) {
+        state.query = query;
+        syncView();
+        return;
+      }
+      await this.setQuery(query);
     },
 
     source,
@@ -396,7 +533,10 @@ export function createGridController(tab: Tab, source: GridSource): GridControll
         if (buffer.isDirty()) {
           const keys = hitKeys.has("*") ? state.rows.map((row) => row.key) : [...hitKeys];
           buffer.markStale(keys);
-          statusMessage("Grid rows changed on disk — marked stale (refresh to reload)", 5000);
+          notify.warn("Grid rows changed on disk — marked stale; refresh to reload.", {
+            key: "grid.stale",
+            source: "Data",
+          });
           syncView();
         } else {
           void controller.refresh();

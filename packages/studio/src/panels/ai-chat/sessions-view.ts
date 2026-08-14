@@ -3,13 +3,21 @@
  * Sessions-view.js — the full-pane chat history list (VSCode-Copilot style).
  *
  * Renders the session rows (title, relative time, message count) with per-row delete,
- * a header with a New Chat action, and an empty state. Pure template functions — all
- * state and storage live in ai-panel / document-assistant.
+ * a header with a New Chat action, and an empty state. State and storage live in
+ * ai-panel / document-assistant; the row callbacks address ONE session each, which is
+ * why they stay callbacks.
+ *
+ * New Chat is the exception, and it is `assistant.newChat` — the same record the chat
+ * header runs ({@link commandButton}). The two headers draw the same button, so a
+ * second definition site is exactly how they would come to disagree about its name, its
+ * chord, or when it is offered.
  *
  * @license MIT
  */
 
 import { html } from "lit-html";
+import { now } from "../../services/clock";
+import { commandButton } from "./chat-view";
 import type { TemplateResult } from "lit-html";
 import type { SessionMeta } from "../../services/ai-session-store";
 
@@ -22,11 +30,11 @@ const DAY = 24 * HOUR;
  * date.
  *
  * @param {number} ts
- * @param {number} [now]
+ * @param {number} [at] Epoch milliseconds to measure against; defaults to the {@link now} seam.
  * @returns {string}
  */
-export function relativeTime(ts: number, now: number = Date.now()): string {
-  const delta = Math.max(0, now - ts);
+export function relativeTime(ts: number, at: number = now()): string {
+  const delta = Math.max(0, at - ts);
   if (delta < MINUTE) {
     return "just now";
   }
@@ -49,7 +57,6 @@ export interface SessionsListOptions {
   sessions: SessionMeta[];
   onOpen: (id: string) => void;
   onDelete: (id: string) => void;
-  onNew: () => void;
 }
 
 function renderRow(s: SessionMeta, opts: SessionsListOptions): TemplateResult {
@@ -84,10 +91,10 @@ export function renderSessionsList(opts: SessionsListOptions): TemplateResult {
     <div class="ai-chat-header">
       <span class="ai-chat-title">Chats</span>
       <span class="ai-header-spacer"></span>
-      <sp-action-button size="s" quiet title="New chat" @click=${opts.onNew}>
-        <sp-icon-add slot="icon"></sp-icon-add>
-        New Chat
-      </sp-action-button>
+      ${commandButton("assistant.newChat", {
+        content: html`<sp-icon-add slot="icon"></sp-icon-add>New Chat`,
+        quiet: true,
+      })}
     </div>
     <div class="ai-sessions">
       ${

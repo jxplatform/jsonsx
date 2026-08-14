@@ -165,6 +165,36 @@ export const EDIT_PLACEHOLDER_CSS = `
   font-size: 13px;
   pointer-events: none;
 }
+[data-jx-layout-region] {
+  position: relative;
+  opacity: 0.5;
+  transition: opacity 120ms ease;
+}
+[data-jx-layout-region]:hover {
+  opacity: 0.85;
+  outline: 1px dashed color-mix(in srgb, #808080 55%, transparent);
+  outline-offset: -1px;
+}
+[data-jx-layout-region] [data-jx-layout-region] {
+  opacity: 1;
+}
+[data-jx-layout-region]::before {
+  content: "LAYOUT \\00B7 " attr(data-jx-layout-file);
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  padding: 1px 5px;
+  border-radius: 0 0 3px 0;
+  background: color-mix(in srgb, #808080 78%, transparent);
+  color: #fff;
+  font: 700 9px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+}
+[data-jx-layout-region] [data-jx-layout-region]::before {
+  content: none;
+}
 `;
 
 /**
@@ -185,6 +215,22 @@ export function syncEditModeCss(doc: Document, mode: CanvasMode): void {
   style.id = EDIT_PLACEHOLDER_STYLE_ID;
   style.textContent = EDIT_PLACEHOLDER_CSS;
   doc.head.append(style);
+}
+
+/**
+ * Flag the canvas document as a preview shell, so `canvas.html`'s preview rules apply.
+ *
+ * The document's default box is built for EDITING: `html, body { overflow: hidden }`, because the
+ * host grows the iframe to its content height there and the parent canvas is what pans. Preview
+ * inverts that — the frame stays at the pane's height and the document scrolls itself — and until
+ * this existed nothing turned the clipping off, so preview showed the first screenful of every page
+ * and no more. An attribute rather than an injected stylesheet: the rules it switches live beside
+ * the ones they override, which is where a reader looks for them.
+ *
+ * Called on every render because one iframe is reused across modes.
+ */
+export function syncPreviewShell(doc: Document, mode: CanvasMode): void {
+  doc.documentElement.toggleAttribute("data-jx-preview", mode === "preview");
 }
 
 /**
@@ -429,7 +475,10 @@ export function injectHead(doc: JxDocument): void {
   }
 }
 
-/** Build the `onNodeCreated` hook that stamps `data-jx-path` / `data-jx-layout` on rendered nodes. */
+/**
+ * Build the `onNodeCreated` hook that stamps `data-jx-path` (page content) or `data-jx-layout-path`
+ * + `data-jx-layout-file` (layout-originated nodes) on rendered nodes.
+ */
 export function makeStamper(ctx: PathMapCtx) {
   return (created: Node, path: (string | number)[], def: unknown) => {
     if (!(created instanceof HTMLElement)) {
@@ -459,7 +508,25 @@ export function makeStamper(ctx: PathMapCtx) {
     }
     const classified = classifyRenderNode(path, def, ctx);
     if (classified.kind === "layout") {
-      created.dataset.jxLayout = "";
+      // A layout node has no page-document path, but it is NOT anonymous: stamp where it came from
+      // So a click on it can select it and offer to open the layout at that node. Without this the
+      // Two most clickable strings on a brand-new project ("My Site", "Built with Jx") answered a
+      // Click with nothing at all.
+      created.dataset.jxLayoutPath = serializeJxPath(classified.layoutPath);
+      if (classified.layoutFile) {
+        created.dataset.jxLayoutFile = classified.layoutFile;
+      }
+      if (classified.chrome) {
+        // Chrome — a region of the layout that does NOT wrap the page content. Marked so the canvas
+        // Can dim and label it, and frozen so no caret can land there. The container is permanently
+        // `contenteditable`, so without this the browser happily put a caret in the site header and
+        // Then dropped every keystroke on the floor at the `beforeinput` chokepoint: the one place a
+        // New author is most likely to click looked editable and silently was not.
+        created.dataset.jxLayoutRegion = "";
+        if (isEditableMode(ctx.canvasMode)) {
+          created.contentEditable = "false";
+        }
+      }
       return;
     }
     created.dataset.jxPath = serializeJxPath(classified.path);
@@ -542,6 +609,7 @@ export async function renderResolvedDocument(opts: {
   applySiteStyle(opts.siteStyle, (opts.doc as { $media?: Record<string, string> }).$media ?? {});
   injectHead(opts.doc);
   syncEditModeCss(opts.container.ownerDocument, opts.mode);
+  syncPreviewShell(opts.container.ownerDocument, opts.mode);
   syncStylebookCss(opts.container.ownerDocument, opts.mode);
   // Seed the runtime's root $media before buildScope so a COMPONENT with its own `@--name` blocks
   // But no own `$media` resolves the breakpoint to its real query (the iframe path calls buildScope

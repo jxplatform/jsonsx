@@ -1,119 +1,99 @@
 /// <reference lib="dom" />
 /**
- * CSS Variables editor — form-based editor for managing design tokens. Colors are scheme-aware
- * (per-scheme overrides in `@--dark`-style blocks, spec §9.5); sizes/spacing are media-aware; fonts
- * are neither.
+ * The design-token editor — the token half of **Project Styles** (plan §9.4).
+ *
+ * Every token in the project's root `style` block, grouped by what it names, each editable in place
+ * and each able to carry a different value in any **rendering context** the project declares. The
+ * model — groups, tokens, contexts, overrides — lives in {@link file://../style/project-styles.ts}
+ * so the catalogue, the canvas and this form all read the same vocabulary; this module is the form
+ * over it.
+ *
+ * Three things it does NOT do, each on purpose:
+ *
+ * - **It does not define a context.** Breakpoints and colour schemes are declared once, in Project
+ *   Settings › Contexts, and this level only overrides against them (§2 principle 5). Where nothing
+ *   is declared it says so and routes there.
+ * - **It does not change the file format.** Overrides are the same `"@--ctx": { "--token": … }`
+ *   blocks the compiler already reads, and an emptied block is removed rather than left behind.
+ * - **It does not re-render the canvas.** An edit is pushed to every live canvas in place through
+ *   {@link pushProjectStylesToCanvas} — which is what makes "tune a token and watch the page
+ *   change" true of the specimen canvas as well as the page one.
  */
 
 import { html, render as litRender, nothing } from "lit-html";
 import { ref } from "lit-html/directives/ref.js";
+import { classMap } from "lit-html/directives/class-map.js";
+import { errorMessage } from "@jxsuite/schema/parse";
+import { notify } from "../services/notify";
 import { projectState } from "../store";
 import { getEffectiveMedia, updateSiteConfig } from "../site-context";
-import { postSiteStyleToLiveHosts } from "../canvas/iframe-host";
-import { isSchemeQuery, schemeOfQuery } from "../utils/canvas-media";
-import { friendlyNameToVar, varDisplayName } from "../utils/studio-utils";
+import {
+  addableContexts,
+  groupTokens,
+  listTokenContexts,
+  readTokenOverride,
+  writeTokenOverride,
+} from "../style/project-styles";
+import { renderTokenChip, resolveTokenValue, tokenRefName } from "../style/token-ref";
+import { pushProjectStylesToCanvas } from "../style/live-preview";
+import { friendlyNameToVar } from "../utils/studio-utils";
 
 import type { JxStyle } from "@jxsuite/schema/types";
+import type { ProjectToken, TokenContext, TokenGroup, TokenGroupId } from "../style/project-styles";
+import type { TemplateResult } from "lit-html";
 
-/** A declared scheme query in $media: the block key name plus the scheme it targets. */
-export interface SchemeEntry {
-  name: string;
-  scheme: "light" | "dark";
+/**
+ * What each group's add row hints with — an example friendly name and an example value. These are
+ * the form's illustrations, not the model's data: they teach the shape of an answer and are never
+ * written anywhere.
+ */
+const ADD_ROW_HINTS: Readonly<Record<TokenGroupId, { name: string; value: string }>> = {
+  color: { name: "Primary Blue", value: "#3b82f6" },
+  font: { name: "Body Serif", value: "'Georgia', serif" },
+  other: { name: "Custom Var", value: "value" },
+  size: { name: "Spacing Large", value: "32px" },
+};
+
+/** The colour a `<input type="color">` shows when the token's value is not a hex literal. */
+const COLOR_INPUT_FALLBACK = "#3b82f6";
+
+/** The same, for an override row: a scheme override is usually a darker value than the base. */
+const OVERRIDE_INPUT_FALLBACK = "#111111";
+
+/** What one token row needs from the surrounding form — bound once per render, not per row. */
+interface TokenFormCtx {
+  /** The project's root style, mutated in place and persisted through {@link updateSiteConfig}. */
+  rootStyle: JxStyle;
+  /** Every declared rendering context, schemes first ({@link listTokenContexts}). */
+  contexts: TokenContext[];
+  /** Commit the current style without re-rendering the form. */
+  save: () => void;
+  /** Commit and re-render — for anything that changes which rows exist. */
+  commit: () => void;
 }
 
-/** @param {HTMLElement} container */
+/**
+ * Render the token editor into a container.
+ *
+ * @param {HTMLElement} container
+ */
 export function renderCssVarsEditor(container: HTMLElement) {
   const config = projectState?.projectConfig || {};
-  const rootStyle = config.style || {};
-  const media = getEffectiveMedia(config.$media);
-
-  /**
-   * @type {{
-   *   color: [string, string | number][];
-   *   font: [string, string | number][];
-   *   size: [string, string | number][];
-   *   other: [string, string | number][];
-   * }}
-   */
-  const groups: {
-    color: [string, string | number][];
-    font: [string, string | number][];
-    size: [string, string | number][];
-    other: [string, string | number][];
-  } = { color: [], font: [], other: [], size: [] };
-  for (const [k, v] of Object.entries(rootStyle)) {
-    if (!k.startsWith("--")) {
-      continue;
-    }
-    if (typeof v !== "string" && typeof v !== "number") {
-      continue;
-    }
-    if (k.startsWith("--color")) {
-      groups.color.push([k, v]);
-    } else if (k.startsWith("--font")) {
-      groups.font.push([k, v]);
-    } else if (k.startsWith("--size") || k.startsWith("--spacing") || k.startsWith("--radius")) {
-      groups.size.push([k, v]);
-    } else {
-      groups.other.push([k, v]);
-    }
-  }
-
-  const mediaNames = media
-    ? Object.keys(media).filter((m) => m !== "--" && !isSchemeQuery(String(media[m])))
-    : [];
-  const schemeEntries: SchemeEntry[] = media
-    ? Object.entries(media).flatMap(([name, query]) => {
-        const scheme = schemeOfQuery(String(query));
-        return scheme ? [{ name, scheme }] : [];
-      })
-    : [];
+  const rootStyle = (config.style || {}) as JxStyle;
+  const contexts = listTokenContexts(getEffectiveMedia(config.$media));
+  const hasScheme = contexts.some((c) => c.kind === "scheme");
 
   const save = () => {
     void updateSiteConfig({ style: { ...rootStyle } });
-    // Live canvas feedback: replace the site-style sheet in place — no re-render needed.
-    postSiteStyleToLiveHosts();
+    pushProjectStylesToCanvas();
   };
 
-  const updateVar = (name: string, val: string) => {
-    rootStyle[name] = val;
-    save();
-  };
-
-  // Write/clear a per-scheme token override in the scheme's `@--name` block (spec §9.5). An empty
-  // Value clears the override (and drops the block when it empties) — the token inherits the base.
-  const updateSchemeVar = (schemeName: string, varName: string, val: string) => {
-    const key = `@${schemeName}`;
-    if (val) {
-      const block = (rootStyle[key] ??= {}) as Record<string, unknown>;
-      block[varName] = val;
-    } else {
-      const block = rootStyle[key];
-      if (block && typeof block === "object") {
-        delete (block as Record<string, unknown>)[varName];
-        if (Object.keys(block).length === 0) {
-          delete rootStyle[key];
-        }
-      }
-    }
+  const commit = () => {
     save();
     renderCssVarsEditor(container);
   };
 
-  // Without a declared scheme query nothing ever shows the scheme UI (here or in the tab bar) —
-  // This is the opt-in affordance for existing projects. Re-render after the async config update
-  // Lands (unlike style edits, $media is not mutated in place).
-  const enableDarkScheme = () => {
-    void updateSiteConfig({
-      $media: { ...config.$media, "--dark": "(prefers-color-scheme: dark)" },
-    }).then(() => renderCssVarsEditor(container));
-  };
-
-  const deleteVar = (name: string) => {
-    delete rootStyle[name];
-    save();
-    renderCssVarsEditor(container);
-  };
+  const ctx: TokenFormCtx = { commit, contexts, rootStyle, save };
 
   const addVar = (prefix: string, friendlyName: string, val: string) => {
     const varName = friendlyNameToVar(friendlyName, prefix);
@@ -121,31 +101,35 @@ export function renderCssVarsEditor(container: HTMLElement) {
       return;
     }
     rootStyle[varName] = val;
-    save();
-    renderCssVarsEditor(container);
+    commit();
+  };
+
+  /*
+   * Without a declared scheme query there is nothing to override, so this section can only point at
+   * the place a scheme is DEFINED. It used to define one itself — a button here appended
+   * `'--dark': '(prefers-color-scheme: dark)'` to `$media` without ever using the word breakpoint,
+   * which made this form the fourth and least discoverable definition site for a map whose other
+   * three lived in the wizard, Overview and Properties › Media. The lazy import breaks the
+   * css-vars-editor ↔ section-registry cycle.
+   */
+  const manageContexts = () => {
+    void import("./section-registry")
+      .then(({ setSettingsSection }) => setSettingsSection("contexts"))
+      .catch((error: unknown) => {
+        notify.error(`Could not open Settings › Contexts — ${errorMessage(error)}`, {
+          source: "Settings",
+        });
+      });
   };
 
   const tpl = html`
     <div class="settings-section">
       <h3 class="settings-section-title">CSS Variables</h3>
-
-      ${renderColorSection(
-        groups.color,
-        updateVar,
-        deleteVar,
-        addVar,
-        rootStyle,
-        schemeEntries,
-        updateSchemeVar,
-        enableDarkScheme,
+      ${groupTokens(rootStyle).map(({ group, tokens }) =>
+        group.id === "other" && tokens.length === 0
+          ? nothing
+          : renderGroup(group, tokens, ctx, hasScheme, addVar, manageContexts),
       )}
-      ${renderFontSection(groups.font, updateVar, deleteVar, addVar)}
-      ${renderSizeSection(groups.size, updateVar, deleteVar, addVar, rootStyle, mediaNames)}
-      ${
-        groups.other.length > 0
-          ? renderOtherSection(groups.other, updateVar, deleteVar, addVar, rootStyle, mediaNames)
-          : nothing
-      }
     </div>
   `;
 
@@ -153,62 +137,42 @@ export function renderCssVarsEditor(container: HTMLElement) {
 }
 
 /**
- * @param {[string, string | number][]} vars
- * @param {(name: string, val: string) => void} updateVar
- * @param {(name: string) => void} deleteVar
+ * One group: its heading, its token rows, its add row, and — for Colors with no scheme declared —
+ * the sentence that says where a scheme comes from.
+ *
+ * @param {TokenGroup} group
+ * @param {ProjectToken[]} tokens
+ * @param {TokenFormCtx} ctx
+ * @param {boolean} hasScheme
  * @param {(prefix: string, friendlyName: string, val: string) => void} addVar
+ * @param {() => void} manageContexts
  */
-function renderColorSection(
-  vars: [string, string | number][],
-  updateVar: (name: string, val: string) => void,
-  deleteVar: (name: string) => void,
+function renderGroup(
+  group: TokenGroup,
+  tokens: ProjectToken[],
+  ctx: TokenFormCtx,
+  hasScheme: boolean,
   addVar: (prefix: string, friendlyName: string, val: string) => void,
-  rootStyle: JxStyle,
-  schemeEntries: SchemeEntry[],
-  updateSchemeVar: (schemeName: string, varName: string, val: string) => void,
-  enableDarkScheme: () => void,
-) {
+  manageContexts: () => void,
+): TemplateResult {
   return html`
     <div class="css-vars-group">
-      <h4 class="css-vars-group-title">Colors</h4>
-      ${vars.map(
-        ([name, val]) => html`
-          <div class="css-var-row">
-            <div class="css-var-swatch" style="background:${val}">
-              <input
-                type="color"
-                .value=${val && String(val).startsWith("#") ? val : "#3b82f6"}
-                @input=${(e: Event) => updateVar(name, (e.target as HTMLInputElement).value)}
-              />
-            </div>
-            <span class="css-var-name">${varDisplayName(name, "--color-")}</span>
-            <sp-textfield
-              size="s"
-              .value=${String(val)}
-              @change=${(e: Event) => updateVar(name, (e.target as HTMLInputElement).value)}
-              style="flex:1;max-width:160px"
-            ></sp-textfield>
-            <sp-action-button quiet size="s" @click=${() => deleteVar(name)}>
-              <sp-icon-delete slot="icon"></sp-icon-delete>
-            </sp-action-button>
-          </div>
-          ${schemeEntries.map((entry) =>
-            renderSchemeOverride(name, rootStyle, entry, updateSchemeVar),
-          )}
-        `,
-      )}
-      ${renderAddRow("--color-", "Primary Blue", "#3b82f6", addVar)}
+      <h4 class="css-vars-group-title">${group.title}</h4>
+      ${tokens.map((token) => renderTokenRow(token, group, ctx))} ${renderAddRow(group, addVar)}
       ${
-        schemeEntries.length === 0
+        group.id === "color" && !hasScheme
           ? html`
-              <sp-action-button
-                size="s"
-                class="css-vars-enable-dark"
-                title="Add a dark color scheme: declares --dark in $media so every color token can carry a dark value"
-                @click=${enableDarkScheme}
-              >
-                Enable dark scheme
-              </sp-action-button>
+              <p class="settings-field-desc">
+                No colour scheme is defined yet, so these tokens have one value each.
+                <sp-action-button
+                  size="s"
+                  quiet
+                  title="Define a colour scheme in Project Settings › Contexts"
+                  @click=${manageContexts}
+                >
+                  Manage contexts…
+                </sp-action-button>
+              </p>
             `
           : nothing
       }
@@ -217,241 +181,234 @@ function renderColorSection(
 }
 
 /**
- * One per-scheme override row under a color token: swatch + field bound to the scheme block's
- * value. Empty shows "inherits" (the base value applies); clearing deletes the override.
+ * One token: its swatch (colours only), its name, its value field, the chip it wears when that
+ * value follows another token, its delete button — then its font preview and its overrides.
  *
- * @param {string} varName
- * @param {JxStyle} rootStyle
- * @param {SchemeEntry} entry
- * @param {(schemeName: string, varName: string, val: string) => void} updateSchemeVar
+ * @param {ProjectToken} token
+ * @param {TokenGroup} group
+ * @param {TokenFormCtx} ctx
  */
-function renderSchemeOverride(
-  varName: string,
-  rootStyle: JxStyle,
-  entry: SchemeEntry,
-  updateSchemeVar: (schemeName: string, varName: string, val: string) => void,
-) {
-  const block = rootStyle[`@${entry.name}`];
-  const current =
-    block && typeof block === "object" ? (block as Record<string, unknown>)[varName] : undefined;
-  const label = entry.scheme === "dark" ? "Dark" : "Light";
+function renderTokenRow(token: ProjectToken, group: TokenGroup, ctx: TokenFormCtx): TemplateResult {
+  const { rootStyle } = ctx;
+  const isColor = group.id === "color";
+  const refName = tokenRefName(token.value);
+  const resolved = resolveTokenValue(rootStyle, token.value);
+
+  const updateVar = (val: string) => {
+    rootStyle[token.name] = val;
+    ctx.save();
+  };
+  const deleteVar = () => {
+    delete rootStyle[token.name];
+    ctx.commit();
+  };
+
   return html`
-    <div class="css-var-media-row css-var-scheme-row">
-      <span class="css-var-media-label">${label}</span>
-      <div class="css-var-swatch" style="background:${current ?? "transparent"}">
-        <input
-          type="color"
-          .value=${current && String(current).startsWith("#") ? String(current) : "#111111"}
-          @input=${(e: Event) =>
-            updateSchemeVar(entry.name, varName, (e.target as HTMLInputElement).value)}
-        />
-      </div>
+    <div class="css-var-row">
+      ${isColor ? renderSwatch(resolved, COLOR_INPUT_FALLBACK, updateVar) : nothing}
+      <span class="css-var-name">${token.label}</span>
+      <sp-textfield
+        size="s"
+        .value=${String(token.value)}
+        @change=${(e: Event) => updateVar((e.target as HTMLInputElement).value)}
+        style=${valueFieldStyle(group)}
+      ></sp-textfield>
+      ${refName ? renderTokenChip(refName, resolved, { swatch: isColor }) : nothing}
+      <sp-action-button quiet size="s" title="Delete ${token.label}" @click=${deleteVar}>
+        <sp-icon-delete slot="icon"></sp-icon-delete>
+      </sp-action-button>
+    </div>
+    ${
+      group.id === "font"
+        ? html`<div class="css-var-font-preview" style="font-family:${String(token.value)}">
+            The quick brown fox jumps over the lazy dog
+          </div>`
+        : nothing
+    }
+    ${renderOverrides(token, group, ctx)}
+  `;
+}
+
+/**
+ * How wide the value field is — colours and sizes are short values beside a swatch or a unit, fonts
+ * and free-form tokens are long ones. The predecessor said the same thing four times.
+ *
+ * @param {TokenGroup} group
+ */
+function valueFieldStyle(group: TokenGroup): string {
+  if (group.id === "color") {
+    return "flex:1;max-width:160px";
+  }
+  if (group.id === "size") {
+    return "max-width:120px";
+  }
+  return "flex:1";
+}
+
+/**
+ * The colour well: a background showing the value the token RESOLVES to (so an alias token is not a
+ * blank square) over a native colour input.
+ *
+ * @param {string | number | undefined} resolved
+ * @param {string} fallback — what the native input shows when the value is not a hex literal
+ * @param {(val: string) => void} onInput
+ */
+function renderSwatch(
+  resolved: string | number | undefined,
+  fallback: string,
+  onInput: (val: string) => void,
+): TemplateResult {
+  const shown = resolved === undefined ? "transparent" : String(resolved);
+  return html`
+    <div class="css-var-swatch" style="background:${shown}">
+      <input
+        type="color"
+        .value=${shown.startsWith("#") ? shown : fallback}
+        @input=${(e: Event) => onInput((e.target as HTMLInputElement).value)}
+      />
+    </div>
+  `;
+}
+
+/**
+ * A token's per-context values: one row per context it is overridden in, plus — for a colour, once
+ * a scheme exists — a row per scheme whether or not it carries a value, because "what is this
+ * colour in dark mode" is a question a palette is always answering. Then the add affordance.
+ *
+ * The add affordance is the change. Before it, a row appeared only for a token that already had an
+ * `@media` block, so the first override for any token could only be written by hand in
+ * `project.json` — the form could edit an override it could not create.
+ *
+ * @param {ProjectToken} token
+ * @param {TokenGroup} group
+ * @param {TokenFormCtx} ctx
+ */
+function renderOverrides(
+  token: ProjectToken,
+  group: TokenGroup,
+  ctx: TokenFormCtx,
+): TemplateResult | typeof nothing {
+  const { contexts, rootStyle } = ctx;
+  const isColor = group.id === "color";
+  const shown = contexts.filter(
+    (context) =>
+      (isColor && context.kind === "scheme") ||
+      readTokenOverride(rootStyle, context, token.name) !== undefined,
+  );
+  /*
+   * A token with no value has nothing to give a context, so the picker is not offered rather than
+   * offered and silently inert — writing an empty override is how one is CLEARED.
+   */
+  const addable =
+    String(token.value) === "" ? [] : addableContexts(rootStyle, contexts, token.name, shown);
+
+  if (shown.length === 0 && addable.length === 0) {
+    return nothing;
+  }
+
+  const setOverride = (context: TokenContext, val: string) => {
+    writeTokenOverride(rootStyle, context, token.name, val);
+    ctx.commit();
+  };
+
+  return html`
+    <div class="css-var-media-overrides">
+      ${shown.map((context) => renderOverrideRow(token, context, isColor, rootStyle, setOverride))}
+      ${
+        addable.length === 0
+          ? nothing
+          : html`
+              <div class="css-var-override-add">
+                <sp-picker
+                  size="s"
+                  quiet
+                  label="Add override"
+                  placeholder="Add override…"
+                  title="Give ${token.label} a different value in one rendering context"
+                  @change=${(e: Event) => {
+                    const name = (e.target as HTMLInputElement).value;
+                    const context = addable.find((c) => c.name === name);
+                    if (context) {
+                      setOverride(context, String(token.value));
+                    }
+                  }}
+                >
+                  ${addable.map(
+                    (context) =>
+                      html`<sp-menu-item value=${context.name}>${context.label}</sp-menu-item>`,
+                  )}
+                </sp-picker>
+              </div>
+            `
+      }
+    </div>
+  `;
+}
+
+/**
+ * One override row. Empty means "inherits the base value", and clearing a row removes the override
+ * (and the block, once it empties) — one write path for a scheme and a breakpoint alike.
+ *
+ * @param {ProjectToken} token
+ * @param {TokenContext} context
+ * @param {boolean} isColor
+ * @param {JxStyle} rootStyle
+ * @param {(context: TokenContext, val: string) => void} setOverride
+ */
+function renderOverrideRow(
+  token: ProjectToken,
+  context: TokenContext,
+  isColor: boolean,
+  rootStyle: JxStyle,
+  setOverride: (context: TokenContext, val: string) => void,
+): TemplateResult {
+  const current = readTokenOverride(rootStyle, context, token.name);
+  return html`
+    <div
+      class=${classMap({
+        "css-var-media-row": true,
+        "css-var-scheme-row": context.kind === "scheme",
+      })}
+    >
+      <span class="css-var-media-label">${context.label}</span>
+      ${
+        isColor
+          ? renderSwatch(resolveTokenValue(rootStyle, current), OVERRIDE_INPUT_FALLBACK, (val) =>
+              setOverride(context, val),
+            )
+          : nothing
+      }
       <sp-textfield
         size="s"
         placeholder="inherits"
-        .value=${current == null ? "" : String(current)}
-        @change=${(e: Event) =>
-          updateSchemeVar(entry.name, varName, (e.target as HTMLInputElement).value)}
-        style="flex:1;max-width:160px"
+        .value=${current === undefined ? "" : String(current)}
+        @change=${(e: Event) => setOverride(context, (e.target as HTMLInputElement).value)}
+        style=${isColor ? "flex:1;max-width:160px" : "max-width:120px"}
       ></sp-textfield>
     </div>
   `;
 }
 
 /**
- * @param {[string, string | number][]} vars
- * @param {(name: string, val: string) => void} updateVar
- * @param {(name: string) => void} deleteVar
- * @param {(prefix: string, friendlyName: string, val: string) => void} addVar
- */
-function renderFontSection(
-  vars: [string, string | number][],
-  updateVar: (name: string, val: string) => void,
-  deleteVar: (name: string) => void,
-  addVar: (prefix: string, friendlyName: string, val: string) => void,
-) {
-  return html`
-    <div class="css-vars-group">
-      <h4 class="css-vars-group-title">Fonts</h4>
-      ${vars.map(
-        ([name, val]) => html`
-          <div class="css-var-row">
-            <span class="css-var-name">${varDisplayName(name, "--font-")}</span>
-            <sp-textfield
-              size="s"
-              .value=${String(val)}
-              @change=${(e: Event) => updateVar(name, (e.target as HTMLInputElement).value)}
-              style="flex:1"
-            ></sp-textfield>
-            <sp-action-button quiet size="s" @click=${() => deleteVar(name)}>
-              <sp-icon-delete slot="icon"></sp-icon-delete>
-            </sp-action-button>
-          </div>
-          <div class="css-var-font-preview" style="font-family:${val}">
-            The quick brown fox jumps over the lazy dog
-          </div>
-        `,
-      )}
-      ${renderAddRow("--font-", "Body Serif", "'Georgia', serif", addVar)}
-    </div>
-  `;
-}
-
-/**
- * @param {[string, string | number][]} vars
- * @param {(name: string, val: string) => void} updateVar
- * @param {(name: string) => void} deleteVar
- * @param {(prefix: string, friendlyName: string, val: string) => void} addVar
- * @param {JxStyle} rootStyle
- * @param {string[]} mediaNames
- */
-function renderSizeSection(
-  vars: [string, string | number][],
-  updateVar: (name: string, val: string) => void,
-  deleteVar: (name: string) => void,
-  addVar: (prefix: string, friendlyName: string, val: string) => void,
-  rootStyle: JxStyle,
-  mediaNames: string[],
-) {
-  return html`
-    <div class="css-vars-group">
-      <h4 class="css-vars-group-title">Sizes &amp; Spacing</h4>
-      ${vars.map(
-        ([name, val]) => html`
-          <div class="css-var-row">
-            <span class="css-var-name"
-              >${
-                varDisplayName(name, "--size-") ||
-                varDisplayName(name, "--spacing-") ||
-                varDisplayName(name, "--radius-") ||
-                name
-              }</span
-            >
-            <sp-textfield
-              size="s"
-              .value=${String(val)}
-              @change=${(e: Event) => updateVar(name, (e.target as HTMLInputElement).value)}
-              style="max-width:120px"
-            ></sp-textfield>
-            <sp-action-button quiet size="s" @click=${() => deleteVar(name)}>
-              <sp-icon-delete slot="icon"></sp-icon-delete>
-            </sp-action-button>
-          </div>
-          ${mediaNames.length > 0 ? renderMediaOverrides(name, rootStyle, mediaNames) : nothing}
-        `,
-      )}
-      ${renderAddRow("--size-", "Spacing Large", "32px", addVar)}
-    </div>
-  `;
-}
-
-/**
- * @param {[string, string | number][]} vars
- * @param {(name: string, val: string) => void} updateVar
- * @param {(name: string) => void} deleteVar
- * @param {(prefix: string, friendlyName: string, val: string) => void} addVar
- * @param {JxStyle} rootStyle
- * @param {string[]} mediaNames
- */
-function renderOtherSection(
-  vars: [string, string | number][],
-  updateVar: (name: string, val: string) => void,
-  deleteVar: (name: string) => void,
-  addVar: (prefix: string, friendlyName: string, val: string) => void,
-  rootStyle: JxStyle,
-  mediaNames: string[],
-) {
-  return html`
-    <div class="css-vars-group">
-      <h4 class="css-vars-group-title">Other</h4>
-      ${vars.map(
-        ([name, val]) => html`
-          <div class="css-var-row">
-            <span class="css-var-name">${name}</span>
-            <sp-textfield
-              size="s"
-              .value=${String(val)}
-              @change=${(e: Event) => updateVar(name, (e.target as HTMLInputElement).value)}
-              style="flex:1"
-            ></sp-textfield>
-            <sp-action-button quiet size="s" @click=${() => deleteVar(name)}>
-              <sp-icon-delete slot="icon"></sp-icon-delete>
-            </sp-action-button>
-          </div>
-          ${mediaNames.length > 0 ? renderMediaOverrides(name, rootStyle, mediaNames) : nothing}
-        `,
-      )}
-      ${renderAddRow("--", "Custom Var", "value", addVar)}
-    </div>
-  `;
-}
-
-/**
- * @param {string} varName
- * @param {JxStyle} rootStyle
- * @param {string[]} mediaNames
- */
-function renderMediaOverrides(varName: string, rootStyle: JxStyle, mediaNames: string[]) {
-  const overrides = [];
-  for (const mediaName of mediaNames) {
-    const mediaKey = `@${mediaName}`;
-    const mediaBlock = rootStyle[mediaKey];
-    if (mediaBlock && typeof mediaBlock === "object" && mediaBlock[varName]) {
-      overrides.push({ mediaName, value: mediaBlock[varName] });
-    }
-  }
-
-  if (overrides.length === 0) {
-    return nothing;
-  }
-
-  return html`
-    <div class="css-var-media-overrides">
-      ${overrides.map(
-        (o) => html`
-          <div class="css-var-media-row">
-            <span class="css-var-media-label">@${o.mediaName}</span>
-            <sp-textfield
-              size="s"
-              .value=${String(o.value)}
-              @change=${(e: Event) => {
-                if (!rootStyle[`@${o.mediaName}`]) {
-                  rootStyle[`@${o.mediaName}`] = {};
-                }
-                (rootStyle[`@${o.mediaName}`] as Record<string, unknown>)[varName] = (
-                  e.target as HTMLInputElement
-                ).value;
-                void updateSiteConfig({ style: { ...rootStyle } });
-              }}
-              style="max-width:120px"
-            ></sp-textfield>
-          </div>
-        `,
-      )}
-    </div>
-  `;
-}
-
-/**
- * @param {string} prefix
- * @param {string} placeholder
- * @param {string} valuePlaceholder
+ * The group's "add a token" row: a friendly name, a value, and the button that slugs the one into a
+ * variable name under the group's prefix.
+ *
+ * @param {TokenGroup} group
  * @param {(prefix: string, friendlyName: string, val: string) => void} addVar
  */
 function renderAddRow(
-  prefix: string,
-  placeholder: string,
-  valuePlaceholder: string,
+  group: TokenGroup,
   addVar: (prefix: string, friendlyName: string, val: string) => void,
-) {
+): TemplateResult {
   let nameEl: HTMLInputElement | null = null;
   let valEl: HTMLInputElement | null = null;
+  const hint = ADD_ROW_HINTS[group.id];
 
   return html`
     <div class="css-var-add-row">
       <sp-textfield
         size="s"
-        placeholder=${placeholder}
+        placeholder=${hint.name}
         ${ref((el) => {
           if (el) {
             nameEl = el as HTMLInputElement;
@@ -460,7 +417,7 @@ function renderAddRow(
       ></sp-textfield>
       <sp-textfield
         size="s"
-        placeholder=${valuePlaceholder}
+        placeholder=${hint.value}
         ${ref((el) => {
           if (el) {
             valEl = el as HTMLInputElement;
@@ -471,7 +428,7 @@ function renderAddRow(
         size="s"
         @click=${() => {
           if (nameEl && valEl) {
-            addVar(prefix, nameEl.value, valEl.value);
+            addVar(group.prefix, nameEl.value, valEl.value);
           }
         }}
         >Add</sp-action-button

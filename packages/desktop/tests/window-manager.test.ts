@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { rpcParity } from "./_rpc-parity";
 
 // ─── Mock electrobun/bun ────────────────────────────────────────────────────
 
@@ -69,6 +70,14 @@ function makeSession(initialRoot: string | null) {
     handleWriteFile: mock(async () => {}),
     handleDeleteFile: mock(async () => {}),
     handleRenameFile: mock(async () => {}),
+    findReferences: mock(async () => ({
+      errors: [],
+      files: [],
+      filesReferencing: 0,
+      path: null,
+      refsTotal: 0,
+      tagName: null,
+    })),
     handleCreateDirectory: mock(async () => {}),
     handleUploadFile: mock(async () => {}),
     handleResolveSiteContext: mock(async () => ({ sitePath: null })),
@@ -76,10 +85,18 @@ function makeSession(initialRoot: string | null) {
     discoverComponents: mock(async () => []),
     codeService: mock(async () => null),
     locateFile: mock(async () => null),
+    searchFiles: mock(async () => [{ name: "a.json", path: "pages/a.json", type: "file" }]),
+    openExternal: mock(async () => ({ ok: true })),
     fetchPluginSchema: mock(async () => null),
     jxResolve: mock(async () => ({ body: "{}", status: 200 })),
     jxServerFunction: mock(async () => ({ body: "{}", status: 200 })),
     listFormats: mock(async () => []),
+    buildSite: mock(async () => ({
+      errors: [],
+      files: 2,
+      routes: 1,
+      url: "http://127.0.0.1:4321",
+    })),
     formatAction: mock(async () => ({})),
     // Data surface + secrets (desktop twins of /__studio/data/* + /__studio/secrets)
     dataConnections: mock(async () => ({ connections: [] })),
@@ -114,8 +131,16 @@ const createProjectSession = mock((root: string | null) => {
   sessions.push(s);
   return s;
 });
+/** The session-free picker: answers "which project" and binds nothing. Null models a cancel. */
+let pickedProject: { root: string; name: string; config: { name: string } } | null = {
+  config: { name: "Picked" },
+  name: "Picked",
+  root: "/proj/picked",
+};
+const pickProjectFile = mock(async () => pickedProject);
 void mock.module("../src/project-session", () => ({
   createProjectSession,
+  pickProjectFile,
   setFileDialog: mock(() => {}),
 }));
 
@@ -321,6 +346,7 @@ describe("per-window RPC", () => {
     // File / project handlers (each forwards to the window's session).
     await reqs.deleteFile({ path: "a.json" } as never);
     await reqs.renameFile({ from: "a", to: "b" } as never);
+    await reqs.findReferences({ path: "components/card.json" } as never);
     await reqs.createDirectory({ path: "d" } as never);
     await reqs.uploadFile({ data: "x", path: "p" } as never);
     await reqs.resolveSiteContext({ filePath: "pages/a.json" } as never);
@@ -328,14 +354,27 @@ describe("per-window RPC", () => {
     await reqs.discoverComponents({} as never);
     await reqs.codeService({ action: "lint", payload: {} } as never);
     await reqs.locateFile({ name: "x.json" } as never);
+    await reqs.searchFiles({ extensions: [".md"], query: "abo" } as never);
+    await reqs.openExternal({ url: "https://example.com" } as never);
     await reqs.fetchPluginSchema({ src: "m.js" } as never);
     await reqs.formatAction({ action: "parse", format: "md" } as never);
     await reqs.jxResolve({ body: "{}" } as never);
     await reqs.jxServerFunction({ body: "{}" } as never);
     await reqs.listFormats();
+    // `View: Open in Browser` builds through this window and opens the origin the reply names.
+    expect(await reqs.buildSite()).toEqual({
+      errors: [],
+      files: 2,
+      routes: 1,
+      url: "http://127.0.0.1:4321",
+    });
     expect(session.handleDeleteFile).toHaveBeenCalledWith({ path: "a.json" });
+    expect(session.findReferences).toHaveBeenCalledWith({ path: "components/card.json" });
     expect(session.listDirectory).toHaveBeenCalledWith({ dir: "src" });
     expect(session.listFormats).toHaveBeenCalledTimes(1);
+    // The format registry's extensions ride along; dropping them makes ⌘P .json-only.
+    expect(session.searchFiles).toHaveBeenCalledWith({ extensions: [".md"], query: "abo" });
+    expect(session.openExternal).toHaveBeenCalledWith({ url: "https://example.com" });
 
     // Data surface + secrets handlers (each forwards to the window's session).
     await reqs.dataConnections();
@@ -369,11 +408,13 @@ describe("per-window RPC", () => {
     await reqs.gitCheckout({ branch: "dev" } as never);
     await reqs.gitCreateBranch({ name: "f" } as never);
     await reqs.gitDiff({} as never);
+    await reqs.gitShow({ path: "a.json", ref: "HEAD" } as never);
     await reqs.gitDiscard({ files: ["a"] } as never);
     await reqs.gitInit();
     await reqs.gitAddRemote({ name: "origin", url: "u" } as never);
     expect(git.gitBranches).toHaveBeenCalledTimes(1);
     expect(git.gitCommit).toHaveBeenCalledWith({ message: "m" });
+    expect(git.gitShow).toHaveBeenCalledWith({ path: "a.json", ref: "HEAD" });
 
     // Package handlers.
     await reqs.listPackages();
@@ -452,8 +493,65 @@ describe("per-window RPC", () => {
     reqs.newWindow();
     expect(listOpenWindows().length).toBe(before + 1);
     expect(createdWindows.at(-1)!.opts.title).toBe("Jx Studio");
-    reqs.openProjectInNewWindow({ root: "/proj/sibling" } as never);
+    const res = reqs.openProjectInNewWindow({ root: "/proj/sibling" } as never);
     expect(createdWindows.at(-1)!.opts.title).toBe(`sibling ${DASH} Jx Studio`);
+    expect(res).toEqual({ focused: false } as never);
+  });
+
+  test("openProjectInNewWindow reports a FOCUS when the project is already open", () => {
+    // Both outcomes hand back a window, so the caller cannot tell them apart by the return value
+    // Alone — and "opened in a new window" is the wrong thing to tell someone whose existing
+    // Window just came forward. The flag is asked before the open, while the answer is still true.
+    const owner = openProjectWindow("/proj/twice") as unknown as MockWindow;
+    openProjectWindow(null);
+    const reqs = lastRequests();
+    const created = createdWindows.length;
+
+    expect(reqs.openProjectInNewWindow({ root: "/proj/twice" } as never)).toEqual({
+      focused: true,
+    } as never);
+    expect(createdWindows.length).toBe(created); // Nothing new was built…
+    expect(owner.activate).toHaveBeenCalled(); // …the one that had it was raised.
+  });
+
+  test("pickProject answers WHICH project without binding this window to it", () => {
+    // The whole reason this request exists beside `openProject`: the New Window branch has to ask
+    // The question without suffering the answer. A session bound here would leave the window that
+    // Merely asked serving a project it is not showing.
+    const win = openProjectWindow("/proj/asking") as unknown as MockWindow;
+    const session = sessions.at(-1)!;
+    const reqs = lastRequests();
+
+    return reqs.pickProject().then((res) => {
+      expect(res).toEqual({ name: "Picked", root: "/proj/picked" } as never);
+      expect(session.setProjectRoot).not.toHaveBeenCalled();
+      expect(session.openProject).not.toHaveBeenCalled();
+      expect(win.setTitle).not.toHaveBeenCalled();
+      expect(listOpenWindows().find((w) => w.id === win.id)?.projectRoot).toBe("/proj/asking");
+    });
+  });
+
+  test("pickProject passes a cancelled picker straight through as null", async () => {
+    const previous = pickedProject;
+    pickedProject = null;
+    try {
+      openProjectWindow(null);
+      expect(await lastRequests().pickProject()).toBeNull();
+    } finally {
+      pickedProject = previous;
+    }
+  });
+});
+
+// ─── Schema ↔ handler parity ────────────────────────────────────────────────
+
+describe("rpc schema parity", () => {
+  test("every request declared in rpc-schema.ts has a handler in this window's map", () => {
+    openProjectWindow("/proj/parity");
+    // No exemptions: the electrobun window IS the full desktop surface.
+    const parity = rpcParity(Object.keys(lastRequests()));
+    expect(parity.unhandled).toEqual([]);
+    expect(parity.undeclared).toEqual([]);
   });
 });
 

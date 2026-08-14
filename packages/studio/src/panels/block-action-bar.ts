@@ -1,17 +1,33 @@
 /// <reference lib="dom" />
 /**
- * Block action bar — extracted from studio.js (Phase 4h). Floating toolbar above selected elements
- * with parent selector, move arrows, drag handle, component actions, and inline formatting.
+ * Block action bar — the floating toolbar above the selected element.
+ *
+ * The bar is a RENDERING of the command registry (plan §3.2 region ⑩, §5.5): its verb cluster is
+ * `registry.forPlacement("blockbar")`, sliced at {@link BLOCKBAR_MAX_ITEMS} with the remainder
+ * behind a `⋮` overflow menu. Every button's accessible name is its record's `title` and its
+ * tooltip carries `keymap.formatBinding(id)`, so no action is named twice.
+ *
+ * `studio-ui-guidelines.md` §8.6 is normative about the shape: **ONE shape.** The bar does not
+ * rearrange itself when the author starts typing, and a control that cannot act is DISABLED, not
+ * removed — a toolbar whose buttons move under the cursor is worse than one with a greyed button.
+ * That is why the parent selector, the drag handle and every verb render unconditionally and take
+ * their disabled state (and its one-sentence reason) from the record's own `enablement`.
+ *
+ * This module is also the single definition site for the structural selection verbs — move
+ * up/down/in/out and the component pair — because their implementations live here.
+ * {@link registerSelectionCommands} is what a host bootstrap calls to put them in the app-wide
+ * registry; until one exists, {@link selectionCommandRegistry} builds the surface's own.
  */
 
 import { html, render as litRender, nothing } from "lit-html";
+import { displayTagName } from "@jxsuite/schema/guards";
 import { styleMap } from "lit-html/directives/style-map.js";
 import { ref } from "lit-html/directives/ref.js";
 import { draggable } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { disableNativeDragPreview } from "@atlaskit/pragmatic-drag-and-drop/element/disable-native-drag-preview";
 
 import {
-  canvasWrap,
+  VOID_ELEMENTS,
   childIndex,
   childList,
   getNodeAtPath,
@@ -19,28 +35,53 @@ import {
   parentElementPath,
 } from "../store";
 import { activeTab } from "../workspace/workspace";
-import { mutateMoveNode, mutateUpdateProperty, transactDoc } from "../tabs/transact";
+import { activeCanvasSurface, stageContaining } from "../canvas/canvas-surface";
+import { primarySelection, structuralBatch } from "../tabs/selection";
+import {
+  mutateDuplicateNodes,
+  mutateMoveNode,
+  mutateRemoveNodes,
+  mutateUpdateProperty,
+  transactDoc,
+} from "../tabs/transact";
 import { view } from "../view";
-import { getInlineActions } from "../editor/inline-edit";
-import type { InlineAction } from "../editor/inline-edit";
+import { getInlineActions, isInlineElement } from "../editor/inline-edit";
 import { buildMergeTags, buildRepeaterTagsFromFields } from "../editor/merge-tags";
 import { findEnclosingRepeater, resolveRepeaterItemFields } from "../editor/repeater-scope";
 import { projectState } from "../state";
 import { componentRegistry } from "../files/components";
 import { convertToComponent } from "../editor/convert-to-component";
 import { getEditBarAnchorRect, getEditSnapshot, postApplyFormat } from "../canvas/iframe-host";
-import { getLayerSlot, isModalOpen } from "../ui/layers";
+import { getLayerSlot, isModalOpen, renderPopover } from "../ui/layers";
 import { showSlashMenu } from "../editor/slash-menu";
 import { getConvertTargets } from "../editor/convert-targets";
 import { rectOf } from "../utils/geometry";
+import { createCommandRegistry } from "../commands/registry";
+import { editorKindForMode, makeContext } from "../commands/context";
+import { defaultCommands, noopCommandDeps } from "../commands/defaults";
 
+import type { AnyCommand, CommandRegistry } from "../commands/registry";
+import type { CommandContext } from "../commands/context";
+import type { CommandDeps } from "../commands/defaults";
 import type { ApplyFormatIntent } from "../canvas/iframe-protocol";
 import type { JxPath } from "../state";
+import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { TemplateResult } from "lit-html";
 import type { SlashCommand } from "../editor/convert-targets.js";
 
-/** The plain format commands (everything an action button posts except link/insertData). */
-type FormatCommand = Extract<ApplyFormatIntent, { command: "bold" }>["command"];
+/**
+ * The plain format commands — everything an action button posts except link/insertData.
+ *
+ * This read `Extract<ApplyFormatIntent, { command: "bold" }>["command"]`, which resolves to
+ * `never`: `Extract` distributes, and the intent member whose `command` is `"bold" | "italic" | …`
+ * is not assignable to `{ command: "bold" }`. Every use of the alias was therefore an unchecked
+ * cast, and the compiler agreed to all of them. Subtracting the two members that carry extra fields
+ * is the shape that actually names the seven.
+ */
+type FormatCommand = Exclude<
+  Extract<ApplyFormatIntent, { command: string }>["command"],
+  "link" | "insertData"
+>;
 
 /**
  * @type {{
@@ -67,7 +108,13 @@ export function initBlockActionBar(ctx: {
 }) {
   _ctx = ctx;
   if (!_formatShortcutBound) {
-    document.addEventListener("keydown", handleParentFormatShortcut);
+    /* The format chords are gone from here. They were a `keydown` switch on ⌘B/⌘I/⌘`/⌘K that ran
+       BESIDE the registry's dispatcher on the same document, with its own modal check and its own
+       early return — a second keyboard authority for four verbs that now hold their chords as
+       records ({@link formatCommands}). Leaving it in place would fire ⌘K twice, and the second
+       call re-mounts the link popover over the URL field the first one opened. */
+    // ⌥↑ is the keyboard way INTO the bar. The audit found it unreachable without a mouse.
+    document.addEventListener("keydown", handleBlockBarEntryKey);
     // `scroll` doesn't bubble but IS deliverable capture-phase at the document — one app-lifetime
     // Listener covers .content-edit-canvas (edit mode), window scrolls, and any future scroll
     // Container, keeping the position:fixed bar tracking its (scrolling) anchor.
@@ -93,7 +140,7 @@ export function onCanvasScroll(e: Event): void {
   if (!_ctx || _linkPopoverOpen) {
     return;
   }
-  if (!activeTab.value?.session.selection) {
+  if (activeTab.value?.session.selection.length === 0) {
     return;
   }
   const mode = _ctx.getCanvasMode();
@@ -103,8 +150,7 @@ export function onCanvasScroll(e: Event): void {
   // Only canvas-area scrolls (or the window itself) move the anchor; left/right panel scrolling
   // Never does.
   const isCanvasScroll =
-    e.target === document ||
-    (canvasWrap != null && e.target instanceof Node && canvasWrap.contains(e.target));
+    e.target === document || (e.target instanceof Node && stageContaining(e.target) !== null);
   if (!isCanvasScroll || _scrollRafPending) {
     return;
   }
@@ -151,8 +197,15 @@ function barPosition(anchor: {
   top: number;
   height: number;
 }): { left: number; top: number } | null {
-  if (canvasWrap) {
-    const wrap = rectOf(canvasWrap);
+  /* Clipped against the stage the CARET is on. The bar anchors to one selection in one document,
+     and the bar is one element, so "is the anchor still on screen" is a question about ONE pane's
+     stage — and the pane is the FOCUSED one, because that is where the caret is. This asked
+     "the stage showing the active tab", which was the same answer only while a tab could be on
+     screen in one place; with a document displayed in two panes it picked whichever came first in
+     the grid, and clipped the bar against a stage the author is not typing in. */
+  const stage = activeCanvasSurface().wrap;
+  if (stage) {
+    const wrap = rectOf(stage);
     if (anchor.top + anchor.height < wrap.top || anchor.top > wrap.bottom) {
       return null;
     }
@@ -176,46 +229,589 @@ function clampBarToWindow(bar: HTMLElement): void {
 }
 
 /**
- * Route Ctrl/Cmd+B/I/`/K to the iframe while an inline-edit session is live but focus is on the
- * PARENT (the format toolbar or its link popover) — the keystroke never reaches the iframe's own
- * contenteditable handler. When focus is inside the canvas iframe, do nothing (the iframe handles
- * it and forwards globals via `forwardKey`). Exported so the unit test can dispatch it directly.
+ * The inline-format vocabulary, as records.
  *
- * @param {KeyboardEvent} e
+ * **What this replaces, and what it revives.** Bold, Italic, Code and Link had chords printed in
+ * three places — a tooltip, a spec table, a data file's `shortcut: "Cmd+B"` string that is wrong on
+ * every Windows machine — and lived in a hand-written `keydown` switch that returned early whenever
+ * focus was inside the canvas iframe, which is exactly when a caret exists. Inside the frame
+ * `iframe-keys.ts` refused to forward them "because the engine handles them", and the engine did
+ * not: the parent's `editor/inline-edit.ts` keydown listener is attached to the BLOCK while the
+ * editing host is the canvas container, and `canvas/editable-actions.ts` rejects the browser's own
+ * `formatBold` because Jx owns its markup. So ⌘B in the canvas did nothing at all, in an app whose
+ * toolbar advertised it.
+ *
+ * They are the case UX-REDESIGN-PLAN §5.1 uses to justify two fields, so they are written the way
+ * it says: `level: "selection"` — a range inside the selected node is still the selection, and a
+ * fifth `range` level would demand a fifth region — with `keyScope: "caret"`, which is what makes
+ * the chord live only where a caret is. They were, until this change, the only capability in Studio
+ * with a chord and no record.
+ *
+ * **The set is the schema's, the verbs are the registry's.** `data/elements-meta.json` says which
+ * of the eight a given tag accepts (`$inlineActions`), so the bar draws four on an `<h1>` and eight
+ * on a `<p>`; what each one is CALLED, which chord it holds and what it does are on the record.
+ * That is the same division P5.3 made for value sources — caps derive from the schema, behaviour
+ * does not.
+ *
+ * `when` is {@link CommandContext.caret.inCanvas} and not `caret.active`: the caret stack is live
+ * in every parent-realm text field too, and ⌘K firing there would re-mount the link popover over
+ * the URL the author is typing into it.
  */
-export function handleParentFormatShortcut(e: KeyboardEvent): void {
-  if (!(e.ctrlKey || e.metaKey) || e.altKey) {
-    return;
+export function formatCommands(): AnyCommand[] {
+  const record = (
+    command: FormatCommand,
+    title: string,
+    icon: string,
+    keybinding?: string,
+  ): AnyCommand => ({
+    category: "Edit",
+    group: "6_format",
+    icon,
+    id: `format.${command}`,
+    ...(keybinding === undefined ? {} : { keybinding }),
+    keyScope: "caret",
+    level: "selection",
+    menus: ["blockbar/format", "palette"],
+    requires: "a text caret in the canvas",
+    run: () => {
+      postApplyFormat({ command });
+    },
+    title,
+    undo: "document",
+    when: (ctx: CommandContext) => ctx.caret.inCanvas,
+  });
+
+  return [
+    record("bold", "Bold", "sp-icon-text-bold", "mod+b"),
+    record("italic", "Italic", "sp-icon-text-italic", "mod+i"),
+    record("underline", "Underline", "sp-icon-text-underline", "mod+u"),
+    record("strikethrough", "Strikethrough", "sp-icon-text-strikethrough"),
+    record("superscript", "Superscript", "sp-icon-text-superscript"),
+    record("subscript", "Subscript", "sp-icon-text-subscript"),
+    record("code", "Code", "sp-icon-code", "mod+`"),
+    {
+      category: "Edit",
+      group: "6_format",
+      icon: "sp-icon-link",
+      id: "format.link",
+      /* ⌘K, at `caret` scope, beside `palette.open`'s global ⌘K. Two scopes may hold one chord —
+         that is what a shadowing ladder is — and the caret's wins only while a caret is in the
+         page. `commands/registry.ts`'s dispatcher takes the narrowest AVAILABLE claimant, so with
+         focus in a panel field (where this record's `when` is false) ⌘K still opens the palette. */
+      keybinding: "mod+k",
+      keyScope: "caret",
+      level: "selection",
+      menus: ["blockbar/format", "palette"],
+      requires: "a text caret in the canvas",
+      run: () => {
+        openLinkPopoverFromShortcut();
+      },
+      title: "Link…",
+      undo: "document",
+      when: (ctx: CommandContext) => ctx.caret.inCanvas,
+    },
+  ];
+}
+
+// ─── The selection command layer ─────────────────────────────────────────────
+
+/** Enough of a tab for the structural verbs. Mirrors `activeTab.value`'s non-null type. */
+type ActiveTab = NonNullable<typeof activeTab.value>;
+
+/**
+ * The node the selection verbs act on, when it is not simply the selection.
+ *
+ * The block action bar's target IS the selection. An Outline row's target is the ROW'S node —
+ * `PLACEMENT_MATRIX["outline/row"]` says so ("row actions act on the row's node"), and a hovered
+ * row is not the selected one. Rather than teach every record a second argument, the surface
+ * declares the target for the duration of one synchronous render or one click
+ * ({@link withCommandTarget}); the records keep reading one function.
+ */
+let _commandTarget: JxPath | null = null;
+
+/** The path the selection verbs currently address: an explicit target, else the selection. */
+export function commandTargetPath(): JxPath | null {
+  return _commandTarget ?? primarySelection(activeTab.value?.session.selection);
+}
+
+/**
+ * The paths a BATCH verb addresses — Delete and Duplicate, the two that are meaningful on a set.
+ *
+ * An explicit target wins outright and is always exactly one path:
+ * `PLACEMENT_MATRIX["outline/row"]` says a row action acts on the row's node, and a hovered row is
+ * not the selection. With no explicit target this is the whole selection, so `length === 1` hands
+ * back the single path the verbs have always received.
+ *
+ * The move verbs deliberately do NOT use this. "Move six nodes up one slot" has no single answer
+ * when they are not siblings, and every one of them is `childIndex` arithmetic against a parent
+ * that the previous move just renumbered.
+ *
+ * @returns {JxPath[]}
+ */
+export function commandTargetPaths(): JxPath[] {
+  if (_commandTarget) {
+    return [_commandTarget];
   }
-  // Same rule as the global shortcuts: a modal surface owns the keyboard, so ⌘B never reformats the
-  // Document behind an underlay the author cannot click through.
-  if (isModalOpen() || !getEditSnapshot().editing) {
-    return;
-  }
-  // Focus inside the cross-origin canvas iframe surfaces as the <iframe> element being active.
-  const active = document.activeElement;
-  if (active instanceof HTMLIFrameElement && active.classList.contains("jx-canvas-iframe")) {
-    return;
-  }
-  const key = e.key.toLowerCase();
-  if (key === "b") {
-    e.preventDefault();
-    postApplyFormat({ command: "bold" });
-  } else if (key === "i") {
-    e.preventDefault();
-    postApplyFormat({ command: "italic" });
-  } else if (key === "`") {
-    e.preventDefault();
-    postApplyFormat({ command: "code" });
-  } else if (key === "k") {
-    e.preventDefault();
-    openLinkPopoverFromShortcut();
+  return activeTab.value?.session.selection ?? [];
+}
+
+/** Run `fn` with `path` as the command target. Synchronous — the target never outlives the call. */
+export function withCommandTarget<T>(path: JxPath, fn: () => T): T {
+  const previous = _commandTarget;
+  _commandTarget = path;
+  try {
+    return fn();
+  } finally {
+    _commandTarget = previous;
   }
 }
 
-/** Pre-built icon templates for inline format buttons (avoids unsafeStatic) */
-const formatIconMap = {
+/** Whether `node` is an instance of a registered project component. */
+function isComponentInstanceNode(node: JxMutableNode | null | undefined): boolean {
+  const tag = node?.tagName;
+  const literal = displayTagName(tag);
+  return Boolean(literal.includes("-") && componentRegistry.some((c) => c.tagName === literal));
+}
+
+/**
+ * The {@link CommandContext} the selection verbs are evaluated against.
+ *
+ * Only the groups these records read are populated; everything else keeps `emptyContext`'s honest
+ * cold-start value. `isRoot` is `parentElementPath(path) === null`, which is the same test in both
+ * document modes: a content root sits at `[]`, an element root at `[]` too, and every movable node
+ * has a `[…, "children", i]` tail.
+ */
+export function selectionCommandContext(): CommandContext {
+  const tab = activeTab.value;
+  const path = commandTargetPath();
+  const node = tab && path ? getNodeAtPath(tab.doc.document, path) : null;
+  return makeContext({
+    /* The caret, as this surface knows it. `getEditSnapshot().editing` IS "a caret session is live
+       in the canvas" — the same fact `commands/live-context.ts` derives from the bridge for the
+       app-wide registry — and the format records are gated on it, so without this line the bar
+       would draw its own format cluster permanently hidden. `active` and `inCanvas` are the same
+       answer here because this surface has no parent-realm text field to confuse it with. */
+    caret: { active: getEditSnapshot().editing, inCanvas: getEditSnapshot().editing },
+    // The editor kind is part of the answer, not a default: `makeContext` fills it with "none",
+    // Which now reads as "not a canvas" and would hide the bar's own verbs from itself.
+    editor: { kind: tab ? editorKindForMode(tab.session.ui.canvasMode) : "none" },
+    document: { open: Boolean(tab) },
+    selection: {
+      count: path ? 1 : 0,
+      isComponentInstance: isComponentInstanceNode(node),
+      isRoot: path ? parentElementPath(path) === null : false,
+      kind: displayTagName(node?.tagName),
+    },
+  });
+}
+
+/** The structural facts a move verb needs. `null` when the target cannot be moved at all. */
+interface StructuralTarget {
+  tab: ActiveTab;
+  path: JxPath;
+  index: number;
+  parentPath: JxPath;
+  siblings: (JxMutableNode | string)[];
+}
+
+/** Resolve the current command target to its parent/index/siblings, or `null` if it has none. */
+function structuralTarget(path: JxPath | null = commandTargetPath()): StructuralTarget | null {
+  const tab = activeTab.value;
+  if (!tab || !path) {
+    return null;
+  }
+  /* THE SAME CONJUNCT `hasSelection` CARRIES, and for the same reason it gives. Four movers gate on
+     this function and none of them asked what editor is open, while their peers Delete and
+     Duplicate did — so with Project Settings focused the Outline row menu dropped Delete and
+     Duplicate and still rendered Move Up / Move Down / Move Into Previous / Move Out of Parent.
+     Those four `transactDoc` element splices straight into `project.json` through the transaction
+     log and then rewrite `session.selection`; the write lands and is saved. One surface, two rules,
+     and the loose ones were the mutating majority. Asked once, here, because all four share it. */
+  if (editorKindForMode(tab.session.ui.canvasMode) !== "canvas") {
+    return null;
+  }
+  const index = childIndex(path);
+  const parentPath = parentElementPath(path);
+  if (typeof index !== "number" || !parentPath) {
+    return null;
+  }
+  const parentNode = getNodeAtPath(tab.doc.document, parentPath);
+  if (!parentNode) {
+    return null;
+  }
+  return { index, parentPath, path, siblings: childList(parentNode), tab };
+}
+
+/**
+ * Whether `node` can accept a dropped-in sibling — the precondition for "move into previous".
+ *
+ * A void element cannot; an element whose only children are inline (a paragraph's `<em>`) is a text
+ * block, not a container, and nesting a block inside it produces invalid markup.
+ */
+function isContainerNode(node: JxMutableNode | string | null | undefined): boolean {
+  if (!node || typeof node !== "object") {
+    return false;
+  }
+  if (VOID_ELEMENTS.has((displayTagName(node.tagName) || "div").toLowerCase())) {
+    return false;
+  }
+  const { children } = node;
+  if (!children) {
+    return false;
+  }
+  if (!Array.isArray(children)) {
+    return (children as unknown as Record<string, unknown>).$prototype === "Array";
+  }
+  return (
+    children.length === 0 ||
+    children.some((c) => typeof c === "object" && c !== null && !isInlineElement(c, node))
+  );
+}
+
+function canMoveUp(): boolean {
+  const target = structuralTarget();
+  return target !== null && target.index > 0;
+}
+
+function canMoveDown(): boolean {
+  const target = structuralTarget();
+  return target !== null && target.index < target.siblings.length - 1;
+}
+
+function canMoveIn(): boolean {
+  const target = structuralTarget();
+  return target !== null && target.index > 0 && isContainerNode(target.siblings[target.index - 1]);
+}
+
+function canMoveOut(): boolean {
+  const target = structuralTarget();
+  return (
+    target !== null &&
+    parentElementPath(target.parentPath) !== null &&
+    typeof childIndex(target.parentPath) === "number"
+  );
+}
+
+/** Move the target up one slot among its siblings, keeping it selected. */
+function moveTargetUp(): void {
+  const target = structuralTarget();
+  if (!target || target.index === 0) {
+    return;
+  }
+  const { index, parentPath, path, tab } = target;
+  transactDoc(tab, (t) => mutateMoveNode(t, path, parentPath, index - 1));
+  tab.session.selection = [[...parentPath, "children", index - 1]];
+}
+
+/** Move the target down one slot among its siblings, keeping it selected. */
+function moveTargetDown(): void {
+  const target = structuralTarget();
+  if (!target || target.index >= target.siblings.length - 1) {
+    return;
+  }
+  const { index, parentPath, path, tab } = target;
+  // `index + 2`: mutateMoveNode removes before it inserts, so a same-parent move down needs the
+  // Post-removal index of the slot AFTER the next sibling.
+  transactDoc(tab, (t) => mutateMoveNode(t, path, parentPath, index + 2));
+  tab.session.selection = [[...parentPath, "children", index + 1]];
+}
+
+/** Append the target to its previous sibling, making it that element's last child. */
+function moveTargetIn(): void {
+  const target = structuralTarget();
+  if (!canMoveIn() || !target) {
+    return;
+  }
+  const { index, parentPath, path, tab } = target;
+  const prevPath = [...parentPath, "children", index - 1];
+  const { length } = childList(getNodeAtPath(tab.doc.document, prevPath));
+  transactDoc(tab, (t) => mutateMoveNode(t, path, prevPath, length));
+  tab.session.selection = [[...prevPath, "children", length]];
+}
+
+/** Lift the target out of its parent, landing it directly after that parent. */
+function moveTargetOut(): void {
+  const target = structuralTarget();
+  if (!target) {
+    return;
+  }
+  const grandparent = parentElementPath(target.parentPath);
+  const parentIndex = childIndex(target.parentPath);
+  if (!grandparent || typeof parentIndex !== "number") {
+    return;
+  }
+  transactDoc(target.tab, (t) => mutateMoveNode(t, target.path, grandparent, parentIndex + 1));
+  target.tab.session.selection = [[...grandparent, "children", parentIndex + 1]];
+}
+
+/**
+ * Delete every targeted node, leaving the primary's parent selected (never a dangling path).
+ *
+ * One transaction, therefore one undo step — a six-node delete that produced six history entries
+ * would make ⌘Z a rebuild rather than a reversal.
+ *
+ * **A delete that removes nothing moves nothing.** The selection jump is the visible half of this
+ * verb, and running it over an unchanged document is the app telling the author something happened
+ * when nothing did. There are two ways to remove nothing, and each is checked on its own side of
+ * the transaction:
+ *
+ * - `mutateRemoveNodes` removes exactly {@link structuralBatch}, which drops every path that names no
+ *   splice coordinate — the document element, a repeater's map template, a `$switch` case. A target
+ *   made only of those filters out entirely, and calling `transactDoc` anyway would ALSO mark the
+ *   tab dirty and push an undo step that reverses nothing. So an empty batch returns before the
+ *   transaction rather than after it.
+ * - `transactDoc` itself declines while a peer holds source-canonical, and says so by leaving the
+ *   document root reference — which it otherwise always replaces — exactly as it found it.
+ */
+function deleteTarget(): void {
+  const tab = activeTab.value;
+  const paths = commandTargetPaths();
+  const path = commandTargetPath();
+  // An empty target and a target of nothing-spliceable are the same answer: `structuralBatch([])`
+  // Is `[]`, so one test covers both.
+  if (!tab || !path || structuralBatch(paths).length === 0) {
+    return;
+  }
+  const documentBefore = tab.doc.document;
+  transactDoc(tab, (t) => mutateRemoveNodes(t, paths));
+  if (tab.doc.document === documentBefore) {
+    return;
+  }
+  const parentPath = parentElementPath(path);
+  tab.session.selection = parentPath ? [parentPath] : [];
+}
+
+/** Duplicate every targeted node in one transaction, selecting the copies. */
+function duplicateTarget(): void {
+  const tab = activeTab.value;
+  const paths = commandTargetPaths();
+  if (!tab || paths.length === 0) {
+    return;
+  }
+  transactDoc(tab, (t) => mutateDuplicateNodes(t, paths));
+}
+
+/** Select the target's parent element. */
+function selectParentOfTarget(): void {
+  const tab = activeTab.value;
+  const path = commandTargetPath();
+  const parentPath = path ? parentElementPath(path) : null;
+  if (tab && parentPath) {
+    tab.session.selection = [parentPath];
+  }
+}
+
+/** What the structural selection verbs need that this module does not own. */
+export interface SelectionCommandDeps {
+  /** Open the component definition behind the selected instance. */
+  navigateToComponent: (path: string) => void;
+  /** Lift the selection into a new component file. */
+  convertToComponent: () => void;
+}
+
+/** A target exists at all — the `when` every selection verb shares. */
+const hasTarget = (ctx: CommandContext) => ctx.selection.count > 0;
+
+/**
+ * The structural selection verbs, defined once.
+ *
+ * `group` keys are ordering keys, not categories: the four moves sort ahead of `3_structure`
+ * (Duplicate, from `commands/defaults.ts`) and `9_danger` (Delete, likewise), which is the order
+ * the bar and the Outline rows both render in.
+ *
+ * No `keybinding` is claimed here on purpose. The chord table is `editor/shortcuts.ts`'s port (plan
+ * P2 workstream 4); claiming chords from a panel would decide that port's outcome by accident. The
+ * buttons still print the chords of the records that DO carry them.
+ */
+export function registerSelectionCommands(
+  registry: CommandRegistry,
+  deps: SelectionCommandDeps,
+): void {
+  registry.registerAll([
+    {
+      category: "Selection",
+      enablement: canMoveUp,
+      group: "1_move_1",
+      icon: "sp-icon-arrow-up",
+      id: "selection.moveUp",
+      keyScope: "canvas",
+      level: "selection",
+      menus: ["blockbar", "outline/row"],
+      requires: "an element with a sibling above it",
+      run: () => moveTargetUp(),
+      title: "Move Up",
+      undo: "document",
+      when: hasTarget,
+    },
+    {
+      category: "Selection",
+      enablement: canMoveDown,
+      group: "1_move_2",
+      icon: "sp-icon-arrow-down",
+      id: "selection.moveDown",
+      keyScope: "canvas",
+      level: "selection",
+      menus: ["blockbar", "outline/row"],
+      requires: "an element with a sibling below it",
+      run: () => moveTargetDown(),
+      title: "Move Down",
+      undo: "document",
+      when: hasTarget,
+    },
+    {
+      category: "Selection",
+      enablement: canMoveIn,
+      group: "1_move_3",
+      icon: "sp-icon-arrow-right",
+      id: "selection.moveIn",
+      keyScope: "canvas",
+      level: "selection",
+      menus: ["outline/row"],
+      requires: "a container directly above the element",
+      run: () => moveTargetIn(),
+      title: "Move Into Previous",
+      undo: "document",
+      when: hasTarget,
+    },
+    {
+      category: "Selection",
+      enablement: canMoveOut,
+      group: "1_move_4",
+      icon: "sp-icon-arrow-left",
+      id: "selection.moveOut",
+      keyScope: "canvas",
+      level: "selection",
+      menus: ["outline/row"],
+      requires: "an element nested inside another",
+      run: () => moveTargetOut(),
+      title: "Move Out of Parent",
+      undo: "document",
+      when: hasTarget,
+    },
+    // Convert / Edit are one slot with two states, not two optional buttons: `when` splits them on
+    // "is this a component instance", so exactly one of the pair renders for any selection and the
+    // Bar keeps its shape.
+    {
+      category: "Selection",
+      // …and the same conjunct here: Convert to Component starts a project-level flow, so it must
+      // Not be reachable from a config node drawn as a layer tree.
+      enablement: (ctx) =>
+        Boolean(ctx.selection.kind) && !ctx.selection.isRoot && ctx.editor.kind === "canvas",
+      group: "4_component",
+      icon: "sp-icon-box",
+      id: "selection.convertToComponent",
+      level: "selection",
+      // Three surfaces, ONE record. `editor/context-menu.ts` carried a second `convertToComponent`
+      // With the same title and a different `when`, invisible to every registry but its own popover.
+      menus: ["blockbar", "context/element", "palette"],
+      requires: "an element that is not the document root",
+      // Deliberately NOT awaited: `convertToComponent()` resolves when the human answers the name
+      // Dialog, and a command whose promise waits on a person is a command nothing automated can
+      // Call. `run()` means "start this flow", the same as `settings.open` and `project.new`.
+      run: () => {
+        void deps.convertToComponent();
+      },
+      title: "Convert to Component",
+      undo: "project",
+      when: (ctx) => ctx.selection.count > 0 && !ctx.selection.isComponentInstance,
+    },
+    {
+      category: "Selection",
+      group: "4_component",
+      icon: "sp-icon-edit",
+      id: "selection.editComponent",
+      level: "selection",
+      menus: ["blockbar", "context/element", "palette"],
+      requires: "a component instance",
+      run: () => {
+        const node = componentOfTarget();
+        if (node) {
+          deps.navigateToComponent(node);
+        }
+      },
+      title: "Edit Component",
+      undo: "none",
+      when: (ctx) => ctx.selection.isComponentInstance,
+    },
+  ] satisfies AnyCommand[]);
+}
+
+/** The component file behind the current target, when it is an instance. */
+function componentOfTarget(): string | null {
+  const tab = activeTab.value;
+  const path = commandTargetPath();
+  const node = tab && path ? getNodeAtPath(tab.doc.document, path) : null;
+  const entry = componentRegistry.find((c) => c.tagName === node?.tagName);
+  return entry?.path ?? null;
+}
+
+/** The registry the two selection surfaces render. Injected by a host, or built on first use. */
+let _registry: CommandRegistry | null = null;
+
+/**
+ * Hand the surfaces the app-wide registry (or `null` to drop back to the surface's own).
+ *
+ * A host that injects one is responsible for two things: registering
+ * {@link registerSelectionCommands}, and building its `getContext` so it honours
+ * {@link commandTargetPath} — otherwise an Outline row's buttons report the SELECTION's enablement
+ * rather than the row's.
+ */
+export function useCommandRegistry(registry: CommandRegistry | null): void {
+  _registry = registry;
+}
+
+/**
+ * The registry the block action bar and the Outline rows render.
+ *
+ * Until a host bootstrap injects one there is no app-wide registry, so this builds the surface's
+ * own: the SELECTION-level slice of `commands/defaults.ts` (which is where Delete, Duplicate and
+ * Select Parent are defined, with `blockbar` / `outline/row` already declared) plus the structural
+ * verbs above. The other levels are filtered out rather than stubbed — Save is not this surface's
+ * to own, and a registry holding a no-op `file.save` would be a lie.
+ */
+export function selectionCommandRegistry(): CommandRegistry {
+  if (_registry) {
+    return _registry;
+  }
+  const registry = createCommandRegistry({ getContext: selectionCommandContext });
+  const deps: CommandDeps = {
+    ...noopCommandDeps(),
+    deleteSelection: deleteTarget,
+    duplicateSelection: duplicateTarget,
+    selectParent: selectParentOfTarget,
+  };
+  registry.registerAll(defaultCommands(deps).filter((command) => command.level === "selection"));
+  registerSelectionCommands(registry, {
+    convertToComponent: () => convertToComponent(),
+    navigateToComponent: (path) => _ctx?.navigateToComponent(path),
+  });
+  // The format cluster renders from records like every other button on this bar, so the surface's
+  // Own registry has to hold them — otherwise `keymap.formatBinding("format.bold")` has nothing to
+  // Format and the tooltip goes back to the hardcoded `Cmd+B` this change deleted.
+  registry.registerAll(formatCommands());
+  _registry = registry;
+  return registry;
+}
+
+/** How many verb buttons the bar renders before the rest fold into `⋮` (plan §3.2 ⑩). */
+export const BLOCKBAR_MAX_ITEMS = 5;
+
+/**
+ * Icons for command records, keyed by the record's own `icon`.
+ *
+ * A record with no icon renders its title as text rather than an unlabelled blank: the surface is
+ * allowed to choose how a name is drawn, never what it is.
+ */
+const commandIconMap: Record<string, TemplateResult> = {
+  "sp-icon-arrow-down": html`<sp-icon-arrow-down slot="icon"></sp-icon-arrow-down>`,
+  "sp-icon-arrow-left": html`<sp-icon-arrow-left slot="icon"></sp-icon-arrow-left>`,
+  "sp-icon-arrow-right": html`<sp-icon-arrow-right slot="icon"></sp-icon-arrow-right>`,
+  "sp-icon-arrow-up": html`<sp-icon-arrow-up slot="icon"></sp-icon-arrow-up>`,
+  "sp-icon-box": html`<sp-icon-box slot="icon" size="xs"></sp-icon-box>`,
   "sp-icon-code": html`<sp-icon-code slot="icon"></sp-icon-code>`,
+  "sp-icon-delete": html`<sp-icon-delete slot="icon"></sp-icon-delete>`,
+  "sp-icon-duplicate": html`<sp-icon-duplicate slot="icon"></sp-icon-duplicate>`,
+  "sp-icon-edit": html`<sp-icon-edit slot="icon" size="xs"></sp-icon-edit>`,
   "sp-icon-link": html`<sp-icon-link slot="icon"></sp-icon-link>`,
   "sp-icon-text-bold": html`<sp-icon-text-bold slot="icon"></sp-icon-text-bold>`,
   "sp-icon-text-italic": html`<sp-icon-text-italic slot="icon"></sp-icon-text-italic>`,
@@ -227,7 +823,44 @@ const formatIconMap = {
     slot="icon"
   ></sp-icon-text-superscript>`,
   "sp-icon-text-underline": html`<sp-icon-text-underline slot="icon"></sp-icon-text-underline>`,
-} as Record<string, TemplateResult>;
+};
+
+/** The record's icon, or its title drawn as a compact label. */
+export function commandIcon(command: AnyCommand): TemplateResult {
+  return (
+    (command.icon ? commandIconMap[command.icon] : undefined) ??
+    html`<span class="cmd-label">${command.title}</span>`
+  );
+}
+
+/**
+ * The tooltip: the chord when the control can act, the `requires` sentence when it cannot.
+ *
+ * Both strings come from the record. The accessible name stays the bare `title` either way, so a
+ * screen reader announces "Delete", not "Delete, requires an element selection".
+ */
+export function commandTooltip(registry: CommandRegistry, command: AnyCommand): string {
+  const reason = registry.disabledReason(command.id);
+  if (reason !== undefined) {
+    return `${command.title} — requires ${reason}`;
+  }
+  const chord = registry.keymap.formatBinding(command.id);
+  return chord ? `${command.title} (${chord})` : command.title;
+}
+
+/** Run a command, swallowing the refusal a disabled control should never have produced. */
+export function runCommand(registry: CommandRegistry, id: string, target?: JxPath | null): void {
+  const invoke = () => {
+    if (registry.isEnabled(id)) {
+      void registry.run(id);
+    }
+  };
+  if (target) {
+    withCommandTarget(target, invoke);
+  } else {
+    invoke();
+  }
+}
 
 /**
  * Prevent the bar from stealing focus from contenteditable
@@ -267,39 +900,34 @@ function onTagBadgeClick(e: MouseEvent, targets: SlashCommand[], selection: JxPa
 }
 
 /**
- * Handle a format-button click. The iframe owns the Selection — link opens the parent popover;
- * every other command posts an `applyFormat` intent across the bridge.
+ * The parent selector.
  *
- * @param {MouseEvent} e
- * @param {InlineAction} action
+ * It renders the `selection.selectParent` record — its name, its chord and its handler — but as
+ * fixed chrome rather than from `forPlacement("blockbar")`, because that record does not declare
+ * the placement. Its disabled state is "the selection has no parent", which the record's own
+ * `enablement` (a bare "there is a selection") cannot express yet.
  */
-function onFormatClick(e: MouseEvent, action: InlineAction) {
-  e.stopPropagation();
-  if (action.command === "link") {
-    showLinkPopover((e.target as HTMLElement).closest("sp-action-button") as HTMLElement);
-  } else if (action.command) {
-    postApplyFormat({ command: action.command as FormatCommand });
-  }
-}
-
-function renderParentSelector() {
+function renderParentButton(registry: CommandRegistry) {
   const tab = activeTab.value;
-  if (!tab?.session.selection) {
-    return nothing;
-  }
-  const pPath = parentElementPath(tab.session.selection);
-  if (!pPath) {
-    return nothing;
-  }
-  const parentNode = getNodeAtPath(tab.doc.document, pPath);
+  const selection = primarySelection(tab?.session.selection);
+  const parentPath = selection ? parentElementPath(selection) : null;
+  const parentNode = tab && parentPath ? getNodeAtPath(tab.doc.document, parentPath) : null;
+  const command = registry.get("selection.selectParent");
+  const name = command?.title ?? "Select Parent";
+  const chord = command ? registry.keymap.formatBinding(command.id) : undefined;
+  const label = parentNode ? `Select parent: ${nodeLabel(parentNode)}` : name;
   return html`
     <sp-action-button
       size="xs"
       quiet
-      title="Select parent: ${nodeLabel(parentNode)}"
+      data-toolbar-item
+      tabindex="-1"
+      aria-label=${label}
+      title=${chord ? `${label} (${chord})` : label}
+      ?disabled=${!parentPath}
       @click=${(e: MouseEvent) => {
         e.stopPropagation();
-        activeTab.value!.session.selection = pPath;
+        runCommand(registry, "selection.selectParent");
       }}
     >
       <sp-icon-back slot="icon"></sp-icon-back>
@@ -307,42 +935,217 @@ function renderParentSelector() {
   `;
 }
 
-function renderMoveArrows() {
-  const tab = activeTab.value;
-  if (!tab?.session.selection) {
-    return nothing;
+/** One verb, rendered from its record. */
+function renderCommandButton(registry: CommandRegistry, command: AnyCommand) {
+  const disabled = registry.disabledReason(command.id) !== undefined;
+  return html`<sp-action-button
+    size="xs"
+    quiet
+    class=${command.destructive ? "bar-cmd bar-cmd--danger" : "bar-cmd"}
+    data-toolbar-item
+    data-command=${command.id}
+    tabindex="-1"
+    aria-label=${command.title}
+    title=${commandTooltip(registry, command)}
+    ?disabled=${disabled}
+    @mousedown=${(e: MouseEvent) => e.preventDefault()}
+    @click=${(e: MouseEvent) => {
+      e.stopPropagation();
+      runCommand(registry, command.id);
+    }}
+    >${commandIcon(command)}</sp-action-button
+  >`;
+}
+
+/** The `⋮` button and the menu of everything past {@link BLOCKBAR_MAX_ITEMS}. */
+function renderOverflowButton(registry: CommandRegistry, commands: readonly AnyCommand[]) {
+  return html`<sp-action-button
+    size="xs"
+    quiet
+    class="bar-overflow"
+    data-toolbar-item
+    tabindex="-1"
+    aria-label="More block actions"
+    aria-haspopup="menu"
+    title="More block actions"
+    @mousedown=${(e: MouseEvent) => e.preventDefault()}
+    @click=${(e: MouseEvent) => {
+      e.stopPropagation();
+      showCommandOverflow(e.currentTarget as HTMLElement, registry, commands);
+    }}
+  >
+    <sp-icon-more slot="icon"></sp-icon-more>
+  </sp-action-button>`;
+}
+
+/** The open overflow menu, so a second press (or a re-render) closes rather than stacks it. */
+let _overflowHandle: { dismiss: () => void; host: HTMLElement } | null = null;
+
+/** Close the block action bar's `⋮` menu if it is open. */
+export function dismissBlockBarOverflow(): void {
+  _overflowHandle?.dismiss();
+  _overflowHandle = null;
+}
+
+/**
+ * Show the `⋮` menu under `anchor`. Rows carry the same names, chords and refusals as the buttons.
+ *
+ * Shared by the block action bar and the Outline rows — one menu is open at a time, so `target`
+ * (the Outline row's node) is captured per row and re-applied when a row is chosen.
+ */
+export function showCommandOverflow(
+  anchor: HTMLElement,
+  registry: CommandRegistry,
+  commands: readonly AnyCommand[],
+  target: JxPath | null = null,
+): void {
+  dismissBlockBarOverflow();
+  const rect = rectOf(anchor);
+  // Resolve every row's name / chord / refusal against the TARGET, not the selection, before the
+  // Template is built — lit evaluates these eagerly, so the wrap has to cover the whole projection.
+  const project = () =>
+    commands.map((command) => ({
+      chord: registry.keymap.formatBinding(command.id),
+      destructive: command.destructive === true,
+      disabled: registry.disabledReason(command.id) !== undefined,
+      id: command.id,
+      title: command.title,
+      tooltip: commandTooltip(registry, command),
+    }));
+  const rows = target ? withCommandTarget(target, project) : project();
+  _overflowHandle = renderPopover(
+    html`<sp-popover
+      open
+      class="bar-overflow-menu"
+      style=${styleMap({
+        left: `${rect.left}px`,
+        position: "fixed",
+        top: `${rect.bottom + 4}px`,
+        zIndex: "101",
+      })}
+    >
+      <sp-menu>
+        ${rows.map(
+          (row) => html`<sp-menu-item
+            ?disabled=${row.disabled}
+            data-command=${row.id}
+            title=${row.tooltip}
+            style=${row.destructive ? "color: var(--danger)" : nothing}
+            @click=${() => {
+              dismissBlockBarOverflow();
+              runCommand(registry, row.id, target);
+            }}
+            >${row.title}${
+              row.chord ? html`<kbd slot="value" class="cmd-chord">${row.chord}</kbd>` : nothing
+            }</sp-menu-item
+          >`,
+        )}
+      </sp-menu>
+    </sp-popover>`,
+    {
+      dismissOnOutsideClick: true,
+      onDismiss: () => {
+        _overflowHandle = null;
+      },
+    },
+  );
+}
+
+// ─── Toolbar keyboard model ──────────────────────────────────────────────────
+
+/** The bar's focusable items, in DOM order, skipping the ones that cannot act. */
+function toolbarItems(bar: HTMLElement): HTMLElement[] {
+  return [...bar.querySelectorAll<HTMLElement>("[data-toolbar-item]")].filter(
+    (el) => !el.hasAttribute("disabled") && el.getAttribute("aria-disabled") !== "true",
+  );
+}
+
+/**
+ * Apply the roving tabindex: exactly one item is in the tab order at a time.
+ *
+ * Called after every render, so the survivor is whichever item still holds focus and otherwise the
+ * first — a toolbar that resets to its first control on every keystroke is not navigable.
+ */
+export function applyRovingTabindex(bar: HTMLElement): void {
+  const items = toolbarItems(bar);
+  const focused = items.findIndex(
+    (el) => el === document.activeElement || el.contains(document.activeElement),
+  );
+  const active = focused === -1 ? 0 : focused;
+  for (const [index, el] of items.entries()) {
+    el.tabIndex = index === active ? 0 : -1;
   }
-  const sel = tab.session.selection;
-  const idx = childIndex(sel) as number;
-  const pPath = parentElementPath(sel);
-  const parentNode = pPath ? getNodeAtPath(tab.doc.document, pPath) : null;
-  const siblings = parentNode ? childList(parentNode) : null;
-  return html`
-    <sp-action-button
-      size="xs"
-      quiet
-      title="Move up"
-      ?disabled=${idx <= 0}
-      @click=${(e: MouseEvent) => {
-        e.stopPropagation();
-        moveSelectionUp();
-      }}
-    >
-      <sp-icon-arrow-up slot="icon"></sp-icon-arrow-up>
-    </sp-action-button>
-    <sp-action-button
-      size="xs"
-      quiet
-      title="Move down"
-      ?disabled=${!siblings || idx >= siblings.length - 1}
-      @click=${(e: MouseEvent) => {
-        e.stopPropagation();
-        moveSelectionDown();
-      }}
-    >
-      <sp-icon-arrow-down slot="icon"></sp-icon-arrow-down>
-    </sp-action-button>
-  `;
+}
+
+/** Move focus to item `index` (wrapping), and make it the one in the tab order. */
+function focusToolbarItem(bar: HTMLElement, index: number): void {
+  const items = toolbarItems(bar);
+  if (items.length === 0) {
+    return;
+  }
+  const wrapped = ((index % items.length) + items.length) % items.length;
+  for (const [i, el] of items.entries()) {
+    el.tabIndex = i === wrapped ? 0 : -1;
+  }
+  items[wrapped]!.focus();
+}
+
+/** Put the keyboard back where it came from — the canvas iframe, else its wrapper. */
+function returnFocusToCanvas(): void {
+  // The FOCUSED pane's stage: the keyboard came from there and is going back there. Resolving it
+  // From the active tab answered with whichever pane displays that document first.
+  const stage = activeCanvasSurface().wrap;
+  const iframe = stage?.querySelector<HTMLElement>("iframe.jx-canvas-iframe");
+  (iframe ?? stage)?.focus();
+}
+
+/** `role="toolbar"` navigation: ←/→ between items, Home/End to the ends, Esc back to the canvas. */
+export function onToolbarKeydown(e: KeyboardEvent): void {
+  const bar = e.currentTarget as HTMLElement;
+  const items = toolbarItems(bar);
+  const current = items.findIndex(
+    (el) => el === document.activeElement || el.contains(document.activeElement),
+  );
+  if (e.key === "ArrowRight") {
+    e.preventDefault();
+    focusToolbarItem(bar, current + 1);
+  } else if (e.key === "ArrowLeft") {
+    e.preventDefault();
+    focusToolbarItem(bar, current - 1);
+  } else if (e.key === "Home") {
+    e.preventDefault();
+    focusToolbarItem(bar, 0);
+  } else if (e.key === "End") {
+    e.preventDefault();
+    focusToolbarItem(bar, items.length - 1);
+  } else if (e.key === "Escape") {
+    e.preventDefault();
+    dismissBlockBarOverflow();
+    returnFocusToCanvas();
+  }
+}
+
+/**
+ * ⌥↑ enters the bar from the canvas.
+ *
+ * Bound on the PARENT document, so it fires whenever the parent chrome owns focus. A press from
+ * inside the canvas iframe does not arrive: `canvas/iframe-keys.ts` forwards bare navigation keys
+ * only when the target is not editable, and the canvas root is permanently `contenteditable`.
+ * Exported so a test can dispatch it directly.
+ */
+export function handleBlockBarEntryKey(e: KeyboardEvent): void {
+  if (e.key !== "ArrowUp" || !e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) {
+    return;
+  }
+  if (isModalOpen()) {
+    return;
+  }
+  const bar = view.blockActionBarEl?.querySelector<HTMLElement>(".block-action-bar");
+  if (!bar) {
+    return;
+  }
+  e.preventDefault();
+  focusToolbarItem(bar, 0);
 }
 
 /**
@@ -364,7 +1167,7 @@ function onMergeTagClick(e: MouseEvent) {
   // When the caret sits inside a repeater, offer its local scope (item/index + item fields). There is
   // No live `$map` in edit mode — the perimeter renders one glyph template — so fields resolve
   // Parent-side from schema, keyed off the selected element's doc path (which carries a `map` segment).
-  const selPath = getEditSnapshot().snapshot?.path ?? tab?.session.selection;
+  const selPath = getEditSnapshot().snapshot?.path ?? primarySelection(tab?.session.selection);
   const arrayNode = tab && selPath ? findEnclosingRepeater(tab.doc.document, selPath) : null;
   if (arrayNode) {
     const tokens = resolveRepeaterItemFields(
@@ -397,9 +1200,88 @@ export function dismissLinkPopover() {
 
 /** Dismiss the block action bar. */
 export function dismissBlockActionBar() {
+  /* A dismiss is the bar's STRUCTURAL teardown — `canvas/canvas-render.ts` calls it when a stage is
+     torn down and again on a mode transition — so it also drops any suppression. The bar it would
+     otherwise be holding down does not exist any more; what comes back is a different one. */
+  _suppressedFor = null;
+  dismissBlockBarOverflow();
   if (view.blockActionBarEl) {
     litRender(nothing, view.blockActionBarEl);
   }
+}
+
+/**
+ * The document + selection the bar is currently suppressed FOR, or null while it is free to draw.
+ *
+ * **Why a key and not a boolean.** The bar is `position: fixed` and clamped into the window, so it
+ * can sit over the Document Header card, the pane context bar and the docks; an author working in
+ * the Inspector's Logic tab reported it "blocking a part of the interface that the user needs to
+ * utilize". Hiding it on a chrome pointerdown is half an answer — {@link dismissBlockActionBar}
+ * alone would flash back on the very next repaint, because the bar is re-rendered from the
+ * `toolbarRefresh` seam on every selection snapshot and from `renderOnly("overlays")` on zoom/pan.
+ * The key is what makes the state end by itself: a render for a DIFFERENT selection is the click
+ * that hid the bar having also chosen a new target (an Outline row, a Navigator entry), and the bar
+ * belongs over the new one. {@link releaseBlockActionBar} is the other door, for the click that
+ * chose the same target again.
+ *
+ * Nothing outside this module reads it. "Is the bar suppressed" is not a fact any other surface may
+ * branch on — it is one panel declining to draw itself, and a second reader would make it a mode.
+ */
+let _suppressedFor: { key: string } | null = null;
+
+/**
+ * What the bar is suppressed FOR: a path, in a document.
+ *
+ * The tab is half the key because `["children",0]` names a node in every document there has ever
+ * been. Keyed on the path alone, an author who suppressed the bar and then switched tabs — itself a
+ * chrome click — would find it hidden over the new document's first block, which they never clicked
+ * away from. `JSON.stringify` rather than `join` for the same reason one level down: the document
+ * root is `[]` and "nothing selected" is `null`, and those two must not compare equal.
+ */
+function suppressionKey(tab: ActiveTab | null, path: JxPath | null): string {
+  return JSON.stringify([tab?.id ?? null, path]);
+}
+
+/**
+ * Hide the bar until the canvas is in play again — the author pressed a pointer down in parent
+ * chrome, which is a surface the bar may be sitting on top of.
+ *
+ * **The selection is deliberately untouched.** The Inspector edits the selected node, so a click
+ * into it is how the author edits the thing they selected; clearing the selection here would make
+ * the panel they just reached for go blank. Only the bar's own rendering is suspended.
+ *
+ * The `⋮` menu and the link popover go with it, because both are ANCHORED to the bar — the overflow
+ * under its `⋮` button, the popover under its Link button. Left open they would float over the
+ * chrome with nothing under them to belong to, which is the same defect one level down. Neither can
+ * be the cause of this call: {@link isEditChromeTarget} exempts both.
+ */
+export function suppressBlockActionBar(): void {
+  // Clears any earlier key as its first act; this selection's replaces it below.
+  dismissBlockActionBar();
+  if (_linkPopoverOpen) {
+    dismissLinkPopover();
+  }
+  const tab = activeTab.value;
+  _suppressedFor = { key: suppressionKey(tab, primarySelection(tab?.session.selection)) };
+}
+
+/**
+ * Let the bar draw again — a pointer went down in a canvas frame, so the canvas is the surface the
+ * author is working on.
+ *
+ * This is the door the SELECTION cannot open: clicking the already-selected element posts the same
+ * path back, so the key comparison in {@link renderBlockActionBar} still matches and the bar would
+ * stay hidden for as long as the author kept clicking the block they are editing.
+ *
+ * A no-op when nothing is suppressed, so the common case — every canvas pointerdown, suppressed or
+ * not — costs a null check rather than a render.
+ */
+export function releaseBlockActionBar(): void {
+  if (!_suppressedFor) {
+    return;
+  }
+  _suppressedFor = null;
+  renderBlockActionBar();
 }
 
 /**
@@ -428,6 +1310,7 @@ export function isEditChromeTarget(target: EventTarget | null): boolean {
   }
   const roots = [
     view.blockActionBarEl,
+    _overflowHandle?.host ?? null,
     getLayerSlot("popover", "link-popover"),
     getLayerSlot("popover", "slash-menu"),
   ];
@@ -522,45 +1405,15 @@ function showLinkPopover(anchorBtn: HTMLElement) {
  */
 export function openLinkPopoverFromShortcut(): void {
   const bar = view.blockActionBarEl?.querySelector(".block-action-bar") as HTMLElement | null;
+  /* By RECORD ID, not by rendered text. This queried `sp-action-button[title^="Link"]`, which is
+     the addressing §13's first rule bans in the screenshot manifest — a match on a title the app
+     DERIVES (it now reads "Link… (⌘K)", and on Windows it reads something else again). The id is
+     the input the app accepts. */
   const linkBtn =
-    (bar?.querySelector('sp-action-button[title^="Link"]') as HTMLElement | null) ?? bar;
+    (bar?.querySelector('[data-command-id="format.link"]') as HTMLElement | null) ?? bar;
   if (linkBtn) {
     showLinkPopover(linkBtn);
   }
-}
-
-/** Move the selected node up (swap with previous sibling). */
-function moveSelectionUp() {
-  const tab = activeTab.value;
-  if (!tab?.session.selection || tab.session.selection.length < 2) {
-    return;
-  }
-  const sel = tab.session.selection;
-  const idx = childIndex(sel) as number;
-  if (idx <= 0) {
-    return;
-  }
-  const pPath = parentElementPath(sel) as JxPath;
-  transactDoc(tab, (t) => mutateMoveNode(t, sel, pPath, idx - 1));
-  tab.session.selection = [...pPath, "children", idx - 1];
-}
-
-/** Move the selected node down (swap with next sibling). */
-function moveSelectionDown() {
-  const tab = activeTab.value;
-  if (!tab?.session.selection || tab.session.selection.length < 2) {
-    return;
-  }
-  const sel = tab.session.selection;
-  const idx = childIndex(sel) as number;
-  const pPath = parentElementPath(sel) as JxPath;
-  const parentNode = getNodeAtPath(tab.doc.document, pPath);
-  const siblings = childList(parentNode);
-  if (idx >= siblings.length - 1) {
-    return;
-  }
-  transactDoc(tab, (t) => mutateMoveNode(t, sel, pPath, idx + 2));
-  tab.session.selection = [...pPath, "children", idx + 1];
 }
 
 /** Render the unified block action bar above the selected element. */
@@ -572,6 +1425,19 @@ export function renderBlockActionBar() {
     view.blockActionBarEl = getLayerSlot("popover", "block-action-bar");
   }
 
+  /* A snapshot-driven refresh must not re-mount an open link popover — it would re-create the URL
+     field and lose the caret — so this pass is skipped entirely.
+
+     It sits AHEAD of the drag release below, because it is the one early return that LEAVES THE BAR
+     UP. Releasing and then returning without re-rendering left the ⠿ handle on screen and inert, and
+     nothing re-installs it: `dismissLinkPopover` does not re-render the bar. Any repaint reaches
+     here — `applyTransform` → `renderOnly("overlays")` → this — so a pan, a zoom or a pane resize
+     with the Link popover open silently killed dragging until the next selection change. Every
+     other early return draws `nothing`, so releasing before them is right. */
+  if (_linkPopoverOpen) {
+    return;
+  }
+
   if (view.selDragCleanup) {
     view.selDragCleanup();
     view.selDragCleanup = null;
@@ -580,18 +1446,25 @@ export function renderBlockActionBar() {
   const tab = activeTab.value;
   const canvasMode = _ctx.getCanvasMode();
 
-  if (!tab?.session.selection || (canvasMode !== "design" && canvasMode !== "edit")) {
+  const selection = primarySelection(tab?.session.selection);
+
+  /* Suppressed by a chrome pointerdown, and this pass is the first of the two doors out of it (see
+     {@link _suppressedFor}). A different selection means the click that hid the bar also chose a new
+     target, so the suppression is over; the same selection keeps it, which is what stops the next
+     snapshot- or overlay-driven repaint from flashing the bar back under the author's cursor. */
+  if (_suppressedFor) {
+    if (_suppressedFor.key === suppressionKey(tab, selection)) {
+      litRender(nothing, view.blockActionBarEl);
+      return;
+    }
+    _suppressedFor = null;
+  }
+
+  if (!tab || !selection || (canvasMode !== "design" && canvasMode !== "edit")) {
     litRender(nothing, view.blockActionBarEl);
     return;
   }
 
-  // A snapshot-driven refresh must not re-mount an open link popover (it would re-create the URL
-  // Field and lose the caret) — preserve it by skipping this render pass.
-  if (_linkPopoverOpen) {
-    return;
-  }
-
-  const { selection } = tab.session;
   const node = getNodeAtPath(tab.doc.document, selection);
   if (!node) {
     litRender(nothing, view.blockActionBarEl);
@@ -607,7 +1480,7 @@ export function renderBlockActionBar() {
     return;
   }
 
-  const tag = (node.tagName ?? "div").toLowerCase();
+  const tag = (displayTagName(node.tagName) || "div").toLowerCase();
 
   // Inline format state, sourced from the iframe's selection snapshot.
   const { editingProp, snapshot } = getEditSnapshot();
@@ -631,7 +1504,7 @@ export function renderBlockActionBar() {
 
   // Conversion targets for badge click
   const isComponent =
-    node.tagName?.includes("-") &&
+    displayTagName(node.tagName).includes("-") &&
     componentRegistry.some((/** @type {{ tagName: string }} */ c) => c.tagName === node.tagName);
   const children = childList(node);
   const isEmpty =
@@ -644,96 +1517,98 @@ export function renderBlockActionBar() {
   const convertTargets = !isComponent && !isRepeater ? getConvertTargets(tag, isEmpty) : [];
   const badgeInteractive = convertTargets.length > 0;
 
+  // The verb cluster, sliced at the cap. `forPlacement` already dropped the records whose `when` is
+  // False and sorted the rest by group; everything past the cap keeps its name and its chord in the
+  // `⋮` menu rather than being silently unavailable.
+  const registry = selectionCommandRegistry();
+  /* The SET is the schema's, the VERBS are the registry's (see {@link formatCommands}).
+     `$inlineActions` says which of the eight this tag accepts and in what order — four on an `<h1>`,
+     eight on a `<p>` — and each one's name, icon, chord and behaviour come off its record. An action
+     the registry has no record for is dropped rather than drawn as a button that runs nothing, so
+     adding a ninth verb to the data file without a record shows up as a missing button and as a red
+     `tests/block-action-bar.test.ts`, not as a silent no-op. */
+  const formatButtons = actions.flatMap((action) => {
+    const command = registry.get(`format.${action.command}`);
+    return command ? [{ action, command }] : [];
+  });
+  const placed = registry.forPlacement("blockbar");
+  const shown = placed.slice(0, BLOCKBAR_MAX_ITEMS);
+  const overflow = placed.slice(BLOCKBAR_MAX_ITEMS);
+  // The handle is chrome, not a verb, so it renders on every selection; only a node that actually
+  // Sits at a child index can be dragged, and at the root it is a disabled affordance rather than a
+  // Missing one (§8.6: ONE shape).
+  const canDragSelection = structuralTarget(selection) !== null;
+
   litRender(
     html`
       <div
         class="block-action-bar"
+        data-jx-region="overlay.menu:block-action-bar"
+        role="toolbar"
+        aria-label="Block actions"
+        aria-orientation="horizontal"
         style=${styleMap({ left: `${pos.left}px`, top: `${pos.top}px` })}
         @mousedown=${onBarMousedown}
+        @keydown=${onToolbarKeydown}
       >
-        ${selection.length >= 2 ? renderParentSelector() : nothing}
+        ${renderParentButton(registry)}
 
         <span
           class="bar-tag${badgeInteractive ? " bar-tag--interactive" : ""}"
+          role=${badgeInteractive ? "button" : nothing}
+          data-toolbar-item=${badgeInteractive ? "" : nothing}
+          tabindex=${badgeInteractive ? "-1" : nothing}
+          title=${badgeInteractive ? "Change element type" : nothing}
           @click=${
             badgeInteractive
               ? (e: MouseEvent) => onTagBadgeClick(e, convertTargets, selection)
               : nothing
           }
-          >${isRepeater ? nodeLabel(node) : node.$id || (node.tagName ?? "div")}${
+          >${isRepeater ? nodeLabel(node) : node.$id || displayTagName(node.tagName) || "div"}${
             editingProp ? ` · ${editingProp}` : ""
           }</span
         >
 
-        ${
-          selection.length >= 2
-            ? html`<span
-                class="bar-drag-handle"
-                title="Drag to reorder"
-                ${ref((handleEl) => {
-                  if (!handleEl) {
-                    return;
-                  }
-                  if (view.selDragCleanup) {
-                    view.selDragCleanup();
-                    view.selDragCleanup = null;
-                  }
-                  view.selDragCleanup = draggable({
-                    element: handleEl as HTMLElement,
-                    getInitialData: () => ({
-                      // Snapshot the selection: the live array is a Vue reactive proxy, which
-                      // Structured clone rejects when the src crosses postMessage (DataCloneError
-                      // Killed the whole handle drag), and a live reference would also mutate the
-                      // Retained srcData if the selection changed mid-drag.
-                      path: [...(activeTab.value?.session.selection ?? [])],
-                      type: "tree-node",
-                    }),
-                    onGenerateDragPreview: ({
-                      nativeSetDragImage,
-                    }: {
-                      nativeSetDragImage: ((image: Element, x: number, y: number) => void) | null;
-                    }) => {
-                      // Suppress the native drag image; the cross-frame ghost is the drag affordance.
-                      disableNativeDragPreview({ nativeSetDragImage });
-                    },
-                  });
-                })}
-                >⠿</span
-              >`
-            : nothing
-        }
-        ${selection.length >= 2 ? renderMoveArrows() : nothing}
-        ${
-          selection.length >= 2 && node.tagName
-            ? (() => {
-                const isComp =
-                  node.tagName.includes("-") &&
-                  componentRegistry.some(
-                    (/** @type {{ tagName: string }} */ c) => c.tagName === node.tagName,
-                  );
-                if (isComp) {
-                  const comp = componentRegistry.find(
-                    (/** @type {{ tagName: string; path: string }} */ c) =>
-                      c.tagName === node.tagName,
-                  );
-                  return html`<sp-action-button
-                    size="xs"
-                    quiet
-                    title="Edit Component"
-                    @click=${() => _ctx?.navigateToComponent(comp?.path as string)}
-                    ><sp-icon-edit slot="icon" size="xs"></sp-icon-edit
-                  ></sp-action-button>`;
-                }
-                return html`<sp-action-button
-                  size="xs"
-                  quiet
-                  title="Convert to Component"
-                  @click=${() => convertToComponent()}
-                  ><sp-icon-box slot="icon" size="xs"></sp-icon-box
-                ></sp-action-button>`;
-              })()
-            : nothing
-        }
+        <span
+          class="bar-drag-handle${canDragSelection ? "" : " bar-drag-handle--disabled"}"
+          title=${canDragSelection ? "Drag to reorder" : "Drag to reorder — the document root cannot move"}
+          aria-disabled=${canDragSelection ? nothing : "true"}
+          data-toolbar-item
+          tabindex="-1"
+          ${ref((handleEl) => {
+            if (!handleEl || !canDragSelection) {
+              return;
+            }
+            /* No release here: {@link renderBlockActionBar} already released at the top of this
+               pass, and that one — not this — is the load-bearing copy, because it also runs on
+               the passes that return before `litRender` and never reach this ref at all. A second
+               release here could only ever see null, which is why it was dead. */
+            view.selDragCleanup = draggable({
+              element: handleEl as HTMLElement,
+              getInitialData: () => ({
+                // Snapshot the selection: the live array is a Vue reactive proxy, which
+                // Structured clone rejects when the src crosses postMessage (DataCloneError
+                // Killed the whole handle drag), and a live reference would also mutate the
+                // Retained srcData if the selection changed mid-drag.
+                path: [...(primarySelection(activeTab.value?.session.selection) ?? [])],
+                type: "tree-node",
+              }),
+              onGenerateDragPreview: ({
+                nativeSetDragImage,
+              }: {
+                nativeSetDragImage: ((image: Element, x: number, y: number) => void) | null;
+              }) => {
+                // Suppress the native drag image; the cross-frame ghost is the drag affordance.
+                disableNativeDragPreview({ nativeSetDragImage });
+              },
+            });
+          })}
+          >⠿</span
+        >
+
+        <sp-divider size="s" vertical></sp-divider>
+        ${shown.map((command) => renderCommandButton(registry, command))}
+        ${overflow.length > 0 ? renderOverflowButton(registry, overflow) : nothing}
         ${
           showFormat
             ? html`
@@ -745,17 +1620,24 @@ export function renderBlockActionBar() {
                   selects="multiple"
                   selected=${activeValues.length > 0 ? JSON.stringify(activeValues) : nothing}
                 >
-                  ${actions.map(
-                    (action) => html`
+                  ${formatButtons.map(
+                    ({ action, command }) => html`
                       <sp-action-button
                         size="xs"
                         value=${action.tag}
-                        title="${action.label}${action.shortcut ? ` (${action.shortcut})` : ""}"
+                        data-command-id=${command.id}
+                        data-toolbar-item
+                        tabindex="-1"
+                        aria-label=${command.title}
+                        title=${commandTooltip(registry, command)}
                         ?disabled=${formatDisabled && action.command !== "link"}
                         @mousedown=${(e: MouseEvent) => e.preventDefault()}
-                        @click=${(e: MouseEvent) => onFormatClick(e, action)}
+                        @click=${(e: MouseEvent) => {
+                          e.stopPropagation();
+                          runCommand(registry, command.id);
+                        }}
                       >
-                        ${action.icon ? (formatIconMap[action.icon] ?? nothing) : nothing}
+                        ${commandIcon(command)}
                       </sp-action-button>
                     `,
                   )}
@@ -763,6 +1645,10 @@ export function renderBlockActionBar() {
                 <sp-action-button
                   size="xs"
                   quiet
+                  data-toolbar-item
+                  data-jx-region="overlay.menu:block-action-bar/insertData"
+                  tabindex="-1"
+                  aria-label="Insert data"
                   title="Insert data"
                   @mousedown=${(e: MouseEvent) => e.preventDefault()}
                   @click=${onMergeTagClick}
@@ -776,6 +1662,11 @@ export function renderBlockActionBar() {
     `,
     view.blockActionBarEl,
   );
+
+  const rendered = view.blockActionBarEl.querySelector<HTMLElement>(".block-action-bar");
+  if (rendered) {
+    applyRovingTabindex(rendered);
+  }
 
   // Post-render side effects
   requestAnimationFrame(() => {

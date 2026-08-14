@@ -1,0 +1,28 @@
+{
+  "tagName": "sc-cta",
+  "state": { "heading": "Book a viewing", "cta": "Pick a time" },
+  "style": {
+    "display": "block",
+    "padding": "clamp(2rem, 5vw, 3rem) 1.5rem",
+    "borderTop": "1px solid var(--color-border)",
+    "backgroundColor": "var(--color-surface)",
+    "textAlign": "center"
+  },
+  "children": [
+    { "tagName": "h2", "style": { "margin": "0 0 1rem" }, "children": ["${heading}"] },
+    {
+      "tagName": "a",
+      "attributes": { "href": "/contact/" },
+      "style": {
+        "display": "inline-block",
+        "padding": "0.7rem 1.4rem",
+        "borderRadius": "0.6rem",
+        "backgroundColor": "var(--color-accent)",
+        "color": "#0f1115",
+        "fontWeight": "600",
+        "textDecoration": "none"
+      },
+      "children": ["${cta}"]
+    }
+  ]
+}

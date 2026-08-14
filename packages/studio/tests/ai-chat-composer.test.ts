@@ -153,7 +153,7 @@ describe("context attach", () => {
       { children: [{ tagName: "h1", textContent: "Welcome to the site" }], tagName: "div" },
       { documentPath: "pages/index.json" },
     );
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     const c = makeComposer();
     const [pageItem, selItem] = menuItems(c);
     expect(pageItem!.textContent).toContain("pages/index.json");
@@ -165,7 +165,7 @@ describe("context attach", () => {
   test("menu disables items without a page or selection", () => {
     const tab = resetWorkspaceWithTab();
     tab.documentPath = null;
-    tab.session.selection = null;
+    tab.session.selection = [];
     const c = makeComposer();
     const [pageItem, selItem] = menuItems(c);
     expect(pageItem!.hasAttribute("disabled")).toBe(true);
@@ -177,7 +177,7 @@ describe("context attach", () => {
       { children: [{ tagName: "h1", textContent: "Welcome" }], tagName: "div" },
       { documentPath: "pages/index.json" },
     );
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     const c = makeComposer();
     chooseContext(c, "page");
     chooseContext(c, "selection");

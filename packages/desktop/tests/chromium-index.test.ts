@@ -2,6 +2,7 @@
 import { afterAll, beforeAll, describe, expect, mock, test } from "bun:test";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { CHROMIUM_RPC_EXEMPT, rpcParity } from "./_rpc-parity";
 
 // In-process import of src/chromium/index.ts, a launcher with import-time side effects.
 // Collaborators are mocked so tests can drive the embedded HTTP + WebSocket RPC server.
@@ -54,6 +55,8 @@ writeFileSync(
 let projectRootValue = FIXTURES;
 
 const handlerMocks = {
+  // `View: Open in Browser` builds first, so the reader sees what the author does.
+  buildSite: mock(() => Promise.resolve({ errors: [], files: 0, routes: 0 })),
   codeService: mock((params: unknown) => Promise.resolve({ echoed: params })),
   // Data surface + secrets (desktop twins of /__studio/data/* + /__studio/secrets)
   dataConnections: mock(() => Promise.resolve({ connections: [] })),
@@ -67,6 +70,16 @@ const handlerMocks = {
   setSecrets: mock(() => Promise.resolve({ names: ["SEEDED"], ok: true })),
   discoverComponents: mock(() => Promise.resolve([{ path: "btn.json", tagName: "my-btn" }])),
   fetchPluginSchema: mock(() => Promise.resolve({ type: "object" })),
+  findReferences: mock(() =>
+    Promise.resolve({
+      errors: [],
+      files: [{ count: 2, path: "pages/index.json", refs: [] }],
+      filesReferencing: 1,
+      path: "components/Card.json",
+      refsTotal: 2,
+      tagName: "my-card",
+    }),
+  ),
   formatAction: mock(() => Promise.resolve({ doc: { ok: true } })),
   getProjectRoot: mock(() => projectRootValue),
   handleCreateDirectory: mock(() => Promise.resolve()),
@@ -87,6 +100,9 @@ const handlerMocks = {
   listExtensions: mock(() => Promise.resolve([{ specifier: "@jxsuite/parser" }])),
   listFormats: mock(() => Promise.resolve([{ format: "markdown" }])),
   locateFile: mock(() => Promise.resolve("located/file.json")),
+  searchFiles: mock(() =>
+    Promise.resolve([{ name: "a.json", path: "pages/a.json", type: "file" }]),
+  ),
   openExternal: mock(({ url }: { url: string }) => ({ ok: url.startsWith("http") })),
   openProject: mock(() => Promise.resolve({ config: { name: "P" }, handle: { root: "." } })),
   createProject: mock(() => Promise.resolve({ config: { name: "New" }, root: "/new" })),
@@ -111,6 +127,7 @@ const gitMocks = {
   // Rejects with an Error to exercise the error.message branch
   gitPull: mock(() => Promise.reject(new Error("pull failed"))),
   gitPush: mock(() => Promise.resolve()),
+  gitShow: mock(() => Promise.resolve("{\n  old: true\n}")),
   gitStage: mock(() => Promise.resolve()),
   gitStatus: mock(() => Promise.resolve({ branch: "main", files: [] })),
   gitUnstage: mock(() => Promise.resolve()),
@@ -400,6 +417,19 @@ describe("seedChromiumPreferences", () => {
   });
 });
 
+// ─── Schema ↔ handler parity ────────────────────────────────────────────────
+
+describe("rpc schema parity", () => {
+  test("every declared request is handled here or explicitly answered elsewhere", () => {
+    const parity = rpcParity(Object.keys(chromiumIndex.handlers), CHROMIUM_RPC_EXEMPT);
+    expect(parity.unhandled).toEqual([]);
+    expect(parity.undeclared).toEqual([]);
+    // The exemptions are claims about this launcher, so they rot in both directions.
+    expect(parity.staleExempt).toEqual([]);
+    expect(parity.orphanExempt).toEqual([]);
+  });
+});
+
 // ─── WebSocket RPC dispatch ─────────────────────────────────────────────────
 
 describe("chromium launcher RPC dispatch", () => {
@@ -425,6 +455,11 @@ describe("chromium launcher RPC dispatch", () => {
       { path: "btn.json", tagName: "my-btn" },
     ]);
     expect(await rpc("locateFile", { name: "file.json" })).toBe("located/file.json");
+    // Quick Access (⌘P): the format registry's extensions must survive the wire hop.
+    expect(await rpc("searchFiles", { extensions: [".md"], query: "abo" })).toEqual([
+      { name: "a.json", path: "pages/a.json", type: "file" },
+    ]);
+    expect(handlerMocks.searchFiles).toHaveBeenCalledWith({ extensions: [".md"], query: "abo" });
     expect(await rpc("openProject")).toEqual({ config: { name: "P" }, handle: { root: "." } });
     // Preview links leave the webview: the Bun side hands the URL to the OS.
     expect(await rpc("openExternal", { url: "https://example.com" })).toEqual({ ok: true });
@@ -510,6 +545,8 @@ describe("chromium launcher RPC dispatch", () => {
     expect(await rpc("gitLog", { limit: 5 })).toEqual([{ hash: "abc", message: "init" }]);
     expect(gitMocks.gitLog).toHaveBeenCalledWith({ limit: 5 });
     expect(await rpc("gitDiff", { path: "x" })).toBe("diff --git a/x");
+    expect(await rpc("gitShow", { path: "x.json", ref: "HEAD" })).toBe("{\n  old: true\n}");
+    expect(gitMocks.gitShow).toHaveBeenCalledWith({ path: "x.json", ref: "HEAD" });
   });
 
   test("git mutation methods dispatch with params and resolve null", async () => {

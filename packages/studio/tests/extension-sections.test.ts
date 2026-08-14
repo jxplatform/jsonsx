@@ -1,44 +1,39 @@
 /**
- * Tests for src/settings/extension-sections.ts — deriving settings-modal registrations from the
- * extensions payload (deriveSettingsSection) and syncing them into the section registry
- * (syncExtensionSettingsSections): registration, re-sync unregistration of removed extensions, and
- * reset. The modal integration (nav position, contributed render) lives in settings-modal.test.ts;
- * the end-to-end parser parity in contributed-content-types.test.ts.
+ * Tests for src/settings/extension-sections.ts — deriving section registrations from the extensions
+ * payload (deriveSettingsSection) and syncing them into the section registry
+ * (syncExtensionSettingsSections): registration, re-sync unregistration of removed extensions,
+ * coalescing of concurrent syncs, and reset. The document integration (nav position, contributed
+ * render) lives in settings-document.test.ts; the end-to-end parser parity in
+ * contributed-content-types.test.ts.
  */
-import { flush, installMockPlatform, resetStudioState } from "./harness";
+import { flush, installMockPlatform, resetStudioState, surfaceOf } from "./harness";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import {
   deriveSettingsSection,
   extensionSectionKeys,
+  extensionSectionsReady,
   resetExtensionSettingsSections,
   syncExtensionSettingsSections,
 } from "../src/settings/extension-sections";
-import { closeSettingsModal, openSettingsModal } from "../src/settings/settings-modal";
+import { detachSettingsPane, renderSettingsPane } from "../src/panels/settings-pane";
+import { setSettingsSection, settingsSectionKeys } from "../src/settings/section-registry";
+import "../src/settings/settings-document";
 import { refreshFormats } from "../src/format/format-host";
-import { initLayers } from "../src/ui/layers";
 import type { ExtensionContributionInfo, ExtensionsInfo } from "../src/types";
 
 // ─── Environment setup ───────────────────────────────────────────────────────
 
-for (const id of ["layer-popover", "layer-modal", "layer-dialog"]) {
-  if (!document.querySelector(`#${id}`)) {
-    const el = document.createElement("div");
-    el.id = id;
-    document.body.append(el);
-  }
+let host: HTMLElement;
+
+/** Mount the settings document on a throwaway host and read its inner nav. */
+async function navLabels(): Promise<(string | undefined)[]> {
+  renderSettingsPane(surfaceOf(host));
+  await flush();
+  return [...host.querySelectorAll(".settings-nav-item")].map((b) => b.textContent?.trim());
 }
-initLayers();
 
-globalThis.requestAnimationFrame = ((cb: FrameRequestCallback) => {
-  setTimeout(() => cb(0), 0);
-  return 0;
-}) as typeof requestAnimationFrame;
-
-function navLabels(): (string | undefined)[] {
-  const modal = (document.querySelector("#layer-modal") as HTMLElement).querySelector(
-    ".settings-modal",
-  );
-  return [...modal!.querySelectorAll(".settings-nav-item")].map((b) => b.textContent?.trim());
+function body(): HTMLElement {
+  return host.querySelector(".settings-doc-content") as HTMLElement;
 }
 
 const guestbookContribution: ExtensionContributionInfo = {
@@ -65,10 +60,14 @@ beforeEach(() => {
   resetExtensionSettingsSections();
   refreshFormats();
   resetStudioState({ projectConfig: { guestbook: {} } as unknown });
+  host = document.createElement("div");
+  document.body.append(host);
 });
 
 afterEach(async () => {
-  closeSettingsModal();
+  detachSettingsPane("primary");
+  host.remove();
+  setSettingsSection("overview");
   await flush();
   resetExtensionSettingsSections();
 });
@@ -178,10 +177,29 @@ describe("syncExtensionSettingsSections", () => {
     });
     await syncExtensionSettingsSections();
     expect(extensionSectionKeys()).toEqual(["guestbook"]);
+    expect(await navLabels()).toContain("Guestbook");
+  });
 
-    openSettingsModal();
-    await flush(4);
-    expect(navLabels()).toContain("Guestbook");
+  test("concurrent callers share one run — the deep-link race, at its source", async () => {
+    let loads = 0;
+    installMockPlatform({
+      listExtensions: async () => {
+        loads += 1;
+        await new Promise((resolve) => {
+          setTimeout(resolve, 0);
+        });
+        return extensionsWith([guestbookContribution]);
+      },
+    });
+    const first = syncExtensionSettingsSections();
+    const second = syncExtensionSettingsSections();
+    expect(second).toBe(first);
+    expect(extensionSectionsReady()).toBe(first);
+    await Promise.all([first, second]);
+    expect(loads).toBe(1);
+    expect(extensionSectionKeys()).toEqual(["guestbook"]);
+    // With nothing in flight, readiness is immediate rather than the last run's promise.
+    await extensionSectionsReady();
   });
 
   test("contributions without settings are skipped", async () => {
@@ -205,10 +223,7 @@ describe("syncExtensionSettingsSections", () => {
     installMockPlatform({ listExtensions: async () => [] });
     await syncExtensionSettingsSections();
     expect(extensionSectionKeys()).toEqual([]);
-
-    openSettingsModal();
-    await flush(4);
-    expect(navLabels()).not.toContain("Guestbook");
+    expect(await navLabels()).not.toContain("Guestbook");
   });
 
   test("platforms without listExtensions register nothing", async () => {
@@ -224,12 +239,11 @@ describe("syncExtensionSettingsSections", () => {
     await syncExtensionSettingsSections();
     resetExtensionSettingsSections();
     expect(extensionSectionKeys()).toEqual([]);
-    // Opening the modal re-syncs against the CURRENT platform — with none, nothing comes back.
+    // A re-sync against the CURRENT platform — with none, nothing comes back.
     refreshFormats();
     installMockPlatform();
-    openSettingsModal();
-    await flush(4);
-    expect(navLabels()).not.toContain("Guestbook");
+    await syncExtensionSettingsSections();
+    expect(await navLabels()).not.toContain("Guestbook");
   });
 
   test("registered sections render through renderContributedSection with the live config", async () => {
@@ -238,19 +252,10 @@ describe("syncExtensionSettingsSections", () => {
     });
     resetStudioState({ projectConfig: { guestbook: { moderation: true } } as unknown });
     await syncExtensionSettingsSections();
-    openSettingsModal();
-    await flush(4);
-    const modal = (document.querySelector("#layer-modal") as HTMLElement).querySelector(
-      ".settings-modal",
-    )!;
-    const nav = [...modal.querySelectorAll(".settings-nav-item")].find(
-      (b) => b.textContent?.trim() === "Guestbook",
-    )!;
-    nav.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    await flush();
-    const contentEl = modal.querySelector(".settings-modal-content")!;
-    expect(contentEl.querySelector(".settings-section-title")?.textContent).toBe("Guestbook");
-    const check = contentEl.querySelector('[data-prop="moderation"] sp-checkbox');
-    expect(check).not.toBeNull();
+    expect(settingsSectionKeys()).toContain("guestbook");
+    setSettingsSection("guestbook");
+    await navLabels();
+    expect(body().querySelector(".settings-section-title")?.textContent).toBe("Guestbook");
+    expect(body().querySelector('[data-prop="moderation"] sp-checkbox')).not.toBeNull();
   });
 });

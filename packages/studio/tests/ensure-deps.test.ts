@@ -3,6 +3,8 @@ import { flush, installMockPlatform } from "./harness";
 import { afterEach, beforeAll, describe, expect, test } from "bun:test";
 import { initLayers } from "../src/ui/layers";
 import { ensureDependenciesInstalled } from "../src/packages/ensure-deps";
+import { problems, resetNotifications } from "../src/services/notify";
+import { activities, resetActivities } from "../src/panels/activity-panel";
 
 beforeAll(() => {
   for (const id of ["layer-popover", "layer-modal", "layer-dialog"]) {
@@ -21,6 +23,8 @@ function card(): Element | null {
 
 afterEach(() => {
   (document.querySelector("#layer-modal") as HTMLElement).innerHTML = "";
+  resetNotifications();
+  resetActivities();
 });
 
 describe("ensureDependenciesInstalled", () => {
@@ -59,14 +63,18 @@ describe("ensureDependenciesInstalled", () => {
     expect(card()).toBeNull();
   });
 
-  test("surfaces the failure log when install fails", async () => {
+  test("surfaces the failure log as a Problem, which outlives the modal", async () => {
     installMockPlatform({
       dependenciesNeedInstall: async () => true,
       installDependencies: async () => ({ log: "EACCES denied", ok: false }),
     });
     await ensureDependenciesInstalled();
     await flush();
-    expect(card()?.textContent).toContain("EACCES denied");
+    // §7.3: the modal's error view is promoted into Problems, so the log is still readable after
+    // The blocking surface has gone — which it has.
+    expect(card()).toBeNull();
+    expect(problems[0]?.message).toContain("EACCES denied");
+    expect(activities[0]?.state).toBe("failed");
   });
 
   test("skips install entirely in automation mode (never mutates the project)", async () => {
@@ -105,7 +113,7 @@ describe("ensureDependenciesInstalled", () => {
     expect(card()).toBeNull();
   });
 
-  test("shows the failure view when install throws", async () => {
+  test("a thrown failure lands in Problems too", async () => {
     installMockPlatform({
       dependenciesNeedInstall: async () => true,
       installDependencies: async () => {
@@ -114,6 +122,7 @@ describe("ensureDependenciesInstalled", () => {
     });
     await ensureDependenciesInstalled();
     await flush();
-    expect(card()?.textContent).toContain("spawn ENOENT");
+    // A one-line message IS the headline; only a captured log gets folded into the detail.
+    expect(problems[0]?.message).toContain("spawn ENOENT");
   });
 });

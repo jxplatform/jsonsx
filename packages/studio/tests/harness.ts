@@ -16,6 +16,13 @@ import type { TemplateResult } from "lit-html";
 import { registerPlatform } from "../src/platform";
 import { setProjectState } from "../src/store";
 import { closeAllTabs, openTab } from "../src/workspace/workspace";
+import {
+  STAGE_CLASS,
+  allCanvasSurfaces,
+  registerCanvasSurface,
+  unregisterCanvasSurface,
+} from "../src/canvas/surface-registry";
+import { REGION_ATTR, paneRegion } from "../src/ui/regions";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { DirEntry, ProjectState, RenameResult, StudioPlatform } from "../src/types";
 
@@ -409,6 +416,81 @@ export function npType(el: HTMLInputElement, value: string): void {
  */
 export function npFillLocation(parent = "/home/dev/Sites"): void {
   npType(npLocation(), parent);
+}
+
+// ─── Pane stages ──────────────────────────────────────────────────────────────
+
+/**
+ * Stand a pane's cell up in the current document and hand back its surface.
+ *
+ * ONE spelling, because there were about to be twenty-four. Twenty-three test files hand-wrote
+ * `<div id="canvas-wrap">` — the shell's single stage — and every one of them meant "the primary
+ * pane has somewhere to draw". A stage belongs to a pane now (`canvas/surface-registry.ts`), so the
+ * fixture is a registered surface rather than a div with a well-known id.
+ *
+ * Deliberately NOT `pane-grid.ts`'s own reconciler: a unit test for the Library should not have to
+ * boot the shell, install stage gestures or own a `#pane-grid`. It builds the same shape the
+ * reconciler builds — `.pane-stage`, stamped, registered — and nothing else.
+ *
+ * @param {string} [paneId]
+ * @param {ParentNode} [parent] Where to attach. Defaults to `document.body`.
+ * @returns {CanvasSurface}
+ */
+export function standUpPaneGrid(paneId = "primary", parent: ParentNode = document.body) {
+  const stage = document.createElement("div");
+  stage.className = STAGE_CLASS;
+  stage.setAttribute(REGION_ATTR, paneRegion(paneId));
+  parent.append(stage);
+  return registerCanvasSurface(paneId, stage);
+}
+
+/**
+ * Treat an element a test already built as the primary pane's stage, and hand back its surface.
+ *
+ * The adapter for the twenty-three test files that hand-wrote a stage div of their own. They pass
+ * the element to a renderer that now takes a surface; this is the one-line conversion, and it
+ * registers rather than fabricating so `stageContaining`, `panelHostingCanvas` and the release path
+ * all see the same record the app would.
+ *
+ * @param {HTMLElement} el
+ * @param {string} [paneId]
+ * @returns {CanvasSurface}
+ */
+export function surfaceOf(el: HTMLElement, paneId = "primary") {
+  return registerCanvasSurface(paneId, el);
+}
+
+/**
+ * Adopt whatever stage a fixture's own `innerHTML` already built, creating one if it built none.
+ *
+ * The third spelling because it answers a third question. {@link standUpPaneGrid} makes a stage;
+ * {@link surfaceOf} adopts an element the caller is holding; this one adopts THE stage of a document
+ * a fixture wrote as a template literal, which is what a dozen suites do at module scope.
+ * `initShellRefs()` used to do exactly this from `#canvas-wrap`, and it stopped because a stage
+ * belongs to a pane rather than to the shell — so the fixture has to say which element it is.
+ *
+ * Idempotent: `resetStudioState` drops every surface record between tests, and calling this again
+ * re-registers the same element.
+ *
+ * @param {string} [paneId]
+ * @returns {CanvasSurface}
+ */
+export function registerPrimaryStage(paneId = "primary") {
+  const stage =
+    document.querySelector<HTMLElement>(`.${STAGE_CLASS}`) ?? document.createElement("div");
+  stage.className = STAGE_CLASS;
+  stage.setAttribute(REGION_ATTR, paneRegion(paneId));
+  if (!stage.isConnected) {
+    (document.querySelector("#app") ?? document.body).append(stage);
+  }
+  return registerCanvasSurface(paneId, stage);
+}
+
+/** Forget every surface a test stood up. Called from {@link resetStudioState}. */
+export function tearDownPaneGrids(): void {
+  for (const surface of allCanvasSurfaces()) {
+    unregisterCanvasSurface(surface.paneId);
+  }
 }
 
 // ─── happy-dom gap stubs ──────────────────────────────────────────────────────

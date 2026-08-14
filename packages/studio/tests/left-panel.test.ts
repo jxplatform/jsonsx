@@ -9,15 +9,16 @@ import { mount, render, unmount } from "../src/panels/left-panel";
 import { initShellRefs, leftPanel } from "../src/store";
 import { activeTab, closeAllTabs } from "../src/workspace/workspace";
 import { view } from "../src/view";
+import { shell } from "../src/shell";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
 type AnyFn = (...args: any[]) => any;
 
 let ctx: Record<string, any>;
-let captured: { head: any; imports: any; signals: any[]; data: any[]; git: any[] };
+let captured: { head: any; imports: any; signals: any[]; git: any[] };
 
 function makeCtx(overrides: Record<string, unknown> = {}) {
-  captured = { data: [], git: [], head: null, imports: null, signals: [] };
+  captured = { git: [], head: null, imports: null, signals: [] };
   return {
     cloneRepository: mock(() => {}),
     defaultDef: (tag: string) => ({ tagName: tag }),
@@ -30,10 +31,6 @@ function makeCtx(overrides: Record<string, unknown> = {}) {
     registerFileTreeDnD: mock(() => {}),
     registerLayersDnD: mock(() => {}),
     renderCanvas: mock(() => {}),
-    renderDataExplorerTemplate: mock((...args: unknown[]) => {
-      captured.data = args;
-      return html`<div id="data-rendered"></div>`;
-    }),
     renderFilesTemplate: mock(() => html`<div class="file-tree" id="files-rendered"></div>`),
     renderGitPanel: mock((...args: unknown[]) => {
       captured.git = args;
@@ -78,7 +75,7 @@ beforeEach(() => {
   if (!Element.prototype.scrollIntoView) {
     Element.prototype.scrollIntoView = () => {};
   }
-  view.leftTab = "layers";
+  shell.leftTab = "layers";
   view.dndCleanups = [];
   view._layersCollapsed = new Set();
   resetStudioState();
@@ -96,7 +93,7 @@ afterEach(() => {
 
 describe("left panel — project-level tabs", () => {
   test("files tab renders the file tree and wires keyboard + DnD", async () => {
-    view.leftTab = "files";
+    shell.leftTab = "files";
     await mountWith();
     expect(leftPanel.querySelector("#files-rendered")).not.toBeNull();
     expect(ctx.setupTreeKeyboard).toHaveBeenCalledTimes(1);
@@ -105,30 +102,47 @@ describe("left panel — project-level tabs", () => {
   });
 
   test("files tab without a .file-tree skips keyboard wiring", async () => {
-    view.leftTab = "files";
+    shell.leftTab = "files";
     await mountWith({ renderFilesTemplate: mock(() => html`<div id="no-tree"></div>`) });
     expect(leftPanel.querySelector("#no-tree")).not.toBeNull();
     expect(ctx.setupTreeKeyboard).not.toHaveBeenCalled();
   });
 
-  test("git tab passes the active tab's ui and the ctx through", async () => {
-    activeTab.value!.session.ui.gitCommitMessage = "wip";
-    view.leftTab = "git";
+  test("git tab passes the ctx through and reads project state, not the tab", async () => {
+    shell.leftTab = "git";
     await mountWith();
     expect(leftPanel.querySelector("#git-rendered")).not.toBeNull();
-    expect(captured.git[0].ui.gitCommitMessage).toBe("wip");
-    expect(captured.git[1]).toBe(ctx);
+    expect(captured.git[0]).toBe(ctx);
   });
 
-  test("git tab with no active tab passes an empty ui", async () => {
+  test("git tab renders with no active tab — Source Control is project level", async () => {
     closeAllTabs();
-    view.leftTab = "git";
+    shell.leftTab = "git";
     await mountWith();
-    expect(captured.git[0].ui).toEqual({});
+    expect(leftPanel.querySelector("#git-rendered")).not.toBeNull();
   });
 
-  test("blocks tab renders the elements palette and registers DnD", async () => {
-    view.leftTab = "blocks";
+  test("project-level source-control changes repaint the panel with no tab open", async () => {
+    // The panel used to be repainted by hand from inside git-panel (renderOnly("leftPanel") after
+    // Every write). Those calls are gone: the fields it renders from are tracked here.
+    closeAllTabs();
+    shell.leftTab = "git";
+    await mountWith();
+    const renders = () => (ctx.renderGitPanel as ReturnType<typeof mock>).mock.calls.length;
+    const before = renders();
+
+    shell.git.subTab = "history";
+    await flush(3);
+    expect(renders()).toBeGreaterThan(before);
+
+    const afterSubTab = renders();
+    shell.git.logEntries = [{ author: "a", date: "d", hash: "abc", message: "m" }];
+    await flush(3);
+    expect(renders()).toBeGreaterThan(afterSubTab);
+  });
+
+  test("insert panel renders the elements palette and registers DnD", async () => {
+    shell.leftTab = "insert";
     await mountWith();
     expect(leftPanel.querySelector('[data-block-tag="p"]')).not.toBeNull();
     expect(ctx.registerElementsDnD).toHaveBeenCalled();
@@ -145,7 +159,7 @@ describe("left panel — document tabs", () => {
   });
 
   test("layers tab scrolls the selected row into view", async () => {
-    activeTab.value!.session.selection = ["children", 0];
+    activeTab.value!.session.selection = [["children", 0]];
     const scrolled: Element[] = [];
     const orig = Element.prototype.scrollIntoView;
     Element.prototype.scrollIntoView = function scrollIntoView(this: Element) {
@@ -167,9 +181,9 @@ describe("left panel — document tabs", () => {
     expect(ctx.registerLayersDnD).not.toHaveBeenCalled();
   });
 
-  test("imports tab passes document elements and a transact-backed applyMutation", async () => {
+  test("packages panel passes document elements and a transact-backed applyMutation", async () => {
     activeTab.value!.doc.document.$elements = ["@acme/widgets"] as never;
-    view.leftTab = "imports";
+    shell.leftTab = "packages";
     await mountWith();
     expect(leftPanel.querySelector("#imports-rendered")).not.toBeNull();
     expect(captured.imports.documentElements).toEqual(["@acme/widgets"]);
@@ -181,55 +195,78 @@ describe("left panel — document tabs", () => {
     expect(activeTab.value!.doc.document.title).toBe("Mutated");
   });
 
-  test("state tab passes a state snapshot to renderSignalsTemplate", async () => {
-    view.leftTab = "state";
+  test("the data tab renders the ONE template, over the whole tab", async () => {
+    // `state` and `data` were two tabs calling two templates with two slices of the same tab —
+    // `renderSignalsTemplate` got a snapshot, `renderDataExplorerTemplate` got `document.state` and
+    // `canvas.scope` separately. One panel takes the tab record itself, so the definitions and the
+    // Values it resolved to cannot come from different reads.
+    activeTab.value!.doc.document.state = { count: 1 } as never;
+    activeTab.value!.session.canvas.scope = { count: 1 };
+    shell.leftTab = "data";
     await mountWith();
     expect(leftPanel.querySelector("#signals-rendered")).not.toBeNull();
     const [snapshot, deps] = captured.signals as [Record<string, unknown>, Record<string, AnyFn>];
     expect(snapshot.document).toBe(activeTab.value!.doc.document);
     expect(snapshot.selection).toBe(activeTab.value!.session.selection);
-    expect(typeof deps.updateSession).toBe("function");
+    expect((snapshot.canvas as Record<string, unknown>).scope).toBe(
+      activeTab.value!.session.canvas.scope,
+    );
+    // A repaint and a refetch. `renderCanvas` and `updateSession` were threaded through here until
+    // Nothing in the panel read either — see `SignalsPanelCtx`.
+    expect(Object.keys(deps).toSorted()).toEqual(["refreshData", "renderLeftPanel"]);
   });
 
-  test("data tab passes document state and canvas scope", async () => {
-    activeTab.value!.doc.document.state = { count: 1 } as never;
-    activeTab.value!.session.canvas.scope = { stop: () => {} };
-    view.leftTab = "data";
+  test("there is no `state` tab left to render", async () => {
+    shell.leftTab = "state";
     await mountWith();
-    expect(leftPanel.querySelector("#data-rendered")).not.toBeNull();
-    expect(captured.data[0]).toEqual({ count: 1 });
-    expect(captured.data[1]).toBe(activeTab.value!.session.canvas.scope);
+    const body = leftPanel.querySelector(".panel-body") as HTMLElement;
+    expect(body.querySelector(".empty-state-message")?.textContent).toBe(
+      'No Navigator panel is registered as "state".',
+    );
   });
 
-  test("data tab defaults to empty state and null scope", async () => {
-    view.leftTab = "data";
-    await mountWith();
-    expect(captured.data[0]).toEqual({});
-    expect(captured.data[1]).toBeNull();
-  });
-
-  test("unknown tab renders an empty panel body", async () => {
-    view.leftTab = "bogus";
+  test("an id the registry does not declare says so instead of painting a blank body", async () => {
+    shell.leftTab = "bogus";
     await mountWith();
     const body = leftPanel.querySelector(".panel-body") as HTMLElement;
     expect(body).not.toBeNull();
-    expect(body.children.length).toBe(0);
+    expect(body.querySelector(".empty-state-message")?.textContent).toBe(
+      'No Navigator panel is registered as "bogus".',
+    );
   });
 
-  test("no active tab renders an empty panel body for document tabs", async () => {
+  test("no active tab teaches what each document tab is for instead of painting a blank body", async () => {
     closeAllTabs();
-    view.leftTab = "layers";
+    shell.leftTab = "layers";
     await mountWith();
     const body = leftPanel.querySelector(".panel-body") as HTMLElement;
-    expect(body).not.toBeNull();
-    expect(body.children.length).toBe(0);
+    expect(body.querySelector(".empty-state-message")?.textContent).toBe(
+      "Open a page to see the elements it is built from.",
+    );
+    expect((body.querySelector(".empty-state-action") as HTMLElement).textContent?.trim()).toBe(
+      "Open a page…",
+    );
     expect(ctx.registerLayersDnD).not.toHaveBeenCalled();
+  });
+
+  test("every document tab has its own no-document sentence", async () => {
+    closeAllTabs();
+    const seen = new Set<string>();
+    for (const tabName of ["layers", "packages", "data", "page"]) {
+      shell.leftTab = tabName;
+      await mountWith();
+      const message = leftPanel.querySelector(".empty-state-message")?.textContent ?? "";
+      expect(message.startsWith("Open a page to")).toBe(true);
+      seen.add(message);
+      unmount();
+    }
+    expect(seen.size).toBe(4);
   });
 });
 
-describe("left panel — head tab", () => {
+describe("left panel — page panel", () => {
   test("non-content mode passes the document and transacts mutations directly", async () => {
-    view.leftTab = "head";
+    shell.leftTab = "page";
     await mountWith();
     expect(leftPanel.querySelector("#head-rendered")).not.toBeNull();
     expect(captured.head.document).toBe(activeTab.value!.doc.document);
@@ -247,7 +284,7 @@ describe("left panel — head tab", () => {
       $head: [{ content: "x", tag: "meta" }],
       title: "FM Title",
     };
-    view.leftTab = "head";
+    shell.leftTab = "page";
     await mountWith();
     expect(captured.head.document.title).toBe("FM Title");
     expect(captured.head.document.$head).toEqual([{ content: "x", tag: "meta" }]);
@@ -257,7 +294,7 @@ describe("left panel — head tab", () => {
     const tab = activeTab.value!;
     tab.doc.mode = "content";
     tab.doc.content.frontmatter = { title: "Old" };
-    view.leftTab = "head";
+    shell.leftTab = "page";
     await mountWith();
 
     captured.head.applyMutation((doc: JxMutableNode) => {
@@ -276,7 +313,7 @@ describe("left panel — head tab", () => {
       $head: [{ content: "x", tag: "meta" }],
       title: "Same",
     };
-    view.leftTab = "head";
+    shell.leftTab = "page";
     await mountWith();
 
     captured.head.applyMutation((doc: JxMutableNode) => {
@@ -291,7 +328,7 @@ describe("left panel — lifecycle and recovery", () => {
   test("reactive effect re-renders on selection change", async () => {
     await mountWith();
     expect(leftPanel.querySelector(".layer-row.selected")).toBeNull();
-    activeTab.value!.session.selection = ["children", 0];
+    activeTab.value!.session.selection = [["children", 0]];
     await flush(3);
     expect(leftPanel.querySelector(".layer-row.selected")).not.toBeNull();
   });
@@ -307,7 +344,7 @@ describe("left panel — lifecycle and recovery", () => {
 
   test("a render error is recovered by clearing lit state and retrying", async () => {
     let calls = 0;
-    view.leftTab = "git";
+    shell.leftTab = "git";
     await mountWith({
       renderGitPanel: mock(() => {
         calls += 1;
@@ -322,7 +359,7 @@ describe("left panel — lifecycle and recovery", () => {
   });
 
   test("a persistent render error is swallowed without crashing", async () => {
-    view.leftTab = "git";
+    shell.leftTab = "git";
     await mountWith({
       renderGitPanel: mock(() => {
         throw new Error("always");

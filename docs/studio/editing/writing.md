@@ -29,8 +29,11 @@ There is nothing to start or stop. The cursor is simply on the page, the way it 
 - **Click** any text to put the cursor there.
 - **Arrow keys** move it through the whole page, from the end of one block into the next.
 - :kbd[Home] / :kbd[End], word motion, and :kbd[Page Up] / :kbd[Page Down] all work as they do anywhere else.
+- :kbd[⌘A] / :kbd[Ctrl+A] selects the text of the block you are in. With no cursor — a block selected from the Outline, say — the same keys select every element beside it instead.
 - **Drag** — or hold :kbd[Shift] and move — to select, including across several blocks at once.
 - :kbd[Esc] puts the cursor away.
+
+Placing the cursor also selects the block it lands in — one block. So clicking into a paragraph while [several elements are selected](/docs/studio/design/layers#select-several-at-once) narrows the selection back to that paragraph, and the toolbar above it is that paragraph's. To add a block to a selection instead of replacing it, hold :kbd[⌘] (macOS) / :kbd[Ctrl] (Windows/Linux) as you click.
 
 Your writing is saved into the document as you pause, so :kbd[⌘S] (macOS) / :kbd[Ctrl+S] (Windows/Linux) always writes what is on screen, mid-sentence or not.
 
@@ -64,7 +67,7 @@ The floating toolbar above the block carries the formatting buttons (the same ba
 - Paragraphs, list items, and table cells offer **Bold**, **Italic**, **Underline**, **Strikethrough**, **Superscript**, **Subscript**, **Code**, and **Link**.
 - Headings offer the shorter set: **Bold**, **Italic**, **Code**, and **Link**.
 
-With nothing selected the format buttons are disabled — they act on a range — and only **Link** stays clickable. The keyboard versions: :kbd[⌘B] / :kbd[Ctrl+B] for bold, :kbd[⌘I] / :kbd[Ctrl+I] for italic, :kbd[⌘`] / :kbd[Ctrl+`] for code.
+With nothing selected the format buttons are disabled — they act on a range — and only **Link** stays clickable. Every button also has a name and a shortcut of its own: :kbd[⌘B] / :kbd[Ctrl+B] for bold, :kbd[⌘I] / :kbd[Ctrl+I] for italic, :kbd[⌘U] / :kbd[Ctrl+U] for underline, and :kbd[⌘`] / :kbd[Ctrl+`] for code. Each one is also in the command palette under **Edit**, and each can be rebound in **[Preferences › Keyboard](/docs/studio/interface/preferences)** — the button's tooltip prints whatever it is bound to on your machine, so it stays true if you change it.
 
 ## Links
 

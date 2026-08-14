@@ -56,7 +56,7 @@ export async function startPush(connection: string | undefined, onDone: () => vo
   if (pushDialog) {
     return;
   }
-  const handle = openModal(html``);
+  const handle = openModal(html``, { label: "Push Schema", onDismiss: closePushDialog });
   pushDialog = { connection, handle, onDone, phase: "loading", plan: null, result: null };
   renderPushDialog();
   const plan = await pushSchema({
@@ -148,7 +148,9 @@ function renderPushDialog(): void {
                 size="s"
                 emphasized
                 class="push-apply"
-                @click=${() => void applyPush()}
+                @click=${() => {
+                  void applyPush();
+                }}
                 >Apply</sp-action-button
               >`
             : nothing
@@ -224,14 +226,18 @@ function renderSectionActions(sectionKey: string, ctx: SectionActionsContext): T
       <sp-action-button
         size="s"
         class="data-action-push"
-        @click=${() => void startPush(pushTarget, rerender)}
+        @click=${() => {
+          void startPush(pushTarget, rerender);
+        }}
       >
         Push Schema
       </sp-action-button>
       <sp-action-button
         size="s"
         class="data-action-grid"
-        @click=${() => void openGridSourcePicker()}
+        @click=${() => {
+          void openGridSourcePicker();
+        }}
       >
         Open Data Grid
       </sp-action-button>

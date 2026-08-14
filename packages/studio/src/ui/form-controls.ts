@@ -1,17 +1,19 @@
 /// <reference lib="dom" />
 /**
  * Built-in schema-form controls (specs/extensions.md §9.1): "schema-builder" (visual JSON-Schema
- * field editor wrapping settings/schema-field-ui) and "secret" (value committed via the host's
- * secret store, never project.json). The third built-in, "binding", registers from
- * panels/signals-panel.ts because it owns panel-local ephemeral UI state (custom-ref mode) and the
- * route-param picker semantics.
+ * field editor wrapping settings/schema-field-ui), "secret" (value committed via the host's secret
+ * store, never project.json) and "reference" (an entry of another content collection). The fourth
+ * built-in, "binding", registers from panels/signals-panel.ts because it owns panel-local ephemeral
+ * UI state (custom-ref mode) and the route-param picker semantics.
  *
  * Imported once for side effects from studio startup.
  */
 
-import { html } from "lit-html";
+import { html, nothing } from "lit-html";
 import { repeat } from "lit-html/directives/repeat.js";
-import { registerFormControl } from "./schema-form";
+import { until } from "lit-html/directives/until.js";
+import { errorMessage } from "@jxsuite/schema/parse";
+import { referenceTarget, registerFormControl } from "./schema-form";
 import {
   addFieldFormTpl,
   detectFieldFormat,
@@ -320,5 +322,190 @@ registerFormControl("secret", ({ key, value, onChange, ctx, rerender }) => {
   ></sp-textfield>`;
 });
 
+// ─── Reference control ───────────────────────────────────────────────────────
+
+/**
+ * An entry of another content collection — site-architecture.md §6.1's `{ "$ref": "#/content/x" }`
+ * and §7.4's "entry picker (dropdown of collection entries)".
+ *
+ * **Registered once, consulted by everything.** `ui/schema-form.ts` dispatches to it for any
+ * property whose `$ref` names a collection, so the settings forms, the entry editor and the
+ * frontmatter card all draw the same picker without any of them knowing it exists. That is the
+ * whole point: P5 collapsed six value-source vocabularies into one and three call sites still spoke
+ * their own, so this one arrives as a registration rather than as a fourth renderer.
+ *
+ * Three states, and none of them lies:
+ *
+ * - **loading** — a disabled picker saying so, replaced when the read lands (which is why the control
+ *   needs `rerender`; without it there is no second frame and "Loading…" is forever);
+ * - **failed** — the current value stays EDITABLE as text, with the reason and a Retry beside it.
+ *   Swapping a failed read for an empty dropdown would present "no entries" and "could not find
+ *   out" as the same screen, which is §16.1's complaint in miniature;
+ * - **ready** — the entries, plus the current value even when it is not among them, marked `— not
+ *   found`. A dangling reference is a fact about the project and the author has to see it; silently
+ *   blanking the field would delete the evidence and the value in one repaint.
+ */
+
+/** Entry ids per collection, as the in-flight read. Started on first ask. */
+const entryIdCache = new Map<string, Promise<string[]>>();
+
+/**
+ * What the read ENDED as, per collection.
+ *
+ * Kept beside the promise so a settled collection renders synchronously. Without it every repaint
+ * of the enclosing form hands `until` a fresh unsettled promise, `until` falls back to its
+ * placeholder, and a picker that has had its answer for ten minutes flashes "Loading…" on every
+ * keystroke in the field beside it.
+ */
+const entryIdResult = new Map<string, { ids: string[] } | { error: string }>();
+
+/**
+ * Forget cached entry ids — for one collection, or all of them.
+ *
+ * Creating, renaming or deleting an entry changes the answer, and the picker would otherwise keep
+ * offering a file that is gone until the window reloads. Called by `content/entry-commands.ts`
+ * after a create; exported so the test harness can start from a known state.
+ */
+export function invalidateReferenceEntries(collection?: string): void {
+  if (collection === undefined) {
+    entryIdCache.clear();
+    entryIdResult.clear();
+  } else {
+    entryIdCache.delete(collection);
+    entryIdResult.delete(collection);
+  }
+}
+
+/** The collection's entry ids, reading them once however many fields reference it. */
+function entryIdsFor(collection: string): Promise<string[]> {
+  const known = entryIdCache.get(collection);
+  if (known) {
+    return known;
+  }
+  /* Dynamic: the collection reader pulls in the platform, the format registry and the workspace,
+     and this module is imported for its side effects at startup and by the bare-Bun checks. A
+     static import would make registering a form control cost the whole file layer. */
+  const pending = import("../grid/sources/content-source").then((m) =>
+    m.listCollectionEntryIds(collection),
+  );
+  entryIdCache.set(collection, pending);
+  return pending;
+}
+
+/** Plain text editing of the reference id — the fallback when the choices cannot be listed. */
+function referenceTextField(current: string, onChange: (next: unknown) => void) {
+  return html`<sp-textfield
+    size="s"
+    class="reference-field"
+    .value=${current}
+    @change=${(e: Event) => onChange((e.target as HTMLInputElement).value.trim() || undefined)}
+  ></sp-textfield>`;
+}
+
+/** The picker, once the ids are in. */
+function referencePicker(
+  collection: string,
+  ids: string[],
+  current: string,
+  onChange: (next: unknown) => void,
+) {
+  const dangling = current !== "" && !ids.includes(current);
+  return html`
+    <sp-picker
+      size="s"
+      class="reference-field"
+      value=${current || "__none__"}
+      @change=${(e: Event) => {
+        const chosen = (e.target as HTMLInputElement).value;
+        onChange(chosen === "__none__" ? undefined : chosen);
+      }}
+    >
+      <sp-menu-item value="__none__">—</sp-menu-item>
+      ${
+        dangling
+          ? html`<sp-menu-item class="reference-missing" value=${current}
+              >${current} — not found</sp-menu-item
+            >`
+          : nothing
+      }
+      ${ids.map((id) => html`<sp-menu-item value=${id}>${id}</sp-menu-item>`)}
+    </sp-picker>
+    ${ids.length === 0 ? html`<span class="reference-note">No ${collection} entries yet.</span>` : nothing}
+  `;
+}
+
+registerFormControl("reference", ({ schema, value, onChange, rerender }: SchemaFormControlArgs) => {
+  const collection = referenceTarget(schema);
+  const current = typeof value === "string" ? value : "";
+  if (collection === null) {
+    /* The control was named by a `ui.control` override on a property that references nothing. The
+       field is still editable — refusing to draw it would lose the value — and the note says which
+       half of the declaration is missing. */
+    return html`<div class="reference-control">
+      ${referenceTextField(current, onChange)}
+      <span class="reference-note"
+        >No collection referenced — add <code>"$ref": "#/content/&lt;type&gt;"</code> to this
+        field.</span
+      >
+    </div>`;
+  }
+
+  const failedTpl = (error: string) => html`
+    ${referenceTextField(current, onChange)}
+    <span class="reference-note reference-note--failed"
+      >Could not list ${collection} entries — ${error}</span
+    >
+    ${
+      /* Retry only where a repaint is possible. A button that cannot do the thing it is named
+           after is worse than its absence — the field beside it still edits the value. */
+      rerender
+        ? html`<sp-action-button
+            size="s"
+            quiet
+            @click=${() => {
+              invalidateReferenceEntries(collection);
+              rerender();
+            }}
+            >Retry</sp-action-button
+          >`
+        : nothing
+    }
+  `;
+
+  // Already answered: render it now. Only the FIRST paint of a collection waits.
+  const done = entryIdResult.get(collection);
+  if (done) {
+    return html`<div class="reference-control">
+      ${
+        "ids" in done
+          ? referencePicker(collection, done.ids, current, onChange)
+          : failedTpl(done.error)
+      }
+    </div>`;
+  }
+
+  /* `until` rather than a host repaint: a form control cannot ask its host to draw a second frame,
+     and the frontmatter renderer passes no `rerender` at all — with one, this field would have said
+     "Loading…" for the life of the panel. */
+  const resolved = entryIdsFor(collection).then(
+    (ids) => {
+      entryIdResult.set(collection, { ids });
+      return referencePicker(collection, ids, current, onChange);
+    },
+    (error: unknown) => {
+      const message = errorMessage(error);
+      entryIdResult.set(collection, { error: message });
+      return failedTpl(message);
+    },
+  );
+
+  return html`<div class="reference-control">
+    ${until(
+      resolved,
+      html`<sp-picker size="s" class="reference-field" disabled label="Loading…"></sp-picker>`,
+    )}
+  </div>`;
+});
+
 // Keep an explicit export so hosts can assert the built-ins module loaded
-export const builtinFormControls = ["schema-builder", "secret"] as const;
+export const builtinFormControls = ["schema-builder", "secret", "reference"] as const;

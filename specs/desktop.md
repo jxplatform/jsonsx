@@ -2,9 +2,9 @@
 
 ## Platform Abstraction, Project Loading, and Component Scoping
 
-**Version:** 0.3.4-draft
+**Version:** 0.3.8-draft
 **Status:** Pending
-**Updated:** 2026-07-31
+**Updated:** 2026-08-13
 **License:** MIT
 
 ---
@@ -80,7 +80,7 @@ The canonical `StudioPlatform` interface is `packages/studio/src/types.ts` — r
 | Family                   | Representative members                                                                                                                                                                                                         |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Session / project**    | `id`, `projectRoot`, `activate`, `openProject`, `openProjectPicker?`, `probeRootProject`, `createDestination`, `createProject`, `pickDirectory?`, `listStarters?`, `importSite?`, `listProjects?`, recent-projects persistence |
-| **Filesystem**           | `listDirectory`, `readFile`, `writeFile`, `uploadFile`, `deleteFile`, `renameFile`, `createDirectory`, `locateFile`, `searchFiles`, `subscribeFileEvents?`                                                                     |
+| **Filesystem**           | `listDirectory`, `readFile`, `writeFile`, `uploadFile`, `deleteFile`, `renameFile`, `findReferences?`, `createDirectory`, `locateFile`, `searchFiles`, `subscribeFileEvents?`                                                  |
 | **Documents / formats**  | `discoverComponents`, `listFormats?`, `listExtensions?`, `fetchProjectSchemas?`, `formatAction?`, `fetchPluginSchema`                                                                                                          |
 | **Packages**             | `listPackages`, `addPackage`, `removePackage`, `installDependencies?`, `outdatedPackages?`, `setPackageVersions?`                                                                                                              |
 | **Git**                  | `gitStatus`, `gitCommit`, `gitPush`, `gitPull`, `gitDiff`, `gitCheckout`, `gitClone?`, `createPullRequest?`, …                                                                                                                 |
@@ -88,7 +88,7 @@ The canonical `StudioPlatform` interface is `packages/studio/src/types.ts` — r
 | **Data / secrets**       | `dataConnections?`, `dataRows?`, row CRUD, `dataPush?`, `listSecrets?`, `setSecrets?`                                                                                                                                          |
 | **Publish / identity**   | `getUser?`, `getAccountStatus?`, `listRepos?`, `importProject?`, `cfConnection?`, `cfConnect?`, `cfApi?`                                                                                                                       |
 | **Code services / AI**   | `codeService` (§5.3), `resolveClass?`, `aiChatUrl`                                                                                                                                                                             |
-| **Multi-window / shell** | `openProjectInNewWindow?`, `newWindow?`, `setWindowProject?`, `getProjectRoot?`, `getAppInfo?`, backend-persisted settings                                                                                                     |
+| **Multi-window / shell** | `openProjectInNewWindow?`, `pickProject?`, `newWindow?`, `setWindowProject?`, `getProjectRoot?`, `getAppInfo?`, backend-persisted settings                                                                                     |
 
 **Core vs. optional, and degradation.** Required members are the minimal backend every platform implements. Optional members (marked `?` in the interface) each back an optional protocol route; Studio feature-detects them and degrades gracefully when they are absent — hiding the corresponding UI or falling back to a client-side path. Each optional route's `degradation` note in `STUDIO_ROUTES` records exactly what turns off (e.g. no `collab` → Studio edits solo with file-level saves; no `importSite` → the New Project modal hides its Import tab).
 
@@ -146,6 +146,7 @@ if (!hasPlatform()) {
    - Otherwise, show the welcome state ("Open a project to get started")
 3. When the user triggers "Open Project":
    - With `openProjectPicker: "repo-list"` (cloud), Studio shows its own repository picker over `listRepos` + `importProject` (write-access repositories only) and opens the choice through the recent-projects path — `openProject()` is never called
+   - With a project already open on a platform that implements **both** `openProjectInNewWindow` and `pickProject`, Studio first asks **where** (§4.2a) and routes the answer
    - Otherwise Studio calls `getPlatform().openProject()` and the platform presents its native project opening flow
    - On success, Studio receives `{ config, handle }` and initializes the file tree
 
@@ -191,6 +192,9 @@ User clicks "Open Project"
         │    → listRepos → write-access repos, Jx-tagged first → user picks
         │    → importProject → { root } → opens via the recent-projects path
         │    (openProject() is never called)
+        │
+        ├─── A project is open AND the platform has openProjectInNewWindow + pickProject:
+        │    ask WHERE first (§4.2a). "New Window" never reaches openProject().
         ▼
 platform.openProject()
         │
@@ -213,6 +217,45 @@ Studio initializes project state:
   - Auto-expand key directories (pages/, layouts/, components/)
   - Switch to Files tab
 ```
+
+### 4.2a Where the Project Opens
+
+> **Status: Implemented.**
+
+A window holds one project, so opening another is a question with two answers, and Studio asks it whenever both are available: **This Window** or **New Window**, with the open project named in the prompt.
+
+**The question is only asked where it can be honoured.** That takes two PAL members, not one:
+
+| Member                   | What it provides                                                              |
+| ------------------------ | ----------------------------------------------------------------------------- |
+| `openProjectInNewWindow` | Somewhere else to open into                                                   |
+| `pickProject`            | An answer to _which project_ that does not bind **this** window to the answer |
+
+`openProject()` picks **and binds** — the platform re-roots the calling window's session as part of presenting its dialog. That is correct for This Window and unusable for New Window, where the asking window must be left exactly as it was. A platform with only `openProjectInNewWindow` cannot carry out either answer faithfully, so no choice is offered and Open Project behaves as it does with one window.
+
+```
+"New Window"
+        │
+        ▼
+platform.pickProject()            → { root, name } | null   (binds nothing, anywhere)
+        │                              │
+        │                              └── null (cancelled): nothing opens, nothing is reported
+        ▼
+platform.openProjectInNewWindow(root)
+        │
+        ▼
+Returns { focused }
+        │
+        ├─── focused: false — a window was created for the project; it loads the project itself
+        │    and adds its own recent-projects entry
+        │
+        └─── focused: true — a window already had this project and was raised instead
+        ▼
+Studio reports what happened. The asking window's project, tabs and backend binding are untouched
+on every branch above.
+```
+
+**The outcome is reported, never the intent.** The three results — opened here, opened in a new window, raised an existing window — are distinguishable, and a cancelled picker is silent. Announcing the chosen target instead produces reports of things that did not happen: "Opening the project in a new window…" over a dismissed file dialog, or over a window that merely came to the front.
 
 ### 4.3 Single File Mode
 
@@ -250,7 +293,9 @@ projectState = {
 
 A new project is written **only** where the user said to put it. No backend picks a destination on its own, and none falls back to its own root — an unspecified destination is an error, not a default.
 
-`StudioPlatform.createDestination` declares which kind of destination the platform takes, and the New Project modal renders the matching fields on its Parameters step:
+**The wizard is two steps, and the second collects identity only.** Step 1 (_Choose a starting point_) offers the starter gallery — with one **Start from scratch** card at its end for the minimal scaffold — plus the Import and Agent sources on their own tabs. Step 2 (_Name your project_) collects the project name and the destination, and nothing else: the site's URL, its deployment adapter and its design tokens are project settings, editable for the life of the project, so they are not creation-time decisions. **Cancel is available on both steps**, alongside the underlay, `Escape` and the header close button; dismissing the modal while an import is streaming aborts the run rather than trapping the user behind it.
+
+`StudioPlatform.createDestination` declares which kind of destination the platform takes, and the New Project modal renders the matching fields on its Name step:
 
 | `createDestination` | Platforms           | Fields collected                            | `createProject({ destination })`                             |
 | ------------------- | ------------------- | ------------------------------------------- | ------------------------------------------------------------ |
@@ -286,7 +331,9 @@ Returns { root, config } and the modal opens it
 
 A live preview under the fields shows the resolved destination (`/home/you/Sites/my-site`, or `acme/my-site`) before anything is written.
 
-**Import shares this destination.** The Import tab is one of the four New Project sources, so it collects the same Location field and sends the resolved absolute path as `ImportSiteOptions.directory`. A relative directory reaching a backend means a caller skipped the field and is refused.
+**Every created project is a git repository.** A scaffold that is not under version control has no undo for its first destructive action, and nothing in the app says so. On the create path — every source, including Import and Agent — Studio therefore binds the backend to the new root (`activate`), reads `gitStatus`, and runs `gitInit` when the tree is not already a repository. It is skipped entirely on `createDestination: "repo"` platforms, where the project _is_ a repository by construction, and a git failure is reported without failing the create: the project that was written stays written.
+
+**Import shares this destination.** The Import tab is one of the three New Project sources, so it collects the same Location field and sends the resolved absolute path as `ImportSiteOptions.directory`. A relative directory reaching a backend means a caller skipped the field and is refused.
 
 ---
 
@@ -313,6 +360,7 @@ A few illustrative rows (see the table for the rest):
 | Read file           | `GET /__studio/file?path=`      | `readFile(path)`           |
 | Write file          | `PUT /__studio/file?path=`      | `writeFile(path, content)` |
 | Rename file         | `POST /__studio/file/rename`    | `renameFile(from, to)`     |
+| Find references     | `GET /__studio/references`      | `findReferences(target)?`  |
 | Discover components | `GET /__studio/components?dir=` | `discoverComponents(dir)`  |
 | Realtime co-editing | `GET /__studio/collab` (WS)     | `collab(docPath)`          |
 
@@ -342,7 +390,7 @@ A few illustrative rows (see the table for the rest):
 | Resolve $prototype/$src | `POST /__jx_resolve__`     | The runtime (direct POST) |
 | Execute server function | `POST /__jx_server__`      | The runtime (direct POST) |
 
-These are **not** PAL methods — the runtime POSTs to `/__jx_resolve__` and `/__jx_server__` directly, on every platform. The dev server and the loopback project server (which token-gates them) serve the routes as plain HTTP. In the ElectroBun shell there is no HTTP backend for the webview, so the desktop adapter bridges them by patching `window.fetch` (`packages/desktop/src/platform.ts`): POSTs to those two paths are intercepted and forwarded over RPC to the Bun process (`jxResolve` / `jxServerFunction` handlers), and every other request falls through to the original fetch. The only PAL member in this area is the optional `resolveClass?`, which **Studio itself** (not the runtime) uses to resolve class-prototype configs through the same `/__jx_resolve__` pipeline (e.g. the tab-bar's route-param picker).
+These are **not** PAL methods — the runtime POSTs to `/__jx_resolve__` and `/__jx_server__` directly, on every platform. The dev server and the loopback project server (which token-gates them) serve the routes as plain HTTP. In the ElectroBun shell there is no HTTP backend for the webview, so the desktop adapter bridges them by patching `window.fetch` (`packages/desktop/src/platform.ts`): POSTs to those two paths are intercepted and forwarded over RPC to the Bun process (`jxResolve` / `jxServerFunction` handlers), and every other request falls through to the original fetch. The only PAL member in this area is the optional `resolveClass?`, which **Studio itself** (not the runtime) uses to resolve class-prototype configs through the same `/__jx_resolve__` pipeline (e.g. the pane context bar's route-param picker, in its "resolving with" popover).
 
 Optional PAL members may not exist on all platforms. Studio feature-detects them by presence before calling:
 
@@ -813,6 +861,10 @@ Ensure desktop app matches dev-mode capabilities:
 
 ## Changelog
 
+- **0.3.8-draft** (2026-08-13) — Open Project asks where a project should open (§4.2a): New Window is routed through pickProject + openProjectInNewWindow, and the outcome is reported rather than the target.
+- **0.3.7-draft** (2026-08-11) — Name the pane context bar's resolving-with popover rather than the tab bar, which P8 deleted.
+- **0.3.6-draft** (2026-08-03) — §3.1/§5.1: findReferences? PAL member and the GET /__studio/references route — the read side of the rename refactor's walker.
+- **0.3.5-draft** (2026-08-02) — searchFiles, gitShow and openExternal RPC handlers registered on both launchers; styles/ staged into the packaged app.
 - **0.3.4-draft** (2026-07-31) — List the cfConnect? PAL member in the Publish/identity family — it ships in StudioPlatform and backs the hosted Cloudflare OAuth flow, but the table omitted it.
 - **0.3.3-draft** (2026-07-29) — PAL: launcher-only capabilities (updater, windowControls) stay off the StudioPlatform interface; adapter factories infer their return type and assert conformance instead of annotating it away.
 - **0.3.2-draft** (2026-07-29) — The desktop shell routes Studio preview links to the user's default browser via Utils.openExternal (§3.5).
@@ -836,4 +888,4 @@ Ensure desktop app matches dev-mode capabilities:
 
 ---
 
-_Jx Studio Desktop Architecture Specification v0.3.4-draft_
+_Jx Studio Desktop Architecture Specification v0.3.8-draft_

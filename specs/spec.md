@@ -2,9 +2,9 @@
 
 ## Declarative Document Object Model — JSON Edition
 
-**Version:** 0.4.27-draft
+**Version:** 0.4.28-draft
 **Status:** Partial
-**Updated:** 2026-07-30
+**Updated:** 2026-08-10
 **License:** MIT
 
 ---
@@ -1880,7 +1880,7 @@ Example — an input handler with no `body` string:
 
 ### 19.6 Placement
 
-`$expression` is valid in two positions:
+`$expression` is valid in three positions:
 
 1. **As a `state` entry** (a named, reusable operation — Shape 5, §19.7):
 
@@ -1920,6 +1920,39 @@ Example — an input handler with no `body` string:
 A named `state` expression may be bound to multiple elements via `$ref` (`"onclick": { "$ref": "#/state/toggleTheme" }`), exactly as a Function entry is. Prefer the named form when reused; prefer the inline form for single-use handlers (cf. §6.5).
 
 A **pure** expression (§19.1) used as a `state` entry is a computed value — it is read via `$ref` or `${}` like any Shape 3 computed (`"textContent": { "$ref": "#/state/total" }`). A **mutating** expression used as a `state` entry is a handler, bound to events. The mode follows from the operator; it is not declared.
+
+3. **As an element's `tagName`** — a tag chosen when the element is created, narrowed to the
+   `TagExpression` shape: `?:` or `switch`, whose every result is a literal `TagName`. This is the
+   one position where an `$expression` is **not live** — the tag is resolved once, at creation, and
+   never re-read.
+
+   ```json
+   {
+     "tagName": {
+       "$expression": {
+         "operator": "?:",
+         "target": { "$ref": "#/state/href" },
+         "value": "a",
+         "initial": "div"
+       }
+     },
+     "attributes": { "href": "${state.href}" },
+     "children": ["…written once, whichever tag it turns out to be…"]
+   }
+   ```
+
+   **Why the results are tag names and not operands.** The candidate set has to be readable without
+   evaluating anything: the compiler emits one template per candidate (lit cannot bind a tag name),
+   `jx validate` refuses an illegal name at authoring time, and the void-element, preformatted and
+   slot analyses that read a tag structurally keep a finite set to reason about. A `${…}` template
+   here would surrender all of it — and did: nothing in the pipeline evaluated one, so each consumer
+   failed differently and silently.
+
+   **Why once and not live.** A tag that changed after mount means replacing the element, and the
+   subtree's listeners, focus, typed input values and component instances go with it. `jx validate`
+   warns when a tag discriminant is also an assignment target, so the case where the rule bites is
+   caught before it ships. The document ROOT's `tagName` and a `$head` entry's stay literal — they
+   are a custom element's name and a head tag.
 
 ### 19.7 Shape Detection (amends §5.7)
 
@@ -2298,6 +2331,7 @@ This rewrites the mutating handlers of Appendix A's idiom using `$expression`, l
 
 ## Changelog
 
+- **0.4.28-draft** (2026-08-10) — §19.6 $expression gains a third position — an element's tagName, narrowed to a TagExpression whose every branch is a literal TagName so the candidate set is enumerable without evaluating; it is the one $expression position that is not live, resolved once at element creation, and the document root's and $head entries' tagNames stay literal.
 - **0.4.27-draft** (2026-07-30) — Clarify that a bare `return;` is an early-exit guard, not a value return, when classifying a Function body as a computed (§5.3 4b).
 - **0.4.26-draft** (2026-07-30) — Define the handler-side iteration context: an event handler bound inside a map reads its row via state.$map (§10.2).
 - **0.4.25-draft** (2026-07-30) — Define parameter binding by name at event call sites, and how a bodyless $src Function is classified as a computed or a callable (§5.3 4d).
@@ -2345,4 +2379,4 @@ This rewrites the mutating handlers of Appendix A's idiom using `$expression`, l
 
 ---
 
-_Jx Specification v0.4.27-draft — subject to revision_
+_Jx Specification v0.4.28-draft — subject to revision_

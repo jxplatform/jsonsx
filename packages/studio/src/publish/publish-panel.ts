@@ -6,11 +6,24 @@
  * cf-settings); connected without `build.deploy` → create-and-connect form;
  * connected → deployment status (publishing rides every commit).
  *
+ * **The token was in the DOM, on every open.** `credentialTpl` rendered
+ * `value=${getCfToken()}` into an `sp-textfield` whenever a token was stored and
+ * the platform had no hosted broker — a control the reader had not asked to
+ * edit, on a surface `scripts/screenshots` photographs. `type="password"` masks
+ * pixels and nothing else: the value is in the attribute, in the serialized
+ * HTML, in the accessibility tree and in every DOM dump. It is gone. A stored
+ * token is now reported as *stored*, the field is only ever drawn empty for a
+ * REPLACEMENT the reader asked for, and revoking lives where every other
+ * credential's does — Preferences › Accounts (`studio.md` §15 rule 1: a surface
+ * never prints the secret it describes).
+ *
  * @license MIT
  */
 
 import { html } from "lit-html";
 import type { DeployConfig, ProjectConfig } from "@jxsuite/schema/types";
+import { activeRegistry } from "../commands/active-registry";
+import { currentDeploy, noteDeployment } from "./deploy-checklist";
 import { getPlatform } from "../platform";
 import { getCfToken, setCfToken } from "../services/cf-settings";
 import { projectState } from "../store";
@@ -33,14 +46,12 @@ let _accounts: CfAccount[] = [];
 let _deployment: PagesDeploymentInfo | null = null;
 let _error = "";
 let _busy = false;
+/** Whether the reader has asked to replace a token that is already stored. */
+let _replacing = false;
 let _form = { accountId: "", branch: "main", owner: "", projectName: "", repo: "" };
 
 function currentConfig(): ProjectConfig | null {
   return (projectState?.projectConfig as ProjectConfig | undefined) ?? null;
-}
-
-function currentDeploy(): DeployConfig | undefined {
-  return currentConfig()?.build?.deploy;
 }
 
 function deriveSlug(name: string): string {
@@ -71,6 +82,9 @@ async function loadConnection(): Promise<void> {
       const deploy = currentDeploy();
       if (deploy) {
         _deployment = await latestDeployment(deploy);
+        // We ASKED, so the deploy checklist may stop saying "unknown" — including when the answer
+        // Was "none", which is a fact and not an absence of one.
+        noteDeployment(_deployment);
       }
     }
   } catch (error) {
@@ -80,11 +94,32 @@ async function loadConnection(): Promise<void> {
   render();
 }
 
+/**
+ * Take the token straight from the live control to storage.
+ *
+ * It is read from the DOM and never written back to it, which is the whole asymmetry: a secret may
+ * pass through a field the user typed it into, and may not be painted into one they did not.
+ */
 async function saveToken(host: HTMLElement): Promise<void> {
   const input = host.querySelector<HTMLInputElement>("#cf-token-input");
-  setCfToken(input?.value ?? "");
+  const value = (input?.value ?? "").trim();
+  if (!value) {
+    _error = "Paste a token, or use Preferences › Accounts to forget the stored one.";
+    render();
+    return;
+  }
+  setCfToken(value);
+  if (input) {
+    input.value = "";
+  }
+  _replacing = false;
   _error = "";
   await loadConnection();
+}
+
+/** Open Preferences on Accounts — the one place a credential is listed and forgotten. */
+function openAccounts(): void {
+  void activeRegistry()?.run("app.preferences", { section: "accounts" });
 }
 
 async function hostedConnect(): Promise<void> {
@@ -164,28 +199,67 @@ function credentialTpl() {
   if (platform.cfConnect) {
     return html`
       <p>Connect your Cloudflare account to publish this site.</p>
-      <sp-button ?disabled=${_busy} @click=${() => void hostedConnect()}>
+      <sp-button
+        ?disabled=${_busy}
+        @click=${() => {
+          void hostedConnect();
+        }}
+      >
         Connect Cloudflare
       </sp-button>
+    `;
+  }
+  const stored = getCfToken() !== "";
+  if (stored && !_replacing) {
+    // The token is STORED, and that is the whole of what this says. It was rejected or has expired
+    // — otherwise `_connection.connected` would be true and this branch unreachable — so the two
+    // Honest moves are to replace it or to forget it, and neither needs to see it.
+    return html`
+      <p>
+        A Cloudflare API token is stored on this machine, and Cloudflare did not accept it. It may
+        have been revoked, or it may be missing the Account Settings Read and Pages Read/Write
+        permissions.
+      </p>
+      <div class="publish-actions">
+        <sp-button
+          ?disabled=${_busy}
+          @click=${() => {
+            _replacing = true;
+            _error = "";
+            render();
+          }}
+        >
+          Replace token
+        </sp-button>
+        <sp-button variant="secondary" @click=${openAccounts}>Preferences › Accounts</sp-button>
+      </div>
     `;
   }
   return html`
     <p>
       Paste a Cloudflare API token (permissions: Account Settings Read, Pages Read/Write). It is
-      stored locally and only sent to the same-origin proxy.
+      stored on this machine and only sent to the same-origin proxy — Studio never renders it back.
     </p>
     ${fieldRow(
       "API token",
       html`<sp-textfield
         id="cf-token-input"
         type="password"
-        value=${getCfToken()}
+        value=""
         placeholder="cf_..."
       ></sp-textfield>`,
     )}
-    <sp-button ?disabled=${_busy} @click=${(e: Event) => void saveToken(hostOf(e))}>
-      Verify & Connect
-    </sp-button>
+    <div class="publish-actions">
+      <sp-button
+        ?disabled=${_busy}
+        @click=${(e: Event) => {
+          void saveToken(hostOf(e));
+        }}
+      >
+        Verify &amp; Connect
+      </sp-button>
+      <sp-button variant="secondary" @click=${openAccounts}>Preferences › Accounts</sp-button>
+    </div>
   `;
 }
 
@@ -248,7 +322,12 @@ function connectFormTpl() {
         }}
       ></sp-textfield>`,
     )}
-    <sp-button ?disabled=${_busy} @click=${() => void submitConnect()}>
+    <sp-button
+      ?disabled=${_busy}
+      @click=${() => {
+        void submitConnect();
+      }}
+    >
       ${_busy ? "Connecting…" : "Create & Connect"}
     </sp-button>
   `;
@@ -280,10 +359,22 @@ function statusTpl(deploy: DeployConfig) {
     }
     <p class="publish-hint">Publishing happens automatically on every commit.</p>
     <div class="publish-actions">
-      <sp-button variant="secondary" ?disabled=${_busy} @click=${() => void loadConnection()}>
+      <sp-button
+        variant="secondary"
+        ?disabled=${_busy}
+        @click=${() => {
+          void loadConnection();
+        }}
+      >
         Refresh
       </sp-button>
-      <sp-button variant="negative" ?disabled=${_busy} @click=${() => void disconnect()}>
+      <sp-button
+        variant="negative"
+        ?disabled=${_busy}
+        @click=${() => {
+          void disconnect();
+        }}
+      >
         Disconnect
       </sp-button>
     </div>
@@ -330,7 +421,7 @@ function errorTpl() {
 
 function render(): void {
   const tpl = html`
-    <div class="new-project-modal publish-modal">
+    <div class="new-project-modal publish-modal" data-jx-region="overlay.dialog:publish">
       <div class="new-project-modal-header">
         <h2 class="new-project-modal-title">Publish</h2>
         <sp-action-button size="s" quiet @click=${close}>✕</sp-action-button>
@@ -341,7 +432,7 @@ function render(): void {
   if (_handle) {
     _handle.update(tpl);
   } else {
-    _handle = openModal(tpl);
+    _handle = openModal(tpl, { label: "Publish", onDismiss: close });
   }
 }
 
@@ -357,8 +448,10 @@ export function seedPublishConnected(options: {
   _connection = { accountId: options.accountId ?? "demo-account", connected: true };
   _accounts = [];
   _deployment = options.deployment;
+  noteDeployment(options.deployment);
   _error = "";
   _busy = false;
+  _replacing = false;
   render();
 }
 
@@ -371,6 +464,7 @@ export function openPublishPanel(): void {
   _deployment = null;
   _error = "";
   _busy = false;
+  _replacing = false;
   _form = {
     accountId: "",
     branch: "main",

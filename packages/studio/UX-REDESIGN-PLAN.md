@@ -1,0 +1,1469 @@
+# Jx Studio — The Named Shell
+
+**A unified redesign plan.** Built on _Nameable — the registry is the shell_, governed by _Concentric_'s containment law, and paid for up front by _One Band, Four Places_' first-hour work.
+
+---
+
+## 0\. Revision note
+
+This revision applies verified corrections to the first draft. What changed:
+
+**A · Architecture correctness.** `Command.when` / `Command.enablement` are `(ctx) => boolean` predicates, not a string DSL — `gated-registry.ts:18-23` ships closures, and the evaluator the draft implied is now explicit future work (§13). `view.ts:54` is a plain object literal, so P2 now opens by splitting it into non-reactive `view` (render outputs) and a reactive `shell.ts` (UI inputs) before the context store exists. The six git fields, `settingsTab` and the four `stylebook*` fields are hoisted out of `TabUi` (`tab.ts:57-67`), because a project-level panel may not read per-tab state. The level check is now a **level × placement matrix** with its exemptions in the table, not one level per region. The Bottom dock folds Deploy into Activity — four tabs, budget honoured.
+
+**B · Roadmap sequencing.** P0 gains four workstreams: the missing desktop `searchFiles` handler (⌘P is dead on the only end-user path), the screenshot-manifest `run(id)` conversion that four later phases would otherwise break, the stylesheet split, and the orphan check folded into the shipped `check-styles.ts`. P1 is reordered — cheap credibility first, the layout-node fix landed alone — with `caret.active` pulled forward and the Document Header card pushed to P3. Contexts lands in P4, ahead of P5. `findReferences` is a five-package workstream with its own estimate. The minimal pane model moves to P3. Estimates carry the cost of rewriting 8,199 lines of existing tests: P2 4→6, P3 4→6, P5 4→6, P7 5→6.
+
+**D · The screenshot pipeline (new §13).** The pipeline bent the app three times in one session, so it now has a section and two governing rules: a shot may name inputs the app accepts, never values it derives; and the pipeline may only ask the app to do sooner what the plan already commits to. Verified while writing it: **`docs:verify` does not verify screenshots** — `check-doc-refs.ts:209-231` checks only that a referenced image exists and that the manifest _could_ produce its name, and no CI job anywhere runs `bun run screenshots`, which is how two shots stayed red on main under green CI. Also verified: capture is already byte-deterministic for most shots, and `hero`'s 15 % run-to-run drift is **remote Google Fonts inside the canvas iframe** — a cold cache renders fallback metrics and 80px of extra content height, and `document.fonts.ready` resolves against an empty font set in a blank frame, so it never waited. (The first draft of this note blamed a P1 Preview sizing race; measurement said otherwise. §13.4 carries the finding.) The old §13 becomes §14.
+
+**E · What P4 changed about the plan itself** (added on landing, not designed up front). Three corrections the phase forced. **The rail foot** was two hand-authored buttons calling module functions directly, and the gear opened _project_ configuration from an application-level slot — §3.2 ② always said Preferences ⌘, belonged there, and P3 never finished it; About became the `help.about` record it had never had. **Problems' host** was genuinely ambiguous in this document — §3.2 ③ lists it as a Navigator panel, ⑪ as a Bottom-dock tab, and §7.2's table as "Bottom dock ⑪, badge on the rail". §7.2 wins; the other two readings let the same list be open in two places at once. **The tab strip is not deleted** — P3 deleted the tab _bar_ (`#tab-bar`, the old context row) and the frontmatter band; `panels/tab-strip.ts` is alive and is now one strip per pane, which is what the shot manifest already photographs as `pane.primary/tabs`. Anywhere this plan reads as though documents lost their tabs, it means that row.
+
+**F · What P5 changed about the plan itself** (added on landing). Four things this document got
+wrong, each found by reading the code rather than the plan. **The Target Line's segments** are
+element → breakpoint → scheme → **selector last**, and a scheme variant exists only at Base, because
+scheme × breakpoint compound blocks are unsupported — §6.1's illustration
+`⌖ h1 · @md · :hover · dark variant` shows a state the app cannot render. **Canvas Ctrl/Cmd-click
+already accumulates** (`iframe-host.ts:1605` toggles into the set); only the marquee is absent, so
+"the Outline is where multi-selection is authored" was too narrow. **The scope chip understates the
+widest case**: `resolveScope` treats only `layouts/` as project-wide, so `project.json` — the
+document Stylebook opens by default, whose root style merges into every page and component — reads
+"in this document". **Six vocabularies was an undercount of the work, not of the vocabularies**:
+§6.3 collapsed the dynamic-slot ring and the expression operand picker, but the schema-form binding
+control, the event-mode picker and the Style/Content `caps` arrays each survived as separate call
+sites, and the schema-form control only appears once a value is _already_ a `$ref`, so no gesture in
+those forms starts a binding at all.
+
+**G · What P6 changed about the plan itself** (added on landing). **The count was 29, not 42**,
+across eight files — but the number that mattered was hidden inside it: **21 of the 29 dropped a
+rejected write on the floor** (`void saveProjectConfig()`, or an `await` inside an un-awaited click
+handler), which is the silent-failure path the workstream existed to close. **"One serialisation"
+was not enough.** 2-space is canonical and `oxfmt --check` agrees, but `JSON.stringify(config,
+null, 2)` does not round-trip 13 of the 14 committed `project.json` files, because the formatter
+keeps short arrays on one line — so a byte-comparing writer would have rewritten almost every
+project on its first settings edit. The guarantee that works is semantic: **a no-op edit writes
+nothing at all**. A real one-field edit still reformats, and §17.2 says so rather than implying
+otherwise. **A settings document is not a canvas, and the code did not know it**: `tab.ts` and
+`live-context.ts` each hold a copy of the mode→editor-kind map, neither had a `settings` entry, both
+fall through to `"canvas"`, and ⌘V therefore inserted an element node into `project.json` through
+the transaction log. Duplicated maps fail open. **The new spec section is §17, not §16** — P4 took
+§16 for Feedback, and docs `spec:` frontmatter anchors section numbers, so they are appended, never
+renumbered. Finally, the `settings-modal` **shot name became false** the moment the modal died; a
+shot is named for what it photographs, so it is `settings-document` now.
+
+**H · What P7 changed about the plan itself** (added on landing). **There are two command roots and
+they can diverge.** `appCommandSet()` is what `check-command-levels` counts and
+`docs/studio/interface/commands.md` is generated from; the running app registers through
+`register*(commandRegistry)` calls in `studio.ts`. Nothing tied them together, so P7 shipped four
+factories in NEITHER — Push, Deploy, Save View and the whole Redirects editor absent from the
+palette with no other entry point, while their unit tests passed and CI reported a healthy count —
+and P4 had put `help.about` and the entire `collab.*` family in the projection ALONE, so CI counted
+commands the app could not run, in the same change that deleted the button one of them replaced.
+Six unreachable command sets across two phases, none of which any gate could see, because a command
+that is never composed is simply absent and absence reads as fine.
+`tests/app-commands-composition.test.ts` is the guard.
+
+**Two tests could not fail.** `entry-editor.test.ts` built its tab with `openTab({ frontmatter })` —
+state the real open path never produces for a JSON entry — so the editor rendered a blank form and
+discarded every edit while reporting "Saved", and every fixture agreed it was fine. The Library's
+perf test **deletes the global `IntersectionObserver`**, so it structurally could not see that
+observation targets are never released and scrolling degrades the longer you scroll. A test that
+constructs state the app never constructs will confirm whatever you built; both of these did.
+
+**Measurement finds what review cannot.** Item 1's acceptance test — 300 pages, one category — was
+worth stating as a number, and building it turned up three bugs nobody was looking for: an LRU that
+never marked on-screen previews as used, a cache cap SMALLER than one window (so it thrashed against
+itself), and a failed scan retried by the very repaint its failure caused.
+
+**`site-architecture.md` §7 had eight stale `Pending` markers** — rename, delete and CSV editing all
+shipped long ago. A status table that has to be re-derived from the code is worse than none, because
+it is the one artifact a reader consults _instead of_ reading the code.
+
+**I · What P8 changed about the plan itself** (added on landing). **A green gate is evidence about
+the gate.** P8 built a compiler-resolved reachability check over the whole package and it found
+what eight phases of unit tests could not: twelve-plus surfaces built, tested and wired to nothing.
+Three caches with an invalidator and no caller. `activityIdleBlockers`, named in a docstring as a
+`probe.idle()` source and never registered as one, so the screenshot lane could photograph a
+half-finished install. `view.openInBrowser` bypassing the desktop seam with an inlined `window.open`
+beside the function that routes it properly. The **entire sub-document stack** — push, pop,
+jump-to-level, a palette command, a breadcrumb, a collab guard — whose only entrance had zero
+callers, so it could never hold a frame. The rule this plan should have carried from §1: **a stack
+needs a push, and the push is the part to specify.**
+
+**Moving a surface leaves believers behind, and they are not comments.** Putting the function editor
+and the formula workspace in the Bottom dock made four other places wrong at once. Two were prose.
+The third suppressed the pane context bar's three axes and the zoom pod, on the reasoning that the
+axes "describe a document that is not the one on screen" — true of a takeover, false of a dock. The
+fourth was the takeover itself, still returning early out of `renderCanvasContent`, so the stage
+froze on whatever it had last painted while the dock claimed to be rendering beside a live page. A
+move is not done when the new host works; it is done when nothing still believes in the old one.
+
+**A control that does nothing is worse than an absent one.** `pane.toggleZoom` and `pane.setZoomed`
+wrote `zoomedPaneId`; nothing that draws ever read it. A reserved `diff` Bottom-dock tab sat behind
+a permanently-false predicate for four phases, held by a comment that argued against its own
+reservation. Both are deleted. A reservation is honest only while the capability exists nowhere
+else — which is why the Navigator's Search slot stays.
+
+**Two literal NUL bytes** in `panels/jump-bar.ts` (a path separator written as the
+byte instead of the `\u0000` escape) made git, grep, oxfmt and GitHub classify a 22 KB source
+file as **binary**. Three searches for text plainly in it returned nothing before anyone ran `file` on it. Neither the
+separator nor the joined key was needed: `pathsEqual` already answered the question.
+
+**J · What the branch audit changed about the plan itself** (added on landing, after a read of the
+whole feature set against this document). Every finding was an ABSENCE, and absence is what six
+green gates and 8,311 passing tests each read as fine. Four of them were things a user does with the
+keyboard.
+
+**⌘B in the canvas did nothing, and had done nothing since the iframe landed.** Not "was not a
+record" — did nothing. `iframe-keys.ts` withheld `b i u \`` from forwarding "because the editing
+engine implements them itself", and the engine does not: `editor/inline-edit.ts`'s keydown listener
+is bound to the BLOCK while the editing host is the canvas container, so it never fires, and
+`canvas/editable-actions.ts`rejects the browser's own`formatBold`because Jx owns its markup. The
+toolbar advertised the chord, §10 documented it, and a data file hardcoded`"Cmd+B"`into the tooltip
+on every platform. ⌘A was the same defect inverted: forwarded AND`preventDefault`ed, with no record
+bound to it, so it neither selected the paragraph nor selected anything else. **Two hand-written
+lists cannot agree with a registry**; the frame is handed the chord table now (§5.3's scope stack,
+crossing the bridge as a `keymap`message) and resolves against it, so the clipboard trio, the bare
+editing keys and the format chords all fall out of scope declarations instead of being listed. That
+is the decision this document owed`inline formatting's level`(§0 C) and §14's "no fifth range
+level" row: the eight verbs are`level: "selection"`, `keyScope: "caret"`records, in a`blockbar/format` placement with its own cap, because eight verbs sharing the bar's cap of five would
+have pushed Bold into an overflow menu.
+
+**Ten records the app ran were invisible to every check.** `appCommandSet()` — what
+`check-command-levels` counts and the generated keyboard sheet is built from — omitted
+`editor/shortcuts.ts`'s private `canvasCommands()`, so ⌘C, ⌘X, ⌘V, Enter, the three structural arrows
+and all three zoom chords were unvalidated and undocumented. The deferral was written down, with a
+reason (`edit.copy` declared twice) that had stopped being true two phases earlier. P7's composition
+test could not see it because it only checks projection → registration; the reverse direction has a
+guard now, and so does "no two palette rows print the same sentence" — which caught
+`view.setAssistant` and `inspector.focus.assistant` both rendering **View: Show Assistant**.
+
+**A rename migrated the read path and left the write path alone.** `blocks → insert` shipped with
+`migratePanelId` for persisted state, while the Outline's own empty state called
+`setActivityTab("blocks")` — so the one action an empty page offers landed the Navigator on _No
+Navigator panel is registered as "blocks"_. Its test asserted `"blocks"` under a title that said
+"opens Insert". A typed door (`setActivityTab(tab: NavigatorPanelId)`) closes the class.
+
+**One of this document's own promises was still open, and one was already kept.** P0's guard on bare
+`outline: none` did not exist — there is no stylelint in this repo and never was, so the rule joined
+`scripts/check-styles.ts` beside the orphan check. It is a **paired allowance**, not a ban: every
+allowed suppression names the `:focus-visible` rule that restores the ring, so deleting the restore
+turns the allowance red — which is how it immediately found a live defect a ban could not have, a
+`.jx-grid-input` whose restore covered the picker beside it and not the text cells. The count in P0
+is wrong twice over: five stylesheet declarations (six suppressions, one being a grouped selector),
+plus **two inline `style=` attributes that were never swept at all** and cannot be paired, in the
+slash menu's and the media picker's filter inputs. P1's `git init` on create, by contrast, **shipped
+long ago** (`files.ts`'s `initProjectRepo`, called from the one exit all three create paths take),
+and the status bar states the untracked case through the deploy checklist's first unforged link
+rather than a second item beside it; what was missing was anything pinning that pairing, so a test
+now asserts the state is stated exactly once and that its command is `git.init`.
+
+**Both trees are virtualized, on one primitive** (`ui/virtual-window.ts`, moved out of `browse/`),
+which closes §0 C's `unvirtualized trees`. The hazard was not the windowing: the Outline's shift-range
+read its row list **from the DOM**, so a range whose far end had scrolled out of the window would
+have silently selected the wrong set. Every DOM-derived row read in both trees — the range, the arrow
+walk, Home/End, ←'s climb to the parent, reveal-on-select, rename — moved to the model, and both
+trees now report `aria-posinset`/`aria-setsize` because a windowed tree without them tells a screen
+reader "3 of 11" about a 5,000-row document.
+
+**`rightTab` stayed per-document** against P3.1's letter — the code argues its case at
+`right-panel.ts:74` ("the tab you were on comes back with the file") and it is the better behaviour,
+so the plan follows the code: a layout preset's `inspectorTab` is the tab it OPENS on, not one it
+enforces.
+
+**C · Facts and dropped surfaces.** 36 `project.json` write sites → **42**, across eight files. `"stylebook"` is a wire-protocol value (`iframe-protocol.ts:25`), so it stays one. The Layout show/hide toggle, the GitHub-App install prompt, the per-recent remove affordance and the `?project=` deep link all get an explicit home in §11. The New Project wizard rework is scheduled in P1, the Insert command family in P3. Six owner-less findings — the 158 silent catch blocks, `leftTab`/`rightTab`, the three `$elements` writers, the unvirtualized trees, the panel scheduler's silent deferral, and inline formatting's level — each get a phase and a decision.
+
+---
+
+## 1\. Thesis
+
+Jx Studio bought the IDE silhouette — activity rail, tab strip, status bar, ⌘P — and skipped the machine underneath it. Every capability in the app is hand-wired at each surface that exposes it, so the surfaces disagree; every container was placed where there was room, so position encodes nothing; and every outcome is shouted into a 24px strip that erases it after three seconds, so the app cannot tell the user what happened. Those are not three problems. They are one missing idea in three costumes.
+
+**The organising idea: everything Studio can do, everything Studio can show, and everything Studio can report is a _record_ — with a name, a containment level, and a predicate — and every surface is a rendering of those records.**
+
+Three record types, three root causes:
+
+| Record       | Root cause it fixes | What exists today                                                                                                                                                                                                                                                                                                             | What it becomes                                                                                                                                                                                                                                                                                                                                             |
+| ------------ | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Command      | Command substrate   | ~180 actions hand-wired per surface; 12 chords against ~126 entry points; "duplicate node" implemented four times; minimalToolbarTemplate is the real toolbar retyped with disabled on every button; ⌘W refuses to close the last tab (editor/shortcuts.ts:192) while the tab's × closes it happily (panels/tab-strip.ts:182) | One registerCommand({ id, title, level, keyScope, when, requires, keybinding, menus, run, aiTool }). Palette, Command Bar, rail, context menus, block action bar, keymap, __jxAutomation and the AI's 18 tools are renderings. Enablement computes once.                                                                                                    |
+| Panel        | Scope               | Ten persistent containers, none owning a level; an eight-item array literal in panels/activity-bar.ts:95-104; five of eight panels paint a bare <div class="panel-body"> when no tab is open; the Imports panel changes meaning based on which file is focused                                                                | One registerPanel({ id, title, level, dock, when, render }) mirroring the shipped registerSettingsSection. level ∈ {application, project, document, selection} is required and CI-checked against the level × placement matrix (§5.1): a region renders only the levels the matrix admits for it. Rings with no object collapse instead of rendering blank. |
+| Notification | Feedback            | 78 statusMessage() call sites — 26 failures and 52 successes in identical 11px grey, self-destructing at 3000ms; sp-toast registered at ui/spectrum.ts:199 with zero uses; 158 of 240 catch blocks reach no surface; the canvas posts {kind:"renderError", message} and iframe-host.ts:1289 throws it away                    | notify(severity, message, { action: commandId }). Three lifetimes chosen by required action: toast (reversible, no action needed), Problems (must be fixed, persists until it is), inline (at the offending control). Recovery is a command id, not a per-call-site closure. The status bar becomes ambient state only.                                     |
+
+`services/gated-registry.ts:18-23` already ships `ToolAvailability { when: () => boolean; requires: string }` — a JavaScript predicate plus a human-readable reason — wired to the AI's tools and to nothing a human can touch. That record is the **model** for `Command.when` / `Command.requires`: `when` stays a closure over one reactive context store, so there is no expression grammar to write and no evaluator to test, and `requires` stays one string. From day one the agent's refusal message, the disabled button's tooltip, the palette row's grey subtitle and the automation runner's gate are **the same string**.
+
+Two things follow that make the plan more than an architecture memo.
+
+**Depth becomes free, so chrome can be deleted rather than negotiated.** The toolbar's own CSS admits it is over budget — a container query at 1140px strips every `.tb-label` rather than conceding there are too many controls. Once a retired control keeps a name, a chord and a residue, the fifth grid column (`#chat-panel`, ~300px in every screenshot of the product) and one full-width band (`#frontmatter-panel`) can go. The canvas goes from ~712px of a 1600px window (45%) to ~974px (61%) in the Design layout, ~1284px (80%) in Write, and full bleed in Zen.
+
+**The registry is invisible, so the plan front-loads the visible.** Phase 1 ships before the registry exists and fixes the app's worst moment: the first click a new user makes — on "My Site" in the header — resolves nothing, blinks a caret, and swallows every keystroke, while the panel written for exactly that moment (`properties-panel.ts:1078-1126`, purple "Layout" badge, "Open Layout →") is dead code because `view.layoutSelection` has zero writers in `src/`.
+
+---
+
+## 2\. Design principles
+
+Nine rules. Each is a rule you can reject a PR with.
+
+1.  **One definition site per action.** If a capability exists, it is a `Command` record. Palette, chrome, menus, keymap, automation and the AI tool surface may choose _whether_ to show a command — never what it is called, when it is available, or what it does. A second hand-maintained list of actions is a defect, not a feature.
+
+2.  **Every record declares a containment level, and every placement declares the levels it admits.** `level: "application" | "project" | "document" | "selection"` is required on every `Command` and every `Panel`. The **level × placement matrix** (§5.1, normative copy in `studio-ui-guidelines.md` §12) lists, for each placement, the set of levels it accepts; `scripts/check-command-levels.ts` validates every declared `menus` entry against that table. Mixed regions are mixed _in the table_ — the Navigator rail hosts two single-level groups, the Bottom dock admits project and document with the panel header stating which, and the status bar is three separate single-level placements. There are no prose exemptions.
+
+3.  **File a surface by the level of the state it _writes_, not the state it _reads_.** Insert reads the project's component registry and writes the document tree → document level. Library reads documents and writes project files → project level. This rule, not intuition, settles every contested placement, and it is the rule that stops the rail re-accreting. Its corollary is enforced: a panel declared `level:"project"` may not import `activeTab`, because a project-level badge sourced from the focused document disappears when the last tab closes.
+
+4.  **Enablement is a predicate with a sentence, never a template branch.** Every command carries `when` (hide) and `enablement` (show-but-disable) as closures over one reactive context store, plus a `requires` sentence. No control may render permanently dead with no explanation; no template may be duplicated to express a disabled state.
+
+5.  **Definition and selection are different levels — separate them, then link them both ways.** Breakpoints, colour schemes and feature queries are _defined_ once at project level and _selected_ once at document level. Every selector's popover ends in "Manage…" routing to its definition site; every definition site states where it is selected. A level's surface may route to another level's surface but may never host its controls.
+
+6.  **Every invoking surface prints the action's name and its chord; every empty region teaches.** No unlabelled icon without its command title as the accessible name and its binding in the tooltip. No context-menu row without its chord. No `.empty-state` that is a noun phrase: one sentence of what the region is for, plus the action that fills it, plus one shared verb across Content / Style / Logic.
+
+7.  **Feedback lifetime is chosen by the action required, and the status bar carries ambient state only.** Toast for reversible outcomes; Problems for anything that must be fixed; inline for a bad value at its control. The status bar's three fields are laid out in scope order (project ‖ document ‖ selection) and are never overwritten by a transient message.
+
+8.  **Modality is proportional to risk.** Anything with persistent, savable state is a document and opens in a pane — including `project.json`. Modals are reserved for short-lived blocking decisions, are always dismissible, and may never suspend Save, Undo or the palette.
+
+9.  **Chrome is earned by frequency and capped by a build check.** At most five commands may declare `menus: ["commandbar/primary"]`; at most four tabs per dock; `scripts/check-chrome-budget.ts` fails CI otherwise. Retiring a control costs (a) a discoverable command name, (b) a bindable chord, and usually (c) a status-bar or context-menu residue. Retiring without all three is deletion, not consolidation.
+
+---
+
+## 3\. The shell
+
+### 3.1 Layout
+
+```text
+╔═ ① COMMAND BAR · application ═══════════════════════════════════════════ 36px ═╗
+║ ⬢ │ Write ▸Design◂ Build Ship │ ◈ acme › blog/[slug] › h1  ⌘K │⤺⤻⌷│◉◉│▤▥▦│─□✕ ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+┌──────┬──────────────────┬───────────────────────────────────┬──────────────────┐
+│ ②RAIL│ ③ NAVIGATOR DOCK │ ⑤ PANE                            │ ⑨ INSPECTOR DOCK │
+│ 56px │ FILES · project  │ [slug].json ●│ index.md │ Styles ⊞│ ⌖ h1 · instance  │
+│      ├──────────────────┼───────────────────────────────────┼──────────────────┤
+│ ▤ ⌘1 │ ▾ pages          │⑥ ⌂ acme › pages › blog › [slug] ⌄│ Content│Style│Logic│✦│
+│Files │   ▾ blog         │⑦ Canvas ⌄│Edit Design Preview│md⌄ │──────────────────│
+│ ⌕ ⌘2 │     ▪[slug].json │───────────────────────────────────│ h1 · @md · :hover│
+│Search│   ▪ index.md     │ ┌ ⑧ DOCUMENT HEADER (in-stage) ─┐ │──────────────────│
+│ ⎇ ⌘3 │ ▸ components     │ │ Title   Getting started      │ │ ▾ Typography     │
+│Source│ ▸ content        │ │ Route   /blog/getting-started│ │  font-size 2rem ●│
+│ ⚠2⌘4 │ ▸ layouts        │ │ ▸ SEO   SERP + social card   │ │    set here      │
+│Probs │ ▸ public         │ └──────────────────────────────┘ │  line-height 1.1◦│
+│──────│                  │                                   │    from @base  → │
+│ ⧉ ⌘5 │                  │    « live @jxsuite/runtime »      │ ▸ Layout         │
+│Outlin│                  │                                   │ ▸ Background     │
+│ ≡ ⌘6 │                  │           ⑩ ⊟ 100% ⊞ ⛶  (floats)  │                  │
+│Page  │                  ├─⑪ ⌘J Problems 2┃Diff┃Logic┃Activity───────────── ✕ ──│
+│ ƒ ⌘7 │                  │ ⚠ project.json:14 unknown key "adaptor"      → Fix   │
+│Data  │                  │ ⓘ Library search failed (HTTP 500)           → Retry │
+│ ◫ ⌘8 │                  │                                                      │
+│Pkgs  │                  │                                                      │
+│ ⚙ ⌘, │                  │                                                      │
+└──────┴──────────────────┴───────────────────────────────────┴──────────────────┘
+╔═ ⑫ STATUS BAR · project ‖ document ‖ selection ═════════════════════════ 24px ═╗
+║ ◈acme ⎇main ↑2 ⚠2 ◉3 ‖ blog/[slug].json · Canvas/Edit · Saved 2m ‖ sec › h1  ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+SPLIT + DERIVED PANE (⌘\ splits right — P3; the right pane FOLLOWS the left — P8)
+├──────┬──────────────────┬─────────────────────┬─────────────────┬──────────────┤
+│ ▤    │ FILES            │ [slug].json ●   ⫶ ⊞ │ ⟲ Card.json ⫶ ✕ │ INSPECTOR    │
+│      │ ▾ components     │ …› section › <jx-card>│ ⟲ FOLLOWS SEL.│ jx-card      │
+│      │   ▪ Card.json    │ Canvas⌄│Edit│ md ⌄   │ Definition ⌄   │ Used on 7 →  │
+│      │                  │  « page render »     │ « Card.json »  │ ▾ Props      │
+   ⟲ menu: Code · Layout of this page · Component definition ·
+           Diff vs HEAD · Same page at ⟨breakpoint⟩ · Pin as a normal tab
+```
+
+Vertical honesty: today there are **six** full-width horizontal bands (`#toolbar`, `#tab-strip`, `#tab-bar`, `#frontmatter-panel`, canvas, `#statusbar`). After this there are **two** (Command Bar, Status Bar). The tab strip and context bar are not deleted — they are demoted _into the pane_, where they are labelled, scoped and split with it. `#frontmatter-panel` is deleted outright: its content becomes part of the artefact (region ⑧), not chrome.
+
+Horizontal: 1600px window, Design layout = 56 rail + 260 navigator + 300 inspector + handles ≈ 626 of chrome → **canvas 974px (61%)**, against today's 712px (45%). Write layout collapses the inspector until something is selected → **1284px (80%)**. `⌘.` (Zen) hides every dock → full bleed.
+
+### 3.2 Regions
+
+| #   | Region                                                 | Level                                                                    | Contents                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Moved here from                                                                                                                                                                                                                                                                                                                                                                                |
+| --- | ------------------------------------------------------ | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ①   | Command Bar (36px, full width)                         | application                                                              | App menu ⬢; named layout tabs in plain text (Write · Design · Build · Ship · +); the Command Center pill; the contextual verb cluster (≤5 commands with menus:["commandbar/primary"] — in practice Save, Undo, Redo, Open in Browser); presence cluster; three dock toggles; CSD window controls                                                                                                                                                                                         | #toolbar (full + minimal variants). Open Project + recents + New Project → the pill. Manage → File: Browse Library. Publish → the Publish: family + the Activity tab's Deploy checklist. Sync Project → the status bar's branch item. The 5-mode switcher → region ⑦. Panel toggles → dock toggles. minimalToolbarTemplate deleted.                                                            |
+| ①a  | Command Center pill (centre of ①)                      | mixed (the address; hierarchical by definition)                          | ◈ project › document › selection, right-aligned ⌘K. Each segment opens the palette pre-scoped: project → Project: Open Recent…, document → file mode, selection → @ mode. Empty space → mode picker (?)                                                                                                                                                                                                                                                                                  | The Open Project split button, the recents dropdown, .tb-search-trigger ("Search files… ⌘P"), and the total absence of a persistent project name (today it renders only in the Files panel header; the desktop titlebar is titleBarStyle:"hidden")                                                                                                                                             |
+| ①b  | Layout tabs (in ①)                                     | application                                                              | Named view.applyLayout() presets — a tuple of {rail group, active panels, dock visibility + widths, inspector tab, default editor kind}. Double-click renames; + saves the current arrangement; View: Reset Layout is always one action away. Persisted per project. A layout reconfigures; it never removes — every panel stays reachable by rail, chord and palette                                                                                                                    | New. The 80% of One Band's workspace idea that costs a segmented control, with none of the re-architecture. Replaces the ad-hoc preset hiding in toolbar.ts:414 (entering Stylebook force-sets rightTab:"style")                                                                                                                                                                               |
+| ②   | Navigator rail (56px, labelled, collapsible to 32px)   | mixed (two single-level groups, divided)                                 | Panel buttons from registerPanel() filtered by when, grouped by level with a divider: PROJECT (Files ⌘1, Search ⌘2, Source Control ⌘3, Problems ⌘4) above; DOCUMENT (Outline ⌘5, Page ⌘6, Data ⌘7, Packages ⌘8) below. Each has an 11px text label under the icon, a badge slot, and toggle-focus semantics. Preferences ⚙ ⌘, pinned at the foot                                                                                                                                         | #activity-bar's eight-item array literal. Elements leaves the rail entirely (it is an insert palette, not a view). About leaves for Help: About. The gear no longer opens project configuration. Icon-only + tooltip-only naming — eleven hover probes to learn — is gone.                                                                                                                     |
+| ③   | Navigator dock (left, one panel at a time, resizable)  | mixed (hosts one levelled panel; header states which)                    | Files (virtualized, "Search whole project" hand-off), Search (project-wide content/symbol index — the same index @/# need), Source Control, Problems, Outline (the layers tree: virtualized, filter, bidirectional canvas hover, reveal-on-select, multi-select, role="tree" + roving tabindex), Page, Data (definitions + live values in one row), Packages. Every panel renders under a header naming its title and its level ("FILES · project" / "OUTLINE · pages/blog/[slug].json") | #left-panel. Six of eight panels have no header today, so nothing tells you which one you are in — and the Imports panel silently swaps meaning on documentPath?.endsWith("project.json"). The header is where that stops.                                                                                                                                                                     |
+| ④   | Overlay layer (palette, dialogs, popovers, toasts)     | application                                                              | One Palette widget in many modes; the dialog family; context menus with the menu contract (role="menu", roving tabindex, arrows, Escape, focus restore); a toast host as a fourth layer beside #layer-popover/#layer-modal/#layer-dialog. openModal becomes a thin wrapper over showDialog's focus-in / trap / restore / Escape machinery with role="dialog" + label applied at the wrapper                                                                                              | Six divergent overlay idioms; the nine biggest modals used the one with no focus management at all. sp-toast is already in the bundle with zero uses.                                                                                                                                                                                                                                          |
+| ⑤   | Pane grid (centre, 1fr, 1–2 panes)                     | document                                                                 | One or two editor panes. Each hosts one editor kind over one document: Canvas (the real runtime iframe, unchanged), Grid, Code, Diff, Library, Config. One pane may be derived — following the focused pane by rule (Xcode assistant editor) rather than being navigated                                                                                                                                                                                                                 | New. Four current full-canvas takeovers (Code mode, git-diff, the formula workspace, the Monaco function editor) become panes or Bottom-dock tabs. canvas-render.ts:596-618 already renders two documents side by side for git-diff — the capability is built and withheld.                                                                                                                    |
+| ⑥   | Pane jump bar (per pane, left of ⑦)                    | mixed (navigation is hierarchical; segments are addresses, not controls) | project › file › node › node, every segment a dropdown. File segments open a filtered picker; node segments list siblings using the same nodeLabel() strings the Outline shows; drill-in frames render as leading ƒ / fx / component segments                                                                                                                                                                                                                                            | Merges Studio's two disjoint half-breadcrumbs: tab-bar.ts:129-185's document-stack breadcrumb + Back, and statusbar.ts:90-93's clickable .sb-path-seg chain. Gives the takeover editors real context instead of a bare Back button that is also their only exit.                                                                                                                               |
+| ⑦   | Pane context bar (per pane, ~28px)                     | document                                                                 | Three separately-labelled axes: Editor kind (Canvas ⌄ — only kinds this document supports), Canvas view (Edit │ Design │ Preview — one control, three values), Rendering context (md ⌄ Light ⌄, folding in feature queries, route params, component test props as "resolving with…", and the layout show/hide segment)                                                                                                                                                                   | #tab-bar, dissolved. Its five unrelated axes were navigation + viewport + document data + rendering state + a mode action in one unlabelled 28px row identical in styling to the row above it.                                                                                                                                                                                                 |
+| ⑧   | Document Header card (in-stage, part of the artefact)  | document                                                                 | Title · Route · Draft · Summary · layout picker · a `Search appearance…` button opening the SEO modal (which is where the live SERP and social-card previews and character counters went) · a "Raw head tags" disclosure. Rendered for any document with frontmatter or $head, in every layout, whenever the stage renders a page                                                                                                                                                        | #frontmatter-panel (a fourth full-width band up to 40vh that appeared and vanished as a side effect of the canvas mode, with no control to summon it) plus the Document tab's Page/OpenGraph forms. One collectFmFields call, one reserved-key policy. The if (!fieldSet?.collection) gate is deleted, so it finally appears on the default home page.                                         |
+| ⑨   | Inspector dock (right, tabbed, one width)              | selection                                                                | Four text-labelled tabs: Content (element, attributes, component props, link target, media), Style, Logic (Events + Repeater + Switch + Observed Attributes), Assistant ✦. Every panel header names its target; Style's header is the Target Line (§6)                                                                                                                                                                                                                                   | #right-panel (three icon-only tabs, no target statement anywhere) plus #chat-panel — a fifth permanent grid column, open by default, ~300px, hosting an off-system credentials form. Folding the Assistant in costs zero additional width.                                                                                                                                                     |
+| ⑩   | Canvas overlay chrome (floating, inside a Canvas pane) | selection                                                                | Block action bar (selection-scoped verbs from menus:["blockbar"], now with Delete, a hard cap + ⋮ overflow, role="toolbar" + roving tabindex); hover/selection/presence/drop overlays; insertion +; a floating zoom/fit cluster pinned bottom-right, with Fit applied automatically on entering Design                                                                                                                                                                                   | The zoom widget leaves #tab-bar. The five always-visible action buttons on every Outline row collapse to the selected row (Gutenberg's rule, codified: the floating bar owns selection-scoped verbs, the inspector owns values).                                                                                                                                                               |
+| ⑪   | Bottom dock (⌘J, tabbed, under the pane grid only)     | mixed (hosts levelled panels; header states which)                       | Four tabs, at the documented cap: Problems, Diff, Logic (formula workspace + Monaco function editor), Activity (long operations, streaming log, Cancel — and the Deploy prerequisite checklist, because a deploy is a long operation with a log)                                                                                                                                                                                                                                         | New. Studio has no bottom dock and at least five surfaces want one, so they take over the canvas — the one thing that must never disappear. Sits under the pane grid, not the window, so it never steals width from the side docks.                                                                                                                                                            |
+| ⑫   | Status bar (24px, role="status" aria-live="polite")    | mixed by field — three single-level placements                           | A lit template (not innerHTML string concatenation with a three-character escaper), three fixed fields in scope order: PROJECT (name · branch ↑n↓n · problems · peers · task progress · deploy state) ‖ DOCUMENT (path · editor/view · worded save state) ‖ SELECTION (ancestor breadcrumb). Every item is a command                                                                                                                                                                     | #statusbar. Transient messages leave entirely for the toast host. statusbar/project, statusbar/document and statusbar/selection are three placements in the matrix, each admitting exactly one level, so the bar's mixedness is structural rather than an exemption — and the fields sit in the same left-to-right order as the shell's levels, so the bar restates the model on every glance. |
+| ⑬   | Start pane ("no project open", occupies the pane grid) | project                                                                  | Start commands (New Project, Start from an Example, Open, Clone, Add Repository — each a real command); Recents by project name + disambiguating parent folder + last opened, each row keeping its remove affordance plus a Clear all; the GitHub-App install prompt when needsAppInstall(); a Projects catalogue; a walkthrough whose steps are commands with real completion detection; "Resume session / Start fresh"                                                                 | The welcome screen, today rendered into #canvas-wrap (grid-column 3) with an empty bordered right panel and a credentials column holding ~600px around it, listing ~20 raw absolute paths with "My Site" five times, under the tagline "Visual component builder". Built from Spectrum components, with the empty-state layout preset applied.                                                 |
+
+---
+
+## 4\. The navigation model
+
+### 4.1 Four transports, one rule
+
+| Level     | Transport                                                                                                                                      | Notes                                                                                                                                                                                                                              |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Project   | Command Center pill segment 1; Project: commands (Open…, Open Recent…, New…, Clone…, Add Repository…, Settings); the status bar's left cluster | project.open while one is open prompts "this window / new window" and reports the outcome. Today it silently routes to platform.openProjectInNewWindow and returns, so the click appears to do nothing if the window opens behind. |
+| Pane      | ⌘\ split right, ⌘0/⌘⌥0 focus panes, pane.toggleZoom, pane.setDerived(kind)                                                                     | Panes are the unit of split, zoom and focus. Max two. The model — panes: [{ id, tabOrder, activeTabId }], replacing workspace.ts:30's lone activeTabId — lands in P3; derived panes and the follow rules land in P8.               |
+| Document  | Per-pane tab strips; ⌃Tab MRU; palette file mode; the jump bar's file segments                                                                 | Drill-into-component opens a real tab or a side pane, never a mutation of tab.documentPath in place.                                                                                                                               |
+| Selection | Canvas click; Outline (hover-synced both ways, multi-select); the jump bar's node segments; the status bar's selection field; Escape-to-parent | session.selection widens to an ordered JxPath[] with Mixed-value behaviour defined for all three inspector tabs.                                                                                                                   |
+
+**The rule that binds them: every navigation is a command.** "Go to the Style tab for the h1 at @md" is expressible, bindable, palette-reachable, automatable and speakable to the assistant.
+
+### 4.2 What replaces the 5 modes + preview toggle + scheme control
+
+Three orthogonal, separately-labelled axes, all on the pane context bar (⑦):
+
+**1\. Editor kind** — `Canvas · Grid · Code · Diff · Library · Config`. Mostly _derived_ from the document and its format class, not chosen. Rendered as a dropdown offering **only kinds this document supports**, so it can never contain a permanently dead entry. Today no session has all five modes live: `ALL_MODES` (`tabs/tab.ts:191`) does not contain `grid` at all, a virtual grid tab ships `modes:["grid"]`, `project.json` allows only stylebook+source (`tab.ts:284`), and the default `.md` home page ships with 40% of the switcher greyed and no explanation.
+
+**2\. Canvas view** — `Edit │ Design │ Preview` as one segmented control with three values, present only when Editor = Canvas. Preview stops being a toggle on a different bar with different visual grammar that silently composes with a base mode the switcher keeps showing as selected. Being a _value_ is also what makes it gateable, so Preview can finally become truthful: overlays off, structural edits refused, real scrolling (today the iframe is sized to full content height and the wheel drives a pan transform, so `position:sticky`, scroll-driven animation and IntersectionObserver reveals never fire).
+
+**3\. Rendering context** — one control covering size breakpoint × colour scheme × feature queries × layout show/hide, with route params and component test props folded in behind "resolving with…". This control **only selects**. Definition moves to Project Settings › Contexts, removing all four of today's definition sites (the New Project wizard, Settings › General, Properties › Media — which only renders when the document root is selected, so adding a breakpoint costs you your element — and the CSS Variables editor's "Enable dark scheme", which appends `'--dark': '(prefers-color-scheme: dark)'` to `$media` without ever using the word breakpoint). Per principle 5, the popover's footer is **"Manage contexts…"**, which opens Project Settings _in the side pane_ so you add the breakpoint with your `<h1>` still selected, the Style tab still open, and ⌘Z still bound.
+
+Two promotions and one demotion complete it:
+
+- **Stylebook → the `Project Styles` document**, opened in a tab: the element-defaults catalogue and the CSS-variable tokens together, edited with the canvas rendering in the pane beside them — which is exactly what `postSiteStyleToLiveHosts()` on every token save was written for and what the `inset:40px` modal blackout defeats. **The on-disk format does not change**: per-document `& <tag>` overrides remain, exposed as a "This document's overrides" section in the Style tab's scope chip. **Nor does the wire format**: `"stylebook"` is a value in `CANVAS_MODES` (`canvas/iframe-protocol.ts:25`) carried on the render message and consumed by the separately-built `dist/iframe-entry.js`, so it stays a wire mode — the Project Styles document simply sets it. A shell redesign does not get to take a file-format migration, or a cross-realm protocol change, as a side effect.
+- **git-diff → the `Diff` editor kind**, with a revision picker and a real close control, instead of an unlisted seventh mode reachable only from a git row whose only exit is picking another mode — which clears `gitDiffState` as a side effect.
+- **The Auto/Light/Dark control → a segment of Rendering context.** It stops rendering on grid tabs whose document is `GRID_STUB_DOCUMENT`, because the control's `when` reads the pane's editor kind.
+
+### 4.3 Tabs and the multi-document story
+
+Tab strips become **per-pane** (a tab belongs to a pane; the pane is what splits) and gain, in this order:
+
+1.  **Disambiguated labels** — shortest unique path suffix, and for pages the **route** (`/blog/[slug]` beats a fourth tab reading `index.json`). Today `tabLabel()` is `path.split("/").at(-1)`, so a realistic Jx session shows four tabs all reading `index.md`.
+2.  **Overflow chevron** listing hidden tabs. Today the scrollbar is deliberately hidden and the file's own comment names the mouse wheel as "the primary way to reach off-screen tabs" — a trackpad user with 15 open files can be stranded.
+3.  **`⌃Tab` MRU cycling**, drag reorder, pin, `⌘⇧T` reopen-closed.
+4.  **Preview tabs** (single click from the palette or the tree opens italic and replaceable) — worth more in Jx than in VS Code, because the palette's `@`/`#` modes make browsing cheap and browsing must not litter.
+5.  **Activating a tab syncs `projectState.selectedPath`**, so the file tree and the tab strip stop disagreeing about where you are.
+
+**Drill-in is fixed at the model level.** `navigateToComponent` (`studio.ts:236-247`) currently rewrites `tab.documentPath` and leaves `tab.id`, so `openFileInTab`'s dedupe misses, `openTab` overwrites `workspace.tabs` at the same id without disposing the old tab, and pushes a duplicate id into `tabOrder` — duplicate lit `repeat` keys, a leaked effect scope, a lost document stack. It becomes: open a real tab (or a side pane), and keep the breadcrumb as a **relationship** indicator. The `documentStack` survives only for genuine sub-documents (`$map` templates, function editors), and each frame snapshots the full shell context — `activeMedia`, `activeSelector`, inspector tab, `zoom` — so popping restores where you were, not just what you were looking at.
+
+### 4.4 "Where am I"
+
+Four facts, continuously, in non-collapsible chrome: **which project** (Command Center pill + status bar left), **which document** (pill + pane tab + jump bar + status bar centre), **which editor and view** (pane context bar + status bar centre — reporting the _effective_ view, so it can never say "Design" while the canvas is in preview), **which selection and rendering context** (Inspector target line + status bar right). Every one is click-through to the surface that owns it.
+
+Session state persists **per project root** under one namespaced record on the reactive `shell` store (§5.2): open tabs and order per pane, active tab, per-tab editor kind / view / zoom / rendering context, dock visibility and widths, active layout. This ends the bug where `persistWidths()` writes a fresh `{chat,left,right}` object to the same localStorage key that `applyPanelCollapse()` read-merge-writes the collapse flags into, so dragging any handle wipes all three.
+
+---
+
+## 5\. The command system
+
+### 5.1 The record
+
+`packages/studio/src/commands/registry.ts`:
+
+```ts
+/** Containment level — WHAT this acts on. Governs placement. CI-checked. */
+type Level = "application" | "project" | "document" | "selection";
+
+/** Keyboard dispatch scope — WHERE the chord is live. Orthogonal to Level. */
+type KeyScope = "global" | "canvas" | "caret" | "grid" | "code" | "dock" | "palette";
+
+type Placement =
+  | "commandbar/primary"
+  | "commandbar/overflow"
+  | "statusbar/project"
+  | "statusbar/document"
+  | "statusbar/selection"
+  | "context/element"
+  | "context/file"
+  | "context/layer"
+  | "context/tab"
+  | "context/pane"
+  | "blockbar"
+  | "outline/row"
+  | "palette"
+  | "never";
+
+interface Command<A = void> {
+  id: string; // "selection.duplicate", "view.toggleDock.right" — namespace.verb
+  title: string; // "Duplicate" — imperative; palette renders "Selection: Duplicate"
+  category: Category; // File|Edit|Selection|Insert|View|Document|Project|
+  // Source Control|Publish|Assistant|Collaborate|Help
+  level: Level; // REQUIRED. checked against every declared Placement.
+  keyScope?: KeyScope; // default "global"
+  icon?: string; // resolved through activity-bar.ts's existing tabIcon() map
+  when?: (ctx: CommandContext) => boolean; // hide entirely; default () => true
+  enablement?: (ctx: CommandContext) => boolean; // show but disable; defaults to `when`
+  requires?: string; // "an element selection" — hover reason, palette subtitle,
+  //   agent refusal message. ONE string, three consumers.
+  keybinding?: string | string[]; // "mod+d"; user overrides layer on top
+  args?: JSONSchema; // palette argument prompt AND the agent's tool parameters
+  menus?: Placement[]; // default ["palette"]
+  group?: string; // menu ordering: "1_clipboard", "3_structure", "9_danger"
+  undo?: "document" | "project" | "none";
+  destructive?: boolean;
+  aiTool?: { name: string; description: string }; // opt-in projection to the assistant
+  run: (ctx: CommandContext, args: A) => void | Promise<void>;
+}
+```
+
+`registerPanel({ id, title, icon, level, dock, defaultWidth, when, render })` mirrors this and mirrors the shipped `registerSettingsSection` contribution point.
+
+**`when` and `enablement` are plain predicates over the reactive context record** — exactly the shape `services/gated-registry.ts:18-23` already ships and the AI tool registry already consumes. `ctx.selection.count > 0 && ctx.editor.kind === "canvas"` inside a closure recomputes automatically because the context record is reactive; the equivalent string grammar would buy serialisability that nothing in Studio consumes and cost a tokenizer, a parser and an evaluator that must clear the per-file gate (§13).
+
+**`level` and `keyScope` are deliberately two fields.** _Nameable_ shipped one `scope` field that was really keyboard dispatch; _Concentric_ needed a containment taxonomy. Conflating them is how "position encodes scope" degrades into unenforced prose. The clearest case is inline text formatting: **there is no `range` level.** Bold, Italic, Code and Link act on a text range inside the selected node, so their level is `selection` — what they act on is the selection's content — while their `keyScope` is `caret`, which is what makes the chord live only when a caret exists. A fifth level would demand a fifth region, and there is none.
+
+The **level × placement matrix** is the CI check. `scripts/check-command-levels.ts` validates every declared `menus` entry against this table; the normative copy lives in `studio-ui-guidelines.md` §12. Multi-level placements are declared here, in the table, not excused in prose:
+
+| Placement                              | Admits levels                  | Note                                                                                    |
+| -------------------------------------- | ------------------------------ | --------------------------------------------------------------------------------------- |
+| commandbar/primary                     | application, document          | document only for Save / Undo / Redo, by frequency; ≤5 total (principle 9)              |
+| commandbar/overflow                    | application, project, document | never selection — the Command Bar is not a selection surface                            |
+| Navigator rail — upper group           | project                        | Panel records only                                                                      |
+| Navigator rail — lower group           | document                       | Panel records only                                                                      |
+| Navigator dock body                    | project, document              | whichever level the hosted panel declares; the header prints it                         |
+| Pane header, pane context bar          | document                       |                                                                                         |
+| Jump bar segments                      | project, document, selection   | segments are addresses, not controls — the one hierarchical placement, declared as such |
+| blockbar, outline/row, context/element | selection                      |                                                                                         |
+| context/file                           | project                        |                                                                                         |
+| context/layer                          | selection                      |                                                                                         |
+| context/tab, context/pane              | document                       |                                                                                         |
+| Inspector dock                         | selection                      |                                                                                         |
+| Bottom dock                            | project, document              | the panel header states which                                                           |
+| statusbar/project                      | project                        |                                                                                         |
+| statusbar/document                     | document                       |                                                                                         |
+| statusbar/selection                    | selection                      |                                                                                         |
+| palette, never                         | all four                       | the palette is the level-agnostic surface; it groups rows by level                      |
+
+The check validates placement. It cannot see the state a panel _reads_, which is a separate defect with a separate lint: a `Panel` declared `level:"project"` may not import `activeTab` (§5.2).
+
+### 5.2 Context keys
+
+One reactive record (`commands/context.ts`) derived from the three places state actually lives once `view.ts` is split (§12 P2.1): the new reactive **`shell`** record, **`workspace`**, and **`activeTab`**.
+
+`project.open`, `project.isSite`, `project.isRepo`, `git.behind`, `git.ahead`, `git.dirtyCount` · `document.open`, `document.dirty`, `document.mode`, `document.canUndo/canRedo` · `editor.kind`, `canvas.view`, `pane.count`, `pane.derived` · `selection.count`, `selection.kind`, `selection.isRoot`, `selection.isComponentInstance`, `selection.isLayoutNode` · **`caret.active`** · `focus.region`, `modal.open` · `collab.attached`, `collab.readOnly`, `collab.sourceCanonical` · `ai.configured`, `ai.streaming` · `capability.<pal>` derived from the Platform Abstraction Layer (`gitClone`, `importSite`, `openProjectInNewWindow`, `dataRows`, `windowControls`, `findReferences`), so cloud/desktop/dev-server differences stop being `if (platform.x)` scattered across templates and become one when-clause per command.
+
+**Project-level keys are not sourced from the focused document.** Today `git.*` is: `tabs/tab.ts:62-67` puts `gitStatus`, `gitBranches`, `gitCommitMessage`, `gitLoading`, `gitError` and `gitDiffState` inside `TabUi`, and `activity-bar.ts:94` draws the rail badge from `tab?.session.ui.gitStatus?.files?.length`. `settingsTab` (`:61`) and the four `stylebook*` fields (`:57-60`) are in the same place and are equally project-level. Declaring Source Control `level:"project"` without moving them means the project group's badge is sourced from whichever document happens to be focused and vanishes when the last tab closes. All eleven fields hoist onto the reactive shell/project record in the same PR as the rail's level grouping (§12 P3.1), behind the `activeTab` import lint.
+
+`caret.active` is the load-bearing one, and it ships in **P1**, six weeks before the dispatcher that consumes it. Today `isEditing()`'s `activeEl` is permanently null because `startEditing` only ever runs in the iframe realm, so the guard at `shortcuts.ts:171-182` never triggers — which is exactly why ⌘C/⌘X/⌘V are stolen from the text caret and act on the enclosing element (copying a phrase copies the whole `<p>` as JSON; ⌘X while typing deletes the paragraph). It is not new protocol work: `canvas/iframe-protocol.ts` already sends `{kind:"editStart"}` (`:346`), `{kind:"editEnd"}` (`:415`) and `{kind:"selectionChanged"}` (`:401`) across the boundary today, so `caret.active` is a host-side boolean derived in `iframe-host.ts` from messages that already arrive.
+
+### 5.3 The keymap
+
+Chords normalise to `"mod+shift+p"` and are formatted per platform by **one** function — which kills the hardcoded `⌘P` shown to Windows and Linux users at `toolbar.ts:301` and `:555`, everywhere at once. Resolution walks a **scope stack**: `caret > grid/code engine > focused dock > global`. That replaces `shortcuts.ts`'s blanket `if (isModalOpen()) return`, its `canvasMode === "grid" && !['o','p','s','w','z','Z']` special case (which is why the grid cannot be wheel-scrolled — the exempted mode string `"manage"` exists nowhere else in the codebase), and the dead `isEditing()` guard.
+
+| Chord                      | Command                                       | Notes                                                               |
+| -------------------------- | --------------------------------------------- | ------------------------------------------------------------------- |
+| ⌘K                         | palette.open (mode picker)                    | one omnibox, many modes                                             |
+| ⌘P / ⌘⇧P                   | palette file mode / command mode              | > switches inside the widget                                        |
+| ⌘1–⌘8                      | panel.focus.<id>                              | toggle-focus: reveal → focus → return to the pane                   |
+| ⌘⇧1–⌘⇧4                    | Inspector tab (Content/Style/Logic/Assistant) |                                                                     |
+| ⌘B / ⌥⌘B / ⌘J              | toggle Navigator / Inspector / Bottom dock    |                                                                     |
+| ⌘0 / ⌘⌥0                   | focus pane grid / focus other pane            |                                                                     |
+| ⌘\                         | pane.splitRight                               | ⌘⇧\ = pane.setDerived…                                              |
+| ⌃Tab / ⌃⇧Tab               | MRU tab cycling                               | ⌘⇧T reopen closed                                                   |
+| ⌘⌥↑ / ⌘⌥↓                  | cycle rendering-context breakpoint            | ⌘⌥⇧S cycle colour scheme                                            |
+| ⌘, / ⌘⇧,                   | Preferences / Project Settings                |                                                                     |
+| ⌘.                         | Zen                                           | reversible by the same key                                          |
+| F6 / ⇧F6                   | cycle shell regions                           | rail → navigator → pane → inspector → dock → status                 |
+| ⌥↑ from a canvas selection | enter the block action bar                    | Escape returns to the selection; again selects parent; again clears |
+| ⇧F10                       | element context menu at the selection         |                                                                     |
+| ⌘S ⌘Z ⌘⇧Z ⌘D ⌘W ⌘O ⌘0/=/-  | unchanged in meaning, one implementation      | ⌘W and the tab × can no longer disagree                             |
+
+Everything else lives in the palette by name. That is what lets the chrome shrink.
+
+### 5.4 The palette
+
+One widget (the existing `panels/quick-search.ts` overlay chrome, arrow loop and layer slot), several modes, the mode echoed as a **removable chip** in the input:
+
+| Prefix  | Namespace                                                              | Source                                                           |
+| ------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| (plain) | files — fuzzy subsequence over the full path, not a basename substring | platform.searchFiles, whose desktop RPC handler lands in P0      |
+| >       | commands                                                               | the registry, grouped by level, each row printing its chord      |
+| @       | document nodes                                                         | flattenTree() + nodeLabel() — the same strings the Outline shows |
+| #       | state signals and $defs                                                | document.state, Definitions                                      |
+| :       | content entries and route params                                       | content-source.ts, page-params.ts                                |
+| $       | data connections and tables                                            | grid-source.ts                                                   |
+| ?       | enumerates the modes                                                   |                                                                  |
+
+Recently-used commands pin above the rest. **Unavailable commands render greyed with their `requires` string as the subtitle** rather than being hidden — "why can't I" is the question a palette is uniquely good at answering. A per-row gear jumps to Preferences › Keyboard prefiltered to that command. The no-project case becomes a named `Project: Open Recent…` mode that works whether or not a project is open, instead of today's hidden domain swap on `!projectState` — same trigger, same chrome, different feature.
+
+### 5.5 What derives from the registry
+
+| Surface                                             | Today                                                                                        | After                                                                                                                                                                                         |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Command Bar                                         | toolbar.ts + a duplicated minimalToolbarTemplate of permanently disabled buttons             | tbCmd(id) renders label, icon, title="Save (⌘S)", disabled state and disabled reason from the record. The no-project state is the same bar with project.open false.                           |
+| Navigator rail                                      | eight-item array literal                                                                     | panels.filter(when) grouped by level                                                                                                                                                          |
+| Context menus (element / file / layer / tab / pane) | ~18 hand-built items in editor/context-menu.ts, bare labels for actions that all have chords | menus:[…] sorted by group, chords printed, destructive styling derived. The file keeps positioning and popover rendering only.                                                                |
+| Block action bar                                    | 8 hand-placed sp-action-buttons, no Delete, mouse-only                                       | menus:["blockbar"], hard cap + ⋮, role="toolbar"                                                                                                                                              |
+| Keymap                                              | 403-line hard-coded switch                                                                   | ~40-line chord→id dispatcher over the scope stack                                                                                                                                             |
+| __jxAutomation                                      | 25 bespoke shell methods                                                                     | run(id, args); the 25 names kept as thin aliases for one release so scripts/screenshots keeps working                                                                                         |
+| AI tools                                            | 18 hand-written definitions + gated-registry.ts                                              | projections of commands with aiTool. The agent's gate and the human's gate are one predicate; chips render command titles, not duplicate_node; undo:"project" marks disk writes to the human. |
+| Docs                                                | specs/studio.md §10 hand-maintained; docs/studio/interface/shortcuts.md separately           | both generated, plus a new generated docs/studio/interface/commands.md, diffed by CI — drift becomes a build failure                                                                          |
+
+---
+
+## 6\. The inspector and the edit-target problem
+
+The inspector is the only region that already had a consistent level (selection) and the only one that never said so. Three things fix that.
+
+### 6.1 The Target Line — the compound target as a sentence
+
+`style-panel.ts` already computes the exact coordinate as its per-field key — literally `style|${sel.join("/")}|${editMedia}|${activeSelector}|${prop}` — and resolves the commit function through a five-branch if/else over `(activeSelector, isTagPath, editMedia)`. It then hides it behind three disconnected widgets on two different bars, one of which (the Auto/Light/Dark control) is on a _different surface_ entirely, and whose own tooltip confesses the problem.
+
+Render the resolved tuple as one clickable sentence at the top of the Style tab, each segment a control:
+
+```text
+⌖  h1 · @md · :hover · dark variant                    [ this element ▾ ]
+```
+
+The trailing **scope chip** is what makes Stylebook safe. It reads _this element_ / _all `<h1>` in this document_ / _all `<h1>` in this project_, and the project case renders as a warning band with an affected count and a "show affected" action. Today entering Stylebook silently discards the element selection, replaces the Outline with a flat tag catalogue, force-sets `rightTab:"style"`, and converts every subsequent Style edit from "this element" to "every element of this tag" — with a single line of text, `Styling: <h1>`, as the only signal, after the fact.
+
+The Target Line replaces the `<sp-tabs>` breakpoint strip, the `.selector-select` picker, and the `.style-scheme-badge` (which emits a class that has **no CSS rule anywhere in the repo**, so it renders as unstyled inline text).
+
+### 6.2 Provenance-coded labels
+
+Every field label carries a four-state chip. This is the single cheapest win against the vocabulary problem and the "is this value set?" problem at once:
+
+| State     | Rendering                                                                                                          | Behaviour                                                    |
+| --------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
+| Set here  | accent                                                                                                             | click to clear (mutate* already accepts undefined to delete) |
+| Inherited | amber, naming the donor — "from @base", "from layouts/base.json", "from site tokens", "from the component default" | click to jump to the donor                                   |
+| Default   | ghost                                                                                                              | —                                                            |
+| Bound     | violet, naming the signal or formula                                                                               | click opens the source                                       |
+
+`computeInheritedStyle()` **already knows the donor breakpoint** and Jx throws it away, surfacing inherited values only as an input placeholder — visually identical to the CSS initial value rendered by `style-inputs.ts:233`. Naming the donor is something Webflow cannot do; Jx can, for free. Collapsed accordion headers get provenance dots, which subsumes the `styleFilterActive` "Active" toggle — that toggle exists only because provenance is otherwise invisible. The same chip vocabulary is reused on Component Props rows (set-here vs component default), because it is the same problem in a second cascade.
+
+### 6.3 The binding ladder, in plain language
+
+Six competing vocabularies for "how is this value produced" collapse into one. The chip **is** the Value Source control:
+
+| Today                                            | New                                             |
+| ------------------------------------------------ | ----------------------------------------------- |
+| abc / $ref / ${} / fx (dynamic-slot.ts:26-31)    | Fixed value / From data… / Mixed text / Formula |
+| Events picker inline / $expression / $ref        | Inline function / Formula / From data           |
+| Expression operand lit / $ref / expr             | same three                                      |
+| Schema-form Static value / route param / Custom… | same three                                      |
+
+Behaviour fixes that ride along: the one-way cycle ring becomes click-to-open-a-picker so any rung is one action away (today `$ref → literal` must pass through `${}`); `caps` stops being four hand-written arrays and derives from what the schema permits, so the `fx` rung appears exactly where `$expression` is legal — today no `caps` array anywhere includes `"expression"`, so the fourth rung the UI draws is unreachable from every Properties and Style field, and Style's `["literal","template"]` means a CSS property can never be bound to a signal at all; mode switches stash the previous representation (the Events tab destroys it, contradicting `slotModeMemory` used everywhere else); typing a `${…}` literal no longer silently swaps the widget underneath the user.
+
+### 6.4 Which cascade layer an edit lands in
+
+Four disclosures, in the order the user meets them:
+
+1.  **The Target Line** states the compound target _before_ you type.
+2.  **The scope chip** states the blast radius, and warns before the first project-wide write.
+3.  **Provenance chips** state, per field, whether typing creates an override, edits one, or is a no-op — and where clearing lands you.
+4.  **The Rendering context control** (⑦) selects the breakpoint/scheme axes and links to their definition site. The Style tab no longer owns a third selector, and it can no longer disagree with the tab bar.
+
+### 6.5 Tab re-split, by task
+
+**Content** (element, attributes, custom attributes, link target, component props, media) · **Style** · **Logic** (Events + Repeater + Switch + Observed Attributes + CSS Properties/Parts — wiring a `$switch` and wiring a click handler are the same task) · **Assistant**. Leaving the inspector: the Page section → the Document Header card; Media (breakpoint _definitions_) → Project Settings › Contexts, which is the only reason adding a breakpoint costs you your element selection.
+
+The dead **Layout-element panel** finally renders, because clicking a layout node now writes `view.layoutSelection` (§8.2). Multi-select widens `session.selection` to `JxPath[]` with Mixed-value behaviour defined for all three tabs and structural commands iterating inside **one** transaction, so a batch is one undo step. Event names become a free-form combobox instead of a hard-coded list of ten. Repeater/Switch rows move onto `renderFieldRow` so they get a set-dot and a clear affordance like every other row. Shorthand longhands stop being second-class.
+
+---
+
+## 7\. The feedback system
+
+### 7.1 Three tiers, chosen by required action
+
+| Tier     | Host                                                            | Lifetime                   | Use when                                 | Carries                                                                        |
+| -------- | --------------------------------------------------------------- | -------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------ |
+| Toast    | new fourth overlay layer, sp-toast (already bundled, zero uses) | 4–8s, dismissible, stacked | outcome is reversible or needs no action | severity icon, one line, optional Undo or recovery command id                  |
+| Problems | Bottom dock ⑪, badge on the rail                                | until fixed                | it must be fixed                         | source, location, click-through to the offending field, a Fix or Retry command |
+| Inline   | error?: string slot added to ui/field-row.ts's renderFieldRow   | until the value is valid   | a bad value at a specific control        | message + counter, validated on commit, never on input                         |
+
+`statusMessage(msg)` becomes `notify.success/warn/error(msg, { action })`. The 78 call sites are triaged: the 52 successes that are genuinely ambient (save, selection) stop notifying at all and become status-bar state; the reversible ones become toasts with Undo; **all 26 failures** route to Problems and stop self-destructing. The same sweep takes the **158 of 240 catch blocks that reach no surface** — 46 of them entirely empty — and gives each one a tier or an explicit `// intentionally ignored: <reason>`; the lint that bans raw `statusMessage` outside `notify` bans bare empty catch blocks in `src/` in the same rule.
+
+### 7.2 What lands in Problems
+
+`jx-validate` diagnostics across documents (today wired only to the AI's `write_project_config` — the human editing the same file through Settings gets no validation at all) · Monaco markers · failed writes (the 42 fire-and-forget `updateSiteConfig`/`saveProjectConfig` sites across eight files, currently the highest-consequence silent-failure path in the app) · reference warnings · contributed settings-section import failures (today a bare catch, so a section can simply never appear) · **canvas render errors** (the iframe posts `{kind:"renderError", message}` and the host deletes the pending id and returns; `msg.message` is read nowhere) · collab attach failures (today indistinguishable from having no collaboration) · AI schema-gate degradation (today announced once to the developer console while the user keeps trusting a validated-edits promise that is no longer being kept).
+
+`"Iframe render OK"` — a debug string shipped to end users and legible in a published docs screenshot — is deleted, and the failure it inverts is surfaced.
+
+### 7.3 Progress and cancellation
+
+`showProgressModal` has four call sites, no cancel, and is **the only surface in Studio with a real error view** (red headline, captured log, explicit Close). That view is promoted into Problems so _any_ operation can produce a persistent, inspectable failure with a log. The running state moves to the Bottom dock's **Activity** tab with a streaming log, a status-bar progress item, and **Cancel**. Blocking is retained only for dependency install, and even then with Cancel. Project open — which today chains a blocking spinner (deps), a transient status line (git sync) and a confirm-plus-spinner (@jxsuite update), none cancellable — becomes one Activity entry with three steps.
+
+One more silence closes here: `panels/panel-scheduler.ts:37-39` **defers every external render while a text input in the panel is focused**, so a file appearing on disk, a collab peer's edit or a completed refresh simply does not show up until you blur. The deferred state becomes visible — the panel header carries a "new changes — finish this field to see them" hint, and committing or blurring flushes immediately.
+
+### 7.4 Honesty in the two assistive layers
+
+**AI**: tool chips render outcome (`ToolCallRecord.result` is populated by the loop and ignored by the renderer) under **command titles**; each turn shows a "Changed 4 files" summary that expands to a diff in the Bottom dock's Diff pane with a **Restore to here** checkpoint (an AI turn forces a `transact.ts` checkpoint regardless of `CHECKPOINT_INTERVAL`, `transact.ts:33`); disk-writing tools are marked with the undo caveat **rendered to the human**, not appended to the model-facing summary; `chatState.retryLast()` — implemented, exported, zero callers — gets its Retry button; context trimming stops appearing as a fake right-aligned user bubble; the `beginBatch(getTab())` batch bug is fixed so a turn spanning tabs does not drop the second tab's history _and_ its collab publish.
+
+**Collab**: presence chips get CSS (`.jx-presence*` matches no stylesheet in the repo — the flagship affordance ships unstyled); the source-canonical freeze gets a visible indicator instead of a 3-second grey line; read-only guests get a banner instead of watching their edits apply locally and be silently dropped at the publish gate; attach failure is distinguishable from solo; a `Collaborate:` command family (Share, Copy session link, Follow peer, Stop) gives co-editing the entry point and exit it has never had; save state is worded ("Saved 2m ago" / "Unsaved changes" / "Kevin is saving"), which is also where the `tab-strip.ts:159` save-responsibility rule finally becomes visible.
+
+---
+
+## 8\. The first hour
+
+### 8.1 Cold start
+
+The Start pane (⑬) replaces a welcome screen squeezed into grid-column 3 with ~600px of inert chrome around it. Recents render as **name + parent directory + last opened**, never raw absolute paths, so "My Site" ×5 becomes distinguishable; each row keeps the per-project remove affordance it already has (`welcome-screen.ts:213`) and gains a Clear all. The GitHub-App install prompt (`welcome-screen.ts:129-152`, gated on `needsAppInstall()`) survives verbatim — it is the recovery path for the structured needs-installation 403 that `platform-errors.ts` already decodes. The tagline stops reading "Visual component builder". `Resume session / Start fresh`. Built from Spectrum components rather than raw `<button>`/`<svg>`. The `start` layout preset collapses the Inspector and Bottom docks so the pane is not framed by empty bordered columns.
+
+**The AI credentials form leaves in Phase 1.** It is a roaming application credential configured once, and it occupies ~300px of the window in every screenshot of the product. It moves to Preferences › Assistant (interim: an `Assistant: Settings…` dialog), rebuilt on `sp-textfield` instead of raw `<input type="password">` with 200-character inline style strings. The chat column defaults closed and then ceases to be a column at all.
+
+**The New Project wizard is reworked in the same phase**, because it is the other half of the first hour and it is written for someone who already knows Jx: the one tab that produces a site worth looking at sits behind a different welcome button. Starters lead; the four breakpoint templates collapse to one "Start from scratch" card; step 2 is Name + Location only. URL, adapter and design tokens leave for the project's own configuration surface — which exists today as Settings › General and Settings › CSS Variables, so this ships in P1 and simply re-points at the Project Settings document in P6 with no further work.
+
+### 8.2 The default document as a teaching surface — the first click
+
+This is the single most important fix in the plan and it ships alone, at the end of P1, behind a full screenshot diff.
+
+The `Blank` template's `pages/index.md` renders four visible strings; two of them — "My Site" and "Built with Jx" — come from `layouts/base.json`. Layout-originated nodes are stamped `data-jx-layout` with **no** `data-jx-path` (`iframe-render.ts:461`), so `nearestPathEl` finds nothing and the click posts nothing: no selection, no hover, no status line, no inspector change. Meanwhile the render container is `contentEditable="true"`, so a caret **does** land in "My Site", the user types, and `classifyBeforeInput` returns `{kind:"reject"}` with no message.
+
+The fix, in four parts:
+
+1.  `classifyRenderNode` returns `{ kind: "layout", layoutPath, layoutFile }`; the renderer stamps `data-jx-layout-path` / `-file`.
+2.  The hit test **writes `view.layoutSelection`** — so `renderLayoutSelectionPanel`, already written with its purple badge and "Open Layout →" link and today unreachable, renders.
+3.  Layout subtrees become `contenteditable="false"`, so no caret ever appears in text that cannot be typed into.
+4.  The frame dims the layout region and shows a `LAYOUT · layouts/base.json` chip on hover.
+
+And the payoff: the Inspector shows **one field, `Site name`**, with a provenance chip reading _from project.json › title_, and an "Open layout" action that — from P3, when the second pane exists — opens `layouts/base.json` beside the page, and from P8 keeps following the selection. They type. The page updates. They never opened a file tree, never learned what a layout is, never switched a mode, and never met the word "Stylebook".
+
+The **Document Header card** (⑧) completes the moment in P3: the page's own `title: Home` is editable where the user is looking, instead of three renamings away (the file says `title:`, the rail says "Document", the section says "Page") behind a `view-all-tags` icon — and behind a `if (!fieldSet?.collection)` gate that hides the panel on the default home page entirely. It waits for P3 because it merges two field sets with two different reserved-key policies (`head-panel.ts:83`'s `RESERVED_FM_KEYS` against `frontmatter-panel.ts:28`'s `NO_RESERVED_KEYS`) and deletes a grid row that P3 restructures anyway.
+
+### 8.3 Empty states
+
+Principle 7 is a spec obligation in `studio-ui-guidelines.md`, not a copy pass. Every `.empty-state` states what the region is for and offers the action that fills it; five of eight panels stop rendering a bare `<div class="panel-body"></div>` because `when` gates them out and the level-collapse rule supplies the replacement. **One verb across the inspector**: "Click anything on the canvas to edit its content / to style it / to wire it up" — today Properties says "Select an element to inspect" and Style, immediately beside it, says "Select an element to style", which reads as two different requirements.
+
+The other verified blank: closing the last tab with a project open. `when: project.open && !document.open` is one more panel record, and it renders a **Document Start** in the pane grid listing this project's pages with a create action.
+
+### 8.4 Jargon
+
+| Today                                                       | New                                                           |
+| ----------------------------------------------------------- | ------------------------------------------------------------- |
+| abc / $ref / ${} / fx                                       | Fixed value / From data / Mixed text / Formula                |
+| "Stylebook"                                                 | Project Styles (element defaults)                             |
+| "Imports" (an sp-icon-box)                                  | Packages & Components                                         |
+| "Document" (rail tab, internally keyed head)                | Page                                                          |
+| "Elements" (internally keyed blocks)                        | Insert (keyed insert)                                         |
+| "State" + "Data" (two tabs, same object, same empty string) | Data (one panel, definition + live value per row)             |
+| "Content Mode" (status bar)                                 | deleted — the status bar names the editor kind and the format |
+| "Manage" / "Manage Files" / "Browse" / browseView           | Library                                                       |
+| "Publish to GitHub" (git panel)                             | Create GitHub repository                                      |
+| "Publish" (toolbar)                                         | Deploy — a checklist, not a form                              |
+| "Sync Project" (a button that appears and disappears)       | the status bar's branch item → Source Control: Sync           |
+
+Stored keys are renamed to match labels so code, spec and UI stop diverging. The rename lands with the screenshot manifest's `setActivity("head")` / `("blocks")` steps re-authored in the same PR (§12 P3).
+
+### 8.5 Help, shortcuts, and closing the loop
+
+Studio has exactly one user-facing documentation link, a plain `<a>` inside the About modal, behind an unlabelled ⓘ in the rail footer; exactly two shortcuts are advertised anywhere in the running app. After this: **chords are printed at the point of use** (palette rows, tooltips derived from the record, context-menu rows), `Help: Keyboard Shortcuts` is **generated from the registry** and searchable by name _or_ by pressing the key, Preferences › Keyboard is rebindable, and `Help: Walkthrough` opens the Start pane's checklist whose steps _are_ commands with real completion detection.
+
+And the missing end of the task loop, which none of the three proposals closed: **there is no control anywhere in Studio that opens the built site in a browser.** A grep for `openExternal` / "Open in browser" / "View Site" returns nothing; `preview-navigate.ts` exists solely to hand an anchor click _inside_ Preview to the OS. `View: Open in Browser` (`⌘⇧O`) ships in P1, serving the built page **at its real route** from the dev server, with a persistent slot beside Save and a status-bar residue. Preview is not a substitute and this plan stops pretending it is.
+
+### 8.6 Safety in the first hour
+
+A project created from a template is **not a git repository**, and the only place the app says so is an empty state behind an unlabelled branch icon. `createProject` initialises git by default; repo state is a persistent status-bar field. Delete and rename get **pre-flight impact disclosure** from the reference index the server already computes and throws away (§9.6): "Delete hero.png? Used by 3 pages — show them", "Rename Card.json → Tile.json? Updates 12 references in 5 files". Reversible file ops get an undo toast; genuinely irreversible ones get typed confirmation via `showPromptDialog`'s existing `validate`. Every destructive dialog states what **survives** ("It stays in git history and can be restored from Source Control") — a promise Jx can make honestly.
+
+---
+
+## 9\. Content and project management
+
+### 9.1 Files vs Library — two surfaces, one file set, one creation flow
+
+|          | Files (Navigator panel, project)     | Library (editor kind, opens in a pane)                                               |
+| -------- | ------------------------------------ | ------------------------------------------------------------------------------------ |
+| Question | "where is this file"                 | "what content do I have"                                                             |
+| Shape    | tree, virtualized, DnD, context menu | one GridSource, many layouts: Table · Cards · Calendar · Board · Media               |
+| Reached  | rail ⌘1                              | File: Browse Library (⌘⇧E), a collection header, the Files context menu, the palette |
+
+The Manage modal (`browse.ts`) is not kept and rebuilt — it is **collapsed into a layout of the grid**. Today Studio has two unrelated browser implementations that disagree about what "filter" means (Browse filters filenames, the grid filters rows) and one of them renders a live runtime instance of every page, layout, component and content document in the project with no cap, no virtualization and a `_previewCache` that never evicts. After: virtualized rows over the same virtual-list primitive the Files and Outline trees get in P3, lazy previews behind an IntersectionObserver with an LRU cap, **saved views** (layout + filter + sort + visible columns + group-by, named, persisted per collection, keyed by `makeGridTabId()` — extending the `grid-layout.ts` persistence that already half-proves it), and one creation flow shared with the Files tree instead of two dialogs with different defaults.
+
+Its "No files found" on an HTTP 500 is fixed twice over: the 500 lands in Problems with a Retry command, and the empty state distinguishes "no results" from "the request failed".
+
+### 9.2 Where the Pending CMS surfaces land — no new containers
+
+| Pending surface                                                        | Home                                                                                                                                | Mechanism                                                                                                                                                                                                                                                   |
+| ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Collection browser — card / calendar views (site-architecture.md §7.2) | Library layouts                                                                                                                     | Card keys off any GridColumnKind: "image"; Calendar off any "date"; Board off any "enum" — content-source.ts already emits these columns                                                                                                                    |
+| Content entry editor — JSON form (§7.4)                                | Config/entry editor kind over ui/schema-form.ts                                                                                     | one renderFmField path, one reserved-key policy; the missing reference branch added and registered through registerFormControl so frontmatter, settings and grid popovers share one picker                                                                  |
+| Collection-scoped "New Entry" + reference-aware rename/delete (§7.5)   | Library collection header + the destructive-dialog pre-flight                                                                       | the shared reference index (§9.6)                                                                                                                                                                                                                           |
+| Draft workflow (§7.6)                                                  | a draft column + persisted filter in Library; a status pill on the pane tab; an "including drafts" perspective in Rendering context | no Studio-side publish state — git is the version axis                                                                                                                                                                                                      |
+| SEO panel (§8.6)                                                       | `Search appearance`, from the Document Header card ⑧ and the Page panel                                                             | two rendered preview cards + a warnings list over fields head-panel.ts already has; previews the merged site→layout→page $head and marks inherited values, so it does not report "missing description" on a page that inherits one. No traffic-light score. |
+| Media metadata / usage / safe delete (§9.4)                            | Library's Media layout + the reference index                                                                                        | usage keys on the authored ref, not the preview URL — content-assets.ts means ./images/hero.jpg renders at its asset-mount URL while the source keeps the authored ref                                                                                      |
+| Redirect editor (§11.4)                                                | one more GridSource over projectConfig redirects, opened as a grid:// tab                                                           | inherits inline editing, batch save with undo, Find & Replace, paging for free; chain/loop/shadow validation via the cell error classes grid-view.ts already renders                                                                                        |
+| Extension enable/disable                                               | Project Settings › Extensions                                                                                                       | the extensions array today has no UI at all despite site-context.ts:277 having a dedicated branch to react to it                                                                                                                                            |
+
+### 9.3 Settings vs Preferences
+
+`project.json` has two incompatible identities today: a document you open in a tab (whose only permitted modes are stylebook and source, `tab.ts:284`, and whose presence silently reconfigures the Imports panel) and a modal you open from a gear (whose own escape hatch, "Edit Global Styles", closes the modal and opens the document — the configuration IA jumping into the document IA).
+
+|          | Project Settings (a document in a pane)                                                                                                                                                                                                                     | Preferences (⌘,, application)                                                                                                                                                                                           |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sections | Overview · Contexts (breakpoints + schemes) · Site head · Definitions · Content types · Packages · Extensions · Redirects · Deploy · Raw JSON                                                                                                               | Appearance · Keyboard (generated from the registry, searchable by name or by pressing the key, rebindable) · Editor behaviour · Assistant · Accounts (GitHub, Cloudflare, AI key — listed, revocable) · Updates · About |
+| Modality | none — canvas visible in the pane beside it, ⌘S, dirty flag, undo                                                                                                                                                                                           | a plane sheet that does not suspend app commands                                                                                                                                                                        |
+| Fixes    | the inset:40px blackout that kills ⌘S/⌘Z/⌘P while you tune tokens that push live to the canvas it is covering; 42 fire-and-forget write sites; two serializations (null,2 vs "\t") producing full-file diffs; Open Data Grid opening a tab behind the modal | Studio has no application-preferences surface, and credentials live in three unrelated places none of which can list or clear them (clearGithubToken() has zero callers)                                                |
+
+Contributed extension sections keep `registerSettingsSection` and now report load failures to Problems with a Retry.
+
+### 9.4 Project Styles (Stylebook, promoted)
+
+The token panel and the element-defaults catalogue, together, as a **document** — reachable from the Project Settings sidebar, the palette, and `pane.openToSide`. Its catalogue becomes that document's Outline (one tree contract, one filter, instead of a filtered list in the canvas chrome and an unfiltered duplicate in the rail). Tokens become **pickable** from Style fields as chips via `value-selector.ts` / `color-selector.ts` / `unit-selector.ts`, and a bound value renders as a chip rather than raw text. Media-query overrides gain an add affordance (today a row appears only for tokens that already carry an `@media` block). "Enable dark scheme" becomes an ordinary row in Contexts, not a silent `$media` write from a colour editor. The dead `stylebookTab:"variables"` branch is removed. **The per-document `& <tag>` override path is preserved, and so is `"stylebook"` as a `CANVAS_MODES` wire value** — the document sets the mode the iframe already understands.
+
+### 9.5 Publishing
+
+Two unrelated operations are called "Publish" today, and the toolbar one disappears whenever no document tab is open. After:
+
+- `Source Control: Create GitHub Repository` — renamed, so two unrelated operations stop sharing a verb.
+- A **`Publish:` command family** (`Set Up…`, `Deploy`, `Open Dashboard`), always reachable, disabled with a `requires` reason when unavailable.
+- A **Deploy checklist in the Bottom dock's Activity tab**: an ordered prerequisite list (git initialised → pushed to a remote → provider connected → deployed) with the next action inline as a command, instead of a Cloudflare form asking for a GitHub repository that does not exist yet. It lives in Activity rather than a fifth tab because a deploy _is_ a long operation with a streaming log, and the dock cap is four (principle 9).
+- A **persistent deploy item in the status bar's project field** whose label _is_ the next blocking prerequisite, so it is both the shortcut and the explanation — one action to Deploy when prerequisites are met.
+- Credentials link to Preferences › Accounts. The stored Cloudflare token stops being rendered into the DOM on every open of a control the user did not ask to edit.
+
+### 9.6 The reference index
+
+`packages/server/src/refactor/` already contains the whole answer and exposes almost none of it: `refs.ts` (236 lines) walks a project for references to a path or a tag name, `apply.ts` (215) rewrites them, and `watcher.ts` (70) knows when they go stale. Exactly one route consumes it — `fileRename` (`packages/protocol/src/routes.ts:116`, "Rename/move (+ refactor report)") — and it reports _after_ the fact.
+
+`findReferences(path | tagName)` becomes a first-class cached query, invalidated from the existing fs watcher, with three renderings: **"Used on N pages →"** in the inspector's component-instance header, **`Selection: Find Usages`** in the palette and the component context menus, and a **reference count inside every delete and rename confirmation**.
+
+Exposing it is a five-package change and is scheduled as one (§12 P4.6): a `packages/server` route; a `packages/protocol` route entry — which forces `bun run docs:generate` for the generated protocol-routes page in the same PR; a `packages/desktop` `rpc-schema.ts` entry **and its handler**, which is the exact omission the schema↔handler parity test from P0 now catches; a `packages/studio` PAL method; and a cloud adapter. **Cloud computes it server-side** — the walker lives in `packages/server`, which the cloud target already runs — so no host degrades to "unknown". The three renderings still sit behind a `capability.findReferences` when-clause, so a host without the route hides them rather than reporting a confident zero.
+
+---
+
+## 10\. Accessibility and the design system
+
+**The enforcement problem, stated plainly:** Studio does not need a design system — it has a good one (the semantic token layer on `sp-theme`, 111 of 181 font-sizes bound to the Spectrum ramp). It needs the boundary to be **checkable**, because 130 emitted CSS classes resolve to no rule anywhere and they are not stragglers — they are the formula workspace, the expression editor, the dynamic-slot ladder, the presence chips, the AI credentials form, contributed settings sections. Those surfaces are styled by 276 inline `style=` attributes across 44 files, cannot be themed, cannot receive a focus ring from a stylesheet rule, and cannot be restyled without editing TypeScript.
+
+| Problem                                                                                           | Enforcement                                                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 130 orphan classes                                                                                | folded into the shipped packages/studio/scripts/check-styles.ts, already wired as lint:styles in the package test script — one gate, not two: every class= token in src/ must resolve to a rule. Fails CI. The 130 are the migration backlog, ordered by visibility: presence chips and the dynamic slot first.                                                                            |
+| 6 overlay idioms                                                                                  | openModal becomes a ~20-line wrapper over showDialog's focus-in / trap / restore / Escape machinery, with role="dialog" + label at the wrapper. Nine call sites delete their hand-rolled Escape handlers. renderPopover gains the menu contract. ui/layers.ts remains the only sanctioned way.                                                                                             |
+| One aria-live in the app                                                                          | role="status" aria-live="polite" on the status bar; the toast host is assertive for errors, polite otherwise. One attribute makes 78 outcomes audible.                                                                                                                                                                                                                                     |
+| 22 ARIA attributes, 5 roles, 232 files                                                            | files.ts is the reference implementation. Mirror role="tree" / treeitem / group / aria-expanded / aria-level / roving tabindex into the Outline and the Project Styles catalogue. role="toolbar" + single tab stop + arrows on the Command Bar, the rail and the block action bar. Name the canvas iframe.                                                                                 |
+| :focus-visible used 0 times against 8 outline: none                                               | all 8 replaced with :focus-visible rings from the existing --accent token. Lint bans bare outline: none.                                                                                                                                                                                                                                                                                   |
+| Ten-step type scale (8/9/10/11/12/13/14/16/24/28) for a system that defines four                  | collapse to the four Spectrum steps plus one deliberate dense-chrome step promoted to a token (--fg-size-dense). Nothing below 11px. The 21-use 13px cluster is a phantom step and is removed.                                                                                                                                                                                             |
+| 4719-line inline <style> in index.html, duplicated across the iframe boundary and already drifted | split by ownership into shell / panels / inspector / canvas-chrome / overlays / tokens built into dist/, token layer shared — a mechanical, move-only cut owned by P0, before any phase touches the grid. EDIT_PLACEHOLDER_CSS becomes one module both realms import, with tokens passed across the boundary — which is also how the placeholder-contrast fix lands once instead of twice. |
+| Canvas hints at ~1.6:1 contrast                                                                   | placeholders render as a chip with its own background (low-opacity surface + solid text) rather than tinted grey over user content of unknown luminance. The parent-realm copy at index.html:1478-1520 governs no canvas and is deleted, and #808080 leaves ALLOWED_HEX (check-styles.ts:36) in the same PR so the grey cannot come back.                                                  |
+| Three commit paradigms, fifteen timing constants                                                  | finish the migration ui/field-input.ts already declares: move the 12 debouncedStyleCommit sites onto the draft layer. Extract INPUT_DEBOUNCE / LIVE_PREVIEW / POLL / TOAST into one module.                                                                                                                                                                                                |
+| Unvirtualized trees                                                                               | one virtual-list primitive lands in P3 behind both the Files tree and the Outline tree, and is reused by the Library grid in P7. Three lists, one implementation, one keyboard contract.                                                                                                                                                                                                   |
+
+**The canvas keyboard contract** (currently five blockers deep): `caret.active` decides ownership — with a caret, ⌘C/⌘X/⌘V/⌘A belong to the text; with a structural selection and no caret, they act on the node and **Delete/Backspace deletes it** (today impossible in Design or Edit, because the whole container is contenteditable so `isContentEditable` is true for every descendant and the key is neither forwarded nor handled). Escape walks a defined ladder: leave the action bar → deselect → select parent → clear. ⌘K opens the link popover from the canvas. ⌘U is either implemented or removed from `EDITOR_OWNED_CHORDS`. Right-clicking empty canvas space yields the browser menu instead of a dead zone that suppresses both. `⌥↑` enters the block action bar; `F6` cycles shell regions. Grid mode scrolls with the wheel, because the keyboard scope is `grid` and not a mode string that exists nowhere else in the codebase.
+
+---
+
+## 11\. Complete surface migration
+
+`M` moved · `⊕` merged · `⊘` split · `↑` promoted · `↓` demoted · `R` replaced · `✕` removed · `=` unchanged · `+` new
+
+### 11.1 Shell
+
+| Existing surface                                        | New home                                                                                                                                                                                                                                                                                                                  |     |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- |
+| App grid shell #app (6×5)                               | 3 rows (Command Bar / workspace / Status Bar); docks + pane grid inside the middle row                                                                                                                                                                                                                                    | R   |
+| Toolbar — full variant                                  | Command Bar ① (dissolved by level; see §3.2)                                                                                                                                                                                                                                                                              | ⊘   |
+| Toolbar — minimal variant (minimalToolbarTemplate)      | deleted; the no-project state is the same bar with project.open false                                                                                                                                                                                                                                                     | ✕   |
+| Open Project split button + recents menu                | Command Center pill + Project: Open… / Open Recent… / New…                                                                                                                                                                                                                                                                | ⊕   |
+| Mode switcher (5 buttons)                               | pane context bar ⑦ — three named axes                                                                                                                                                                                                                                                                                     | ⊘   |
+| Quick Access palette (⌘P)                               | the Palette: modes, fuzzy full-path scoring, chords, recents, requires subtitles; the missing desktop searchFiles RPC handler registered in P0, with a schema↔handler parity test                                                                                                                                         | ↑   |
+| Tab strip #tab-strip                                    | per-pane tab strip in the pane header, over the P3 pane model (panes:[{id,tabOrder,activeTabId}], max two); disambiguated labels, pin, reorder, overflow, MRU, preview tabs, ⌘⇧T                                                                                                                                          | M   |
+| Tab bar #tab-bar                                        | dissolved: breadcrumb → jump bar ⑥; zoom → floating pod ⑩; Preview → canvas-view axis; scheme + media toggles + route params + test props + layout show/hide → Rendering context; Export → File: Export                                                                                                                   | ⊘   |
+| Tab bar — document-stack breadcrumb / Back              | jump bar ⑥ with per-segment dropdowns                                                                                                                                                                                                                                                                                     | M   |
+| Tab bar — zoom widget                                   | floating bottom-right over the canvas                                                                                                                                                                                                                                                                                     | M   |
+| Tab bar — view settings cluster                         | canvas-view axis + Rendering context                                                                                                                                                                                                                                                                                      | ⊕   |
+| Tab bar — Auto/Light/Dark                               | segment of Rendering context; defined in Project Settings › Contexts                                                                                                                                                                                                                                                      | ⊕   |
+| Tab bar — Layout show/hide toggle (tab-bar.ts:296-301)  | a segment of Rendering context on ⑦ ("with layout · page only"), backed by View: Toggle Layout so it is bindable and palette-reachable. Not dropped: it is the only way to see the page bare                                                                                                                              | M   |
+| Activity bar #activity-bar (8 tabs)                     | Navigator rail ② — registerPanel() records, 56px labelled, grouped by level with a divider, ⌘1–8 toggle-focus                                                                                                                                                                                                             | ⊘   |
+| Activity bar footer (About + Settings)                  | About → Help: About; the gear → Preferences ⌘, (application), not project config                                                                                                                                                                                                                                          | ⊘   |
+| Left panel host #left-panel                             | Navigator dock ③, one panel at a time, header naming title + level; error boundary gains a retry state instead of a permanently blank column                                                                                                                                                                              | M   |
+| Right panel #right-panel                                | Inspector dock ⑨, four text-labelled tabs                                                                                                                                                                                                                                                                                 | M   |
+| Chat panel #chat-panel (fifth column)                   | Assistant tab inside ⑨; Assistant: command family (Focus ⌘⇧A, New Chat, History, Retry, Attach Selection, Stop)                                                                                                                                                                                                           | ↓   |
+| Frontmatter panel #frontmatter-panel                    | Document Header card ⑧, in-stage, mode-independent, no collection gate                                                                                                                                                                                                                                                    | ⊕   |
+| Status bar #statusbar                                   | region ⑫: lit template, three fields in scope order, per-item commands, role="status"                                                                                                                                                                                                                                     | R   |
+| Welcome screen                                          | Start pane ⑬                                                                                                                                                                                                                                                                                                              | R   |
+| View-state object view.ts (:54, a plain object literal) | split: view keeps render outputs (Monaco, panzoom wrap, observers, the three cleanup arrays) and stays non-reactive; a new reactive shell.ts owns UI inputs — active panel per dock, dock visibility and width, focus region, layout preset, layoutSelection. Context keys derive from shell + workspace + activeTab only | ⊘   |
+| Panel resize handles ×3                                 | three dock handles spanning full dock height; one namespaced per-project layout record on shell                                                                                                                                                                                                                           | M   |
+| Window resize edges + CSD controls                      | unchanged, hosted in ①                                                                                                                                                                                                                                                                                                    | =   |
+| Manage Files modal                                      | Library editor kind                                                                                                                                                                                                                                                                                                       | R   |
+| Desktop application menu                                | unchanged; mirrored by the pill so dev-server and cloud have the same operations                                                                                                                                                                                                                                          | =   |
+| ?project= / ?open= URL deep link (studio.ts:724-868)    | survives unchanged, including the absolute-path contract — it is how the cloud target and the screenshot runner open a project. Its one error path (?project= requires an absolute path) stops being a 3-second status line and lands in Problems                                                                         | =   |
+
+### 11.2 Left panel
+
+| Existing                                                                                                                                                             | New home                                                                                                                                                                                                                                                                                                                             |     |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --- |
+| Activity bar rail                                                                                                                                                    | region ② (see above)                                                                                                                                                                                                                                                                                                                 | ⊘   |
+| Left panel error boundary / focus-aware scheduler                                                                                                                    | kept; the DnD cleanup drain moves into the scheduler so any panel render releases the previous registration set; the scheduler's deferred-render state becomes visible instead of silent (§7.3)                                                                                                                                      | =   |
+| Files panel + toolbar + context menu + DnD + keyboard nav                                                                                                            | Navigator › Files; virtualized on the shared primitive; "Search whole project" hand-off; ArrowLeft re-renders; selection synced to the active tab; every context row a File: command with its chord                                                                                                                                  | M   |
+| File name dialogs (New / Rename / Delete)                                                                                                                            | one dialog family, graded by reversibility, reference-aware                                                                                                                                                                                                                                                                          | =   |
+| Layers panel + row actions + inline title + context menu + DnD                                                                                                       | Navigator › Outline; virtualized on the same primitive; filter, bidirectional hover, reveal-on-select, multi-select, role="tree", instance badge, empty state; the five always-visible row buttons collapse to the selected row                                                                                                      | M   |
+| Stylebook layers list                                                                                                                                                | Project Styles document's Outline (one filter, not two lists)                                                                                                                                                                                                                                                                        | M   |
+| Elements palette + Components accordion                                                                                                                              | the Insert command family: slash menu at the caret, canvas +, and a pinnable Insert overlay (⌘⇧A). Relative insertion (before/after/inside), disabled-with-reason instead of throwing, empty state, drag registrations drained per render. Scheduled in P3 — it is a rail removal plus a command family, which is exactly P3's shape | ↓   |
+| Imports — document level                                                                                                                                             | Navigator › Packages; searchable, collapsible, inline Enable so the Imports↔Elements round trip disappears                                                                                                                                                                                                                           | M   |
+| Imports — site level (isSiteLevel branch)                                                                                                                            | Project Settings › Packages / Definitions. The branch is deleted.                                                                                                                                                                                                                                                                    | ⊘   |
+| Three unrelated $elements writers (Imports checkboxes imports-panel.ts:215/:413, the "Add component…" picker, the automatic push on canvas insert panels/dnd.ts:451) | one enableElement() / disableElement() service behind all three, landing with the Packages rename in P3. Today the same array is written three ways with no shared UI and no shared validation                                                                                                                                       | ⊕   |
+| State panel + inline editor                                                                                                                                          | Navigator › Data; per-tab expansion, multiple rows open, collision-checked rename with a visible error                                                                                                                                                                                                                               | ⊕   |
+| Data explorer                                                                                                                                                        | the live-value column of the same panel; truncation markers gain real expand actions; Refresh gets a loading state instead of a 200ms guess                                                                                                                                                                                          | ⊕   |
+| Document panel — Frontmatter / Layout picker / Page + OG / Custom Tags                                                                                               | Document Header card ⑧ (one field set, one reserved-key policy — head-panel.ts:83's RESERVED_FM_KEYS wins over frontmatter-panel.ts:28's empty set — SERP + social previews, "Raw head tags" disclosure); layout picker stops filtering to .json; site-level $head links to Project Settings › Site head                             | ⊘   |
+| Source Control — sync bar, branch, commit, Local Changes, History, bootstrap                                                                                         | Navigator › Source Control (project group, reading the hoisted project record rather than TabUi) + a Source Control: command family, every action of which is pointer-only today except ⌘⏎. Poll timer owned by the panel lifecycle; the dead "Actions" overflow removed; non-diffable rows stop advertising cursor:pointer          | M   |
+| Per-tab git / settings / stylebook state (tab.ts:57-67)                                                                                                              | hoisted out of TabUi onto the reactive shell/project record: the six git* fields (:62-67), settingsTab (:61) and the four stylebook* fields (:57-60). A lint bans activeTab imports from any panel declared level:"project"                                                                                                          | M   |
+| leftTab (application state) vs rightTab (per-TabUi document state)                                                                                                   | both move to shell as application state. leftTab wins: a layout preset (§3.2 ①b) already declares the inspector tab as part of the arrangement, so the active tab of either dock is a property of the workspace, not of a document                                                                                                   | ⊕   |
+| Left panel resize handle                                                                                                                                             | dock handle, full height                                                                                                                                                                                                                                                                                                             | M   |
+
+### 11.3 Project & lifecycle
+
+| Existing                                                                                                                                                                     | New home                                                                                                                                                                                                                                                                                                                                                                            |     |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- |
+| New Project modal (2-step wizard)                                                                                                                                            | stays modal — genuinely blocking and short-lived. Reworked in P1: starters lead; the four breakpoint templates collapse to one "Start from scratch" card; step 2 is Name + Location only (URL, adapter, design tokens → the project's own settings surface: today's Settings modal in P1, the Project Settings document from P6); the headline states the step; Cancel always works | =   |
+| New Project — destination fields / design quickstart / Import tab / Agent tab                                                                                                | destination unchanged; design quickstart removed (→ Project Styles); Import and Agent gated on capability.importSite and ai.configured, linking to Preferences › Assistant instead of embedding a third copy of the credentials form                                                                                                                                                | ⊘   |
+| Repository picker / Add Existing Repository / Clone dialog                                                                                                                   | Project: Add Repository… / Clone… / Open… — three named commands, three headlines, three outcomes, each gated by a capability.* when-clause                                                                                                                                                                                                                                         | ⊘   |
+| Welcome — GitHub-App install prompt (welcome-screen.ts:129-152)                                                                                                              | Start pane ⑬, kept verbatim and still gated on needsAppInstall(); it is the recovery path for the structured needs-installation 403 that platform-errors.ts:26 already decodes                                                                                                                                                                                                      | =   |
+| Welcome — per-recent remove affordance (welcome-screen.ts:213)                                                                                                               | Start pane recents row, kept, plus a Clear all; both become Project: commands so the palette can reach them                                                                                                                                                                                                                                                                         | =   |
+| Publish to GitHub                                                                                                                                                            | Source Control: Create GitHub Repository. The device-flow CORS failure becomes a reported, actionable error instead of an unhandled rejection                                                                                                                                                                                                                                       | M   |
+| Manage modal                                                                                                                                                                 | Library editor kind (§9.1)                                                                                                                                                                                                                                                                                                                                                          | R   |
+| Media upload core                                                                                                                                                            | unchanged; destination is named before the fact instead of disclosed in a 3-second line                                                                                                                                                                                                                                                                                             | =   |
+| Settings modal shell + section registry                                                                                                                                      | Project Settings document; registerSettingsSection preserved; failures report to Problems                                                                                                                                                                                                                                                                                           | R   |
+| Settings → General                                                                                                                                                           | Project Settings › Overview + › Contexts (breakpoints); one deployment-adapter enumeration shared with New Project; "Edit Global Styles" becomes pane.openToSide('Project Styles')                                                                                                                                                                                                  | ⊘   |
+| Settings → Head (+ Google Fonts)                                                                                                                                             | Project Settings › Site head, named for its level, cross-linked to the page-level card; Google Fonts → Project Styles › Typography                                                                                                                                                                                                                                                  | ⊘   |
+| Settings → CSS Variables                                                                                                                                                     | Project Styles document, beside a live canvas; media overrides gain an add affordance; "Enable dark scheme" becomes a Contexts row                                                                                                                                                                                                                                                  | ↑   |
+| Settings → Definitions ($defs)                                                                                                                                               | Project Settings › Definitions; the reference field type completed (it emits #/content/ and never renders the target picker because contentTypeNames is never passed)                                                                                                                                                                                                               | M   |
+| Settings → Dependencies                                                                                                                                                      | Project Settings › Packages, one implementation shared with the Navigator panel; progress → Activity with Cancel                                                                                                                                                                                                                                                                    | ⊕   |
+| Settings → contributed extension sections                                                                                                                                    | same contribution point; real loading and failure states; a new Extensions section exposes the extensions array                                                                                                                                                                                                                                                                     | M   |
+| Data section actions (Test / Push Schema / Open Data Grid)                                                                                                                   | unchanged, and they work — nothing hides the tab they open                                                                                                                                                                                                                                                                                                                          | =   |
+| Grid source picker + grid tabs                                                                                                                                               | Data: Open Grid… with palette-prompted args, plus a collection context menu, the Library collection header, and the Files tree                                                                                                                                                                                                                                                      | M   |
+| Publish modal                                                                                                                                                                | Publish: family + the Deploy checklist inside the Bottom dock's Activity tab + status-bar deploy item (§9.5)                                                                                                                                                                                                                                                                        | ⊘   |
+| AI credentials form                                                                                                                                                          | Preferences › Assistant, on Spectrum components                                                                                                                                                                                                                                                                                                                                     | M   |
+| User-settings persistence (no UI)                                                                                                                                            | Preferences › Accounts is its UI: list, and revoke                                                                                                                                                                                                                                                                                                                                  | ↑   |
+| PAL registration                                                                                                                                                             | capability.* context keys                                                                                                                                                                                                                                                                                                                                                           | M   |
+| Project open pipeline                                                                                                                                                        | one Activity entry with steps + Cancel; all paths route through pullWithPackageSync                                                                                                                                                                                                                                                                                                 | R   |
+| Sync Project (toolbar)                                                                                                                                                       | status-bar branch item → Source Control: Sync, routed through the package-aware pull                                                                                                                                                                                                                                                                                                | M   |
+| About modal                                                                                                                                                                  | Help: About Jx Studio (a small dialog) + Preferences › About                                                                                                                                                                                                                                                                                                                        | ↓   |
+| Blocking progress modal                                                                                                                                                      | Activity tab + status-bar progress; its error view generalised into Problems                                                                                                                                                                                                                                                                                                        | ↑   |
+| Statusbar messages                                                                                                                                                           | notify.* three-tier (§7)                                                                                                                                                                                                                                                                                                                                                            | R   |
+| __jxAutomation                                                                                                                                                               | thin adapter over the registry; the 25 method names aliased for one release, and run(id, args) added in P0 so the screenshot manifest stops addressing the shell by CSS selector                                                                                                                                                                                                    | R   |
+| Project-config validation (headless)                                                                                                                                         | wired to the Project Settings save path and to Problems                                                                                                                                                                                                                                                                                                                             | ↑   |
+| AI tool gating (gated-registry.ts:18-23)                                                                                                                                     | the model for Command.when / Command.requires: when stays a (ctx) => boolean predicate, requires stays one string with three consumers (agent refusal, disabled tooltip, palette subtitle)                                                                                                                                                                                          | ⊕   |
+| Pending: collection card/calendar · entry form · New Entry + ref-aware CRUD · draft workflow · SEO panel · media metadata/usage · redirect editor · extension enable/disable | §9.2 — all land on existing surfaces, no new containers                                                                                                                                                                                                                                                                                                                             | ↑   |
+
+### 11.4 Inspector
+
+| Existing                                                                          | New home                                                                                                                                                                             |     |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --- |
+| Right panel shell + 3 icon tabs                                                   | Inspector dock ⑨, four text-labelled tabs, ⌘⇧1–4, target header on every panel                                                                                                       | R   |
+| Right-panel collapse toggle / resize handle                                       | dock toggle ⌥⌘B / dock handle                                                                                                                                                        | M   |
+| Properties › Page section (layout picker)                                         | Document Header card ⑧                                                                                                                                                               | M   |
+| Properties › Element section                                                      | Inspector › Content; drafts keyed by node path (today all elements share one draft slot per field); the dead list="tag-names" autocomplete replaced with a real combobox             | M   |
+| Properties › Repeater / Switch / Observed Attributes / CSS Properties+Parts       | Inspector › Logic; rows move onto renderFieldRow; the { $ref: "#/state/" } seed that pre-binds a filter to nothing is removed                                                        | ⊘   |
+| Properties › Component Props                                                      | Inspector › Content, with provenance chips (set-here vs component default), an instance header naming the component, "Open component", "Reset props", and "Used on N pages →" (§9.6) | M   |
+| Properties › HTML attribute sections / Link target / Custom attributes            | Inspector › Content, unchanged in content                                                                                                                                            | =   |
+| Properties › Media (breakpoint definitions)                                       | Project Settings › Contexts — the only reason adding a breakpoint costs you your selection                                                                                           | M   |
+| Properties › Layout-element read-only panel                                       | renders, because the hit test writes view.layoutSelection (§8.2)                                                                                                                     | ↑   |
+| Events › declared events / binding rows / inline body / expression binding        | Inspector › Logic; free-form event-name combobox; mode switches remember the previous representation; the roomy editors open as panes, not takeovers                                 | ⊕   |
+| Style › toolbar (breakpoint tabs + scheme badge + selector picker)                | the Target Line (§6.1)                                                                                                                                                               | R   |
+| Style › custom-selector inline input                                              | one flow: showPromptDialog with validation, replacing the imperative <input> that bypasses lit and ui/layers.ts                                                                      | ⊕   |
+| Style › filter bar                                                                | filter kept; the "Active" toggle subsumed by provenance chips                                                                                                                        | ⊕   |
+| Style › 8 sections / 138 props / shorthands / relative styling / custom props     | unchanged in substance; shorthand rows go through renderFieldRow; longhands get the ladder; style fields gain the missing $ref rung                                                  | =   |
+| Style › stylebook target header                                                   | the Target Line's scope chip, with an affected count and a warning band                                                                                                              | ⊕   |
+| Dynamic slot (mode ring)                                                          | the provenance chip, which is also the Value Source picker; plain-language rungs; caps derived from the schema                                                                       | R   |
+| Expression editor / formula chips / formula palette / statement editor            | unchanged in role; chips become clickable inline (today onChipSelect defaults to a no-op outside the workspace); all four leave the 130-orphan list                                  | =   |
+| Media picker / colour selector / unit selector / button group / jx-value-selector | unchanged; migrated onto the draft layer; the button group stops emitting the literal "**none**" as a CSS value                                                                      | =   |
+| Field-input draft layer / universal field row                                     | renderFieldRow gains the error slot (§7.1) and the provenance chip; the 12 debouncedStyleCommit sites migrate onto the draft layer                                                   | ↑   |
+| Frontmatter "Properties" panel (above canvas)                                     | Document Header card ⑧                                                                                                                                                               | M   |
+| Formula workspace (canvas takeover)                                               | Bottom dock › Logic, or a derived pane                                                                                                                                               | M   |
+| Monaco function editor (canvas takeover)                                          | Bottom dock › Logic, or a derived pane                                                                                                                                               | M   |
+| Schema-form engine + registered controls                                          | unchanged; gains the shared reference control and the error slot                                                                                                                     | =   |
+| _fieldRow (dead, tests only)                                                      | removed                                                                                                                                                                              | ✕   |
+
+### 11.5 Canvas
+
+| Existing                                                               | New home                                                                                                                                                                                 |     |
+| ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- |
+| Canvas iframe host (one per breakpoint panel)                          | unchanged; named (title/aria-label); renderError surfaced to Problems; live-frame count capped when a derived compare pane is open                                                       | =   |
+| Selection / hover / presence / drop / replace-target overlays          | unchanged; presence gains CSS; hover gains a data-origin chip naming where a rendered string came from                                                                                   | =   |
+| Insertion +                                                            | unchanged in role; advertised in the placeholder chip; no longer dropped on every DOM update if the cursor has not moved                                                                 | =   |
+| Block action bar                                                       | region ⑩ from menus:["blockbar"]; gains Delete; hard cap + ⋮; role="toolbar" + roving tabindex + ⌥↑ entry                                                                                | =   |
+| Link popover / slash menu / merge-tag menu / tag-badge convert menu    | unchanged in role; one slash-menu interaction model (today typing / gives no filter field while the + gives one that steals focus); ⌘K works from the canvas                             | =   |
+| Canvas context menu                                                    | menus:["context/element"] sorted by group, chords printed; right-clicking empty space yields the browser menu                                                                            | ⊕   |
+| Document-wide caret / editable root                                    | unchanged, except layout subtrees are contenteditable="false" (§8.2); caret.active derived host-side in P1 from the editStart/editEnd/selectionChanged messages the bridge already sends | =   |
+| Prop-bound nested editing host                                         | unchanged                                                                                                                                                                                | =   |
+| Empty-state placeholders                                               | rendered as chips with their own background; one shared CSS module across the iframe boundary                                                                                            | R   |
+| Pan/zoom viewport + edit-mode content column                           | unchanged; zoom pod floats; Fit applied on entering Design; middle-mouse pan no longer live over Monaco and Tabulator                                                                    | =   |
+| CANVAS_MODES wire union (iframe-protocol.ts:25)                        | unchanged — "stylebook" stays a wire value the separately-built dist/iframe-entry.js understands; the Project Styles document sets it rather than a shell mode owning it                 | =   |
+| Stylebook specimen hit surface                                         | the Project Styles document's stage                                                                                                                                                      | M   |
+| Preview link interception                                              | unchanged, and joined by View: Open in Browser (§8.5)                                                                                                                                    | =   |
+| OS file drop / cross-frame drag coordinator / drag ghost / auto-scroll | unchanged; one drop visualisation for one logical operation across tree and canvas                                                                                                       | =   |
+| Background click-to-deselect                                           | unchanged                                                                                                                                                                                | =   |
+| Parent keyboard layer + iframe→parent bridge                           | the ~40-line dispatcher over the registry's scope stack (§5.3)                                                                                                                           | R   |
+| Grid mode surface                                                      | Grid editor kind; wheel scrolling works; document panels no longer render over GRID_STUB_DOCUMENT                                                                                        | ⊘   |
+| Code mode surface                                                      | Code editor kind, and available as a derived side pane                                                                                                                                   | ⊘   |
+| git-diff (unlisted 7th mode)                                           | Diff editor kind with a revision picker and a close control                                                                                                                              | ↑   |
+
+### 11.6 Assistive, collaborative, feedback
+
+| Existing                                                                                     | New home                                                                                                                                                                              |     |
+| -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- |
+| AI chat sidebar #chat-panel                                                                  | Assistant tab in ⑨ + the Assistant: family                                                                                                                                            | ↓   |
+| AI credentials gate / managed Cloudflare connect                                             | Preferences › Assistant; the panel's empty state becomes a teaching state with "Set up the assistant"                                                                                 | M   |
+| Chat header / message list / composer / sessions list                                        | unchanged in role; tool chips gain outcome; per-turn changed-files summary + Restore; Retry wired; context trimming shown as a system notice; session delete confirmed                | =   |
+| New Project → Agent tab                                                                      | unchanged; links to Preferences for credentials                                                                                                                                       | =   |
+| Agent loop / tool executor / tool surface                                                    | beginBatch bug fixed (per-tab batching, collab flush); tools become command projections                                                                                               | ⊕   |
+| Schema / render / token gates                                                                | unchanged; degradation reports to Problems                                                                                                                                            | =   |
+| Context budget manager                                                                       | tokenCount / contextWarning actually rendered                                                                                                                                         | ↑   |
+| Automation seam                                                                              | registry adapter; run(id, args) from P0, the 25 legacy names aliased for one release                                                                                                  | R   |
+| Presence chips + sync pill                                                                   | Command Bar ① with real CSS + a Collaborate: family                                                                                                                                   | ↑   |
+| Peer selection boxes / remote Monaco cursors                                                 | unchanged; cursors labelled without hover                                                                                                                                             | =   |
+| Source-canonical freeze / read-only guest                                                    | visible indicators, not a 3-second grey line and silence                                                                                                                              | ↑   |
+| Status bar transient message                                                                 | toast host                                                                                                                                                                            | R   |
+| Overlay layer helpers                                                                        | one contract; openModal wraps showDialog                                                                                                                                              | ⊕   |
+| Blocking progress modal                                                                      | Activity + Problems (§7.3)                                                                                                                                                            | ↑   |
+| Bespoke inline error text (8 classes)                                                        | the error slot + Problems; .publish-error, .push-dialog-error, .push-dialog-warning, .fw-result--error get rules or are deleted                                                       | ⊕   |
+| Activity-bar count badge                                                                     | rail badge slot, generalised (changed files, problems), sourced from the hoisted project record rather than TabUi                                                                     | =   |
+| 158 of 240 catch blocks reaching no surface (46 empty)                                       | each gets a tier or an explicit // intentionally ignored: <reason>; the notify lint bans bare empty catches in src/ (P4)                                                              | R   |
+| Panel scheduler's silent deferral (panel-scheduler.ts:37-39)                                 | deferred renders announce themselves in the panel header and flush on commit or blur                                                                                                  | ↑   |
+| Structured platform-error decoding                                                           | every notify.error consults platformErrorInfo for a recovery command                                                                                                                  | ↑   |
+| Live expression preview                                                                      | unchanged                                                                                                                                                                             | =   |
+| Empty states                                                                                 | principle 7 (§8.3)                                                                                                                                                                    | R   |
+| Developer console                                                                            | Problems + Activity; a Help: Open Developer Tools command on desktop                                                                                                                  | ↑   |
+| context-resolver.ts (mis-grouped)                                                            | unchanged; re-filed in docs under specs/extensions.md §9.1                                                                                                                            | =   |
+| Reference walker (packages/server/src/refactor/: apply.ts 215 · refs.ts 236 · watcher.ts 70) | findReferences(path \| tagName) exposed as a cached query behind three renderings, gated by capability.findReferences; a five-package change with its own workstream (§9.6, §12 P4.6) | ↑   |
+
+---
+
+## 12\. The roadmap
+
+Nine blocks. Each is independently shippable, each leaves the app working, and no block spends more than one iteration without a user-visible result. Substrate lands in P2, but P1 and P0 run first precisely so that P2's six honest weeks of refactor are not the first thing anyone sees.
+
+**Standing obligations on every phase**, non-negotiable: new source files ship with tests in the same PR (the `check-coverage-manifest.ts` gate fails CI otherwise); coverage thresholds in `packages/studio/bunfig.toml` (`lines = 0.95`, `functions = 0.94`, enforced **per file**) are ratcheted, never lowered without written justification; every behaviour change lands code + spec edit + docs page together; spec sections are edited **in place** and new material is **appended as new numbered sections** (never renumbered — docs `spec:` frontmatter anchors them); every substantive spec edit runs `bun run spec:bump` and `bun run docs:generate`, and `docs:check` / `docs:verify` / `docs:claims` must be green.
+
+**Estimates include the cost of rewriting existing tests.** `packages/studio/tests` is 294 files and 86,364 lines under that per-file gate, and four phases rewrite the modules its largest files assert against: P2 touches 2,463 lines of tests (shortcuts 656, context-menu 653, block-action-bar 1,154), P3 1,831 (toolbar 585, activity-bar 263, tab-strip 327, quick-search 323, left-panel 333), P5 2,578 (style-panel 991, properties-panel 1,587) and P7 1,327 (browse). Each of those four carries a +50% multiplier below. Splitting one well-tested file into five modules reliably dips one of them under 0.95, so **each of those phases states its ratchet in the PR description**: the new per-file floor, and — if any file lands lower than the file it replaced — the written justification CLAUDE.md requires.
+
+---
+
+### P0 · Enforcement rails
+
+_Runs in parallel with P1; workstreams 1–3 land first because P1's screenshots and P3's chrome moves depend on them. Tooling, not UI. ~2 weeks._
+
+**Goal.** Put the checks in place before the code that must satisfy them, so the redesign cannot re-create what it is fixing — and repair the two seams that every later phase would otherwise break.
+
+**Workstreams (ordered).**
+
+1.  **Desktop `searchFiles` handler.** `rpc-schema.ts:277` declares it, `platform.ts:473-474` and `chromium/platform.ts:296-297` call it, and **no handler exists** — not in `window-manager.ts`'s map (which registers `listDirectory` at `:260`) nor in `chromium/index.ts`. ⌘P is non-functional on the desktop app, the only end-user path to Studio, and fails indistinguishably from an empty project because `quick-search.ts` swallows the rejection. Register the handler, and add a **schema↔handler parity test** asserting every `rpc-schema.ts` entry has one, so the class of bug cannot recur — it is about to recur for `findReferences` (§9.6).
+2.  **Screenshot-manifest seam — `run(id, args)`.** ✅ **Shipped.** `__jxAutomation` gained `run(id, args)` over a 39-entry id→handler table in the `<category>.<verb>` namespace, and all 58 `click` steps are command-addressed. `click` and `hover` are now **zero** in the manifest. This is step **S1's prerequisite**, not the whole story — see §13.
+
+2b. **The shot contract (§13), before P3.** The `run(id)` conversion removed the _driving_ coupling; the _waiting_, _cropping_ and _staging_ coupling remains — 115 `wait:{ms}` totalling 73.6 s, 43 `waitFor` selectors, 36 region selectors over 16 CSS selectors (seven naming nodes P3–P7 delete), 53 `setStatus`, and 16 `press` shims still holding XPath inside `automation.ts`. Land §13's **S0** (determinism), **S1** (`check-shot-contract.ts` in the `checks` job) and **S2** (the contract, `probe.idle()`, the region registry, the seed registry, `capture.lock.json`, the two CI lanes, and the manifest conversion).
+
+    **This is a sequencing constraint, not a preference.** P3's and P4's screenshot deliverables below are struck through precisely because S2 discharges them; if S2 slips into P3, that phase carries the conversion *and* the demolition at once, while already deleting a grid column, a tab bar, a toolbar template and three storage keys. Sequence it here or do not start it.
+
+3. **Split the stylesheet.** Mechanically cut the single inline `<style>` block in `index.html` into six files by section comment — `shell / panels / inspector / canvas-chrome / overlays / tokens` — token layer staying the shared root, built into `dist/`. Move-only, no rule changes, low risk, and it is what makes every later CSS diff reviewable: P1 deletes a grid row, P3 deletes a grid column and rewrites `#toolbar`, P8 restructures the grid again. 4. **Orphan-class check, folded into the checker that already ships.** `packages/studio/scripts/check-styles.ts` is already wired as `lint:styles` in the package `test` script; the orphan rule joins it rather than adding a second gate. Land it **allowlisting the existing 130** so it is green on day one and shrinks monotonically. 5. `openModal` → thin wrapper over `showDialog`'s focus/trap/restore/Escape machinery + `role="dialog"` + label. Nine call sites delete their hand-rolled Escape handlers. 6. `ui/timing.ts` — `INPUT_DEBOUNCE / LIVE_PREVIEW / POLL / TOAST`. The fifteen magic numbers become four. 7. `:focus-visible` sweep: all 8 `outline: none` replaced; a stylelint rule bans bare `outline: none`. 8. `role="status" aria-live="polite"` on `#statusbar`; `title`/`aria-label` on the canvas iframe; the duplicated `title`+`aria-label` double-announce in the rail fixed.
+
+**Newly possible.** ⌘P works on the desktop app. A keyboard user gets focus rings everywhere; a screen-reader user hears 78 previously-silent operation outcomes; every modal traps and restores focus. And the docs pipeline stops being a hostage of CSS selectors.
+
+**Specs.** `studio-ui-guidelines.md` §1.1, §8.7, §10 (in place). Patch bump.
+
+**Risk.** Low. The one live risk is the focus-ring sweep changing visual density in dense panels — mitigate with a screenshot-pipeline diff, which workstream 2 has just made stable.
+
+---
+
+### P1 · First Contact
+
+_The credibility phase. ~4 weeks. Zero registry dependency._
+
+**Goal.** Make the first ten minutes work. Every item here is independently valuable, independently revertible, and answers a verified blocker. Cheap credibility runs first; the one risky change runs last and alone.
+
+**Workstreams (ordered).**
+
+1.  **Reclaim 300px.** Chat panel closed by default; the AI credentials form moves to an `Assistant: Settings…` dialog on `sp-textfield`, out of the ~300px column it occupies in every screenshot of the product.
+2.  **Truthful Design and Preview entry.** Fit applied on entering Design (the 1280px artboard stops landing clipped mid-word in a ~700px viewport). Preview gates overlays, structural edits and inserts, and scrolls for real.
+3.  **Start pane.** Disambiguated recents (name + parent directory + last opened) keeping the per-row remove and gaining Clear all; the GitHub-App install prompt preserved; corrected tagline; Spectrum components; `start` layout preset collapsing the inert docks.
+4.  **`View: Open in Browser`** (⌘⇧O) — the built page at its real route, in the Command Bar beside Save and in the status bar. Closes the task loop for the first time.
+5.  **`caret.active` across the bridge.** Derive it in `iframe-host.ts` from the `{kind:"editStart"}` (`iframe-protocol.ts:346`), `{kind:"editEnd"}` (`:415`) and `{kind:"selectionChanged"}` (`:401`) messages that already arrive, and make the dead guard at `shortcuts.ts:171-182` read it. This is a host-side boolean, not protocol work, and it fixes three of P2's four advertised keyboard wins six weeks early: ⌘C/⌘X/⌘V stop being stolen from the text caret. It also de-risks P2's dispatcher rewrite by proving the guard against the shipped keymap first.
+6.  **The layout-node fix, landed alone.** `classifyRenderNode` returns `{ kind:"layout", layoutPath, layoutFile }`; the renderer stamps `data-jx-layout-path`/`-file`; the hit test writes `view.layoutSelection`; layout subtrees become `contenteditable="false"`; the frame dims the layout region with a `LAYOUT · layouts/base.json` chip. `renderLayoutSelectionPanel` — already written, currently unreachable — renders.
+7.  **Legible canvas hints.** Placeholder chips with their own background; the parent-realm duplicate at `index.html:1478-1520` deleted; one shared CSS module across the iframe boundary; `#808080` removed from `ALLOWED_HEX` (`check-styles.ts:36`) in the same PR.
+8.  **Empty-state pass** across the inspector and the rail, with one verb.
+9.  **git init by default** in `createProject`; repo state becomes a persistent status-bar field.
+10. **New Project wizard rework** (§11.3): starters lead, four breakpoint templates collapse to one "Start from scratch" card, step 2 is Name + Location, Cancel always works. URL, adapter and design tokens route to today's Settings modal and re-point at the Project Settings document in P6 for free.
+
+**Deliverable, not a standing obligation.** Re-author the manifest shots affected by items 1, 3 and 6 (the chat column, the welcome screen, the canvas hit test) over P0's `run(id)` seam and regenerate the docs images in the same PRs.
+
+**Newly possible.** A new user can click the site name and rename it; can open the real page in a browser; can find their project in the recents list; can copy a phrase and get the phrase; and gets 300px of window back.
+
+**Specs.** `studio.md` §4.1, §4.2, §4.3, §8.1, §8.2, §12 (in place). `studio-ui-guidelines.md` §2.2, §3.1 (the grid diagram is already wrong — it shows four columns and three rows), new **§11 Empty States and Copy**. `site-architecture.md` §5.2, §7.3, §7.4. Minor bump on studio.md and the guidelines.
+
+**Risk.** **Medium-high, concentrated in item 6.** The layout-node change touches `iframe-render.ts` / `iframe-interaction.ts` / `path-mapping.ts` — the hottest hit-test path, cross-realm. A regression makes _everything_ unselectable. That is why it lands last and alone: behind the harness tests in `packages/studio/tests/`, verified end-to-end with the `packages/studio:verify` skill and a full screenshot-pipeline diff, with items 1–5 already merged so a revert costs one change and not the phase. Item 2's Preview gating is a **behaviour removal** for anyone currently editing in Preview by accident — announce it in the changelog.
+
+---
+
+### P2 · The Registry
+
+_The substrate. ~6 weeks (4 of build, 2 of rewriting the 2,463 test lines that assert the old dispatch). Carries three visible bug fixes so it is not invisible._
+
+**Goal.** One definition site per action, with the containment taxonomy and the enforcement check, before any chrome is redrawn.
+
+**Workstreams (ordered).**
+
+1.  **Split `view.ts`.** `view.ts:54` is a plain object literal — `export const view: ViewState = {…}` — and `activity-bar.ts:110-122` proves it: setting `view.leftTab` requires an explicit `renderOnly("leftPanel")` plus `renderActivityBar()`. It cannot be wrapped in a reactive proxy wholesale, because the same object holds `monacoEditor`, `panzoomWrap`, `centerObserver` and three cleanup arrays. So cut it in two: `view` keeps the render **outputs** and stays non-reactive; a new reactive **`shell.ts`** owns the UI **inputs** — active panel per dock, dock visibility and width, focus region, layout preset, `layoutSelection`. Migrate the importers. This is a gate for workstream 2 and the natural home for P3's per-project layout/session record.
+2.  `commands/registry.ts` + `commands/context.ts` + `commands/keymap.ts`. `when` and `enablement` are `(ctx) => boolean` predicates modelled on `services/gated-registry.ts:18-23`; `requires` is one string with three consumers. `level` (containment) and `keyScope` (dispatch) are **two** fields. Context keys derive from `shell` + `workspace` + `activeTab`. No UI change.
+3.  The **level × placement matrix** written into `studio-ui-guidelines.md` §12, then `scripts/check-command-levels.ts` validating against that table plus `scripts/check-chrome-budget.ts`, both wired into `.github/workflows/test.yml`.
+4.  **Port `editor/shortcuts.ts`** (403 lines → ~40-line dispatcher over the scope stack). `caret.active` is already live from P1, so the guard is proven before the rewrite. Visible outcomes shipped here: ⌘W stops disagreeing with the tab ×; Delete removes a canvas-selected element; ⌘K opens the link popover from the canvas; ⌘A works; Escape walks its ladder; the grid scrolls with the wheel.
+5.  **Port `editor/context-menu.ts`** to `menus:["context/*"]` with `group` ordering — chords printed and `destructive` styling derived for free.
+6.  **Port `panels/block-action-bar.ts`** and the Outline row actions. The bar gains Delete, a cap + `⋮`, `role="toolbar"`, roving tabindex and `⌥↑` entry.
+7.  **Fix tab identity**: drill-in opens a real tab instead of mutating `tab.documentPath` in place. (The _pane_ waits for P3; the _corruption_ does not.)
+
+**Newly possible.** The canvas keyboard finally works as documented: delete a selected image, add a link with ⌘K, press Escape and have something happen. Every context-menu row teaches its chord.
+
+**Specs.** `studio.md` new **§13 Command Registry and Context Keys**; in place §4.4, §10 (marked as generated from P3 onward). `studio-ui-guidelines.md` new **§12 Command and Menu Rendering Rules**, carrying the level × placement matrix as its normative copy. Major bump on both (breaking contract change; at 0.x this moves the minor).
+
+**Risk.** **The highest-risk phase.** It touches the three most load-bearing input files simultaneously, and a half-migrated registry — owning the keymap but not the chrome — puts enablement in two places, which is the ⌘W bug generalised. Mitigations: workstream 1 lands first and alone, because every importer of `view` is touched; workstreams 4–6 are three separate PRs, each behaviour-preserving-plus-one-named-fix, each with a test asserting the old and new dispatch agree on every existing binding; `check-command-levels.ts` runs from workstream 3 so no port can regress placement; ~15 new modules each need tests in the same PR under the coverage manifest gate — budgeted above, it is not overhead, it is the phase.
+
+---
+
+### P3 · The Shell Derived
+
+_The visible payoff of P2. ~6 weeks (4 of build, 2 of rewriting the 1,831 test lines that assert the old chrome)._
+
+**Goal.** Redraw the chrome as renderings of the registry, delete the fifth column, and give the app a palette.
+
+**Workstreams (ordered).**
+
+1.  **`registerPanel()`**, mirroring `registerSettingsSection`. Port the eight-item array literal. Rail → 56px labelled, grouped by `level` with a divider, `when`\-gated. Every panel renders under a header naming title + level. Rename the stored keys (`blocks`→`insert`, `head`→`page`, `imports`→`packages`). **In the same PR**, hoist the six git fields (`tab.ts:62-67`), `settingsTab` (`:61`) and the four `stylebook*` fields (`:57-60`) out of `TabUi` onto the reactive shell/project record, and add the lint banning `activeTab` imports from any panel declared `level:"project"` — otherwise the project group's badge is sourced from the focused document and vanishes when the last tab closes. `leftTab` and `rightTab` both land on `shell` as application state, because a layout preset already declares the inspector tab as part of the arrangement.
+2.  **Command Bar.** Port `toolbar.ts`; **delete `minimalToolbarTemplate`**; `tbBtnTpl` → `tbCmd(id)`; chord glyphs formatted per platform by one function.
+3.  **The Palette.** Modes, fuzzy full-path scoring, chords right-aligned, recents pinned, `requires` subtitles on greyed rows, `?` mode list — over the desktop `searchFiles` handler registered in P0.
+4.  **Command Center pill** + `Project: Open…` prompting this-window/new-window.
+5.  **The Insert command family.** Elements leaves the rail: slash menu at the caret, canvas `+`, a pinnable Insert overlay (⌘⇧A), relative insertion, disabled-with-reason instead of throwing. One `enableElement()`/`disableElement()` service replaces the three unrelated `$elements` writers (`imports-panel.ts:215`/`:413`, the "Add component…" picker, `panels/dnd.ts:451`'s auto-import).
+6.  **Assistant into the Inspector dock**; `#chat-panel` deleted as a grid column; **Preferences (⌘,)** ships with Appearance, Assistant, Accounts (list + revoke, including `clearGithubToken` which has zero callers today) and a generated read-only Keyboard sheet.
+7.  **Named layouts** in the Command Bar; per-project layout + session persistence in one namespaced record on `shell` — which fixes the two-writer localStorage bug that wipes collapse flags on every resize.
+8.  **Direct keys**: ⌘1–8 toggle-focus, ⌘⇧1–4, ⌘B/⌥⌘B/⌘J, F6 region cycling.
+9.  **The minimal pane model** — `panes: [{ id, tabOrder, activeTabId }]`, max two, replacing `workspace.ts:30`'s lone `activeTabId` — plus per-pane tab strips: disambiguated labels (route-aware), overflow chevron, ⌃Tab MRU, pin, reorder, preview tabs, ⌘⇧T; activating a tab syncs `projectState.selectedPath`. **No derived-pane rules and no second live Canvas host**: until P8's fan-out lands, the second pane is capped to Code, Config, Diff and Library. This is what makes "opens Project Settings in the side pane" (§4.2, P6.3) and "Open layout" (§8.2) real instead of forward references.
+10. **The Document Header card.** One `collectFmFields` call, one reserved-key policy (`head-panel.ts:83`'s `RESERVED_FM_KEYS` wins), no collection gate. Deletes `#frontmatter-panel` as a grid row — in the phase that restructures the grid anyway. (SEO previews and warnings land in P7; the card ships with fields, route and layout picker.)
+11. **One virtual-list primitive** behind the Files tree and the Outline tree, reused by the Library grid in P7.
+
+**Deliverable — mostly discharged by P0 2b (§13.7).** No manifest text names a DOM node any more, so deleting `#tab-bar`, `#chat-panel` and `minimalToolbarTemplate` touches nothing. The three key renames fail `check-shot-contract.ts` **in this PR**, naming both the old and new id: exactly 4 steps (`blocks` ×2, `imports` ×1, `head` ×1) out of 46 — one find-replace. What remains is genuine: the assistant crop, the tab-strip crop (labels are route-aware now) and the frontmatter crop must be re-captured because those surfaces really moved.
+
+**Newly possible.** Everything is reachable by name; the app teaches its own keyboard; four named layouts; the session survives a relaunch; the canvas gains ~260px; every panel says what it is; two documents can be open side by side.
+
+**Specs.** `studio.md` §3.1, §5.1, §5.2, §5.3, §10 (now generated); new **§14 Panels and Docks**. `studio-ui-guidelines.md` §3.1, §3.2. Generated: `docs/studio/interface/shortcuts.md` + a new `docs/studio/interface/commands.md`, CI-diffed. Major bump.
+
+**Risk.** Medium. The rail regrouping and key renames touch persisted state — ship a one-time migration of `jx-studio-panel-widths` and the leftTab key, with a fallback, and test it. Chrome-budget lint will bite immediately; that is the point, but expect one round of negotiation over which five commands earn the primary slot.
+
+---
+
+### P4 · Feedback and Truth
+
+_~5 weeks: ~3 for the notification substrate, ~1 for the five-package `findReferences` change, ~1 for Contexts._
+
+**Goal.** Make the app able to tell the user what happened.
+
+**Workstreams (ordered).**
+
+1.  Toast host as a fourth overlay layer; `notify.success/warn/error(msg, { action: commandId })`.
+2.  **Bottom dock** ⑪ (⌘J) with **Problems** and **Activity**; the progress modal's error view generalised; Cancel on long operations; project open becomes one Activity entry. (Diff and Logic arrive with P8's takeover migration; four tabs is the cap.)
+3.  **The silence sweep.** Triage all 78 `statusMessage` sites; route all 26 failures; delete `"Iframe render OK"`; surface `renderError`; wire `jx-validate` diagnostics, Monaco markers, the failed `project.json` writes and contributed-section import failures. In the same sweep, the **158 of 240 catch blocks that reach no surface** — 46 of them entirely empty — each get a tier or an explicit `// intentionally ignored: <reason>`, and the lint that bans raw `statusMessage` outside `notify` bans bare empty catches in `src/`.
+4.  `renderFieldRow` gains the `error` slot (one edit, inherited by every consumer), and `panel-scheduler.ts:37-39`'s silent deferral becomes a visible "new changes" hint that flushes on commit or blur.
+5.  **Status bar rewrite**: lit template, three fields in scope order, per-item commands, worded save state, deploy state.
+6.  **`findReferences(path | tagName)`** — its own workstream, ~1 week, because it is a five-package change: a `packages/server` route over the existing `refactor/refs.ts` walker; a `packages/protocol` route entry, which forces `docs:generate` for the generated protocol-routes page in the same PR; a `packages/desktop` `rpc-schema.ts` entry **and its handler**, covered by P0's parity test; a `packages/studio` PAL method; a cloud adapter. Cached, invalidated from the existing fs watcher. Cloud computes it server-side; the three renderings sit behind `capability.findReferences` regardless (§9.6).
+7.  **Destructive dialogs**, consuming workstream 6: reference counts inside every delete and rename confirmation, grading by reversibility, stating what survives.
+8.  AI honesty (tool-chip outcomes, changed-files summary, Restore to here, disk-write marking, Retry, the `beginBatch` cross-tab fix) and collab honesty (freeze indicator, read-only banner, attach-failure distinction, `Collaborate:` family, presence CSS).
+9.  **Project Settings › Contexts** — pulled out of P6 and landed here, ~1 week, as the single definition site for breakpoints and colour schemes, with the bidirectional link to the Rendering-context selector ("Manage contexts…" ↔ "selected on the pane context bar"). It reads and writes `$media` and has no dependency on P6.1's transaction work, so it ships as a section through the existing `registerSettingsSection` contribution point and is re-hosted, not rebuilt, when P6.2 turns Settings into a document. This unblocks P5.4 and removes all four of today's definition sites.
+
+**Deliverable — discharged by P0 2b (§13.7).** All 53 `setStatus` steps were deleted in S2, three phases early: the Remote Rule forbids staging presentation state a user cannot write, so the shots stopped photographing a fabricated "Ready". What this phase adds instead is new regions — toasts, Bottom dock, Problems, Activity — and one **named exception** to §13.3 clause 6: a toast is timed, so `probe.idle()` treats one mid-transition as not-idle and an automation-gated infinite lifetime is a listed, justified branch in the toast host. Resolve it here rather than discovering it.
+
+**Newly possible.** Errors persist and carry a Retry; long operations can be cancelled; you can see what a delete will break before you confirm it; you can see and undo what the AI did; you can tell a collab freeze from a bug; you can add a breakpoint without losing your element selection.
+
+**Specs.** `studio.md` new **§15 Feedback, Problems and Progress**; §9.1.1 (destructive ops). `studio-ui-guidelines.md` new **§13 Notification Tiers**; §8.7. `specs/ai.md` §3; `specs/collab.md`. Minor–major depending on file.
+
+**Risk.** Medium-low, but item 3 is a wide, shallow change across 16 files with no single test that proves it — mitigate with the lint. Item 6's risk is coordination, not logic: five packages in one PR, with a generated docs page that CI diffs.
+
+---
+
+### P5 · The Edit Target
+
+_~6 weeks (4 of build, 2 of rewriting the 2,578 test lines in `style-panel` and `properties-panel`)._
+
+**Goal.** Make the inspector state what it edits, where the value came from, and where the edit will land.
+
+**Workstreams (ordered).**
+
+1.  Target Line, each segment a control; the breakpoint `sp-tabs`, selector picker and scheme badge retire into it.
+2.  Provenance chips (four states, donor named) on Style, then Component Props, then frontmatter.
+3.  The plain-language ladder; `caps` derived from the schema; the `$ref` rung for style; mode-switch memory; free-form event names; the `${…}`\-typing widget swap fixed.
+4.  Tab re-split: Content / Style / Logic; Page section out; Media definitions out to Project Settings › Contexts, which landed in P4.
+5.  Multi-select: `JxPath[]`, Mixed values in all three tabs, structural commands iterating in one transaction; shift-range and ctrl-accumulate in the Outline first, canvas marquee after.
+6.  Shorthand rows and Repeater/Switch rows onto `renderFieldRow`; the inert Properties section dot given a handler or removed; the three near-duplicate kv-row implementations collapsed.
+
+**Newly possible.** You can read the compound target as a sentence before you type; you can see where every value came from and jump to its source; you can set padding on six cards in one decision; you can bind a style property to a signal.
+
+**Specs.** `studio.md` §6.1, §6.2, §6.3, §7.4. `studio-ui-guidelines.md` §4.1, §4.2, §8.1. Major bump on studio.md.
+
+**Risk.** Medium-high on item 5: widening `selection` touches the canvas hit test, the Outline, all three inspector tabs, `block-action-bar`'s `childIndex` maths, `transact.ts` and the collab `setPresence` overlay. Land it last in the phase, behind the harness, with the single-selection path preserved as `length === 1`.
+
+---
+
+### P6 · Configuration as Documents
+
+_~4 weeks._
+
+**Goal.** Delete the Settings modal. Make project configuration as safe as document editing — which requires making it as _recoverable_ as document editing first.
+
+**Workstreams (ordered).**
+
+1.  **`project.json` becomes a real Tab under the transaction log.** `tab.ts:284`'s `inferModes` already returns `["stylebook","source"]` for it, so making it a Tab with a **Config editor kind** gets `undo`, the dirty flag, ⌘S and the history delegate for free, and `updateSiteConfig` becomes a single chokepoint: one serialization, one error path. This is a **hard dependency**, not a follow-up: 42 fire-and-forget `updateSiteConfig`/`saveProjectConfig` sites across eight files to the file that defines the project is the app's highest-consequence silent-failure path, and making it non-modal without this makes the most destructive category of edit easier without making it recoverable. `tabs/transact.ts` is 1,290 lines and entirely Tab-shaped, and its `setHistoryDelegate` (`:463`) is exactly the hook Yjs uses — so `project.json` is declared **out of collab replication** with a one-line gate at that delegate, and `specs/collab.md` says so.
+2.  **Project Settings document** — sections as inner nav (Overview, Contexts, Site head, Definitions, Content types, Packages, **Extensions**, Deploy, Raw JSON), `registerSettingsSection` preserved, failures to Problems, deep links no longer racing the async import.
+3.  **Contexts re-hosted.** The section shipped in P4; here it moves from the section registry into the document's inner nav. A re-host, not a rebuild.
+4.  **Project Styles document**: tokens + element defaults, live canvas beside it, tokens pickable as chips from Style fields, media-override add affordance, dark scheme as an explicit Contexts row, dead `variables` branch removed. **On-disk format unchanged**; per-document `& <tag>` overrides exposed via the scope chip. **Wire format unchanged too**: `"stylebook"` stays in `CANVAS_MODES`.
+5.  Preferences completed: Keyboard editor (searchable by name _or_ by pressing the key, rebindable) generated from the registry; Accounts with revoke.
+6.  Settings modal deleted. `Definitions` reference picker completed.
+
+**Deliverable — near-zero, and it is the thesis's proof (§13.7).** `project.openSettings {section, entry}` means "reach project settings", not "open the modal": its `run` changes from opening a modal to opening a Tab and **not one of the 7 steps changes**. `open.view: "stylebook"` survives verbatim because `"stylebook"` stays in `CANVAS_MODES`. What must be re-captured is the 7 region crops that move from `overlay.dialog:settings` to `pane.primary` — and that frame change is exactly what the docs need to show.
+
+**Newly possible.** Tune a design token and watch the page change. Turn an extension on. Undo a settings mistake. Rebind a key.
+
+**Specs.** `studio.md` §7.1–§7.4 (Stylebook → Project Styles, in place), new **§16 Project Documents (Settings and Styles)**. `studio-ui-guidelines.md` §9.2 (history now covers project documents). `site-architecture.md` §3.1, §3.2. `specs/collab.md` (the `project.json` replication exclusion). Major bump.
+
+**Risk.** **High on item 1** — it is a genuinely risky change to the file that defines the project, and everything else in the phase depends on it. Land it alone, with a round-trip test per writer and a **required** git-diff assertion that a no-op settings edit produces an empty diff: today the two serialisations in play (`null,2` against `"\t"`) are exactly what makes almost any settings edit rewrite the whole file's indentation. Item 4's residual risk is the wire boundary — anything that _did_ change `CANVAS_MODES` would be a `ParentToIframe` union change requiring the studio bundle and `dist/iframe-entry.js` rebuilt in lockstep, which is precisely why the plan keeps `"stylebook"`.
+
+---
+
+### P7 · Content and Shipping
+
+_~6 weeks (5 of build, 1 of rewriting the 1,327 test lines in `browse`)._
+
+**Goal.** Close the CMS gap and the publishing gap, entirely on surfaces that now exist.
+
+**Workstreams (ordered).**
+
+1.  **Library** editor kind over `GridSource`; Manage deleted; Table/Cards/Calendar/Board/Media layouts; virtualization on P3's shared primitive + IntersectionObserver previews + LRU cap; the "No files found" lie fixed on both sides; one creation flow shared with the Files tree; a named upload destination.
+2.  **Saved views** (layout + filter + sort + columns + group-by), named, per collection, extending `grid-layout.ts` persistence.
+3.  **Entry editor** + the shared `reference` control registered once through `registerFormControl`; collection-scoped **New Entry** with schema defaults.
+4.  **Draft workflow**: column, filter, pane-tab pill, "including drafts" perspective.
+5.  **Media**: metadata, usage from the reference index (keyed on the _authored_ ref), safe delete.
+6.  **SEO** as `Search appearance`, a modal behind `document.openSeo` with two doors — the Document
+    Header card and the Page panel: merged-`$head` SERP + social previews, counters, warnings,
+    inherited-value marking. No score. _(Shipped inside the card as a disclosure and moved out: the
+    previews want width, and a card whose job is four fields cannot also be a picture you study.)_
+7.  **Redirects** as a `GridSource` with chain/loop/shadow validation and `_redirects`/CSV import.
+8.  **Publishing**: the `Publish:` family, the Deploy checklist inside the Activity tab, the status-bar deploy item, `Create GitHub Repository` renamed, the token out of the DOM, the GitHub device-flow CORS failure reported and routed.
+
+**Newly possible.** Browse a collection as cards or a calendar; save the view; create an entry from its collection; see which pages use an image before deleting it; see your search result before it is published; deploy from a checklist that tells you what is missing.
+
+**Specs.** `site-architecture.md` §7.1–§7.6, §8.6, §9.4, §11.4 — Pending markers flipped, and the **stale** ones corrected (rename, delete and CSV editing all ship today but are listed Pending, which makes the spec unusable as a gap list). `studio.md` §9.3. Minor bump.
+
+**Risk.** Medium. Largest scope, lowest architectural risk — every item lands on a surface built in P3–P6. Watch item 1's performance work: the current implementation renders a live runtime instance per card with no cap, so the acceptance test is a 300-page project opening the "All" category.
+
+---
+
+### P8 · Panes
+
+_~4 weeks. Deliberately last._
+
+**Goal.** Two _live_ documents on screen, and no editor that hides the page it computes. The pane model itself shipped in P3; this is the fidelity half.
+
+**Workstreams (ordered).**
+
+1.  `canvas-patcher.ts` fan-out: one mutation across N live hosts instead of N re-renders. Verified with `__jxCanvasPerf`. **Gate for everything else in the phase**, and the reason P3's second pane is capped to non-Canvas kinds.
+2.  Lift that cap: a second Canvas pane, `pane.toggleZoom`, `⌘0`/`⌘⌥0` focus, per-pane context bars.
+3.  **Derived pane** with a fixed preset menu: Code of this document · Layout of this page · Component definition of the selection · Diff vs HEAD · **Same page at ⟨breakpoint⟩** · Pin as a normal tab.
+4.  **Jump bar** ⑥ with per-segment dropdowns, merging the two half-breadcrumbs.
+5.  Formula workspace, function editor and Diff out of canvas takeover into the Bottom dock's Logic and Diff tabs or a derived pane, each with a real close.
+6.  Drill-in opens to the side; `pane.compareWith`; "Open layout" from the layout chip starts following the selection, completing P1's first-click story.
+
+**Newly possible.** Watch the JSON while editing visually. Keep a layout visible while editing the page it wraps. Compare two breakpoints side by side. Author a formula with the page still rendering beside it.
+
+**Specs.** `studio.md` new **§17 Panes, Tabs and Navigation**; §3.1, §4.2 in place. `studio-ui-guidelines.md` §3.1. Major bump.
+
+**Risk.** **Performance, entirely.** Every additional Canvas pane is a real `@jxsuite/runtime` render plus an `iframe-channel` connection. Workstream 1 gates the phase; derived panes render at reduced fidelity; the pane cap is two and is enforced. If workstream 1 slips, ship workstreams 4 and 5 (jump bar, takeovers into the Bottom dock) alone — they are independently valuable and need no second live host.
+
+---
+
+### Sequencing rationale, stated plainly
+
+Rails before everything (P0's four seams are what let the later phases move chrome without breaking the docs build), substrate before surface (P2 before P3), state before predicates (P2.1's `view`/`shell` split before the context store), recoverability before non-modality (P6.1 before P6.2), definition sites before selectors (Contexts in P4 before P5.4), and the reference index before the destructive dialogs that depend on it (P4.6 before P4.7). Two phases are deliberately out of dependency order: **P1 runs before the substrate** because six invisible weeks with nothing to show is how architecture programmes die, and **P8 runs last** because it is the only phase whose risk is a performance cliff rather than a correctness bug. If the programme is cut short, the useful stopping points are after **P4** (a coherent, honest, keyboard-driven shell) and after **P6** (that, plus configuration that cannot silently destroy your project).
+
+---
+
+## 13\. The screenshot pipeline
+
+### 13.1 Why this is in the plan
+
+`scripts/screenshots/manifest.json` is 61 shots and 400 actions. 115 of those actions are `wait: {ms}` totalling **73,570 ms** across 43 shots; 43 more are `waitFor: {selector}` over 26 distinct selectors; 36 region captures address the shell through 16 CSS selectors, seven of which (`#tab-strip`, `#chat-panel`, `#frontmatter-panel`, `.settings-modal` ×6, `.settings-editor-panel`, `.browse-view`, `.publish-modal`) name nodes P3–P7 delete outright. 53 steps are `setStatus`, whose only function is to overwrite the status bar with the word "Ready" so the camera does not photograph the last operation. `packages/studio/src/services/automation.ts` still carries 16 `press` shims holding raw XPath into the shell, three of which match **rendered text** (`layerRow`, `namedRow`, `menuItem`) and two of which are hand-maintained mirrors of labels the app renders (`SETTINGS_SECTION_LABELS`, `BROWSE_CATEGORY_LABELS`). One shim is a compatibility branch inside the application — `setRightTab`'s `if (tab === "assistant")` redirect at `automation.ts:461` exists solely to keep a manifest verb working after the chat sidebar moved. That line is the complaint made literal.
+
+The three breakages in the P2 session were one error three times: **the manifest named things the app derives.** `toggleAssistant` named a _delta_ against an unstated default, so flipping that default inverted 18 steps silently. `canvasClick` named a _screen coordinate_, so it now branches on `Math.abs(scale - 1) < 0.001` (`shot.ts:155-198`) to guess whether a fit transform is in play. The Outline shim named _rendered text_, so making the layer label derived (`$title → #id → own text → .class → landmark`) broke a shot by improving the app. Two rules govern everything below, and both are review-enforceable:
+
+> **R1. A shot may name inputs the app accepts. It may never name values the app derives.** Deltas, coordinates and rendered text are all derived.
+>
+> **R2. The pipeline may only ask the app to do sooner what the plan already commits to doing. It may never ask for anything the plan does not already want.** If a shot needs a capability that fails R2, the shot is deleted or replaced by a paragraph of prose — never by a line of code in `src/`.
+
+There is a fourth problem nobody has named, and it reframes the urgency: **`docs:verify` does not verify screenshots.** `check-doc-refs.ts:209-231` asserts only that a referenced image resolves into `docs/images/`, that its basename is a name the manifest _could_ produce, and `existsSync`. No CI job anywhere runs `bun run screenshots` — `test.yml:206` runs `docs:verify` only, and `git diff --exit-code -- docs` fires only against a dirty tree, which CI never has. So today: two shots (`slash-menu-shot`, `repeat-dialog`) have been broken on main for weeks, ~10 images drift 1.1–19.6 % on a same-machine re-run, and CI is green throughout. The gate everyone is bending the app to satisfy is simultaneously too strict for a human to run and too weak to catch staleness. That combination is the disease; the contract below is the cure for half of it and the lane in §13.5 is the cure for the other half.
+
+---
+
+### 13.2 The shot contract
+
+Five verbs replace twenty-six action kinds. `open` declares boot state totally. `steps` carries exactly one of `cmd` / `seed` / `input` per entry. `expect` asserts and **fails the shot**. `capture` names regions, never selectors. `then` replaces `variants`. There is no `wait`, no `waitFor`, no `clip`/`regions` split, and no selector anywhere.
+
+```jsonc
+{
+  "contract": 1,
+  "outDir": "docs/images",
+  "defaults": { "project": "packages/starters/sites/real-estate", "viewport": {…},
+                "deviceScaleFactor": 2, "theme": "dark", "profile": "fresh" },
+  "shots": [{
+    "name": "git-panel",
+    "docs": ["studio/publish"],
+
+    // BOOT. Total, not a delta: every field the app owns resets to `profile` before these apply.
+    // This is what makes a default flip (P3.6's assistant column) a no-op instead of an inversion.
+    "open": {
+      "project": "scripts/screenshots/fixtures/repos/showcase",  // allowlisted; never the live repo
+      "file": "components/re-listings-filter.json",
+      "view": "design",             // canvas mode
+      "fit": "width",               // DECLARED, not an entry side effect — see §13.4
+      "profile": "fresh",           // named app-owned startup profile (P3.7), not localStorage.clear()
+      "clock": "2026-01-15T09:30:00Z",
+      "docks": { "chat": { "collapsed": true } }   // stated, never toggled
+    },
+
+    // DRIVE. `cmd` = registry id + typed args. `seed` = a remote stood in for. `input` = budgeted debt.
+    "steps": [
+      { "cmd": "view.showPanel", "args": { "panel": "git" } },
+      { "seed": "git.status", "args": { "fixture": "dirty-3" } }
+    ],
+
+    // ASSERT. `probe.idle()` runs implicitly after boot, after every step and before every capture.
+    "expect": [
+      { "region": "navigator/panel:git" },
+      { "state": { "shell": { "leftTab": "git" } } }
+    ],
+
+    // CAPTURE. Region ids resolved against the registries at VALIDATE time, browserlessly.
+    "capture": [
+      { "image": "git-panel",  "of": "navigator/panel:git" },
+      { "image": "git-commit", "of": "navigator/panel:git/commit", "padding": 16 }
+    ]
+  }]
+}
+```
+
+**Region grammar.** `<surface>[.<instance>][/<part>]`. Surfaces are `rail · navigator · inspector · pane · dock.bottom · statusbar · commandbar · overlay`; instances are `pane.primary`, `pane.secondary`, `overlay.palette`, `overlay.dialog`, `overlay.menu`, `overlay.toasts`; parts are `navigator/panel:git`, `inspector/tab:style`, `inspector/field:href`, `pane.primary/tabs`. **Ids are derived, not authored**: the panel host stamps `data-jx-region="navigator/panel:${panel.id}"` once and all eight panels get regions from `registerPanel()` for free (so P3's `head`→`page` propagates automatically while a stale manifest id fails Lane 1); `ui/field-row.ts:50` already emits `data-prop=${prop}` so `inspector/field:*` is _shipped today_ and is the existing precedent the manifest already uses; `ui/layers.ts:550` already keys `_namedSlots` as `${layer}:${id}`, so one line in `getLayerSlot` makes every overlay `overlay.<kind>:<id>` and incidentally fixes the latent bug where two popovers both match `sp-popover[open]`.
+
+**Transient surfaces are opened by command, not by clicking.** Every dialog, modal, menu and anchored editor in the manifest is a command or a placement: `menu.open {placement: "context/layer", target: {path}}` is a real registry command — the keyboard cannot reach a context menu at all today, so Shift+F10 wants it regardless. Dialogs accept declared initial values (`showPromptDialog({ initialValue })`), which is why the 26-line one-character-at-a-time typing dance in `convert-to-component` becomes impossible to need, and which renaming a file wants anyway.
+
+#### Before / after: `tab-strip-shot`
+
+**Today — 39 actions, 10 sleeps totalling 7,700 ms, one XPath, 13 consecutive Backspaces, three quick-search round trips.** It types `" Come hungry."` into a real starter file and deletes it character by character purely to make a tab dirty, then opens three more tabs by typing into the quick-search box and pressing Enter, then asserts `.tab-strip-dirty` and crops `#tab-strip` — a node P3.9 deletes.
+
+```jsonc
+{ "do": "setActivity", "value": "layers" }, { "do": "setStatus", "value": "Ready" },
+{ "do": "wait", "ms": 1000 },
+{ "do": "canvasClick", "selector": "xpath/(//p[contains(., 'Come for the coffee')])[1]" },
+{ "do": "wait", "ms": 700 }, { "do": "canvasKey", "key": "End" },
+{ "do": "canvasType", "text": " Come hungry." }, { "do": "wait", "ms": 400 },
+{ "do": "canvasKey", "key": "Backspace" },   // ×13
+{ "do": "canvasKey", "key": "Escape" }, { "do": "wait", "ms": 500 },
+{ "do": "openQuickSearch" }, { "do": "type", "selector": ".quick-search-input", "text": "menu" },
+{ "do": "wait", "ms": 400 }, { "do": "canvasKey", "key": "Enter" }, { "do": "wait", "ms": 1200 },
+// … the same five steps twice more, then a final setStatus
+```
+
+**After — 6 steps, 0 sleeps, 0 selectors, 0 keystrokes.**
+
+```jsonc
+{
+  "name": "tab-strip-shot",
+  "docs": ["studio/interface/tabs"],
+  "open": {
+    "project": "packages/starters/sites/restaurant",
+    "file": "pages/index.md",
+    "view": "edit",
+    "viewport": { "width": 1280, "height": 900 },
+  },
+  "steps": [
+    { "cmd": "view.showPanel", "args": { "panel": "layers" } },
+    {
+      "cmd": "edit.setText",
+      "args": { "path": ["children", 3], "text": "Come for the coffee. Come hungry." },
+    },
+    { "cmd": "file.open", "args": { "path": "pages/menu.md" } },
+    { "cmd": "file.open", "args": { "path": "components/bit-hero.json" } },
+    { "cmd": "file.open", "args": { "path": "pages/about.md" } },
+  ],
+  "expect": [
+    { "state": { "pane.primary": { "activeTabDirty": false, "tabCount": 4 } } },
+    { "state": { "tabs": { "pages/index.md": { "dirty": true } } } },
+  ],
+  "capture": [{ "image": "tab-strip", "of": "pane.primary/tabs", "padding": 3 }],
+}
+```
+
+The dirty flag is **earned, not asserted**: `edit.setText` goes through `tabs/transact.ts` on the production path, so undo, the history ring and the collab delta are all real. A `dirty: true` hydration primitive is deliberately **not** offered — that would be photography. `file.open` is the command quick search already runs. `pane.primary/tabs` survives P3.9 because the region names the _pane's_ strip, not `#tab-strip`.
+
+---
+
+### 13.3 What the app owes
+
+`window.__jxAutomation` exposes four namespaces: `run(id, args)` (a projection of the command registry — no parallel action table), `seed(id, args)`, `probe` (read-only), and nothing else.
+
+| Capability                                                                                                                                                                                                  | Why the app wants it anyway                                                                                                                                                                                                                                                                                                                                                                           | Cost                       |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| `run()` becomes `registry.run()` behind an `isScriptable` projection; the 39-entry `AUTOMATION_COMMANDS` table is deleted                                                                                   | Plan §2 principle 1 and spec §13 already declare `__jxAutomation` a rendering of the registry. A hand-maintained parallel action list is _defined as a defect_ by the app's own rules.                                                                                                                                                                                                                | Moderate (P2)              |
+| The 16 remaining `press` shims become registry commands (`selection.convertToComponent`, `insert.data`, `inspector.setSection`, `state.select`, `style.setSelector`, `library.setCategory`, `menu.open`, …) | Every one is a thing a user does, so every one belongs in the palette, on a chord and in the `aiTool` surface. Each is already scheduled by a named phase (P2 / P3.5 / P5 / P6.2 / P7.1 / P7.5). **This is not an ask — it is a countdown of registry gaps.**                                                                                                                                         | Moderate, already budgeted |
+| Idempotent `set*` naming; `run()` refuses `/\.toggle[A-Z]/` at runtime and Lane 1 refuses it statically                                                                                                     | The AI tool surface has the identical bug: an agent calling `view.toggleAssistant` is guessing at state it cannot observe. Idempotence is a correctness property of the registry, not a camera convenience.                                                                                                                                                                                           | Trivial + a naming rule    |
+| `args` JSON Schema on every scriptable command                                                                                                                                                              | Spec §13.1 already requires it for the palette's argument prompt and the AI tool's parameters.                                                                                                                                                                                                                                                                                                        | Free (already specified)   |
+| **Region registry** — `regions.resolve(id)`, derived from `registerPanel()`, the dock ids and `Placement`, stamped by one lit directive                                                                     | `shell.ts:38` already declares `FocusRegion = "rail" \| "navigator" \| "pane" \| "inspector" \| "dock" \| "status"` — an enum with **no DOM counterpart**. P3.8 ships F6 region cycling, which needs exactly this map; P4.1 toasts and P4.2 Problems need to move focus to a region; `PLACEMENTS` already contains `statusbar/project                                                                 | document                   | selection`. The camera is the third consumer. | Moderate |
+| `probe.idle()` — quiescence over in-flight PAL calls, queued lit renders, panel-scheduler deferrals, open Activity entries, canvas host generations, fonts, two quiet frames                                | P4.2 _is_ the in-flight-operation tracker (Bottom dock Activity with Cancel); P4.4 makes `panel-scheduler.ts:37-39`'s silent deferral user-visible; `waitForCanvasReady` already reads `session.canvas.status`. `idle()` is a read-only projection of P4's own feature, and the `packages/studio:verify` skill and the harness both currently guess with sleeps.                                      | Moderate                   |
+| `probe.state()` returns the full `CommandContext` instead of `automation.ts:438`'s four ad-hoc fields                                                                                                       | The record already exists in `commands/context.ts`; the AI surface and the verify skill both want it. This deletes a bespoke shape.                                                                                                                                                                                                                                                                   | Trivial                    |
+| `probe.pointAt(target)` / `revealPath(path)` — the app composes its own transforms and returns a top-document point                                                                                         | The canvas already computes these rects for the selection overlay and the block action bar; P4.6 `findReferences` jump-to-node, P8.4's jump bar and collab follow-peer all need path→point. Deletes `shot.ts:155-198` entirely.                                                                                                                                                                       | Trivial                    |
+| `data-jx-path` on Outline rows                                                                                                                                                                              | P5.5 multi-select shift-range, drag-reorder, canvas↔Outline sync and collab presence overlays keyed on `structuralSelection` all need node identity in the DOM. Deletes `layerRow()`, `namedRow()`, `menuItem()` and both label mirrors.                                                                                                                                                              | Trivial                    |
+| Named startup profiles (`?profile=fresh`)                                                                                                                                                                   | P3.7 ships per-project layout + session persistence, which needs a defined cold start and a way to test it; Preferences wants "Reset layout"; support wants "reproduce with a clean profile". Today the runner reaches _around_ the app with `evaluateOnNewDocument(localStorage.clear())`.                                                                                                           | Trivial                    |
+| `ui.fit: "width" \| "page" \| "none" \| number` as declared per-tab state                                                                                                                                   | An implicit fit-on-entry is why Puppeteer started clicking the wrong node. Fit is a per-tab preference users expect to persist and today silently resets; the zoom control should be able to read it.                                                                                                                                                                                                 | Trivial                    |
+| `services/clock.ts` — one `now()` seam behind `git-panel.ts:770`, `welcome-screen.ts:131`, `ai-chat/sessions-view.ts:28`, `recent-projects.ts`                                                              | Standard testability seam; those four formatters are untestable without it and session restore needs an honest "last opened". Four import edits, **not** a blanket `Date.now` override (which breaks Monaco and every timeout).                                                                                                                                                                       | Trivial                    |
+| Seed registry under the **Remote Rule**: _a seed may only write state whose real writer is a network or IPC boundary — it stands in for a remote, never for a user_                                         | `packages/studio/tests` already mocks these boundaries at module level to exercise the assistant, collab and publish UIs; a declared registry gives both consumers one fixture format. Admits `seed.assistant/collab/publish/git/projectList`. Refuses `setStatus`, `setActivity`, `setRightTab`, `setZoom`, `select`, `openSettings` — a user does all of those, so a **command** does all of those. | Moderate                   |
+| `check-bundle-budget.ts` asserts `services/automation.ts` is absent from the desktop and cloud bundles                                                                                                      | A scripting surface that ships is an attack surface.                                                                                                                                                                                                                                                                                                                                                  | Trivial                    |
+
+**What the app is explicitly NOT required to provide.** These are normative refusals, and each names something that exists today:
+
+1. **No method that accepts a selector.** `click`, `hover`, `type(selector)`, `dispatchDragOver(selector)`, `canvasClick(selector)` leave `AutomationApi` and the manifest schema. If a shot cannot say it in command ids, region ids and `JxPath`s, it cannot say it.
+2. **No presentation state a user cannot write.** `setStatus` is deleted — all 53 steps. Staging "Ready" is lying to the camera; if a shot needs a calm status bar, the app must _be_ calm.
+3. **No non-idempotent action**, and no compatibility shim like `setRightTab`'s assistant redirect.
+4. **No write that bypasses the transaction log.** The `updateUi(...)` pokes inside the hook are removed; automation mutates documents by running the commands a user runs.
+5. **No photogenic state primitives.** No `dirty: true`, no `select` that sets a rendered label, no "pretend this deployed".
+6. **No behaviour that differs under `?automation=1`** beyond installing the hook, pinning the clock and selecting a profile. Today's runner-injected `FREEZE_CSS` becomes the app honouring `prefers-reduced-motion` properly, so the photograph shows what a reduced-motion user actually sees.
+
+**The rule that keeps that list empty is R2.** Every ask above passes it: the registry projection is principle 1; regions are F6 and focus restoration; `idle()` is P4.2; `data-jx-path` is P5.5; `pointAt` is the selection overlay's own arithmetic; the profile is P3.7. Three items honestly fail R2 and are therefore **capped, counted and ratcheted rather than argued about**:
+
+| Tax                                                                                                                                                                                                                                                      | Cap                                                                                                                                                                                                                                                                                         |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Fixture repos** — `scripts/screenshots/fixtures/repos/showcase`, a git repo with pinned `GIT_AUTHOR_DATE`/`GIT_COMMITTER_DATE` and a fixed dirty set. No product wants a synthetic repo.                                                               | Lives entirely in `scripts/screenshots/`, zero app code. Ten fixture projects already exist there.                                                                                                                                                                                          |
+| **Hand-stamped leaf regions** — `navigator/panel:git/commit`, `inspector/target`, `navigator/statements`. Roughly 6 of today's 16 selectors fall out of `registerPanel()` and `getLayerSlot()` for free; ~10 are authored to be photographed.            | `check-shot-budget.ts` commits the count of _non-derived_ region ids and fails when it increases. Same idiom as `check-chrome-budget.ts`.                                                                                                                                                   |
+| **`input` steps** — `hover`, `type`, `dragOver`, caret placement. State cannot express a gesture in flight, and faking one would be a worse lie than a two-line hatch.                                                                                   | Manifest-wide count in `check-shot-budget.ts`, monotonically non-increasing. Lands at **≤6** (slash menu, inline editing, media-upload's `dragOver`, one field-typing shot); target 3. Note `click` and `hover` are already **zero** in the manifest today.                                 |
+| **`unstable` allowlist** — a step or capture may carry `{ reason, until: "<phase>" }` to address a surface that is not yet registry-driven. Admits a hand-stamped region id, **never a selector**, so "no CSS in the manifest" is absolute from day one. | Committed count, hard ratchet down. Honest framing: it does not have to reach zero on a date — it has to never grow, and CI fails when an entry's `until` names a phase that has shipped. Editing `until` forward requires the same written justification as lowering a coverage threshold. |
+
+---
+
+### 13.4 Determinism
+
+**"Settled" is one predicate, `probe.idle()`, in `packages/studio/src/services/idle.ts`.** It resolves when all six hold for two consecutive animation frames, and **rejects on timeout with `blockedBy`** — `["canvas[pane.primary]: gen 7 unacked", "platform: 1 in-flight (/__studio/git/status)"]`. That rejection message is the point: 115 sleeps are 115 places that _cannot fail_, so today a slow subsystem is answered with `+500 ms` and a wrong capture is accepted. Tomorrow it names itself.
+
+1. No queued lit render — an in-flight counter around `store.ts`'s `render()`/`renderOnly()`.
+2. No pending panel-scheduler frame — `panel-scheduler.ts` already tracks this per instance; add a module-level `Set` that `createPanelScheduler` joins and `unbind` leaves, plus `schedulersQuiet()`. ~10 lines.
+3. No unacked canvas generation, **per host** — `iframe-host.ts` already tracks `gen`/`pendingTabIds` and adopts on `renderComplete`/`renderError`. Written per-host from day one because P8 adds a second, and `shot.ts:118`'s `canvasFrame()` ("Studio's only child frame") is a coin flip the moment it does.
+4. Zero in-flight platform I/O — one counting proxy around the constructed `StudioPlatform`, covering all 30+ `git*`/fs/fetch methods in `platforms/devserver.ts` in one place, and covering desktop and cloud for free. This is what the git-panel shot's 1,500 ms sleep and the stylebook shot's 5,000 ms sleep are actually waiting for.
+5. No running Web Animations — `document.getAnimations().some(a => a.playState === "running")`, in every frame.
+6. Fonts loaded and images decoded, **in every frame**, re-checked after steps rather than once at baseline.
+
+The canvas answers cross-realm without the runner polling: `iframe-entry.ts` posts one new `{kind: "idle", gen, fonts, animations, images}` member on the `CanvasMessage` union at its own rAF-quiet, and `iframe-host.ts` folds it in.
+
+**A measurement worth having before any of this is scheduled.** Two back-to-back full captures of the same four shots, same tree, same machine, compared byte-wise:
+
+| Shot          | mode        | Result                                                                                                                                                                                                                                                          |
+| ------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mode-edit`   | edit        | **byte-identical**                                                                                                                                                                                                                                              |
+| `stylebook`   | stylebook   | **byte-identical**                                                                                                                                                                                                                                              |
+| `state-panel` | design      | differs, but RMSE **0.0011** — anti-aliasing, an order of magnitude under `DIFF_THRESHOLD`, and it would never rewrite the committed PNG                                                                                                                        |
+| `hero`        | **preview** | differs, RMSE **0.150** — and rolling the image ±1–4 px only makes it worse, so it is not a layout shift. The canvas is rendered at a **different size**: one run sized-to-content (the whole page crammed in, more sections visible), the other viewport-sized |
+
+Two conclusions the drift table above does not support on its own. First, **capture is already deterministic for most shots** — "~10 images drift" conflates sub-threshold anti-aliasing with genuine state differences, and the remediation should be sized against the latter. Second, whatever causes `hero`'s 15 % is a _content_ difference, not a shift, so it is worth isolating before anything is built on top of it.
+
+> **Resolved in S0 — and the first guess in this section was wrong, which is worth recording.** The visible difference read as a zoom change, so this paragraph originally blamed P1's Preview stage racing the `contentHeight` message. It is not that. Capturing `hero` **12× in one process** reproduces it exactly (2 distinct images, RMSE 0.150214 — the same number to five digits), and the outlier is always the **first** capture. The cause is that the starter site loads **Google Fonts over the network inside the canvas iframe**: on a cold HTTP cache the frame measures `scroll=5406` with `Plus Jakarta Sans` still `loading`, and every later page measures `5326` — 80 px of fallback-metric content height, different wrapping, 0.150. Preview geometry was byte-identical in both (`height:100%`, box 1352×1104).
+>
+> `document.fonts.ready` does not catch it: **in the canvas frame it resolves `"loaded"` against an empty font set while the frame is still blank.** The honest predicate is "the page has stopped fetching", which is why §13.4's quiescence counts network in-flight per frame rather than asking the document whether it feels ready. Post-S0: `hero` ×12, twice, **12/12 byte-identical**.
+>
+> The P1 Preview race turned out to be real anyway and was fixed alongside — `state.preview` was assigned _after_ `await resolveCanvasDocument()` while the `contentHeight` handler branched on it, and `iframe-entry.ts` dedupes an unchanged measurement, so nothing ever arrived to correct a wrong answer. Sizing is now derived from `(preview, contentHeight, contentFragment)` rather than applied incrementally. Six tests cover it, all of which fail against the pre-S0 logic. It simply was not the thing the camera photographed.
+
+**Named offenders, verified on this branch:**
+
+| Offender                                                                                                                                                                                                                                                                                                                                                                                                                             | Evidence                                                                                                | Fix                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| ✅ **Remote webfonts inside the canvas iframe.** The starter sites fetch Google Fonts; the first capture in a process measures fallback metrics. `document.fonts.ready` is useless here — in a blank canvas frame it resolves against an empty font set.                                                                                                                                                                             | `hero`, RMSE 0.150214, always the first capture; 12× in one process → exactly 2 distinct images         | **Fixed in S0.** Quiescence counts network in-flight per frame and rejects naming what is outstanding. `hero` ×12 is now byte-identical, twice. §13.5's lane container should still pin the font set.                                                                                                        |
+| ✅ **Preview raced its own sizing.** `state.preview` was assigned after `await resolveCanvasDocument()` while the `contentHeight` handler branched on it, and `iframe-entry.ts` dedupes an unchanged measurement — so no second message ever corrected a wrong answer.                                                                                                                                                               | 6 tests, all failing against the pre-S0 logic                                                           | **Fixed in S0.** Sizing derives from `(preview, contentHeight, contentFragment)`; `setHostPreview()` moves flag, overlay and box as one transition. A real user switching to Preview could lose this race — it just was not what the camera caught.                                                          |
+| ✅ **The freeze photographed the wrong iframe.** `shot.ts:510-512` freezes every frame, then `:517` calls `setCanvasMode` → `deps.render()`, which `automation.ts:483` documents as rebuilding the iframe DOM. **58 of 61 shots carry a `canvasMode`** (design 31, preview 15, edit 11, stylebook 1), so in those shots the canvas actually captured was created _after_ the freeze and is unfrozen — live transitions, live carets. | structural; note the two byte-identical shots above show it is not sufficient on its own to cause drift | Move the freeze to `page.evaluateOnNewDocument` + a `frameattached` handler, and better: serve it from the app under `?automation=1` so frozen-ness is a property of the page, not of the runner's timing. **Fixed in S0** via `evaluateOnNewDocument` + `frameattached`, armed before the first navigation. |
+| **The git-panel shot reads the live working tree.** Its project is the default `packages/starters/sites/real-estate`, which is inside this repo — so `git status` reports the whole monorepo's uncommitted state.                                                                                                                                                                                                                    | the shot photographs whatever the author had dirty                                                      | `fixture.repos/showcase` behind `seed.git`, with pinned author/committer/dates.                                                                                                                                                                                                                              |
+| **Relative timestamps move.** `git-panel.ts:770-778`, `welcome-screen.ts:131-145`, `ai-chat/sessions-view.ts:28`, `recent-projects.ts`.                                                                                                                                                                                                                                                                                              | "2 minutes ago" → "3 minutes ago"                                                                       | `services/clock.ts` + `open.clock`; `TZ=UTC`, `LANG=C.UTF-8`, `--lang=en-US`.                                                                                                                                                                                                                                |
+| **The dev server is reused.** `lib/server.ts:27-31` adopts whatever answers on :3000, inheriting whatever `packages/studio/dist` that server was started with.                                                                                                                                                                                                                                                                       | a capture can photograph a stale bundle                                                                 | Always spawn fresh; `--reuse-server` becomes the interactive opt-in. Assert `dist/studio.js` is newer than the newest `src/**` mtime, or build.                                                                                                                                                              |
+| **Region measurement mutates the next region.** `resolveRegionClip` (`shot.ts:432`) calls `scrollIntoView`, compensated only by a 1-frame settle.                                                                                                                                                                                                                                                                                    | shots with 2+ regions (16 of them)                                                                      | Save/restore scroll around each measurement.                                                                                                                                                                                                                                                                 |
+| **Nothing controls hover or focus,** yet `:hover` and `:focus-visible` visibly change dense panels — P0's focus-ring sweep names this as the phase's one live visual risk.                                                                                                                                                                                                                                                           | untracked                                                                                               | `page.mouse.move(-1,-1)` + blur `activeElement` before every capture; a shot that wants either declares `"hover": "<region>"` / `"focus": "<region>"`.                                                                                                                                                       |
+| **Fonts resolve off the host.** The three vendored JetBrains Mono faces use `font-display: swap`, and the Spectrum UI stack resolves differently on NixOS and Ubuntu.                                                                                                                                                                                                                                                                | cross-machine churn                                                                                     | Pinned Chromium **and fontconfig set** in the lane container (§13.5); `--font-render-hinting=none --disable-lcd-text`; one fresh `BrowserContext` per shot.                                                                                                                                                  |
+| **`fixture.overlay`.** `slash-menu-shot` presses Enter into `packages/starters/sites/restaurant/pages/index.md` — a committed file — then runs a `variants.cleanup` pass to undo the damage. It is one crash away from corrupting a starter, and it is one of the two shots red on main.                                                                                                                                             | 1 shot, 1 concept                                                                                       | Copy-on-write file layering in the dev server. Deletes `ShotVariant`'s cleanup role and the whole class of self-undoing shots.                                                                                                                                                                               |
+
+**Reject loudly, never clamp.** `automation.ts:71-74` already worries in a comment that "a silently-skipped step would capture the wrong state and the docs build would accept it." Make it a tested property: `run()` throws `CommandUnavailableError` when `enablement` refuses and the runner **fails the shot**; `open` rejects a `view` not in the tab's capabilities, a `selection` path absent from the document, a `leftTab` not in the panel registry. A shot that asks for a state the app refuses should fail, because that shot is lying.
+
+`DIFF_THRESHOLD = 0.01` on a 32×32 mean-abs-diff (`shot.ts:18`, `330-361`) stays for _review presentation_ and stops being load-bearing for identity. A 9.91 % reading on a 120× box filter is not anti-aliasing — it is ~25/255 average difference across the whole thumbnail, i.e. a different application state. Once the table above is done, identity is `sha256` and the perceptual number only _sorts_ the review list.
+
+---
+
+### 13.5 The gate
+
+Two lanes, deliberately separate, because "the pipeline broke" and "the documentation is now wrong" are different events with different owners.
+
+**Lane 1 — `scripts/check-shot-contract.ts` · every PR · no browser · seconds.** Sits beside `check-command-levels.ts` (`test.yml:191`) and `check-chrome-budget.ts` (`:194`) in the existing `checks` job, using the same `defaultCommandSet()` import — `commands/registry.ts` takes its context by injection precisely so CI can import the command set in a bare Bun process. It fails when: a `cmd` id is unknown or refused by the projection; `args` fail the command's own `args` JSON Schema; a region id is not declared by the panel/dock/region registries; a `seed` id is unknown; a `toggle*` id appears anywhere; `manifest.contract` mismatches; the `input` count, the non-derived-region count or the `unstable` count increased. **The PR that renames `head`→`page` goes red with `manifest shot "properties-bar" names panel "head"; the registry declares "page"` — in the PR that caused it, in seconds.** That is the single highest-ratio change in this section and it needs no new app capability to start: 58 `run` steps over 20 command ids are checkable today.
+
+**Lane 2 — `.github/workflows/screenshots.yml` · required on any PR touching `packages/studio/src/**`, `scripts/screenshots/**`, `packages/starters/**` · plus nightly on main.** Lane 1 is semantically blind: a command that still exists and now means something different sails through green. Nightly-only means the wrong picture already shipped; a label means opt-in; both make staleness nobody's job — which is exactly how two shots stayed red on main under green CI. So it is required, and its **failure mode is a bot commit, not a red X**:
+
+- Pinned container (Chromium + fontconfig) → build studio → materialise fixtures → capture all shots → diff against the lock.
+- Push the changed PNGs **and** the updated `capture.lock.json` to the PR branch.
+- Post/update **one** comment: a table of shot · changed-pixel % · before/after thumbnails · **the docs pages that reference each changed image** (the `docs:` field already carries that link).
+- Status is `neutral` on a visual change — always. It goes **red only on a shot error**: a failed `expect`, an unknown command id, an unresolvable region, an `idle()` timeout. Those are regressions. A picture merely changing is an aesthetic judgement CI cannot make, and pretending otherwise is how we got here.
+- Fork PRs: no credentials, no push. Read-only run, diff attached as an artifact, maintainer lands the lock via `workflow_dispatch`. (This needs `contents: write` on the workflow — a permissions conversation with whoever owns org settings; put it on the P0 checklist, not on someone's surprise.)
+
+**`scripts/screenshots/capture.lock.json` — committed, ~50 KB, next to the still-committed PNGs.** Per image: `sha256`, `w`/`h`/`bytes`, the shot's canonicalised-definition hash, `capturedAt`, `capturedBy`, and the runtime triple (Chromium major · fontset id · OS). **Bytes stay in git.** Docs pages use page-relative `![](<./images/foo.png>)` refs specifically so `/docs` reads correctly in a markdown editor; content-addressed external storage would mean a fresh clone renders every docs page broken until someone runs a network fetch, and a docs author on a plane could not see their own page. Repo weight (25 MB / 65 files in a 120 MB `.git`; `mode-edit.png` alone is 2.4 MB at DSF 2 × 1920) is a real second-order problem, addressed by **capture discipline** — docs render these at ~800 px, so full-shell shots drop to DSF 1.5 and region crops to DSF 1, which roughly halves the bytes without a new dependency. The lock makes eviction a mechanical move later if it ever bites.
+
+**What replaces the guarantee the blocking gate gave:**
+
+| Guarantee                                                | Today                                             | After                                                                                                                                                                                                                                                  |
+| -------------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Every referenced image exists and is manifest-producible | `docs:check`, blocking, `existsSync` + name match | **Unchanged, still blocking** — checks the lock, so it works on any checkout                                                                                                                                                                           |
+| Screenshots are never hand-taken                         | prose in CLAUDE.md + honour system                | **Mechanised.** A PNG whose `sha256` has no lock entry fails `docs:check`. The lock is written only by `bun run screenshots`, which stamps `capturedBy`.                                                                                               |
+| Images are current                                       | **not given** — no CI job runs the pipeline       | **New, blocking (`docs:images:check`).** Recompute each shot's definition hash from the working tree; fail when a shot's definition changed without a re-capture. Satisfied by the lane's own push, so the loop closes without a human touching a PNG. |
+| The pictures depict real software                        | incidental                                        | Lane 2's `expect` assertions, required on studio PRs. Weaker than it sounds — see the risk in §13.6.                                                                                                                                                   |
+
+**Quarantine, so rot is visible.** A shot may carry `"status": {"state": "quarantined", "reason": "…", "since": "<sha>"}`. `docs:check` reports it and **fails if any docs page references a quarantined shot's image**. `slash-menu-shot` and `repeat-dialog` need this today — but they are fixed in the migration, not quarantined, because their whole failure mode (xpath + sleeps) is what the contract deletes.
+
+**Deleting a shot is a first-class fix.** P3 generates `docs/studio/interface/shortcuts.md` and `commands.md`; P6.5 generates the Preferences Keyboard sheet. _A screenshot of content the docs pipeline already generates is a bug._ Every phase asks which shots it can delete before asking which it must re-author. 61 is not a target.
+
+**CLAUDE.md policy edit** — replace the "screenshots come only from `scripts/screenshots` (never hand-taken)" clause with:
+
+> Screenshots are never hand-taken and never hand-committed. `docs/images/` and `scripts/screenshots/capture.lock.json` are written only by `bun run screenshots`, which stamps each image's origin; an image whose hash is absent from the lock fails `docs:check`. A docs page may only reference an image the lock names. When a change alters a shot's declared inputs, the `screenshots` CI lane re-captures, pushes the images and the lock to your branch, and comments with a before/after table and **the docs pages each changed image appears on — re-read those pages before merging.** You review pictures and prose; the lane produces bytes. The shot contract (`scripts/screenshots/README.md`) forbids CSS selectors, sleeps and `toggle*` command ids in the manifest; `scripts/check-shot-contract.ts` enforces it on every PR.
+
+**Where the contract is written down.** `scripts/screenshots/README.md` plus Lane 1's error strings — **not** a new spec section, not yet. Under CLAUDE.md every substantive spec edit is a `spec:bump` release, so specifying the region grammar now adds a release to every registry rename that touches it, and the predictable failure is bumping `CONTRACT_VERSION` instead of fixing four manifest lines. Amend `specs/studio.md` §13 **in place**, once, in the P0 PR: the projection rule (`__jxAutomation.run` is `registry.run`), the idempotence rule, and the Remote Rule. The full §18 graduates after P5, when the region grammar has survived two demolitions. A `contract` bump is for surface _shape_, never for content drift.
+
+**`docs:sync` learns about shots.** Shots already carry `docs:`; `scripts/docs/check-doc-sync.ts` already maps a working diff to affected pages via `code:` frontmatter and `@docs` tags. Join them so the Stop hook says "this change affects `docs/studio/design/components.md` and shot `convert-to-component`." Both halves are built; the join is cheap and it partially closes the residual Lane 1 cannot see.
+
+---
+
+### 13.6 Migration
+
+**S0 — this week, no architecture attached, land alone.** Freeze via `evaluateOnNewDocument` + `frameattached`; kill dev-server reuse and assert bundle freshness; scroll save/restore around region measurement; hover/focus reset before capture; one fresh `BrowserContext` per shot; `TZ`/`LANG`/font flags. Then re-run and re-measure the drift table — S0 alone plausibly retires most of the ~10 drifting images, and everything after is sized against the _remaining_ drift, not the current noise.
+
+**S1 — `scripts/check-shot-contract.ts` into the `checks` job.** ~200 lines, no browser, no app change. Covers 58 `run` steps and 20 command ids on day one; grows to cover regions when `registerPanel()` lands and seeds when the seed registry does. This is the cheapest thing in the section and it is what makes every later rename a red X instead of archaeology.
+
+**S2 — P0 workstream 2b, BEFORE P3. One PR, one full re-baseline.** This is the point of the whole section: P3's stated deliverable is "re-author the manifest shots broken by the key renames and by the deletion of `#tab-bar`, `#chat-panel` and `minimalToolbarTemplate`," and P4's is "the status-bar rewrite kills 53 `setStatus` steps; re-author those shots." Both evaporate if S2 lands first. If S2 slips into P3, that phase carries the conversion _and_ the demolition simultaneously — and P3 is already deleting a grid column, a tab bar, a toolbar template and three storage keys. **Sequence it as P0 2b or do not start it.**
+
+Contents of S2: `probe.idle()`, `probe.state()`, `probe.pointAt()`, the region registry (`data-jx-region` + the one-line `getLayerSlot` stamp), the seed registry, `services/clock.ts`, `open.profile`, `ui.fit`, `fixture.overlay`, the `showcase` fixture repo, `capture.lock.json`, `check-shot-budget.ts`, `docs:images:check`, `.github/workflows/screenshots.yml` — and the manifest conversion.
+
+**The 61 shots, honestly:**
+
+|                            | Count   | What happens                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| -------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Convert mechanically**   | **50**  | No raw-input steps. A codemod: `setActivity` → `cmd: view.showPanel`, `setRightTab` → `cmd: view.showInspectorTab`, `select` → `cmd: selection.set`, `setZoom` → `cmd: canvas.setZoom`, `canvasMode` → `open.view`, `openSettings`/`openBrowse`/`openQuickSearch`/`openNewProject`/`showWelcome`/`openDataGrid`/`editDef` → existing ids, `seed*` → `seed:`, `regions[]` → `capture[]` against the region table, **all 115 `wait` deleted, all 43 `waitFor` → `expect`, all 53 `setStatus` deleted.**                                                                                                                                                                                                                                                                          |
+| **Hand-authored**          | **11**  | The shots carrying `canvasClick`/`canvasKey`/`canvasType`/`type`/`dispatchDragOver`: `quick-access`, `block-action-bar-shot`, `slash-menu-shot`, `inline-editing-shot`, `formula-palette-shot`, `convert-to-component`, `repeat-dialog`, `tab-strip-shot`, `counter-test-prop`, `blog-insert-data`, `media-upload`. Of these, **7 reach zero `input` steps** once their press-shims become commands (`element.repeat`, `element.insertData`, `element.convertToComponent`, `formula.browseCatalog`, `menu.open`) and dialogs accept `initialValue`. **4 keep exactly one `input`**: `slash-menu-shot` (`type "/"` at a placed caret), `inline-editing-shot` (caret), `media-upload` (`dragOver`), `counter-test-prop` (a field keystroke). That is the budget's landing value. |
+| **Delete**                 | **4–6** | Shots of content the docs pipeline generates, and region crops that duplicate a full-shell shot they sit inside. Identify them during S2, not after.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| **Fixed, not quarantined** | **2**   | `slash-menu-shot` and `repeat-dialog`, red on main today, are pure `wait: {ms}` + XPath chains — precisely the pattern S2 deletes.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| **Re-baseline**            | **all** | Fixtures change (frozen clock, fixture git, declared fit). One reviewable commit with `--force`, the drift table in the PR body, and a pre-flight audit of the pages whose prose depends on a staged status message before the 53 `setStatus` steps go.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+
+**S3 — trails into P2.** `run()` becomes `registry.run()`; `AUTOMATION_COMMANDS` and the INTERIM banner delete; the 16 `press` shims convert in the workstream that creates each command. **No manifest change** — that is the test of whether S2 got the addressing right.
+
+**S4 — standing.** Every phase that renames a command id, a panel id or a region id fixes the manifest **in the same PR**, because Lane 1 is red until it does. Every phase that adds an async subsystem registers it with `probe.idle()` — this goes on the per-phase checklist next to the coverage ratchet, because the reflex when a shot times out will be to re-add a sleep, and that is how this decays back to 73 seconds.
+
+---
+
+### 13.7 How each later phase is affected
+
+| Phase                               | Automatic                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Legitimately re-authored — the documentation is now wrong                                                                                                                                                                                                                                                                                                                                                                     |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **P3 · The Shell Derived**          | Deleting `#tab-bar`, `#chat-panel`, `minimalToolbarTemplate` touches **nothing** — no manifest text names a DOM node. Panel renames fail Lane 1 in the renaming PR naming both ids: exactly **4 steps** (`blocks` ×2, `imports` ×1, `head` ×1) out of 46 `setActivity`, one find-replace. Region ids gain the pane axis with `pane` aliasing `pane.primary`, so P3.9's per-pane strips invalidate no id. ⌘1–8 and F6 share the region registry. Command Bar / Palette / pill / Preferences / named layouts are new regions from birth. **P3's screenshot deliverable is deleted from the plan.**                                                                                                    | `ai-sidebar-chat`'s `#chat-panel` crop (the assistant genuinely moved into the Inspector dock — the _command_ survives, the picture must change); `tab-strip-shot`'s crop (labels are now route-aware and disambiguated); `properties-bar`'s `#frontmatter-panel` (replaced by the Document Header card). **≈1 shot deleted** in favour of generated `shortcuts.md`/`commands.md`.                                            |
+| **P4 · Feedback and Truth**         | **All 53 `setStatus` steps died in S2, three phases early** — the Remote Rule forbids them from day one, so P4's largest listed screenshot deliverable is discharged before the phase opens. The status bar's three fields map to `statusbar/project                                                                                                                                                                                                                                                                                                                                                                                                                                                | document                                                                                                                                                                                                                                                                                                                                                                                                                      | selection`, already in `PLACEMENTS`. Toasts, Bottom dock, Problems, Activity and destructive dialogs are new regions → additive new shots. P4.9's Contexts section is later re-hosted in P6.3; because the shot names `project.openSettings {section: "contexts"}` rather than a modal, the plan's own claim ("a re-host, not a rebuild") becomes machine-checkable. | Any tight status-bar crop (cosmetic). **One named exception to §13.3 clause 6**: toasts are timed, so `probe.idle()` counts a toast mid-transition as not-idle, and an automation-gated infinite toast lifetime is a listed, justified exception — one branch in the toast host. Resolve it here, not by discovering the contradiction in P4. |
+| **P5 · The Edit Target**            | The canonical _correct_ failure: all **15 `setRightTab`** values (properties ×6, style ×3, events ×3, assistant ×3) fail Lane 1 statically when `view.showInspectorTab`'s `args` enum stops admitting them — in the PR that re-splits the tabs. Widening `selection` to `JxPath[]` fails Lane 1 on all 15 `selection.set` steps: a schema change, so a codemod. `inspector/field:href` survives by construction — `renderFieldRow` survives and P5.6 moves _more_ rows onto it. `automation.ts:461`'s assistant special-case deletes: Assistant becomes a real inspector tab record. Four press shims die here.                                                                                     | Every inspector crop, and **every paragraph naming the old tabs**. This is the phase where the prose risk is largest and the tooling is weakest — the lane's comment listing affected pages is the only mechanism, and it is process, not proof.                                                                                                                                                                              |
+| **P6 · Configuration as Documents** | **The thesis in one example.** `project.openSettings {section, entry}` is not "open the modal", it is "reach project settings": its `run` changes from opening a modal to opening a Tab and **not one step changes** — all 7 `openSettings` and 8 `settings.*` steps survive the modal's deletion. `open.view: "stylebook"` survives verbatim because P6.4 keeps `"stylebook"` in `CANVAS_MODES`. Automation edits `project.json` through the same commands a user runs, so the shots exercise the real transaction log. `settings.setSection` / `settings.selectEntry` press shims become commands. **P6's screenshot deliverable becomes two region-table entries.**                              | 7 region captures across 6 shots (`.settings-modal` ×6 in `settings-modal`, `css-variables-shot`, `blog-content-type`, `blog-schema-fields`, `content-type-builder-shot`; `.settings-editor-panel` in `data-tables-shot`, `connections-section`) move from `overlay.dialog:settings` to `pane.primary`. The frame change is precisely what the docs must show. **≈1 shot deleted** in favour of the generated Keyboard sheet. |
+| **P7 · Content and Shipping**       | `project.browse` → `library.open` is a rename: Lane 1 fails on 3 steps. Saved views, entry editor, drafts, media usage, SEO and redirects all land on regions built in P3–P6 → additive. The last 4 press shims convert; the `unstable` count reaches its floor.                                                                                                                                                                                                                                                                                                                                                                                                                                    | `mode-manage`'s `.browse-modal` and `media-upload`'s `.browse-view` (Manage → Library editor kind, `pane.primary`); `publish-panel`'s `.publish-modal` → `dock.bottom/activity`. `media-upload`'s single `dragOver` hatch follows `pane.primary/library/dropZone` if P7.1's named upload destination moves it — one shot, one attribute, and the checker names it.                                                            |
+| **P8 · Panes**                      | This is the phase that breaks the **runner** today and does not under the contract: `shot.ts:118` takes "Studio's only child frame", which a second live host makes a coin flip. `probe.idle()` aggregates every canvas host's generation state (condition 3 is written per-host from S2 for exactly this), and `pointAt` / `regions.resolve("pane.secondary")` are answered by the app, which knows which iframe belongs to which pane. `pane.secondary` ids were minted in P3 and simply start resolving. Formula workspace / function editor / Diff moving out of canvas takeover is the **same pattern as P6**: `formula.openWorkspace` and `formula.editDef` survive; only their host changes. | `formula-palette-shot`'s and `formula-workspace`'s region crops and the Monaco wait; any breadcrumb crop, because P8.4's jump bar merges the two half-breadcrumbs — and the prose about breadcrumbs is wrong too. New shots for the derived pane, `pane.toggleZoom` and side-by-side breakpoints.                                                                                                                             |
+
+**Net across P3–P8: ~20 region captures and ~20 command steps legitimately re-author** — every one because a surface genuinely changed and the documentation is genuinely now wrong. Zero because a class name moved.
+
+---
+
+## 14\. What we are deliberately not doing
+
+| Not doing                                                   | Why                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A serialisable string DSL for when clauses                  | VS Code's "project.open && editor.kind == 'canvas'" grammar needs a tokenizer, a parser and a reactive evaluator — several hundred lines that must clear the per-file 95%/94% gate, inside the phase already flagged highest-risk, to buy serialisability nothing in Studio consumes. when is a (ctx) => boolean predicate, which is the shape gated-registry.ts already ships. If third-party extensions ever need to contribute commands declaratively, the DSL gets its own spec section and its own phase; it does not get smuggled in as a P2 assumption. |
+| A fifth range containment level                             | Inline formatting acts on a text range inside the selected node, so its level is selection and its keyScope is caret. A fifth level would demand a fifth region and there is none — and the case is the clearest demonstration of why level and keyScope are two fields.                                                                                                                                                                                                                                                                                       |
+| Floating docks over the canvas by default                   | Occlusion-without-collapse is the loudest complaint about the exemplar (Figma UI3) and the digest names it as the antipattern. Docks stay pinned and space-reserving; ⌘. Zen and the three dock toggles are the escape valve. Floating is a per-dock opt-in only after someone measures that it earns its occlusion.                                                                                                                                                                                                                                           |
+| One live runtime frame per declared breakpoint              | Jx's canvas is a real @jxsuite/runtime render, so four breakpoints is four full renders plus four iframe-channel connections — on day one, in the default Design experience, on the app's most expensive surface. We take the pattern's value at a quarter of the cost: one derived compare pane, capped, gated on canvas-patcher fan-out.                                                                                                                                                                                                                     |
+| Deleting the horizontal tab strip for a vertical open list  | Genuinely lossy — you lose the at-a-glance horizontal scan, the reorder muscle memory every other editor trains, and twelve documents in one 24px row. Disambiguated labels, overflow, pin and MRU solve the actual defect.                                                                                                                                                                                                                                                                                                                                    |
+| Workspaces as places that gate features                     | A copy editor who cannot see the Style panel and is told "it's in ⌘K" has been given the affordance non-technical users are least likely to reach for. Named layouts reconfigure and never remove; every panel stays reachable by rail, chord and palette; Reset Layout is always one action away.                                                                                                                                                                                                                                                             |
+| A 2×2 recursive pane tree                                   | Ship one splitter, two panes, a fixed derived-pane menu and a zoom command. Recursive splitting waits for evidence anyone wants it.                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Branching / non-linear undo                                 | Rejected in the pattern digest with three Jx-specific reasons, and the need behind it — "get me back to before I redesigned the header" — is served better by named durable checkpoints over git. Photoshop's non-linear mode has been off by default for two decades.                                                                                                                                                                                                                                                                                         |
+| A global beginner/advanced switch                           | Splits documentation, splits support answers, makes half the screenshots wrong. Disclosure is per-surface, keyed to the artefact and the selection, and reversible in one click at the point of use.                                                                                                                                                                                                                                                                                                                                                           |
+| A global class registry (the Webflow styling model)         | It would create a third competing cascade beside $media and element defaults, and break the framework's core property — a node's appearance would no longer be readable from the node. We steal the blast-radius honesty (the scope chip) and reject the model. Corollary: no free-text class field that the Style panel cannot see, because provenance chips would start lying.                                                                                                                                                                               |
+| A second, non-live preview pane beside the canvas           | Jx's canvas is the render. Two sources of truth and double the render cost. We import the route bar and the reverse routing, not the extra pane.                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Changing the on-disk stylebook format — or the wire one     | Promoting Stylebook to a project document must not drop per-document & <tag> overrides, and must not touch CANVAS_MODES (iframe-protocol.ts:25), whose values cross a ParentToIframe union into a separately-built bundle. A shell redesign does not get to take a file-format migration, or a lockstep two-bundle release, as a side effect.                                                                                                                                                                                                                  |
+| Autosave                                                    | Explicit save is deliberate and correct for a file-backed artefact the user also owns on disk. What changes is that the state is stated in words ("Unsaved changes" / "Saved 2m ago" / "Saved by Kevin 30s ago") instead of a dot glyph, plus hot-exit recovery from the op log so the save/discard dialog is not the only safety net.                                                                                                                                                                                                                         |
+| A "Keyboard Shortcuts" help modal as the discovery strategy | It is a graveyard. The chord appears at the moment of use, on the row the user is already looking at. The generated sheet exists as a reference, not as the plan.                                                                                                                                                                                                                                                                                                                                                                                              |
+| Eager project-wide content indexing at project open         | Jx projects are on disk and can be large. Scan lazily on first invocation with a bounded cache invalidated from files/fs-events.ts.                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Rebuilding the design system                                | One exists and is well-built. The work is enforcement — the orphan check folded into check-styles.ts, the type-scale collapse, the one overlay contract. Adding a second system is how the first one died.                                                                                                                                                                                                                                                                                                                                                     |
+| Free-form drag-anywhere docking                             | Zed's constrained model — fixed dock set, panels tabbed within a dock, one open per dock — captures ~90% of the value with none of the "I broke my layout" support load.                                                                                                                                                                                                                                                                                                                                                                                       |
+| A traffic-light SEO score                                   | It invites gaming and implies a guarantee Jx cannot make. The value is entirely in the mock plus honest per-field warnings.                                                                                                                                                                                                                                                                                                                                                                                                                                    |

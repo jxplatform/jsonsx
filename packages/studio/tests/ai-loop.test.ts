@@ -110,10 +110,13 @@ describe("ai agent loop — integration", () => {
     disposeTab(tab);
   });
 
-  test("gives up with an error after the round cap when tools never stop", async () => {
+  test("a run that hit the round cap AFTER applying changes is not an error (§7.4)", async () => {
+    /* Partial success is not failure. `setError` paints the turn red and — in chat-state.ts —
+       deletes the streaming message, so a run that made five edits and then hit the cap reported
+       as an error that had also erased its own account of the five edits. */
     const tab = makeTab();
     const { chatState, toolRegistry } = harness(tab, async () => []);
-    // Every round emits another tool call — the model never stops.
+    // Every round emits another tool call — the model never stops, but every call SUCCEEDS.
     const client = fakeClient(
       Array.from({ length: 10 }, (_, i) =>
         toolCallRound(`c${i}`, "set_property", { path: [], key: "id", value: `v${i}` }),
@@ -124,8 +127,14 @@ describe("ai agent loop — integration", () => {
     await runAgentLoop({ chatState, streamingClient: client, toolRegistry, systemPrompt: "" });
 
     expect(client.calls()).toBe(5); // MAX_ROUNDS
-    expect(chatState.status).toBe("error");
-    expect(chatState.error).toContain("ran out of tool-call rounds");
+    expect(chatState.status).toBe("idle");
+    expect(chatState.error).toBeNull();
+    const tail = chatState.messages.at(-1)!;
+    expect(tail.role).toBe("assistant");
+    expect(tail.content).toContain("ran out of tool-call rounds");
+    expect(tail.content).toContain("Changes applied so far");
+    // And the edits it is telling you about are really there.
+    expect((tab.doc.document as Record<string, unknown>).id).toBe("v4");
     disposeTab(tab);
   });
 
@@ -189,5 +198,55 @@ describe("ai agent loop — integration", () => {
     expect(toolMsg!.content).toContain("Failed to parse arguments");
     expect(chatState.status).toBe("idle");
     disposeTab(tab);
+  });
+});
+
+// ─── §7.4: the batch follows the tab it edits ────────────────────────────────
+
+describe("cross-tab batching", () => {
+  test("a turn that moves to a second document gives BOTH documents a history entry", async () => {
+    /* `beginBatch(getTab())` ran once, against whichever tab was active when the loop started,
+       and `endBatch()` pushed ITS snapshot. A turn whose tools then edited a second document
+       closed the batch against the FIRST tab, so the second document got neither a history
+       snapshot nor a collab publish — its edits were simply not undoable. */
+    const first = createTab({ document: { children: [], tagName: "div" }, id: "first" });
+    const second = createTab({ document: { children: [], tagName: "section" }, id: "second" });
+    let current: Tab = first;
+
+    const chatState = createChatState({ model: "test" });
+    const toolRegistry = createToolRegistry();
+    registerAiTools(toolRegistry, { getTab: () => current, validate: async () => [] });
+
+    const beforeSecond = second.history.snapshots.length;
+    const client = fakeClient([
+      toolCallRound("a", "set_property", { key: "id", path: [], value: "one" }),
+      toolCallRound("b", "set_property", { key: "id", path: [], value: "two" }),
+    ]);
+    // Between rounds the user (or a tool) moves to the other document.
+    const originalStream = client.streamChat.bind(client);
+    let round = 0;
+    (client as { streamChat: unknown }).streamChat = async function* streamChat(
+      ...args: unknown[]
+    ) {
+      round += 1;
+      if (round === 2) {
+        current = second;
+      }
+      yield* (originalStream as (...a: unknown[]) => AsyncGenerator<StreamEvent>)(...args);
+    };
+
+    chatState.sendMessage("edit both");
+    await runAgentLoop({
+      chatState,
+      getTab: () => current,
+      streamingClient: client as StreamingClient,
+      systemPrompt: "",
+      toolRegistry: toolRegistry as ToolRegistry,
+    });
+
+    expect((second.doc.document as Record<string, unknown>).id).toBe("two");
+    expect(second.history.snapshots.length).toBeGreaterThan(beforeSecond);
+    disposeTab(first);
+    disposeTab(second);
   });
 });

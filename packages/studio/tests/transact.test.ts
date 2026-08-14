@@ -119,15 +119,15 @@ describe("undo/redo", () => {
 
   test("undo restores the selection from just before the undone edit", () => {
     const tab = makeTab();
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     transactDoc(tab, (t) => mutateInsertNode(t, [], 1, { tagName: "span" }));
-    tab.session.selection = ["children", 1];
+    tab.session.selection = [["children", 1]];
     transactDoc(tab, (t) => mutateUpdateProperty(t, ["children", 1], "textContent", "world"));
 
     undo(tab); // Selection as it was before the text edit
-    expect(tab.session.selection).toEqual(["children", 1]);
+    expect(tab.session.selection).toEqual([["children", 1]]);
     undo(tab); // Selection as it was before the insert
-    expect(tab.session.selection).toEqual(["children", 0]);
+    expect(tab.session.selection).toEqual([["children", 0]]);
   });
 });
 
@@ -158,9 +158,9 @@ describe("mutateRemoveNode", () => {
 
   test("clears selection if removed node is selected", () => {
     const tab = makeTab();
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     transactDoc(tab, (t) => mutateRemoveNode(t, ["children", 0]));
-    expect(tab.session.selection).toBeNull();
+    expect(tab.session.selection).toEqual([]);
     disposeTab(tab);
   });
 });
@@ -171,7 +171,7 @@ describe("mutateDuplicateNode", () => {
     transactDoc(tab, (t) => mutateDuplicateNode(t, ["children", 0]));
     expect(tab.doc.document.children).toHaveLength(2);
     expect((tab.doc.document as any).children[1].tagName).toBe("p");
-    expect(tab.session.selection).toEqual(["children", 1]);
+    expect(tab.session.selection).toEqual([["children", 1]]);
     disposeTab(tab);
   });
 });
@@ -260,6 +260,26 @@ describe("mutateUpdateProperty", () => {
     const tab = makeTab();
     transactDoc(tab, (t) => mutateUpdateProperty(t, ["children", 0], "textContent", ""));
     expect((tab.doc.document as any).children[0].textContent).toBeUndefined();
+    disposeTab(tab);
+  });
+
+  /**
+   * A PATH THAT NO LONGER RESOLVES IS AN ORDINARY STATE OF THE DOCUMENT, not a programming error.
+   *
+   * Deletions arrive from collaborators and from the author's own undo while a surface addressing
+   * the deleted node is still open. `getNodeAtPath` answers `undefined` for the coordinate, and
+   * `node[key]` on that threw `undefined is not an object` from INSIDE the mutation — rolled back
+   * and rethrown by `transactDoc`, correctly, into whatever asked for the edit. For the dock's
+   * debounced body commit that caller is `commitBufferWrites`, and the throw came out of the dock
+   * panel's `afterRender`: the repaint aborted with the editor undisposed and its 500ms timer still
+   * armed over a container lit was about to replace.
+   */
+  test("a path that no longer resolves changes nothing instead of throwing", () => {
+    const tab = makeTab();
+    expect(() =>
+      transactDoc(tab, (t) => mutateUpdateProperty(t, ["children", 7], "onclick", { body: "x" })),
+    ).not.toThrow();
+    expect((tab.doc.document as any).children[7]).toBeUndefined();
     disposeTab(tab);
   });
 });
@@ -438,5 +458,63 @@ describe("mutateUpdateFrontmatter", () => {
     expect(tab.doc.document.children).toHaveLength(1);
     expect(tab.doc.content.frontmatter.title).toBe("Changed");
     disposeTab(tab);
+  });
+});
+
+describe("the debug history-consistency assertion", () => {
+  /**
+   * Ops-based undo/redo and checkpoint replay must land on the same state. The check only runs
+   * behind the `jx-canvas-debug` flag — it JSON-stringifies the whole document twice per step, so
+   * it cannot be on by default — which means nothing exercises it unless a test sets the flag.
+   */
+  test("stays silent when the flag is off, and when replay agrees", () => {
+    const errors: unknown[][] = [];
+    const realError = console.error;
+    console.error = (...args: unknown[]) => {
+      errors.push(args);
+    };
+    try {
+      const tab = makeTab();
+      transactDoc(tab, (t) => mutateInsertNode(t, [], 1, { tagName: "span" }));
+      undo(tab);
+      redo(tab);
+      expect(errors).toHaveLength(0);
+
+      localStorage.setItem("jx-canvas-debug", "1");
+      undo(tab);
+      redo(tab);
+      // The ops path and the replay path agree, so the flag being on changes nothing.
+      expect(errors).toHaveLength(0);
+      disposeTab(tab);
+    } finally {
+      localStorage.removeItem("jx-canvas-debug");
+      console.error = realError;
+    }
+  });
+
+  test("reports divergence when the live document has drifted from its snapshot", () => {
+    const errors: unknown[][] = [];
+    const realError = console.error;
+    console.error = (...args: unknown[]) => {
+      errors.push(args);
+    };
+    try {
+      localStorage.setItem("jx-canvas-debug", "1");
+      const tab = makeTab();
+      transactDoc(tab, (t) => mutateInsertNode(t, [], 1, { tagName: "span" }));
+
+      // Drift the live document behind history's back — exactly the class of bug the assertion
+      // Exists to catch, and the only way to reach its reporting branch.
+      (tab.doc.document.children as JxMutableNode[]).push({ tagName: "em" });
+      undo(tab);
+      redo(tab);
+
+      expect(errors.length).toBeGreaterThan(0);
+      expect(String(errors[0]?.[0])).toContain("diverged from checkpoint replay");
+      disposeTab(tab);
+    } finally {
+      localStorage.removeItem("jx-canvas-debug");
+      console.error = realError;
+    }
   });
 });

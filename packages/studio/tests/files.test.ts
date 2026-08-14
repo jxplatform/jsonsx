@@ -1,26 +1,37 @@
 /**
  * Coverage for src/files/files.ts — project/directory loading and tab-oriented file flows
- * (loadDirectory, loadProject, openProject, openHomePage, openFileFromTree, openFileInTab,
- * reloadFileInTab). Tree rendering, keyboard, context menu, and DnD live in files-tree.test.ts.
+ * (loadDirectory, loadProject, openProject, openHomePage, openFileInTab, reloadFileInTab). Tree
+ * rendering, keyboard, context menu, and DnD live in files-tree.test.ts.
  */
 import { flush, installMockPlatform } from "./harness";
 import type { MockPlatformState } from "./harness";
 import { beforeEach, describe, expect, test } from "bun:test";
-import { createState, requireProjectState, setProjectState, projectState } from "../src/store";
-import { activeTab, closeAllTabs, openTab, workspace } from "../src/workspace/workspace";
+import { requireProjectState, setProjectState, projectState } from "../src/store";
+import {
+  PRIMARY_PANE,
+  SECONDARY_PANE,
+  activeTab,
+  closeAllTabs,
+  focusPane,
+  openTab,
+  paneById,
+  splitRight,
+  workspace,
+} from "../src/workspace/workspace";
 import { MARKDOWN_FORMAT, mockFormatAction, seedMarkdownFormat } from "./format-fixture";
 import {
   findHomePage,
+  initProjectRepo,
   loadDirectory,
   loadProject,
-  openFileFromTree,
+  openFileInPane,
   openFileInTab,
   openHomePage,
   openProject,
   reloadFileInTab,
 } from "../src/files/files";
+import { shell } from "../src/shell";
 import type { DirEntry, StudioPlatform } from "../src/types";
-import type { StudioState } from "../src/state";
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
 
@@ -307,6 +318,52 @@ describe("findHomePage", () => {
   });
 });
 
+// ─── initProjectRepo ──────────────────────────────────────────────────────────
+
+describe("initProjectRepo", () => {
+  test("binds to the new root and initialises a repository the scaffold does not have", async () => {
+    const { state } = installFsPlatform(
+      {},
+      { gitStatus: (async () => ({ files: [], isRepo: false })) as never },
+    );
+    expect(await initProjectRepo("/home/dev/Sites/fresh")).toBe(true);
+    // Activation comes first: gitInit takes no argument and would otherwise run against whichever
+    // Project the window was already serving.
+    const order = state.calls.map((c) => c[0]).filter((n) => n !== "listFormats");
+    expect(order).toEqual(["activate", "gitInit"]);
+    expect(state.calls.find((c) => c[0] === "activate")?.[1]).toBe("/home/dev/Sites/fresh");
+  });
+
+  test("leaves an existing repository alone", async () => {
+    const { state } = installFsPlatform(
+      {},
+      { gitStatus: (async () => ({ files: [], isRepo: true })) as never },
+    );
+    expect(await initProjectRepo("/home/dev/Sites/cloned")).toBe(false);
+    expect(state.calls.map((c) => c[0])).not.toContain("gitInit");
+  });
+
+  test("skips repository-backed platforms entirely", async () => {
+    const { state } = installFsPlatform({}, { createDestination: "repo" });
+    expect(await initProjectRepo("acme/site@main")).toBe(false);
+    expect(state.calls.map((c) => c[0])).not.toContain("activate");
+    expect(state.calls.map((c) => c[0])).not.toContain("gitInit");
+  });
+
+  test("reports a git failure without failing the create", async () => {
+    installFsPlatform(
+      {},
+      {
+        gitInit: (async () => {
+          throw new Error("git not installed");
+        }) as never,
+        gitStatus: (async () => ({ files: [], isRepo: false })) as never,
+      },
+    );
+    expect(await initProjectRepo("/home/dev/Sites/gitless")).toBe(false);
+  });
+});
+
 // ─── openProject ──────────────────────────────────────────────────────────────
 
 describe("openProject", () => {
@@ -314,7 +371,6 @@ describe("openProject", () => {
     const calls: string[] = [];
     return {
       calls,
-      renderActivityBar: () => calls.push("activity"),
       renderLeftPanel: () => calls.push("left"),
     };
   }
@@ -360,7 +416,9 @@ describe("openProject", () => {
     expect(st.dirs.has("pages")).toBe(true);
     expect(st.dirs.has("components")).toBe(true);
 
-    expect(ctx.calls).toEqual(["activity", "left"]);
+    // The rail is no longer repainted by hand: it tracks `shell.leftTab`, which openProject sets.
+    expect(ctx.calls).toEqual(["left"]);
+    expect(shell.leftTab).toBe("files");
     expect(activeTab.value?.documentPath).toBe("pages/index.json");
 
     const recent = JSON.parse(localStorage.getItem("jx-studio-recent-projects") ?? "[]");
@@ -401,130 +459,6 @@ describe("openProject", () => {
   });
 });
 
-// ─── openFileFromTree ─────────────────────────────────────────────────────────
-
-describe("openFileFromTree", () => {
-  function makeCtx(init: Partial<StudioState> = {}) {
-    const S = createState({ children: [], tagName: "div" });
-    Object.assign(S, init);
-    const commits: StudioState[] = [];
-    const renders: number[] = [];
-    const mdLoads: [string, unknown][] = [];
-    return {
-      S,
-      commit: (s: StudioState) => commits.push(s),
-      commits,
-      loadMarkdown: (source: string, handle: unknown) => {
-        mdLoads.push([source, handle]);
-      },
-      mdLoads,
-      render: () => renders.push(1),
-      renders,
-    };
-  }
-
-  test("opens a JSON document and commits fresh state", async () => {
-    installFsPlatform({
-      "pages/a.json": JSON.stringify({ children: [], tagName: "article" }),
-    });
-    siteState();
-    const ctx = makeCtx();
-
-    await openFileFromTree(ctx, "pages/a.json");
-
-    expect(ctx.commits).toHaveLength(1);
-    expect(ctx.commits[0]!.documentPath).toBe("pages/a.json");
-    expect(ctx.commits[0]!.dirty).toBe(false);
-    expect(ctx.commits[0]!.document.tagName).toBe("article");
-    expect(requireProjectState().selectedPath).toBe("pages/a.json");
-    expect(ctx.renders).toHaveLength(1);
-  });
-
-  test("routes format files through loadMarkdown", async () => {
-    installFsPlatform({ "post.md": "# Hello\n" });
-    siteState();
-    const ctx = makeCtx();
-
-    await openFileFromTree(ctx, "post.md");
-
-    expect(ctx.mdLoads).toEqual([["# Hello\n", null]]);
-    expect(ctx.S.documentPath).toBe("post.md");
-    expect(ctx.S.dirty).toBe(false);
-    expect(ctx.commits).toEqual([ctx.S]);
-  });
-
-  test("auto-saves the current dirty document before switching", async () => {
-    const { state } = installFsPlatform({
-      "pages/next.json": JSON.stringify({ tagName: "div" }),
-    });
-    siteState();
-    const ctx = makeCtx({
-      dirty: true,
-      document: { children: [], tagName: "section" },
-      documentPath: "pages/old.json",
-    });
-
-    await openFileFromTree(ctx, "pages/next.json");
-
-    expect(JSON.parse(state.files.get("pages/old.json")!)).toEqual({
-      children: [],
-      tagName: "section",
-    });
-    expect(ctx.commits[0]!.documentPath).toBe("pages/next.json");
-  });
-
-  test("auto-save failure still opens the new file", async () => {
-    installFsPlatform(
-      { "pages/next.json": JSON.stringify({ tagName: "div" }) },
-      {
-        writeFile: async () => {
-          throw new Error("read-only fs");
-        },
-      },
-    );
-    siteState();
-    const ctx = makeCtx({ dirty: true, documentPath: "pages/old.json" });
-
-    await openFileFromTree(ctx, "pages/next.json");
-
-    expect(ctx.commits).toHaveLength(1);
-    expect(ctx.commits[0]!.documentPath).toBe("pages/next.json");
-  });
-
-  test("empty content aborts without committing", async () => {
-    installFsPlatform({ "empty.json": "" });
-    siteState({ selectedPath: "before" });
-    const ctx = makeCtx();
-
-    await openFileFromTree(ctx, "empty.json");
-
-    expect(ctx.commits).toHaveLength(0);
-    expect(requireProjectState().selectedPath).toBe("before");
-  });
-
-  test("unknown extension surfaces a no-format error", async () => {
-    installFsPlatform({ "data.toml": "a = 1" });
-    siteState({ selectedPath: null });
-    const ctx = makeCtx();
-
-    await openFileFromTree(ctx, "data.toml");
-
-    expect(ctx.commits).toHaveLength(0);
-    expect(ctx.renders).toHaveLength(0);
-    expect(requireProjectState().selectedPath).toBeNull();
-  });
-
-  test("read failure is reported without committing", async () => {
-    installFsPlatform({});
-    siteState();
-    const ctx = makeCtx();
-
-    await openFileFromTree(ctx, "missing.json");
-
-    expect(ctx.commits).toHaveLength(0);
-  });
-});
-
 // ─── openFileInTab ────────────────────────────────────────────────────────────
 
 describe("openFileInTab", () => {
@@ -547,6 +481,87 @@ describe("openFileInTab", () => {
 
     expect(activeTab.value?.id).toBe("tab-a");
     expect(requireProjectState().selectedPath).toBe("pages/a.json");
+    expect(state.calls.filter(([name]) => name === "readFile")).toHaveLength(0);
+  });
+
+  test("opens into a NAMED pane, without the keyboard, as a preview tab", async () => {
+    installFsPlatform({
+      "components/card.json": JSON.stringify({ children: [], tagName: "my-card" }),
+    });
+    siteState();
+    openTab({ document: { tagName: "div" }, documentPath: "pages/a.json", id: "tab-a" });
+    openTab({ document: { tagName: "div" }, documentPath: "pages/b.json", id: "tab-b" });
+    expect(splitRight()?.id).toBe(SECONDARY_PANE);
+    focusPane(PRIMARY_PANE);
+
+    await openFileInPane(SECONDARY_PANE, "components/card.json");
+
+    // It landed in the pane that was named, not in the one the keyboard is in.
+    expect(paneById(SECONDARY_PANE)!.tabOrder).toContain("components/card.json");
+    expect(paneById(SECONDARY_PANE)!.activeTabId).toBe("components/card.json");
+    // The keyboard did NOT follow — and neither did the tree's cursor, which answers "where is the
+    // Author" and would otherwise say the author is somewhere they are not.
+    expect(workspace.activePaneId).toBe(PRIMARY_PANE);
+    expect(workspace.activeTabId).toBe("tab-a");
+    expect(requireProjectState().selectedPath).not.toBe("components/card.json");
+    // Browsing, not committing: the next side-open takes this slot.
+    expect(workspace.tabs.get("components/card.json")?.preview).toBe(true);
+  });
+
+  test("the three-way paned dedupe: activate here, MOVE from there, or leave it alone", async () => {
+    const { state } = installFsPlatform({ "pages/a.json": "{}" });
+    siteState();
+    openTab({ document: { tagName: "div" }, documentPath: "pages/a.json", id: "pages/a.json" });
+    openTab({ document: { tagName: "div" }, documentPath: "pages/b.json", id: "pages/b.json" });
+    openTab({ document: { tagName: "div" }, documentPath: "pages/c.json", id: "pages/c.json" });
+    expect(splitRight()?.id).toBe(SECONDARY_PANE);
+    focusPane(PRIMARY_PANE);
+    // Primary: [a, b] showing b · secondary: [c] showing c
+
+    // 1 · already in the requested pane → activate there, and never re-read the file.
+    await openFileInTab("pages/a.json", { paneId: PRIMARY_PANE, focus: false });
+    expect(paneById(PRIMARY_PANE)!.activeTabId).toBe("pages/a.json");
+    expect(state.calls.filter(([name]) => name === "readFile")).toHaveLength(0);
+
+    // 2 · elsewhere and NOT its pane's active tab → it MOVES. One tab is one document in one strip.
+    await openFileInTab("pages/b.json", { paneId: SECONDARY_PANE, focus: false });
+    expect(paneById(SECONDARY_PANE)!.tabOrder).toEqual(["pages/c.json", "pages/b.json"]);
+    expect(paneById(PRIMARY_PANE)!.tabOrder).toEqual(["pages/a.json"]);
+
+    /* 3 · elsewhere and IS its pane's active tab → NOTHING. You are already looking at it, and
+       moving it would oscillate the derivation that produced the request. */
+    await openFileInTab("pages/b.json", { paneId: PRIMARY_PANE, focus: false });
+    expect(paneById(SECONDARY_PANE)!.tabOrder).toEqual(["pages/c.json", "pages/b.json"]);
+    expect(paneById(PRIMARY_PANE)!.tabOrder).toEqual(["pages/a.json"]);
+    expect(workspace.activePaneId).toBe(PRIMARY_PANE);
+  });
+
+  /* CASE 1 STILL ACTIVATES, and the three-way test above cannot see it. Its case-1 tab is in the
+     requested pane but is NOT that pane's active one, so `holder.id !== wanted` and
+     `holder.activeTabId === tabId` are false together — and dropping the FIRST of them leaves case
+     1 passing anyway, because a `moveTabToPane` into the pane a tab is already in is a documented
+     no-op. The case that separates them is the tab that is ALREADY the requested pane's active
+     one: with the guard it falls straight through to `activateTab`, honouring `focus`; without it,
+     the "you are already looking at it" early return swallows the request and the keyboard never
+     arrives. That is `⌘P` onto the document the other pane is showing — the request looks
+     satisfied and the focus is in the wrong pane. */
+  test("re-opening a pane's OWN active tab still activates it, so `focus` is honoured", async () => {
+    const { state } = installFsPlatform({ "pages/a.json": "{}" });
+    siteState();
+    openTab({ document: { tagName: "div" }, documentPath: "pages/a.json", id: "pages/a.json" });
+    openTab({ document: { tagName: "div" }, documentPath: "pages/b.json", id: "pages/b.json" });
+    expect(splitRight()?.id).toBe(SECONDARY_PANE);
+    focusPane(SECONDARY_PANE);
+    // Primary: [a] showing a · secondary: [b] showing b · the keyboard is in the secondary.
+    expect(paneById(PRIMARY_PANE)!.activeTabId).toBe("pages/a.json");
+
+    await openFileInTab("pages/a.json", { paneId: PRIMARY_PANE });
+
+    expect(workspace.activePaneId).toBe(PRIMARY_PANE);
+    expect(workspace.activeTabId).toBe("pages/a.json");
+    // It did not MOVE and it was not re-read: this is a reveal, not an open.
+    expect(paneById(PRIMARY_PANE)!.tabOrder).toEqual(["pages/a.json"]);
+    expect(paneById(SECONDARY_PANE)!.tabOrder).toEqual(["pages/b.json"]);
     expect(state.calls.filter(([name]) => name === "readFile")).toHaveLength(0);
   });
 

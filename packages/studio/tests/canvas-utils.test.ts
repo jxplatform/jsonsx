@@ -1,4 +1,11 @@
-import { renderInto, resetStudioState, resetWorkspaceWithTab, stubRect } from "./harness";
+import {
+  registerPrimaryStage,
+  renderInto,
+  resetStudioState,
+  resetWorkspaceWithTab,
+  standUpPaneGrid,
+  stubRect,
+} from "./harness";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import {
   applyEditZoom,
@@ -6,47 +13,108 @@ import {
   canvasPanelTemplate,
   centerCanvas,
   clampEditZoom,
+  clampPanZoom,
   EDIT_ZOOM_MAX,
   EDIT_ZOOM_MIN,
+  applyFit,
+  DEFAULT_FIT,
+  fitOnCanvasEntry,
   fitToScreen,
-  initCanvasUtils,
+  getFit,
+  hasDeclaredFit,
+  markExplicitZoom,
   observeCenterUntilStable,
+  PAN_ZOOM_MAX,
+  PAN_ZOOM_MIN,
   panToElement,
   panToParentRect,
   requestEditZoom,
+  resetFits,
   resetZoom,
+  revealScroller,
+  setFit,
   setEditZoom,
+  setUserZoom,
+  stageZoom,
   updateActivePanelHeaders,
 } from "../src/canvas/canvas-utils";
-import { canvasPanels, canvasWrap, initShellRefs, registerRenderer } from "../src/store";
-import { view } from "../src/view";
+import { initShellRefs, registerRenderer } from "../src/store";
+import {
+  activeCanvasSurface,
+  surfaceForPane,
+  tabOfPane,
+  unregisterCanvasSurface,
+} from "../src/canvas/canvas-surface";
+import {
+  closeAllTabs,
+  openTab,
+  PRIMARY_PANE,
+  SECONDARY_PANE,
+  workspace,
+} from "../src/workspace/workspace";
 import type { CanvasPanel } from "../src/types";
+
+/* The panels of the FOCUSED pane's stage. Panels belong to a pane's surface now, not to the
+   app (`src/canvas/canvas-surface.ts`); the array identity is stable, so a module-level
+   binding still sees what the render mutated. */
+const canvasPanels = activeCanvasSurface().panels;
+
+/** The primary pane's surface — every geometry helper takes one explicitly now. */
+function primary() {
+  return surfaceForPane(PRIMARY_PANE);
+}
 
 // ─── Test context plumbing ────────────────────────────────────────────────────
 
-let zoom = 1;
-let canvasMode = "design";
-const setZoomDirect = mock((z: number) => {
-  zoom = z;
-});
+/*
+ * There is nothing to inject any more.
+ *
+ * `initCanvasUtils` handed the module `getCanvasMode`, `getZoom` and `setZoomDirect`, and all three
+ * were `activeTab.value` — the FOCUSED pane's tab — while every geometry function already took an
+ * explicit `CanvasSurface`. The fixture mirrored that split with a `let zoom` and a
+ * `setZoomDirect` mock, which is why a two-pane failure could never surface here: there was only
+ * one number to observe. The scale is read and written through the surface's own tab now, so the
+ * assertions read it there too.
+ */
+
+/** The primary pane's own pan-zoom scale. */
+const paneZoom = () => tabOfPane(PRIMARY_PANE)?.session.ui.zoom ?? 1;
+
+/** Put the primary pane's document at `value`. */
+function setPaneZoom(value: number) {
+  const tab = tabOfPane(PRIMARY_PANE);
+  if (tab) {
+    tab.session.ui.zoom = value;
+  }
+}
+
+/** Put the primary pane's document into `mode` — what `canvasModeOfPane` answers with. */
+function setPaneMode(mode: string) {
+  const tab = tabOfPane(PRIMARY_PANE);
+  if (tab) {
+    tab.session.ui.canvasMode = mode;
+  }
+}
+
+/** A fresh primary tab already in `mode`. */
+function tabInMode(mode: string) {
+  const tab = resetWorkspaceWithTab();
+  tab.session.ui.canvasMode = mode;
+  return tab;
+}
+
 const overlaysRenderer = mock(() => {});
 registerRenderer("overlays", overlaysRenderer);
 
 function setupShell() {
   document.body.innerHTML = "";
-  for (const id of [
-    "canvas-wrap",
-    "activity-bar",
-    "left-panel",
-    "right-panel",
-    "toolbar",
-    "statusbar",
-  ]) {
+  for (const id of ["activity-bar", "left-panel", "right-panel", "toolbar", "statusbar"]) {
     const el = document.createElement("div");
     el.id = id;
     document.body.append(el);
   }
   initShellRefs();
+  registerPrimaryStage();
 }
 
 /** Define a read-only layout metric on an element (happy-dom does no layout). */
@@ -56,8 +124,8 @@ function defineMetric(el: Element, prop: string, value: number) {
 
 function makePanzoomWrap() {
   const el = document.createElement("div");
-  canvasWrap.append(el);
-  view.panzoomWrap = el;
+  primary().wrap.append(el);
+  surfaceForPane("primary").panzoomWrap = el;
   return el;
 }
 
@@ -67,21 +135,17 @@ const OriginalResizeObserver = globalThis.ResizeObserver;
 beforeEach(() => {
   setupShell();
   resetStudioState();
-  zoom = 1;
-  canvasMode = "design";
-  setZoomDirect.mockClear();
+  /* One primary pane holding one tab, every time. The geometry reads its scale and its mode off
+     that tab, so a suite that left the workspace to whatever the previous test built would be
+     measuring another test's document. */
+  resetWorkspaceWithTab();
   overlaysRenderer.mockClear();
   canvasPanels.length = 0;
-  view.panzoomWrap = null;
-  view.centerObserver = null;
-  view.needsCenter = true;
-  view.panX = 0;
-  view.panY = 0;
-  initCanvasUtils({
-    getCanvasMode: () => canvasMode,
-    getZoom: () => zoom,
-    setZoomDirect,
-  });
+  surfaceForPane("primary").panzoomWrap = null;
+  surfaceForPane("primary").centerObserver = null;
+  surfaceForPane("primary").needsCenter = true;
+  surfaceForPane("primary").panX = 0;
+  surfaceForPane("primary").panY = 0;
 });
 
 afterEach(() => {
@@ -129,23 +193,64 @@ describe("canvasPanelTemplate", () => {
     expect(panel._width).toBeNull();
   });
 
+  /** Mount a panel the way a render does — into a pane's stage, which is what addresses it. */
+  async function mountPanel(
+    media: string | null,
+    label: string,
+    paneId: string = PRIMARY_PANE,
+  ): Promise<CanvasPanel> {
+    const { tpl, panel } = canvasPanelTemplate(media, label, false, 768);
+    await renderInto(tpl);
+    surfaceForPane(paneId).panels.push(panel);
+    return panel;
+  }
+
+  function clickHeader(panel: CanvasPanel) {
+    const header = panel.element!.querySelector(".canvas-panel-header") as HTMLElement;
+    header.click();
+  }
+
   test("header click sets activeMedia from panel media", async () => {
     const tab = resetWorkspaceWithTab();
-    const { tpl, panel } = canvasPanelTemplate("md", "Tablet (768px)", false, 768);
-    await renderInto(tpl);
-    const header = panel.element?.querySelector(".canvas-panel-header") as HTMLElement;
-    header.click();
+    clickHeader(await mountPanel("md", "Tablet (768px)"));
     expect(tab.session.ui.activeMedia).toBe("md");
   });
 
   test("base panel header click resets activeMedia to null", async () => {
     const tab = resetWorkspaceWithTab();
     tab.session.ui.activeMedia = "md";
-    const { tpl, panel } = canvasPanelTemplate("base", "Base (320px)", false, 320);
-    await renderInto(tpl);
-    const header = panel.element?.querySelector(".canvas-panel-header") as HTMLElement;
-    header.click();
+    clickHeader(await mountPanel("base", "Base (320px)"));
     expect(tab.session.ui.activeMedia).toBeNull();
+  });
+
+  /*
+   * The breakpoint belongs to the tab of the pane that MOUNTED the artboard. This is the
+   * parent-side twin of the iframe's `hit` message: `updateUi` writes to `activeTab`, which is the
+   * FOCUSED pane's tab, so clicking a header in a pane the keyboard is not in set another
+   * document's breakpoint — and the Style panel then edited a compound block nobody had opened.
+   */
+  test("the header writes the breakpoint of the pane that mounted it, not the focused one", async () => {
+    const focused = resetWorkspaceWithTab(undefined, { documentPath: "/project/a.json", id: "a" });
+    const other = openTab({
+      document: { children: [], tagName: "div" },
+      documentPath: "/project/b.json",
+      id: "b",
+    });
+    // Tab "b" lives in the side pane; the keyboard stays in the primary, on "a".
+    workspace.panes[0]!.tabOrder = ["a"];
+    workspace.panes[0]!.activeTabId = "a";
+    workspace.panes = [
+      ...workspace.panes,
+      { activeTabId: "b", derived: null, id: SECONDARY_PANE, tabOrder: ["b"] },
+    ];
+    workspace.activePaneId = PRIMARY_PANE;
+
+    clickHeader(await mountPanel("md", "Tablet (768px)", SECONDARY_PANE));
+
+    expect(other.session.ui.activeMedia).toBe("md");
+    expect(focused.session.ui.activeMedia).toBeNull();
+
+    surfaceForPane(SECONDARY_PANE).panels.length = 0;
   });
 });
 
@@ -153,28 +258,28 @@ describe("canvasPanelTemplate", () => {
 
 describe("centerCanvas", () => {
   test("no-op when there is no panzoom wrapper", () => {
-    view.panX = 123;
-    centerCanvas();
-    expect(view.panX).toBe(123);
+    surfaceForPane("primary").panX = 123;
+    centerCanvas(primary());
+    expect(surfaceForPane("primary").panX).toBe(123);
   });
 
   test("centers content horizontally and resets panY", () => {
     const wrap = makePanzoomWrap();
-    defineMetric(canvasWrap, "clientWidth", 1000);
+    defineMetric(primary().wrap, "clientWidth", 1000);
     defineMetric(wrap, "scrollWidth", 800);
-    view.panY = 99;
-    centerCanvas();
-    expect(view.panX).toBe(100); // (1000 - 800) / 2
-    expect(view.panY).toBe(0);
+    surfaceForPane("primary").panY = 99;
+    centerCanvas(primary());
+    expect(surfaceForPane("primary").panX).toBe(100); // (1000 - 800) / 2
+    expect(surfaceForPane("primary").panY).toBe(0);
   });
 
   test("clamps panX to 16 when content is wider than the viewport", () => {
     const wrap = makePanzoomWrap();
-    defineMetric(canvasWrap, "clientWidth", 500);
+    defineMetric(primary().wrap, "clientWidth", 500);
     defineMetric(wrap, "scrollWidth", 800);
-    zoom = 2;
-    centerCanvas();
-    expect(view.panX).toBe(16);
+    setPaneZoom(2);
+    centerCanvas(primary());
+    expect(surfaceForPane("primary").panX).toBe(16);
   });
 });
 
@@ -182,25 +287,25 @@ describe("centerCanvas", () => {
 
 describe("applyTransform", () => {
   test("no-op without panzoom wrapper", () => {
-    applyTransform();
+    applyTransform(primary());
     expect(overlaysRenderer).not.toHaveBeenCalled();
   });
 
   test("applies translate + scale and re-renders overlays", () => {
     const wrap = makePanzoomWrap();
-    view.panX = 10;
-    view.panY = 20;
-    zoom = 2;
-    applyTransform();
+    surfaceForPane("primary").panX = 10;
+    surfaceForPane("primary").panY = 20;
+    setPaneZoom(2);
+    applyTransform(primary());
     expect(wrap.style.transform).toBe("translate(10px, 20px) scale(2)");
     expect(overlaysRenderer).toHaveBeenCalled();
   });
 
   test("stylebook mode needs no per-mode overlay redraw (iframe overlays live in the wrap)", () => {
     makePanzoomWrap();
-    canvasMode = "stylebook";
+    setPaneMode("stylebook");
     overlaysRenderer.mockClear();
-    applyTransform();
+    applyTransform(primary());
     expect(overlaysRenderer).toHaveBeenCalled();
   });
 });
@@ -209,52 +314,207 @@ describe("applyTransform", () => {
 
 describe("fitToScreen", () => {
   test("no-op without panzoom wrapper", () => {
-    fitToScreen();
-    expect(setZoomDirect).not.toHaveBeenCalled();
+    fitToScreen({ surface: primary() });
+    expect(paneZoom()).toBe(1);
   });
 
   test("fits panels to the viewport and centers", () => {
     const wrap = makePanzoomWrap();
-    defineMetric(canvasWrap, "clientWidth", 1000);
-    defineMetric(canvasWrap, "clientHeight", 600);
+    defineMetric(primary().wrap, "clientWidth", 1000);
+    defineMetric(primary().wrap, "clientHeight", 600);
     stubRect(wrap, { height: 300, width: 1056 });
     canvasPanels.push({ _width: 400 } as never, { _width: 600 } as never);
 
-    fitToScreen();
+    fitToScreen({ surface: primary() });
 
     // Total width = 400 + 600 + 24 gap + 32 padding = 1056; height fit = 600/332
     const expectedZoom = Math.min(1000 / 1056, 600 / 332);
-    expect(setZoomDirect).toHaveBeenCalledWith(expectedZoom);
-    expect(view.panX).toBeCloseTo(Math.max(0, (1000 - 1056 * expectedZoom) / 2));
-    expect(view.panY).toBeCloseTo(Math.max(0, (600 - 332 * expectedZoom) / 2));
+    expect(paneZoom()).toBeCloseTo(expectedZoom, 10);
+    expect(surfaceForPane("primary").panX).toBeCloseTo(
+      Math.max(0, (1000 - 1056 * expectedZoom) / 2),
+    );
+    expect(surfaceForPane("primary").panY).toBeCloseTo(Math.max(0, (600 - 332 * expectedZoom) / 2));
     expect(wrap.style.transform).toContain(`scale(${expectedZoom}`);
   });
 
   test("defaults panel width to 800 and clamps zoom to at least 0.05", () => {
     const wrap = makePanzoomWrap();
-    defineMetric(canvasWrap, "clientWidth", 1);
-    defineMetric(canvasWrap, "clientHeight", 600);
+    defineMetric(primary().wrap, "clientWidth", 1);
+    defineMetric(primary().wrap, "clientHeight", 600);
     stubRect(wrap, { height: 300 });
     canvasPanels.push({} as never);
-    fitToScreen();
-    expect(setZoomDirect).toHaveBeenCalledWith(0.05);
+    fitToScreen({ surface: primary() });
+    expect(paneZoom()).toBe(0.05);
+  });
+});
+
+// ─── Author zoom vs. the automatic fit on entering a panzoom mode ─────────────
+
+describe("pan zoom clamping", () => {
+  test("clamps to the supported range", () => {
+    expect(clampPanZoom(100)).toBe(PAN_ZOOM_MAX);
+    expect(clampPanZoom(0)).toBe(PAN_ZOOM_MIN);
+    expect(clampPanZoom(1.5)).toBe(1.5);
+  });
+});
+
+describe("declared fit", () => {
+  beforeEach(() => {
+    resetFits();
+  });
+
+  test("an undeclared document reports the default fit", () => {
+    resetWorkspaceWithTab();
+    expect(hasDeclaredFit()).toBe(false);
+    expect(getFit()).toBe(DEFAULT_FIT);
+  });
+
+  test("setUserZoom clamps, declares the number as the fit, and applies the transform", () => {
+    const tab = resetWorkspaceWithTab();
+    const wrap = makePanzoomWrap();
+    expect(hasDeclaredFit()).toBe(false);
+
+    setUserZoom(99);
+
+    expect(tab.session.ui.zoom).toBe(PAN_ZOOM_MAX);
+    expect(getFit()).toBe(PAN_ZOOM_MAX);
+    expect(wrap.style.transform).toContain("scale(");
+  });
+
+  test("markExplicitZoom declares whatever the zoom currently is", () => {
+    resetWorkspaceWithTab();
+    makePanzoomWrap();
+    setPaneZoom(0.75);
+    markExplicitZoom();
+    expect(getFit()).toBe(0.75);
+  });
+
+  test("setUserZoom and markExplicitZoom are no-ops with no tab open", () => {
+    closeAllTabs();
+    setUserZoom(2);
+    markExplicitZoom();
+    expect(hasDeclaredFit()).toBe(false);
+    expect(getFit()).toBe(DEFAULT_FIT);
+  });
+
+  test("the fit is per document, so another document still gets the default", () => {
+    const tab = resetWorkspaceWithTab();
+    tab.documentPath = "pages/index.md";
+    setFit("width");
+    expect(getFit()).toBe("width");
+    tab.documentPath = "pages/about.md";
+    expect(hasDeclaredFit()).toBe(false);
+    expect(getFit()).toBe(DEFAULT_FIT);
+  });
+
+  test('applyFit("none") frames nothing', () => {
+    resetWorkspaceWithTab();
+    const wrap = makePanzoomWrap();
+    setPaneZoom(0.4);
+    applyFit("none");
+    expect(paneZoom()).toBe(0.4);
+    expect(wrap.style.transform).toContain("scale(0.4)");
+  });
+
+  test('a declared "width" fit ignores the height axis', () => {
+    resetWorkspaceWithTab();
+    const wrap = makePanzoomWrap();
+    defineMetric(primary().wrap, "clientWidth", 700);
+    // A viewport far too short for the artboard: "page" would fit to this, "width" must not.
+    defineMetric(primary().wrap, "clientHeight", 100);
+    stubRect(wrap, { height: 600, width: 1312 });
+    canvasPanels.push({ _width: 1280 } as never);
+
+    setFit("width");
+
+    expect(paneZoom()).toBeCloseTo(700 / 1312, 10);
+  });
+});
+
+describe("fitOnCanvasEntry", () => {
+  beforeEach(() => {
+    resetFits();
+    resetWorkspaceWithTab();
+  });
+
+  test("fits a wide artboard that would otherwise land clipped", () => {
+    const wrap = makePanzoomWrap();
+    defineMetric(primary().wrap, "clientWidth", 700);
+    defineMetric(primary().wrap, "clientHeight", 600);
+    stubRect(wrap, { height: 0, width: 1312 });
+    canvasPanels.push({ _width: 1280 } as never);
+
+    fitOnCanvasEntry(primary());
+
+    // 1280 + 32 padding = 1312 → the artboard is scaled down to fit 700px of viewport.
+    expect(paneZoom()).toBeCloseTo(700 / 1312, 10);
+  });
+
+  test("never magnifies past life size", () => {
+    const wrap = makePanzoomWrap();
+    defineMetric(primary().wrap, "clientWidth", 2000);
+    defineMetric(primary().wrap, "clientHeight", 1200);
+    stubRect(wrap, { height: 0, width: 432 });
+    canvasPanels.push({ _width: 400 } as never);
+
+    fitOnCanvasEntry(primary());
+
+    expect(paneZoom()).toBe(1);
+  });
+
+  test("the Fit control may still magnify", () => {
+    const wrap = makePanzoomWrap();
+    defineMetric(primary().wrap, "clientWidth", 2000);
+    defineMetric(primary().wrap, "clientHeight", 1200);
+    stubRect(wrap, { height: 0, width: 432 });
+    canvasPanels.push({ _width: 400 } as never);
+
+    fitToScreen({ surface: primary() });
+
+    expect(paneZoom()).toBeCloseTo(2000 / 432, 10);
+  });
+
+  test("honours a numeric fit the author declared for this document", () => {
+    const wrap = makePanzoomWrap();
+    defineMetric(primary().wrap, "clientWidth", 700);
+    canvasPanels.push({ _width: 1280 } as never);
+    setPaneZoom(0.5);
+    markExplicitZoom();
+
+    fitOnCanvasEntry(primary());
+
+    expect(paneZoom()).toBe(0.5);
+    expect(wrap.style.transform).toContain("scale(0.5)");
+  });
+
+  test("leaves the zoom alone when the viewport has no measurable width", () => {
+    // A hidden or not-yet-laid-out pane would otherwise fit to the 5% floor.
+    makePanzoomWrap();
+    defineMetric(primary().wrap, "clientWidth", 0);
+    canvasPanels.push({ _width: 1280 } as never);
+
+    fitOnCanvasEntry(primary());
+
+    expect(paneZoom()).toBe(1);
   });
 });
 
 describe("resetZoom", () => {
   test("no-op without panzoom wrapper", () => {
-    resetZoom();
-    expect(setZoomDirect).not.toHaveBeenCalled();
+    resetZoom(primary());
+    expect(paneZoom()).toBe(1);
   });
 
-  test("resets zoom to 1 and re-centers", () => {
+  test("resets zoom to 1, re-centers, and declares 1 as the fit", () => {
     const wrap = makePanzoomWrap();
-    defineMetric(canvasWrap, "clientWidth", 1000);
+    defineMetric(primary().wrap, "clientWidth", 1000);
     defineMetric(wrap, "scrollWidth", 500);
-    zoom = 3;
-    resetZoom();
-    expect(setZoomDirect).toHaveBeenCalledWith(1);
-    expect(view.panX).toBe(250);
+    resetWorkspaceWithTab();
+    setPaneZoom(3);
+    resetZoom(primary());
+    expect(getFit()).toBe(1);
+    expect(paneZoom()).toBe(1);
+    expect(surfaceForPane("primary").panX).toBe(250);
     expect(wrap.style.transform).toBe("translate(250px, 0px) scale(1)");
   });
 });
@@ -276,7 +536,7 @@ function makeEditPanel(columnWidth = 800) {
   viewport.append(canvas);
   column.append(viewport);
   sc.append(column);
-  canvasWrap.append(sc);
+  primary().wrap.append(sc);
   stubRect(column, { width: columnWidth });
   defineMetric(iframe, "offsetHeight", 500);
   const panel = { _width: null, canvas, viewport } as unknown as CanvasPanel;
@@ -286,27 +546,24 @@ function makeEditPanel(columnWidth = 800) {
 
 describe("applyEditZoom", () => {
   test("no-op outside edit mode", () => {
-    canvasMode = "design";
-    const tab = resetWorkspaceWithTab();
+    const tab = tabInMode("design");
     tab.session.ui.editZoom = 2;
     const { canvas } = makeEditPanel();
-    applyEditZoom();
+    applyEditZoom(primary());
     expect(canvas.style.transform).toBe("");
   });
 
   test("no-op without a mounted panel", () => {
-    canvasMode = "edit";
-    resetWorkspaceWithTab().session.ui.editZoom = 2;
-    expect(() => applyEditZoom()).not.toThrow();
+    tabInMode("edit").session.ui.editZoom = 2;
+    expect(() => applyEditZoom(primary())).not.toThrow();
   });
 
   test("shrinks the iframe layout width and counter-scales back to the column footprint", () => {
-    canvasMode = "edit";
-    const tab = resetWorkspaceWithTab();
+    const tab = tabInMode("edit");
     tab.session.ui.editZoom = 2;
     const { canvas, iframe, panel, viewport } = makeEditPanel(800);
 
-    applyEditZoom();
+    applyEditZoom(primary());
 
     // LayoutWidth = 800 / 2 = 400 → rendered footprint = 400 * scale(2) = 800 again.
     expect(canvas.style.width).toBe("400px");
@@ -320,24 +577,22 @@ describe("applyEditZoom", () => {
   });
 
   test("zoom-out grows the layout width past the footprint", () => {
-    canvasMode = "edit";
-    resetWorkspaceWithTab().session.ui.editZoom = 0.5;
+    tabInMode("edit").session.ui.editZoom = 0.5;
     const { canvas, iframe } = makeEditPanel(600);
-    applyEditZoom();
+    applyEditZoom(primary());
     expect(canvas.style.width).toBe("1200px");
     expect(canvas.style.transform).toBe("scale(0.5)");
     expect(iframe.style.width).toBe("1200px");
   });
 
   test("editZoom 1 restores the fluid layout exactly", () => {
-    canvasMode = "edit";
-    const tab = resetWorkspaceWithTab();
+    const tab = tabInMode("edit");
     tab.session.ui.editZoom = 2;
     const { canvas, iframe, panel, viewport } = makeEditPanel();
-    applyEditZoom();
+    applyEditZoom(primary());
 
     tab.session.ui.editZoom = 1;
-    applyEditZoom();
+    applyEditZoom(primary());
 
     expect(canvas.style.width).toBe("");
     expect(canvas.style.transform).toBe("");
@@ -347,10 +602,9 @@ describe("applyEditZoom", () => {
   });
 
   test("no-op when the column has no measurable width", () => {
-    canvasMode = "edit";
-    resetWorkspaceWithTab().session.ui.editZoom = 2;
+    tabInMode("edit").session.ui.editZoom = 2;
     const { canvas } = makeEditPanel(0);
-    applyEditZoom();
+    applyEditZoom(primary());
     expect(canvas.style.transform).toBe("");
   });
 });
@@ -363,8 +617,7 @@ describe("setEditZoom / requestEditZoom", () => {
   });
 
   test("setEditZoom clamps, persists on the tab, and applies synchronously", () => {
-    canvasMode = "edit";
-    const tab = resetWorkspaceWithTab();
+    const tab = tabInMode("edit");
     const { canvas } = makeEditPanel(600);
     setEditZoom(99);
     expect(tab.session.ui.editZoom).toBe(EDIT_ZOOM_MAX);
@@ -372,12 +625,12 @@ describe("setEditZoom / requestEditZoom", () => {
   });
 
   test("setEditZoom without a tab is a no-op", () => {
+    closeAllTabs();
     expect(() => setEditZoom(2)).not.toThrow();
   });
 
   test("requestEditZoom writes state immediately but coalesces DOM work to one frame", () => {
-    canvasMode = "edit";
-    const tab = resetWorkspaceWithTab();
+    const tab = tabInMode("edit");
     const { canvas } = makeEditPanel(600);
     const frames: FrameRequestCallback[] = [];
     globalThis.requestAnimationFrame = ((cb: FrameRequestCallback) => {
@@ -398,6 +651,7 @@ describe("setEditZoom / requestEditZoom", () => {
   });
 
   test("requestEditZoom without a tab is a no-op", () => {
+    closeAllTabs();
     expect(() => requestEditZoom(2)).not.toThrow();
   });
 });
@@ -428,41 +682,41 @@ describe("observeCenterUntilStable", () => {
   });
 
   test("no-op without panzoom wrapper", () => {
-    observeCenterUntilStable();
-    expect(view.centerObserver).toBeNull();
+    observeCenterUntilStable(primary());
+    expect(surfaceForPane("primary").centerObserver).toBeNull();
     expect(FakeResizeObserver.instances.length).toBe(0);
   });
 
   test("observes the wrapper and re-centers on resize while needed", () => {
     const wrap = makePanzoomWrap();
-    defineMetric(canvasWrap, "clientWidth", 1000);
+    defineMetric(primary().wrap, "clientWidth", 1000);
     defineMetric(wrap, "scrollWidth", 600);
-    observeCenterUntilStable();
-    expect(view.needsCenter).toBe(true);
+    observeCenterUntilStable(primary());
+    expect(surfaceForPane("primary").needsCenter).toBe(true);
     const ro = FakeResizeObserver.instances[0]!;
     expect(ro.observed).toEqual([wrap]);
-    expect(view.panX).toBe(200);
+    expect(surfaceForPane("primary").panX).toBe(200);
 
-    view.panX = 0;
+    surfaceForPane("primary").panX = 0;
     ro.cb();
-    expect(view.panX).toBe(200);
+    expect(surfaceForPane("primary").panX).toBe(200);
     expect(wrap.style.transform).toContain("translate(200px, 0px)");
   });
 
   test("disconnects once the user pans (needsCenter false)", () => {
     makePanzoomWrap();
-    observeCenterUntilStable();
+    observeCenterUntilStable(primary());
     const ro = FakeResizeObserver.instances[0]!;
-    view.needsCenter = false;
+    surfaceForPane("primary").needsCenter = false;
     ro.cb();
     expect(ro.disconnected).toBe(true);
-    expect(view.centerObserver).toBeNull();
+    expect(surfaceForPane("primary").centerObserver).toBeNull();
   });
 
   test("replaces a previous observer", () => {
     makePanzoomWrap();
-    observeCenterUntilStable();
-    observeCenterUntilStable();
+    observeCenterUntilStable(primary());
+    observeCenterUntilStable(primary());
     const first = FakeResizeObserver.instances[0]!;
     const second = FakeResizeObserver.instances[1]!;
     expect(first.disconnected).toBe(true);
@@ -489,23 +743,23 @@ function makeRenderedPanel(opts: { scrollContainer?: HTMLElement | null } = {}) 
 
 describe("panToElement", () => {
   test("no-op when there is no active panel", () => {
-    view.panY = 7;
+    surfaceForPane("primary").panY = 7;
     panToElement(["children", 0]);
-    expect(view.panY).toBe(7);
+    expect(surfaceForPane("primary").panY).toBe(7);
   });
 
   test("no-op when the panel has no canvas", () => {
     canvasPanels.push({ canvas: null, mediaName: "base" } as never);
-    view.panY = 7;
+    surfaceForPane("primary").panY = 7;
     panToElement(["children", 0]);
-    expect(view.panY).toBe(7);
+    expect(surfaceForPane("primary").panY).toBe(7);
   });
 
   test("no-op when the element is not found", () => {
     makeRenderedPanel();
-    view.panY = 7;
+    surfaceForPane("primary").panY = 7;
     panToElement(["children", 99]);
-    expect(view.panY).toBe(7);
+    expect(surfaceForPane("primary").panY).toBe(7);
   });
 
   test("scrolls the scroll container smoothly in content mode", () => {
@@ -515,7 +769,7 @@ describe("panToElement", () => {
     (scrollContainer as unknown as { scrollTo: typeof scrollTo }).scrollTo = scrollTo;
     const { target } = makeRenderedPanel({ scrollContainer });
 
-    stubRect(canvasWrap, { height: 600, top: 0 });
+    stubRect(primary().wrap, { height: 600, top: 0 });
     stubRect(target, { height: 50, top: 100 });
     panToElement(["children", 0]);
 
@@ -526,7 +780,7 @@ describe("panToElement", () => {
   test("animates panY via requestAnimationFrame without a scroll container", () => {
     const { target } = makeRenderedPanel();
     makePanzoomWrap();
-    stubRect(canvasWrap, { height: 600, top: 0 });
+    stubRect(primary().wrap, { height: 600, top: 0 });
     stubRect(target, { height: 0, top: 500 });
 
     // Drive the animation deterministically: one mid-flight frame, one final frame
@@ -537,28 +791,125 @@ describe("panToElement", () => {
       return 0;
     }) as typeof requestAnimationFrame;
 
-    view.panY = 0;
+    surfaceForPane("primary").panY = 0;
     panToElement(["children", 0]);
 
     // OffsetY = 300 - 500 = -200; final eased value lands on the target
-    expect(view.panY).toBeCloseTo(-200);
+    expect(surfaceForPane("primary").panY).toBeCloseTo(-200);
   });
 });
 
 describe("panToParentRect", () => {
   test("pans by the parent-viewport rect (the stylebook pan-to-card entry point)", () => {
     makePanzoomWrap();
-    stubRect(canvasWrap, { height: 600, top: 0 });
+    stubRect(primary().wrap, { height: 600, top: 0 });
 
     globalThis.requestAnimationFrame = ((cb: FrameRequestCallback) => {
       cb(performance.now() + 1000);
       return 0;
     }) as typeof requestAnimationFrame;
 
-    view.panY = 50;
+    surfaceForPane("primary").panY = 50;
     panToParentRect({ height: 0, top: 0 });
     // OffsetY = 300 → target = 350
-    expect(view.panY).toBeCloseTo(350);
+    expect(surfaceForPane("primary").panY).toBeCloseTo(350);
+  });
+
+  /*
+   * The Edit surface. `revealCanvasPath` composes exactly this with a measure on either side, so
+   * these four cases are the geometry the block-action-bar shot's caret step depends on: while this
+   * function only wrote `surfaceForPane("primary").panY`, Edit — which renders no `.panzoom-wrap` — did not move at all.
+   */
+  test("scrolls the active panel's container when the pane is a scrolling surface", () => {
+    const scrollContainer = document.createElement("div");
+    scrollContainer.scrollTop = 0;
+    makeRenderedPanel({ scrollContainer });
+    stubRect(primary().wrap, { height: 885, top: 0 });
+
+    // The measured case from P4: children/1 at y=1139 in an 885px viewport.
+    panToParentRect({ height: 40, top: 1139 });
+
+    // ElCenterY = 1159, vpCenterY = 442.5, offsetY = -716.5 → scrollTop = 0 + 716.5
+    expect(scrollContainer.scrollTop).toBeCloseTo(716.5);
+  });
+
+  test("scrolls back up for a node above the fold, from the container's current position", () => {
+    const scrollContainer = document.createElement("div");
+    scrollContainer.scrollTop = 800;
+    makeRenderedPanel({ scrollContainer });
+    stubRect(primary().wrap, { height: 600, top: 100 });
+
+    // Rect centre 150 is 50px below the pane's top, i.e. 250px above its centre.
+    panToParentRect({ height: 100, top: 100 });
+
+    expect(scrollContainer.scrollTop).toBeCloseTo(800 - 250);
+  });
+
+  test("does not ease the scroll — the point it answers with must be true on return", () => {
+    const scrollContainer = document.createElement("div");
+    const scrollTo = mock((_opts: ScrollToOptions) => {});
+    (scrollContainer as unknown as { scrollTo: typeof scrollTo }).scrollTo = scrollTo;
+    makeRenderedPanel({ scrollContainer });
+    stubRect(primary().wrap, { height: 600, top: 0 });
+
+    panToParentRect({ height: 0, top: 1000 });
+
+    expect(scrollTo).not.toHaveBeenCalled();
+    expect(scrollContainer.scrollTop).toBeCloseTo(700);
+  });
+
+  test("still pans when the active panel is a panzoom stage, scroll container or not", () => {
+    makeRenderedPanel();
+    makePanzoomWrap();
+    stubRect(primary().wrap, { height: 600, top: 0 });
+    globalThis.requestAnimationFrame = ((cb: FrameRequestCallback) => {
+      cb(performance.now() + 1000);
+      return 0;
+    }) as typeof requestAnimationFrame;
+
+    surfaceForPane("primary").panY = 0;
+    panToParentRect({ height: 0, top: 900 });
+
+    // OffsetY = 300 - 900 = -600
+    expect(surfaceForPane("primary").panY).toBeCloseTo(-600);
+  });
+});
+
+describe("revealScroller", () => {
+  test("is null with no panel, and null for a panzoom panel", () => {
+    expect(revealScroller(primary())).toBeNull();
+    makeRenderedPanel();
+    expect(revealScroller(primary())).toBeNull();
+  });
+
+  test("is the active panel's scroll container on the Edit surface", () => {
+    const scrollContainer = document.createElement("div");
+    makeRenderedPanel({ scrollContainer });
+    expect(revealScroller(primary())).toBe(scrollContainer);
+  });
+
+  /*
+   * It answers about the SURFACE it was handed, not about the focused pane. It used to be
+   * zero-arity and to call `getActivePanel()`, which resolves through `activeCanvasSurface()` — so
+   * `revealBy(surface, …)` was handed one stage and scrolled whichever one had the keyboard. Benign
+   * only because both callers happened to pass the focused surface; a reveal in a side pane would
+   * have scrolled the primary and then re-measured a node that had not moved.
+   */
+  test("answers for the surface it is given, not the focused one", () => {
+    const sideScroller = document.createElement("div");
+    const side = surfaceForPane("secondary");
+    side.panels.push({
+      canvas: document.createElement("div"),
+      mediaName: "base",
+      scrollContainer: sideScroller,
+    } as unknown as CanvasPanel);
+    // The FOCUSED pane has a scroller of its own, and a different one.
+    const primaryScroller = document.createElement("div");
+    makeRenderedPanel({ scrollContainer: primaryScroller });
+
+    expect(revealScroller(side)).toBe(sideScroller);
+    expect(revealScroller(primary())).toBe(primaryScroller);
+    side.panels.length = 0;
   });
 });
 
@@ -605,5 +956,236 @@ describe("updateActivePanelHeaders", () => {
     await renderInto(noLabel.tpl);
     canvasPanels.push(noLabel.panel as never, { element: null, mediaName: "md" } as never);
     expect(() => updateActivePanelHeaders()).not.toThrow();
+  });
+});
+
+// ─── A lens's geometry is its own ─────────────────────────────────────────────
+
+/*
+ * The pane-per-stage work above assumed two stages meant two TABS, and a lens breaks that: it
+ * shares the source pane's tab and every per-tab number on it. Four discriminators carry the
+ * difference — `zoomOf`, `setZoomOf`, `fitKey` and `updateActivePanelHeaders` — and only the first
+ * was tested. Deleting the other three left the whole suite green while zooming a lens rescaled
+ * the document beside it, "Fit page" in either pane re-framed both, and the lens marked the source
+ * pane's breakpoint on its own artboard.
+ */
+describe("a lens shares the tab and none of its geometry", () => {
+  /** The primary showing `a`; the secondary a lens over it, with a stage of its own. */
+  function lensBeside(preset: "code" | "breakpoint", media: string | null = null) {
+    const a = resetWorkspaceWithTab(undefined, { documentPath: "/project/a.json", id: "a" });
+    workspace.panes[0]!.tabOrder = ["a"];
+    workspace.panes[0]!.activeTabId = "a";
+    workspace.panes = [
+      ...workspace.panes,
+      { activeTabId: null, derived: null, id: SECONDARY_PANE, tabOrder: [] },
+    ];
+    workspace.panes[1]!.derived = {
+      diff: null,
+      kind: "lens",
+      media,
+      mode: preset === "code" ? "source" : "design",
+      preset,
+      reason: "",
+      sourcePaneId: PRIMARY_PANE,
+      status: "ready",
+      zoom: 1,
+    };
+    workspace.activePaneId = PRIMARY_PANE;
+    const side = standUpPaneGrid(SECONDARY_PANE);
+    const sideWrap = document.createElement("div");
+    side.wrap.append(sideWrap);
+    side.panzoomWrap = sideWrap;
+    // Both stages resolve to ONE tab — that is the hop, and the reason none of the numbers below
+    // May come from it.
+    expect(tabOfPane(SECONDARY_PANE)?.id).toBe("a");
+    return { a, side, sideWrap };
+  }
+
+  afterEach(() => {
+    surfaceForPane(SECONDARY_PANE).panels.length = 0;
+    unregisterCanvasSurface(SECONDARY_PANE);
+  });
+
+  test("the zoom pod in a lens reports the LENS's scale", () => {
+    const { a, side } = lensBeside("breakpoint", "md");
+    a.session.ui.zoom = 2;
+    (workspace.panes[1]!.derived as { zoom: number }).zoom = 0.4;
+
+    expect(stageZoom(side)).toBeCloseTo(0.4, 10);
+    expect(stageZoom(primary())).toBe(2);
+  });
+
+  test("zooming a lens does not rescale the document beside it", () => {
+    /* The WRITE, which nothing asserted while the READ was covered — so the pod reported 40% and
+       its `-` divided the desktop pane's number and applied the result to the author's own
+       document. */
+    const { a, side, sideWrap } = lensBeside("breakpoint", "md");
+    a.session.ui.zoom = 2;
+
+    setUserZoom(0.5, side);
+
+    expect((workspace.panes[1]!.derived as { zoom: number }).zoom).toBeCloseTo(0.5, 10);
+    expect(a.session.ui.zoom).toBe(2);
+    // …and it is the number the stage actually draws at.
+    applyTransform(side);
+    expect(sideWrap.style.transform).toContain("scale(0.5)");
+  });
+
+  test("the two stages declare SEPARATE fits, though they share one document", () => {
+    /* `_fits` is keyed by tab id + path, and a lens has neither of its own — so one key served
+       both stages: "Fit page" chosen in the lens re-framed the pane beside it, and every mode
+       transition in either pane re-applied the other's fit. */
+    const { side } = lensBeside("breakpoint", "md");
+    resetFits();
+
+    setFit("width", side);
+
+    expect(getFit(side)).toBe("width");
+    expect(hasDeclaredFit(side)).toBe(true);
+    expect(getFit(primary())).toBe(DEFAULT_FIT);
+    expect(hasDeclaredFit(primary())).toBe(false);
+  });
+
+  test("the lens marks ITS breakpoint's artboard header, not the shared tab's", async () => {
+    const { a, side } = lensBeside("breakpoint", "md");
+    // The tab the lens shares is on the base artboard. The lens is a lens of `md`.
+    a.session.ui.activeMedia = null;
+    const base = canvasPanelTemplate("base", "Base (320px)", false, 320);
+    const md = canvasPanelTemplate("md", "Tablet (768px)", false, 768);
+    await renderInto(base.tpl);
+    await renderInto(md.tpl);
+    side.panels.push(base.panel as never, md.panel as never);
+
+    updateActivePanelHeaders(side);
+
+    const active = (panel: { element?: Element | null }) =>
+      panel.element?.querySelector(".canvas-panel-header")?.classList.contains("active");
+    expect(active(md.panel)).toBe(true);
+    expect(active(base.panel)).toBe(false);
+  });
+});
+
+// ─── Two panes, two scales ────────────────────────────────────────────────────
+
+describe("the pan-zoom axis is per stage", () => {
+  /*
+   * Defect S3, as four assertions.
+   *
+   * `panX`, `panY` and `panzoomWrap` moved onto `CanvasSurface`; the SCALE did not. It stayed
+   * behind `initCanvasUtils`, whose `getZoom`/`setZoomDirect` were `activeTab.value` — so every
+   * function below took an explicit surface and then asked the focused pane what scale to draw it
+   * at. `scripts/check-pane-singletons.ts` could not see it: it banned `view.<field>` by name, and
+   * the zoom was never on `view`.
+   */
+
+  /** Two panes on two documents, each with its own registered stage and panzoom wrap. */
+  function twoPanes() {
+    const a = resetWorkspaceWithTab(undefined, { documentPath: "/project/a.json", id: "a" });
+    const b = openTab({
+      document: { children: [], tagName: "div" },
+      documentPath: "/project/b.json",
+      id: "b",
+    });
+    workspace.panes[0]!.tabOrder = ["a"];
+    workspace.panes[0]!.activeTabId = "a";
+    workspace.panes = [
+      ...workspace.panes,
+      { activeTabId: "b", derived: null, id: SECONDARY_PANE, tabOrder: ["b"] },
+    ];
+    // The keyboard stays in the PRIMARY throughout — that is what makes the side pane "unfocused".
+    workspace.activePaneId = PRIMARY_PANE;
+
+    const side = standUpPaneGrid(SECONDARY_PANE);
+    const primaryWrap = makePanzoomWrap();
+    const sideWrap = document.createElement("div");
+    side.wrap.append(sideWrap);
+    side.panzoomWrap = sideWrap;
+    return { a, b, primaryWrap, side, sideWrap };
+  }
+
+  afterEach(() => {
+    surfaceForPane(SECONDARY_PANE).panels.length = 0;
+    unregisterCanvasSurface(SECONDARY_PANE);
+  });
+
+  test("each stage draws at its OWN document's scale", () => {
+    const { a, b, primaryWrap, side, sideWrap } = twoPanes();
+    a.session.ui.zoom = 1;
+    b.session.ui.zoom = 2;
+
+    applyTransform(primary());
+    applyTransform(side);
+
+    // The failure was `scale(1)` here: the unfocused pane drew at the FOCUSED tab's scale.
+    expect(sideWrap.style.transform).toContain("scale(2)");
+    expect(primaryWrap.style.transform).toContain("scale(1)");
+  });
+
+  test("the side pane's zoom-in zooms the side pane", () => {
+    const { a, b, side } = twoPanes();
+    a.session.ui.zoom = 1;
+    b.session.ui.zoom = 2;
+
+    // Exactly what the side pane's `+` runs: its own tab's zoom, times 1.2, on its own surface.
+    setUserZoom((b.session.ui.zoom ?? 1) * 1.2, side);
+
+    expect(b.session.ui.zoom).toBeCloseTo(2.4, 10);
+    // It used to land HERE — the primary's document, at a factor computed from the side pane's.
+    expect(a.session.ui.zoom).toBe(1);
+  });
+
+  test("the fit is per document, so the unfocused pod reports its own", () => {
+    const { side } = twoPanes();
+    resetFits();
+
+    setFit("width", side);
+
+    expect(getFit(side)).toBe("width");
+    expect(hasDeclaredFit(side)).toBe(true);
+    expect(getFit(primary())).toBe(DEFAULT_FIT);
+    expect(hasDeclaredFit(primary())).toBe(false);
+  });
+
+  test("one pane entering Design does not re-fit the other", () => {
+    const { a, b, side, sideWrap } = twoPanes();
+    resetFits();
+    a.session.ui.zoom = 1;
+    b.session.ui.zoom = 1;
+    defineMetric(side.wrap, "clientWidth", 700);
+    defineMetric(side.wrap, "clientHeight", 600);
+    stubRect(sideWrap, { height: 0, width: 1312 });
+    side.panels.push({ _width: 1280 } as never);
+
+    fitOnCanvasEntry(side);
+
+    expect(b.session.ui.zoom).toBeCloseTo(700 / 1312, 10);
+    // The reported failure: the side pane fitting itself snapped the PRIMARY to 16%.
+    expect(a.session.ui.zoom).toBe(1);
+  });
+
+  test("edit zoom is per stage too, down to the coalescing frame", () => {
+    const { a, b, side } = twoPanes();
+    a.session.ui.canvasMode = "edit";
+    b.session.ui.canvasMode = "edit";
+    const frames: FrameRequestCallback[] = [];
+    globalThis.requestAnimationFrame = ((cb: FrameRequestCallback) => {
+      frames.push(cb);
+      return frames.length;
+    }) as typeof requestAnimationFrame;
+
+    a.session.ui.editZoom = 1;
+    b.session.ui.editZoom = 1;
+
+    setEditZoom(2, side);
+    expect(b.session.ui.editZoom).toBe(2);
+    // It opened `activeTab.value`, so the side pane's `+` wrote the PRIMARY's content zoom.
+    expect(a.session.ui.editZoom).toBe(1);
+
+    // `_editZoomRaf` was ONE global slot: a burst in one pane swallowed the other pane's frame.
+    requestEditZoom(1.5, primary());
+    requestEditZoom(2.5, side);
+    expect(frames.length).toBe(2);
+    expect(a.session.ui.editZoom).toBe(1.5);
+    expect(b.session.ui.editZoom).toBe(2.5);
   });
 });

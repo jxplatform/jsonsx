@@ -11,11 +11,39 @@ import {
   closeTab,
   openTab,
   replaceAllTabs,
+  tabIsLive,
   workspace,
 } from "../src/workspace/workspace";
+import type { Tab } from "../src/tabs/tab";
 
 beforeEach(() => {
   closeAllTabs();
+});
+
+/**
+ * The question a CAPTURED tab owes before anything is written into it.
+ *
+ * Both Monaco surfaces commit on a debounce, and a debounce is a promise to write into a tab that
+ * was open half a second ago. `null` is one of the answers callers rely on: `commitTabBuffers`
+ * flushes a buffer whose `_editingTab` may be nothing at all.
+ */
+describe("tabIsLive", () => {
+  test("is false for no tab, for a closed one, and for a stale object of the same id", () => {
+    const nothing = undefined as Tab | undefined;
+    expect(tabIsLive(null)).toBe(false);
+    expect(tabIsLive(nothing)).toBe(false);
+
+    const tab = openTab({ document: { tagName: "div" }, id: "t1" });
+    expect(tabIsLive(tab)).toBe(true);
+
+    // Same id, different object: a tab that was closed and reopened is not the tab a commit was
+    // Promised to, and writing into it would push history onto a document nobody asked about.
+    const stale = { ...tab, id: "t1" } as typeof tab;
+    expect(tabIsLive(stale)).toBe(false);
+
+    closeTab("t1");
+    expect(tabIsLive(tab)).toBe(false);
+  });
 });
 
 describe("closeTab early return", () => {

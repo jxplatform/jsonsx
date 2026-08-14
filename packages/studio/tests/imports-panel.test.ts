@@ -2,7 +2,7 @@
 import { flush, installMockPlatform, renderInto, resetStudioState } from "./harness";
 import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { renderImportsTemplate } from "../src/panels/imports-panel";
-import { loadComponentRegistry } from "../src/files/components";
+import { componentRegistry, loadComponentRegistry } from "../src/files/components";
 import { initLayers } from "../src/ui/layers";
 import { requireProjectState } from "../src/store";
 
@@ -95,10 +95,12 @@ describe("site-level imports (project.json)", () => {
     expect(sections).toContain("Add Dependency");
   });
 
-  test("shows empty state when there are no class imports", async () => {
+  test("with no imported modules it teaches what an import buys", async () => {
     resetStudioState({ projectConfig: { name: "t" } });
     const container = await renderSite();
-    expect(container.textContent).toContain("No class imports");
+    expect(container.textContent).toContain(
+      "Imported modules give this project extra kinds of data",
+    );
   });
 
   test("checkbox state reflects cherry-picked and legacy imports", async () => {
@@ -329,6 +331,23 @@ describe("document-level imports", () => {
       (i) => i.textContent,
     );
     expect(options).toEqual(["<my-card>"]);
+  });
+
+  test("with no component imports it teaches what they buy, and names the picker below", async () => {
+    doc.$elements = ["@acme/kit/button.js"];
+    const container = await renderInto(renderImportsTemplate(docCtx() as never));
+    expect(container.querySelector(".empty-state-message")?.textContent).toBe(
+      "Components you add here can be dropped onto this page. Pick one below.",
+    );
+  });
+
+  test("with no project components at all it says where components come from", async () => {
+    doc.$elements = [];
+    componentRegistry.length = 0;
+    const container = await renderInto(renderImportsTemplate(docCtx() as never));
+    expect(container.querySelector(".empty-state-message")?.textContent).toContain(
+      "This project has none yet",
+    );
   });
 
   test("removing a $ref import filters it out of $elements", async () => {

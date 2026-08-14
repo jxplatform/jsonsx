@@ -14,21 +14,21 @@ code:
 
 # Data sources
 
-A data source is a state entry whose value comes from somewhere — a URL, the browser's storage, a form, your project's content, a database table — instead of being typed in. You add one from the **[State panel](/docs/studio/logic/state)**'s **+ Add…** picker, and from then on it behaves like any other value: bind it, compute from it, show it. Sources are reactive — when the underlying data changes, everything built on it updates. The model behind that is **[Reactivity](/docs/framework/concepts/reactivity)**.
+A data source is a state entry whose value comes from somewhere — a URL, the browser's storage, a form, your project's content, a database table — instead of being typed in. You add one from the **[Data panel](/docs/studio/logic/data)**'s **+ Add…** picker, and from then on it behaves like any other value: bind it, compute from it, show it. Sources are reactive — when the underlying data changes, everything built on it updates. The model behind that is **[Reactivity](/docs/framework/concepts/reactivity)**.
 
 Each source's editor shows just the fields that source needs.
 
 ## Request — fetch from a URL
 
-**Fetch (Request)** loads data over HTTP — a JSON API, most typically.
+**Fetch from a URL** loads data over HTTP — a JSON API, most typically.
 
-![The State panel editing a Request source's URL, method, and timing](../../images/data-source-request.png)
+![The Data panel editing a Request source's URL, method, and timing](../../images/data-source-request.png)
 
 - **URL** — where to fetch from.
 - **Method** — `GET`, `POST`, `PUT`, `DELETE`, or `PATCH`.
 - **Timing** — `client` fetches in the visitor's browser; `server` runs the request on the server instead — useful when an API can't be called from a browser.
 
-While the request is in flight the entry reads as `pending` in the **[Data explorer](/docs/studio/logic/data-explorer)**; the resolved response then flows wherever the entry is used.
+While the request is in flight the entry reads as `pending` in the **[Data panel](/docs/studio/logic/data)**; the resolved response then flows wherever the entry is used.
 
 ## LocalStorage and SessionStorage — remember in the browser
 
@@ -75,7 +75,7 @@ Two small structural sources round out the built-ins: **Set** (a list without du
 - **sort** — zero or more rules, each a **field** and an **order** (`asc` or `desc`).
 - **limit** — the maximum number of entries to return.
 
-On a page with a dynamic address, a field holding a reference shows a binding picker instead of a plain value — **Static value**, the page's URL parameters, or **Custom…** — so a detail page can query "the entry this URL names".
+A field that already holds a reference is edited with a binding picker instead of a plain value. The picker lists **Static value** — which clears the binding and hands the field back its ordinary editor — then one entry per URL parameter the page's address declares (`$params/slug` and friends), then **Custom…**, which reveals a free-form `#/$params/…` field for any other pointer. That is how a detail page queries "the entry this URL names".
 
 ## Database sources
 
@@ -96,7 +96,7 @@ Both extensions are covered from the other side — the tables, the settings, th
 
 ## External sources
 
-**External Module…** points an entry at a JavaScript module of your own (**Source** and **Prototype** fields); if the module describes its options, Studio renders them as a form, the same way it does for ContentCollection. Sources added by any other installed extension list themselves in the **+ Add…** picker the same way.
+**From a module…** points an entry at a JavaScript module of your own (**Source** and **Kind** fields); if the module describes its options, Studio renders them as a form, the same way it does for ContentCollection. Sources added by any other installed extension list themselves in the **+ Add…** picker the same way.
 
 :::doc-note
 Every source is stored as a small JSON object in the file's `state` — a `$prototype` naming the kind plus the fields above. Nothing here is code; the runtime interprets these declarations, as described in **[Reactivity](/docs/framework/concepts/reactivity)**. The table sources are rewritten at build time into ordinary fetches against `/_jx/data`, so no extension code ships to the browser.
@@ -104,6 +104,6 @@ Every source is stored as a small JSON object in the file's `state` — a `$prot
 
 ## Next
 
-- Watch a source resolve, live, in the **[Data explorer](/docs/studio/logic/data-explorer)**
+- Watch a source resolve, live, in the **[Data panel](/docs/studio/logic/data)**
 - Compute over fetched data with **[Formulas and expressions](/docs/studio/logic/formulas)**
 - Content types themselves are managed in **[Content types](/docs/studio/projects/content-types)**

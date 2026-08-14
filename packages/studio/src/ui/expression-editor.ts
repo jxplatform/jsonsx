@@ -1,4 +1,14 @@
 /// <reference lib="dom" />
+/**
+ * The expression editor — one operator row plus an operand editor per slot, nested to any depth.
+ *
+ * **The layout is CSS, in `styles/inspector.css` (§ "The expression editor").** Every row here used
+ * to be an inline `display:flex;…` attribute with a hard `min-width` on the pickers, and no rung of
+ * that chain could set `min-width: 0` — so at Inspector width the operand controls refused to
+ * shrink and Operator, Target and Value were clipped by the edge of the window. The editor is drawn
+ * in the Inspector (~280px), in the Navigator, and in the Bottom dock's Logic tab (very wide), so
+ * every row wraps to a stack rather than sizing itself in pixels.
+ */
 import { html, nothing } from "lit-html";
 import { live } from "lit-html/directives/live.js";
 import { PURE_METHOD_OPS } from "@jxsuite/runtime/expression";
@@ -7,6 +17,8 @@ import { renderFieldRow } from "./field-row";
 import { renderFormulaChips } from "./formula-chips";
 import { applyCatalogPick, calleeEntry, formulaCatalog } from "./formula-catalog";
 import { openFormulaPalette } from "./formula-palette";
+import { VALUE_SOURCE_LABELS } from "./value-source";
+import { renderEmptyState } from "../panels/empty-state";
 
 import type {
   JxExpressionNode,
@@ -35,6 +47,18 @@ const BINARY_OPS = new Set([
   "??",
 ]);
 const ASSIGN_OPS = new Set(["=", "+=", "-=", "*=", "/="]);
+
+/**
+ * Does this expression node DO something rather than compute something?
+ *
+ * An assignment writes a target and yields nothing worth reading; a `+` or a `filter` yields a
+ * value. The Data panel needs the distinction to know whether a row has a value column at all —
+ * labelling `setBeds0` "pending" reads as "still loading" for a thing that will never load.
+ */
+export function isActionExpression(node: unknown): boolean {
+  const op = (node as { operator?: unknown } | null | undefined)?.operator;
+  return typeof op === "string" && ASSIGN_OPS.has(op);
+}
 const NO_ARG_OPS = new Set(["pop", "shift"]);
 const ONE_ARG_OPS = new Set(["push", "unshift"]);
 
@@ -180,6 +204,10 @@ function operatorInfo(op: string): OperatorInfo {
 // ─── Operand Mode Detection ─────────────────────────────────────────────────
 
 /**
+ * Which rung of the value ladder an operand occupies. The three answers are the same three the
+ * Properties, Style and Logic tabs give, and they are spelled the same way — `ui/value-source.ts`
+ * owns the words, so `lit / $ref / expr` is gone from the operand picker (plan §6.3).
+ *
  * @param {unknown} operand
  * @returns {"ref" | "expression" | "literal"}
  */
@@ -315,14 +343,7 @@ function renderValueBadge(preview: EditorPreview | null | undefined, pathKey: st
   if (text === undefined) {
     return nothing;
   }
-  return html`
-    <span
-      class="expr-live-badge"
-      title=${text}
-      style="font-family:var(--spectrum-code-font-family, monospace);font-size:10px;line-height:16px;padding:0 5px;border-radius:4px;background:var(--spectrum-gray-200, #323232);color:var(--spectrum-seafoam-900, #35a690);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px;flex-shrink:1"
-      >${text}</span
-    >
-  `;
+  return html`<span class="expr-live-badge" title=${text}>${text}</span>`;
 }
 
 // ─── Ref Picker ─────────────────────────────────────────────────────────────
@@ -343,10 +364,20 @@ function renderRefPicker(
   const allRefs = [...stateRefs, ...eventRefs];
   const isCustom = refVal && !allRefs.includes(refVal);
 
+  // Nothing to pick and nothing already picked: a picker whose only entry is a disabled "No state
+  // Defined" is a dead end. Say what a binding is instead, in the shell's one empty-state voice.
+  if (allRefs.length === 0 && !refVal) {
+    return renderEmptyState({
+      compact: true,
+      detail: "Add one in the State panel and it shows up here.",
+      message: "A binding points at a value this page holds.",
+    });
+  }
+
   return html`
     <sp-picker
       size="s"
-      style="flex:1"
+      class="expr-ref"
       placeholder="Select…"
       .value=${live(isCustom ? "__custom__" : refVal || "")}
       @change=${(e: Event) => {
@@ -357,13 +388,9 @@ function renderRefPicker(
         onRefChange(val);
       }}
     >
-      ${
-        stateRefs.length > 0
-          ? stateRefs.map(
-              (r) => html`<sp-menu-item value=${r}>${r.replace("#/state/", "")}</sp-menu-item>`,
-            )
-          : html`<sp-menu-item disabled>No state defined</sp-menu-item>`
-      }
+      ${stateRefs.map(
+        (r) => html`<sp-menu-item value=${r}>${r.replace("#/state/", "")}</sp-menu-item>`,
+      )}
       ${
         eventRefs.length > 0
           ? html`
@@ -386,10 +413,10 @@ function renderRefPicker(
 function renderLiteralEditor(operand: unknown, onChange: (newVal: JxExpressionOperand) => void) {
   const type = literalType(operand);
   return html`
-    <div style="display:flex;gap:4px;align-items:center;flex:1">
+    <div class="expr-literal">
       <sp-picker
         size="s"
-        style="min-width:56px"
+        class="expr-literal-type"
         .value=${live(type)}
         @change=${(e: Event) => {
           const newType = (e.target as HTMLInputElement).value;
@@ -405,28 +432,26 @@ function renderLiteralEditor(operand: unknown, onChange: (newVal: JxExpressionOp
         type === "string"
           ? html`<sp-textfield
               size="s"
-              style="flex:1"
+              class="expr-literal-value"
               .value=${live(String(operand ?? ""))}
               @input=${(e: Event) => onChange((e.target as HTMLInputElement).value)}
             ></sp-textfield>`
           : type === "number"
             ? html`<sp-number-field
                 size="s"
-                style="flex:1"
+                class="expr-literal-value"
                 .value=${live(Number(operand ?? 0))}
                 @change=${(e: Event) => onChange(Number((e.target as HTMLInputElement).value))}
               ></sp-number-field>`
             : type === "boolean"
               ? html`<sp-checkbox
                   size="s"
+                  class="expr-literal-bool"
                   ?checked=${Boolean(operand)}
                   @change=${(e: Event) => onChange((e.target as HTMLInputElement).checked)}
                   >true</sp-checkbox
                 >`
-              : html`<span
-                  style="font-size:var(--spectrum-font-size-75, 12px);color:var(--spectrum-gray-600, #808080)"
-                  >null</span
-                >`
+              : html`<span class="expr-literal-null">null</span>`
       }
     </div>
   `;
@@ -465,25 +490,26 @@ export function renderOperandEditor(
   if (opts.mustBeRef) {
     const refVal = ((operand as Record<string, unknown> | null)?.$ref as string) ?? "";
     return html`
-      <div style="flex:1">${renderRefPicker(refVal, (r) => onChange({ $ref: r }), opts)}</div>
+      <div class="expr-operand">${renderRefPicker(refVal, (r) => onChange({ $ref: r }), opts)}</div>
     `;
   }
 
   const mode = operandMode(operand);
   return html`
-    <div style="display:flex;gap:4px;align-items:flex-start;flex:1">
+    <div class="expr-operand">
       <sp-picker
         size="s"
-        style="min-width:60px"
+        class="expr-operand-mode"
+        label="Value source"
         .value=${live(mode)}
         @change=${(e: Event) => {
           const newMode = (e.target as HTMLInputElement).value;
           onChange(defaultForMode(newMode));
         }}
       >
-        <sp-menu-item value="literal">lit</sp-menu-item>
-        <sp-menu-item value="ref">$ref</sp-menu-item>
-        <sp-menu-item value="expression">expr</sp-menu-item>
+        <sp-menu-item value="literal">${VALUE_SOURCE_LABELS.literal}</sp-menu-item>
+        <sp-menu-item value="ref">${VALUE_SOURCE_LABELS.ref}</sp-menu-item>
+        <sp-menu-item value="expression">${VALUE_SOURCE_LABELS.expression}</sp-menu-item>
       </sp-picker>
       ${
         mode === "literal"
@@ -526,13 +552,8 @@ function renderSpliceArgsEditor(
     <div class="array-object-field">
       ${safeArgs.map(
         (arg, idx) => html`
-          <div
-            class="array-object-row"
-            style="display:flex;gap:4px;align-items:center;margin-bottom:4px"
-          >
-            <span style="font-size:10px;color:var(--spectrum-gray-600, #808080);min-width:30px">
-              ${labels[idx] ?? fallbackLabel}
-            </span>
+          <div class="array-object-row">
+            <span class="array-object-label">${labels[idx] ?? fallbackLabel}</span>
             ${renderOperandEditor(
               arg,
               (newArg) => {
@@ -614,21 +635,14 @@ export function renderExpressionEditor(
   const sub = (...segs: (string | number)[]) => [...path, ...segs].join("/");
   /** Wrap an operand widget with its live value badge. */
   const withBadge = (widget: unknown, key: string) =>
-    html`<div style="display:flex;gap:4px;align-items:center;flex:1;min-width:0">
-      ${widget}${renderValueBadge(preview, key)}
-    </div>`;
-
-  const nestStyle =
-    depth > 0
-      ? "border-left:2px solid var(--spectrum-gray-300, #3c3c3c);margin-left:8px;padding-left:8px;"
-      : "";
+    html`<div class="expr-widget">${widget}${renderValueBadge(preview, key)}</div>`;
 
   // The root badge: pure roots show their result; mutating roots' effect shows on target/value.
   const rootBadge =
     depth === 0 && preview && !preview.mutating ? renderValueBadge(preview, pathKey) : nothing;
 
   return html`
-    <div class="expression-editor" style=${nestStyle}>
+    <div class=${depth > 0 ? "expression-editor expression-editor--nested" : "expression-editor"}>
       ${
         depth === 0
           ? renderFormulaChips(safeNode, opts.onChipSelect ?? (() => {}), { path, preview })
@@ -636,11 +650,7 @@ export function renderExpressionEditor(
       }
       ${
         depth === 0 && preview?.error
-          ? html`<div
-              style="font-size:10px;color:var(--spectrum-negative-content-color-default, #f76a63);padding:2px 0"
-            >
-              ${preview.error}
-            </div>`
+          ? html`<div class="expr-error">${preview.error}</div>`
           : nothing
       }
       ${renderFieldRow({
@@ -648,9 +658,10 @@ export function renderExpressionEditor(
         label: "Operator",
         prop: "operator",
         widget: html`
-          <div style="display:flex;gap:4px;align-items:center;flex:1;min-width:0">
+          <div class="expr-widget">
             <sp-picker
               size="s"
+              class="expr-operator"
               .value=${live(op)}
               @change=${(e: Event) => {
                 const newOp = (e.target as HTMLInputElement).value;
@@ -748,7 +759,7 @@ export function renderExpressionEditor(
       ${
         info.needsValue && info.valueIsNode
           ? html`
-              <div style="margin-top:4px">
+              <div class="expr-subsection">
                 ${renderFieldRow({
                   hasValue: false,
                   label: "Per-item",
@@ -769,7 +780,7 @@ export function renderExpressionEditor(
       ${
         info.spliceArray
           ? html`
-              <div style="margin-top:4px">
+              <div class="expr-subsection">
                 ${renderFieldRow({
                   hasValue: false,
                   label: "Args",
@@ -791,7 +802,7 @@ export function renderExpressionEditor(
       ${
         info.callArgs
           ? html`
-              <div style="margin-top:4px">
+              <div class="expr-subsection">
                 ${renderFieldRow({
                   hasValue: false,
                   label: "Args",
@@ -867,13 +878,13 @@ function renderSwitchCasesEditor(
   const setCases = (next: Record<string, unknown>) => onChange({ ...safeNode, cases: next });
 
   return html`
-    <div class="switch-cases" style="margin-top:4px">
+    <div class="switch-cases">
       ${entries.map(
         ([key, operand]) => html`
-          <div style="display:flex;gap:4px;align-items:flex-start;margin-bottom:4px">
+          <div class="switch-case-row">
             <sp-textfield
               size="s"
-              style="width:80px;flex-shrink:0"
+              class="switch-case-key"
               placeholder="value"
               .value=${live(key)}
               @change=${(e: Event) => {
@@ -910,11 +921,8 @@ function renderSwitchCasesEditor(
           </div>
         `,
       )}
-      <div style="display:flex;gap:4px;align-items:flex-start;margin-bottom:4px">
-        <span
-          style="width:80px;flex-shrink:0;font-size:10px;line-height:24px;color:var(--spectrum-gray-600, #808080)"
-          >default</span
-        >
+      <div class="switch-case-row">
+        <span class="switch-case-key switch-case-default">default</span>
         ${withBadge(
           renderOperandEditor(safeNode.default, (v) => onChange({ ...safeNode, default: v }), {
             ...opts,

@@ -114,6 +114,15 @@ export const STUDIO_ROUTES = {
   fileDelete: route("DELETE", "/__studio/file", "Delete a file"),
   fileUpload: route("POST", "/__studio/file/upload", "Upload binary content to a path"),
   fileRename: route("POST", "/__studio/file/rename", "Rename/move (+ refactor report)"),
+  references: route(
+    "GET",
+    "/__studio/references",
+    "Where a file or a component tag is used (?path=&tag=, at least one) → ReferencesResult " +
+      "{files, filesReferencing, refsTotal} — the read side of the rename refactor's own walker, " +
+      "cached until the backend's watcher sees the tree move (backs findReferences)",
+    'Usage counts are hidden: no "Used on N pages" in the inspector, no Selection: Find Usages, ' +
+      "and delete/rename confirmations state no reference count.",
+  ),
   locate: route("POST", "/__studio/locate", "Find a file by name → {path | null}"),
   collab: route(
     "GET",
@@ -181,6 +190,27 @@ export const STUDIO_ROUTES = {
     "/__studio/code/lint",
     "Lint posted source {code, path?} → {diagnostics}",
     "Code editors show no lint markers.",
+  ),
+
+  // ─── Site build ───────────────────────────────────────────────────────────
+  /**
+   * Build the site to its output directory, so what a reader opens is what the author sees.
+   *
+   * `View: Open in Browser` runs this first. Without it the reader gets whatever the last build
+   * left on disk — which for most projects is nothing, and for the rest is yesterday — while the
+   * canvas beside them shows today. A preview that silently shows stale output is worse than one
+   * that says it cannot open.
+   *
+   * The reply also names `url`, the ORIGIN the result is browsable at. It is not this server's:
+   * these paths mean the project's SOURCES, and a built page addresses its own OUTPUT by the same
+   * paths (`/components/x.js` is the formula module here and the custom element there), so a
+   * backend serves the built site somewhere of its own and says where.
+   */
+  buildSite: route(
+    "POST",
+    "/__studio/build",
+    "Build the site to its output directory → {routes, files, errors, url}",
+    "Open in Browser reports that this target cannot build a preview.",
   ),
 
   // ─── Packages ─────────────────────────────────────────────────────────────

@@ -1,14 +1,14 @@
 /** Tests for src/packages/pull-package-sync.ts — pull orchestration with package-conflict recovery. */
 import { flush, installMockPlatform } from "./harness";
 import { afterEach, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
+import { notifyModule } from "./notify-mock";
 import { initLayers } from "../src/ui/layers";
 import type { GitStatusResult, StudioPlatform } from "../src/types";
 
 const applyCalls: unknown[][] = [];
-let checkResult: {
-  target: string;
-  outdated: { name: string; current: string; dev: boolean }[];
-} | null = null;
+/* `checkJxsuiteUpdate` returns the outdated list itself now — one entry per package, each carrying
+   its OWN newest published version, because the packages no longer share a release cadence. */
+let checkResult: { name: string; current: string; latest: string; dev: boolean }[] = [];
 
 void mock.module("../src/packages/jxsuite-update", () => ({
   applyJxsuiteUpdate: async (...args: unknown[]) => {
@@ -19,15 +19,9 @@ void mock.module("../src/packages/jxsuite-update", () => ({
 }));
 
 const statusMessages: string[] = [];
-void mock.module("../src/panels/statusbar", () => ({
-  mountStatusbar: () => {},
-  renderStatusbar: () => {},
-  setStatusbarRenderer: () => {},
-  statusMessage: (msg: string) => {
-    statusMessages.push(msg);
-  },
-  unmountStatusbar: () => {},
-}));
+void mock.module("../src/services/notify.js", () =>
+  notifyModule((call) => statusMessages.push(call.message)),
+);
 
 const { autoSyncProjectOnOpen, isAutomatedPackageDiff, planPackageDiscard, pullWithPackageSync } =
   await import("../src/packages/pull-package-sync");
@@ -46,7 +40,7 @@ beforeAll(() => {
 beforeEach(() => {
   applyCalls.length = 0;
   statusMessages.length = 0;
-  checkResult = null;
+  checkResult = [];
 });
 
 afterEach(() => {
@@ -183,10 +177,7 @@ describe("pullWithPackageSync — preemptive", () => {
       },
       { "bun.lock": "lock-local", "package.json": PKG_AUTOMATED },
     );
-    checkResult = {
-      outdated: [{ current: "^0.19.0", dev: false, name: "@jxsuite/runtime" }],
-      target: "0.30.1",
-    };
+    checkResult = [{ current: "^0.19.0", dev: false, latest: "1.3.2", name: "@jxsuite/runtime" }];
 
     await pullWithPackageSync();
 
@@ -199,7 +190,7 @@ describe("pullWithPackageSync — preemptive", () => {
     expect(discard?.[1]).toEqual(["package.json", "bun.lock"]);
     expect(applyCalls).toHaveLength(1);
     expect(dialog()).toBeNull();
-    expect(statusMessages).toContain("Local package updates were superseded by pulled changes");
+    expect(statusMessages).toContain("Local package updates were superseded by pulled changes.");
   });
 
   test("leaves files alone when upstream content matches HEAD", async () => {
@@ -274,10 +265,7 @@ describe("pullWithPackageSync — preemptive", () => {
       },
       { "bun.lock": "lock-local", "package.json": PKG_AUTOMATED },
     );
-    checkResult = {
-      outdated: [{ current: "^0.19.0", dev: false, name: "@jxsuite/runtime" }],
-      target: "0.30.1",
-    };
+    checkResult = [{ current: "^0.19.0", dev: false, latest: "1.3.2", name: "@jxsuite/runtime" }];
 
     const error = await rejectionOf(pullWithPackageSync());
     expect(error.message).toBe("network died mid-pull");
@@ -312,7 +300,7 @@ describe("pullWithPackageSync — post-pull sync", () => {
     expect(progressCard()).toBeNull();
   });
 
-  test("shows the install log in the progress modal when bun install fails", async () => {
+  test("shows the install log in Problems when bun install fails", async () => {
     const { state } = installMockPlatform(
       {
         gitPull: async () => {
@@ -327,7 +315,9 @@ describe("pullWithPackageSync — post-pull sync", () => {
     await pullWithPackageSync();
     await flush();
 
-    expect(progressCard()?.textContent).toContain("lockfile corrupt");
+    // `notify` is mocked in this file, so the failure is observed where it is reported rather
+    // Than in the store: a one-line install log becomes the Problem's own headline.
+    expect(statusMessages).toContain("lockfile corrupt");
   });
 
   test("falls back to reading all package files when the root listing fails", async () => {
@@ -538,6 +528,6 @@ describe("autoSyncProjectOnOpen", () => {
       gitStatus: async () => gitStatusOf(),
     });
     await autoSyncProjectOnOpen();
-    expect(statusMessages.some((m) => m.startsWith("Sync skipped:"))).toBe(true);
+    expect(statusMessages.some((m) => m.includes("could not be synced"))).toBe(true);
   });
 });

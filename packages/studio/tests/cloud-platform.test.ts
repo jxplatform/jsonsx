@@ -678,6 +678,33 @@ describe("bound session surface", () => {
     await p.deleteFile("gone.md"); // Default mock 200 → resolves.
   });
 
+  test("findReferences is computed server-side — cloud never degrades to unknown", async () => {
+    const calls = mockFetch({
+      "/references": {
+        body: {
+          errors: [],
+          files: [{ count: 2, path: "pages/index.json", refs: [] }],
+          filesReferencing: 1,
+          path: "components/card.json",
+          refsTotal: 2,
+          tagName: "my-card",
+        },
+      },
+    });
+    const p = createCloudPlatform(PROJECT);
+    const result = await p.findReferences!({ path: "components/card.json", tagName: "my-card" });
+    expect(result.refsTotal).toBe(2);
+    const call = calls.find((c) => c.url.includes("/references"))!;
+    expect(call.url).toContain("path=components%2Fcard.json");
+    expect(call.url).toContain("tag=my-card");
+  });
+
+  test("findReferences surfaces a failure rather than answering zero", async () => {
+    mockFetch({ "/references": { status: 500, body: { error: "walker exploded" } } });
+    const p = createCloudPlatform(PROJECT);
+    expect(p.findReferences!({ tagName: "my-card" })).rejects.toThrow(/walker exploded/);
+  });
+
   test("error bodies surface their message; non-JSON errors fall back", async () => {
     mockFetch({ "/file?path=x": { status: 500, body: { error: "disk full" } } });
     const p = createCloudPlatform(PROJECT);

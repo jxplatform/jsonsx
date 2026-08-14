@@ -1,72 +1,134 @@
+/**
+ * The Command Bar (region ①) — a rendering of the registry, and nothing else.
+ *
+ * The assertions are grouped by the claim each one defends:
+ *
+ * - **One definition site.** Every button's label, icon, tooltip, chord and disabled state is read
+ *   off a record; there is no second template for the no-project case, so the tests that used to
+ *   assert `minimalToolbarTemplate`'s hardcoded `disabled` attributes are gone with it.
+ * - **The pill is the address.** `◈ project › document › selection`, each segment opening the palette
+ *   pre-scoped — the one place Studio now states which project is open.
+ * - **`openInBrowserTarget` is a pure function** and is tested as one, route by route.
+ */
 import { flush, installMockPlatform } from "./harness";
-import type { MockPlatformState } from "./harness";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { notifyModule } from "./notify-mock";
 import type { Tab } from "../src/tabs/tab";
+import type { SiteBuildResult } from "../src/types";
+import type { PaletteMode } from "../src/commands/defaults";
 
 // ─── Module mocks (must precede the toolbar import) ───────────────────────────
 
-const openQuickSearch = mock(() => {});
-void mock.module("../src/panels/quick-search.js", () => ({
-  openQuickSearch,
-}));
+const openQuickSearch = mock((_mode?: PaletteMode) => {});
+void mock.module("../src/panels/quick-search.js", () => ({ openQuickSearch }));
 
-const refreshGitStatus = mock(async () => {});
-void mock.module("../src/panels/git-panel.js", () => ({
-  refreshGitStatus,
-}));
-
-const openBrowseModal = mock(() => {});
-void mock.module("../src/browse/browse-modal.js", () => ({
-  openBrowseModal,
-}));
-
-let newProjectResult: { root: string } | null = null;
-const openNewProjectModal = mock(async () => newProjectResult);
-void mock.module("../src/new-project/new-project-modal.js", () => ({
-  openNewProjectModal,
-}));
+const notified = mock((_message: string) => {});
+void mock.module("../src/services/notify.js", () => notifyModule((call) => notified(call.message)));
 
 const toolbar = await import("../src/panels/toolbar");
-const { view } = await import("../src/view");
+const { shell, resetProjectShell } = await import("../src/shell");
+// The assistant's toggle reports a TAB selection, so the bar reads it where the Inspector keeps it.
+const { setInspectorTab } = await import("../src/panels/right-panel");
+const { setProjectState } = await import("../src/state");
+const { setPreviewNavigateHandler } = await import("../src/canvas/preview-navigate");
 const { closeAllTabs, openTab } = await import("../src/workspace/workspace");
+const { createCommandRegistry } = await import("../src/commands/registry");
+const { defaultCommands, noopCommandDeps } = await import("../src/commands/defaults");
+const { shellViewCommands } = await import("../src/shell");
+const { makeContext } = await import("../src/commands/context");
+const { setActiveRegistry } = await import("../src/commands/active-registry");
+
+type CommandRegistry = ReturnType<typeof createCommandRegistry>;
+type CommandContext = ReturnType<typeof makeContext>;
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
-type ToolbarCtx = Parameters<typeof toolbar.mount>[1];
-
-function makeCtx(overrides: Partial<ToolbarCtx> = {}): ToolbarCtx {
-  return {
-    closeFunctionEditor: mock(() => {}),
-    getCanvasMode: mock(() => "edit"),
-    openProject: mock(() => {}),
-    openRecentProject: mock(async (_root: string) => {}),
-    renderCanvas: mock(() => {}),
-    safeRenderRightPanel: mock(() => {}),
-    saveFile: mock(() => {}),
-    setCanvasMode: mock((_mode: string) => {}),
-    ...overrides,
-  } as ToolbarCtx;
-}
-
 const ALL_MODES = ["edit", "design", "preview", "source", "stylebook"];
 
-function openTestTab(modes: string[] = ALL_MODES): Tab {
+/** The context the registry's predicates read. Mutated per test, read on every evaluation. */
+let ctx: CommandContext = makeContext();
+
+/** Verbs the records reach, recorded so a click is observable. */
+let ran: string[] = [];
+
+/**
+ * Publish a registry over the real default records.
+ *
+ * The point of using the REAL records rather than fixtures: the bar's job is to render whatever the
+ * registry holds, so a test that invented its own commands would prove nothing about Save's icon or
+ * ⌘B's tooltip.
+ */
+function installRegistry(): CommandRegistry {
+  const registry = createCommandRegistry({ getContext: () => ctx, mac: true });
+  registry.registerAll(
+    defaultCommands({
+      ...noopCommandDeps(),
+      panelRoster: [{ id: "files", title: "Files" }],
+      saveDocument: () => {
+        ran.push("save");
+      },
+      undo: () => {
+        ran.push("undo");
+      },
+      redo: () => {
+        ran.push("redo");
+      },
+      openInBrowser: () => {
+        ran.push("openInBrowser");
+      },
+      openProject: () => {
+        ran.push("openProject");
+      },
+      toggleDock: (dock) => {
+        ran.push(`toggleDock:${dock}`);
+      },
+      focusPanel: (id) => {
+        ran.push(`focusPanel:${id}`);
+      },
+    }),
+  );
+  // The bar's third dock toggle is `shell.ts`'s record now — ⌘J flips `shell.docks.bottom`, which
+  // Is a dock the shell owns, so the verb is declared beside the state rather than injected.
+  registry.registerAll(
+    shellViewCommands({ inspectorTab: () => "properties", setInspectorTab: () => {} }),
+  );
+  // A gated overflow record, so the ⬢ menu's hide-vs-disable behaviour has something to show: every
+  // Default overflow command is ungated, which is a fact about the defaults, not about the menu.
+  registry.register({
+    id: "test.overflowGated",
+    title: "Gated Overflow",
+    category: "View",
+    level: "application",
+    menus: ["commandbar/overflow", "palette"],
+    group: "9_test",
+    when: (candidate) => candidate.project.open,
+    enablement: (candidate) => candidate.document.open,
+    requires: "an open document",
+    run: () => {
+      ran.push("gated");
+    },
+  });
+  setActiveRegistry(registry);
+  return registry;
+}
+
+function openTestTab(documentPath = "/project/index.json"): Tab {
   closeAllTabs();
   return openTab({
-    capabilities: { modes },
+    capabilities: { modes: ALL_MODES },
     document: { children: [{ tagName: "p", textContent: "Hi" }], tagName: "div" },
-    documentPath: "/project/index.json",
+    documentPath,
     id: "toolbar-tab",
   });
 }
 
-/** Find the first sp-action-button whose text content includes the given label. */
-function btn(root: HTMLElement, label: string): HTMLElement {
-  const match = [...root.querySelectorAll("sp-action-button")].find((b) =>
-    (b.textContent || "").includes(label),
+/** Find the first sp-action-button whose accessible name is exactly `label`. */
+function btn(label: string): HTMLElement {
+  const match = [...root.querySelectorAll("sp-action-button")].find(
+    (b) => b.getAttribute("aria-label") === label,
   );
   if (!match) {
-    throw new Error(`no button labeled ${label}`);
+    throw new Error(`no button labelled ${label}`);
   }
   return match as HTMLElement;
 }
@@ -75,22 +137,40 @@ function click(el: Element): void {
   el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
 }
 
+function segments(): string[] {
+  return [...root.querySelectorAll(".tb-center-seg")].map((el) => el.textContent?.trim() ?? "");
+}
+
+function stageProject() {
+  setProjectState({
+    dirs: new Map(),
+    expanded: new Set(),
+    isSiteProject: true,
+    name: "acme",
+    projectConfig: null,
+    projectRoot: "/acme",
+    searchQuery: "",
+    selectedPath: null,
+  });
+}
+
 let root: HTMLElement;
-let platformState: MockPlatformState;
 
 beforeEach(() => {
   closeAllTabs();
   localStorage.clear();
-  view.rightPanelCollapsed = false;
-  view.panX = 0;
-  view.panY = 0;
-  view.functionEditor = null;
-  newProjectResult = null;
+  shell.docks.left.collapsed = false;
+  shell.docks.right.collapsed = false;
+  setInspectorTab("properties");
+  resetProjectShell();
+  ctx = makeContext();
+  ran = [];
   openQuickSearch.mockClear();
-  refreshGitStatus.mockClear();
-  openBrowseModal.mockClear();
-  openNewProjectModal.mockClear();
-  ({ state: platformState } = installMockPlatform());
+  notified.mockClear();
+  setProjectState(null);
+  setPreviewNavigateHandler(null);
+  installMockPlatform();
+  installRegistry();
   root = document.createElement("div");
   document.body.append(root);
 });
@@ -98,412 +178,332 @@ beforeEach(() => {
 afterEach(() => {
   toolbar.unmount();
   root.remove();
-  delete (globalThis as any).__jxPlatform;
+  setActiveRegistry(null);
+  setPreviewNavigateHandler(null);
+  setProjectState(null);
+  delete (globalThis as Record<string, unknown>).__jxPlatform;
 });
 
-// ─── Minimal toolbar (no tab) ─────────────────────────────────────────────────
+// ─── tbCmd: the record IS the control ────────────────────────────────────────
 
-describe("minimal toolbar (no open tab)", () => {
-  test("renders Open Project, disabled file ops, and disabled modes", async () => {
-    toolbar.mount(root, makeCtx());
+describe("tbCmd", () => {
+  test("with no project open the same bar renders, gated by `when`", async () => {
+    toolbar.mount(root);
     await flush();
-
-    expect(root.textContent).toContain("Open Project");
-    expect(btn(root, "Save").hasAttribute("disabled")).toBe(true);
-    expect(btn(root, "Undo").hasAttribute("disabled")).toBe(true);
-    expect(btn(root, "Redo").hasAttribute("disabled")).toBe(true);
-    for (const label of ["Edit", "Design", "Code", "Stylebook"]) {
-      expect(btn(root, label).hasAttribute("disabled")).toBe(true);
-    }
-    // Preview is a tab-bar toggle now, not a switchable mode.
-    expect(root.textContent).not.toContain("Preview");
-    expect(btn(root, "Design").hasAttribute("selected")).toBe(true);
-    expect(btn(root, "Edit").hasAttribute("selected")).toBe(false);
+    // No second template: Save simply is not visible, because `file.save` needs a document.
+    expect(root.querySelector("sp-action-button[aria-label='Save']")).toBeNull();
+    expect(segments()).toEqual(["No project", "No document"]);
   });
 
-  test("Open Project invokes ctx.openProject", async () => {
-    const ctx = makeCtx();
-    toolbar.mount(root, ctx);
+  test("a live record renders its title, its icon and its chord in the tooltip", async () => {
+    ctx = makeContext({ document: { open: true, canUndo: true } });
+    toolbar.mount(root);
     await flush();
-    click(root.querySelector(".tb-split-main")!);
-    expect(ctx.openProject).toHaveBeenCalledTimes(1);
+
+    const save = btn("Save");
+    expect(save.getAttribute("title")).toBe("Save (⌘S)");
+    expect(save.querySelector("sp-icon-save-floppy")).not.toBeNull();
+    expect(save.textContent).toContain("Save");
+    click(save);
+    expect(ran).toEqual(["save"]);
   });
 
-  test("Manage opens the browse modal", async () => {
-    toolbar.mount(root, makeCtx());
+  test("a disabled record states WHY in the tooltip instead of vanishing", async () => {
+    ctx = makeContext({ document: { open: true, canUndo: false } });
+    toolbar.mount(root);
     await flush();
-    click(btn(root, "Manage"));
-    expect(openBrowseModal).toHaveBeenCalledTimes(1);
+    const undo = btn("Undo");
+    expect(undo.hasAttribute("disabled")).toBe(true);
+    expect(undo.getAttribute("title")).toBe("Undo — requires a change to undo");
   });
 
-  test("search trigger opens quick search", async () => {
-    toolbar.mount(root, makeCtx());
-    await flush();
-    click(root.querySelector(".tb-search-trigger")!);
-    expect(openQuickSearch).toHaveBeenCalledTimes(1);
+  test("commandTooltip is empty for an id no registry declares", () => {
+    const registry = installRegistry();
+    expect(toolbar.commandTooltip(registry, "nope.missing")).toBe("");
   });
 
-  test("recent projects menu lists stored projects and opens one on change", async () => {
-    localStorage.setItem(
-      "jx-studio-recent-projects",
-      JSON.stringify([
-        { name: "Proj A", root: "/a", timestamp: 2 },
-        { name: "Proj B", root: "/b", timestamp: 1 },
-      ]),
+  test("a record with no chord prints just its name", () => {
+    const registry = installRegistry();
+    expect(toolbar.commandTooltip(registry, "palette.openNodes")).toBe(
+      "Go to Symbol in Document… — requires an open document",
     );
-    const ctx = makeCtx();
-    toolbar.mount(root, ctx);
+    ctx = makeContext({ document: { open: true } });
+    expect(toolbar.commandTooltip(registry, "palette.openNodes")).toBe("Go to Symbol in Document…");
+  });
+
+  test("an invisible command renders the same nothing as an unknown one", () => {
+    const registry = installRegistry();
+    expect(toolbar.tbCmd(registry, "file.save")).toBe(toolbar.tbCmd(registry, "nope.missing"));
+  });
+
+  test("the primary cluster is exactly what declares commandbar/primary", async () => {
+    ctx = makeContext({
+      project: { open: true, isSite: true },
+      document: { open: true, canUndo: true, canRedo: true },
+    });
+    toolbar.mount(root);
+    await flush();
+    const cluster = root.querySelector("sp-action-group[compact]")!;
+    const labels = [...cluster.querySelectorAll("sp-action-button")].map((b) =>
+      b.getAttribute("aria-label"),
+    );
+    // Sorted by `group` then title, which is the registry's ordering, not the template's.
+    expect(labels).toEqual(["Save", "Redo", "Undo", "Open in Browser"]);
+  });
+});
+
+// ─── ①a The Command Center pill ──────────────────────────────────────────────
+
+describe("the Command Center pill", () => {
+  test("names the project, the document and the selection, and prints ⌘K", async () => {
+    stageProject();
+    const tab = openTestTab("/acme/pages/blog/index.md");
+    tab.session.selection = [["children", 0]];
+    toolbar.mount(root);
     await flush();
 
-    const items = [...root.querySelectorAll("sp-menu-item")];
-    expect(items.map((i) => i.textContent?.trim())).toEqual([
-      "New Project…",
-      "Proj A",
-      "Proj B",
-      "Clear recent projects",
+    // The selection segment is the Outline's own `nodeLabel`, so the two cannot disagree.
+    expect(segments()).toEqual(["acme", "pages/blog/index.md", "p — Hi"]);
+    expect(root.querySelector(".tb-center-chord")?.textContent).toBe("⌘K");
+  });
+
+  test("each segment opens the palette pre-scoped, and the gap opens the mode picker", async () => {
+    stageProject();
+    const tab = openTestTab("/acme/pages/index.md");
+    tab.session.selection = [["children", 0]];
+    toolbar.mount(root);
+    await flush();
+
+    const [project, document_, selection] = [...root.querySelectorAll(".tb-center-seg")];
+    click(project!);
+    click(document_!);
+    click(selection!);
+    expect(openQuickSearch.mock.calls.map(([mode]) => mode)).toEqual([
+      "projects",
+      "files",
+      "nodes",
     ]);
 
-    const menu = root.querySelector("sp-menu") as HTMLElement & { value: string };
-    menu.value = "/b";
-    menu.dispatchEvent(new Event("change", { bubbles: true }));
-    expect(ctx.openRecentProject).toHaveBeenCalledWith("/b");
+    // The segment click stops there — the pill's own handler must not also fire.
+    openQuickSearch.mockClear();
+    click(root.querySelector(".tb-center")!);
+    expect(openQuickSearch.mock.calls.map(([mode]) => mode)).toEqual(["picker"]);
   });
 
-  test("a recent project's remove button drops just that entry", async () => {
-    localStorage.setItem(
-      "jx-studio-recent-projects",
-      JSON.stringify([
-        { name: "Proj A", root: "/a", timestamp: 2 },
-        { name: "Proj B", root: "/b", timestamp: 1 },
-      ]),
-    );
-    const ctx = makeCtx();
-    toolbar.mount(root, ctx);
+  test("the selection segment is absent with nothing selected, and reads layout for chrome", async () => {
+    openTestTab();
+    toolbar.mount(root);
     await flush();
+    expect(segments()).toHaveLength(2);
 
-    const removeBtns = [...root.querySelectorAll("sp-action-button[title='Remove from recent']")];
-    expect(removeBtns).toHaveLength(2);
-    click(removeBtns[0]!); // Proj A is newest-first
+    shell.layoutSelection = { path: [], tagName: "header" } as never;
     await flush();
-    expect(ctx.openRecentProject).not.toHaveBeenCalled();
-    const names = [...root.querySelectorAll("sp-menu-item")].map((i) => i.textContent?.trim());
-    expect(names).toEqual(["New Project…", "Proj B", "Clear recent projects"]);
+    expect(segments().at(-1)).toBe("layout");
+    shell.layoutSelection = null;
   });
 
-  test("Clear recent projects empties the list", async () => {
-    localStorage.setItem(
-      "jx-studio-recent-projects",
-      JSON.stringify([{ name: "Proj A", root: "/a", timestamp: 1 }]),
-    );
-    toolbar.mount(root, makeCtx());
-    await flush();
-
-    const menu = root.querySelector("sp-menu") as HTMLElement & { value: string };
-    menu.value = "__clear__";
-    menu.dispatchEvent(new Event("change", { bubbles: true }));
-    await flush();
-    const items = [...root.querySelectorAll("sp-menu-item")];
-    expect(items).toHaveLength(1);
-    expect(items[0]!.textContent?.trim()).toBe("New Project…");
+  test("the document label drops the project root, and says so when there is none", () => {
+    expect(toolbar.documentSegmentLabel(null)).toBe("No document");
+    stageProject();
+    const tab = openTestTab("./pages/index.md");
+    expect(toolbar.documentSegmentLabel(tab)).toBe("pages/index.md");
   });
 
-  test("menu without stored projects only offers New Project", async () => {
-    toolbar.mount(root, makeCtx());
-    await flush();
-    const items = [...root.querySelectorAll("sp-menu-item")];
-    expect(items).toHaveLength(1);
-    expect(root.querySelector("sp-menu-divider")).toBeNull();
+  test("the selection label is empty with no tab and no selection", () => {
+    expect(toolbar.selectionSegmentLabel(null)).toBe("");
+    const tab = openTestTab();
+    expect(toolbar.selectionSegmentLabel(tab)).toBe("");
   });
 
-  test("New Project menu entry opens modal and loads the created project", async () => {
-    newProjectResult = { root: "/created" };
-    const ctx = makeCtx();
-    toolbar.mount(root, ctx);
-    await flush();
-
-    const menu = root.querySelector("sp-menu") as HTMLElement & { value: string };
-    menu.value = "__new__";
-    menu.dispatchEvent(new Event("change", { bubbles: true }));
-    await flush();
-    expect(openNewProjectModal).toHaveBeenCalledTimes(1);
-    expect(ctx.openRecentProject).toHaveBeenCalledWith("/created");
+  test("one selected element is named by its node label, exactly as it always was", () => {
+    const tab = openTestTab();
+    tab.session.selection = [["children", 0]];
+    expect(toolbar.selectionSegmentLabel(tab)).toBe("p — Hi");
   });
 
-  test("cancelled New Project modal does not open anything", async () => {
-    newProjectResult = null;
-    const ctx = makeCtx();
-    toolbar.mount(root, ctx);
+  test("a batch is not a place, so the address bar names its size (§6.5)", () => {
+    const tab = openTestTab();
+    tab.session.selection = [["children", 0], []];
+    expect(toolbar.selectionSegmentLabel(tab)).toBe("2 elements");
+  });
+});
+
+// ─── The ⬢ app menu ───────────────────────────────────────────────────────────
+
+describe("the ⬢ overflow menu", () => {
+  test("lists what declared commandbar/overflow, with chords, and runs the picked one", async () => {
+    ctx = makeContext({ project: { open: true } });
+    toolbar.mount(root);
     await flush();
+
+    const values = [...root.querySelectorAll("sp-menu-item")].map((i) => i.getAttribute("value"));
+    expect(values).toContain("project.open");
+    expect(values).toContain("view.toggleNavigator");
+    const zen = [...root.querySelectorAll("sp-menu-item")].find(
+      (i) => i.getAttribute("value") === "view.zen",
+    )!;
+    expect(zen.querySelector("[slot='value']")?.textContent).toBe("⌘.");
 
     const menu = root.querySelector("sp-menu") as HTMLElement & { value: string };
-    menu.value = "__new__";
+    menu.value = "project.open";
     menu.dispatchEvent(new Event("change", { bubbles: true }));
-    await flush();
-    expect(openNewProjectModal).toHaveBeenCalledTimes(1);
-    expect(ctx.openRecentProject).not.toHaveBeenCalled();
+    expect(ran).toEqual(["openProject"]);
   });
 
-  test("right panel toggle flips collapse state and icon", async () => {
-    toolbar.mount(root, makeCtx());
+  test("a gated row is listed disabled, then vanishes when `when` turns false", async () => {
+    ctx = makeContext({ project: { open: true } });
+    toolbar.mount(root);
     await flush();
+    const gated = [...root.querySelectorAll("sp-menu-item")].find(
+      (i) => i.getAttribute("value") === "test.overflowGated",
+    )!;
+    // Visible but disabled, with the `requires` sentence in the tooltip — never a silent absence.
+    expect(gated.hasAttribute("disabled")).toBe(true);
+    expect(gated.getAttribute("title")).toBe("Gated Overflow — requires an open document");
 
-    expect(root.querySelector("sp-icon-rail-right-close")).not.toBeNull();
-    click(root.querySelector("sp-action-button[title='Toggle Right Panel']")!);
-    await flush();
-    expect(view.rightPanelCollapsed).toBe(true);
-    expect(root.querySelector("sp-icon-rail-right-open")).not.toBeNull();
+    const menu = root.querySelector("sp-menu") as HTMLElement & { value: string };
+    menu.value = "test.overflowGated";
+    menu.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(ran).toEqual([]);
 
-    click(root.querySelector("sp-action-button[title='Toggle Right Panel']")!);
+    ctx = makeContext();
+    toolbar.render();
+    expect(
+      [...root.querySelectorAll("sp-menu-item")].some(
+        (i) => i.getAttribute("value") === "test.overflowGated",
+      ),
+    ).toBe(false);
+  });
+});
+
+// ─── Dock toggles ─────────────────────────────────────────────────────────────
+
+describe("dock toggles", () => {
+  /*
+   * `querySelector` PROVES NOTHING ABOUT AN ICON.
+   *
+   * These three assertions read `sp-icon-rail-left-open` / `-close` and passed for as long as the
+   * Navigator's toggle rendered nothing at all: an unregistered custom element is still an element,
+   * so lit puts the tag in the DOM and the query finds it, upgraded or not. Spectrum ships no
+   * left-hand rail pair — only `rail-right-open`/`close` and a plain `IconRailLeft` — so those two
+   * tags could never resolve, and the button was an empty box from the day it was written.
+   *
+   * So these assert WHICH glyph the bar renders, mirrored or not — a question this file can answer.
+   * Whether that glyph is a registered element is a different question and a static one:
+   * `scripts/check-icons.ts` asks it of the whole package, and `tests/icons.test.ts` pins it. It
+   * cannot be asked here, because this file never loads `ui/spectrum.ts` and every icon would read
+   * as unregistered, including the ones that work.
+   */
+  /**
+   * A dock toggle's glyph, by tag.
+   *
+   * A tag name is a weak assertion when two glyphs are lookalikes — it is what let the mirrored
+   * `rail-right-*` pair ship crossed, since both spellings named a real element and only the
+   * arrow's direction differed. It is a fine assertion for `rail-left` / `rail-right` /
+   * `rail-bottom`, which are three visibly distinct shapes; the STATE is `?selected`, asserted
+   * separately on every one of them below.
+   */
+  function glyph(el: Element): string {
+    const icon = el.querySelector("[slot='icon']");
+    if (!icon) {
+      return "none";
+    }
+    return icon.tagName.toLowerCase();
+  }
+
+  test("each dock's glyph and pressed state follow the record it renders", async () => {
+    toolbar.mount(root);
     await flush();
-    expect(view.rightPanelCollapsed).toBe(false);
+    const navigatorToggle = btn("Toggle Navigator Dock");
+    expect(navigatorToggle.hasAttribute("selected")).toBe(true);
+    // Three regions, three distinct shipped glyphs — including the Bottom dock, which used to
+    // Carry `align-bottom` and so named no region at all.
+    expect(glyph(navigatorToggle)).toBe("sp-icon-rail-left");
+    expect(glyph(btn("Toggle Inspector Dock"))).toBe("sp-icon-rail-right");
+    expect(glyph(btn("Toggle Bottom Dock"))).toBe("sp-icon-rail-bottom");
+    // …and no two of them are the same element, which is the property the mirrored pair lacked.
+    const shapes = [
+      glyph(navigatorToggle),
+      glyph(btn("Toggle Inspector Dock")),
+      glyph(btn("Toggle Bottom Dock")),
+    ];
+    expect(new Set(shapes).size).toBe(shapes.length);
+    expect(navigatorToggle.getAttribute("title")).toBe("Toggle Navigator Dock (⌘B)");
+
+    click(navigatorToggle);
+    expect(ran).toEqual(["toggleDock:navigator"]);
   });
 
-  test("assistant toggle flips the chat sidebar collapse state", async () => {
-    view.chatPanelCollapsed = false;
-    toolbar.mount(root, makeCtx());
+  test("a flip made from outside the bar reaches its icons", async () => {
+    toolbar.mount(root);
     await flush();
+    expect(btn("Toggle Bottom Dock").hasAttribute("selected")).toBe(false);
 
-    const toggle = () => root.querySelector("sp-action-button[title='Toggle Assistant']")!;
-    expect(toggle()).not.toBeNull();
-    click(toggle());
+    // A bare state write, with no repaint call beside it: the band's effect tracks all three dock
+    // Records, so a flip made by the automation runner, a layout preset or the boot-time restore
+    // Reaches the icons the same way a click does. The third toggle reports the BOTTOM dock —
+    // Naming ⌘J while drawing a chat glyph and reporting the Assistant's tab selection was a
+    // Control that announced one surface and answered for another.
+    shell.docks.bottom.collapsed = false;
     await flush();
-    expect(view.chatPanelCollapsed).toBe(true);
+    expect(btn("Toggle Bottom Dock").hasAttribute("selected")).toBe(true);
+    expect(glyph(btn("Toggle Bottom Dock"))).toBe("sp-icon-rail-bottom");
 
-    click(toggle());
+    // The Assistant is an Inspector tab now, and the Bottom dock does not answer for it.
+    setInspectorTab("assistant");
     await flush();
-    expect(view.chatPanelCollapsed).toBe(false);
+    expect(btn("Toggle Bottom Dock").hasAttribute("selected")).toBe(true);
+
+    shell.docks.right.collapsed = true;
+    shell.docks.bottom.collapsed = true;
+    await flush();
+    expect(btn("Toggle Bottom Dock").hasAttribute("selected")).toBe(false);
+    // Three docks in three different states at once: the glyph names the region, `selected` the
+    // State, and the two must not be confused for one another.
+    expect(glyph(btn("Toggle Inspector Dock"))).toBe("sp-icon-rail-right");
+    expect(btn("Toggle Inspector Dock").hasAttribute("selected")).toBe(false);
+    expect(glyph(btn("Toggle Navigator Dock"))).toBe("sp-icon-rail-left");
+    expect(btn("Toggle Navigator Dock").hasAttribute("selected")).toBe(true);
+
+    toolbar.unmount();
+    setInspectorTab("properties");
+    await flush();
+    expect(btn("Toggle Bottom Dock").hasAttribute("selected")).toBe(false);
   });
 
-  test("window controls render and dispatch when the platform provides them", async () => {
+  test("the navigator button reports a closed dock without changing what it names", async () => {
+    shell.docks.left.collapsed = true;
+    toolbar.mount(root);
+    await flush();
+    expect(btn("Toggle Navigator Dock").hasAttribute("selected")).toBe(false);
+    expect(glyph(btn("Toggle Navigator Dock"))).toBe("sp-icon-rail-left");
+  });
+});
+
+// ─── Window controls ──────────────────────────────────────────────────────────
+
+describe("window controls", () => {
+  test("non-mac order is minimize, maximize, close — and they sit at the end", async () => {
     const controls = { close: mock(() => {}), maximize: mock(() => {}), minimize: mock(() => {}) };
-    (globalThis as any).__jxPlatform = { windowControls: controls };
-    toolbar.mount(root, makeCtx());
+    (globalThis as Record<string, unknown>).__jxPlatform = { windowControls: controls };
+    toolbar.mount(root);
     await flush();
 
     expect(root.classList.contains("electrobun-webkit-app-region-drag")).toBe(true);
     const group = root.querySelector(".window-controls")!;
-    click(group.querySelector("sp-action-button[title='Minimize']")!);
-    click(group.querySelector("sp-action-button[title='Maximize']")!);
-    click(group.querySelector("sp-action-button[title='Close']")!);
-    expect(controls.minimize).toHaveBeenCalledTimes(1);
-    expect(controls.maximize).toHaveBeenCalledTimes(1);
-    expect(controls.close).toHaveBeenCalledTimes(1);
-  });
-
-  test("no window controls group without a desktop platform", async () => {
-    toolbar.mount(root, makeCtx());
-    await flush();
-    expect(root.querySelector(".window-controls")).toBeNull();
-    expect(root.classList.contains("electrobun-webkit-app-region-drag")).toBe(false);
-  });
-});
-
-// ─── Full toolbar (active tab) ────────────────────────────────────────────────
-
-describe("full toolbar (active tab)", () => {
-  test("Save enables when the document is dirty and calls ctx.saveFile", async () => {
-    const tab = openTestTab();
-    const ctx = makeCtx();
-    toolbar.mount(root, ctx);
-    await flush();
-    expect(btn(root, "Save").hasAttribute("disabled")).toBe(true);
-
-    tab.doc.dirty = true;
-    await flush();
-    const save = btn(root, "Save");
-    expect(save.hasAttribute("disabled")).toBe(false);
-    click(save);
-    expect(ctx.saveFile).toHaveBeenCalledTimes(1);
-  });
-
-  test("Undo/Redo follow history position and drive the transact pipeline", async () => {
-    const tab = openTestTab();
-    toolbar.mount(root, makeCtx());
-    await flush();
-    expect(btn(root, "Undo").hasAttribute("disabled")).toBe(true);
-    expect(btn(root, "Redo").hasAttribute("disabled")).toBe(true);
-
-    tab.history.snapshots.push({
-      document: { children: [], tagName: "div" },
-      selection: null,
-    });
-    tab.history.index = 1;
-    await flush();
-    expect(btn(root, "Undo").hasAttribute("disabled")).toBe(false);
-    expect(btn(root, "Redo").hasAttribute("disabled")).toBe(true);
-
-    click(btn(root, "Undo"));
-    await flush();
-    expect(tab.history.index).toBe(0);
-    expect(btn(root, "Undo").hasAttribute("disabled")).toBe(true);
-    expect(btn(root, "Redo").hasAttribute("disabled")).toBe(false);
-
-    click(btn(root, "Redo"));
-    await flush();
-    expect(tab.history.index).toBe(1);
-    expect(tab.doc.document).toEqual({ children: [], tagName: "div" });
-  });
-
-  test("mode switcher selects the current canvas mode and switches modes", async () => {
-    const tab = openTestTab();
-    const ctx = makeCtx();
-    toolbar.mount(root, ctx);
-    await flush();
-
-    expect(btn(root, "Edit").hasAttribute("selected")).toBe(true);
-    expect(btn(root, "Design").hasAttribute("disabled")).toBe(false);
-
-    view.panX = 50;
-    view.panY = 60;
-    click(btn(root, "Design"));
-    expect(ctx.setCanvasMode).toHaveBeenCalledWith("design");
-    expect(ctx.renderCanvas).toHaveBeenCalledTimes(1);
-    expect(ctx.safeRenderRightPanel).toHaveBeenCalledTimes(1);
-    expect(view.panX).toBe(0);
-    expect(view.panY).toBe(0);
-    expect(tab.session.ui.editingFunction).toBeNull();
-  });
-
-  test("switcher has no Preview button and keeps the base mode highlighted while previewing", async () => {
-    const tab = openTestTab();
-    toolbar.mount(root, makeCtx());
-    tab.session.ui.canvasMode = "design";
-    tab.session.ui.preview = true;
-    await flush();
-
-    expect(root.textContent).not.toContain("Preview");
-    expect(btn(root, "Design").hasAttribute("selected")).toBe(true);
-    expect(btn(root, "Edit").hasAttribute("selected")).toBe(false);
-  });
-
-  test("clicking the current mode is a no-op", async () => {
-    openTestTab();
-    const ctx = makeCtx({ getCanvasMode: mock(() => "edit") });
-    toolbar.mount(root, ctx);
-    await flush();
-    click(btn(root, "Edit"));
-    expect(ctx.setCanvasMode).not.toHaveBeenCalled();
-    expect(ctx.renderCanvas).not.toHaveBeenCalled();
-  });
-
-  test("disallowed modes are disabled and ignore clicks", async () => {
-    openTestTab(["edit", "source"]);
-    const ctx = makeCtx();
-    toolbar.mount(root, ctx);
-    await flush();
-
-    const design = btn(root, "Design");
-    expect(design.hasAttribute("disabled")).toBe(true);
-    expect(btn(root, "Code").hasAttribute("disabled")).toBe(false);
-    click(design);
-    expect(ctx.setCanvasMode).not.toHaveBeenCalled();
-  });
-
-  test("switching to stylebook also activates the style right tab", async () => {
-    const tab = openTestTab();
-    const ctx = makeCtx();
-    toolbar.mount(root, ctx);
-    await flush();
-    tab.session.ui.rightTab = "properties";
-
-    click(btn(root, "Stylebook"));
-    expect(ctx.setCanvasMode).toHaveBeenCalledWith("stylebook");
-    expect(tab.session.ui.rightTab).toBe("style");
-  });
-
-  test("switching modes disposes an open function editor", async () => {
-    const tab = openTestTab();
-    const ctx = makeCtx();
-    toolbar.mount(root, ctx);
-    await flush();
-
-    const dispose = mock(() => {});
-    tab.session.ui.editingFunction = { name: "onClick" } as any;
-    view.functionEditor = { dispose } as any;
-    await flush();
-
-    click(btn(root, "Design"));
-    expect(dispose).toHaveBeenCalledTimes(1);
-    expect(view.functionEditor).toBeNull();
-    expect(tab.session.ui.editingFunction).toBeNull();
-  });
-
-  test("recent projects menu also works with a tab open", async () => {
-    localStorage.setItem(
-      "jx-studio-recent-projects",
-      JSON.stringify([{ name: "Proj A", root: "/a", timestamp: 1 }]),
-    );
-    openTestTab();
-    const ctx = makeCtx();
-    toolbar.mount(root, ctx);
-    await flush();
-
-    const menu = root.querySelector("sp-menu") as HTMLElement & { value: string };
-    menu.value = "/a";
-    menu.dispatchEvent(new Event("change", { bubbles: true }));
-    expect(ctx.openRecentProject).toHaveBeenCalledWith("/a");
-
-    newProjectResult = { root: "/fresh" };
-    menu.value = "__new__";
-    menu.dispatchEvent(new Event("change", { bubbles: true }));
-    await flush();
-    expect(openNewProjectModal).toHaveBeenCalledTimes(1);
-    expect(ctx.openRecentProject).toHaveBeenCalledWith("/fresh");
-  });
-
-  test("right panel toggle also works with a tab open", async () => {
-    openTestTab();
-    toolbar.mount(root, makeCtx());
-    await flush();
-
-    expect(root.querySelector("sp-icon-rail-right-close")).not.toBeNull();
-    click(root.querySelector("sp-action-button[title='Toggle Right Panel']")!);
-    await flush();
-    expect(view.rightPanelCollapsed).toBe(true);
-    expect(root.querySelector("sp-icon-rail-right-open")).not.toBeNull();
-  });
-
-  test("Sync Project appears when behind upstream and pulls then refreshes", async () => {
-    const tab = openTestTab();
-    toolbar.mount(root, makeCtx());
-    await flush();
-    expect(root.textContent).not.toContain("Sync Project");
-
-    tab.session.ui.gitStatus = { behind: 2 } as any;
-    await flush();
-    const sync = btn(root, "Sync Project");
-    click(sync);
-    await flush();
-    expect(platformState.calls.some(([name]) => name === "gitPull")).toBe(true);
-    expect(refreshGitStatus).toHaveBeenCalledTimes(1);
-  });
-
-  test("no Sync Project when up to date", async () => {
-    const tab = openTestTab();
-    tab.session.ui.gitStatus = { behind: 0 } as any;
-    toolbar.mount(root, makeCtx());
-    await flush();
-    expect(root.textContent).not.toContain("Sync Project");
-  });
-
-  test("window controls render in non-mac order with a tab open", async () => {
-    const controls = { close: mock(() => {}), maximize: mock(() => {}), minimize: mock(() => {}) };
-    (globalThis as any).__jxPlatform = { windowControls: controls };
-    openTestTab();
-    toolbar.mount(root, makeCtx());
-    await flush();
-
-    const group = root.querySelector(".window-controls")!;
     expect(group.classList.contains("mac")).toBe(false);
     const buttons = [...group.querySelectorAll("sp-action-button")];
     expect(buttons.map((b) => b.getAttribute("title"))).toEqual(["Minimize", "Maximize", "Close"]);
+    click(buttons[0]!);
+    click(buttons[1]!);
     click(buttons[2]!);
+    expect(controls.minimize).toHaveBeenCalledTimes(1);
+    expect(controls.maximize).toHaveBeenCalledTimes(1);
     expect(controls.close).toHaveBeenCalledTimes(1);
-    // Non-mac CSD renders at the end of the toolbar.
     expect(root.lastElementChild?.classList.contains("window-controls")).toBe(true);
   });
 
-  test("mac platforms put window controls first with close leading", async () => {
+  test("mac puts them first, close leading", async () => {
     toolbar.setMacPlatformForTests(true);
     try {
       const controls = {
@@ -511,26 +511,14 @@ describe("full toolbar (active tab)", () => {
         maximize: mock(() => {}),
         minimize: mock(() => {}),
       };
-      (globalThis as any).__jxPlatform = { windowControls: controls };
-      openTestTab();
-      toolbar.mount(root, makeCtx());
+      (globalThis as Record<string, unknown>).__jxPlatform = { windowControls: controls };
+      toolbar.mount(root);
       await flush();
-
       const group = root.querySelector(".window-controls")!;
       expect(group.classList.contains("mac")).toBe(true);
-      const buttons = [...group.querySelectorAll("sp-action-button")];
-      expect(buttons.map((b) => b.getAttribute("title"))).toEqual([
-        "Close",
-        "Minimize",
-        "Maximize",
-      ]);
-      click(buttons[0]!);
-      expect(controls.close).toHaveBeenCalledTimes(1);
-      click(buttons[1]!);
-      expect(controls.minimize).toHaveBeenCalledTimes(1);
-      click(buttons[2]!);
-      expect(controls.maximize).toHaveBeenCalledTimes(1);
-      // Mac CSD renders at the START of the toolbar.
+      expect(
+        [...group.querySelectorAll("sp-action-button")].map((b) => b.getAttribute("title")),
+      ).toEqual(["Close", "Minimize", "Maximize"]);
       expect(root.firstElementChild?.classList.contains("window-controls")).toBe(true);
     } finally {
       toolbar.setMacPlatformForTests(null);
@@ -538,7 +526,222 @@ describe("full toolbar (active tab)", () => {
   });
 });
 
-// ─── Lifecycle and error handling ─────────────────────────────────────────────
+// ─── View: Open in Browser ────────────────────────────────────────────────────
+
+/** The origin a backend reports the built site at — its own port, never the editor's. */
+const SITE_ORIGIN = "http://127.0.0.1:4321";
+
+function openSiteProject(trailingSlash?: "always" | "never") {
+  (globalThis as Record<string, unknown>).__jxPlatform = {
+    canvasUrl: `${SITE_ORIGIN}/__studio__/canvas.html`,
+  };
+  setProjectState({
+    dirs: new Map(),
+    expanded: new Set(),
+    isSiteProject: true,
+    name: "acme",
+    projectConfig: (trailingSlash ? { build: { trailingSlash } } : {}) as never,
+    projectRoot: "/acme",
+    searchQuery: "",
+    selectedPath: null,
+  });
+}
+
+function pageTab(documentPath: string): Tab {
+  closeAllTabs();
+  return openTab({
+    capabilities: { modes: ALL_MODES },
+    document: { children: [], tagName: "div" },
+    documentPath,
+    id: "page-tab",
+  });
+}
+
+describe("openInBrowserTarget", () => {
+  /* These asserted the compiler's OUTPUT PATH — `/dist/blog/hello/index.html` — and passed against
+     a URL no reader could use. A built page's own markup is root-absolute (`/components/demo.css`,
+     a link to `/basics/counter`), so from a `/dist/…` URL the assets 404 against the server root
+     and the first link leaves the site: measured on the running dev server as page 200, CSS 404,
+     link 404. The answer is the page's ROUTE now — the one it will have when published, and the
+     one its own links already point at. The ORIGIN is the backend's to report, because the built
+     site is served on a port of its own. */
+  test("a page resolves to the route it will be published at", () => {
+    openSiteProject();
+    expect(toolbar.openInBrowserTarget(pageTab("pages/blog/hello.md"))).toEqual({
+      path: "/blog/hello/",
+    });
+  });
+
+  test("the root page is the site root", () => {
+    openSiteProject();
+    expect(toolbar.openInBrowserTarget(pageTab("./pages/index.md"))).toEqual({ path: "/" });
+  });
+
+  test("trailingSlash: never drops the slash, as the published URL does", () => {
+    openSiteProject("never");
+    expect(toolbar.openInBrowserTarget(pageTab("pages/about.json"))).toEqual({ path: "/about" });
+  });
+
+  test("a dynamic route waits for its params, then resolves the chosen page", () => {
+    openSiteProject();
+    const tab = pageTab("pages/blog/[slug].json");
+    expect(toolbar.openInBrowserTarget(tab)).toEqual({
+      reason: "Pick a value for :slug to open one of this route's pages.",
+    });
+    tab.session.ui.previewParams = { slug: "getting started" };
+    expect(toolbar.openInBrowserTarget(tab)).toEqual({ path: "/blog/getting%20started/" });
+  });
+
+  test("every refusal is a sentence, not an absence", () => {
+    expect(toolbar.openInBrowserTarget(null)).toEqual({
+      reason: "Open a page to view it in a browser.",
+    });
+    const tab = pageTab("pages/index.md");
+    expect(toolbar.openInBrowserTarget(tab)).toEqual({
+      reason: "This project does not build a site.",
+    });
+    openSiteProject();
+    expect(toolbar.openInBrowserTarget(pageTab("components/Card.json"))).toEqual({
+      reason: "Only pages have a route — components/Card.json is not under pages/.",
+    });
+    expect(toolbar.openInBrowserTarget(pageTab("pages/docs/[...rest].json"))).toEqual({
+      reason: "Catch-all routes match many pages — open a generated one instead.",
+    });
+  });
+});
+
+describe("runOpenInBrowser", () => {
+  /** A backend that builds and reports where the result is browsable. */
+  function installBuildingPlatform(result: Partial<SiteBuildResult> = {}) {
+    installMockPlatform({
+      buildSite: async () => ({ errors: [], files: 3, routes: 2, url: SITE_ORIGIN, ...result }),
+      canvasUrl: `${SITE_ORIGIN}/__studio__/canvas.html`,
+    });
+  }
+
+  test("hands the URL to the preview-navigate seam, and falls back to a new tab", async () => {
+    openSiteProject();
+    pageTab("pages/index.md");
+    installBuildingPlatform();
+    const opened: string[] = [];
+    setPreviewNavigateHandler((url) => opened.push(url));
+    await toolbar.runOpenInBrowser();
+    expect(opened).toEqual([`${SITE_ORIGIN}/`]);
+
+    setPreviewNavigateHandler(null);
+    const calls: unknown[][] = [];
+    const originalOpen = window.open;
+    (window as unknown as { open: unknown }).open = (...args: unknown[]) => {
+      calls.push(args);
+      return null;
+    };
+    try {
+      await toolbar.runOpenInBrowser();
+      expect(calls).toEqual([[`${SITE_ORIGIN}/`, "_blank", "noopener,noreferrer"]]);
+    } finally {
+      window.open = originalOpen;
+    }
+  });
+
+  test("reports the blocking reason instead of opening nothing", () => {
+    closeAllTabs();
+    void toolbar.runOpenInBrowser();
+    expect(notified).toHaveBeenCalledTimes(1);
+    expect(notified.mock.calls[0]![0]).toContain("Open a page to view it");
+  });
+
+  /* The other half of "as if published": what a reader opens is what the AUTHOR is looking at.
+     Nothing in Studio had ever written the site's output, so before this the reader saw whatever
+     the last `jx build` left on disk — for most projects nothing at all, which is a 404 dressed up
+     as a feature. */
+  test("builds before opening, and opens the origin the BUILD reports", async () => {
+    /* Not the editor's origin. The two URL spaces collide: `/components/demo.js` is the formula
+       module in the project's sources and the custom element in its output, and a reader handed
+       the editor's origin gets whichever the editor resolves — measured as a page that rendered
+       with `customElements.get(…)` null and nothing on it working. */
+    openSiteProject();
+    pageTab("pages/index.md");
+    const built: string[] = [];
+    installMockPlatform({
+      buildSite: async () => {
+        built.push("built");
+        return { errors: [], files: 3, routes: 2, url: "http://127.0.0.1:5555" };
+      },
+      canvasUrl: `${SITE_ORIGIN}/__studio__/canvas.html`,
+    });
+    const opened: string[] = [];
+    setPreviewNavigateHandler((url) => opened.push(url));
+    await toolbar.runOpenInBrowser();
+    expect(built).toEqual(["built"]);
+    expect(opened).toEqual(["http://127.0.0.1:5555/"]);
+    setPreviewNavigateHandler(null);
+  });
+
+  test("a build error is named, and the page still opens", async () => {
+    // A partial build produced pages. Refusing to show the one the author asked for would trade a
+    // Readable page plus a sentence for a sentence.
+    openSiteProject();
+    pageTab("pages/index.md");
+    installBuildingPlatform({ errors: ["pages/broken.json: unknown tag"], files: 1, routes: 1 });
+    const opened: string[] = [];
+    setPreviewNavigateHandler((url) => opened.push(url));
+    await toolbar.runOpenInBrowser();
+    expect(opened).toEqual([`${SITE_ORIGIN}/`]);
+    expect(notified.mock.calls.at(-1)![0]).toContain("unknown tag");
+    setPreviewNavigateHandler(null);
+  });
+
+  test("a build that THROWS does not open a page that would be a lie", async () => {
+    openSiteProject();
+    pageTab("pages/index.md");
+    installMockPlatform({
+      buildSite: async () => {
+        throw new Error("no disk space");
+      },
+      canvasUrl: `${SITE_ORIGIN}/__studio__/canvas.html`,
+    });
+    const opened: string[] = [];
+    setPreviewNavigateHandler((url) => opened.push(url));
+    await toolbar.runOpenInBrowser();
+    expect(opened).toEqual([]);
+    expect(notified.mock.calls.at(-1)![0]).toContain("no disk space");
+    setPreviewNavigateHandler(null);
+  });
+
+  test("a backend that cannot build says so rather than opening the editor's origin", async () => {
+    /* It used to open the canvas origin and call that graceful. It is not: that origin serves the
+       project's SOURCES, so the reader would get a page whose scripts and styles are whichever
+       source file shares the URL. A sentence beats a site that looks published and is not. */
+    openSiteProject();
+    pageTab("pages/index.md");
+    installMockPlatform({ canvasUrl: `${SITE_ORIGIN}/__studio__/canvas.html` });
+    const opened: string[] = [];
+    setPreviewNavigateHandler((url) => opened.push(url));
+    await toolbar.runOpenInBrowser();
+    expect(opened).toEqual([]);
+    expect(notified.mock.calls.at(-1)![0]).toContain("cannot build a preview");
+    setPreviewNavigateHandler(null);
+  });
+
+  test("a build that reports no origin does not send the reader anywhere", async () => {
+    // The build succeeded and the backend serves no preview of it — a real answer for a hosted
+    // Backend, and one the reader must be told rather than shown a broken address for.
+    openSiteProject();
+    pageTab("pages/index.md");
+    installMockPlatform({
+      buildSite: async () => ({ errors: [], files: 3, routes: 2 }),
+      canvasUrl: `${SITE_ORIGIN}/__studio__/canvas.html`,
+    });
+    const opened: string[] = [];
+    setPreviewNavigateHandler((url) => opened.push(url));
+    await toolbar.runOpenInBrowser();
+    expect(opened).toEqual([]);
+    expect(notified.mock.calls.at(-1)![0]).toContain("serves no preview");
+    setPreviewNavigateHandler(null);
+  });
+});
+
+// ─── Lifecycle ────────────────────────────────────────────────────────────────
 
 describe("lifecycle", () => {
   test("render is a no-op before mount and after unmount", () => {
@@ -548,33 +751,50 @@ describe("lifecycle", () => {
     }).not.toThrow();
   });
 
-  test("unmount stops the reactive effect", async () => {
-    const tab = openTestTab();
-    toolbar.mount(root, makeCtx());
+  test("the band paints a skeleton before the bootstrap composes the registry", async () => {
+    setActiveRegistry(null);
+    toolbar.mount(root);
     await flush();
-    expect(btn(root, "Save").hasAttribute("disabled")).toBe(true);
+    // The pill is still there — "where am I" does not depend on the registry — but no verbs are.
+    expect(root.querySelector(".tb-center")).not.toBeNull();
+    expect(root.querySelector("sp-action-button")).toBeNull();
+
+    // Publishing the registry repaints, with no render() call beside it.
+    ctx = makeContext({ document: { open: true } });
+    installRegistry();
+    await flush();
+    expect(btn("Save")).toBeTruthy();
+  });
+
+  test("unmount stops the reactive effect", async () => {
+    ctx = makeContext({ document: { open: true, canUndo: false } });
+    toolbar.mount(root);
+    await flush();
+    expect(btn("Undo").hasAttribute("disabled")).toBe(true);
 
     toolbar.unmount();
-    tab.doc.dirty = true;
+    ctx = makeContext({ document: { open: true, canUndo: true } });
+    openTestTab();
     await flush();
-    // Stale DOM is left in place but no longer updates.
-    expect(btn(root, "Save").hasAttribute("disabled")).toBe(true);
+    expect(btn("Undo").hasAttribute("disabled")).toBe(true);
   });
 
   test("template errors are caught and logged, not thrown", async () => {
-    const tab = openTestTab();
-    // Poison the tab capabilities (read only inside the template, not the mount effect) so the
-    // AllowedModes read throws during render.
-    (tab as unknown as { capabilities: unknown }).capabilities = null;
+    const registry = installRegistry();
+    setActiveRegistry({
+      ...registry,
+      forPlacement: () => {
+        throw new Error("boom");
+      },
+    } as unknown as CommandRegistry);
     const errors: unknown[][] = [];
     const originalError = console.error;
     console.error = (...args: unknown[]) => {
       errors.push(args);
     };
     try {
-      const ctx = makeCtx();
       expect(() => {
-        toolbar.mount(root, ctx);
+        toolbar.mount(root);
       }).not.toThrow();
       await flush();
       expect(errors.some(([first]) => first === "toolbar render error:")).toBe(true);

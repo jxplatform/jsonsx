@@ -1,4 +1,5 @@
 // Leaf schemas
+export { elementTagNameSchema, tagExpressionSchema } from "./tag-expression.schema";
 export { tagNameSchema } from "./tag-name.schema";
 export { stringOrRefSchema, boolOrRefSchema, numberOrRefSchema } from "./string-or-ref.schema";
 export { headEntrySchema } from "./head-entry.schema";

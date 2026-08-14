@@ -15,6 +15,7 @@ import {
   isNodeDynamic,
   PREFORMATTED_TAGS,
   pureSchemeOf,
+  resolveStaticTagName,
   resolveStaticValue,
   SELF_CLOSING,
 } from "../shared.ts";
@@ -160,7 +161,9 @@ function compileNode(
     return `<${tagName}></${tagName}>`;
   }
 
-  const tag = def.tagName ?? "div";
+  // Resolved against the same scope the attributes are, so the prerendered element and its
+  // Attributes come from one decision rather than two.
+  const tag = resolveStaticTagName(def.tagName, nextContext.scope);
   const attrs = buildAttrs(def, nextContext.scope);
 
   // Void elements (br, hr, img, …) have no closing tag.

@@ -185,6 +185,32 @@ jobs:
       # Core packages must never depend on extension packages — see
       # specs/extensions.md §2 and scripts/check-dep-rules.ts.
       - run: bun scripts/check-dep-rules.ts
+      # Studio commands: every declared `menus` placement must admit the command's
+      # containment level (the level × placement matrix — UX-REDESIGN-PLAN §5.1,
+      # normative copy in specs/studio-ui-guidelines.md §12).
+      - run: bun scripts/check-command-levels.ts
+      # Studio chrome is capped: ≤5 commands in the Command Bar's primary cluster,
+      # ≤4 tabs per dock. See UX-REDESIGN-PLAN §2, principle 9.
+      - run: bun scripts/check-chrome-budget.ts
+      # Screenshot manifest — Lane 1 of the gate (UX-REDESIGN-PLAN §13.5). No browser,
+      # seconds: every shot step must name a declared, scriptable command with valid
+      # args, no `toggle*` id, and no CSS/XPath selector beyond the committed budget.
+      # `docs:verify` below checks only that referenced images EXIST; this is the check
+      # that turns a panel or command rename into a red X in the PR that caused it.
+      - run: bun scripts/check-shot-contract.ts
+      # The pane grid's two singleton rules (UX-REDESIGN-PLAN §18): per-stage state must live on
+      # `CanvasSurface`, and a module that draws into a stage must key its instance by pane id.
+      # Neither is expressible in the type system — `ViewState` has an index signature and a
+      # module-level `let active` is well-typed — so the guard is a ratcheting allow-list.
+      - run: bun --cwd packages/studio scripts/check-pane-singletons.ts
+      - run: bun --cwd packages/studio scripts/check-icons.ts
+      # The derived pane's lens/companion discriminators (§18.4), each mutated in turn against the
+      # ONE test file expected to notice. Two review rounds of that workstream each fixed the
+      # defects they named and left as many behind, because a green suite says nothing about
+      # whether it could tell right from wrong — a measurement found seven discriminators whose
+      # inversion the whole 8000-test suite passed. A surviving mutant is red here, in the PR that
+      # removed the assertion, naming the behaviour that is now unprotected.
+      - run: bun --cwd packages/studio scripts/check-lens-mutants.ts
       - run: bun run typecheck
       # packages/desktop is EXCLUDED from the root tsconfig (electrobun ships raw .ts in its dist,
       # which the root's two strictest flags reject 165 times) so it needs its own pass — without
@@ -212,3 +238,10 @@ jobs:
       # fixtures) validates end-to-end — project.json, documents, classes, fragments, and
       # self-contained committed entry docs. See scripts/validate-schemas.ts.
       - run: bun run schema:validate-all
+      # …and every committed schema is what its own generator produces — the core, and all 50
+      # per-project entry documents. `schema:validate-all` checks that DOCUMENTS satisfy the
+      # committed schemas; it cannot see a committed schema that has fallen behind its generator.
+      # That gap hid two separate faults for six weeks: 40 CSS properties un-propagated from the
+      # core, and one starter whose entry document was composed against a published @jxsuite/schema
+      # left in a stray node_modules, so it was NARROWER than its own content required.
+      - run: bun run schema:verify

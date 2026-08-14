@@ -1,7 +1,8 @@
 /**
- * Tests for src/panels/ai-panel.ts — the assistant tab orchestrator: key gate, the chat ↔ sessions
- * view machine, the rAF render loop driven by the reactive chat-state watcher, stick-to-bottom
- * auto-scroll, and the seedAssistantPrompt hand-off.
+ * Tests for src/panels/ai-panel.ts — the assistant tab orchestrator: the chat ↔ sessions view
+ * machine, the hand-off to Preferences › Assistant where the provider key now lives, the rAF render
+ * loop driven by the reactive chat-state watcher, stick-to-bottom auto-scroll, and the
+ * seedAssistantPrompt hand-off.
  *
  * The document assistant is mocked (reactive chat-state, recorded session API); the panel module
  * holds singleton state, so these tests run as one ordered scenario.
@@ -37,6 +38,17 @@ const chatState = reactive({
   error: null as string | null,
   messages: [] as Message[],
   status: "idle" as "idle" | "streaming" | "error",
+  /* The real one pops the failed assistant turn AND the user message that caused it, on the
+     contract that the caller re-sends. It has been exported with zero callers since it was
+     written (§7.4); the panel's Retry is the first. */
+  retryLast() {
+    while (chatState.messages.length > 0 && chatState.messages.at(-1)!.role !== "user") {
+      chatState.messages.pop();
+    }
+    chatState.messages.pop();
+    chatState.error = null;
+    chatState.status = "idle";
+  },
 });
 
 let msgCounter = 0;
@@ -84,12 +96,48 @@ void mock.module("../src/services/document-assistant", () => ({
 }));
 
 const {
+  assistantCommands,
   bindAiPanelHost,
+  handleRestore,
+  isAssistantStreaming,
   mountAiPanel,
   renderAiPanelTemplate,
+  revealAssistant,
   seedAssistantMessages,
   seedAssistantPrompt,
 } = await import("../src/panels/ai-panel");
+const { closePreferences } = await import("../src/settings/preferences-dialog");
+const { initLayers } = await import("../src/ui/layers");
+
+/*
+ * The `Assistant:` family, in a real registry (§11.1).
+ *
+ * The chat header's two buttons and the error row's Retry are RENDERED FROM the registry now, so a
+ * panel with no registry draws none of them — which is the contract, and which means these tests
+ * have to compose one exactly as `studio.ts` does. The context is a plain mutable record so a test
+ * can state "a provider is connected" or "a turn is in flight" instead of standing up the app.
+ */
+const { createCommandRegistry } = await import("../src/commands/registry");
+const { makeContext } = await import("../src/commands/context");
+const { setActiveRegistry } = await import("../src/commands/active-registry");
+const { hasAiCredentials } = await import("../src/services/ai-models");
+
+/** How many nodes the canvas has selected, as `live-context.ts` would report it. */
+let selectionCount = 0;
+
+const registry = createCommandRegistry({
+  // Derived per evaluation from the same two probes `live-context.ts` reads, so a test that flips
+  // `chatState.status` moves `ctx.ai.streaming` without restating anything.
+  getContext: () =>
+    makeContext({
+      ai: { configured: hasAiCredentials(), streaming: isAssistantStreaming() },
+      editor: { kind: "canvas" },
+      selection: { count: selectionCount },
+    }),
+  mac: true,
+});
+registry.registerAll(assistantCommands());
+setActiveRegistry(registry);
 
 // The panel renders into its bound host via the rAF loop, exactly as in the app.
 const host = document.createElement("div");
@@ -98,27 +146,104 @@ bindAiPanelHost(host);
 mountAiPanel();
 mountAiPanel(); // Idempotent
 
+// The credentials form left the panel for Preferences, so these tests need the overlay layers.
+for (const id of ["layer-popover", "layer-modal", "layer-dialog"]) {
+  if (!document.querySelector(`#${id}`)) {
+    const el = document.createElement("div");
+    el.id = id;
+    document.body.append(el);
+  }
+}
+initLayers();
+
 function q<T extends Element = HTMLElement>(sel: string) {
   return host.querySelector(sel) as T | null;
 }
 
+/** Query inside the dialog layer — where Preferences renders. */
+function d<T extends Element = HTMLElement>(sel: string) {
+  return document.querySelector(`#layer-dialog ${sel}`) as T | null;
+}
+
+/** The dialog's `<sp-button>` whose label contains `label`. */
+function dialogButton(label: string) {
+  return [...document.querySelectorAll("#layer-dialog sp-button")].find((b) =>
+    b.textContent?.includes(label),
+  ) as HTMLElement | undefined;
+}
+
+/** Open Preferences › Assistant from the in-panel notice and settle its first render. */
+async function openSettingsFromNotice() {
+  pointer(q(".ai-setup-notice sp-button")!, "click");
+  await flush(3);
+}
+
+/** Dismiss whatever Preferences sheet is up, and let the panel repaint. */
+async function closeSettings() {
+  closePreferences();
+  await flush(3);
+}
+
 beforeEach(() => {
   resetWorkspaceWithTab();
+  selectionCount = 0;
 });
 
 // ─── Ordered scenario (module-level singleton state) ─────────────────────────
 
 describe("ai-panel", () => {
-  test("gates the chat behind the credentials form when no key is stored", async () => {
+  test("keeps the chat and offers the settings action when no key is stored", async () => {
     globalThis.localStorage.clear();
     pushMessage("user", "pre-existing");
     await flush(3); // Watcher → rAF render
-    expect(q(".ai-creds-form")).not.toBeNull();
-    expect(q(".ai-chat-messages")).toBeNull();
+    // The panel is a chat, not a credentials form — the transcript and composer are both up.
+    expect(q(".ai-chat-messages")).not.toBeNull();
+    expect(q(".ai-composer textarea")).not.toBeNull();
+    expect(q(".ai-creds-form")).toBeNull();
+    // …with one line and the action that fixes it.
+    expect(q(".ai-setup-notice")!.textContent).toContain("No AI provider is connected yet.");
+    // The action is Preferences, not a dialog of the panel's own: a provider key is an
+    // Application setting, and the surface that owns those can also list and revoke it.
+    expect(q(".ai-setup-notice sp-button")!.textContent).toContain("Open Preferences…");
     chatState.messages.length = 0;
   });
 
-  test("offers Connect Cloudflare on managed platforms and unlocks after connecting", async () => {
+  test("the notice opens Preferences on the Assistant section; Close dismisses it", async () => {
+    globalThis.localStorage.clear();
+    await flush(3);
+    await openSettingsFromNotice();
+    expect(d(".ai-creds-form")).not.toBeNull();
+    expect(d("sp-dialog-wrapper")!.getAttribute("headline")).toBe("Preferences");
+    // The form is Spectrum controls, not raw inputs with inline styles.
+    expect(document.querySelectorAll("#layer-dialog sp-textfield").length).toBeGreaterThan(0);
+    expect(d(".ai-creds-form input")).toBeNull();
+
+    d("sp-dialog-wrapper")!.dispatchEvent(new Event("close", { bubbles: true }));
+    await flush(3);
+    expect(d(".ai-creds-form")).toBeNull();
+    expect(q(".ai-setup-notice")).not.toBeNull();
+  });
+
+  test("saving a key retires the notice — and leaves Preferences open", async () => {
+    globalThis.localStorage.clear();
+    await flush(3);
+    await openSettingsFromNotice();
+    const field = d<HTMLInputElement>("sp-textfield")!;
+    field.value = "sk-from-dialog";
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+    pointer(dialogButton("Save")!, "click");
+    await flush(3);
+    expect(globalThis.localStorage.getItem("jx.ai.openaiKey")).toBe("sk-from-dialog");
+    // Preferences is a PLACE, not a wizard step: it stays up, and the panel behind it has
+    // Already dropped the notice because the save announced itself.
+    expect(d(".ai-creds-form")).not.toBeNull();
+    expect(q(".ai-setup-notice")).toBeNull();
+    await closeSettings();
+    globalThis.localStorage.clear();
+    await flush(3);
+  });
+
+  test("offers Connect Cloudflare in the dialog and retires the notice after connecting", async () => {
     globalThis.localStorage.clear();
     const realFetch = globalThis.fetch;
     // Managed platform, Workers AI not yet connected.
@@ -129,25 +254,25 @@ describe("ai-panel", () => {
     mockPlatform.cfConnect = cfConnect;
     pushMessage("user", "nudge render");
     await flush(3);
+    await openSettingsFromNotice();
     // Both real paths show: the managed connect CTA above the BYOK form.
-    expect(q(".ai-managed-connect")).not.toBeNull();
-    expect(q(".ai-creds-form")).not.toBeNull();
+    expect(d(".ai-managed-connect")).not.toBeNull();
+    expect(d(".ai-creds-form")).not.toBeNull();
 
-    // Connecting flips /models to configured — the gate opens into the chat.
+    // Connecting flips /models to configured — the notice retires.
     (globalThis as Record<string, unknown>).fetch = async () =>
       Response.json(
         { models: [{ id: "@cf/meta/llama-4" }], configured: true, managed: true },
         { status: 200 },
       );
-    const button = [...host.querySelectorAll("sp-button")].find((b) =>
-      b.textContent?.includes("Connect Cloudflare"),
-    )!;
-    pointer(button, "click");
+    pointer(dialogButton("Connect Cloudflare")!, "click");
     await flush(6);
     expect(cfConnect).toHaveBeenCalledTimes(1);
-    expect(q(".ai-managed-connect")).toBeNull();
+    expect(d(".ai-managed-connect")).toBeNull();
+    expect(q(".ai-setup-notice")).toBeNull();
     expect(q(".ai-composer textarea")).not.toBeNull();
 
+    await closeSettings();
     chatState.messages.length = 0;
     delete mockPlatform.cfConnect;
     invalidateModelCache();
@@ -155,7 +280,7 @@ describe("ai-panel", () => {
     await flush(3);
   });
 
-  test("unlocks without a key when the proxy reports itself configured (managed platforms)", async () => {
+  test("no notice at all when the proxy reports itself configured (managed platforms)", async () => {
     globalThis.localStorage.clear();
     const realFetch = globalThis.fetch;
     (globalThis as Record<string, unknown>).fetch = async () =>
@@ -166,7 +291,7 @@ describe("ai-panel", () => {
     await fetchAvailableModels({ force: true });
     pushMessage("user", "cloud hello");
     await flush(3);
-    expect(q(".ai-creds-form")).toBeNull();
+    expect(q(".ai-setup-notice")).toBeNull();
     expect(q(".ai-composer textarea")).not.toBeNull();
     chatState.messages.length = 0;
     invalidateModelCache();
@@ -178,7 +303,7 @@ describe("ai-panel", () => {
     globalThis.localStorage.setItem("jx.ai.openaiKey", "sk-test");
     pushMessage("user", "hello");
     await flush(3);
-    expect(q(".ai-creds-form")).toBeNull();
+    expect(q(".ai-setup-notice")).toBeNull();
     expect(q(".ai-chat-header")).not.toBeNull();
     expect(q(".ai-composer textarea")).not.toBeNull();
     expect(q(".ai-msg-user")!.textContent).toContain("hello");
@@ -238,7 +363,7 @@ describe("ai-panel", () => {
       { createdAt: 1, id: "s1", messageCount: 4, title: "First chat", updatedAt: 2 },
       { createdAt: 3, id: "s2", messageCount: 2, title: "Second chat", updatedAt: 4 },
     ];
-    pointer(q("sp-action-button[title='Chat history']")!, "click");
+    pointer(q("sp-action-button[title='Chat History']")!, "click");
     await flush(3);
     expect(q(".ai-sessions")).not.toBeNull();
     expect(host.querySelectorAll(".ai-session-row")).toHaveLength(2);
@@ -260,25 +385,28 @@ describe("ai-panel", () => {
   });
 
   test("New Chat clears to a fresh unsaved chat from either view", async () => {
-    pointer(q("sp-action-button[title='Chat history']")!, "click");
+    pointer(q("sp-action-button[title='Chat History']")!, "click");
     await flush(3);
-    pointer(q("sp-action-button[title='New chat']")!, "click");
+    pointer(q("sp-action-button[title='New Chat']")!, "click");
     await flush(3);
     expect(newChatMock).toHaveBeenCalledTimes(1);
     expect(q(".ai-chat-messages")).not.toBeNull();
     expect(q(".ai-chat-title")!.textContent).toBe("New chat");
   });
 
-  test("the composer gear opens the credentials form; Cancel returns to the chat", async () => {
+  test("the composer gear opens Preferences; the chat behind it is untouched", async () => {
     pointer(q("sp-action-button[title='API key & endpoint']")!, "click");
     await flush(3);
-    expect(q(".ai-creds-form")).not.toBeNull();
-    const cancel = [...host.querySelectorAll("sp-button")].find((b) =>
-      b.textContent?.includes("Cancel"),
-    )!;
-    pointer(cancel, "click");
+    expect(d(".ai-creds-form")).not.toBeNull();
+    // The chat behind the sheet never went anywhere — that is the whole point of the move.
+    expect(q(".ai-chat-messages")).not.toBeNull();
+    // Cancel is offered because a key exists at this point in the scenario; it clears the drafts
+    // And leaves the sheet up.
+    pointer(dialogButton("Cancel")!, "click");
     await flush(3);
-    expect(q(".ai-creds-form")).toBeNull();
+    expect(d(".ai-creds-form")).not.toBeNull();
+    await closeSettings();
+    expect(d(".ai-creds-form")).toBeNull();
     expect(q(".ai-chat-messages")).not.toBeNull();
   });
 
@@ -327,11 +455,11 @@ describe("ai-panel", () => {
     expect(renderAiPanelTemplate()).toBeDefined();
   });
 
-  test("seedAssistantMessages stages a canned conversation and opens the key gate", async () => {
+  test("seedAssistantMessages stages a canned conversation and retires the notice", async () => {
     globalThis.localStorage.clear();
     chatState.messages.length = 0;
-    await flush(3); // With no key the gate is up again.
-    expect(q(".ai-creds-form")).not.toBeNull();
+    await flush(3); // With no key the setup notice is back.
+    expect(q(".ai-setup-notice")).not.toBeNull();
 
     seedAssistantMessages([
       {
@@ -346,13 +474,278 @@ describe("ai-panel", () => {
       },
     ]);
     await flush(3);
-    // The inert demo key opened the gate (localStorage only — no request fires)…
+    // The inert demo key landed (localStorage only — no request fires)…
     expect(globalThis.localStorage.getItem("jx.ai.openaiKey")).toBe("sk-demo");
-    expect(q(".ai-creds-form")).toBeNull();
+    expect(q(".ai-setup-notice")).toBeNull();
     // …and the canned transcript renders with context chips and tool chips.
     expect(q(".ai-msg-user")!.textContent).toContain("Make the hero friendlier");
     expect(q(".ai-context-chip")!.textContent).toContain("Page: pages/index.md");
     expect(q(".ai-msg-assistant")!.textContent).toContain("softened the headline");
     expect(q(".ai-tool-chip")!.textContent).toContain('set_text: ["children",0]');
+  });
+});
+
+// ─── §7.4: Retry and Restore to here ─────────────────────────────────────────
+
+const { beginTurn, endTurn, recordWrite, resetAiWrites } =
+  await import("../src/services/ai-writes");
+const { problems, resetNotifications, toasts } = await import("../src/services/notify");
+const { activeTab, closeAllTabs } = await import("../src/workspace/workspace");
+
+/** File a ledger entry against a message id, the way the agent loop does. */
+function ledger(id: string, writes: { disk: boolean; ok: boolean; path: string }[]) {
+  beginTurn(`for:${id}`);
+  for (const w of writes) {
+    recordWrite({ ...w, tool: "write_file" });
+  }
+  endTurn(id);
+}
+
+function notices(): string[] {
+  return [...toasts, ...problems].map((n) => n.message);
+}
+
+describe("retry", () => {
+  test("the error row's Retry re-sends the last user message", async () => {
+    chatState.messages.length = 0;
+    chatState.error = "429 rate limit";
+    chatState.status = "error";
+    pushMessage("user", "make it blue");
+    pushMessage("assistant", "");
+    await flush(3);
+
+    sendMessage.mockClear();
+    pointer(q(".ai-msg-retry")!, "click");
+    await flush(4);
+    expect(sendMessage).toHaveBeenCalledWith("make it blue");
+    chatState.error = null;
+    chatState.status = "idle";
+  });
+
+  test("Retry with nothing to re-send does nothing", async () => {
+    chatState.messages.length = 0;
+    chatState.error = "boom";
+    chatState.status = "error";
+    await flush(3);
+    sendMessage.mockClear();
+    pointer(q(".ai-msg-retry")!, "click");
+    await flush(4);
+    expect(sendMessage).not.toHaveBeenCalled();
+    chatState.error = null;
+    chatState.status = "idle";
+  });
+});
+
+describe("restore to here", () => {
+  beforeEach(() => {
+    resetAiWrites();
+    resetNotifications();
+    chatState.messages.length = 0;
+    chatState.error = null;
+    chatState.status = "idle";
+  });
+
+  test("a transactional turn restores through the tab's history", async () => {
+    pushMessage("assistant", "Done.");
+    const { id } = chatState.messages.at(-1)!;
+    ledger(id, [{ disk: false, ok: true, path: "pages/index.json" }]);
+    await flush(3);
+    expect(activeTab.value).not.toBeNull();
+    pointer(q(".ai-msg-changes sp-action-button")!, "click");
+    await flush(3);
+    expect(notices()).toContain("Restored to before that turn.");
+  });
+
+  test("a turn with no ledger left says so instead of restoring something else", async () => {
+    pushMessage("assistant", "Done.");
+    const { id } = chatState.messages.at(-1)!;
+    ledger(id, [{ disk: false, ok: true, path: "pages/index.json" }]);
+    await flush(3);
+    resetAiWrites();
+    pointer(q(".ai-msg-changes sp-action-button")!, "click");
+    await flush(3);
+    expect(notices()).toContain("There is no longer a record of what that turn changed.");
+  });
+
+  test("a turn that touched disk offers no button, and refuses if called anyway", async () => {
+    pushMessage("assistant", "Done.");
+    const { id } = chatState.messages.at(-1)!;
+    ledger(id, [{ disk: true, ok: true, path: "layouts/base.json" }]);
+    await flush(3);
+    /* Not rendered — but the ledger can be trimmed between a render and a click, so the handler
+       guards again rather than trusting the renderer. */
+    expect(q(".ai-msg-changes sp-action-button")).toBeNull();
+    handleRestore(id);
+    expect(notices().at(-1)).toContain("layouts/base.json");
+    expect(notices().at(-1)).toContain("undo cannot reach");
+  });
+
+  test("with no tab open it says where to go rather than restoring the wrong document", async () => {
+    pushMessage("assistant", "Done.");
+    const { id } = chatState.messages.at(-1)!;
+    ledger(id, [{ disk: false, ok: true, path: "pages/index.json" }]);
+    closeAllTabs();
+    handleRestore(id);
+    expect(notices().at(-1)).toBe("Open the document that turn edited to restore it.");
+  });
+});
+
+// ─── §11.1: the `Assistant:` command family ──────────────────────────────────
+
+const { shell } = await import("../src/shell");
+const { inspectorTab } = await import("../src/panels/right-panel");
+const { emptyContext, makeContext: ctxWith } = await import("../src/commands/context");
+
+/** The record with this id, straight off the factory — the declaration, not the registry's copy. */
+function record(id: string) {
+  return assistantCommands().find((c) => c.id === id)!;
+}
+
+describe("the Assistant command family", () => {
+  beforeEach(() => {
+    resetNotifications();
+    globalThis.localStorage.setItem("jx.ai.openaiKey", "sk-test");
+    chatState.messages.length = 0;
+    chatState.error = null;
+    chatState.status = "idle";
+    shell.docks.right.collapsed = true;
+    newChatMock.mockClear();
+    stopMock.mockClear();
+    sendMessage.mockClear();
+  });
+
+  test("six records, every one Assistant + application + palette", () => {
+    /* Application by principle 3 — a record is filed by the level of the state it WRITES. The chat
+       session outlives the open document and survives project close, and `attachSelection` is the
+       case that proves it: it READS the canvas selection and writes a chip into the composer. */
+    const all = assistantCommands();
+    expect(all.map((c) => c.id)).toEqual([
+      "assistant.focus",
+      "assistant.newChat",
+      "assistant.history",
+      "assistant.attachSelection",
+      "assistant.retry",
+      "assistant.stop",
+    ]);
+    for (const command of all) {
+      expect(command.category).toBe("Assistant");
+      expect(command.level).toBe("application");
+      expect(command.menus).toEqual(["palette"]);
+      // The assistant does not get to end its own conversation: none of these is an agent tool.
+      expect(command.aiTool).toBeUndefined();
+    }
+    // Every gated record says why in one sentence — the disabled tooltip, the palette subtitle and
+    // The agent's refusal all read it. An ungated one has no refusal to explain.
+    for (const command of all) {
+      expect(Boolean(command.requires)).toBe(Boolean(command.when ?? command.enablement));
+    }
+  });
+
+  test("revealAssistant opens the Inspector and selects its fourth tab", () => {
+    revealAssistant();
+    expect(shell.docks.right.collapsed).toBe(false);
+    expect(inspectorTab()).toBe("assistant");
+  });
+
+  test("`assistant.focus` reveals, leaves the sessions view, and lands the caret", async () => {
+    // Start on the sessions list, which has no composer to focus at all.
+    await registry.run("assistant.history");
+    await flush(3);
+    expect(q(".ai-sessions")).not.toBeNull();
+
+    await registry.run("assistant.focus");
+    await flush(4);
+    expect(shell.docks.right.collapsed).toBe(false);
+    const ta = q<HTMLTextAreaElement>(".ai-composer textarea")!;
+    expect(ta).not.toBeNull();
+    expect(document.activeElement).toBe(ta);
+  });
+
+  test("⌘⇧A is its chord, and its title is not `Show Assistant`", () => {
+    /* `inspector.focus.assistant` is DOCUMENT-level and refuses with nothing open — the state the
+       assistant is most wanted in — and `view.setAssistant` is `menus: ["never"]`. Neither puts a
+       caret anywhere. A distinct title is required: two palette rows printing one sentence is the
+       defect `tests/app-commands-composition.test.ts` refuses. */
+    expect(record("assistant.focus").keybinding).toBe("mod+shift+a");
+    expect(record("assistant.focus").title).toBe("Focus Composer");
+  });
+
+  test("`assistant.newChat` and `assistant.history` reveal before they act", async () => {
+    await registry.run("assistant.newChat");
+    await flush(3);
+    expect(newChatMock).toHaveBeenCalledTimes(1);
+    expect(inspectorTab()).toBe("assistant");
+    expect(q(".ai-chat-messages")).not.toBeNull();
+
+    shell.docks.right.collapsed = true;
+    await registry.run("assistant.history");
+    await flush(3);
+    expect(shell.docks.right.collapsed).toBe(false);
+    expect(q(".ai-sessions")).not.toBeNull();
+    await registry.run("assistant.newChat");
+    await flush(3);
+  });
+
+  test("`assistant.attachSelection` attaches the canvas selection as a chip", async () => {
+    const tab = resetWorkspaceWithTab();
+    tab.session.selection = [["children", 0]];
+    selectionCount = 1;
+    expect(registry.isEnabled("assistant.attachSelection")).toBe(true);
+
+    await registry.run("assistant.attachSelection");
+    await flush(4);
+    const chip = q(".ai-composer-chips .ai-context-chip")!;
+    expect(chip.textContent).toContain("<p>");
+    // The chip is the attach menu's own, so a send carries the same delimiter block.
+    expect(chip.getAttribute("title")).toContain('Selected element at ["children",0]');
+  });
+
+  test("with nothing selected it is refused, and refuses again if called anyway", async () => {
+    resetWorkspaceWithTab();
+    selectionCount = 0;
+    expect(registry.isEnabled("assistant.attachSelection")).toBe(false);
+    expect(registry.refusalMessage("assistant.attachSelection")).toContain(
+      "an element selected on the canvas",
+    );
+    // `when` is asked of a snapshot; the selection can go away before the run. A silent no-op
+    // Would look exactly like a chip that had landed.
+    record("assistant.attachSelection").run(emptyContext(), undefined as never);
+    expect(notices().at(-1)).toBe("Nothing is selected to attach.");
+  });
+
+  test("`assistant.retry` needs a provider and an idle turn — and then re-sends", async () => {
+    expect(record("assistant.retry").enablement!(ctxWith({ ai: { configured: false } }))).toBe(
+      false,
+    );
+    expect(
+      record("assistant.retry").enablement!(ctxWith({ ai: { configured: true, streaming: true } })),
+    ).toBe(false);
+
+    chatState.error = "429 rate limit";
+    chatState.status = "error";
+    pushMessage("user", "make it blue");
+    pushMessage("assistant", "");
+    await flush(3);
+    await registry.run("assistant.retry");
+    await flush(4);
+    expect(sendMessage).toHaveBeenCalledWith("make it blue");
+    chatState.error = null;
+    chatState.status = "idle";
+  });
+
+  test("`assistant.stop` is live only while a turn is in flight", async () => {
+    // `ctx.ai.streaming` had ZERO readers and no producer: `live-context.ts` declared the probe
+    // Optional and `studio.ts` never passed one, so this predicate would have been false forever.
+    expect(isAssistantStreaming()).toBe(false);
+    expect(registry.isEnabled("assistant.stop")).toBe(false);
+    expect(registry.refusalMessage("assistant.stop")).toContain("a turn in flight");
+
+    chatState.status = "streaming";
+    expect(isAssistantStreaming()).toBe(true);
+    expect(registry.isEnabled("assistant.stop")).toBe(true);
+    await registry.run("assistant.stop");
+    expect(stopMock).toHaveBeenCalledTimes(1);
+    chatState.status = "idle";
+    await flush(3);
   });
 });

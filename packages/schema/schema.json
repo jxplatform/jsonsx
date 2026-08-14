@@ -961,7 +961,23 @@
           "type": "string"
         },
         "filter": {
-          "$ref": "#/$defs/RefObject"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "description": "A single filter object, e.g. an equality shorthand.",
+              "type": "object"
+            },
+            {
+              "description": "Ordered filter rules, e.g. [{ field: \"Slug\", op: \"not empty\" }].",
+              "items": {
+                "type": "object"
+              },
+              "type": "array"
+            }
+          ],
+          "description": "Filter configuration: a reactive $ref binding, a single filter object, or an ordered array of rules."
         },
         "headers": {
           "additionalProperties": {
@@ -1823,7 +1839,7 @@
           "$ref": "#/$defs/NumberOrRef"
         },
         "tagName": {
-          "$ref": "#/$defs/TagName"
+          "$ref": "#/$defs/ElementTagName"
         },
         "textContent": {
           "$ref": "#/$defs/StringOrRef"
@@ -6020,9 +6036,12 @@
       "oneOf": [
         {
           "items": {
-            "oneOf": [
+            "anyOf": [
               {
                 "$ref": "#/$defs/ElementDef"
+              },
+              {
+                "$ref": "#/$defs/SwitchNode"
               },
               {
                 "$ref": "#/$defs/ArrayNamespace"
@@ -22674,8 +22693,9 @@
       "type": "object"
     },
     "TagName": {
-      "description": "HTML element tag name or custom element name (must contain a hyphen per Web Components spec).",
+      "description": "HTML element tag name or custom element name (must contain a hyphen per Web Components spec). A NAME, never an expression: no `${…}` position in the pipeline evaluates a tagName. Use `$switch`/`cases` to vary the element.",
       "minLength": 1,
+      "pattern": "^[a-zA-Z][a-zA-Z0-9._-]*$",
       "type": "string",
       "examples": [
         "a",
@@ -22891,6 +22911,85 @@
         "user-card"
       ]
     },
+    "TagExpression": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "description": "Two-way: `target` is the test, `value` the tag when it is truthy, `initial` the tag when it is not.",
+          "properties": {
+            "initial": {
+              "$ref": "#/$defs/TagName"
+            },
+            "operator": {
+              "const": "?:",
+              "type": "string"
+            },
+            "target": {
+              "$ref": "#/$defs/ExpressionOperand"
+            },
+            "value": {
+              "$ref": "#/$defs/TagName"
+            }
+          },
+          "required": [
+            "operator",
+            "target",
+            "value",
+            "initial"
+          ],
+          "title": "?: — the tag when the test holds, and the tag when it does not"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Multiway: `target` is the discriminant, matched against case keys by its string form. `default` is required — an element with no tag cannot exist.",
+          "properties": {
+            "cases": {
+              "additionalProperties": {
+                "$ref": "#/$defs/TagName"
+              },
+              "type": "object"
+            },
+            "default": {
+              "$ref": "#/$defs/TagName"
+            },
+            "operator": {
+              "const": "switch",
+              "type": "string"
+            },
+            "target": {
+              "$ref": "#/$defs/ExpressionOperand"
+            }
+          },
+          "required": [
+            "operator",
+            "target",
+            "cases",
+            "default"
+          ],
+          "title": "switch — one tag per discriminant value, with a required fallback"
+        }
+      ],
+      "description": "A tag name chosen at element creation. Every branch resolves to a `TagName`, so the candidate set is enumerable without evaluating anything."
+    },
+    "ElementTagName": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TagName"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "$expression": {
+              "$ref": "#/$defs/TagExpression"
+            }
+          },
+          "required": [
+            "$expression"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "JsonSchemaType": {
       "enum": [
         "string",
@@ -23095,9 +23194,9 @@
       "type": "array"
     },
     "$head": {
-      "description": "Page-level <head> entries. Array of element definitions for meta tags, link tags, script tags, etc. Merged with layout and site-level $head entries.",
+      "description": "Page-level <head> entries. Array of head entries for meta tags, link tags, script tags, etc. Merged with layout and site-level $head entries.",
       "items": {
-        "$ref": "#/$defs/ElementDef"
+        "$ref": "#/$defs/HeadEntry"
       },
       "type": "array"
     },

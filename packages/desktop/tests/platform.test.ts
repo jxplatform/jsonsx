@@ -392,6 +392,13 @@ describe("platform methods", () => {
     ["uploadFile", ["img.png", "ZGF0YQ=="], "uploadFile", { data: "ZGF0YQ==", path: "img.png" }],
     ["deleteFile", ["a.json"], "deleteFile", { path: "a.json" }],
     ["renameFile", ["old.json", "new.json"], "renameFile", { from: "old.json", to: "new.json" }],
+    // The usage query rides the same RPC as the rename it warns about.
+    [
+      "findReferences",
+      [{ path: "components/card.json", tagName: "my-card" }],
+      "findReferences",
+      { path: "components/card.json", tagName: "my-card" },
+    ],
     ["createDirectory", ["newdir"], "createDirectory", { path: "newdir" }],
     [
       "codeService",
@@ -404,6 +411,13 @@ describe("platform methods", () => {
     ],
     ["locateFile", ["button.json"], "locateFile", { name: "button.json" }],
     ["searchFiles", ["query"], "searchFiles", { query: "query" }],
+    // Quick Access widens the search with the format registry's document extensions.
+    [
+      "searchFiles",
+      ["query", [".md", ".mdx"]],
+      "searchFiles",
+      { extensions: [".md", ".mdx"], query: "query" },
+    ],
     ["listFormats", [], "listFormats", undefined],
     ["listExtensions", [], "listExtensions", undefined],
     ["fetchProjectSchemas", [], "fetchProjectSchemas", undefined],
@@ -460,6 +474,11 @@ describe("platform methods", () => {
     ["listStarters", [], "listStarters", undefined],
     ["aiChatUrl", [], "aiChatUrl", undefined],
     ["setWindowProject", ["/proj/x"], "setWindowProject", { root: "/proj/x" }],
+    // Both of these ANSWER now. `openProjectInNewWindow` reports whether it built a window or
+    // Raised one that already had the project, and `pickProject` is the picker whose whole value
+    // Is its return: the chosen project, with this window left bound to its own.
+    ["openProjectInNewWindow", ["/proj/y"], "openProjectInNewWindow", { root: "/proj/y" }],
+    ["pickProject", [], "pickProject", undefined],
     ["getProjectRoot", [], "getProjectRoot", undefined],
     ["getRecentProjects", [], "getRecentProjects", undefined],
     ["getSettings", [], "getSettings", undefined],
@@ -493,6 +512,8 @@ describe("platform methods", () => {
       { pk: "r1", table: "posts" },
     ],
     ["setSecrets", [{ set: { MAIN_URL: "v" } }], "setSecrets", { set: { MAIN_URL: "v" } }],
+    // `View: Open in Browser` builds through this and opens the origin the reply names.
+    ["buildSite", [], "buildSite", undefined],
   ];
 
   for (const [method, args, rpcMethod, expectedPayload] of delegations) {
@@ -540,7 +561,6 @@ describe("platform methods", () => {
         url: "git@host:repo.git",
       },
     ],
-    ["openProjectInNewWindow", ["/proj/y"], "openProjectInNewWindow", { root: "/proj/y" }],
     ["newWindow", [], "newWindow", undefined],
     [
       "saveRecentProjects",

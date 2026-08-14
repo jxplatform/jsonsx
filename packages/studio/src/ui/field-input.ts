@@ -20,12 +20,10 @@ import { html } from "lit-html";
 import type { TemplateResult } from "lit-html";
 import { live } from "lit-html/directives/live.js";
 import { keyed } from "lit-html/directives/keyed.js";
+import { LIVE_PREVIEW } from "./timing";
 
 /** A lit-renderable value (template or directive result). */
 type Renderable = unknown;
-
-/** Default debounce (ms) before an in-progress edit is committed to the document. */
-export const DEFAULT_DEBOUNCE_MS = 350;
 
 interface DraftEntry {
   value: string;
@@ -167,7 +165,7 @@ export function spTextField(
   commit: (v: string) => void,
   opts: FieldOpts = {},
 ): Renderable {
-  const ms = opts.debounceMs ?? DEFAULT_DEBOUNCE_MS;
+  const ms = opts.debounceMs ?? LIVE_PREVIEW;
   const { onInput, onCommit, onKeydown } = makeHandlers(key, ms, commit, opts.commitMode);
   return keyed(
     key,
@@ -193,7 +191,7 @@ export function spTextArea(
   commit: (v: string) => void,
   opts: FieldOpts = {},
 ): Renderable {
-  const ms = opts.debounceMs ?? DEFAULT_DEBOUNCE_MS;
+  const ms = opts.debounceMs ?? LIVE_PREVIEW;
   const { onInput, onCommit } = makeHandlers(key, ms, commit, opts.commitMode);
   return keyed(
     key,
@@ -219,7 +217,7 @@ export function rawTextArea(
   commit: (v: string) => void,
   opts: TextAreaOpts = {},
 ): Renderable {
-  const ms = opts.debounceMs ?? DEFAULT_DEBOUNCE_MS;
+  const ms = opts.debounceMs ?? LIVE_PREVIEW;
   const { onInput, onCommit } = makeHandlers(key, ms, commit, opts.commitMode);
   const style = [
     `min-height:${opts.minHeight ?? "40px"}`,

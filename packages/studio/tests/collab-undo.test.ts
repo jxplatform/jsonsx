@@ -102,12 +102,12 @@ describe("collab undo (Y.UndoManager delegate)", () => {
     const hub = createMockCollabHub();
     const tab = await openAttached(hub);
 
-    tab.session.selection = ["children", 0];
+    tab.session.selection = [["children", 0]];
     transactDoc(tab, (t) => mutateInsertNode(t, [], 1, { tagName: "span" }));
-    tab.session.selection = ["children", 1];
+    tab.session.selection = [["children", 1]];
 
     undo(tab);
-    expect(tab.session.selection).toEqual(["children", 0]);
+    expect(tab.session.selection).toEqual([["children", 0]]);
   });
 
   test("detaching restores solo history rebased on the current doc", async () => {

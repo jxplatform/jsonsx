@@ -1,5 +1,7 @@
 import "./with-dom.js";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { notifyModule } from "./notify-mock";
+import { resetActivities } from "../src/panels/activity-panel";
 import type { StudioPlatform } from "../src/types";
 
 if (globalThis.localStorage === undefined) {
@@ -66,14 +68,26 @@ void mock.module("../src/panels/git-panel.js", () => ({
   renderGitPanel: () => null,
 }));
 
-void mock.module("../src/panels/statusbar.js", () => ({
-  statusMessage: (msg: string) => statusMessages.push(msg),
-}));
+// `notify` in place of the deleted `statusMessage`: the publish flow's three progress lines and
+// Its two failures are the same facts, now with a severity and a tier.
+const details: string[] = [];
+const record = (message: string, opts?: { detail?: string }) => {
+  statusMessages.push(message);
+  if (opts?.detail) {
+    details.push(opts.detail);
+  }
+  return { id: "n", message } as never;
+};
+void mock.module("../src/services/notify.js", () =>
+  notifyModule((call) => record(call.message, call.options)),
+);
 
-const { publishToGithub } = await import("../src/github/github-publish.js");
+const { createGithubRepository } = await import("../src/github/github-publish.js");
 
-describe("publishToGithub", () => {
+describe("createGithubRepository", () => {
   beforeEach(() => {
+    resetActivities();
+    details.length = 0;
     localStorage.removeItem(STORAGE_KEY);
     statusMessages = [];
     showDialogResult = null;
@@ -88,14 +102,14 @@ describe("publishToGithub", () => {
   });
 
   test("returns false when auth returns no token", async () => {
-    const result = await publishToGithub({ projectName: "test-project" });
+    const result = await createGithubRepository({ projectName: "test-project" });
     expect(result).toBe(false);
   });
 
   test("returns false when repo dialog is cancelled", async () => {
     localStorage.setItem(STORAGE_KEY, "ghp_test_token");
     showDialogResult = null;
-    const result = await publishToGithub({ projectName: "test-project" });
+    const result = await createGithubRepository({ projectName: "test-project" });
     expect(result).toBe(false);
   });
 
@@ -117,7 +131,7 @@ describe("publishToGithub", () => {
       },
     ]);
 
-    const result = await publishToGithub({ projectName: "test-project" });
+    const result = await createGithubRepository({ projectName: "test-project" });
     expect(result).toBe(true);
 
     expect(mockFetchCalls[0]!.url).toBe("https://api.github.com/user/repos");
@@ -134,7 +148,7 @@ describe("publishToGithub", () => {
       "https://github.com/user/my-repo.git",
     );
     expect(mockPlatform.gitPush).toHaveBeenCalledWith({ setUpstream: true });
-    expect(statusMessages.some((m) => m.includes("Published to GitHub"))).toBe(true);
+    expect(statusMessages.some((m) => m.includes("Repository created"))).toBe(true);
   });
 
   test("returns false and reports error when GitHub API fails", async () => {
@@ -152,9 +166,12 @@ describe("publishToGithub", () => {
       },
     ]);
 
-    const result = await publishToGithub({ projectName: "test" });
+    const result = await createGithubRepository({ projectName: "test" });
     expect(result).toBe(false);
-    expect(statusMessages.some((m) => m.includes("name already exists"))).toBe(true);
+    expect(statusMessages.some((m) => m.includes("Could not create the GitHub repository"))).toBe(
+      true,
+    );
+    expect(details).toContain("name already exists");
   });
 
   test("returns false when push fails", async () => {
@@ -176,9 +193,46 @@ describe("publishToGithub", () => {
       },
     ]);
 
-    const result = await publishToGithub({ projectName: "test" });
+    const result = await createGithubRepository({ projectName: "test" });
     expect(result).toBe(false);
-    expect(statusMessages.some((m) => m.includes("Push failed"))).toBe(true);
+    expect(statusMessages.some((m) => m.includes("the push failed"))).toBe(true);
+  });
+
+  test("a fetch that never lands is reported, not swallowed", async () => {
+    localStorage.setItem(STORAGE_KEY, "ghp_test_token");
+    showDialogResult = { description: "", isPrivate: true, name: "unreachable" };
+    // @ts-expect-error -- a rejecting fetch is the whole point of this stub
+    globalThis.fetch = async () => {
+      throw new TypeError("Failed to fetch");
+    };
+    const result = await createGithubRepository({ projectName: "test" });
+    expect(result).toBe(false);
+    expect(statusMessages).toContain("Could not reach GitHub to create the repository.");
+    expect(details.join("\n")).toContain("Failed to fetch");
+  });
+
+  test("a remote that cannot be added says so, instead of failing at the push", async () => {
+    // `gitAddRemote` had no error path at all before this: an `origin` that already existed
+    // Surfaced as a push failure describing the push.
+    localStorage.setItem(STORAGE_KEY, "ghp_test_token");
+    showDialogResult = { description: "", isPrivate: true, name: "remote-fail" };
+    mockPlatform.gitAddRemote = mock(() => Promise.reject(new Error("remote origin exists")));
+    setupFetch([
+      {
+        json: {
+          clone_url: "https://github.com/user/remote-fail.git",
+          html_url: "https://github.com/user/remote-fail",
+        },
+        ok: true,
+      },
+    ]);
+    const result = await createGithubRepository({ projectName: "test" });
+    expect(result).toBe(false);
+    expect(statusMessages).toContain(
+      "The repository was created, but the remote could not be added.",
+    );
+    expect(details.join("\n")).toContain("remote origin exists");
+    expect(mockPlatform.gitPush).not.toHaveBeenCalled();
   });
 
   test("sends correct Accept header to GitHub API", async () => {
@@ -199,7 +253,7 @@ describe("publishToGithub", () => {
       },
     ]);
 
-    await publishToGithub({ projectName: "test" });
+    await createGithubRepository({ projectName: "test" });
     expect(mockFetchCalls.length).toBeGreaterThan(0);
     expect(mockFetchCalls[0]!.opts.headers.Accept).toBe("application/vnd.github+json");
   });

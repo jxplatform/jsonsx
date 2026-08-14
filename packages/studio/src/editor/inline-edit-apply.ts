@@ -182,7 +182,7 @@ export function applyBlockMerge(
     // Linger as invisible structure that still occupies layout and shows up in the layers panel.
     pruneEmptyAncestors(t, parentElementPath(fromPath) as JxPath);
     if (isTabActive(tab)) {
-      t.session.selection = intoPath;
+      t.session.selection = [intoPath];
     }
   });
 
@@ -248,7 +248,7 @@ export function applyInlineSplit(
     // A background tab's selection stays exactly as the user left it — only the visible tab's
     // Selection follows the split.
     if (isTabActive(tab)) {
-      t.session.selection = newPath;
+      t.session.selection = [newPath];
     }
   });
   return newPath;
@@ -279,7 +279,7 @@ export function applyInlineInsert(
         mutateUpdateProperty(t, path, "textContent");
       }
       if (isTabActive(tab)) {
-        t.session.selection = path;
+        t.session.selection = [path];
       }
     });
     return path;
@@ -303,7 +303,7 @@ export function applyInlineInsert(
     }
     mutateInsertNode(t, parentPath, idx + 1, structuredClone(elementDef));
     if (isTabActive(tab)) {
-      t.session.selection = newPath;
+      t.session.selection = [newPath];
     }
   });
   return newPath;
@@ -364,7 +364,7 @@ export function applyRangeReplace(
       }
     }
     if (isTabActive(tab)) {
-      t.session.selection = from.path;
+      t.session.selection = [from.path];
     }
   });
 

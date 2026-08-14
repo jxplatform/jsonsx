@@ -1,56 +1,21 @@
-/// <reference lib="dom" />
 /**
- * State.js — Builder state model and mutation API
+ * Document paths, the tree walk over them, and the project record.
  *
- * All state changes go through named mutation functions. State is immutable — every mutation
- * produces a new state object. History is a linear stack of { document, selection } snapshots.
+ * A `JxPath` addresses one node from the document root: `[]` is the root itself, `["children", 0]`
+ * its first child, `["children", 0, "children", 2]` that child's third. Every module that points at
+ * a node — selection, hover, the layers tree, a patch — spells it this way, which is why the
+ * comparison and ancestry predicates live here rather than beside any one of them.
  *
- * Path convention: [] = root document ['children', 0] = first child ['children', 0, 'children', 2]
- * = third child of first child
+ * The editable document and its history belong to a TAB (`tabs/tab.ts`) and its session lives on
+ * the workspace; nothing here holds mutable document state. The one exception is `projectState`,
+ * which outlives every document because it describes the folder they all come from.
  */
 
 import type { ProjectState } from "./types";
-import { isRef } from "@jxsuite/schema/guards";
+import { displayTagName, isRef } from "@jxsuite/schema/guards";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
 export type JxPath = (string | number)[];
-
-interface HistorySnapshot {
-  document: JxMutableNode;
-  selection: JxPath | null;
-}
-
-export interface StudioState {
-  document: JxMutableNode;
-  selection: JxPath | null;
-  hover: JxPath | null;
-  history: HistorySnapshot[];
-  historyIndex: number;
-  dirty: boolean;
-  fileHandle: FileSystemFileHandle | null;
-  documentPath: string | null;
-  documentStack: StudioStackFrame[];
-  handlersSource: string | null;
-  mode: string;
-  content: { frontmatter: Record<string, unknown> };
-  ui: Record<string, unknown>;
-  canvas: {
-    status: string;
-    scope: Record<string, unknown> | null;
-    error: string | null;
-  };
-}
-
-interface StudioStackFrame {
-  document: JxMutableNode;
-  selection: JxPath | null;
-  fileHandle: FileSystemFileHandle | null;
-  documentPath: string | null;
-  dirty: boolean;
-  history: HistorySnapshot[];
-  historyIndex: number;
-  mode: string;
-}
 
 // ─── Path utilities ───────────────────────────────────────────────────────────
 
@@ -71,35 +36,6 @@ export function getNodeAtPath(doc: JxMutableNode, path: JxPath) {
     node = node[key] as JxMutableNode;
   }
   return node;
-}
-
-/**
- * Shallow-clone every node along `path` from root to target, leaving non-path subtrees as shared
- * references. Returns the new root and the mutable target node at the end of the path.
- *
- * Used by mutation functions for structural-sharing history: the old root becomes an immutable
- * snapshot (shared subtrees are never mutated), and the new root is the live document.
- */
-export function cloneAlongPath(
-  doc: JxMutableNode,
-  path: JxPath,
-): { root: JxMutableNode; target: JxMutableNode } {
-  const root = Array.isArray(doc) ? [...doc] : { ...doc };
-  let node: Record<string | number, unknown> = root as Record<string | number, unknown>;
-
-  for (const key of path) {
-    const child = node[key];
-    if (child == null) {
-      return { root: root as JxMutableNode, target: node as JxMutableNode };
-    }
-    const cloned = Array.isArray(child)
-      ? [...(child as unknown[])]
-      : { ...(child as Record<string, unknown>) };
-    node[key] = cloned;
-    node = cloned as Record<string | number, unknown>;
-  }
-
-  return { root: root as JxMutableNode, target: node as JxMutableNode };
 }
 
 /**
@@ -300,7 +236,7 @@ function collectRows(
   }
 
   // Custom component instances without user-authored children are atomic in the layer tree
-  if (doc.$props && (doc.tagName || "").includes("-") && !Array.isArray(doc.children)) {
+  if (doc.$props && displayTagName(doc.tagName).includes("-") && !Array.isArray(doc.children)) {
     return;
   }
 
@@ -372,119 +308,15 @@ export function nodeLabel(node: JxMutableNode | null) {
     const name = node.attributes?.name;
     return typeof name === "string" && name.trim() ? `slot: ${name.trim()}` : "slot";
   }
-  const tag = node.tagName ?? "div";
+  /* `displayTagName`, because a tag may be CHOSEN rather than written: this label reached the
+     Outline row, the Inspector's header and the jump bar, and a raw read rendered `[object Object]`
+     in all three. `a|div` is the honest answer — one element, tag decided at creation. */
+  const tag = displayTagName(node.tagName) || "div";
   const suffix = node.$switch ? " ⇆" : "";
   if (typeof node.textContent === "string" && node.textContent.length > 0) {
     return `${tag} — ${node.textContent.slice(0, 24)}${suffix}`;
   }
   return tag + suffix;
-}
-
-// ─── State factory ────────────────────────────────────────────────────────────
-
-/**
- * @param {JxMutableNode} doc
- * @returns {StudioState}
- */
-export function createState(doc: JxMutableNode): StudioState {
-  const initial = { document: doc, selection: null };
-  return {
-    canvas: {
-      error: null, // Error message on failure
-      scope: null, // $defs scope from runtime buildScope
-      status: "idle", // "idle" | "loading" | "ready" | "error"
-    },
-    content: { frontmatter: {} }, // Frontmatter metadata for .md files
-    dirty: false,
-    document: doc,
-    documentPath: null, // Root-relative path, e.g. "examples/markdown/blog.json"
-    documentStack: [], // Frames for component navigation
-    fileHandle: null,
-    handlersSource: null,
-    history: [initial],
-    historyIndex: 0,
-    hover: null,
-    mode: "component", // 'component' | 'content'
-    selection: null,
-    ui: {
-      activeMedia: null, // '--md' | null (base) — focused canvas/breakpoint
-      activeSelector: null, // ':hover' | '.child' | null (base) — nested selector context
-      editingFunction: null, // Null | { type: 'def', defName } | { type: 'event', path, eventKey }
-      featureToggles: {}, // { '--dark': true } — non-size media toggles
-      gitBranches: null, // { current, branches: [] }
-      gitCommitMessage: "", // Commit message input
-      gitDiffState: null,
-      gitError: null, // Error message string
-      gitLoading: false, // Loading indicator during async ops
-      gitStatus: null, // { branch, ahead, behind, files: [] }
-      inspectorSections: {}, // { identity: true, ... } — properties panel section open/closed state
-      pendingInlineEdit: null, // Null | { path, mediaName } — deferred inline edit awaiting canvas readiness
-      rightTab: "properties", // 'properties' | 'events' | 'style'
-      settingsTab: "stylebook", // "stylebook" | "definitions" | "contentTypes"
-      styleFilter: "", // Free-text filter for CSS property names
-      styleFilterActive: false, // True = show only props with values set
-      styleSections: {}, // { layout: true, ... } — section open/closed state
-      styleShorthands: {}, // { padding: true, ... } — shorthand expand/collapse state
-      stylebookCustomizedOnly: false, // Show only customized elements
-      stylebookFilter: "", // Search filter text
-      stylebookSelection: null, // Tag name string, e.g. "h1"
-      stylebookTab: "elements", // "elements" | "variables"
-      zoom: 1,
-    },
-  };
-}
-
-// ─── Doc/Session slice helpers ───────────────────────────────────────────────
-
-/**
- * Compose a flat StudioState from separate doc and session slices.
- *
- * @param {Partial<StudioState>} doc
- * @param {Partial<StudioState>} session
- * @returns {StudioState}
- */
-export function toFlat(doc: Partial<StudioState>, session: Partial<StudioState>) {
-  return { ...doc, ...session } as StudioState;
-}
-
-/**
- * Decompose a flat StudioState into doc and session slices.
- *
- * @param {StudioState} S
- * @returns {{ doc: Partial<StudioState>; session: Partial<StudioState> }}
- */
-export function fromFlat(S: StudioState) {
-  const {
-    document,
-    dirty,
-    fileHandle,
-    documentPath,
-    documentStack,
-    handlersSource,
-    mode,
-    content,
-    history,
-    historyIndex,
-    selection,
-    hover,
-    ui,
-    canvas,
-  } = S;
-  return {
-    doc: {
-      content,
-      dirty,
-      document,
-      documentPath,
-      documentStack,
-      fileHandle,
-      handlersSource,
-      history,
-      historyIndex,
-      mode,
-    },
-    session: { canvas, hover, selection, ui },
-  };
 }
 
 // ─── Project state (persists across document switches) ────────────────────────
@@ -509,97 +341,4 @@ export function setProjectState(ps: ProjectState | null) {
  */
 export function requireProjectState() {
   return projectState as ProjectState;
-}
-
-// ─── Frontmatter mutation ───────────────────────────────────────────────────
-
-/**
- * Update a frontmatter field. Does not use applyMutation because frontmatter lives in S.content,
- * not S.document.
- *
- * @param {StudioState} state
- * @param {string} field
- * @param {unknown} value
- * @returns {StudioState}
- */
-export function updateFrontmatter(state: StudioState, field: string, value: unknown) {
-  const fm = { ...state.content?.frontmatter };
-  if (value === undefined || value === null || value === "") {
-    delete fm[field];
-  } else {
-    fm[field] = value;
-  }
-  return {
-    ...state,
-    content: { ...state.content, frontmatter: fm },
-    dirty: true,
-  };
-}
-
-// ─── Selection / hover ────────────────────────────────────────────────────────
-
-/**
- * @param {StudioState} state
- * @param {JxPath | null} path
- * @returns {StudioState}
- */
-export function selectNode(state: StudioState, path: JxPath | null) {
-  return { ...state, selection: path };
-}
-
-/**
- * @param {StudioState} state
- * @param {JxPath | null} path
- * @returns {StudioState}
- */
-export function hoverNode(state: StudioState, path: JxPath | null) {
-  return { ...state, hover: path };
-}
-
-// ─── Document stack (component navigation) ──────────────────────────────────
-
-/**
- * Push current document onto the stack and switch to editing a new document.
- *
- * @param {StudioState} state
- * @param {JxMutableNode} doc
- * @param {string | null} documentPath
- * @returns {StudioState}
- */
-export function pushDocument(state: StudioState, doc: JxMutableNode, documentPath: string | null) {
-  const frame = {
-    dirty: state.dirty,
-    document: state.document,
-    documentPath: state.documentPath,
-    fileHandle: state.fileHandle,
-    history: state.history,
-    historyIndex: state.historyIndex,
-    mode: state.mode,
-    selection: state.selection,
-  };
-  const newState = createState(doc);
-  newState.documentStack = [...(state.documentStack || []), frame];
-  newState.documentPath = documentPath;
-  newState.ui = { ...state.ui, activeMedia: null, activeSelector: null };
-  return newState;
-}
-
-/**
- * Pop the document stack and return to the previous document.
- *
- * @param {StudioState} state
- * @returns {StudioState}
- */
-export function popDocument(state: StudioState) {
-  if (!state.documentStack || state.documentStack.length === 0) {
-    return state;
-  }
-  const stack = [...state.documentStack];
-  const frame = stack.pop();
-  return {
-    ...state,
-    ...frame,
-    documentStack: stack,
-    ui: { ...state.ui },
-  };
 }

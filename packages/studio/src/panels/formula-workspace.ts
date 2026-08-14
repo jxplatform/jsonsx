@@ -1,50 +1,146 @@
 /// <reference lib="dom" />
 /**
- * Formula workspace — the full-screen structured editing surface for a single `$expression` (spec
- * §19.9, milestone M4). Takes over the canvas area exactly like the Monaco function editor
- * (renderFunctionEditor): `TabUi.editingFormula` identifies the document position being edited (a
- * state entry's `$expression` via defName, or an element event binding's via path + eventKey).
+ * ⑪ · Logic — the formula workspace and the function editor, hosted by the Bottom dock.
  *
- * Layout: the chip pipeline summarizes the whole tree with live value badges on top; the recursive
- * expression form edits the chip-selected sub-node in the main pane; a data rail mirrors the canvas
- * dataScope snapshot on the right; the footer reports the root result (or the evaluation error).
+ * **What changed, and why it is the whole point.** Both of these surfaces used to TAKE OVER the
+ * canvas: `TabUi.editingFormula` (this file) and `TabUi.editingFunction` (`panels/editors.ts`) each
+ * cleared `canvasWrap`, dropped every canvas panel and drew themselves over the stage. So the one
+ * artefact whose values you are authoring — the page — was the one thing you could not see while
+ * authoring them, and the workspace's own data rail existed to paper over it: a frozen snapshot of
+ * a scope, shown because the live thing had just been unmounted. Plan §12 P8.5: "no editor hides
+ * the page it computes." They are a **tab of the Bottom dock** now (§3.2 ⑪), which sits under the
+ * pane grid, so the page renders beside the formula and keeps rendering while you edit it.
+ *
+ * **A dock tab is not a reparented takeover.** The surface has to work at dock height, so the
+ * header is one row, the chip pipeline and the result are single lines, the data rail is a narrow
+ * column that scrolls rather than a 280px slab, and every measurement lives in `styles/panels.css`
+ * instead of the inline `style=` attributes that kept seventeen `fw-*` classes on
+ * `scripts/check-styles.ts`'s orphan list.
+ *
+ * **One target, two surfaces, one tab.** {@link logicTarget} is the single reader of the two
+ * `TabUi` fields, and the function editor wins when both are set — the precedence `tabs/tab.ts` has
+ * always documented, now stated in exactly one place. The tab's `when` is that same predicate, so
+ * Logic exists only while something is open in it, and `panels/bottom-dock.ts` reveals the dock on
+ * that tab when a target appears.
+ *
+ * **The close is real.** Both surfaces carry one, and closing is the only thing that clears the
+ * target — leaving the dock, switching tabs and collapsing the dock all keep your place, because
+ * the editor no longer owns a screen it would otherwise be stranded on.
  *
  * Every edit immutably replaces the selected sub-node within the root and writes the WHOLE root
- * node back through transactDoc — undo/redo and canvas/panel refresh come free.
+ * node back through `transactDoc` — undo/redo and the canvas patch come free, and because the
+ * canvas is still mounted the patch lands in a page you can watch.
  */
 
-import { html, render as litRender } from "lit-html";
+import { html } from "lit-html";
 import { getEventBinding, isExpressionDef, isJsonObject } from "@jxsuite/schema/guards";
 
-import { canvasPanels, canvasWrap, getNodeAtPath, updateUi } from "../store";
+import { shallowRef } from "../reactivity";
+import { getNodeAtPath, updateUi } from "../store";
 import { activeTab } from "../workspace/workspace";
 import { mutateAddDef, mutateUpdateDef, mutateUpdateProperty, transactDoc } from "../tabs/transact";
-import { view } from "../view";
+import { setBottomTab } from "../shell";
 import { chipSummary, renderFormulaChips } from "../ui/formula-chips";
 import { renderExpressionEditor } from "../ui/expression-editor";
 import { applyCatalogPick, formulaCatalog } from "../ui/formula-catalog";
 import { openFormulaPalette } from "../ui/formula-palette";
 import { livePreviewExpression } from "../services/live-preview";
+import { closeFunctionEditor, functionEditorTemplate, syncFunctionEditor } from "./editors";
+import { registerPanel } from "./panel-registry";
+import { renderEmptyState } from "./empty-state";
 import { dataTypeLabel, renderDataTreeTemplate, unwrapSignal } from "./data-explorer";
 
+import {
+  argsSchema,
+  pathArg,
+  pathProperty,
+  stringArg,
+  stringProperty,
+} from "../commands/command-args";
+
 import type { JxNodeValue } from "../tabs/transact";
-import type { FormulaEditDef, JsonValue } from "../types";
+import type { AnyCommand, CommandRegistry } from "../commands/registry";
+import type { PanelBody } from "./panel-registry";
+import type { ExpressionPreview } from "../services/preview-eval";
+import type { FormulaEditDef, FunctionEditDef, JsonValue } from "../types";
 import type { Tab } from "../tabs/tab";
 import type { JxStateDefinition } from "@jxsuite/schema/types";
 import type { TemplateResult } from "lit-html";
 
 type NodePath = (string | number)[];
 
-// ─── Module state ────────────────────────────────────────────────────────────
+/** What the Logic tab is showing: the Monaco function body, or the structured `$expression`. */
+export type LogicTarget =
+  | { surface: "function"; editing: FunctionEditDef }
+  | { surface: "formula"; editing: FormulaEditDef };
 
-/** Chip-selected sub-node path within the root expression (root = []). */
-let _selectedPath: NodePath = [];
+/**
+ * The Logic tab's target, or `null` when nothing is open in it.
+ *
+ * The ONE reader of `TabUi.editingFunction` / `TabUi.editingFormula`, and therefore the one place
+ * their precedence is decided. Two surfaces used to answer that question separately — the canvas
+ * render pipeline by branch order, the pane context bar by an `||` — which is two definition sites
+ * for a rule neither of them stated.
+ *
+ * @param {Tab | null} [tab] The tab to read; defaults to the focused one.
+ * @returns {LogicTarget | null}
+ */
+export function logicTarget(tab: Tab | null = activeTab.value): LogicTarget | null {
+  const ui = tab?.session.ui;
+  if (!ui) {
+    return null;
+  }
+  if (ui.editingFunction) {
+    return { editing: ui.editingFunction as FunctionEditDef, surface: "function" };
+  }
+  if (ui.editingFormula) {
+    return { editing: ui.editingFormula as FormulaEditDef, surface: "formula" };
+  }
+  return null;
+}
 
-/** Serialized editing target — the selection resets when the workspace retargets. */
-let _targetKey: string | null = null;
+/**
+ * Put the Logic tab on screen. Idempotent.
+ *
+ * `setBottomTab` is the shell's own "reveal" — it selects the tab AND opens the dock, for the same
+ * reason `setActivityTab` does: "show me the formula" means the formula is on screen when the call
+ * returns, not that a tab is selected inside a closed dock.
+ */
+export function revealLogicPanel(): void {
+  setBottomTab("logic");
+}
 
-/** Owning tab of the current target — a same-looking target in another tab is a retarget. */
-let _targetTab: Tab | null = null;
+/**
+ * Open something in the Logic tab and put it on screen. The one WRITER of the two `TabUi` fields
+ * {@link logicTarget} reads, as that is its one reader.
+ *
+ * **One tab holds one target, so opening either surface clears the other.** `logicTarget` gives the
+ * function editor precedence when both are set, which is the right tie-break for a state that
+ * should never occur — and every opener used to create it. Four buttons and two commands each set
+ * their own field and left the other alone, so "Open in formula workspace" on an `$expression`
+ * while a Function body was open was a dead click: the dock went on showing the function, and the
+ * target key had not changed so nothing revealed either. Writing both fields here means the fifth
+ * opener inherits the rule instead of re-deciding it.
+ *
+ * **The reveal is the OTHER half, and it is a different event from the dock's.**
+ * `panels/bottom-dock.ts` reveals when a target APPEARS or CHANGES, at most once per target — that
+ * is what lets you close the dock over an open formula and have it stay closed (§16.3). Neither
+ * half can do the other's job: an effect on the target cannot see "the user pressed the button
+ * again" (same target, no change, no reveal — the dock stayed shut and the button did nothing), and
+ * a gesture cannot cover a target that appears without one. So the gesture says so explicitly, and
+ * this is what makes a call to it a gesture.
+ *
+ * @param {LogicTarget} target The surface to show and what it should be pointed at.
+ */
+export function openLogicTarget(target: LogicTarget): void {
+  updateUi(
+    activeTab.value,
+    "editingFunction",
+    target.surface === "function" ? target.editing : null,
+  );
+  updateUi(activeTab.value, "editingFormula", target.surface === "formula" ? target.editing : null);
+  revealLogicPanel();
+}
 
 function isExprNode(value: unknown): value is Record<string, unknown> {
   return isJsonObject(value) && typeof value.operator === "string";
@@ -119,215 +215,245 @@ function writeRoot(tab: Tab, editing: FormulaEditDef, newRoot: unknown) {
       mutateUpdateProperty(t, path, eventKey, { $expression: newRoot } as JxNodeValue),
     );
   }
-  renderFormulaWorkspace();
 }
 
-/** Close the workspace — clears `editingFormula`; the canvas re-renders its regular mode. */
+/** Close the workspace — clears `editingFormula`; the Logic tab leaves the strip with it. */
 export function closeFormulaWorkspace() {
-  updateUi("editingFormula", null);
+  updateUi(activeTab.value, "editingFormula", null);
 }
 
-// ─── Rendering ───────────────────────────────────────────────────────────────
-
-const PANE_BORDER = "1px solid var(--spectrum-gray-200, #323232)";
-
-const MONO = "font-family:var(--spectrum-code-font-family, monospace)";
+// ─── The Logic tab ───────────────────────────────────────────────────────────
 
 /**
- * Render the formula workspace into the canvas area. Mirrors renderFunctionEditor's takeover: the
- * canvas DnD/event handlers and panel registrations are cleared and canvasWrap becomes a stretched
- * column owned by this template.
+ * The chip selection, keyed by the target it belongs to.
+ *
+ * Keyed rather than reset, because the reset used to happen INSIDE the render — and a render that
+ * writes the state it reads is a reactive loop the moment the surface becomes an effect, which is
+ * exactly what hosting it in the dock makes it. A selection whose key no longer matches simply does
+ * not apply, so retargeting starts at the root with nothing written.
  */
-export function renderFormulaWorkspace() {
-  const tab = activeTab.value;
-  const editing = tab?.session.ui.editingFormula as FormulaEditDef | null | undefined;
-  if (!tab || !editing) {
-    return;
-  }
+const _selection = shallowRef<{ tab: Tab | null; key: string; path: NodePath }>({
+  key: "",
+  path: [],
+  tab: null,
+});
 
-  // Reset the chip selection when the workspace retargets.
-  const targetKey = JSON.stringify(editing);
-  if (targetKey !== _targetKey || tab !== _targetTab) {
-    _targetKey = targetKey;
-    _targetTab = tab;
-    _selectedPath = [];
-  }
-
-  // Clean up canvas DnD and event handlers (the canvas surface is being replaced).
-  for (const fn of view.canvasDndCleanups) {
-    fn();
-  }
-  view.canvasDndCleanups = [];
-  for (const fn of view.canvasEventCleanups) {
-    fn();
-  }
-  view.canvasEventCleanups = [];
-  canvasPanels.length = 0;
-
-  // Eject foreign DOM (iframe canvas markup) plus any stale Lit part before the first render;
-  // Subsequent renders diff in place so form focus survives re-renders.
-  if (!canvasWrap.firstElementChild?.classList.contains("formula-workspace")) {
-    canvasWrap.textContent = "";
-    // @ts-expect-error -- _$litPart$ is Lit's private render-part marker, not in the DOM types
-    delete canvasWrap["_$litPart$"];
-  }
-  canvasWrap.style.padding = "0";
-  canvasWrap.style.flexDirection = "column";
-  canvasWrap.style.alignItems = "stretch";
-
-  litRender(workspaceTemplate(tab, editing), canvasWrap);
+/**
+ * The document position a selection belongs to. Paired with the tab OBJECT, never its id: a tab
+ * that was closed and reopened at the same path is a different document, and inheriting a chip
+ * selection into it is how you edit the wrong sub-node of a formula that merely looks the same.
+ */
+function selectionKey(editing: FormulaEditDef): string {
+  return JSON.stringify(editing);
 }
 
-function workspaceTemplate(tab: Tab, editing: FormulaEditDef): TemplateResult {
-  const stateEntries = (tab.doc.document?.state ?? {}) as Record<string, JxStateDefinition>;
-  const title = (editing.type === "def" ? editing.defName : editing.eventKey) ?? "?";
-  const root = formulaRoot(tab, editing);
+/**
+ * Register the Bottom dock's Logic tab.
+ *
+ * Defined here and registered from `panels/bottom-dock.ts`, the same way Problems is defined beside
+ * its notification store: the dock owns the strip, the surface owns the record.
+ */
+export function registerLogicPanel(): void {
+  registerPanel({
+    id: "logic",
+    title: "Logic",
+    level: "document",
+    dock: "bottom",
+    icon: "sp-icon-event",
+    // No rail button: Logic has no steady state to badge. It exists while a formula or a function
+    // Is open and leaves the strip when you close it, which is what `when` says below.
+    rail: false,
+    when: () => logicTarget() !== null,
+    render: (ctx) => logicPanelBody(ctx.rerender),
+    afterRender: (_ctx, host) => syncFunctionEditor(host),
+  });
+}
 
-  const closeButton = html`
-    <sp-action-button
-      quiet
-      size="s"
-      class="fw-close"
-      title="Close formula workspace"
-      @click=${closeFormulaWorkspace}
-    >
-      <sp-icon-close slot="icon"></sp-icon-close>
-      Close
-    </sp-action-button>
+/**
+ * What the Logic tab draws.
+ *
+ * @param {() => void} rerender The dock's repaint, handed to the live-preview refresh.
+ * @returns {PanelBody}
+ */
+export function logicPanelBody(rerender: () => void): PanelBody {
+  const tab = activeTab.value;
+  const target = logicTarget(tab);
+  if (!tab || !target) {
+    return renderEmptyState({
+      message: "Open a formula or a function to edit it here, beside the page it computes.",
+    });
+  }
+  return target.surface === "function"
+    ? functionPaneTemplate(target.editing)
+    : workspaceTemplate(tab, target.editing, rerender);
+}
+
+/** The one header both surfaces wear: what is open, what kind it is, its verbs, and the close. */
+function logicHeaderTemplate(
+  glyph: string,
+  name: string,
+  kind: string,
+  title: string,
+  verbs: TemplateResult | null,
+  close: () => void,
+): TemplateResult {
+  return html`
+    <div class="fw-header">
+      <span class="fw-title" title=${title}>${glyph} ${name}</span>
+      <span class="fw-kind">${kind}</span>
+      <div class="fw-header-gap"></div>
+      ${verbs}
+      <sp-action-button
+        quiet
+        size="s"
+        class="fw-close"
+        title="Close"
+        @click=${() => {
+          close();
+        }}
+      >
+        <sp-icon-close slot="icon"></sp-icon-close>
+        Close
+      </sp-action-button>
+    </div>
   `;
+}
+
+/** The Monaco function body, at dock height. The editor itself is mounted by `afterRender`. */
+function functionPaneTemplate(editing: FunctionEditDef): TemplateResult {
+  const name = editing.defName ?? editing.eventKey ?? "?";
+  return html`
+    <div class="formula-workspace formula-workspace--code">
+      ${logicHeaderTemplate(
+        "ƒ",
+        name,
+        editing.type === "def" ? "function body" : "event handler",
+        editing.type === "def" ? `state/${name}` : name,
+        null,
+        () => {
+          void closeFunctionEditor();
+        },
+      )}
+      ${functionEditorTemplate()}
+    </div>
+  `;
+}
+
+function workspaceTemplate(
+  tab: Tab,
+  editing: FormulaEditDef,
+  rerender: () => void,
+): TemplateResult {
+  const stateEntries = (tab.doc.document?.state ?? {}) as Record<string, JxStateDefinition>;
+  const name = (editing.type === "def" ? editing.defName : editing.eventKey) ?? "?";
+  const root = formulaRoot(tab, editing);
+  const kind = editing.type === "def" ? "state expression" : "event expression";
+  const title = editing.type === "def" ? `state/${name}` : name;
 
   if (!root) {
     return html`
-      <div
-        class="formula-workspace"
-        style="display:flex;flex-direction:column;flex:1;min-height:0;gap:12px;padding:20px"
-      >
-        <div class="fw-header" style="display:flex;align-items:center;gap:8px">
-          <span class="fw-title" style="${MONO};font-size:14px">fx ${title}</span>
-          <div style="flex:1"></div>
-          ${closeButton}
+      <div class="formula-workspace">
+        ${logicHeaderTemplate("fx", name, kind, title, null, closeFormulaWorkspace)}
+        <div class="fw-body">
+          ${renderEmptyState({ message: "No expression found at this document position." })}
         </div>
-        <div class="empty-state">No expression found at this document position.</div>
       </div>
     `;
   }
 
   const { scope } = tab.session.canvas;
-  // Live-context evaluation in the canvas iframe with snapshot fallback (M6). While the workspace
-  // Owns canvasWrap the iframe is usually unmounted (immediate snapshot); when a live host exists
-  // (e.g. another panel's canvas), a landed result re-renders this workspace. An event target's
+  // Live-context evaluation in the canvas iframe with snapshot fallback (M6). The canvas is no
+  // Longer unmounted while this surface is open — that is the entire point of the move — so the
+  // Live path is the ORDINARY case now rather than the one that never happened. An event target's
   // Element path is the context, so repeater-template formulas bind the first item's $map scope.
   const preview = livePreviewExpression(
     tab,
     `formula:${JSON.stringify(editing)}`,
     root,
     editing.type === "event" ? (editing.path ?? null) : null,
-    () => renderFormulaWorkspace(),
+    rerender,
   );
-  const { node: selected, path: selectedPath } = resolveSelection(root, _selectedPath);
+  const stored = _selection.value;
+  const key = selectionKey(editing);
+  const { node: selected, path: selectedPath } = resolveSelection(
+    root,
+    stored.tab === tab && stored.key === key ? stored.path : [],
+  );
   const write = (next: unknown) => writeRoot(tab, editing, next);
   const writeSelected = (next: unknown) => write(replaceAtPath(root, selectedPath, next));
   const onChipSelect = (path: NodePath) => {
-    _selectedPath = path;
-    renderFormulaWorkspace();
+    _selection.value = { key, path, tab };
   };
 
-  // ── Header: target title, catalog browser (palette), Close ──
-  const header = html`
-    <div class="fw-header" style="display:flex;align-items:center;gap:8px;padding:14px 20px 6px">
-      <span
-        class="fw-title"
-        style="${MONO};font-size:14px;color:var(--spectrum-gray-800, #d0d0d0)"
-        title=${editing.type === "def" ? `state/${title}` : title}
-        >fx ${title}</span
-      >
-      <span class="fw-kind" style="font-size:11px;color:var(--spectrum-gray-600, #808080)">
-        ${editing.type === "def" ? "state expression" : "event expression"}
-      </span>
-      <div style="flex:1"></div>
-      <sp-action-button
-        quiet
-        size="s"
-        class="fw-browse-catalog"
-        title="Browse catalog"
-        @click=${(e: Event) =>
-          openFormulaPalette({
-            anchor: e.currentTarget as HTMLElement,
-            entries: formulaCatalog(stateEntries),
-            onPick: (entry) =>
-              applyCatalogPick(entry, writeSelected, {
-                onInsertDef: (name, def) =>
-                  transactDoc(activeTab.value, (t) =>
-                    mutateAddDef(t, name, def as Record<string, JsonValue>),
-                  ),
-                stateEntries,
-              }),
-          })}
-      >
-        <sp-icon-brackets slot="icon"></sp-icon-brackets>
-        Catalog
-      </sp-action-button>
-      ${closeButton}
-    </div>
-  `;
-
-  // ── Chip strip: the whole tree as chips with live badges; clicking selects the sub-node ──
-  const chips = html`
-    <div class="fw-chips" style="padding:2px 20px 10px;border-bottom:${PANE_BORDER}">
-      ${renderFormulaChips(root, onChipSelect, { preview })}
-    </div>
-  `;
-
-  // ── Main pane: the recursive expression form for the SELECTED sub-node ──
-  const editor = html`
-    <div class="fw-editor" style="flex:1;min-width:0;overflow:auto;padding:16px 20px">
-      <div
-        class="fw-selected"
-        style="font-size:11px;color:var(--spectrum-gray-600, #808080);padding-bottom:8px"
-      >
-        Selected:
-        <span style=${MONO}>${selectedPath.length === 0 ? "root" : chipSummary(selected)}</span>
-      </div>
-      ${renderExpressionEditor(selected, writeSelected, {
-        allowEventRef: editing.type === "event",
-        depth: 1,
-        path: selectedPath,
-        preview,
-        stateDefs: Object.keys(stateEntries),
-        stateEntries,
-      })}
-    </div>
-  `;
-
-  // ── Right rail: live data context (the canvas dataScope snapshot) ──
-  const scopeEntries = scope ? Object.entries(scope) : [];
-  const rail = html`
-    <div
-      class="fw-context"
-      style="width:280px;flex-shrink:0;overflow:auto;border-left:${PANE_BORDER};padding:16px"
+  const catalogButton = html`
+    <sp-action-button
+      quiet
+      size="s"
+      class="fw-browse-catalog"
+      title="Browse catalog"
+      @click=${(e: Event) =>
+        openFormulaPalette({
+          anchor: e.currentTarget as HTMLElement,
+          entries: formulaCatalog(stateEntries),
+          onPick: (entry) =>
+            applyCatalogPick(entry, writeSelected, {
+              onInsertDef: (defName, def) =>
+                transactDoc(activeTab.value, (t) =>
+                  mutateAddDef(t, defName, def as Record<string, JsonValue>),
+                ),
+              stateEntries,
+            }),
+        })}
     >
-      <div
-        class="fw-context-title"
-        style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--spectrum-gray-600, #808080);padding-bottom:8px"
-      >
-        Data
+      <sp-icon-brackets slot="icon"></sp-icon-brackets>
+      Catalog
+    </sp-action-button>
+  `;
+
+  return html`
+    <div class="formula-workspace">
+      ${logicHeaderTemplate("fx", name, kind, title, catalogButton, closeFormulaWorkspace)}
+      <div class="fw-chips">${renderFormulaChips(root, onChipSelect, { preview })}</div>
+      <div class="fw-body">
+        <div class="fw-editor">
+          <div class="fw-selected">
+            Selected:
+            <span class="fw-selected-node"
+              >${selectedPath.length === 0 ? "root" : chipSummary(selected)}</span
+            >
+          </div>
+          ${renderExpressionEditor(selected, writeSelected, {
+            allowEventRef: editing.type === "event",
+            depth: 1,
+            path: selectedPath,
+            preview,
+            stateDefs: Object.keys(stateEntries),
+            stateEntries,
+          })}
+        </div>
+        ${dataRailTemplate(scope)}
       </div>
+      ${resultTemplate(preview)}
+    </div>
+  `;
+}
+
+/** The live data context — a SECOND opinion now that the page itself is on screen, not the only one. */
+function dataRailTemplate(scope: Record<string, unknown> | null | undefined): TemplateResult {
+  const scopeEntries = scope ? Object.entries(scope) : [];
+  return html`
+    <div class="fw-context">
+      <div class="fw-context-title">Data</div>
       ${
         scopeEntries.length === 0
           ? html`<div class="empty-state">No canvas data snapshot yet</div>`
           : scopeEntries.map(([name, value]) => {
               const unwrapped = unwrapSignal(value);
               return html`
-                <div class="fw-context-entry" style="margin-bottom:10px">
-                  <div style="display:flex;gap:6px;align-items:baseline">
-                    <span
-                      class="fw-context-name"
-                      style="${MONO};font-size:12px;color:var(--spectrum-gray-800, #d0d0d0)"
-                      >${name}</span
-                    >
-                    <span style="font-size:10px;color:var(--spectrum-gray-600, #808080)"
-                      >${dataTypeLabel(value)}</span
-                    >
+                <div class="fw-context-entry">
+                  <div class="fw-context-head">
+                    <span class="fw-context-name">${name}</span>
+                    <span class="fw-context-type">${dataTypeLabel(value)}</span>
                   </div>
                   <div class="data-tree">${renderDataTreeTemplate(unwrapped, 0, 4)}</div>
                 </div>
@@ -336,50 +462,114 @@ function workspaceTemplate(tab: Tab, editing: FormulaEditDef): TemplateResult {
       }
     </div>
   `;
+}
 
-  // ── Footer: the root result badge, or the evaluation error ──
-  const footer = preview?.error
-    ? html`
-        <div
-          class="fw-result fw-result--error"
-          style="${MONO};font-size:12px;padding:10px 20px;border-top:${PANE_BORDER};color:var(--spectrum-negative-content-color-default, #f76a63)"
-        >
-          ${preview.error}
-        </div>
-      `
-    : preview
-      ? html`
-          <div
-            class="fw-result"
-            style="${MONO};font-size:12px;padding:10px 20px;border-top:${PANE_BORDER};color:var(--spectrum-seafoam-900, #35a690)"
-          >
-            = ${preview.values.get("") ?? "undefined"}
-            ${
-              preview.mutating
-                ? html`<span style="color:var(--spectrum-gray-600, #808080)"
-                    >(mutates target)</span
-                  >`
-                : ""
-            }
-          </div>
-        `
-      : html`
-          <div
-            class="fw-result fw-result--pending"
-            style="font-size:12px;padding:10px 20px;border-top:${PANE_BORDER};color:var(--spectrum-gray-600, #808080)"
-          >
-            Preview unavailable — the canvas has not posted a data snapshot yet
-          </div>
-        `;
-
+/** The root result, the evaluation error, or the honest "nothing has evaluated this yet". */
+function resultTemplate(preview: ExpressionPreview | null): TemplateResult {
+  if (preview?.error) {
+    return html`<div class="fw-result fw-result--error">${preview.error}</div>`;
+  }
+  if (preview) {
+    return html`
+      <div class="fw-result">
+        = ${preview.values.get("") ?? "undefined"}
+        ${preview.mutating ? html`<span class="fw-result-note">(mutates target)</span>` : ""}
+      </div>
+    `;
+  }
   return html`
-    <div
-      class="formula-workspace"
-      style="display:flex;flex-direction:column;flex:1;min-height:0;background:var(--spectrum-gray-75, #1d1d1d)"
-    >
-      ${header} ${chips}
-      <div class="fw-body" style="display:flex;flex:1;min-height:0">${editor} ${rail}</div>
-      ${footer}
+    <div class="fw-result fw-result--pending">
+      Preview unavailable — the canvas has not posted a data snapshot yet
     </div>
   `;
+}
+
+// ─── Commands ─────────────────────────────────────────────────────────────────
+
+/**
+ * The formula/function EDITOR verbs — open a state entry's body or an event binding in Logic.
+ *
+ * They live here rather than beside `panels/editors.ts`'s renderer because this module already owns
+ * the other half of the same idea: `editingFormula` (the structured workspace) and
+ * `editingFunction` (the code editor) are two surfaces of ONE dock tab, addressing the same two
+ * document positions — a state entry by `defName`, or an element event binding by `path` +
+ * `eventKey`.
+ *
+ * Both REFUSE a target the document does not hold. The predecessors wrote `ui.editingFunction`
+ * straight from the automation hook with no check at all, so a renamed def opened an editor over
+ * nothing and the shot photographed an empty takeover.
+ *
+ * @returns {AnyCommand[]}
+ */
+export function formulaEditorCommands(): AnyCommand[] {
+  return [
+    {
+      args: argsSchema({
+        defName: stringProperty("The state entry whose body to open in the code editor."),
+      }),
+      category: "Document",
+      id: "formula.editDef",
+      level: "document",
+      menus: ["palette"],
+      group: "5_data",
+      requires: "an open document that defines state",
+      when: (ctx) => ctx.document.open,
+      run: (_commandCtx, args) => {
+        const defName = stringArg("formula.editDef", args, "defName");
+        const tab = activeTab.value;
+        if (!tab) {
+          throw new RangeError(`command "formula.editDef" needs an open document`);
+        }
+        const defs = tab.doc.document?.state ?? {};
+        if (!(defName in defs)) {
+          const defined = Object.keys(defs);
+          throw new RangeError(
+            `command "formula.editDef" argument "defName": "${defName}" is not a state entry ` +
+              `this document defines — it defines: ` +
+              `${defined.length > 0 ? defined.join(", ") : "nothing"}`,
+          );
+        }
+        openLogicTarget({ editing: { defName, type: "def" }, surface: "function" });
+      },
+      title: "Edit Function",
+    },
+    {
+      args: argsSchema({
+        eventKey: stringProperty('The event binding, e.g. "onclick".'),
+        path: pathProperty("The document path of the element that carries the binding."),
+      }),
+      category: "Document",
+      id: "formula.editEvent",
+      level: "document",
+      menus: ["palette"],
+      group: "5_data",
+      requires: "an open document",
+      when: (ctx) => ctx.document.open,
+      run: (_commandCtx, args) => {
+        const eventKey = stringArg("formula.editEvent", args, "eventKey");
+        const path = pathArg("formula.editEvent", args, "path");
+        const tab = activeTab.value;
+        if (!tab) {
+          throw new RangeError(`command "formula.editEvent" needs an open document`);
+        }
+        if (!getNodeAtPath(tab.doc.document, path)) {
+          throw new RangeError(
+            `command "formula.editEvent" argument "path": [${path.join(", ")}] addresses no ` +
+              `node in ${tab.documentPath ?? "the open document"}`,
+          );
+        }
+        openLogicTarget({ editing: { eventKey, path, type: "event" }, surface: "function" });
+      },
+      title: "Edit Event Handler",
+    },
+  ];
+}
+
+/**
+ * Register the formula/function editor verbs.
+ *
+ * @param {CommandRegistry} registry
+ */
+export function registerFormulaEditorCommands(registry: CommandRegistry): void {
+  registry.registerAll(formulaEditorCommands());
 }
