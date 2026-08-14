@@ -33,3 +33,5 @@ The visual editor only runs as the desktop app above — there's no way to insta
 ## Next
 
 Ready to build something? Continue to **[Your first project](/docs/start/first-project)**.
+
+<!-- CI scope probe: docs-only diff. Delete this branch. -->
