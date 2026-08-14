@@ -24,6 +24,7 @@ import { beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
 import { notifyModule } from "./notify-mock";
 import type { CommandContext } from "../src/commands/context";
 import type { InspectorTabId } from "../src/shell";
+import type { ProjectOpenOutcome, ProjectOpenTarget } from "../src/editor/shortcuts";
 import { surfaceForPane } from "../src/canvas/surface-registry";
 import { paneCommands } from "../src/workspace/workspace";
 
@@ -158,7 +159,9 @@ const setPan = mock((x: number, y: number) => {
 });
 const applyTransform = mock(() => {});
 const saveFile = mock(() => {});
-const openProject = mock(() => {});
+/** The hook answers with what it DID; the flow's report is built from that, not from the target. */
+let openProjectOutcome: ProjectOpenOutcome = "opened";
+const openProject = mock(async (_target: ProjectOpenTarget) => openProjectOutcome);
 const openInBrowser = mock(() => {});
 
 function freshDoc() {
@@ -245,6 +248,7 @@ beforeAll(() => {
 beforeEach(() => {
   canvasMode = "design";
   caretActive = false;
+  openProjectOutcome = "opened";
   panX = 0;
   panY = 0;
   for (const m of [
@@ -1236,6 +1240,14 @@ describe("openProjectFlow", () => {
     return document.querySelector("sp-dialog-wrapper");
   }
 
+  /** A platform that can BOTH open a window elsewhere and pick a project without binding to it. */
+  function multiWindowPlatform() {
+    installMockPlatform({
+      openProjectInNewWindow: (async () => ({ focused: false })) as never,
+      pickProject: (async () => ({ name: "Other", root: "/other" })) as never,
+    });
+  }
+
   test("with one window there is no choice to make, and none is offered", async () => {
     installMockPlatform();
     const hooks = { openInBrowser, openProject, saveDocument: saveFile };
@@ -1245,7 +1257,8 @@ describe("openProjectFlow", () => {
   });
 
   test("with a project open on a multi-window platform it asks, and reports the outcome", async () => {
-    installMockPlatform({ openProjectInNewWindow: (async () => {}) as never });
+    multiWindowPlatform();
+    openProjectOutcome = "newWindow";
     const hooks = { openInBrowser, openProject, saveDocument: saveFile };
     const pending = openProjectFlow(hooks);
     await flush();
@@ -1260,7 +1273,7 @@ describe("openProjectFlow", () => {
   });
 
   test("This Window is a real answer, not a dismissal", async () => {
-    installMockPlatform({ openProjectInNewWindow: (async () => {}) as never });
+    multiWindowPlatform();
     const hooks = { openInBrowser, openProject, saveDocument: saveFile };
     const pending = openProjectFlow(hooks);
     await flush();
@@ -1270,7 +1283,7 @@ describe("openProjectFlow", () => {
   });
 
   test("cancelling opens nothing and says nothing", async () => {
-    installMockPlatform({ openProjectInNewWindow: (async () => {}) as never });
+    multiWindowPlatform();
     const hooks = { openInBrowser, openProject, saveDocument: saveFile };
     const pending = openProjectFlow(hooks);
     await flush();
@@ -1278,6 +1291,45 @@ describe("openProjectFlow", () => {
     await pending;
     expect(openProject).not.toHaveBeenCalled();
     expect(notified).not.toHaveBeenCalled();
+  });
+
+  /* The report describes what HAPPENED. Announcing the target instead is how "Opening the project
+     in a new window…" got printed over a file dialog the user had just dismissed, and over an
+     existing window that had merely been raised. */
+  test("a cancelled picker is reported as nothing, because nothing happened", async () => {
+    multiWindowPlatform();
+    openProjectOutcome = "cancelled";
+    const hooks = { openInBrowser, openProject, saveDocument: saveFile };
+    const pending = openProjectFlow(hooks);
+    await flush();
+    dialogWrapper()!.dispatchEvent(new Event("confirm", { bubbles: true }));
+    await pending;
+    expect(openProject).toHaveBeenCalledWith("newWindow");
+    expect(notified).not.toHaveBeenCalled();
+  });
+
+  test("a project already open elsewhere is reported as a focus, not as a new window", async () => {
+    multiWindowPlatform();
+    openProjectOutcome = "focused";
+    const hooks = { openInBrowser, openProject, saveDocument: saveFile };
+    const pending = openProjectFlow(hooks);
+    await flush();
+    dialogWrapper()!.dispatchEvent(new Event("confirm", { bubbles: true }));
+    await pending;
+    expect(notified.mock.calls[0]![0]).toContain("already open");
+    expect(notified.mock.calls[0]![0]).not.toContain("new window");
+  });
+
+  /* A WINDOW TO OPEN INTO IS NOT ENOUGH. The choice also needs a picker that does not bind this
+     window to the answer, and without one "New Window" cannot be honoured however it is answered —
+     which is exactly the state this dialog shipped in: asked, collected, and then routed into the
+     path that replaces the asking window's project. Nothing to honour it with, nothing asked. */
+  test("no picker that leaves this window alone means no choice is offered", async () => {
+    installMockPlatform({ openProjectInNewWindow: (async () => ({ focused: false })) as never });
+    const hooks = { openInBrowser, openProject, saveDocument: saveFile };
+    await openProjectFlow(hooks);
+    expect(dialogWrapper()).toBeNull();
+    expect(openProject).toHaveBeenCalledWith("thisWindow");
   });
 });
 

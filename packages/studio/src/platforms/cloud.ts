@@ -701,6 +701,9 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
       if (target && typeof window !== "undefined") {
         window.open(editUrl(target), "_blank", "noopener");
       }
+      // `_blank` always makes a tab; a browser tab already showing this project is not something
+      // The page can see, let alone raise.
+      return { focused: false };
     },
 
     /**

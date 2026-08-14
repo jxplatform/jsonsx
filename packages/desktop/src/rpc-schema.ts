@@ -485,14 +485,22 @@ export interface StudioRPC {
         params: void;
         response: { path: string | null };
       };
+      // Native project.json picker that binds NOTHING — the choice without the consequence, so
+      // "open it in a new window" can ask which project without re-rooting the window that asked.
+      pickProject: {
+        params: void;
+        response: { root: string; name: string } | null;
+      };
       // Window management (multi-window)
       newWindow: {
         params: void;
         response: void;
       };
       openProjectInNewWindow: {
+        // A window was created for the project, or one already had it and came to the front.
+        // The response says which, so the caller can report what actually happened.
         params: { root: string };
-        response: void;
+        response: { focused: boolean };
       };
       setWindowProject: {
         params: { root: string };

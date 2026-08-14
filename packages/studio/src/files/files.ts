@@ -161,16 +161,25 @@ export async function loadProject() {
 // ─── Open Project (PAL-based) ─────────────────────────────────────────────
 
 /**
- * Open a project via the platform adapter.
+ * Open a project via the platform adapter, into THIS window.
+ *
+ * Reports whether a project was actually opened: a cancelled picker and a failed open both leave
+ * the window on the project it already had, and the caller announces the outcome — "Opening the
+ * project…" over a dialog the user just dismissed is a report of something that did not happen.
  *
  * @param {{ renderLeftPanel: () => void }} ctx
+ * @returns {Promise<boolean>} Whether the window changed project.
  */
-export async function openProject({ renderLeftPanel }: { renderLeftPanel: () => void }) {
+export async function openProject({
+  renderLeftPanel,
+}: {
+  renderLeftPanel: () => void;
+}): Promise<boolean> {
   try {
     const platform = getPlatform();
     const result = await platform.openProject();
     if (!result) {
-      return;
+      return false;
     } // User cancelled
 
     const { config, handle } = result;
@@ -234,11 +243,13 @@ export async function openProject({ renderLeftPanel }: { renderLeftPanel: () => 
 
     await openLastSessionOrHome();
     void maybePromptJxsuiteUpdate(requireProjectState().projectRoot);
+    return true;
   } catch (error) {
     notify.error("Could not open the project.", {
       detail: errorMessage(error),
       source: "Open Project",
     });
+    return false;
   }
 }
 

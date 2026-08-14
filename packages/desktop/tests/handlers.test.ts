@@ -39,7 +39,8 @@ const {
 
 // The folder picker lives on the session object (the legacy handlers shim does not re-export
 // PickDirectory), so the picker tests below drive it through a session of their own.
-const { createProjectSession } = await import("../src/project-session");
+// `pickProjectFile` is module-level for the same reason it exists: it belongs to no session.
+const { createProjectSession, pickProjectFile } = await import("../src/project-session");
 
 const FIXTURES = join(import.meta.dir, "_fixtures_handlers");
 
@@ -1100,6 +1101,64 @@ describe("openProject", () => {
       expect(result!.handle.name).toBe("_fixtures_handlers");
     } finally {
       setFileDialog(null as unknown as () => Promise<string | null>);
+      cleanup();
+    }
+  });
+});
+
+// ─── pickProjectFile ────────────────────────────────────────────────────────
+// The same picker, minus the binding. `openProject` above IS this plus the bind, which is what
+// Makes "open the project I'm about to choose somewhere ELSE" expressible: the window that asks
+// The question must not be re-rooted by asking it.
+
+describe("pickProjectFile", () => {
+  test("names the project without binding any session to it", async () => {
+    setup();
+    setProjectRoot("/somewhere/else");
+    try {
+      writeFileSync(join(FIXTURES, "project.json"), JSON.stringify({ name: "My Project" }));
+      setFileDialog(async () => join(FIXTURES, "project.json"));
+
+      const picked = await pickProjectFile();
+
+      expect(picked).toEqual({
+        config: { name: "My Project" },
+        name: "My Project",
+        root: FIXTURES,
+      });
+      // THE POINT OF THE FUNCTION: the process-global root is where it was.
+      expect(getProjectRoot()).toBe("/somewhere/else");
+    } finally {
+      setFileDialog(null as unknown as () => Promise<string | null>);
+      cleanup();
+    }
+  });
+
+  test("falls back to the directory basename, and validates like openProject does", async () => {
+    setup();
+    try {
+      writeFileSync(join(FIXTURES, "project.json"), JSON.stringify({}));
+      setFileDialog(async () => join(FIXTURES, "project.json"));
+      expect((await pickProjectFile())!.name).toBe("_fixtures_handlers");
+
+      writeFileSync(join(FIXTURES, "other.json"), "{}");
+      setFileDialog(async () => join(FIXTURES, "other.json"));
+      await expect(pickProjectFile()).rejects.toThrow("not a project.json");
+    } finally {
+      setFileDialog(null as unknown as () => Promise<string | null>);
+      cleanup();
+    }
+  });
+
+  test("returns null when the picker is cancelled, and refuses without one", async () => {
+    setup();
+    try {
+      setFileDialog(async () => null);
+      expect(await pickProjectFile()).toBeNull();
+
+      setFileDialog(null as unknown as () => Promise<string | null>);
+      await expect(pickProjectFile()).rejects.toThrow("No file dialog configured");
+    } finally {
       cleanup();
     }
   });

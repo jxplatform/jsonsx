@@ -9,6 +9,7 @@ code:
   - packages/desktop/src/menu.ts
   - packages/desktop/src/updater.ts
   - packages/desktop/src/platform.ts
+  - packages/desktop/src/window-manager.ts
 ---
 
 # The desktop app
@@ -32,8 +33,9 @@ A fresh window greets you with the **[welcome screen](/docs/studio/interface/wel
 To open an existing project:
 
 1. Choose _File > Open Project…_ or press :kbd[⌘O] (macOS) / :kbd[Ctrl+O] (Windows/Linux) — or click **Open Project...** on the welcome screen.
-2. A native file dialog opens. Select the project's `project.json` file — the file that marks a folder as a Jx project.
-3. The project opens in its own window, with the folder around `project.json` as the project root.
+2. If a project is already open, Studio asks where the next one should go: **This Window** or **New Window**.
+3. A native file dialog opens. Select the project's `project.json` file — the file that marks a folder as a Jx project.
+4. The project opens with the folder around `project.json` as the project root.
 
 You can also open a project straight from your file manager: if your system associates it with Jx Studio, double-clicking a `project.json` opens that project.
 
@@ -43,9 +45,14 @@ You can also open a project straight from your file manager: if your system asso
 
 ## One window per project
 
-Each window holds one project. Opening a second project opens a second window rather than replacing what you have, and the window's title tells you which is which. Opening a project that's already open doesn't duplicate it — the existing window comes to the front.
+Each window holds one project, and the window's title tells you which. When you open another project from a window that already has one, Studio asks where it should go:
 
-_File > New Window_ (:kbd[⇧⌘N] / :kbd[Ctrl+Shift+N]) opens a fresh welcome window when you want to start something else.
+- **New Window** leaves this window untouched — its project, its tabs, its unsaved work — and the project you pick opens beside it.
+- **This Window** replaces the project here. Anything unsaved is confirmed first.
+
+Opening a project that's already open never duplicates it: whichever you chose, the window that has it comes to the front instead.
+
+_File > Open Project…_ from the app menu always opens into a window of its own, and _File > New Window_ (:kbd[⇧⌘N] / :kbd[Ctrl+Shift+N]) opens a fresh welcome window when you want to start something else.
 
 ## How it differs from Studio in the browser
 

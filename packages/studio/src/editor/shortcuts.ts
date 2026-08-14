@@ -99,18 +99,29 @@ export type StageContext = (surface: CanvasSurface) => ShortcutPointerContext;
 /** Where a project the user is about to pick should open. */
 export type ProjectOpenTarget = "thisWindow" | "newWindow";
 
+/**
+ * What Open Project actually did — which is not always what was asked for. The picker can be
+ * cancelled, and a project chosen for a new window may already be open in one, in which case that
+ * window is raised rather than a second one made. The flow reports THIS, never the target.
+ */
+export type ProjectOpenOutcome = "opened" | "newWindow" | "focused" | "cancelled";
+
 /** The verbs the default command set needs that are not implemented in this file. */
 export interface StudioCommandHooks {
   saveDocument: () => void | Promise<void>;
   /**
-   * Open a project, in the window the user chose.
+   * Open a project, in the window the user chose, and answer with what happened.
    *
    * The TARGET is the new half. `project.open` with a project already open used to route silently
    * to `platform.openProjectInNewWindow` and return, so the click looked like it did nothing when
    * the new window opened behind this one. The choice is now asked for ({@link openProjectFlow})
    * and reported; honouring it is the bootstrap's side of the contract.
+   *
+   * The OUTCOME is what makes the report honest. A hook that returned nothing left this file
+   * announcing the target it had asked for, so a dismissed file dialog still said the project was
+   * opening — see {@link ProjectOpenOutcome}.
    */
-  openProject: (target: ProjectOpenTarget) => void | Promise<void>;
+  openProject: (target: ProjectOpenTarget) => Promise<ProjectOpenOutcome>;
   openInBrowser: () => void | Promise<void>;
 }
 
@@ -550,6 +561,13 @@ function focusInspectorTab(registry: CommandRegistry, tabId: string): void {
 
 // ─── Project: Open… ───────────────────────────────────────────────────────────
 
+/** What the flow says once the answer is in — one line per outcome that isn't a cancel. */
+const OPEN_PROJECT_REPORT: Record<Exclude<ProjectOpenOutcome, "cancelled">, string> = {
+  focused: "That project was already open — bringing its window to the front.",
+  newWindow: "Opened the project in a new window.",
+  opened: "Opened the project in this window.",
+};
+
 /**
  * Ask where the project should open, then say what happened.
  *
@@ -557,11 +575,18 @@ function focusInspectorTab(registry: CommandRegistry, tabId: string): void {
  * offered. With one open there IS a choice, and it was previously being made silently in the user's
  * name: `openRecentProject` saw a live `projectState`, called `openProjectInNewWindow` and
  * returned, so a window opened behind this one and the click read as a no-op.
+ *
+ * A window to open into is not enough to make the choice real — the platform must also be able to
+ * ASK WHICH PROJECT without binding this window to the answer ({@link StudioPlatform.pickProject}).
+ * Where the only picker is `openProject()`, which re-roots the asking window as it picks, "New
+ * Window" cannot be honoured however the dialog is answered, so the dialog is not shown.
  */
 export async function openProjectFlow(hooks: StudioCommandHooks): Promise<void> {
   const platform = hasPlatform() ? getPlatform() : null;
-  const multiWindow = typeof platform?.openProjectInNewWindow === "function";
-  if (!projectState || !multiWindow) {
+  const canOpenElsewhere =
+    typeof platform?.openProjectInNewWindow === "function" &&
+    typeof platform?.pickProject === "function";
+  if (!projectState || !canOpenElsewhere) {
     await hooks.openProject("thisWindow");
     return;
   }
@@ -588,11 +613,11 @@ export async function openProjectFlow(hooks: StudioCommandHooks): Promise<void> 
   if (choice === "cancel") {
     return;
   }
-  await hooks.openProject(choice);
-  notify.info(
-    choice === "newWindow" ? "Opening the project in a new window…" : "Opening the project…",
-    { key: "project.open", source: "Project" },
-  );
+  const outcome = await hooks.openProject(choice);
+  if (outcome === "cancelled") {
+    return;
+  }
+  notify.info(OPEN_PROJECT_REPORT[outcome], { key: "project.open", source: "Project" });
 }
 
 // ─── Command records owned by this file ───────────────────────────────────────

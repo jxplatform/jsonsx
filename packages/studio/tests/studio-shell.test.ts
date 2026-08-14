@@ -1704,6 +1704,85 @@ describe("multi-window project routing", () => {
       delete (platform as any).setWindowProject;
     }
   });
+
+  /* THE TARGET, HONOURED — the half `editor/shortcuts.ts` asks for and this file has to deliver.
+     `openProjectFlow` puts the choice to the user and hands the answer to this hook, which was
+     wired as `openProject: () => openProject()` against a function that declared no parameter: the
+     answer was collected and dropped, and "New Window" fell through to the branch that re-roots
+     THIS window. Every assertion below is about the window that asked being left alone. */
+  describe("the openProject hook", () => {
+    /** The desktop pair: a window to open into, and a picker that binds nothing. */
+    function installNewWindowPlatform(focused = false) {
+      const openInNew = mock(async (_root: string) => ({ focused }));
+      const pick = mock(async () => ({ name: "Other", root: "/other/site" }));
+      (platform as any).openProjectInNewWindow = openInNew;
+      (platform as any).pickProject = pick;
+      return { openInNew, pick };
+    }
+
+    const runHook = (target: string) =>
+      (shortcutHooks!.openProject as (t: string) => Promise<string>)(target);
+
+    test('"newWindow" picks a project and opens it elsewhere, leaving this window on its own', async () => {
+      const { openInNew, pick } = installNewWindowPlatform();
+      try {
+        const rootBefore = platform.projectRoot;
+        const bindingPicks = state.calls.filter((c) => c[0] === "openProject").length;
+
+        const outcome = await runHook("newWindow");
+
+        expect(pick).toHaveBeenCalledTimes(1);
+        expect(openInNew).toHaveBeenCalledWith("/other/site");
+        expect(outcome).toBe("newWindow");
+        // `platform.openProject()` is the picker that RE-ROOTS this window as it picks. Reaching
+        // It here is the bug: the file browser opened, and the project it chose replaced this one.
+        expect(state.calls.filter((c) => c[0] === "openProject")).toHaveLength(bindingPicks);
+        expect(platform.projectRoot).toBe(rootBefore);
+      } finally {
+        delete (platform as any).openProjectInNewWindow;
+        delete (platform as any).pickProject;
+      }
+    });
+
+    test('"newWindow" reports a focus when the backend raised a window that already had it', async () => {
+      const { openInNew } = installNewWindowPlatform(true);
+      try {
+        expect(await runHook("newWindow")).toBe("focused");
+        expect(openInNew).toHaveBeenCalledWith("/other/site");
+      } finally {
+        delete (platform as any).openProjectInNewWindow;
+        delete (platform as any).pickProject;
+      }
+    });
+
+    test("a cancelled picker opens no window and changes nothing", async () => {
+      const openInNew = mock(async (_root: string) => ({ focused: false }));
+      (platform as any).openProjectInNewWindow = openInNew;
+      (platform as any).pickProject = mock(async () => null);
+      try {
+        expect(await runHook("newWindow")).toBe("cancelled");
+        expect(openInNew).not.toHaveBeenCalled();
+      } finally {
+        delete (platform as any).openProjectInNewWindow;
+        delete (platform as any).pickProject;
+      }
+    });
+
+    test('"thisWindow" still goes through the platform picker that binds this window', async () => {
+      const bindingPicks = state.calls.filter((c) => c[0] === "openProject").length;
+      // The mock's `openProject` resolves null (a cancelled native dialog), so the outcome reports
+      // The nothing that happened rather than the open it was asked for.
+      expect(await runHook("thisWindow")).toBe("cancelled");
+      expect(state.calls.filter((c) => c[0] === "openProject")).toHaveLength(bindingPicks + 1);
+    });
+
+    test("a target is not needed to open into this window — the default is where you are", async () => {
+      // The toolbar button and the welcome screen call the same private function with no argument.
+      const bindingPicks = state.calls.filter((c) => c[0] === "openProject").length;
+      await welcomeCtx.openProject();
+      expect(state.calls.filter((c) => c[0] === "openProject")).toHaveLength(bindingPicks + 1);
+    });
+  });
 });
 
 describe("remaining wiring arrows", () => {

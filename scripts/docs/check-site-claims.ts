@@ -102,7 +102,10 @@ function lintClaims(): void {
   }));
 
   for (const file of targetFiles()) {
-    const repoFile = relative(ROOT, file);
+    // Forward-slash: `claims.json` writes repo paths one way, and `relative()` answers in the
+    // OS separator. On Windows every allow entry therefore matched nothing, which failed the check
+    // Twice over — once for the claim it was allowing, once for going "stale".
+    const repoFile = relative(ROOT, file).replaceAll("\\", "/");
     const isMarkdown = file.endsWith(".md");
     const lines = readFileSync(file, "utf8").split("\n");
     let inFence = false;
