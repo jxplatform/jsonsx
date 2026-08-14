@@ -1,4 +1,4 @@
-import Electrobun from "electrobun/bun";
+import Electrobun from "electrobun/main";
 import { isAbsolute } from "node:path";
 import { setDirectoryDialog, setFileDialog } from "./project-session";
 import { setNotifyWebview, startBackgroundChecks } from "./updater";

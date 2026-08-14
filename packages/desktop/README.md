@@ -14,6 +14,27 @@
 | NixOS                             | Chromium `--app` + `@jxsuite/server` | Via `nix build`             |
 | Dev mode                          | Chrome + `@jxsuite/server`           | Active (Studio development) |
 
+## Prerequisites
+
+Electrobun 2 builds through **Hutch**, its native build CLI. Hutch is not an npm dependency and
+`bun install` cannot supply it — install it once per machine:
+
+```bash
+curl -fsSL https://hutch.blackboard.sh/hutch/install.sh | sh
+```
+
+On Windows:
+
+```powershell
+& ([scriptblock]::Create((irm https://hutch.blackboard.sh/hutch/install.ps1)))
+```
+
+Hutch reads the exact Electrobun release from [`hutch.config.ts`](hutch.config.ts), caches that
+release's platform archive under `~/.hutch`, and projects its SDK into a generated `.hutch/devkit`
+directory — which is where every `electrobun/*` import resolves from, and why there is no
+`electrobun` entry in `package.json`. Builds sync it implicitly; `bun run sync` does it on demand,
+which is what a fresh clone needs before `bun run typecheck` will pass.
+
 ## Development
 
 ```bash
@@ -26,7 +47,7 @@ bun run chromium     # Launch in Chrome app-mode (NixOS / dev mode)
 ```bash
 bun run build           # Debug build
 bun run build:release   # Canary release build
-bun run build:stable    # Stable release build
+bun run build:stable    # Production release build (+ Windows MSI)
 ```
 
 ## Architecture
@@ -50,11 +71,13 @@ The Bun backend registers all RPC handlers at startup. Studio communicates with 
 
 ## Dependencies
 
-| Package           | Purpose                           |
-| ----------------- | --------------------------------- |
-| `electrobun`      | Native webview + Bun process host |
-| `@jxsuite/studio` | Studio UI                         |
-| `dbus-ts`         | D-Bus integration (Linux)         |
+| Package           | Purpose                   |
+| ----------------- | ------------------------- |
+| `@jxsuite/studio` | Studio UI                 |
+| `dbus-ts`         | D-Bus integration (Linux) |
+
+Electrobun itself is deliberately absent: it is not an npm package here but a Hutch-managed product
+pinned in `hutch.config.ts` — see [Prerequisites](#prerequisites).
 
 ## License
 

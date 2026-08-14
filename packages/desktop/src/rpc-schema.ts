@@ -1,5 +1,5 @@
 // oxlint-disable typescript/no-invalid-void-type -- Electrobun RPCSchema uses `void` to mark no-payload params/responses
-import type { RPCSchema } from "electrobun/bun";
+import type { RPCSchema } from "electrobun/main";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 import type { FsEventPayload, ReferencesResult, RenameReport } from "@jxsuite/server/refactor";
 import type { StarterMeta } from "@jxsuite/starters";

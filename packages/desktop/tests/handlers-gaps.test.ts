@@ -7,7 +7,7 @@ import type { CapabilityInfo, ExtensionCapability } from "@jxsuite/schema/format
 import type { ComponentMeta } from "../src/rpc-schema";
 import type { StudioSchema } from "../src/handlers";
 
-void mock.module("electrobun/bun", () => ({
+void mock.module("electrobun/main", () => ({
   BrowserWindow: class {},
   Electrobun: { start: () => {} },
   Utils: { openFileDialog: async () => [] },

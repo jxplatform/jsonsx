@@ -67,7 +67,7 @@ The AI assistant, publishing, and everything on the canvas behave the same in bo
 
 ## Platform notes
 
-Installers are provided for macOS (Apple Silicon and Intel), Windows (x64), and Linux (x64) — see the **[install page](/docs/start/install)** for downloads. On NixOS the app is packaged differently (built with `nix build`, running Studio in a Chromium app window), but presents the same Studio.
+Installers are provided for macOS (Apple Silicon), Windows (x64), and Linux (x64 and ARM64) — see the **[install page](/docs/start/install)** for downloads. Intel Macs are no longer among the builds. On NixOS the app is packaged differently (built with `nix build`, running Studio in a Chromium app window), but presents the same Studio.
 
 ## Next
 

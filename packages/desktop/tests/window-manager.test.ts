@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { rpcParity } from "./_rpc-parity";
 
-// ─── Mock electrobun/bun ────────────────────────────────────────────────────
+// ─── Mock electrobun/main ───────────────────────────────────────────────────
 
 const rpcConfigs: { handlers: { requests: Record<string, (p?: never) => unknown> } }[] = [];
 const rpcObjects: {
@@ -33,7 +33,7 @@ class MockWindow {
   }
 }
 
-void mock.module("electrobun/bun", () => ({
+void mock.module("electrobun/main", () => ({
   BrowserView: {
     defineRPC: (config: { handlers: { requests: Record<string, (p?: never) => unknown> } }) => {
       rpcConfigs.push(config);

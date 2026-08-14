@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 
-// ─── Mock electrobun/bun (ApplicationMenu) ──────────────────────────────────
+// ─── Mock electrobun/main (ApplicationMenu) ─────────────────────────────────
 
 let capturedMenu: unknown = null;
 let clickHandler: ((event: unknown) => unknown) | null = null;
@@ -13,7 +13,7 @@ const on = mock((event: string, handler: (event: unknown) => unknown) => {
   }
 });
 
-void mock.module("electrobun/bun", () => ({
+void mock.module("electrobun/main", () => ({
   ApplicationMenu: { on, setApplicationMenu },
 }));
 

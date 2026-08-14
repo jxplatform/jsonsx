@@ -10,8 +10,19 @@ on:
 
 jobs:
   build:
-    name: Build (linux-x64)
-    runs-on: ubuntu-latest
+    name: Build (${{ matrix.platform }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux-x64
+          # Electrobun 2 publishes a linux-arm64 core archive, which 1.18 did not. Hutch builds for
+          # the host only, so this needs a native arm64 runner rather than a cross-compile flag.
+          - os: ubuntu-24.04-arm
+            platform: linux-arm64
+
+    runs-on: ${{ matrix.os }}
 
     permissions:
       contents: write
@@ -30,6 +41,12 @@ jobs:
 
       - name: Install dependencies
         run: bun install
+
+      # Electrobun 2's build CLI. `bun install` no longer supplies the runtime or SDK — Hutch
+      # downloads the release pinned in packages/desktop/hutch.config.ts and projects its SDK
+      # into .hutch/devkit.
+      - name: Install Hutch
+        uses: ./.github/actions/install-hutch
 
       - name: Install Linux dependencies
         run: |

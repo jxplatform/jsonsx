@@ -7,7 +7,7 @@
  * @docs studio/desktop
  */
 
-import { BrowserView, BrowserWindow, Screen } from "electrobun/bun";
+import { BrowserView, BrowserWindow, Screen } from "electrobun/main";
 import { realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { applyUpdate, checkForUpdate, downloadUpdate, getLocalInfo, getStatus } from "./updater";

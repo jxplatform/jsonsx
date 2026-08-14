@@ -1,0 +1,65 @@
+name: Install Hutch
+description: >-
+  Install Hutch, the Electrobun 2 build CLI, and put it on PATH. Electrobun 2 ships no runtime or
+  SDK on npm, so `bun install` alone cannot build or typecheck packages/desktop — Hutch downloads
+  the release pinned in packages/desktop/hutch.config.ts and projects its SDK into .hutch/devkit.
+
+inputs:
+  channel:
+    description: Hutch release channel.
+    required: false
+    default: production
+  sync:
+    description: >-
+      Also run `hutch electrobun sync` in packages/desktop, materialising .hutch/devkit. Needed by
+      anything that resolves `electrobun/*` for real — typecheck and builds. Not needed by
+      `bun test`, which mocks the module by specifier and never resolves it.
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    # The Electrobun core archive is ~hundreds of MB and identical for every job on a given pin, so
+    # it is cached on the pin itself rather than re-downloaded per lane. Correctness never depends
+    # on a hit: Hutch verifies and re-fetches whatever the cache does not supply.
+    - name: Cache Hutch products
+      uses: actions/cache@v4
+      with:
+        path: ~/.hutch
+        key: hutch-${{ runner.os }}-${{ inputs.channel }}-${{ hashFiles('packages/desktop/hutch.config.ts') }}
+        restore-keys: |
+          hutch-${{ runner.os }}-${{ inputs.channel }}-
+
+    - name: Install Hutch (POSIX)
+      if: runner.os != 'Windows'
+      shell: bash
+      env:
+        HUTCH_INSTALL_CHANNEL: ${{ inputs.channel }}
+      run: |
+        installer="$RUNNER_TEMP/install-hutch.sh"
+        curl --proto '=https' --tlsv1.2 --fail --silent --show-error --location \
+          https://hutch.blackboard.sh/hutch/install.sh \
+          --output "$installer"
+        sh "$installer" --channel "$HUTCH_INSTALL_CHANNEL" --no-modify-path
+        echo "$HOME/.hutch/bin" >> "$GITHUB_PATH"
+
+    - name: Install Hutch (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      env:
+        HUTCH_INSTALL_CHANNEL: ${{ inputs.channel }}
+      run: |
+        $installer = Join-Path $env:RUNNER_TEMP "install-hutch.ps1"
+        Invoke-WebRequest -UseBasicParsing `
+          -Uri "https://hutch.blackboard.sh/hutch/install.ps1" `
+          -OutFile $installer
+        & $installer -Channel $env:HUTCH_INSTALL_CHANNEL
+        if ($LASTEXITCODE -ne 0) { throw "Hutch installation failed" }
+        (Join-Path $HOME ".hutch\bin") | Out-File -FilePath $env:GITHUB_PATH -Append
+
+    - name: Project the Electrobun SDK into packages/desktop/.hutch/devkit
+      if: inputs.sync == 'true'
+      shell: bash
+      working-directory: packages/desktop
+      run: hutch electrobun sync

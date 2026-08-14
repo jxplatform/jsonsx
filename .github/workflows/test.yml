@@ -212,7 +212,12 @@ jobs:
       # removed the assertion, naming the behaviour that is now unprotected.
       - run: bun --cwd packages/studio scripts/check-lens-mutants.ts
       - run: bun run typecheck
-      # packages/desktop is EXCLUDED from the root tsconfig (electrobun ships raw .ts in its dist,
+      # packages/desktop resolves `electrobun/*` out of .hutch/devkit, which only exists once Hutch
+      # has projected the pinned release's SDK into it — Electrobun 2 publishes no SDK on npm, so
+      # `bun install` cannot supply it and the pass below would fail on every import. The desktop
+      # TEST job deliberately does not need this: it mocks the module by specifier.
+      - uses: ./.github/actions/install-hutch
+      # packages/desktop is EXCLUDED from the root tsconfig (electrobun ships raw .ts in its SDK,
       # which the root's two strictest flags reject 165 times) so it needs its own pass — without
       # this, nothing there is typechecked at all, and an unbound identifier once shipped through.
       # See packages/desktop/tsconfig.json for what differs and why.
