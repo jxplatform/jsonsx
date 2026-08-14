@@ -76,10 +76,16 @@ describe("compileElement", () => {
       expect(content).toContain("<a");
       expect(content).toContain("</a>");
       expect(content).toContain("<div");
-      // In both branches of the bundle the SUBTREE appears; it is written once in the DOCUMENT, which
-      // The thing that was wrong. Hoisting it into a preamble const would shrink the bundle here
-      // And in every existing `$switch` — a refactor of this emitter's return shape, tracked apart.
-      expect(content.split("<span").length - 1).toBe(2);
+      // The subtree is written once in the DOCUMENT and now once in the BUNDLE too: it is hoisted
+      // Into a `const` inside `template()` that both branches reference. Asserted as a COUNT — the
+      // Duplicating emitter passed every other assertion in this test.
+      expect(content.split("<span").length - 1).toBe(1);
+      expect(content).toMatch(/const _c0 = html`/);
+      // Declared inside template(), above the return, so it is rebuilt per render and reads `s`.
+      expect(content.indexOf("const _c0")).toBeGreaterThan(content.indexOf("const s = this.state"));
+      expect(content.indexOf("const _c0")).toBeLessThan(content.indexOf("return html`"));
+      // Both branches reference it rather than repeating the subtree.
+      expect(content.split("${_c0}").length - 1).toBe(2);
       expect(content).not.toContain("[object Object]");
     });
 
