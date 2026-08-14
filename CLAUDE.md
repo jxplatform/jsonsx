@@ -6,7 +6,13 @@ Every workspace must keep full unit-test coverage — `packages/*` core packages
 
 1.  **Per-file coverage thresholds** live in each workspace's own `bunfig.toml` — `packages/<pkg>/bunfig.toml` and `extensions/<ext>/bunfig.toml` (`coverageThreshold = { lines = X, functions = Y }`). Bun enforces these **per file**, not as an aggregate — no single source file may fall below the bar. Keys must be plural (`lines`/`functions`); singular keys are silently ignored by Bun.
 2.  **Manifest check** — `bun scripts/check-coverage-manifest.ts <workspace-dir>` (e.g. `packages/schema`, `extensions/auth`) fails if any `src/**/*.ts` file never appears in `coverage/lcov.info` (Bun only counts files imported during the run, so a brand-new untested file is otherwise invisible to thresholds). Type-only files are allowlisted inside the script.
-3.  **CI** — `.github/workflows/test.yml` runs the per-workspace matrix (see the matrix list in that file — it interleaves `packages/*` and `extensions/*` entries): `bun test --isolate --coverage` (cwd = the workspace, so its bunfig applies) plus the manifest check, and a separate lint-and-typecheck job. The Bun version is pinned there; bump it together with re-baselining thresholds.
+3.  **CI** — `.github/workflows/test.yml` runs the per-workspace matrix: `bun test --isolate --coverage` (cwd = the workspace, so its bunfig applies) plus the manifest check, alongside an ungated `checks` job (lint, both typechecks, the studio guards, the docs and schema gates) and a gated `lens-mutants` job. The Bun version is pinned once in `.github/actions/setup-bun`; bump it together with re-baselining thresholds.
+
+    The matrix is **derived**, not listed: the `changes` job runs `scripts/ci/affected.ts`, which reads the workspace graph via `scripts/lib/workspaces.ts` and emits the workspaces a diff can reach. Consequences for agents:
+    - **Adding a workspace needs no CI edit** — but it must ship a `bunfig.toml` with a `coverageThreshold`, or `affected.ts` fails the run by name.
+    - **A suite that reads a file outside its own workspace needs an entry in `EXTRA_EDGES`**, with the test file that proves it. Those anchors are `existsSync`-checked before any other job starts, so moving a cited test reds CI immediately.
+    - Push to `main` and `workflow_dispatch` are never gated; only pull requests are.
+    - `scripts/**` has no coverage workspace, so its tests run via `bun test --isolate scripts` inside the `checks` job. Put new script tests where that finds them.
 
 Conventions:
 
