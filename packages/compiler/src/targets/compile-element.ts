@@ -556,12 +556,19 @@ export function emitElementModule(
     }
   }
 
+  // Subtrees a branching construct would otherwise repeat are lifted into `const _cN = html`…``
+  // Declarations emitted inside `template()`, above the `return` — inside it, so they are rebuilt
+  // Per render and read the same `s` the template does.
+  const hoistScope = createHoistScope();
+  const templateBody = emitLitChildren(doc.children, doc.style, "      ", false, false, hoistScope);
+
   lines.push(
     // Template method
     "  template() {",
     "    const s = this.state;",
+    ...hoistScope.decls,
     "    return html`",
-    emitLitChildren(doc.children, doc.style, "      "),
+    templateBody,
     "    `;",
     "  }",
     "",
@@ -690,6 +697,46 @@ export function emitElementModule(
 }
 
 /**
+ * Declarations that must be emitted _beside_ a lit template rather than inside it.
+ *
+ * `emitLitNode` writes one template string, so a construct with N branches recursed once per branch
+ * and wrote the whole subtree N times into the bundle — the authored document contains it once. A
+ * scope collects `const _cN = html`…`;` declarations for subtrees that would otherwise repeat, and
+ * the branches reference those instead.
+ *
+ * One scope per template body: `template()` has its own, and each map callback gets a fresh one
+ * because its declarations close over that callback's `item`/`index`.
+ */
+interface HoistScope {
+  decls: string[];
+  byText: Map<string, string>;
+}
+
+function createHoistScope(): HoistScope {
+  return { byText: new Map(), decls: [] };
+}
+
+/**
+ * Hoist an emitted subtree into a `const` and return the `${_cN}` expression referencing it.
+ * Identical subtrees collapse onto a single declaration.
+ *
+ * @param {HoistScope} scope
+ * @param {string} text
+ * @returns {string}
+ */
+function hoistSubtree(scope: HoistScope, text: string): string {
+  const existing = scope.byText.get(text);
+  if (existing) {
+    return existing;
+  }
+  const name = `_c${scope.decls.length}`;
+  scope.decls.push(`    const ${name} = html\`\n${text}\n    \`;`);
+  const ref = `\${${name}}`;
+  scope.byText.set(text, ref);
+  return ref;
+}
+
+/**
  * Convert Jx children to lit-html template content.
  *
  * @param {JxMutableNode["children"]} children
@@ -704,6 +751,7 @@ function emitLitChildren(
   indent: string,
   preformatted = false,
   inMap = false,
+  scope: HoistScope | null = null,
 ) {
   if (!children) {
     return "";
@@ -723,7 +771,7 @@ function emitLitChildren(
     .map((child: JxMutableNode | string) =>
       isMappedArray(child)
         ? emitMappedArray(child, indent)
-        : emitLitNode(child, preformatted ? "" : indent, preformatted, inMap),
+        : emitLitNode(child, preformatted ? "" : indent, preformatted, inMap, scope),
     )
     .join(preformatted ? "" : "\n");
 }
@@ -739,6 +787,9 @@ function emitLitNode(
   indent: string,
   preformatted = false,
   inMap = false,
+  scope: HoistScope | null = null,
+  /** Pre-emitted inner content, so a branching construct can share one subtree across branches. */
+  innerOverride: string | null = null,
 ): string {
   // String children are text nodes
   if (typeof def === "string") {
@@ -760,11 +811,8 @@ function emitLitNode(
      HTML-injection primitive with an unbounded template cache, deliberately avoided in this repo.
 
      The candidates are literal `TagName`s by schema, so this terminates and every branch is a legal
-     element. The subtree is emitted once per candidate in the BUNDLE; it is written once in the
-     DOCUMENT, which is the thing that was wrong. Hoisting the shared subtree into a preamble const
-     would fix the bundle too, and would shrink every existing `$switch` while it was at it —
-     tracked separately, because it is a refactor of this function's return shape rather than part
-     of this feature. */
+     element. The subtree is written once in the DOCUMENT, and — since the hoist scope below lifts it
+     into a single `const` the branches share — once in the BUNDLE too. */
   if (isTagExpression(def.tagName)) {
     const expression = def.tagName.$expression;
     // The same two shapes `$switch` accepts: a pointer, or an expression node.
@@ -781,9 +829,21 @@ function emitLitNode(
             [false, expression.initial],
           ]
         : [...Object.entries(expression.cases), ["__default__", expression.default]];
+    // The inner content is identical across candidates — only the tag differs — so it is emitted
+    // Once and every branch references it. Skipped when the candidates disagree about being
+    // Preformatted, because `white-space` decides how the subtree itself is indented.
+    const candidateTags = branches.map(([, candidate]) => String(candidate));
+    const sharedPre = candidateTags.map((t) => preformatted || PREFORMATTED_TAGS.has(t));
+    let innerRef: string | null = null;
+    if (scope && sharedPre.every((p) => p === sharedPre[0])) {
+      const sharedInner = emitNodeInner(def, `${indent}  `, sharedPre[0] === true, inMap, scope);
+      if (sharedInner.trim() !== "") {
+        innerRef = hoistSubtree(scope, sharedInner);
+      }
+    }
     const rendered: [string | boolean | undefined, string][] = branches.map(([key, candidate]) => {
       const asLiteral = { ...def, tagName: candidate as string };
-      return [key, emitLitNode(asLiteral, `${indent}  `, preformatted, inMap)];
+      return [key, emitLitNode(asLiteral, `${indent}  `, preformatted, inMap, scope, innerRef)];
     });
     if (expression.operator === "?:") {
       const [, yes] = rendered[0]!;
@@ -855,6 +915,12 @@ ${no}
       parts.push(`.${key}="\${${refToExpr((val as JxMutableNode).$ref as string)}}"`);
     } else if (typeof val === "string" && val.includes("${")) {
       parts.push(`.${key}="${toLitExpr(val)}"`);
+    } else {
+      // A literal IDL value (`value: "a"`, `checked: true`) is still a property the author asked
+      // For. Without this branch it was dropped outright — including every `${…}` a build-time map
+      // Expansion had already resolved to a constant, which is how an unrolled `<option>` lost its
+      // Value and fell back to using its own label as its key.
+      parts.push(`.${key}="\${${JSON.stringify(val)}}"`);
     }
   }
 
@@ -914,34 +980,70 @@ ${no}
     return `${indent}<${tag}${attrsStr}\n${indent}>`;
   }
 
-  let inner = "";
-  if (def.$switch) {
-    const switchRef = isRef(def.$switch) ? def.$switch.$ref : (def.$switch as string);
-    const switchExpr = refToExpr(switchRef);
-    const cases = (def.cases ?? {}) as Record<string, JxMutableNode>;
-    const caseEntries: string[] = [];
-    for (const [key, caseDef] of Object.entries(cases)) {
-      if (!caseDef || isRef(caseDef)) {
-        continue;
-      }
-      const renderedCase = emitLitNode(caseDef, `${indent}  `, false, inMap);
-      caseEntries.push(`  ${JSON.stringify(key)}: html\`\n${renderedCase}\n  \``);
-    }
-    inner = `\${{\n${caseEntries.join(",\n")}\n}[${switchExpr}]}`;
-  } else if (def.textContent !== undefined) {
-    inner = toLitTextContent(def.textContent);
-  } else if (def.innerHTML !== undefined) {
-    inner = def.innerHTML;
-  } else if (def.children) {
-    inner = inPre
-      ? emitLitChildren(def.children, def.style, "", true, inMap)
-      : `\n${emitLitChildren(def.children, def.style, `${indent}  `, false, inMap)}\n${indent}`;
-  }
+  const inner = innerOverride ?? emitNodeInner(def, indent, inPre, inMap, scope);
 
   // Inside a <pre>, the newline before `>` would land in the element's own text.
   return inPre
     ? `<${tag}${attrsStr}>${inner}</${tag}>`
     : `${indent}<${tag}${attrsStr}\n${indent}>${inner}</${tag}>`;
+}
+
+/**
+ * Emit an element's inner content — the `$switch` lookup, text, raw HTML, or children.
+ *
+ * Split out of `emitLitNode` so a chosen `tagName` can emit it once and share it across candidates
+ * instead of recursing into the same subtree per branch.
+ *
+ * @param {JxMutableNode} def
+ * @param {string} indent
+ * @param {boolean} inPre
+ * @param {boolean} inMap
+ * @param {HoistScope | null} scope
+ * @returns {string}
+ */
+function emitNodeInner(
+  def: JxMutableNode,
+  indent: string,
+  inPre: boolean,
+  inMap: boolean,
+  scope: HoistScope | null,
+): string {
+  if (def.$switch) {
+    const switchRef = isRef(def.$switch) ? def.$switch.$ref : (def.$switch as string);
+    const switchExpr = refToExpr(switchRef);
+    const cases = (def.cases ?? {}) as Record<string, JxMutableNode>;
+    const rendered: [string, string][] = [];
+    for (const [key, caseDef] of Object.entries(cases)) {
+      if (!caseDef || isRef(caseDef)) {
+        continue;
+      }
+      rendered.push([key, emitLitNode(caseDef, `${indent}  `, false, inMap, scope)]);
+    }
+    // Cases that emit byte-identical subtrees share one hoisted `const` rather than repeating it
+    // Once per case — the authored document names the subtree once (#126).
+    const repeated = new Set(
+      rendered
+        .map(([, text]) => text)
+        .filter((text, i, all) => all.indexOf(text) !== i && text.trim() !== ""),
+    );
+    const caseEntries = rendered.map(([key, text]) => {
+      const body = scope && repeated.has(text) ? hoistSubtree(scope, text) : text;
+      return `  ${JSON.stringify(key)}: html\`\n${body}\n  \``;
+    });
+    return `\${{\n${caseEntries.join(",\n")}\n}[${switchExpr}]}`;
+  }
+  if (def.textContent !== undefined) {
+    return toLitTextContent(def.textContent);
+  }
+  if (def.innerHTML !== undefined) {
+    return def.innerHTML;
+  }
+  if (def.children) {
+    return inPre
+      ? emitLitChildren(def.children, def.style, "", true, inMap, scope)
+      : `\n${emitLitChildren(def.children, def.style, `${indent}  `, false, inMap, scope)}\n${indent}`;
+  }
+  return "";
 }
 
 /**
@@ -981,6 +1083,36 @@ function emitMappedArray(arrayDef: JxMappedArray, indent: string) {
     parts.push(`class="${toLitExpr(String(mapDef.className))}"`);
   }
 
+  // IDL properties (`value`, `checked`, `selected`, …) go straight on the element, exactly as they
+  // Do outside a map (emitLitNode above). Without this loop the map body silently dropped them, so
+  // An `<option value="${$map.item.v}">` emitted no value at all and every option fell back to its
+  // Own label — a change handler then received a display string instead of the key.
+  for (const [key, val] of Object.entries(mapDef)) {
+    if (
+      RESERVED_KEYS.has(key) ||
+      key.startsWith("$") ||
+      key.startsWith("on") ||
+      key === "tagName" ||
+      key === "id" ||
+      key === "className" ||
+      key === "style" ||
+      key === "children" ||
+      key === "textContent" ||
+      key === "innerHTML" ||
+      key === "attributes"
+    ) {
+      continue;
+    }
+
+    if (val && typeof val === "object" && (val as JxMutableNode).$ref) {
+      parts.push(`.${key}="\${${mapRefToExpr((val as JxMutableNode).$ref as string)}}"`);
+    } else if (typeof val === "string" && val.includes("${")) {
+      parts.push(`.${key}="${toLitExpr(val)}"`);
+    } else {
+      parts.push(`.${key}="\${${JSON.stringify(val)}}"`);
+    }
+  }
+
   if (mapDef.$props) {
     for (const [key, val] of Object.entries(mapDef.$props)) {
       if (isRef(val)) {
@@ -1018,11 +1150,14 @@ function emitMappedArray(arrayDef: JxMappedArray, indent: string) {
 
   const attrsStr = parts.length > 0 ? `\n${indent}    ${parts.join(`\n${indent}    `)}` : "";
 
+  // The map body gets its own hoist scope: a subtree lifted out of a branch here closes over this
+  // Callback's `item`/`index`, so its declaration belongs inside the callback, not in `template()`.
+  const mapScope = createHoistScope();
   let inner = "";
   if (mapDef.textContent !== undefined) {
     inner = toLitTextContent(mapDef.textContent);
   } else if (mapDef.children) {
-    inner = `\n${emitLitChildren(mapDef.children, null, `${indent}      `, false, true)}\n${indent}    `;
+    inner = `\n${emitLitChildren(mapDef.children, null, `${indent}      `, false, true, mapScope)}\n${indent}    `;
   }
 
   const body = `html\`\n${indent}  <${tag}${attrsStr}\n${indent}  >${inner}</${tag}>\n${indent}\``;
@@ -1035,8 +1170,11 @@ function emitMappedArray(arrayDef: JxMappedArray, indent: string) {
   // `$map["item"]` — and nests correctly, since an inner map shadows the outer binding exactly as
   // The interpreter's child scope does. Emitted only when referenced, so output is otherwise
   // Unchanged.
-  const callback = body.includes("$map")
-    ? `(item, index) => { const $map = { item, index }; return ${body}; }`
+  const prelude =
+    (body.includes("$map") ? `const $map = { item, index }; ` : "") +
+    mapScope.decls.map((d) => `${d.trim()} `).join("");
+  const callback = prelude
+    ? `(item, index) => { ${prelude}return ${body}; }`
     : `(item, index) => ${body}`;
 
   return `${indent}\${${itemsExpr}.map(${callback})}`;

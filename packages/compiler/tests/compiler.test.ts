@@ -753,3 +753,57 @@ describe("escapeHtml — via compile output", () => {
     expect(html).toContain("it&#39;s fine");
   });
 });
+
+// ─── Project style reaches every route (issue #123) ──────────────────────────
+
+/**
+ * `project.json#/style` declares site-wide tokens and typography. The static and client routes
+ * threaded it into `compileStyles`; the custom-element route built its own <head> inline and
+ * dropped it, so a project whose pages are JSON documents under a component layout emitted no
+ * `:root` rule at all. Every `var(--x)` in the project then resolved to nothing and the page
+ * rendered unstyled — while passing lint, `jx validate`, the build, and a DOM-level check.
+ */
+describe("compile — project style", () => {
+  const STYLE = { "--probe-token": "#ff0000", fontFamily: "ProbeFont, sans-serif" };
+
+  test("emits :root custom properties on the custom-element route", async () => {
+    const result = await compile(
+      { children: [{ tagName: "slot" }], state: { n: 0 }, tagName: "probe-base" },
+      { projectStyle: STYLE, title: "probe" },
+    );
+
+    expect(result.html).toContain(":root { --probe-token: #ff0000 }");
+  });
+
+  test("emits direct properties on body on the custom-element route", async () => {
+    const result = await compile(
+      { children: [{ tagName: "slot" }], state: { n: 0 }, tagName: "probe-base" },
+      { projectStyle: STYLE, title: "probe" },
+    );
+
+    expect(result.html).toContain("body { font-family: ProbeFont, sans-serif }");
+  });
+
+  test("still emits the element's own rules alongside the project's", async () => {
+    const result = await compile(
+      {
+        children: [{ style: { color: "var(--probe-token)" }, tagName: "span" }],
+        state: { n: 0 },
+        tagName: "probe-base",
+      },
+      { projectStyle: STYLE, title: "probe" },
+    );
+
+    expect(result.html).toContain("--probe-token");
+    expect(result.html).toContain("var(--probe-token)");
+  });
+
+  test("emits no project rules when the project declares no style", async () => {
+    const result = await compile(
+      { children: [{ tagName: "slot" }], state: { n: 0 }, tagName: "probe-base" },
+      { title: "probe" },
+    );
+
+    expect(result.html).not.toContain(":root {");
+  });
+});

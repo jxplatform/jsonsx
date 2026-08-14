@@ -130,7 +130,7 @@ export async function compile(sourcePath: string | JxDocument, opts: CompileOpti
       path: `${tagName}.js`,
       tagName,
     };
-    const styleBlock = compileStyles(raw, raw.$media ?? {});
+    const styleBlock = compileStyles(raw, raw.$media ?? {}, projectStyle);
 
     const html = `<!DOCTYPE html>
 <html lang="en">

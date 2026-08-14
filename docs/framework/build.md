@@ -100,6 +100,31 @@ Across all three tiers the emitter indents nested children so the generated HTML
 
 Style never ships as JavaScript. During compilation, every static `style` definition — the project-level `style` from `project.json`, the layout's, the page's, and each node's — is extracted into a single `<style>` block in the page `<head>`, with `$media` breakpoint names expanded to real media queries. Components additionally emit a `dist/components/<tag>.css` sidecar, and styles found in component slot content are collected into the page's style block. See [Styling](/docs/framework/concepts/styling) for the authoring model.
 
+## What prerendering will and won't bake
+
+Every page is prerendered: the compiler evaluates `${state.…}` against the build-time scope and
+writes the result into the HTML. That is what makes a page's content visible to crawlers and to
+readers with no JavaScript. But baking a template **replaces** it — the binding is gone, not stale —
+so the compiler bakes only what it can prove will never change:
+
+- **A constant bakes.** `{"tagline": {"type": "string", "default": "Ship JSON"}}` read as
+  `${state.tagline}` becomes text in the HTML, with no JavaScript behind it.
+- **An entry a handler writes to stays bound.** If any handler in the document assigns to
+  `state.saved` — `=`, `+=`, `++`, or an in-place `push`/`splice`/`sort` — every template reading it
+  keeps its binding, even though the entry has a perfectly ordinary build-time value.
+- **A computed over changing state stays bound.** A `$prototype: "Function"` whose body returns is
+  evaluated at build time, so a computed reading a written entry — or reading a `$src` value or a
+  `Request` — is left unresolved too, however many steps removed.
+- **An array a computed still reads stays in client state.** Expanding an array into a list at build
+  time no longer drops it: if a computed or a template still reads `state.rows` at runtime, the array
+  ships with the island. Mark it `timing: "compiler"` to say the data really is build-time only.
+
+:::doc-note
+One case the compiler cannot see: a handler loaded through `$src` lives in a JavaScript file the
+build does not open, so a state entry written **only** from there is still treated as a constant and
+baked. Declare a writer for it in the document if a binding over it goes dead.
+:::
+
 ## Why is my page shipping JavaScript?
 
 Work the static-detection list backwards:

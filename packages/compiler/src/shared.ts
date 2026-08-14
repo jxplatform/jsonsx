@@ -425,6 +425,62 @@ export function createCompileContext(
 }
 
 /**
+ * `state.x = …`, `state.x += …`, `state.x++` — every form a string handler body can use to write a
+ * state entry. `===`/`!==`/`<=`/`>=` are excluded by the `(?!=)` guard and by the operator set.
+ */
+const STATE_ASSIGNMENT_RE =
+  /\bstate\.([A-Za-z_$][\w$]*)\s*(?:\+\+|--|(?:\*\*|\|\||&&|\?\?|<<|>>>|>>|[-+*/%&|^])?=(?!=))/g;
+
+/** `state.list.push(…)` and friends mutate in place without ever assigning to the entry. */
+const STATE_MUTATING_METHOD_RE =
+  /\bstate\.([A-Za-z_$][\w$]*)\s*\.\s*(?:push|pop|shift|unshift|splice|sort|reverse|fill|copyWithin)\s*\(/g;
+
+/**
+ * Collect every state key a handler writes to, across all the forms a body can take: a string body,
+ * a structured body (spec §20), and an `$expression` node with a mutating operator.
+ *
+ * Used to keep prerender from baking a binding over an entry that changes after hydration. A plain
+ * `{ "type": "string" }` entry holds a perfectly ordinary build-time value, so nothing else
+ * distinguishes it from a constant — but if a handler assigns to it, interpolating it at build time
+ * replaces the template in the emitted output and the element is dead for the life of the page.
+ *
+ * @param {unknown} node
+ * @param {Set<string>} into
+ */
+function collectAssignedStateKeys(node: unknown, into: Set<string>) {
+  if (typeof node === "string") {
+    for (const m of node.matchAll(STATE_ASSIGNMENT_RE)) {
+      into.add(m[1] as string);
+    }
+    for (const m of node.matchAll(STATE_MUTATING_METHOD_RE)) {
+      into.add(m[1] as string);
+    }
+    return;
+  }
+  if (!node || typeof node !== "object") {
+    return;
+  }
+  if (Array.isArray(node)) {
+    for (const entry of node) {
+      collectAssignedStateKeys(entry, into);
+    }
+    return;
+  }
+  const rec = node as Record<string, unknown>;
+  // A mutating expression names its destination as `target: { $ref: "#/state/x" }`.
+  const op = rec.operator;
+  if (typeof op === "string" && isMutating(op)) {
+    const target = rec.target as { $ref?: string } | undefined;
+    if (target && typeof target.$ref === "string" && target.$ref.startsWith("#/state/")) {
+      into.add(target.$ref.slice("#/state/".length).split("/")[0] as string);
+    }
+  }
+  for (const value of Object.values(rec)) {
+    collectAssignedStateKeys(value, into);
+  }
+}
+
+/**
  * @param {Record<string, JxStateDefinition>} [defs]
  * @param {Record<string, unknown> | null} [parentScope]
  * @returns {Record<string, unknown>}
@@ -447,6 +503,26 @@ export function buildInitialScope(
     writable: true,
   });
 
+  // Pass 0: every entry some handler in this document writes to is mutable, so prerender must not
+  // Bake a binding over it. Narrow on purpose — an entry nothing ever writes stays bakeable, so
+  // Prerendered content is preserved for SEO. A `$src` handler's assignments live in a JS file this
+  // Builder cannot open, so a write that only happens there is still missed (issue #125).
+  const assigned = new Set<string>();
+  for (const def of Object.values(defs)) {
+    if (def && typeof def === "object" && (isFunctionDef(def) || isExpressionDef(def))) {
+      collectAssignedStateKeys(
+        (def as { body?: unknown; $expression?: unknown }).body ??
+          (def as { $expression?: unknown }).$expression,
+        assigned,
+      );
+    }
+  }
+  for (const key of assigned) {
+    if (key in defs) {
+      runtimeOnly.add(key);
+    }
+  }
+
   for (const [key, def] of Object.entries(defs)) {
     if (typeof def !== "object" || def === null || Array.isArray(def)) {
       setOwnScopeValue(scope, key, cloneValue(def));
@@ -465,6 +541,10 @@ export function buildInitialScope(
   // Template-string entries are deferred to a third pass: whether one is resolvable depends on the
   // Runtime-only marks the loop below adds, and key order must not decide the answer.
   const templateDefs: [string, string][] = [];
+  // Computed (`bodyReturnsValue`) entries are deferred for the same reason. A computed is stored in
+  // The scope as its already-evaluated *result*, so a template reading it sees an ordinary string
+  // And prerender bakes it — destroying the binding rather than merely staling it (issue #124).
+  const computedBodies: [string, string][] = [];
 
   for (const [key, def] of Object.entries(defs)) {
     if (typeof def === "string" && isTemplateString(def)) {
@@ -523,6 +603,7 @@ export function buildInitialScope(
           fn(...params.map((name) => (name === "state" ? state : event)));
         if (bodyReturnsValue(body)) {
           defineLazyScopeValue(scope, key, () => invoke(scope));
+          computedBodies.push([key, body]);
         } else {
           setOwnScopeValue(scope, key, invoke);
         }
@@ -547,13 +628,23 @@ export function buildInitialScope(
     }
   }
 
-  for (const [key, template] of templateDefs) {
-    // A state entry that interpolates a runtime-only key cannot resolve until hydration either, so
-    // It is runtime-only in turn. Without this, prerender would bake the failed evaluation (`null`)
-    // Into every template that reads *this* entry, one step removed from the original.
-    if (readsRuntimeOnlyState(template, scope)) {
-      runtimeOnly.add(key);
+  // A state entry that reads a runtime-only key cannot resolve until hydration either, so it is
+  // Runtime-only in turn. Without this, prerender would bake the failed evaluation (`null`) into
+  // Every template that reads *this* entry, one step removed from the original. Iterated to a
+  // Fixpoint because marking one entry can qualify another, in either direction, and declaration
+  // Order must not decide the answer.
+  let marked = true;
+  while (marked) {
+    marked = false;
+    for (const [key, source] of [...computedBodies, ...templateDefs]) {
+      if (!runtimeOnly.has(key) && readsRuntimeOnlyState(source, scope)) {
+        runtimeOnly.add(key);
+        marked = true;
+      }
     }
+  }
+
+  for (const [key, template] of templateDefs) {
     defineLazyScopeValue(scope, key, () => evaluateStaticTemplate(template, scope));
   }
 
@@ -669,7 +760,15 @@ function readsRuntimeOnlyState(str: string, scope: Record<string, unknown>) {
     if (runtimeOnly instanceof Set && runtimeOnly.has(key)) {
       return true;
     }
-    if (typeof scope[key] === "function") {
+    // Reading the key can run a computed's getter, which is free to throw on partial build-time
+    // Data. A throw says nothing about whether the entry is runtime-only, so it is not a mark.
+    let value: unknown;
+    try {
+      value = scope[key];
+    } catch {
+      continue;
+    }
+    if (typeof value === "function") {
       return true;
     }
   }

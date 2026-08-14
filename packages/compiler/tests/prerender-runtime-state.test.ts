@@ -214,3 +214,108 @@ describe("emitRequestFetch", () => {
     }
   });
 });
+
+// ── Mutable state is not bakeable (issues #124, #125) ────────────────────────
+
+/**
+ * The widest tier of the #112 family. A `$prototype: "Function"` whose body returns is stored in
+ * the build scope as its already-evaluated _result_, and a plain `{ "type": "string" }` entry holds
+ * an ordinary build-time value — so nothing distinguished either from a constant. Baking a template
+ * over one replaces it in the emitted output, and the element is dead for the life of the page.
+ */
+describe("buildInitialScope — entries a handler writes to", () => {
+  const withHandler = (body: string, extra: Record<string, unknown> = {}) =>
+    scopeOf({
+      count: { default: 0, type: "number" },
+      list: { default: [], type: "array" },
+      saved: { default: "", type: "string" },
+      touch: { $prototype: "Function", body, parameters: ["state"] },
+      ...extra,
+    });
+
+  test("refuses a plain entry a handler assigns to", () => {
+    const scope = withHandler("state.saved = 'saved';");
+
+    // The build-time value is "", so a baked result would be indistinguishable from an empty
+    // Element — which is exactly why this shipped unnoticed.
+    expect(evaluateStaticTemplate("${state.saved}", scope)).toBeNull();
+  });
+
+  test.each([
+    ["compound assignment", "state.count += 1;"],
+    ["increment", "state.count++;"],
+    ["decrement", "state.count--;"],
+  ])("refuses an entry written by %s", (_label, body) => {
+    expect(evaluateStaticTemplate("${state.count}", withHandler(body))).toBeNull();
+  });
+
+  test("refuses an array a handler mutates in place", () => {
+    // `push` never assigns to the entry, so an assignment-only scan would miss it.
+    expect(
+      evaluateStaticTemplate("${state.list.length}", withHandler("state.list.push(1);")),
+    ).toBeNull();
+  });
+
+  test("still bakes an entry nothing ever writes to", () => {
+    // Narrow on purpose: prerendered content has to survive for SEO.
+    const scope = scopeOf({
+      tagline: { default: "Static marketing copy", type: "string" },
+      touch: { $prototype: "Function", body: "state.other = 1;", parameters: ["state"] },
+    });
+
+    expect(evaluateStaticTemplate("${state.tagline}", scope)).toBe("Static marketing copy");
+  });
+
+  test("does not mistake a comparison for a write", () => {
+    const scope = withHandler(
+      "if (state.saved === 'x' && state.count >= 2 && state.list != null) return 1;",
+    );
+
+    expect(evaluateStaticTemplate("${state.saved}", scope)).toBe("");
+  });
+
+  test("refuses an entry a mutating $expression targets", () => {
+    const scope = scopeOf({
+      hits: { default: 0, type: "number" },
+      bump: { $expression: { operator: "+=", target: { $ref: "#/state/hits" }, value: 1 } },
+    });
+
+    expect(evaluateStaticTemplate("${state.hits}", scope)).toBeNull();
+  });
+
+  test("refuses a computed that reads a written entry, in either declaration order", () => {
+    // Issue #124: the computed is stored as its result, so `readsRuntimeOnlyState` saw a plain
+    // String. The mark has to propagate transitively, and key order must not decide the answer.
+    const label = { $prototype: "Function", body: "return state.saved + '!';" };
+    const writer = { $prototype: "Function", body: "state.saved = 'x';", parameters: ["state"] };
+    const base = { saved: { default: "", type: "string" } };
+
+    for (const defs of [
+      { ...base, label, writer },
+      { ...base, writer, label },
+    ]) {
+      expect(evaluateStaticTemplate("${state.label}", scopeOf(defs))).toBeNull();
+    }
+  });
+
+  test("still bakes a computed over constants only", () => {
+    const scope = scopeOf({
+      price: 10,
+      total: { $prototype: "Function", body: "return state.price * 2;" },
+    });
+
+    expect(evaluateStaticTemplate("${state.total}", scope)).toBe(20);
+  });
+
+  test("survives a computed whose getter throws on partial build-time data", () => {
+    // Reading a key to classify it can run a computed's getter, which is free to throw before the
+    // Data it needs exists. A throw says nothing about whether the entry is runtime-only, so it
+    // Must not take the build down with it.
+    const scope = scopeOf({
+      boom: { $prototype: "Function", body: "return state.missing.deep.value;" },
+      label: { $prototype: "Function", body: "return state.boom + '!';" },
+    });
+
+    expect(() => evaluateStaticTemplate("${state.label}", scope)).not.toThrow();
+  });
+});

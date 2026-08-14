@@ -761,6 +761,12 @@ async function compilePage(
   // Also strip resolved content arrays (from ContentCollection) that have been
   // Baked into unrolled map templates.
   if (layoutDoc.state) {
+    // An array is only strippable if nothing that survives the build still reads it. A map
+    // Expansion is one consumer, not the only one: the same array is routinely also read by a
+    // Computed at runtime, and dropping it there left `state.rows` undefined in the browser while
+    // The build reported success (issue #122). `timing: "compiler"` is excluded from this rescue —
+    // That is the author declaring the entry build-time-only, so it is stripped as before.
+    const strippable = new Set<string>();
     for (const [key, def] of Object.entries(layoutDoc.state)) {
       if (key === "$site" || key === "$page") {
         continue;
@@ -773,8 +779,27 @@ async function compilePage(
       ) {
         delete layoutDoc.state[key];
       } else if (Array.isArray(def)) {
-        delete layoutDoc.state[key];
+        strippable.add(key);
       }
+    }
+    // Iterated to a fixpoint: rescuing one array can reveal a read of another from its own def.
+    let rescued = true;
+    while (rescued) {
+      rescued = false;
+      const surviving = { ...layoutDoc.state } as Record<string, unknown>;
+      for (const key of strippable) {
+        delete surviving[key];
+      }
+      const haystack = JSON.stringify({ children: layoutDoc.children, state: surviving });
+      for (const key of strippable) {
+        if (referencesStateKey(haystack, key)) {
+          strippable.delete(key);
+          rescued = true;
+        }
+      }
+    }
+    for (const key of strippable) {
+      delete layoutDoc.state[key];
     }
   }
 
@@ -1227,6 +1252,19 @@ function resolveDocTemplates(node: JxElement | string, scope: Record<string, unk
       i += 1;
     }
   }
+}
+
+/**
+ * Whether a serialized document fragment still reads a given state key — as a `${state.key}`
+ * template, a bare `state.key` inside a handler or computed body, or a `#/state/key` $ref.
+ *
+ * @param {string} haystack - JSON-serialized document fragment
+ * @param {string} key
+ * @returns {boolean}
+ */
+function referencesStateKey(haystack: string, key: string): boolean {
+  const escaped = key.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+  return new RegExp(String.raw`\bstate\.${escaped}\b|#/state/${escaped}(?=["/])`).test(haystack);
 }
 
 /**
