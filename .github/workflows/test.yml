@@ -17,41 +17,52 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Which of the jobs below this diff can actually fail. See scripts/ci/affected.ts for the rules
+  # and for why only three things here are gated at all.
+  #
+  # This workflow must NEVER grow an `on:`-level `paths:` filter. A path-filtered workflow that
+  # does not trigger leaves a required status check pending forever; the `ci` job at the bottom is
+  # the one stable name to protect, and it can only report if the workflow always runs.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      test_matrix: ${{ steps.affected.outputs.test_matrix }}
+      has_tests: ${{ steps.affected.outputs.has_tests }}
+      all_workspaces: ${{ steps.affected.outputs.all_workspaces }}
+      lens_mutants: ${{ steps.affected.outputs.gate_lens_mutants }}
+      mode: ${{ steps.affected.outputs.mode }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The gate diffs against the merge base. `blob:none` keeps history and trees local —
+          # so merge-base and --name-only run offline — while deferring file content nobody here
+          # reads. A full clone of this 551 MB pack is 28s; this is ~4s.
+          fetch-depth: 0
+          filter: blob:none
+      - uses: ./.github/actions/setup-bun
+      # The gate proves itself before it gates. This also gives scripts/*.test.ts its only home in
+      # CI: scripts/ is not a coverage workspace and the matrix below only runs `bun test` with
+      # cwd INSIDE a workspace, so these five files previously ran nowhere.
+      - run: bun test --isolate scripts
+      - id: affected
+        env:
+          BASE_REF: ${{ github.base_ref || github.event.repository.default_branch }}
+        run: bun scripts/ci/affected.ts
+
   test:
+    needs: changes
+    # A `strategy.matrix` built from an empty include is a workflow ERROR, not a skipped job.
+    if: needs.changes.outputs.has_tests == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
+      # dir = workspace path (packages/* core, extensions/* extensions);
+      # flag = codecov flag / artifact name (flags cannot contain "/").
       matrix:
-        # dir = workspace path (packages/* core, extensions/* extensions);
-        # flag = codecov flag / artifact name (flags cannot contain "/").
-        package:
-          - { dir: packages/ai, flag: ai }
-          - { dir: extensions/auth, flag: auth }
-          - { dir: packages/collab, flag: collab }
-          - { dir: packages/compiler, flag: compiler }
-          - { dir: extensions/connector, flag: connector }
-          - { dir: packages/create, flag: create }
-          - { dir: packages/desktop, flag: desktop }
-          - { dir: packages/formulas, flag: formulas }
-          - { dir: packages/import, flag: import }
-          - { dir: packages/markup, flag: markup }
-          - { dir: extensions/parser, flag: parser }
-          - { dir: packages/protocol, flag: protocol }
-          - { dir: packages/runtime, flag: runtime }
-          - { dir: packages/schema, flag: schema }
-          - { dir: extensions/search, flag: search }
-          - { dir: packages/server, flag: server }
-          - { dir: packages/starters, flag: starters }
-          - { dir: packages/studio, flag: studio }
+        package: ${{ fromJSON(needs.changes.outputs.test_matrix).include }}
     steps:
       - uses: actions/checkout@v7
-      - uses: oven-sh/setup-bun@v2
-        with:
-          # Pinned: coverage instrumentation shifts between Bun versions and
-          # would silently move the coverageThreshold ratchet. Bump this
-          # together with re-baselining packages/*/bunfig.toml thresholds.
-          bun-version: 1.3.13
-      - run: bun install --frozen-lockfile
+      - uses: ./.github/actions/setup-bun
       - name: Test with coverage
         shell: bash
         run: |
@@ -114,11 +125,13 @@ jobs:
 
   coverage-comment:
     # Sticky PR comment with all packages' coverage tables. Skipped for fork
-    # PRs, where GITHUB_TOKEN is read-only.
+    # PRs, where GITHUB_TOKEN is read-only, and for a diff that reaches no
+    # workspace at all — a docs PR does not need an all-empty coverage table.
     if: >-
       always() && github.event_name == 'pull_request' &&
-      github.event.pull_request.head.repo.full_name == github.repository
-    needs: test
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      needs.changes.outputs.has_tests == 'true'
+    needs: [changes, test]
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
@@ -130,15 +143,32 @@ jobs:
           merge-multiple: true
       - name: Build comment body
         shell: bash
+        env:
+          # Every workspace, not just the ones that ran. A table that silently shrinks to the
+          # affected packages reads as coverage having vanished; each skipped row says why
+          # instead. Codecov's own flags carry forward (codecov.yml) for the same reason.
+          ALL_WORKSPACES: ${{ needs.changes.outputs.all_workspaces }}
         run: |
+          # jq, not bun: this job never installs Bun, it only downloads artifacts.
+          mapfile -t all < <(echo "$ALL_WORKSPACES" | jq -r '.[]')
+          ran=0
+          for pkg in "${all[@]}"; do
+            [ -f "coverage-reports/$pkg.txt" ] && ran=$((ran + 1))
+          done
           {
             echo "<!-- coverage-report -->"
             echo "## Test coverage"
             echo ""
+            echo "$ran of ${#all[@]} workspaces ran; the rest are unreachable from this diff."
+            echo ""
             echo "| Package | % Funcs | % Lines |"
             echo "|---|---|---|"
-            for f in coverage-reports/*.txt; do
-              pkg=$(basename "$f" .txt)
+            for pkg in "${all[@]}"; do
+              f="coverage-reports/$pkg.txt"
+              if [ ! -f "$f" ]; then
+                echo "| $pkg | — | not affected |"
+                continue
+              fi
               row=$(grep '^All files' "$f" || true)
               funcs=$(echo "$row" | awk -F'|' '{gsub(/ /,"",$2); print $2}')
               lines=$(echo "$row" | awk -F'|' '{gsub(/ /,"",$3); print $3}')
@@ -177,6 +207,11 @@ jobs:
               await github.rest.issues.createComment({ owner, repo, issue_number, body });
             }
 
+  # Deliberately UNGATED, and deliberately one job. Measured on green run 31489926926, every
+  # check below is 0-4s and all of them together are 22s, while a fresh job costs ~15s just to
+  # provision — so splitting these by concern, or gating them, would cost more time than it saves.
+  # The two expensive things that used to live here have moved: the 28s full clone is now blobless,
+  # and the 87s mutation gate is its own job below.
   checks:
     runs-on: ubuntu-latest
     steps:
@@ -190,10 +225,7 @@ jobs:
           # `git merge-base` and `git diff --name-only` still run offline — and defers
           # only file CONTENT, of which the gate reads a handful of changed spec .md.
           filter: blob:none
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.3.13
-      - run: bun install --frozen-lockfile
+      - uses: ./.github/actions/setup-bun
       - run: bun run lint
       # Core packages must never depend on extension packages — see
       # specs/extensions.md §2 and scripts/check-dep-rules.ts.
@@ -253,8 +285,10 @@ jobs:
       - run: bun run schema:verify
 
   # Its own job because it is 87 of the 159 seconds `checks` used to take, and everything else
-  # in there is 0-4s. Running it alongside rather than after halves that job's wall clock; a
-  # later commit gates it on studio, which is the only tree it can be affected by.
+  # in there is 0-4s. It is gated on studio's OWN tree — not on studio merely being retested —
+  # because the mutation targets are files under packages/studio/src and the assertions are
+  # studio's own test files. Gating on the test set would fire this on most PRs in the repo,
+  # since studio sits downstream of nearly everything. See scripts/ci/affected.ts.
   #
   # The derived pane's lens/companion discriminators (§18.4), each mutated in turn against the
   # ONE test file expected to notice. Two review rounds of that workstream each fixed the
@@ -263,11 +297,34 @@ jobs:
   # inversion the whole 8000-test suite passed. A surviving mutant is red here, in the PR that
   # removed the assertion, naming the behaviour that is now unprotected.
   lens-mutants:
+    needs: changes
+    if: needs.changes.outputs.lens_mutants == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.3.13
-      - run: bun install --frozen-lockfile
+      - uses: ./.github/actions/setup-bun
       - run: bun --cwd packages/studio scripts/check-lens-mutants.ts
+
+  # The ONE stable name to make a required status check on `main`. It lives in a workflow with no
+  # `paths:` filter, so it always runs and always reports — a required check on a path-filtered
+  # workflow hangs pending forever instead.
+  #
+  # It tests for failure/cancelled rather than requiring success, because `skipped` is the POINT
+  # of this design: a job the diff cannot reach must leave this green.
+  ci:
+    if: always()
+    needs: [changes, test, checks, lens-mutants, coverage-comment]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Gate
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+          MODE: ${{ needs.changes.outputs.mode }}
+        run: |
+          echo "scope: $MODE — job results: $RESULTS"
+          for result in $RESULTS; do
+            if [ "$result" = "failure" ] || [ "$result" = "cancelled" ]; then
+              echo "::error::a required job reported '$result'"
+              exit 1
+            fi
+          done
