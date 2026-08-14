@@ -340,12 +340,12 @@ function buildClientNode(
     raw?.$media ?? context.media,
   );
 
-  /* REFUSED, LOUDLY. This target has no branch construct — it also drops `$switch` on the floor
-     today, compiling a switch node to `<div><div></div></div>` with no binding at all. Emitting a
-     silently wrong element here would be a second instance of the class the tagName pattern was
-     added to end, so a dynamic page that needs a chosen tag is told to put the element in a
-     component (which compiles through `compile-element`, where the construct is implemented)
-     rather than shipping markup that is quietly missing a branch. */
+  /* REFUSED, LOUDLY. A chosen tag has no implementation in this target: the element's identity is
+     fixed in the prerendered markup, so there is nothing here to re-choose at hydration the way the
+     `$switch` binding below re-chooses a subtree. Emitting a silently wrong element would be an
+     instance of the class the tagName pattern was added to end, so a dynamic page that needs a
+     chosen tag is told to put the element in a component (which compiles through `compile-element`,
+     where the construct is implemented) rather than shipping markup with the wrong tag. */
   if (isTagExpression(def.tagName)) {
     throw new Error(
       "A tag chosen at creation is not supported on a dynamic page yet (candidates: " +
@@ -499,6 +499,33 @@ function buildClientNode(
   // Inner content
   let inner = "";
   const source = raw ?? def;
+  if (source.$switch) {
+    // ─── $switch → lit-html render binding ───
+    // Without this branch the node fell through to the generic element path, which emitted a
+    // Container and then looked for `children` to recurse into — `cases` is not `children`, so the
+    // Subtree was never visited and the page shipped with the content missing, no error (#127).
+    // The container is emitted empty for the same reason the mapped-array branch below is: lit's
+    // `render` appends into the container rather than replacing its existing children, so any
+    // Prerendered branch would survive alongside the rendered one.
+    counter.needsLit = true;
+    const swKey = `_sw${counter.sw}`;
+    counter.sw += 1;
+    const discriminant = isRefObject(source.$switch)
+      ? `state.${refToBindingKey((source.$switch as { $ref: string }).$ref)}`
+      : `\`${String(source.$switch)}\``;
+    const cases = (source.cases ?? {}) as Record<string, JxMutableNode>;
+    const caseEntries = Object.entries(cases)
+      // An external `$ref` case cannot be fetched at compile time, exactly as in the static target.
+      .filter(([, caseDef]) => caseDef && !isRefObject(caseDef))
+      .map(
+        ([key, caseDef]) =>
+          `${JSON.stringify(key)}: html\`${emitChildLit(caseDef, nextContext.preformatted)}\``,
+      );
+    bindings.set(swKey, `() => ({${caseEntries.join(", ")}})[String(${discriminant})] ?? html\`\``);
+    bindAttrs.push(`:render="${swKey}"`);
+    const bindAttrStrSwitch = ` ${bindAttrs.join(" ")}`;
+    return `<${tag}${staticAttrs} data-bind${bindAttrStrSwitch}></${tag}>`;
+  }
   if (source.textContent !== undefined && !needsBind) {
     const value = resolveStaticValue(source.textContent, nextContext.scope);
     inner = value == null ? "" : escapeHtml(String(value));
