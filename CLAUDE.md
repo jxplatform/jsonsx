@@ -12,7 +12,7 @@ Every workspace must keep full unit-test coverage — `packages/*` core packages
     - **Adding a workspace needs no CI edit** — but it must ship a `bunfig.toml` with a `coverageThreshold`, or `affected.ts` fails the run by name.
     - **A suite that reads a file outside its own workspace needs an entry in `EXTRA_EDGES`**, with the test file that proves it. Those anchors are `existsSync`-checked before any other job starts, so moving a cited test reds CI immediately.
     - Push to `main` and `workflow_dispatch` are never gated; only pull requests are.
-    - `scripts/**` has no coverage workspace, so its tests run via `bun test --isolate scripts` inside the `checks` job. Put new script tests where that finds them.
+    - `scripts/**` has no coverage workspace, so its tests run via `bun test --isolate scripts` inside the `changes` job — the gate proves itself before it gates anything. Put new script tests where that finds them.
 
 Conventions:
 
