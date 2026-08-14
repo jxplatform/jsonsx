@@ -287,7 +287,7 @@ jobs:
       # ── One comment, updated in place ──────────────────────────────────────
       - name: Comment
         if: steps.target.outputs.pr != '' && steps.target.outputs.fork != 'true'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('node:fs');
@@ -319,7 +319,7 @@ jobs:
       # Changed" — is published as its own check run against the head commit.
       - name: Publish the neutral conclusion
         if: steps.report.outputs.changed == 'true' && steps.capture.outcome == 'success'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const head_sha = '${{ steps.push.outputs.sha }}' || context.sha;
