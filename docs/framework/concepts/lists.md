@@ -125,6 +125,27 @@ This works on the map body and on any descendant of it. A nested list shadows th
 }
 ```
 
+## Setting a property on each row
+
+Properties that live on the DOM element rather than in markup — `value`, `checked`, `selected`,
+`disabled` — go directly on the map body, the same as anywhere else. They may interpolate `$map`:
+
+```json
+{
+  "$prototype": "Array",
+  "items": { "$ref": "#/state/rows" },
+  "map": {
+    "tagName": "option",
+    "value": "${$map.item.id}",
+    "textContent": "${$map.item.label}"
+  }
+}
+```
+
+Each `<option>` gets its row's `id` as its value, so a `change` handler reads the key rather than the
+label shown on screen. Put it in `attributes` instead and you get an HTML attribute, which for
+`value` sets only the _default_ — the two diverge as soon as the user interacts.
+
 ## Filtering and sorting
 
 `filter` and `sort` reference [functions](/docs/framework/concepts/functions) declared in `state`. The filter function receives each item and returns true to keep it; the sort function receives two items and returns a number, like a standard comparator:
