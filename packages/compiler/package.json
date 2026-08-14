@@ -45,7 +45,7 @@
     "upgrade": "bunx npm-check-updates -u && bun install"
   },
   "dependencies": {
-    "@apidevtools/json-schema-ref-parser": "^15.5.1",
+    "@apidevtools/json-schema-ref-parser": "^16.0.0",
     "@jxsuite/create": "workspace:^",
     "@jxsuite/runtime": "workspace:^",
     "@jxsuite/schema": "workspace:^",
