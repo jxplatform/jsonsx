@@ -14,6 +14,12 @@ on:
       - main
   pull_request:
 
+# Same rule as test.yml: supersede a PR's in-flight run, never main's (the Codecov bundle
+# baseline is per-commit).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   bundle-analysis:
     # Fork PRs get a read-only token with no OIDC, so the upload can't run.

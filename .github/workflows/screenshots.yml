@@ -33,14 +33,19 @@ name: Screenshots
 on:
   pull_request:
     paths:
-      # The surfaces a picture is OF.
+      # The surfaces a picture is OF. `packages/starters/**` was too wide: a starters README
+      # cannot move a pixel, and the only starter inputs a shot opens are the project roots.
       - "packages/studio/src/**"
-      - "packages/starters/**"
+      - "packages/starters/sites/**"
+      - "packages/starters/registry.json"
       # The pipeline itself, and the lock's own definition.
       - "scripts/screenshots/**"
       - "scripts/check-image-lock.ts"
       - "scripts/lib/png.ts"
-      - ".github/workflows/screenshots.yml"
+      # NOT this file. It listed itself, so a dependabot bump of an action version — a diff that
+      # cannot change a picture — booted the container, re-captured all 61 shots, and pushed the
+      # result onto the bot's branch. That is how PR #131, titled "bump actions/upload-artifact
+      # from 4 to 7", merged 26 re-captured PNGs. Editing the *steps* has `workflow_dispatch`.
       # Someone hand-editing bytes: the lane is the fastest way to say so out loud.
       - "docs/images/**"
   schedule:
@@ -70,6 +75,11 @@ concurrency:
 jobs:
   capture:
     runs-on: ubuntu-latest
+    # Belt-and-braces with the `paths:` list above. This lane's failure mode is a bot commit on
+    # your branch, and a bot branch is precisely where that is never wanted: an automated
+    # dependency bump has no picture to review, and the re-capture lands as unreviewable bytes in
+    # a PR nobody opened for that purpose.
+    if: github.event.pull_request.user.login != 'dependabot[bot]'
     # A PINNED container, Chromium AND fontconfig. The fontset is not optional: the Spectrum UI
     # Stack resolves differently on NixOS and on Ubuntu, so a hash lock over bytes rendered with an
     # Unknown font set is a lock nobody can reproduce — which is why every lock entry records the

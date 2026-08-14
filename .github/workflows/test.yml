@@ -8,6 +8,14 @@ on:
       - main
   pull_request:
 
+# A PR branch that gets three pushes in a minute used to leave three full ~22-job fan-outs
+# racing each other; only the last one's answer was ever read. On main, never cancel:
+# release-please and the Codecov per-flag baselines need every main commit to produce a
+# complete report.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -177,6 +185,11 @@ jobs:
           # The spec release gate diffs against the merge base with main; a shallow
           # clone has no merge base and the gate would silently pass.
           fetch-depth: 0
+          # …but a full clone of a 551 MB pack costs 28s, which was the single largest
+          # step in this job. `blob:none` keeps all commits and all trees local — so
+          # `git merge-base` and `git diff --name-only` still run offline — and defers
+          # only file CONTENT, of which the gate reads a handful of changed spec .md.
+          filter: blob:none
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.13
@@ -204,13 +217,6 @@ jobs:
       # module-level `let active` is well-typed — so the guard is a ratcheting allow-list.
       - run: bun --cwd packages/studio scripts/check-pane-singletons.ts
       - run: bun --cwd packages/studio scripts/check-icons.ts
-      # The derived pane's lens/companion discriminators (§18.4), each mutated in turn against the
-      # ONE test file expected to notice. Two review rounds of that workstream each fixed the
-      # defects they named and left as many behind, because a green suite says nothing about
-      # whether it could tell right from wrong — a measurement found seven discriminators whose
-      # inversion the whole 8000-test suite passed. A surviving mutant is red here, in the PR that
-      # removed the assertion, naming the behaviour that is now unprotected.
-      - run: bun --cwd packages/studio scripts/check-lens-mutants.ts
       - run: bun run typecheck
       # packages/desktop is EXCLUDED from the root tsconfig (electrobun ships raw .ts in its dist,
       # which the root's two strictest flags reject 165 times) so it needs its own pass — without
@@ -245,3 +251,23 @@ jobs:
       # core, and one starter whose entry document was composed against a published @jxsuite/schema
       # left in a stray node_modules, so it was NARROWER than its own content required.
       - run: bun run schema:verify
+
+  # Its own job because it is 87 of the 159 seconds `checks` used to take, and everything else
+  # in there is 0-4s. Running it alongside rather than after halves that job's wall clock; a
+  # later commit gates it on studio, which is the only tree it can be affected by.
+  #
+  # The derived pane's lens/companion discriminators (§18.4), each mutated in turn against the
+  # ONE test file expected to notice. Two review rounds of that workstream each fixed the
+  # defects they named and left as many behind, because a green suite says nothing about
+  # whether it could tell right from wrong — a measurement found seven discriminators whose
+  # inversion the whole 8000-test suite passed. A surviving mutant is red here, in the PR that
+  # removed the assertion, naming the behaviour that is now unprotected.
+  lens-mutants:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.13
+      - run: bun install --frozen-lockfile
+      - run: bun --cwd packages/studio scripts/check-lens-mutants.ts

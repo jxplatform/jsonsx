@@ -3,4 +3,12 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "daily" # or weekly/monthly
+      # Weekly, grouped. Daily-and-ungrouped produced bursts of three and four PRs on a single
+      # day, each one firing the entire test matrix for a one-line version bump. Action versions
+      # are not a freshness-critical dependency; a week's latency costs nothing.
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+    groups:
+      actions:
+        patterns: ["*"]
