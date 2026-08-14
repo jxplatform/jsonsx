@@ -594,6 +594,15 @@ export function renderPopover(
     dismiss() {
       if (outsideClickHandler) {
         document.removeEventListener("mousedown", outsideClickHandler, true);
+        /* Disarm the PENDING arming too, not just the armed listener. The `addEventListener` above
+           is deferred a frame so the click that opened this popover cannot immediately close it —
+           so a popover dismissed within that frame (open the same menu twice in one frame, which a
+           double-click does) would otherwise be armed AFTER its own death: a document-wide capture
+           listener on a detached slot, never removed, that answers the next mousedown by calling
+           its owner's `onDismiss`. Owners null their handle field there, so the corpse's callback
+           cleared the pointer to the LIVE popover and stranded it on screen, un-dismissable. The
+           `if` in the rAF was always written for this; nothing had ever nulled the variable. */
+        outsideClickHandler = null;
       }
       litRender(nothing, slot);
       slot.remove();

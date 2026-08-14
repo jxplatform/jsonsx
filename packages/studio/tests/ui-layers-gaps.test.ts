@@ -569,12 +569,36 @@ describe("layers after init", () => {
     });
 
     test("dismiss before the rAF tick does not attach a stale listener", async () => {
-      const handle = renderPopover(html`<div id="pop-fast"></div>`);
-      handle.dismiss();
+      const fired: string[] = [];
+      const early = renderPopover(html`<div id="pop-fast"></div>`, {
+        onDismiss: () => fired.push("pop-fast"),
+      });
+      early.dismiss();
+      await new Promise((resolve) => {
+        requestAnimationFrame(() => resolve(null));
+      });
+
+      /* What must be observed is NOT that #pop-fast is gone — `dismiss()` removed it either way,
+         so asserting only that says nothing about the arming. It is that the corpse's listener was
+         never armed: a popover opened afterwards must survive a mousedown INSIDE itself, and the
+         dead popover's `onDismiss` must not run. Otherwise the corpse answers that mousedown by
+         nulling its owner's handle field, and the live popover is stranded with nothing left that
+         can dismiss it. */
+      const live = renderPopover(html`<div id="pop-live"></div>`, {
+        onDismiss: () => fired.push("pop-live"),
+      });
+      await new Promise((resolve) => {
+        requestAnimationFrame(() => resolve(null));
+      });
+      (live.host.querySelector("#pop-live") as HTMLElement).dispatchEvent(
+        new MouseEvent("mousedown", { bubbles: true }),
+      );
       await flush();
-      // No listener should remain; an outside mousedown must not throw or re-dismiss.
-      document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+
+      expect(fired).toEqual([]);
       expect(layer("popover").querySelector("#pop-fast")).toBeNull();
+      expect(layer("popover").querySelector("#pop-live")).not.toBeNull();
+      live.dismiss();
     });
   });
 

@@ -1425,6 +1425,19 @@ export function renderBlockActionBar() {
     view.blockActionBarEl = getLayerSlot("popover", "block-action-bar");
   }
 
+  /* A snapshot-driven refresh must not re-mount an open link popover — it would re-create the URL
+     field and lose the caret — so this pass is skipped entirely.
+
+     It sits AHEAD of the drag release below, because it is the one early return that LEAVES THE BAR
+     UP. Releasing and then returning without re-rendering left the ⠿ handle on screen and inert, and
+     nothing re-installs it: `dismissLinkPopover` does not re-render the bar. Any repaint reaches
+     here — `applyTransform` → `renderOnly("overlays")` → this — so a pan, a zoom or a pane resize
+     with the Link popover open silently killed dragging until the next selection change. Every
+     other early return draws `nothing`, so releasing before them is right. */
+  if (_linkPopoverOpen) {
+    return;
+  }
+
   if (view.selDragCleanup) {
     view.selDragCleanup();
     view.selDragCleanup = null;
@@ -1449,12 +1462,6 @@ export function renderBlockActionBar() {
 
   if (!tab || !selection || (canvasMode !== "design" && canvasMode !== "edit")) {
     litRender(nothing, view.blockActionBarEl);
-    return;
-  }
-
-  // A snapshot-driven refresh must not re-mount an open link popover (it would re-create the URL
-  // Field and lose the caret) — preserve it by skipping this render pass.
-  if (_linkPopoverOpen) {
     return;
   }
 
@@ -1572,10 +1579,10 @@ export function renderBlockActionBar() {
             if (!handleEl || !canDragSelection) {
               return;
             }
-            if (view.selDragCleanup) {
-              view.selDragCleanup();
-              view.selDragCleanup = null;
-            }
+            /* No release here: {@link renderBlockActionBar} already released at the top of this
+               pass, and that one — not this — is the load-bearing copy, because it also runs on
+               the passes that return before `litRender` and never reach this ref at all. A second
+               release here could only ever see null, which is why it was dead. */
             view.selDragCleanup = draggable({
               element: handleEl as HTMLElement,
               getInitialData: () => ({

@@ -53,9 +53,56 @@ interface ActiveSettingsPane {
   rendered: string | null;
   /** Unsubscribe from the document's change notifications. */
   off: (() => void) | null;
+  /**
+   * The body's `ref` callback, allocated ONCE per record.
+   *
+   * Lit re-invokes a `ref` whose callback IDENTITY changed — the old one with `undefined`, the new
+   * one with the element. Built inline in the template it was a fresh closure every render, so
+   * every render ran `panel.body = null; panel.rendered = null` and then re-bound: `rendered` was
+   * null again by the time the guard in {@link draw} read it, on every single pass. The guard could
+   * not fire and `force` decided nothing.
+   *
+   * What that did NOT cost, despite appearances: the mid-keystroke rebuild. `canvas-render.ts`
+   * returns at its own fast path (`canvasMode === "settings" && settingsPaneMounted(surface) &&
+   * !modeChanged`) before it ever calls back in, and on a real mode change it detaches this record
+   * first — so `draw(paneId, false)` over a SURVIVING record has no caller in the app. That fast
+   * path is what keeps an open inline form alive today; this guard is the second line, and it was
+   * vacuous. Do not read the two as redundant and delete either.
+   *
+   * Per RECORD, not per pane id: a same-host remount after `detachSettingsPane` needs the identity
+   * to change so lit re-binds the element onto the new record.
+   */
+  bindBody: (el: Element | undefined) => void;
 }
 
 const _active = new Map<string, ActiveSettingsPane>();
+
+/**
+ * Build one record's body binder.
+ *
+ * The guard is an IDENTITY test, not a presence test, and that distinction is the whole of it. A
+ * binder outlives its record — lit calls the previous one with `undefined` whenever the callback
+ * changes, and again when the part disconnects — so by the time it runs, `_active` may hold no
+ * record at all, or a DIFFERENT one for the same pane. Writing into whatever `_active` happens to
+ * return would be worse than doing nothing: it would null the live record's `body`, and since a
+ * stable callback over an unchanged element is never re-invoked, nothing would ever re-bind it —
+ * `draw` would return at `!panel.body` forever, `force` included. A superseded binder therefore
+ * touches nothing; its own record is detached and no one reads it.
+ */
+function bodyBinder(paneId: string): (el: Element | undefined) => void {
+  const self = (el: Element | undefined) => {
+    const panel = _active.get(paneId);
+    if (panel?.bindBody !== self) {
+      return;
+    }
+    const next = (el as HTMLElement | undefined) ?? null;
+    if (next !== panel.body) {
+      panel.body = next;
+      panel.rendered = null;
+    }
+  };
+  return self;
+}
 
 /**
  * Mount (or refresh) the settings editor inside the pane.
@@ -71,6 +118,7 @@ export function renderSettingsPane(surface: CanvasSurface): void {
   if (panel?.host !== host) {
     detachSettingsPane(paneId);
     panel = {
+      bindBody: bodyBinder(paneId),
       body: null,
       host,
       off: onSettingsDocumentChanged(() => draw(paneId, true)),
@@ -134,16 +182,7 @@ function draw(paneId: string, force: boolean): void {
           `,
         )}
       </nav>
-      <div
-        class="settings-doc-content"
-        ${ref((el: Element | undefined) => {
-          const next = (el as HTMLElement | undefined) ?? null;
-          if (next !== panel.body) {
-            panel.body = next;
-            panel.rendered = null;
-          }
-        })}
-      ></div>
+      <div class="settings-doc-content" ${ref(panel.bindBody)}></div>
     </div>
   `;
 
