@@ -2,9 +2,9 @@
 
 ## AI Assistant for Jx Studio
 
-**Version:** 0.1.4-draft
+**Version:** 0.1.5-draft
 **Status:** Partial
-**Updated:** 2026-08-12
+**Updated:** 2026-08-15
 **License:** MIT
 
 ---
@@ -104,8 +104,20 @@ The assistant executes only through the same file/RPC surfaces a human uses, beh
 Origin/Host gate and path containment (`@jxsuite/server` §4.2). It has no independent network or
 filesystem access beyond the connected provider endpoint.
 
+## 5. Standards Alignment
+
+External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md). The provider wire format is OpenAI's chat-completions API, which is a vendor de-facto format rather than a published standard, so it is described in §2 rather than cited here.
+
+| Standard                                                                                                  | Class       | Binds | Evidence                      | Note                                                                                                                                                                                                        |
+| --------------------------------------------------------------------------------------------------------- | ----------- | ----- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [WHATWG HTML](https://html.spec.whatwg.org/)                                                              | **Subset**  | §2    | packages/server/src/ai-api.ts | Server-Sent Events only. The proxy emits `text/event-stream` frames discriminated by a `type` field in the JSON payload; it sends no `retry:` field and no event ids, so a dropped stream is not resumable. |
+| [IANA IPv4 Special-Purpose Address Registry](https://www.iana.org/assignments/iana-ipv4-special-registry) | **Subset**  | §4    | packages/server/src/ai-api.ts | Only `169.254.0.0/16` is refused — the link-local range that contains the cloud metadata address. Loopback and private-use ranges are deliberately permitted, because self-hosted models run there.         |
+| [IANA IPv6 Special-Purpose Address Registry](https://www.iana.org/assignments/iana-ipv6-special-registry) | **Subset**  | §4    | packages/server/src/ai-api.ts | Only `fe80::/10` is refused, matching the IPv4 rule.                                                                                                                                                        |
+| [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457)                                                        | **Pending** | §2    | —                             | `gap:ai-problem-details` Failures answer as `{error}` JSON, and an upstream failure answers 200 carrying `upstreamError`. Neither is `application/problem+json`.                                            |
+
 ## Changelog
 
+- **0.1.5-draft** (2026-08-15) — Add §5 Standards Alignment: SSE, the IANA special-purpose address registries the SSRF guard uses, and the problem+json gap.
 - **0.1.4-draft** (2026-08-12) — The assistant's six capabilities are command records, gated on ai.configured and ai.streaming.
 - **0.1.3-draft** (2026-08-04) — §3.2 the turn is accountable (per-write disk marking, Restore to here, chip outcomes, partial success) and §3.3 the batch follows the document, not the tab.
 - **0.1.2-draft** (2026-07-25) — Schema gate (§3.1): tool-level validation against the active project's entry documents, before-write for disk writes and after-apply on canvas, project.json included.
@@ -114,4 +126,4 @@ filesystem access beyond the connected provider endpoint.
 
 ---
 
-_Jx `@jxsuite/ai` Specification v0.1.4-draft — a stub, subject to expansion._
+_Jx `@jxsuite/ai` Specification v0.1.5-draft — a stub, subject to expansion._

@@ -14,20 +14,20 @@ This page is generated from the `> **Status: …**` markers in the specification
 
 | Spec                      | Version      | Status      | Updated    |
 | ------------------------- | ------------ | ----------- | ---------- |
-| `ai.md`                   | 0.1.4-draft  | Partial     | 2026-08-12 |
-| `collab.md`               | 0.2.2-draft  | Partial     | 2026-08-05 |
+| `ai.md`                   | 0.1.5-draft  | Partial     | 2026-08-15 |
+| `collab.md`               | 0.2.3-draft  | Partial     | 2026-08-15 |
 | `compiler.md`             | 0.1.26-draft | Partial     | 2026-08-14 |
 | `desktop.md`              | 0.3.8-draft  | Pending     | 2026-08-13 |
 | `extensions.md`           | 0.3.4-draft  | Partial     | 2026-08-08 |
 | `imports.md`              | 0.1.7-draft  | Partial     | 2026-08-02 |
 | `jx-markdown.md`          | 0.1.7-draft  | Partial     | 2026-07-22 |
 | `parser.md`               | 0.2.4-draft  | Partial     | 2026-07-23 |
-| `relationships.md`        | 0.1.3-draft  | Partial     | 2026-07-22 |
+| `relationships.md`        | 0.1.4-draft  | Partial     | 2026-08-15 |
 | `schema.md`               | 0.3.1-draft  | Partial     | 2026-08-10 |
 | `server.md`               | 0.2.1        | Implemented | 2026-07-25 |
 | `site-architecture.md`    | 0.1.44-draft | Partial     | 2026-08-12 |
 | `spec.md`                 | 0.4.28-draft | Partial     | 2026-08-10 |
-| `standards.md`            | 0.1.0-draft  | Partial     | 2026-08-14 |
+| `standards.md`            | 0.1.1-draft  | Partial     | 2026-08-15 |
 | `studio-ui-guidelines.md` | 0.3.8        | Implemented | 2026-08-13 |
 | `studio.md`               | 0.9.24-draft | Partial     | 2026-08-13 |
 
@@ -44,6 +44,7 @@ This page is generated from the `> **Status: …**` markers in the specification
 
 ### Pending
 
+- `collab.md` §5 — Version Skew
 - `desktop.md` §4.3 — Single File Mode
 - `site-architecture.md` §12.3 — Incremental Builds
 - `site-architecture.md` §13 — Internationalization

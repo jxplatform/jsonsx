@@ -14,6 +14,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `ai.md`
 
+- **0.1.5-draft** (2026-08-15) — Add §5 Standards Alignment: SSE, the IANA special-purpose address registries the SSRF guard uses, and the problem+json gap.
 - **0.1.4-draft** (2026-08-12) — The assistant's six capabilities are command records, gated on ai.configured and ai.streaming.
 - **0.1.3-draft** (2026-08-04) — §3.2 the turn is accountable (per-write disk marking, Restore to here, chip outcomes, partial success) and §3.3 the batch follows the document, not the tab.
 - **0.1.2-draft** (2026-07-25) — Schema gate (§3.1): tool-level validation against the active project's entry documents, before-write for disk writes and after-apply on canvas, project.json included.
@@ -22,6 +23,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `collab.md`
 
+- **0.2.3-draft** (2026-08-15) — Add §6 Standards Alignment; §5 separates wire-envelope skew from document-format skew and is marked Pending.
 - **0.2.2-draft** (2026-08-05) — §4 project.json is excluded from replication, and why.
 - **0.2.1-draft** (2026-08-04) — §4 the four session states, with failed distinguished from detached; freeze and read-only made visible; undo scoping stated in the UI.
 - **0.2.0-draft** (2026-07-28) — Store prose as Y.Text and style/attributes/$props as nested Y.Maps so concurrent edits merge per character and per property; the op bridge diffs whole-value ops onto that structure.
@@ -143,6 +145,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `relationships.md`
 
+- **0.1.4-draft** (2026-08-15) — Add §6 Standards Alignment: JSON Schema 2020-12 for cardinality, and the JSON Pointer shape the reference form borrows.
 - **0.1.3-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.1.2-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
 - **0.1.1-draft** (2026-07-08) — Shipped schema fragments + per-project schema emitters (`9e4a8936`).
@@ -279,6 +282,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `standards.md`
 
+- **0.1.1-draft** (2026-08-15) — A Subset may name a gap for the half it omits; a non-standard is prose rather than a Rejected row.
 - **0.1.0-draft** (2026-08-14) — Initial specification: the conformance vocabulary, the `## N. Standards Alignment` table contract, citation and canonical-URL rules, gap tiers derived from section status, and governance for declining a standard.
 
 ## `studio-ui-guidelines.md`

@@ -110,13 +110,10 @@ export interface UncitedEntry {
  * When it reaches empty, a new spec with numbered headings and no table fails on its first PR.
  */
 export const UNCITED: UncitedEntry[] = [
-  { file: "ai.md", why: "Cited in the standards-citations PR." },
-  { file: "collab.md", why: "Cited in the standards-citations PR." },
   { file: "compiler.md", why: "Cited in the standards-citations PR." },
   { file: "desktop.md", why: "Cited in the standards-citations PR." },
   { file: "extensions.md", why: "Cited in the standards-citations PR." },
   { file: "parser.md", why: "Cited in the standards-citations PR." },
-  { file: "relationships.md", why: "Cited in the standards-citations PR." },
   { file: "schema.md", why: "Cited in the standards-citations PR." },
   { file: "server.md", why: "Cited in the standards-citations PR." },
   { file: "site-architecture.md", why: "Cited in the standards-citations PR." },
@@ -182,6 +179,27 @@ function checkEvidence(
         ),
       );
     }
+  }
+}
+
+/** Validate a gap slug and claim it repo-wide. Shared by the Pending and Subset branches. */
+function recordGapId(
+  spec: SpecStandards,
+  row: StandardsRow,
+  gapIds: Map<string, string>,
+  out: Violation[],
+): void {
+  const id = row.gapId!;
+  if (!GAP_SLUG.test(id)) {
+    out.push(v("gap-id-grammar", spec.file, `"gap:${id}" is not a kebab-case slug`, row.line));
+  }
+  const owner = gapIds.get(id);
+  if (owner) {
+    out.push(
+      v("gap-id-duplicate", spec.file, `gap id "${id}" is already used by ${owner}`, row.line),
+    );
+  } else {
+    gapIds.set(id, `${spec.file}:${row.line}`);
   }
 }
 
@@ -517,6 +535,9 @@ function checkRow(
       v("note-required", spec.file, `"${row.id}" is ${cls} and must say what that means`, row.line),
     );
   }
+  if (cls === "Subset" && row.gapId !== undefined) {
+    recordGapId(spec, row, gapIds, out);
+  }
   if (cls === "Pending") {
     if (row.gapId === undefined) {
       out.push(
@@ -528,31 +549,18 @@ function checkRow(
         ),
       );
     } else {
-      if (!GAP_SLUG.test(row.gapId)) {
-        out.push(
-          v("gap-id-grammar", spec.file, `"gap:${row.gapId}" is not a kebab-case slug`, row.line),
-        );
-      }
-      const owner = gapIds.get(row.gapId);
-      if (owner) {
-        out.push(
-          v(
-            "gap-id-duplicate",
-            spec.file,
-            `gap id "${row.gapId}" is already used by ${owner}`,
-            row.line,
-          ),
-        );
-      } else {
-        gapIds.set(row.gapId, `${spec.file}:${row.line}`);
-      }
+      recordGapId(spec, row, gapIds, out);
     }
-  } else if (row.gapId !== undefined) {
+  } else if (row.gapId !== undefined && cls !== "Subset") {
+    // A Subset MAY carry a gap id: the part of the standard it does not implement is a real,
+    // Trackable absence. A Divergent's deviations are deliberate and an Adopted has nothing
+    // Missing, so a gap id on either is a sign the class is wrong.
     out.push(
       v(
         "gap-id-on-non-pending",
         spec.file,
-        `"${row.id}" is ${cls ?? "off-vocabulary"} and carries a gap id`,
+        `"${row.id}" is ${cls ?? "off-vocabulary"} and carries a gap id — only Pending (required) ` +
+          "and Subset (optional) may name a gap",
         row.line,
       ),
     );

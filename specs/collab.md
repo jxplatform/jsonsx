@@ -2,9 +2,9 @@
 
 ## Real-Time Co-Editing for Jx Projects
 
-**Version:** 0.2.2-draft
+**Version:** 0.2.3-draft
 **Status:** Partial
-**Updated:** 2026-08-05
+**Updated:** 2026-08-15
 **License:** MIT
 
 ---
@@ -107,12 +107,31 @@ changes live; they arrive with the file.
 
 ## 5. Version Skew
 
-There is currently **no cross-version migration story** for the document format a room carries; a
-breaking change to the Jx document schema across a room's lifetime is out of scope for this draft and
-tracked separately (see spec §3.2 on `$schema`).
+> **Status: Pending.** Neither kind of skew is handled today.
+
+Two different things can be out of step, and conflating them has hidden the tractable one.
+
+**Document-format skew** — a breaking change to the Jx document schema across a room's lifetime — is
+out of scope for this draft and tracked separately (see spec §3.2 on `$schema`).
+
+**Wire-envelope skew** is not. Two clients running different envelope versions disagree about merge
+granularity (§3.1) and can join the same room, because the WebSocket carries no subprotocol: the
+client offers no `Sec-WebSocket-Protocol` and the server echoes none. The capability probe already
+returns a version the client discards. RFC 6455 negotiation is the mechanism designed for exactly
+this, and it fails the handshake rather than admitting a divergent peer.
+
+## 6. Standards Alignment
+
+External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md). Yjs and `y-protocols` are libraries rather than published standards, so the encodings they define are described in §2 rather than cited here.
+
+| Standard                                           | Class        | Binds | Evidence                                                       | Note                                                                                                                                                                                                                                                                                                                                             |
+| -------------------------------------------------- | ------------ | ----- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [RFC 6455](https://www.rfc-editor.org/rfc/rfc6455) | **Subset**   | §2    | packages/collab/src/envelope.ts, packages/server/src/collab.ts | `gap:collab-subprotocol` The transport is used as specified. Subprotocol negotiation (§1.9, §4.2.2) is not: no `Sec-WebSocket-Protocol` is offered or echoed, so two peers with incompatible envelopes can share a room — §5 records the consequence.                                                                                            |
+| [RFC 7692](https://www.rfc-editor.org/rfc/rfc7692) | **Rejected** | §2    | —                                                              | because: lib0-encoded Yjs updates are near-incompressible, the dominant frame volume is awareness cursors whose payload is smaller than a deflate block header, both transports are loopback or already compressed at the edge, and Bun allocates a zlib context per socket — a real cost for a server whose purpose is many concurrent sockets. |
 
 ## Changelog
 
+- **0.2.3-draft** (2026-08-15) — Add §6 Standards Alignment; §5 separates wire-envelope skew from document-format skew and is marked Pending.
 - **0.2.2-draft** (2026-08-05) — §4 project.json is excluded from replication, and why.
 - **0.2.1-draft** (2026-08-04) — §4 the four session states, with failed distinguished from detached; freeze and read-only made visible; undo scoping stated in the UI.
 - **0.2.0-draft** (2026-07-28) — Store prose as Y.Text and style/attributes/$props as nested Y.Maps so concurrent edits merge per character and per property; the op bridge diffs whole-value ops onto that structure.
@@ -121,4 +140,4 @@ tracked separately (see spec §3.2 on `$schema`).
 
 ---
 
-_Jx `@jxsuite/collab` Specification v0.2.2-draft — a stub, subject to expansion._
+_Jx `@jxsuite/collab` Specification v0.2.3-draft — a stub, subject to expansion._

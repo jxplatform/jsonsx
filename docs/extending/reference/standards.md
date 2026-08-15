@@ -14,51 +14,71 @@ This page is generated from the `## N. Standards Alignment` tables in the specif
 
 | Class       | Standards | Bindings |
 | ----------- | --------- | -------- |
-| `Adopted`   | 0         | 0        |
-| `Subset`    | 1         | 1        |
+| `Adopted`   | 1         | 1        |
+| `Subset`    | 5         | 5        |
 | `Divergent` | 0         | 0        |
-| `Borrowed`  | 0         | 0        |
-| `Pending`   | 1         | 1        |
-| `Rejected`  | 0         | 0        |
+| `Borrowed`  | 1         | 1        |
+| `Pending`   | 2         | 2        |
+| `Rejected`  | 1         | 1        |
 
 ## Standards Jx implements
 
-| Standard                                                                                               | Body | Class    | Where               | Evidence                        |
-| ------------------------------------------------------------------------------------------------------ | ---- | -------- | ------------------- | ------------------------------- |
-| [Uniform Resource Identifier (URI): Generic Syntax](https://www.rfc-editor.org/rfc/rfc3986) `RFC 3986` | IETF | `Subset` | `standards.md` §5.2 | `scripts/docs/lib/standards.ts` |
+| Standard                                                                                                                                               | Body        | Class      | Where                 | Evidence                                                                                       |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------- | ---------- | --------------------- | ---------------------------------------------------------------------------------------------- |
+| [IANA IPv4 Special-Purpose Address Registry](https://www.iana.org/assignments/iana-ipv4-special-registry) `IANA IPv4 Special-Purpose Address Registry` | IANA        | `Subset`   | `ai.md` §4            | `packages/server/src/ai-api.ts`                                                                |
+| [IANA IPv6 Special-Purpose Address Registry](https://www.iana.org/assignments/iana-ipv6-special-registry) `IANA IPv6 Special-Purpose Address Registry` | IANA        | `Subset`   | `ai.md` §4            | `packages/server/src/ai-api.ts`                                                                |
+| [Uniform Resource Identifier (URI): Generic Syntax](https://www.rfc-editor.org/rfc/rfc3986) `RFC 3986`                                                 | IETF        | `Subset`   | `standards.md` §5.2   | `scripts/docs/lib/standards.ts`                                                                |
+| [The WebSocket Protocol](https://www.rfc-editor.org/rfc/rfc6455) `RFC 6455`                                                                            | IETF        | `Subset`   | `collab.md` §2        | `packages/collab/src/envelope.ts`, `packages/server/src/collab.ts`                             |
+| [JavaScript Object Notation (JSON) Pointer](https://www.rfc-editor.org/rfc/rfc6901) `RFC 6901`                                                         | IETF        | `Borrowed` | `relationships.md` §1 | `packages/schema/schemas/project.core.schema.json`                                             |
+| [JSON Schema, draft 2020-12](https://json-schema.org/draft/2020-12/schema) `JSON Schema 2020-12`                                                       | JSON Schema | `Adopted`  | `relationships.md` §1 | `packages/schema/defs/field-schema.schema.ts`, `packages/schema/tests/project-schemas.test.ts` |
+| [HTML Standard](https://html.spec.whatwg.org/) `WHATWG HTML`                                                                                           | WHATWG      | `Subset`   | `ai.md` §2            | `packages/server/src/ai-api.ts`                                                                |
 
 ## Tracked gaps
 
 ### Near
 
-- <a id="gap-normative-keywords"></a>`gap:normative-keywords` — **Key words for use in RFCs to Indicate Requirement Levels** (BCP 14) in `standards.md` §1 — Jx specifications use MUST and SHOULD informally; none declares the BCP 14 boilerplate that would make them normative.
+- <a id="gap-normative-keywords"></a>`gap:normative-keywords` — **Key words for use in RFCs to Indicate Requirement Levels** (BCP 14, `Pending`) in `standards.md` §1 — Jx specifications use MUST and SHOULD informally; none declares the BCP 14 boilerplate that would make them normative.
+- <a id="gap-ai-problem-details"></a>`gap:ai-problem-details` — **Problem Details for HTTP APIs** (RFC 9457, `Pending`) in `ai.md` §2 — Failures answer as `{error}` JSON, and an upstream failure answers 200 carrying `upstreamError`. Neither is `application/problem+json`.
+
+### Untiered
+
+_These bind a section carrying no status marker, so no tier can be derived._
+
+- <a id="gap-collab-subprotocol"></a>`gap:collab-subprotocol` — **The WebSocket Protocol** (RFC 6455, `Subset`) in `collab.md` §2 — The transport is used as specified. Subprotocol negotiation (§1.9, §4.2.2) is not: no `Sec-WebSocket-Protocol` is offered or echoed, so two peers with incompatible envelopes can share a room — §5 records the consequence.
 
 ## Declined
 
-_Nothing has been declined._
+| Standard                                                                                  | Where          | Because                                                                                                                                                                                                                                                                                                                                 |
+| ----------------------------------------------------------------------------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Compression Extensions for WebSocket](https://www.rfc-editor.org/rfc/rfc7692) `RFC 7692` | `collab.md` §2 | lib0-encoded Yjs updates are near-incompressible, the dominant frame volume is awareness cursors whose payload is smaller than a deflate block header, both transports are loopback or already compressed at the edge, and Bun allocates a zlib context per socket — a real cost for a server whose purpose is many concurrent sockets. |
 
 ## Standards catalog
 
 Every identifier a specification may cite, with the canonical URL the citation must use.
 
-| Id         | Body | Title                                                    | Canonical URL                            |
-| ---------- | ---- | -------------------------------------------------------- | ---------------------------------------- |
-| `BCP 14`   | IETF | Key words for use in RFCs to Indicate Requirement Levels | <https://www.rfc-editor.org/info/bcp14>  |
-| `RFC 3986` | IETF | Uniform Resource Identifier (URI): Generic Syntax        | <https://www.rfc-editor.org/rfc/rfc3986> |
+| Id                                           | Body        | Title                                                    | Canonical URL                                                 |
+| -------------------------------------------- | ----------- | -------------------------------------------------------- | ------------------------------------------------------------- |
+| `BCP 14`                                     | IETF        | Key words for use in RFCs to Indicate Requirement Levels | <https://www.rfc-editor.org/info/bcp14>                       |
+| `IANA IPv4 Special-Purpose Address Registry` | IANA        | IANA IPv4 Special-Purpose Address Registry               | <https://www.iana.org/assignments/iana-ipv4-special-registry> |
+| `IANA IPv6 Special-Purpose Address Registry` | IANA        | IANA IPv6 Special-Purpose Address Registry               | <https://www.iana.org/assignments/iana-ipv6-special-registry> |
+| `JSON Schema 2020-12`                        | JSON Schema | JSON Schema, draft 2020-12                               | <https://json-schema.org/draft/2020-12/schema>                |
+| `RFC 3986`                                   | IETF        | Uniform Resource Identifier (URI): Generic Syntax        | <https://www.rfc-editor.org/rfc/rfc3986>                      |
+| `RFC 6455`                                   | IETF        | The WebSocket Protocol                                   | <https://www.rfc-editor.org/rfc/rfc6455>                      |
+| `RFC 6901`                                   | IETF        | JavaScript Object Notation (JSON) Pointer                | <https://www.rfc-editor.org/rfc/rfc6901>                      |
+| `RFC 7692`                                   | IETF        | Compression Extensions for WebSocket                     | <https://www.rfc-editor.org/rfc/rfc7692>                      |
+| `RFC 9457`                                   | IETF        | Problem Details for HTTP APIs                            | <https://www.rfc-editor.org/rfc/rfc9457>                      |
+| `WHATWG HTML`                                | WHATWG      | HTML Standard                                            | <https://html.spec.whatwg.org/>                               |
 
 ## Specs without a Standards Alignment section
 
 | Spec                      | Why                                                       |
 | ------------------------- | --------------------------------------------------------- |
-| `ai.md`                   | Cited in the standards-citations PR.                      |
-| `collab.md`               | Cited in the standards-citations PR.                      |
 | `compiler.md`             | Cited in the standards-citations PR.                      |
 | `desktop.md`              | Cited in the standards-citations PR.                      |
 | `extensions.md`           | Cited in the standards-citations PR.                      |
 | `imports.md`              | No numbered headings; number the spec first, then cite.   |
 | `jx-markdown.md`          | No numbered headings; number the spec first, then cite.   |
 | `parser.md`               | Cited in the standards-citations PR.                      |
-| `relationships.md`        | Cited in the standards-citations PR.                      |
 | `schema.md`               | Cited in the standards-citations PR.                      |
 | `server.md`               | Cited in the standards-citations PR.                      |
 | `site-architecture.md`    | Cited in the standards-citations PR.                      |
