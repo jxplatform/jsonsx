@@ -1,6 +1,6 @@
 # Imports
 
-**Version:** 0.1.8-draft
+**Version:** 0.1.9-draft
 **Status:** Partial
 **Updated:** 2026-08-15
 **License:** MIT
@@ -182,13 +182,14 @@ The compiler's `injectContext()` also merges site-level `$elements` into page-le
 
 External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md). The Custom Elements Manifest (§2) is a community format with no standards body, so it is described there rather than cited here. Subresource Integrity for a bare-specifier `$elements` script is tracked against `compiler.md` §3, where the emitted-script contract lives.
 
-| Standard                                                                                  | Class        | Binds | Evidence                                 | Note                                                                                                                                                                                                                                                                                                  |
-| ----------------------------------------------------------------------------------------- | ------------ | ----- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [ECMA-262](https://ecma-international.org/publications-and-standards/standards/ecma-262/) | **Adopted**  | §3    | packages/runtime/src/runtime.ts          | A bare-string `$elements` entry is loaded with a dynamic `import()` for its registration side effect — the standard's own module semantics, with no loader of Jx's own.                                                                                                                               |
-| [WHATWG HTML](https://html.spec.whatwg.org/)                                              | **Borrowed** | §1    | packages/compiler/src/site/site-build.ts | The project-level `imports` map has an import map's shape — bare specifier to URL — but it is resolved by Jx at build and load time and is never emitted as a `<script type="importmap">`, so a browser never sees it. The import map the compiler _does_ emit is a separate, fixed two-entry object. |
+| Standard                                                                                  | Class        | Binds | Evidence                                 | Note                                                                                                                                                                                                                                                                                                                                                                                        |
+| ----------------------------------------------------------------------------------------- | ------------ | ----- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [ECMA-262](https://ecma-international.org/publications-and-standards/standards/ecma-262/) | **Adopted**  | §3    | packages/runtime/src/runtime.ts          | A bare-string `$elements` entry is loaded with a dynamic `import()` for its registration side effect — the standard's own module semantics, with no loader of Jx's own.                                                                                                                                                                                                                     |
+| [WHATWG HTML](https://html.spec.whatwg.org/)                                              | **Borrowed** | §1    | packages/compiler/src/site/site-build.ts | The project-level `imports` map has an import map's shape — bare specifier to URL — but it is resolved by Jx at build and load time and is never emitted as a `<script type="importmap">`, so a browser never sees it. The import map the compiler _does_ emit is a separate, fixed two-entry object naming the client runtime, which the build serves from `/assets/` (`compiler.md` §12). |
 
 ## Changelog
 
+- **0.1.9-draft** (2026-08-15) — Name where the emitted import map now points (§1).
 - **0.1.8-draft** (2026-08-15) — Number the sections so they are addressable, and add §7 Standards Alignment.
 - **0.1.7-draft** (2026-08-02) — Imports panel section renamed to Imported Modules in the UI.
 - **0.1.6-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).

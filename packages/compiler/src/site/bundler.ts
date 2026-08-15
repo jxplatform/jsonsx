@@ -90,6 +90,19 @@ export function workerBundleOptions(adapter: string): BundleOptions {
   return { target: adapter === "bun" ? "bun" : "node" };
 }
 
+/**
+ * Substitutions applied to browser bundles.
+ *
+ * `process` does not exist in a browser, so `process.env.NODE_ENV` has to be replaced by something
+ * — but the value also decides which `exports` condition a package resolves to, and that is the
+ * part that mattered. Bun reads it from the build's own `define` (it ignores a `NODE_ENV` set after
+ * the process started), and with no answer it assumes development: `lit-html` was resolving to its
+ * 31 kB dev build, which logs "Lit is in dev mode" into every visitor's console, instead of the 10
+ * kB production one. esbuild already chose production, so the two backends were shipping different
+ * code — exactly what this module exists to prevent.
+ */
+const BROWSER_DEFINE = { "process.env.NODE_ENV": '"production"' } as const;
+
 /** Map a bundle target to esbuild's platform (conditions carry the workerd specifics). */
 function esbuildPlatform(target: BundleTargetName): "browser" | "node" {
   return target === "node" || target === "bun" ? "node" : "browser";
@@ -116,6 +129,7 @@ export async function bundleEntry(request: BundleRequest, opts: BundleOptions): 
     await esbuild.build({
       bundle: true,
       ...(opts.conditions ? { conditions: opts.conditions } : {}),
+      ...(opts.target === "browser" ? { define: { ...BROWSER_DEFINE } } : {}),
       entryPoints: [request.entryPath],
       external,
       format: "esm",
@@ -129,6 +143,7 @@ export async function bundleEntry(request: BundleRequest, opts: BundleOptions): 
 
   const result = await Bun.build({
     ...(opts.conditions ? { conditions: opts.conditions } : {}),
+    ...(opts.target === "browser" ? { define: { ...BROWSER_DEFINE } } : {}),
     entrypoints: [request.entryPath],
     external,
     format: "esm",
@@ -144,44 +159,54 @@ export async function bundleEntry(request: BundleRequest, opts: BundleOptions): 
 }
 
 /**
- * Bundle generated worker source (a string, not a file) into a self-contained module for the
- * adapter's runtime. Bare and relative specifiers resolve from the project root — exactly how the
- * unbundled source would have resolved when served from within the project.
+ * Bundle a source string rather than a file, resolving its imports from `resolveDir`.
+ *
+ * The indirection buys resolution control: what a bare specifier means depends on where you stand,
+ * and the two callers stand in different places. Worker source resolves from the project root,
+ * exactly as the unbundled source would have; the client runtime resolves from the compiler's own
+ * directory, because the compiler is what depends on it.
  */
-export async function bundleWorkerSource(
+export async function bundleSource(
   source: string,
-  { projectRoot, outfile, adapter }: { projectRoot: string; outfile: string; adapter: string },
+  { resolveDir, outfile }: { resolveDir: string; outfile: string },
+  opts: BundleOptions,
 ): Promise<void> {
-  const opts = workerBundleOptions(adapter);
-
   if (useNodeFallback()) {
     const esbuild = await import("esbuild");
     await esbuild.build({
       bundle: true,
       ...(opts.conditions ? { conditions: opts.conditions } : {}),
+      ...(opts.target === "browser" ? { define: { ...BROWSER_DEFINE } } : {}),
       external: opts.external ?? [],
       format: "esm",
       logLevel: "silent",
       minify: false,
       outfile,
       platform: esbuildPlatform(opts.target),
-      stdin: {
-        contents: source,
-        loader: "js",
-        resolveDir: projectRoot,
-        sourcefile: "jx-worker-entry.js",
-      },
+      stdin: { contents: source, loader: "js", resolveDir, sourcefile: "jx-entry.js" },
     });
     return;
   }
 
-  // Bun.build has no stdin input — write a transient entry at the project root so resolution
-  // Matches the stdin/resolveDir behavior, and always remove it.
-  const entryPath = join(projectRoot, ".jx-worker-entry.mjs");
+  // Bun.build has no stdin input — write a transient entry in `resolveDir` so resolution matches
+  // The stdin/resolveDir behavior, and always remove it.
+  const entryPath = join(resolveDir, `.jx-entry-${process.pid}.mjs`);
   writeFileSync(entryPath, source, "utf8");
   try {
     await bundleEntry({ entryPath, outfile }, opts);
   } finally {
     rmSync(entryPath, { force: true });
   }
+}
+
+/**
+ * Bundle generated worker source into a self-contained module for the adapter's runtime. Bare and
+ * relative specifiers resolve from the project root — exactly how the unbundled source would have
+ * resolved when served from within the project.
+ */
+export async function bundleWorkerSource(
+  source: string,
+  { projectRoot, outfile, adapter }: { projectRoot: string; outfile: string; adapter: string },
+): Promise<void> {
+  await bundleSource(source, { outfile, resolveDir: projectRoot }, workerBundleOptions(adapter));
 }

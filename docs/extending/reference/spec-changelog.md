@@ -32,6 +32,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `compiler.md`
 
+- **0.2.0-draft** (2026-08-15) — Client runtime is served from /assets/ instead of esm.sh; browser bundles resolve production export conditions under both backends (§3, §12).
 - **0.1.28-draft** (2026-08-15) — §3: node_modules URLs resolved — bare $head/$elements specifiers land in /assets/.
 - **0.1.27-draft** (2026-08-15) — Add §13 Standards Alignment; §3 marked Partial — inline scripts block a strict CSP and node_modules URLs 404 in production.
 - **0.1.26-draft** (2026-08-14) — $switch compiles on dynamic pages (§9.2); branch subtrees hoisted out of $switch and chosen-tagName constructs (§4.8); prerender treats handler-written entries and computeds reading them as runtime-only, and keeps an array any surviving reader still references (§8.1).
@@ -113,6 +114,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `imports.md`
 
+- **0.1.9-draft** (2026-08-15) — Name where the emitted import map now points (§1).
 - **0.1.8-draft** (2026-08-15) — Number the sections so they are addressable, and add §7 Standards Alignment.
 - **0.1.7-draft** (2026-08-02) — Imports panel section renamed to Imported Modules in the UI.
 - **0.1.6-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).

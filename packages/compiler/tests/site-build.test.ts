@@ -1469,6 +1469,65 @@ describe("buildSite — a $head copy and a sidecar bundle claiming one asset nam
   });
 });
 
+// ── The self-hosted client runtime ───────────────────────────────────────────
+
+describe("buildSite — the import map points at the site, not a CDN", () => {
+  const RT_TMP = resolve(import.meta.dir, "__test-site-runtime__");
+
+  beforeAll(() => {
+    rmSync(RT_TMP, { force: true, recursive: true });
+    mkdirSync(resolve(RT_TMP, "components"), { recursive: true });
+    mkdirSync(resolve(RT_TMP, "pages"), { recursive: true });
+    writeFileSync(
+      resolve(RT_TMP, "project.json"),
+      JSON.stringify({ build: { outDir: "./dist" }, name: "Runtime Test" }),
+      "utf8",
+    );
+    writeFileSync(
+      resolve(RT_TMP, "components/rt-counter.json"),
+      JSON.stringify({
+        children: [{ onClick: "state.n++", tagName: "button", textContent: "${state.n}" }],
+        state: { n: 0 },
+        tagName: "rt-counter",
+      }),
+      "utf8",
+    );
+    writeFileSync(
+      resolve(RT_TMP, "pages/index.json"),
+      JSON.stringify({ children: [{ tagName: "rt-counter" }], tagName: "main", title: "Home" }),
+      "utf8",
+    );
+  });
+
+  afterAll(() => {
+    rmSync(RT_TMP, { force: true, recursive: true });
+  });
+
+  /*
+   * Every interactive page used to import its runtime from esm.sh. That is a third party in the
+   * load path of every visit, with no integrity metadata, and it made `default-src 'self'`
+   * unusable — the policy would have broken every interactive page on the site.
+   */
+  it("serves @vue/reactivity and lit-html from /assets/", async () => {
+    const result = await buildSite(RT_TMP, { verbose: false });
+    expect(result.errors).toHaveLength(0);
+
+    const html = readFileSync(resolve(RT_TMP, "dist/index.html"), "utf8");
+    expect(html).not.toContain("esm.sh");
+    const map = /<script type="importmap">([\s\S]*?)<\/script>/.exec(html)?.[1] ?? "";
+    expect(JSON.parse(map)).toEqual({
+      imports: {
+        "@vue/reactivity": "/assets/vue-reactivity.js",
+        "lit-html": "/assets/lit-html.js",
+      },
+    });
+
+    // And the URLs it names are real files, which is the half a bare rewrite would have missed.
+    expect(existsSync(resolve(RT_TMP, "dist/assets/vue-reactivity.js"))).toBe(true);
+    expect(existsSync(resolve(RT_TMP, "dist/assets/lit-html.js"))).toBe(true);
+  }, 30_000);
+});
+
 // ── Unresolvable bare specifiers ─────────────────────────────────────────────
 
 describe("buildSite — unresolvable bare specifier in $head", () => {

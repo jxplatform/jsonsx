@@ -2,7 +2,7 @@
 
 ## Static HTML Compiler, Custom Element Emitter, and Island Detector
 
-**Version:** 0.1.28-draft
+**Version:** 0.2.0-draft
 **Status:** Partial
 **Updated:** 2026-08-15
 **License:** MIT
@@ -54,12 +54,12 @@ Bare strings and numbers in `children` arrays compile to text nodes in all three
 
 ## 3. Output Tiers
 
-> **Status: Partial.** The tiers themselves are complete. Two properties of the emitted page are
-> not: every tier emits an **inline** import map, and a project declaring a colour-scheme query also
-> gets an inline pre-paint script, so no tier is servable under a strict `script-src` and none emits
-> a Content-Security-Policy. The import map's two entries also resolve to `esm.sh` with no integrity
-> metadata. See §13. (Bare `$elements` and `$head` specifiers no longer emit `/node_modules/…` URLs;
-> they are bundled and copied into `/assets/` — `site-architecture.md` §8.7.)
+> **Status: Partial.** The tiers themselves are complete. One property of the emitted page is not:
+> every tier emits an **inline** import map, and a project declaring a colour-scheme query also gets
+> an inline pre-paint script, so no tier emits a Content-Security-Policy yet — though both inline
+> blocks are now constants a hash can name. See §13. The page no longer loads anything from a third
+> party: the import map resolves to `/assets/` (§12), and bare `$elements` and `$head` specifiers
+> are bundled and copied there too (`site-architecture.md` §8.7).
 
 | Component surface                        | Compiler output                                 |
 | ---------------------------------------- | ----------------------------------------------- |
@@ -778,12 +778,27 @@ The site build bundles Function-def `$src` modules for the browser
   inlined, so `dist/` deploys and runs without `node_modules` — verified by
   importing the bundled worker from an empty directory in tests. The former
   copy of server sources into `dist/components/` is gone.
+- **The client runtime**: `@vue/reactivity` and `lit-html` are bundled from
+  **this package's** dependencies into `/assets/vue-reactivity.js` and
+  `/assets/lit-html.js`, and the emitted import map points there. They resolve
+  from the compiler rather than the project because the compiler is what
+  depends on those versions — a project that never installed them still gets
+  the runtime its output was compiled against. If neither resolves, the map
+  falls back to the CDN URLs with a warning, since a page with no runtime is
+  worse than a page with a third-party one. Emitted once per build, and only
+  when some page actually carries an import map.
 - **Backends**: `Bun.build` when the build runs under Bun; esbuild
   (dynamically imported, a `@jxsuite/compiler` dependency) under plain Node.
   Options are minimal and identical (`format: esm`, browser target, no
-  minify). `JX_BUNDLER=esbuild` forces the fallback. Byte-level output may
-  differ between backends — a repo tracking `dist/` should build with one
-  backend consistently.
+  minify). Browser bundles define `process.env.NODE_ENV` as `"production"`:
+  the substitution matters (a browser has no `process`) but the resolution
+  matters more, because that value decides which `exports` condition a package
+  offers. Bun reads it from the build's own `define` and assumes development
+  without it, so the two backends were resolving different files —
+  `lit-html`'s 31 kB development build under Bun against its 10 kB production
+  build under esbuild. `JX_BUNDLER=esbuild` forces the fallback. Byte-level
+  output may still differ between backends — a repo tracking `dist/` should
+  build with one backend consistently.
 
 > **Status: Implemented** via `site-build` steps 6d (bundling) and 6e
 > (extension `emit`, extensions.md §8.4).
@@ -794,23 +809,31 @@ The site build bundles Function-def `$src` modules for the browser
 
 External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md). `lit-html` and `@vue/reactivity` are libraries rather than standards; Appendix A records them as dependencies.
 
-| Standard                                                                                  | Class       | Binds  | Evidence                                                                                  | Note                                                                                                                                                                                                                                                        |
-| ----------------------------------------------------------------------------------------- | ----------- | ------ | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [ECMA-262](https://ecma-international.org/publications-and-standards/standards/ecma-262/) | **Adopted** | §4, §5 | packages/compiler/src/targets/compile-element.ts, packages/compiler/tests/no-eval.test.ts | Emitted modules are plain ECMAScript modules containing no `new Function` and no `eval`, which is what lets compiled output run under a policy without `'unsafe-eval'` — asserted by a committed test.                                                      |
-| [WHATWG HTML](https://html.spec.whatwg.org/)                                              | **Subset**  | §3, §4 | packages/compiler/src/targets/compile-element.ts                                          | Custom elements are defined and rendered into the **light** DOM; `<slot>` is emulated by splicing saved children, and no shadow root is ever attached. Declarative Shadow DOM, `::part` and `ElementInternals` are therefore unavailable to a Jx component. |
-| [CSP Level 3](https://www.w3.org/TR/CSP3/)                                                | **Pending** | §3     | —                                                                                         | `gap:emit-csp` No policy is emitted for any tier, and the inline import map and pre-paint script would both need hashing before a strict one could be.                                                                                                      |
-| [Subresource Integrity](https://www.w3.org/TR/SRI/)                                       | **Pending** | §3     | —                                                                                         | `gap:sri-cdn-runtime` The import map resolves `@vue/reactivity` and `lit-html` to `esm.sh` with no integrity metadata, so every interactive page trusts a third party at load time.                                                                         |
+| Standard                                                                                  | Class         | Binds  | Evidence                                                                                     | Note                                                                                                                                                                                                                                                                                                                                               |
+| ----------------------------------------------------------------------------------------- | ------------- | ------ | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [ECMA-262](https://ecma-international.org/publications-and-standards/standards/ecma-262/) | **Adopted**   | §4, §5 | packages/compiler/src/targets/compile-element.ts, packages/compiler/tests/no-eval.test.ts    | Emitted modules are plain ECMAScript modules containing no `new Function` and no `eval`, which is what lets compiled output run under a policy without `'unsafe-eval'` — asserted by a committed test.                                                                                                                                             |
+| [WHATWG HTML](https://html.spec.whatwg.org/)                                              | **Subset**    | §3, §4 | packages/compiler/src/targets/compile-element.ts                                             | Custom elements are defined and rendered into the **light** DOM; `<slot>` is emulated by splicing saved children, and no shadow root is ever attached. Declarative Shadow DOM, `::part` and `ElementInternals` are therefore unavailable to a Jx component.                                                                                        |
+| [CSP Level 3](https://www.w3.org/TR/CSP3/)                                                | **Pending**   | §3     | —                                                                                            | `gap:emit-csp` No policy is emitted for any tier. Both inline blocks are constants whose hashes are stable site-wide, and nothing is loaded cross-origin any more, so a strict `script-src` is now reachable — it is simply not emitted yet.                                                                                                       |
+| [Subresource Integrity](https://www.w3.org/TR/SRI/)                                       | **Divergent** | §12    | packages/compiler/src/site/client-runtime.ts, packages/compiler/tests/client-runtime.test.ts | The gap this standard existed to close is closed by **removal** rather than by attestation: the runtime is served from the site, so there is no cross-origin subresource left to hash. SRI would apply again only if a project overrode the import map back to a URL, and the build cannot compute an integrity value for a file it never fetched. |
 
 ## Appendix A — Production Dependency Stack
 
-| Package           | Size (gzip) | Purpose                                |
-| ----------------- | ----------- | -------------------------------------- |
-| `@vue/reactivity` | ~7 kB       | `reactive()`, `computed()`, `effect()` |
-| `lit-html`        | ~3 kB       | `html`, `render()`                     |
-| **Total**         | **~10 kB**  |                                        |
+Served from the site under `/assets/` (§12), not from a CDN. Sizes are the bundles this build
+actually emits — un-minified ESM, since `minify: false` — measured with `gzip -9`:
+
+| Package           | Raw       | gzip        | Purpose                                |
+| ----------------- | --------- | ----------- | -------------------------------------- |
+| `@vue/reactivity` | 48.7 kB   | 11.1 kB     | `reactive()`, `computed()`, `effect()` |
+| `lit-html`        | 10.6 kB   | 3.7 kB      | `html`, `render()`                     |
+| **Total**         | **59 kB** | **14.8 kB** |                                        |
+
+The previous figures here (~7 kB and ~3 kB, ~10 kB total) described neither of these files. They
+are also the _un-minified_ sizes: the bundler does not minify, so a host that compresses on the fly
+is doing the only size work in the pipeline.
 
 ## Changelog
 
+- **0.2.0-draft** (2026-08-15) — Client runtime is served from /assets/ instead of esm.sh; browser bundles resolve production export conditions under both backends (§3, §12).
 - **0.1.28-draft** (2026-08-15) — §3: node_modules URLs resolved — bare $head/$elements specifiers land in /assets/.
 - **0.1.27-draft** (2026-08-15) — Add §13 Standards Alignment; §3 marked Partial — inline scripts block a strict CSP and node_modules URLs 404 in production.
 - **0.1.26-draft** (2026-08-14) — $switch compiles on dynamic pages (§9.2); branch subtrees hoisted out of $switch and chosen-tagName constructs (§4.8); prerender treats handler-written entries and computeds reading them as runtime-only, and keeps an array any surviving reader still references (§8.1).
@@ -843,4 +866,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/compiler` Specification v0.1.28-draft_
+_`@jxsuite/compiler` Specification v0.2.0-draft_

@@ -11,6 +11,8 @@ spec:
   - compiler.md#4.1 # element module output structure
 code:
   - packages/compiler/src/site/site-build.ts
+  - packages/compiler/src/site/client-runtime.ts
+  - packages/compiler/src/site/bundler.ts
   - packages/compiler/src/site/pages-discovery.ts
   - packages/compiler/src/targets/compile-static.ts
   - packages/compiler/src/targets/compile-client.ts
@@ -21,7 +23,7 @@ code:
 
 `jx build` turns a Jx project — JSON documents in `pages/`, `layouts/`, and `components/` — into a production site in `dist/`. The compiler erases the Jx abstractions at build time: no JSON documents, no interpreter, and no framework code ship to production. A page only gets JavaScript when the compiler can prove it needs some, and the proof runs in one direction — everything is static until something dynamic is found.
 
-The only client-side dependencies a page can end up with are `@vue/reactivity` (~7 kB gzip) and `lit-html` (~3 kB gzip), loaded through an import map — and only on pages that need them.
+The only client-side dependencies a page can end up with are `@vue/reactivity` (11.1 kB gzip) and `lit-html` (3.7 kB gzip), loaded through an import map — and only on pages that need them. Both are served from your own site, under `/assets/`.
 
 ## What `jx build` does
 
@@ -87,6 +89,27 @@ A dynamic subtree inside an otherwise-static document doesn't drag the whole pag
 ```
 
 The module upgrades the element in place. Components you author with a hyphenated `tagName` (say `site-counter`) work the same way: the page HTML stays static, and `dist/components/site-counter.js` loads only on pages that use the element. The import map added to those pages resolves `@vue/reactivity` and `lit-html` for the island modules.
+
+## Where the runtime comes from
+
+Those two modules are bundled into your `dist/` at build time and the import map points at them:
+
+```html
+<script type="importmap">
+  {
+    "imports": {
+      "@vue/reactivity": "/assets/vue-reactivity.js",
+      "lit-html": "/assets/lit-html.js"
+    }
+  }
+</script>
+```
+
+They come from `@jxsuite/compiler`'s own dependencies, not your project's, so you don't have to install anything — the runtime always matches the compiler that produced the page.
+
+:::doc-note
+They used to load from `https://esm.sh`. Self-hosting removes a third party from the load path of every interactive page, and it's what makes a `default-src 'self'` Content-Security-Policy possible at all. The old argument for a shared CDN was a shared browser cache, and that stopped being true when browsers began partitioning the HTTP cache by site.
+:::
 
 ### Dynamic pages
 

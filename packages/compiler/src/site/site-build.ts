@@ -49,8 +49,6 @@ import { compile, compileServer, compileSiteServer } from "../compiler.ts";
 import { compileElement } from "../targets/compile-element.ts";
 import type { SiteConnectorSpec, SiteMountSpec } from "../targets/compile-server.ts";
 import {
-  DEFAULT_LIT_HTML_SRC,
-  DEFAULT_REACTIVITY_SRC,
   buildComponentCSS,
   buildInitialScope,
   collectServerEntries,
@@ -67,6 +65,7 @@ import {
 } from "../shared.ts";
 import { resolvePrototypes } from "./prototype-resolver.ts";
 import { transformImageNodes } from "./image-transform.ts";
+import { renderImportMap, resolveClientRuntime, writeClientRuntime } from "./client-runtime.ts";
 import { getImageCacheDir, loadCache, saveCache } from "./image-cache.ts";
 import type { ImageConfig } from "./image-optimizer.ts";
 import type { ImageMetaCache } from "./image-transform.ts";
@@ -139,6 +138,17 @@ export async function buildSite(
    * Bundles and copies land in one URL directory, so one map arbitrates it. Two different files
    * that slug to the same name is a build error, not a silent last-writer-wins overwrite.
    */
+  /*
+   * The two modules the import map names. Resolved up front so every page's map is identical, and
+   * written at the end only if some page actually emitted one.
+   */
+  const clientRuntime = resolveClientRuntime();
+  const runtimeImports = clientRuntime.imports;
+  const runtimeAssetsUsed = new Set<string>();
+  for (const warning of clientRuntime.warnings) {
+    console.warn(warning);
+  }
+
   const assetClaims = new Map<string, { entryPath: string; specifier: string }>();
   const claimAsset = (assetPath: string, entryPath: string, specifier: string) => {
     const existing = assetClaims.get(assetPath);
@@ -435,6 +445,8 @@ export async function buildSite(
           componentCSS,
           staticTags,
           result.files.map((f: { content: string }) => f.content).join("\n"),
+          runtimeImports,
+          runtimeAssetsUsed,
         );
       }
 
@@ -588,6 +600,19 @@ export async function buildSite(
   }
 
   // ── 6d. Bundle client sidecar modules (spec.md §12) ─────────────────────
+  if (runtimeAssetsUsed.size > 0) {
+    log(`Bundling ${runtimeAssetsUsed.size} client runtime module(s)...`);
+    const runtime = await writeClientRuntime(
+      { ...clientRuntime, assetPaths: [...runtimeAssetsUsed] },
+      outDir,
+    );
+    fileCount += runtime.written;
+    for (const error of runtime.errors) {
+      errors.push(error);
+      console.error(error);
+    }
+  }
+
   if (npmAssets.size > 0) {
     log(`Copying ${npmAssets.size} package asset(s)...`);
     for (const [assetPath, entryPath] of npmAssets) {
@@ -1596,6 +1621,8 @@ function expandComponents(
  * @param {Map<string, string>} [cssMap] - TagName → CSS text (for link injection)
  * @param {Set<string>} [staticTags] - Tags where ALL instances are fully static (skip JS)
  * @param {string} [islandSource] - Concatenated island modules emitted for this page
+ * @param {Record<string, string>} [runtimeImports] - The import map's `imports` object
+ * @param {Set<string>} [runtimeAssetsUsed] - Collects the asset paths an emitted import map names
  * @returns {string}
  */
 function injectComponentScripts(
@@ -1604,6 +1631,8 @@ function injectComponentScripts(
   cssMap = new Map<string, string>(),
   staticTags = new Set<string>(),
   islandSource = "",
+  runtimeImports: Record<string, string> = {},
+  runtimeAssetsUsed = new Set<string>(),
 ) {
   // A component reaches a page two ways: as a literal tag in the static HTML, or referenced only
   // From inside an island's client template — in which case the tag exists solely in the island's
@@ -1636,14 +1665,12 @@ function injectComponentScripts(
   }
 
   // Build import map (needed for @vue/reactivity and lit-html)
-  const importMap = `<script type="importmap">
-  {
-    "imports": {
-      "@vue/reactivity": "${DEFAULT_REACTIVITY_SRC}",
-      "lit-html": "${DEFAULT_LIT_HTML_SRC}"
+  const importMap = renderImportMap(runtimeImports);
+  for (const url of Object.values(runtimeImports)) {
+    if (url.startsWith("/")) {
+      runtimeAssetsUsed.add(url);
     }
   }
-  </script>`;
 
   const moduleScripts = jsTags
     .map((tag: string) => `<script type="module" src="/components/${tag}.js"></script>`)
