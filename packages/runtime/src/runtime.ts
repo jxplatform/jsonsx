@@ -2364,7 +2364,12 @@ function injectHead(entries: JxHeadEntry[], _base: string) {
       el.setAttribute(k, String(v));
     }
     if (entry.textContent) {
-      el.textContent = entry.textContent;
+      // An object is a structured data block (JSON-LD, site-architecture.md §8.5). The compiler
+      // Serializes it the same way, so the interpreted page and the built page agree.
+      el.textContent =
+        typeof entry.textContent === "object"
+          ? JSON.stringify(entry.textContent, null, 2)
+          : entry.textContent;
     }
     document.head.append(el);
   }

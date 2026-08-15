@@ -23,9 +23,9 @@ This page is generated from the `> **Status: …**` markers in the specification
 | `jx-markdown.md`          | 0.1.8-draft  | Partial     | 2026-08-15 |
 | `parser.md`               | 0.2.5-draft  | Partial     | 2026-08-15 |
 | `relationships.md`        | 0.1.4-draft  | Partial     | 2026-08-15 |
-| `schema.md`               | 0.4.1-draft  | Partial     | 2026-08-15 |
+| `schema.md`               | 0.4.2-draft  | Partial     | 2026-08-15 |
 | `server.md`               | 0.2.2        | Implemented | 2026-08-15 |
-| `site-architecture.md`    | 0.2.1-draft  | Partial     | 2026-08-15 |
+| `site-architecture.md`    | 0.3.0-draft  | Partial     | 2026-08-15 |
 | `spec.md`                 | 0.4.29-draft | Partial     | 2026-08-15 |
 | `standards.md`            | 0.1.3-draft  | Partial     | 2026-08-15 |
 | `studio-ui-guidelines.md` | 0.3.9        | Implemented | 2026-08-15 |
@@ -60,7 +60,6 @@ This page is generated from the `> **Status: …**` markers in the specification
 
 - `collab.md` §5 — Version Skew
 - `desktop.md` §4.3 — Single File Mode
-- `site-architecture.md` §8.5 — Structured Data (JSON-LD)
 - `site-architecture.md` §12.3 — Incremental Builds
 - `site-architecture.md` §13 — Internationalization
 

@@ -2,7 +2,7 @@
 
 ## File-Based Routing, Content Collections, Layouts, and Static Site Generation
 
-**Version:** 0.2.1-draft
+**Version:** 0.3.0-draft
 **Status:** Partial
 **Updated:** 2026-08-15
 **License:** MIT
@@ -951,22 +951,27 @@ The compiler assembles `<head>` content from three sources, in order:
 2. **Layout-level** (layout's `<head>` children) — charset, viewport, structural tags
 3. **Page-level** (page's `$head`) — page-specific title, description, OG tags
 
-Later entries can override earlier entries. If both site and page define a `<title>`, the page's wins. Deduplication is by `tagName` + identifying attribute (`name`, `property`, `rel`).
+Later entries can override earlier entries. If both site and page define a `<title>`, the page's wins.
+
+Deduplication is by `tagName` plus the attribute that identifies the element: `name` for a `<meta name>`, `property` for a `<meta property>`, and for a `<link>`, `rel` **plus `href` plus whichever of `hreflang`, `type`, `media` or `sizes` is present**. That last part is not pedantry — `rel` and `href` alone are not identity, and the cases where they collide are ones a real site needs: `hreflang="x-default"` conventionally points at the same href as the default locale's alternate, and an RSS and an Atom feed are both `rel="alternate"` differing only in `type`.
+
+An auto-injected entry loses to an author-supplied one under the same key, including the canonical link.
 
 ### 8.4 Automatic SEO
 
 The compiler automatically generates certain tags if not explicitly declared:
 
-| Auto-generated                   | Condition                                            |
-| -------------------------------- | ---------------------------------------------------- |
-| `<meta charset>`                 | Always (from `defaults.charset`)                     |
-| `<meta name="viewport">`         | Always, unless the author supplies one               |
-| `<title>`                        | Always — page title, falling back to the site `name` |
-| `<link rel="canonical">`         | When `url` is set, from `$site.url` + page path      |
-| `<meta property="og:url">`       | With the canonical; an author-supplied value wins    |
-| `<meta property="og:site_name">` | From `$site.name`; an author-supplied value wins     |
-| `<html lang>`                    | From page or site `lang`                             |
-| `sitemap.xml` entry              | Every page, when `url` is set (§8.4.1)               |
+| Auto-generated                   | Condition                                                                |
+| -------------------------------- | ------------------------------------------------------------------------ |
+| `<meta charset>`                 | Always (from `defaults.charset`)                                         |
+| `<meta name="viewport">`         | Always, unless the author supplies one                                   |
+| `<title>`                        | Always — page title, falling back to the site `name`                     |
+| `<link rel="canonical">`         | When `url` is set, from `$site.url` + page path                          |
+| `<meta property="og:url">`       | With the canonical; an author-supplied value wins                        |
+| `<meta property="og:site_name">` | From `$site.name`; an author-supplied value wins                         |
+| `<html lang>`                    | From the page's `$lang`, else `defaults.lang`                            |
+| `<html dir>`                     | From the page's `$dir`, else `defaults.dir`; omitted when neither is set |
+| `sitemap.xml` entry              | Every page, when `url` is set (§8.4.1)                                   |
 
 #### 8.4.1 Sitemap & `robots.txt`
 
@@ -983,10 +988,11 @@ Redirect sources are not pages and never appear in the sitemap.
 
 ### 8.5 Structured Data (JSON-LD)
 
-> **Status: Pending.** The object form below is **not** implemented. A head entry's
-> `textContent` is typed as a string and template resolution only runs on strings, so an
-> object written here renders as `[object Object]`. A JSON-LD block can be authored today
-> only by writing the serialized JSON out as a string. See §16.
+> **Status: Implemented.** A head entry's `textContent` may be an object; the compiler serializes
+> it to JSON inside the tag, and template strings **inside** the object resolve against the same
+> scope as everywhere else — a structured-data block that cannot reference the page it describes
+> would not be much use. The interpreting runtime serializes it identically, so a dev preview and a
+> built page agree.
 
 Pages may include JSON-LD for rich search results:
 
@@ -1827,22 +1833,22 @@ Locally, `jx dev` (server.md) stands in for the worker: it dispatches to the sam
 
 External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md). Feed generation is not cited: no numbered section owes it yet, and it is tracked as a roadmap item in Appendix C.
 
-| Standard                                                                                  | Class       | Binds  | Evidence                                                                                       | Note                                                                                                                                                                                                                                                                          |
-| ----------------------------------------------------------------------------------------- | ----------- | ------ | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [RFC 9309](https://www.rfc-editor.org/rfc/rfc9309)                                        | **Adopted** | §8.4.1 | packages/compiler/src/site/site-build.ts                                                       | A minimal `robots.txt` is created when none was provided, and an existing one is appended to rather than replaced. The `Sitemap:` line the build adds is a sitemaps.org extension, not part of this standard.                                                                 |
-| [Sitemaps 0.9](https://www.sitemaps.org/protocol.html)                                    | **Subset**  | §8.4.1 | packages/compiler/src/site/site-build.ts                                                       | `gap:sitemap-fields` `<loc>` and `<lastmod>` only. No `<changefreq>`, no `<priority>`, and no `xhtml:link` alternates — the last of which §13 will need.                                                                                                                      |
-| [WHATWG URLPattern](https://urlpattern.spec.whatwg.org/)                                  | **Subset**  | §11.1  | packages/compiler/src/site/site-build.ts                                                       | Pattern strings are passed through to `_redirects` verbatim; the compiler neither parses nor validates them, so a malformed pattern is a deploy-time failure rather than a build-time one.                                                                                    |
-| [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110)                                        | **Subset**  | §11.3  | packages/compiler/src/site/site-build.ts                                                       | `gap:redirect-status-codes` Only 301 and 302 are documented as redirects. 303, 307 and 308 are absent, so a redirect cannot preserve a request method. The `200` value listed alongside them is not a redirection status at all — it is the host's rewrite convention.        |
-| [RFC 8288](https://www.rfc-editor.org/rfc/rfc8288)                                        | **Subset**  | §8.1   | packages/compiler/src/site/head-merger.ts                                                      | `gap:link-relation-validation` `rel` values are emitted as authored and deduplicated on `rel` plus `href`. Nothing checks a value against the IANA registry, and the dedup key ignores `hreflang` and `type` — so two alternates that differ only in those collapse into one. |
-| [JSON-LD 1.1](https://www.w3.org/TR/json-ld11/)                                           | **Pending** | §8.5   | —                                                                                              | `gap:jsonld-serialization` §8.5 specifies an object that the compiler serializes; it does not, so structured data can only be authored as a pre-serialized string.                                                                                                            |
-| [BCP 47](https://www.rfc-editor.org/info/bcp47)                                           | **Pending** | §13    | —                                                                                              | `gap:site-locale-tags` `defaultLocale` and `locales` are declared and read by nothing, and no tag is validated or canonicalized.                                                                                                                                              |
-| [RFC 4647](https://www.rfc-editor.org/rfc/rfc4647)                                        | **Pending** | §13    | —                                                                                              | `gap:locale-lookup` Nothing selects a locale for a request. The routing modes §13.2 describes have no implementation, so the bare `/` cannot resolve to a visitor's language.                                                                                                 |
-| [ECMA-402](https://ecma-international.org/publications-and-standards/standards/ecma-402/) | **Pending** | §13    | —                                                                                              | `gap:locale-formatting` No project locale reaches the formatting helpers, so a date or number formatted at build time uses the build machine's locale and the same source produces different output on different machines.                                                    |
-| [RFC 9111](https://www.rfc-editor.org/rfc/rfc9111)                                        | **Adopted** | §14.3  | packages/compiler/src/site/headers-emitter.ts, packages/compiler/tests/headers-emitter.test.ts | Every output declares its cacheability: `must-revalidate` for anything whose URL does not change with its content, and a year for the one output whose URL does.                                                                                                              |
-| [RFC 8246](https://www.rfc-editor.org/rfc/rfc8246)                                        | **Adopted** | §14.3  | packages/compiler/src/site/headers-emitter.ts, packages/compiler/tests/headers-emitter.test.ts | `immutable` is emitted for `/images/_optimized/*` alone. A test asserts no other path can acquire it, because every other filename is reused when its content changes.                                                                                                        |
-| [RFC 6797](https://www.rfc-editor.org/rfc/rfc6797)                                        | **Subset**  | §14.3  | packages/compiler/src/site/headers-emitter.ts                                                  | Off by default and opt-in per project, with `max-age`, `includeSubDomains` and `preload`. `preload` without `includeSubDomains` is refused rather than emitted, since the preload list would reject it.                                                                       |
-| [Referrer Policy](https://www.w3.org/TR/referrer-policy/)                                 | **Adopted** | §14.3  | packages/compiler/src/site/headers-emitter.ts                                                  | `strict-origin-when-cross-origin` by default; any policy token from the standard, or `false` to omit the header.                                                                                                                                                              |
-| [Permissions Policy](https://www.w3.org/TR/permissions-policy/)                           | **Subset**  | §14.3  | packages/compiler/src/site/headers-emitter.ts                                                  | A default deny-list for camera, microphone and geolocation is emitted, and the whole header is author-replaceable. The structured-field grammar is passed through rather than parsed.                                                                                         |
+| Standard                                                                                  | Class       | Binds      | Evidence                                                                                       | Note                                                                                                                                                                                                                                                                                |
+| ----------------------------------------------------------------------------------------- | ----------- | ---------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [RFC 9309](https://www.rfc-editor.org/rfc/rfc9309)                                        | **Adopted** | §8.4.1     | packages/compiler/src/site/site-build.ts                                                       | A minimal `robots.txt` is created when none was provided, and an existing one is appended to rather than replaced. The `Sitemap:` line the build adds is a sitemaps.org extension, not part of this standard.                                                                       |
+| [Sitemaps 0.9](https://www.sitemaps.org/protocol.html)                                    | **Subset**  | §8.4.1     | packages/compiler/src/site/site-build.ts                                                       | `gap:sitemap-fields` `<loc>` and `<lastmod>` only. No `<changefreq>`, no `<priority>`, and no `xhtml:link` alternates — the last of which §13 will need.                                                                                                                            |
+| [WHATWG URLPattern](https://urlpattern.spec.whatwg.org/)                                  | **Subset**  | §11.1      | packages/compiler/src/site/site-build.ts                                                       | Pattern strings are passed through to `_redirects` verbatim; the compiler neither parses nor validates them, so a malformed pattern is a deploy-time failure rather than a build-time one.                                                                                          |
+| [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110)                                        | **Subset**  | §11.3      | packages/compiler/src/site/site-build.ts                                                       | `gap:redirect-status-codes` Only 301 and 302 are documented as redirects. 303, 307 and 308 are absent, so a redirect cannot preserve a request method. The `200` value listed alongside them is not a redirection status at all — it is the host's rewrite convention.              |
+| [RFC 8288](https://www.rfc-editor.org/rfc/rfc8288)                                        | **Subset**  | §8.1, §8.3 | packages/compiler/src/site/head-merger.ts, packages/compiler/tests/head-merger.test.ts         | `gap:link-relation-validation` Link identity now accounts for the target attributes — `rel`, `href`, and whichever of `hreflang`, `type`, `media` or `sizes` distinguishes two links sharing the first two. `rel` values are still not checked against the IANA registry.           |
+| [JSON-LD 1.1](https://www.w3.org/TR/json-ld11/)                                           | **Subset**  | §8.5       | packages/compiler/src/site/head-merger.ts, packages/compiler/tests/head-merger.test.ts         | An object `textContent` is serialized into the tag and templates inside it resolve, so a document can carry structured data that references itself. Jx does not process the JSON-LD — no context expansion, no compaction, no framing; it is emitted for the consumer to interpret. |
+| [BCP 47](https://www.rfc-editor.org/info/bcp47)                                           | **Pending** | §13        | —                                                                                              | `gap:site-locale-tags` `defaultLocale` and `locales` are declared and read by nothing, and no tag is validated or canonicalized.                                                                                                                                                    |
+| [RFC 4647](https://www.rfc-editor.org/rfc/rfc4647)                                        | **Pending** | §13        | —                                                                                              | `gap:locale-lookup` Nothing selects a locale for a request. The routing modes §13.2 describes have no implementation, so the bare `/` cannot resolve to a visitor's language.                                                                                                       |
+| [ECMA-402](https://ecma-international.org/publications-and-standards/standards/ecma-402/) | **Pending** | §13        | —                                                                                              | `gap:locale-formatting` No project locale reaches the formatting helpers, so a date or number formatted at build time uses the build machine's locale and the same source produces different output on different machines.                                                          |
+| [RFC 9111](https://www.rfc-editor.org/rfc/rfc9111)                                        | **Adopted** | §14.3      | packages/compiler/src/site/headers-emitter.ts, packages/compiler/tests/headers-emitter.test.ts | Every output declares its cacheability: `must-revalidate` for anything whose URL does not change with its content, and a year for the one output whose URL does.                                                                                                                    |
+| [RFC 8246](https://www.rfc-editor.org/rfc/rfc8246)                                        | **Adopted** | §14.3      | packages/compiler/src/site/headers-emitter.ts, packages/compiler/tests/headers-emitter.test.ts | `immutable` is emitted for `/images/_optimized/*` alone. A test asserts no other path can acquire it, because every other filename is reused when its content changes.                                                                                                              |
+| [RFC 6797](https://www.rfc-editor.org/rfc/rfc6797)                                        | **Subset**  | §14.3      | packages/compiler/src/site/headers-emitter.ts                                                  | Off by default and opt-in per project, with `max-age`, `includeSubDomains` and `preload`. `preload` without `includeSubDomains` is refused rather than emitted, since the preload list would reject it.                                                                             |
+| [Referrer Policy](https://www.w3.org/TR/referrer-policy/)                                 | **Adopted** | §14.3      | packages/compiler/src/site/headers-emitter.ts                                                  | `strict-origin-when-cross-origin` by default; any policy token from the standard, or `false` to omit the header.                                                                                                                                                                    |
+| [Permissions Policy](https://www.w3.org/TR/permissions-policy/)                           | **Subset**  | §14.3      | packages/compiler/src/site/headers-emitter.ts                                                  | A default deny-list for camera, microphone and geolocation is emitted, and the whole header is author-replaceable. The structured-field grammar is passed through rather than parsed.                                                                                               |
 
 ## Appendix: Element Annotations
 
@@ -1968,6 +1974,7 @@ This spec builds on existing Jx primitives wherever possible:
 
 ## Changelog
 
+- **0.3.0-draft** (2026-08-15) — §8.3 link identity includes hreflang/type/media/sizes; §8.5 JSON-LD objects serialize; §8.4 lang and dir come from the page.
 - **0.2.1-draft** (2026-08-15) — Add §14.3 response headers and §14.4 .nojekyll; §14's header gap is closed and vercel.json is declined.
 - **0.2.0-draft** (2026-08-15) — §11.3 separates redirects from rewrites: an RFC 9110 status enum, a per-status HTML-fallback policy, and no file for a rewrite.
 - **0.1.45-draft** (2026-08-15) — Add §16 Standards Alignment; §8.5 marked Pending — the JSON-LD object form is unimplemented — and §14 Partial: no _headers or .nojekyll is emitted.

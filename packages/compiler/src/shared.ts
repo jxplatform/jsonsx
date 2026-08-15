@@ -784,20 +784,21 @@ export function evaluateStaticTemplate(str: string, scope: Record<string, unknow
   if (readsRuntimeOnlyState(str, scope)) {
     return null;
   }
+  /*
+   * `$site` and `$page` are bound as parameters, not just left on `state`.
+   *
+   * `injectContext` puts them on the document's state, so `${state.$site.name}` always worked — but
+   * every example in site-architecture.md §8.2 writes the bare `${$site.name}`, and that threw a
+   * ReferenceError the catch below turned into a silent null. A `$head` title referencing the site
+   * name reached the page as the literal template text.
+   */
+  const args = ["state", "$map", "$site", "$page"] as const;
+  const values = [scope, scope?.$map, scope?.$site, scope?.$page];
   try {
     const singleExprMatch = str.match(/^\$\{(.+)\}$/s);
-    if (singleExprMatch) {
-      const fn = new Function("state", "$map", `return (${singleExprMatch[1]})`) as (
-        state: Record<string, unknown>,
-        $map: unknown,
-      ) => unknown;
-      return fn(scope, scope?.$map);
-    }
-    const fn = new Function("state", "$map", `return \`${str}\``) as (
-      state: Record<string, unknown>,
-      $map: unknown,
-    ) => unknown;
-    return fn(scope, scope?.$map);
+    const body = singleExprMatch ? `return (${singleExprMatch[1]})` : `return \`${str}\``;
+    const fn = new Function(...args, body) as (...a: unknown[]) => unknown;
+    return fn(...values);
   } catch {
     return null;
   }

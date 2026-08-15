@@ -2,7 +2,7 @@
 
 ## JSON Schema 2020-12 Meta-Schema Generator
 
-**Version:** 0.4.1-draft
+**Version:** 0.4.2-draft
 **Status:** Partial
 **Updated:** 2026-08-15
 **License:** MIT
@@ -232,6 +232,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.4.2-draft** (2026-08-15) — Document $lang, $dir and the previously undeclared $sitemap; defaults.dir; HeadEntry.textContent admits an object.
 - **0.4.1-draft** (2026-08-15) — build.headers declares the response-header output (site-architecture.md §14.3).
 - **0.4.0-draft** (2026-08-15) — redirects admits the object form the compiler and Studio already write, with an RFC 9110 status enum and a distinct rewrite shape; §3.2's redirect defect is resolved.
 - **0.3.2-draft** (2026-08-15) — Add §7 Standards Alignment; §3.2 marked Partial — redirects and i18n do not describe what the rest of the platform reads.
@@ -253,4 +254,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/schema` Specification v0.4.1-draft_
+_`@jxsuite/schema` Specification v0.4.2-draft_

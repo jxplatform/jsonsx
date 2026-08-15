@@ -159,6 +159,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `schema.md`
 
+- **0.4.2-draft** (2026-08-15) — Document $lang, $dir and the previously undeclared $sitemap; defaults.dir; HeadEntry.textContent admits an object.
 - **0.4.1-draft** (2026-08-15) — build.headers declares the response-header output (site-architecture.md §14.3).
 - **0.4.0-draft** (2026-08-15) — redirects admits the object form the compiler and Studio already write, with an RFC 9110 status enum and a distinct rewrite shape; §3.2's redirect defect is resolved.
 - **0.3.2-draft** (2026-08-15) — Add §7 Standards Alignment; §3.2 marked Partial — redirects and i18n do not describe what the rest of the platform reads.
@@ -196,6 +197,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `site-architecture.md`
 
+- **0.3.0-draft** (2026-08-15) — §8.3 link identity includes hreflang/type/media/sizes; §8.5 JSON-LD objects serialize; §8.4 lang and dir come from the page.
 - **0.2.1-draft** (2026-08-15) — Add §14.3 response headers and §14.4 .nojekyll; §14's header gap is closed and vercel.json is declined.
 - **0.2.0-draft** (2026-08-15) — §11.3 separates redirects from rewrites: an RFC 9110 status enum, a per-status HTML-fallback policy, and no file for a rewrite.
 - **0.1.45-draft** (2026-08-15) — Add §16 Standards Alignment; §8.5 marked Pending — the JSON-LD object form is unimplemented — and §14 Partial: no _headers or .nojekyll is emitted.

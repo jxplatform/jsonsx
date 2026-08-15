@@ -69,12 +69,23 @@ beforeAll(() => {
   });
 
   writeJSON("pages/about.json", {
+    $dir: "rtl",
     $head: [
       {
         attributes: { content: "About page", name: "description" },
         tagName: "meta",
       },
+      {
+        attributes: { type: "application/ld+json" },
+        tagName: "script",
+        textContent: {
+          "@context": "https://schema.org",
+          "@type": "AboutPage",
+          name: "${$site.name}",
+        },
+      },
     ],
+    $lang: "ar-EG",
     children: [{ children: ["About Us"], tagName: "h1" }],
     title: "About",
   });
@@ -346,6 +357,29 @@ describe("buildSite", () => {
       expect(existsSync(emitted) && readFileSync(emitted, "utf8").includes("418")).toBe(false);
       rmSync(root, { force: true, recursive: true });
     });
+  });
+
+  it("takes lang and dir from the page, not only the site", async () => {
+    await buildSite(TMP, { verbose: false });
+
+    const about = readFileSync(resolve(TMP, "dist/about/index.html"), "utf8");
+    expect(about).toContain('lang="ar-EG"');
+    expect(about).toContain('dir="rtl"');
+
+    // A page that declares neither still gets the site default, and no stray dir.
+    const index = readFileSync(resolve(TMP, "dist/index.html"), "utf8");
+    expect(index).toContain('lang="en"');
+    expect(index).not.toContain("dir=");
+  });
+
+  it("serializes a JSON-LD object and resolves templates inside it (§8.5)", async () => {
+    await buildSite(TMP, { verbose: false });
+
+    const about = readFileSync(resolve(TMP, "dist/about/index.html"), "utf8");
+    expect(about).not.toContain("[object Object]");
+    expect(about).toContain('"@type": "AboutPage"');
+    // A structured-data block that cannot reference the page it describes is not much use.
+    expect(about).toContain('"name": "Test Site"');
   });
 
   it("emits _headers and .nojekyll", async () => {

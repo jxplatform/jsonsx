@@ -866,7 +866,10 @@ async function compilePage(
 
   // Compile the document using the existing compiler
   const result = await compile(layoutDoc, {
-    lang: projectConfig.defaults?.lang ?? "en",
+    lang:
+      (typeof pageDoc.$lang === "string" ? pageDoc.$lang : undefined) ??
+      projectConfig.defaults?.lang ??
+      "en",
     prePaintScheme: false, // Injected via the merged <head> above, not the target template
     projectStyle: projectConfig.style ?? null,
     ...(rewriteSidecarSrc === undefined
@@ -887,7 +890,17 @@ async function compilePage(
   }
 
   // Post-process: inject merged <head> content into the compiled HTML
-  result.html = injectHead(result.html, mergedHead, projectConfig.defaults?.lang ?? "en");
+  /*
+   * A page may declare its own language. §8.4 has always said "from page or site `lang`"; only the
+   * site half was ever read, and `HeadMergeContext.lang` was declared and never used at all.
+   */
+  const pageLang = typeof pageDoc.$lang === "string" ? pageDoc.$lang : undefined;
+  const pageDir = typeof pageDoc.$dir === "string" ? pageDoc.$dir : undefined;
+  const dir = pageDir ?? projectConfig.defaults?.dir;
+  result.html = injectHead(result.html, mergedHead, {
+    lang: pageLang ?? projectConfig.defaults?.lang ?? "en",
+    ...(dir === undefined ? {} : { dir }),
+  });
 
   // Inject <script type="module"> for npm $elements (cherry-picked component imports)
   const npmElements = (layoutDoc.$elements ?? []).filter(
@@ -1014,6 +1027,21 @@ function buildMountSpecs(
  * @param {Record<string, unknown>} scope
  * @returns {JxHeadEntry[]}
  */
+function resolveTemplatesDeep(value: unknown, scope: Record<string, unknown>): unknown {
+  if (typeof value === "string") {
+    return isTemplateString(value) ? (evaluateStaticTemplate(value, scope) ?? value) : value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((v) => resolveTemplatesDeep(v, scope));
+  }
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([k, v]) => [k, resolveTemplatesDeep(v, scope)]),
+    );
+  }
+  return value;
+}
+
 function resolveHeadTemplates(headEntries: JxHeadEntry[], scope: Record<string, unknown>) {
   return headEntries.map((entry: JxHeadEntry) => {
     if (!entry || typeof entry !== "object") {
@@ -1034,6 +1062,13 @@ function resolveHeadTemplates(headEntries: JxHeadEntry[], scope: Record<string, 
       resolved.textContent =
         (evaluateStaticTemplate(resolved.textContent, scope) as string | null) ??
         resolved.textContent;
+    } else if (resolved.textContent !== null && typeof resolved.textContent === "object") {
+      // A structured data block (§8.5): templates inside it resolve too, or a JSON-LD object could
+      // Never reference the page it describes.
+      resolved.textContent = resolveTemplatesDeep(resolved.textContent, scope) as Record<
+        string,
+        unknown
+      >;
     }
     return resolved;
   });
@@ -1531,7 +1566,11 @@ function injectNpmElementScripts(html: string, npmElements: string[]) {
  * @param {string} lang
  * @returns {string}
  */
-function injectHead(html: string, headEntries: JxHeadEntry[], lang: string) {
+function injectHead(
+  html: string,
+  headEntries: JxHeadEntry[],
+  root: { lang: string; dir?: string },
+) {
   const headHtml = renderHead(headEntries);
 
   // Replace the existing <head>...</head> block, preserving compiler-generated <style> and <script> blocks
@@ -1553,12 +1592,18 @@ function injectHead(html: string, headEntries: JxHeadEntry[], lang: string) {
     result = result.replace(headPattern, `<head>\n  ${headHtml}${preservedBlocks}\n</head>`);
   }
 
-  // Set the lang attribute on <html>
+  // Set lang and dir on <html>. `dir` matters for the same reason `lang` does: without it, a
+  // Right-to-left page renders left-to-right, and the default is not "unset" but "ltr".
   result = result.replace(/<html\s[^>]*>/i, (match: string) => {
-    if (/lang=/.test(match)) {
-      return match.replace(/lang="[^"]*"/, `lang="${lang}"`);
+    let tag = /lang=/.test(match)
+      ? match.replace(/lang="[^"]*"/, `lang="${root.lang}"`)
+      : match.replace("<html", `<html lang="${root.lang}"`);
+    if (root.dir !== undefined) {
+      tag = /\sdir=/.test(tag)
+        ? tag.replace(/\sdir="[^"]*"/, ` dir="${root.dir}"`)
+        : tag.replace("<html", `<html dir="${root.dir}"`);
     }
-    return match.replace("<html", `<html lang="${lang}"`);
+    return tag;
   });
 
   return result;

@@ -200,7 +200,11 @@ export interface JxServerFnDef {
 export interface JxHeadEntry {
   tagName: string;
   attributes?: Record<string, string | boolean>;
-  textContent?: string;
+  /**
+   * Element content. An **object** is a structured data block — the compiler serializes it to JSON
+   * inside the tag, which is how JSON-LD is authored (site-architecture.md §8.5).
+   */
+  textContent?: string | Record<string, unknown>;
   children?: (JxHeadEntry | string)[];
   [key: string]: unknown;
 }
@@ -579,6 +583,8 @@ export interface ProjectConfig {
     /** Default layout path; `null` means explicitly no layout. */
     layout?: string | null;
     lang?: string;
+    /** Base direction for `<html dir>`. A page's `$dir` overrides it. */
+    dir?: "ltr" | "rtl" | "auto";
     charset?: string;
     [key: string]: unknown;
   };

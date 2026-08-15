@@ -66,15 +66,51 @@ The build assembles each page's `<head>` from four layers, later entries winning
 
 Duplicates are detected by element identity, so a page-level entry replaces the site-level one rather than appearing twice:
 
-| Element                     | Deduplication key       |
-| --------------------------- | ----------------------- |
-| `<title>`, `<meta charset>` | singleton               |
-| `<meta name="...">`         | `name`                  |
-| `<meta property="...">`     | `property` (Open Graph) |
-| `<link rel="...">`          | `rel` + `href`          |
-| `<script src="...">`        | `src`                   |
+| Element                     | Deduplication key                                  |
+| --------------------------- | -------------------------------------------------- |
+| `<title>`, `<meta charset>` | singleton                                          |
+| `<meta name="...">`         | `name`                                             |
+| `<meta property="...">`     | `property` (Open Graph)                            |
+| `<link rel="...">`          | `rel` + `href` + `hreflang`/`type`/`media`/`sizes` |
+| `<script src="...">`        | `src`                                              |
 
-Two tags are added automatically: `<link rel="canonical">` (built from `url` in `project.json` plus the page route, when `url` is set) and the `<html lang>` attribute (from `defaults.lang`, `"en"` if unset).
+Links carry that fourth part because `rel` and `href` alone are not enough to tell two links apart: an RSS and an Atom feed are both `rel="alternate"` at different `type`s, and two favicon sizes share everything but `sizes`.
+
+Two tags are added automatically: `<link rel="canonical">` (built from `url` in `project.json` plus the page route, when `url` is set) and the `<html lang>` attribute. Both lose to one you write yourself.
+
+`lang` comes from the page's `$lang` if it has one, otherwise `defaults.lang`, otherwise `"en"`. A page can also set `$dir` (or the site `defaults.dir`) for right-to-left content:
+
+```json
+{
+  "$lang": "ar-EG",
+  "$dir": "rtl"
+}
+```
+
+`dir` is omitted entirely when neither is set, rather than being guessed.
+
+## Structured data
+
+A `<script type="application/ld+json">` entry takes an **object** as its `textContent`, and the build serializes it — you do not write JSON inside a string:
+
+```json
+{
+  "$head": [
+    {
+      "tagName": "script",
+      "attributes": { "type": "application/ld+json" },
+      "textContent": {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "headline": "${state.post.data.title}",
+        "author": { "@type": "Person", "name": "${$site.name}" }
+      }
+    }
+  ]
+}
+```
+
+Template strings resolve inside the object, at any depth — so the block can reference the page it describes. Jx emits the JSON-LD as written and does not process it: no context expansion, no validation against schema.org.
 
 ## Sitemap
 

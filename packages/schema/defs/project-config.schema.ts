@@ -242,9 +242,17 @@ export const projectConfigSchema = {
           description: "Default charset for the page.",
           type: "string",
         },
+        dir: {
+          description:
+            "Base direction for the <html> element. Omitted when unset — a page's `$dir` " +
+            "overrides it. Right-to-left content renders left-to-right without this.",
+          enum: ["ltr", "rtl", "auto"],
+          type: "string",
+        },
         lang: {
           default: "en",
-          description: "Default lang attribute for the <html> element.",
+          description:
+            "Default lang attribute for the <html> element. A page's `$lang` overrides it.",
           type: "string",
         },
         layout: {
