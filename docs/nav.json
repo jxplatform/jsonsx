@@ -117,6 +117,7 @@
         { "path": "framework/site/jx-markdown", "label": "Jx Markdown" },
         { "path": "framework/site/relationships", "label": "Relationships" },
         { "path": "framework/site/seo", "label": "SEO and metadata" },
+        { "path": "framework/site/i18n", "label": "Locales and languages" },
         { "path": "framework/site/images", "label": "Images" },
         { "path": "framework/site/redirects", "label": "Redirects" },
         { "path": "framework/site/feeds", "label": "Feeds" },

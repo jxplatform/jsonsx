@@ -16,6 +16,7 @@
     "./validate-project": "./src/validate-project.ts",
     "./types": "./types.ts",
     "./guards": "./src/guards.ts",
+    "./locale": "./src/locale.ts",
     "./parse": "./src/parse.ts",
     "./defs": "./defs/index.ts",
     "./schema.json": "./schema.json",

@@ -1620,6 +1620,94 @@ describe("buildSite — the emitted policy authorizes the page it was built from
   }, 30_000);
 });
 
+// ── Locale routing ───────────────────────────────────────────────────────────
+
+describe("buildSite — locale routing", () => {
+  const I18N_TMP = resolve(import.meta.dir, "__test-site-i18n__");
+  const page = (rel: string, doc: object) => {
+    const abs = resolve(I18N_TMP, "pages", rel);
+    mkdirSync(resolve(abs, ".."), { recursive: true });
+    writeFileSync(abs, JSON.stringify(doc), "utf8");
+  };
+
+  beforeAll(() => {
+    rmSync(I18N_TMP, { force: true, recursive: true });
+    mkdirSync(I18N_TMP, { recursive: true });
+    writeFileSync(
+      resolve(I18N_TMP, "project.json"),
+      JSON.stringify({
+        build: { outDir: "./dist" },
+        // Declared in the spellings an author would actually type, to prove canonicalization.
+        i18n: { defaultLocale: "EN", locales: ["en", "fr-ca", "ar"] },
+        name: "Multi",
+        url: "https://multi.example",
+      }),
+      "utf8",
+    );
+    page("index.json", { children: ["${$page.locale}"], tagName: "main", title: "Home" });
+    page("fr-ca/index.json", { children: ["fr"], tagName: "main", title: "Accueil" });
+    page("ar/index.json", { children: ["ar"], tagName: "main", title: "AR" });
+    page("en/quebec.json", { $lang: "fr-CA", children: ["mixed"], tagName: "main", title: "Q" });
+  });
+
+  afterAll(() => {
+    rmSync(I18N_TMP, { force: true, recursive: true });
+  });
+
+  it("gives each route the lang its prefix declares, and dir only when it earns it", async () => {
+    const result = await buildSite(I18N_TMP, { verbose: false });
+    expect(result.errors).toHaveLength(0);
+    const html = (rel: string) => readFileSync(resolve(I18N_TMP, "dist", rel), "utf8");
+
+    expect(/<html[^>]*lang="en"/.test(html("index.html"))).toBe(true);
+    // Canonical case, from a directory named in lower case.
+    expect(/<html[^>]*lang="fr-CA"/.test(html("fr-ca/index.html"))).toBe(true);
+    // Arabic is right-to-left by script, so `dir` appears without anyone writing it.
+    expect(/<html[^>]*dir="rtl"/.test(html("ar/index.html"))).toBe(true);
+    // `ltr` is HTML's default; writing it on every page would say nothing.
+    expect(html("index.html")).not.toContain('dir="ltr"');
+    // An explicit $lang beats the route it sits under.
+    expect(/<html[^>]*lang="fr-CA"/.test(html("en/quebec/index.html"))).toBe(true);
+    // And the resolved locale is readable from a template.
+    expect(html("index.html")).toContain("en");
+  }, 30_000);
+});
+
+// ── An invalid locale tag ────────────────────────────────────────────────────
+
+describe("buildSite — a malformed BCP 47 tag", () => {
+  const BAD_TMP = resolve(import.meta.dir, "__test-site-bad-locale__");
+
+  beforeAll(() => {
+    rmSync(BAD_TMP, { force: true, recursive: true });
+    mkdirSync(resolve(BAD_TMP, "pages"), { recursive: true });
+    writeFileSync(
+      resolve(BAD_TMP, "project.json"),
+      JSON.stringify({
+        build: { outDir: "./dist" },
+        i18n: { defaultLocale: "en", locales: ["en", "en_US"] },
+        name: "Bad Locale",
+      }),
+      "utf8",
+    );
+    writeFileSync(
+      resolve(BAD_TMP, "pages/index.json"),
+      JSON.stringify({ children: ["hi"], tagName: "main", title: "Home" }),
+      "utf8",
+    );
+  });
+
+  afterAll(() => {
+    rmSync(BAD_TMP, { force: true, recursive: true });
+  });
+
+  // A typo'd locale does not degrade — it ships pages claiming a language that does not exist.
+  it("fails the build and names the tag", async () => {
+    const result = await buildSite(BAD_TMP, { verbose: false });
+    expect(result.errors.some((e) => e.includes("en_US"))).toBe(true);
+  }, 30_000);
+});
+
 // ── Unresolvable bare specifiers ─────────────────────────────────────────────
 
 describe("buildSite — unresolvable bare specifier in $head", () => {

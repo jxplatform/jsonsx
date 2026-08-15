@@ -66,6 +66,8 @@ import {
 import { resolvePrototypes } from "./prototype-resolver.ts";
 import { transformImageNodes } from "./image-transform.ts";
 import { collectCspSources, emptyCspSources } from "./csp.ts";
+import { localeOfRoute, pageLanguage, resolveI18n, undeclaredLocalePrefix } from "./i18n.ts";
+import type { ResolvedI18n } from "./i18n.ts";
 import { renderImportMap, resolveClientRuntime, writeClientRuntime } from "./client-runtime.ts";
 import { getImageCacheDir, loadCache, saveCache } from "./image-cache.ts";
 import type { ImageConfig } from "./image-optimizer.ts";
@@ -151,6 +153,17 @@ export async function buildSite(
    * some emission site believed it wrote.
    */
   const cspSources = emptyCspSources();
+
+  /*
+   * Locale routing (§13). Validated once: a malformed BCP 47 tag is a build error, because a
+   * locale is a URL prefix, an `hreflang` value and an `<html lang>` at once — a typo does not
+   * degrade, it produces a site claiming a language that does not exist.
+   */
+  const { errors: i18nErrors, i18n } = resolveI18n(projectConfig);
+  for (const error of i18nErrors) {
+    errors.push(error);
+    console.error(error);
+  }
   for (const warning of clientRuntime.warnings) {
     console.warn(warning);
   }
@@ -416,7 +429,19 @@ export async function buildSite(
   const sitemapEnabled = Boolean(siteUrl) && projectConfig.build.sitemap !== false;
   const sitemapEntries: { loc: string; lastmod: string }[] = [];
 
+  // Warned once per distinct prefix rather than once per route: one mistyped directory is one
+  // Mistake, however many pages live under it.
+  const warnedLocalePrefixes = new Set<string>();
   for (const route of routes) {
+    const mismatch = undeclaredLocalePrefix(route.urlPattern, i18n);
+    if (mismatch && !warnedLocalePrefixes.has(mismatch.segment)) {
+      warnedLocalePrefixes.add(mismatch.segment);
+      console.warn(
+        `Routes under /${mismatch.segment}/ are served as "${i18n?.defaultLocale}" — ` +
+          `i18n.locales declares "${mismatch.meant}", not "${mismatch.segment}". ` +
+          `Rename the directory to "${mismatch.meant.toLowerCase()}" or declare the shorter tag.`,
+      );
+    }
     try {
       log(`  Compiling ${route.urlPattern} ...`);
       const result = await compilePage(
@@ -433,6 +458,7 @@ export async function buildSite(
         assetMounts,
         extensionHead,
         rewriteNpmAsset,
+        i18n,
       );
 
       // Determine which component tags are fully static (for script omission)
@@ -814,6 +840,7 @@ async function compilePage(
   assetMounts: readonly AssetMount[] = [],
   extensionHead: readonly JxHeadEntry[] = [],
   rewriteNpmAsset: (specifier: string) => string = (s) => s,
+  i18n: ResolvedI18n | null = null,
 ) {
   // Load the raw page document (.json natively, other formats via the registry)
   const pageDoc = await readPageDocument(route.sourcePath as string, formatRegistry);
@@ -831,7 +858,19 @@ async function compilePage(
   delete layoutDoc._pageTitle;
 
   // Inject $site and $page context
-  injectContext(layoutDoc, projectConfig, route, projectRoot);
+  injectContext(layoutDoc, projectConfig, route, projectRoot, i18n);
+
+  /*
+   * The page's language and writing direction. `$lang` on the document wins over the locale its
+   * route implies, and `dir` is emitted only when it is `rtl` or the author asked — `ltr` is
+   * HTML's default and writing it on every page says nothing.
+   */
+  const language = pageLanguage({
+    defaults: projectConfig.defaults,
+    pageDir: typeof pageDoc.$dir === "string" ? pageDoc.$dir : undefined,
+    pageLang: typeof pageDoc.$lang === "string" ? pageDoc.$lang : undefined,
+    routeLocale: localeOfRoute(route.urlPattern, i18n),
+  });
 
   // Resolve generic $prototype entries via .class.json imports (and lower registry classes)
   await resolvePrototypes(layoutDoc, route, projectRoot, {
@@ -970,10 +1009,7 @@ async function compilePage(
 
   // Compile the document using the existing compiler
   const result = await compile(layoutDoc, {
-    lang:
-      (typeof pageDoc.$lang === "string" ? pageDoc.$lang : undefined) ??
-      projectConfig.defaults?.lang ??
-      "en",
+    lang: language.lang,
     prePaintScheme: false, // Injected via the merged <head> above, not the target template
     projectStyle: projectConfig.style ?? null,
     ...(rewriteSidecarSrc === undefined
@@ -994,17 +1030,7 @@ async function compilePage(
   }
 
   // Post-process: inject merged <head> content into the compiled HTML
-  /*
-   * A page may declare its own language. §8.4 has always said "from page or site `lang`"; only the
-   * site half was ever read, and `HeadMergeContext.lang` was declared and never used at all.
-   */
-  const pageLang = typeof pageDoc.$lang === "string" ? pageDoc.$lang : undefined;
-  const pageDir = typeof pageDoc.$dir === "string" ? pageDoc.$dir : undefined;
-  const dir = pageDir ?? projectConfig.defaults?.dir;
-  result.html = injectHead(result.html, mergedHead, {
-    lang: pageLang ?? projectConfig.defaults?.lang ?? "en",
-    ...(dir === undefined ? {} : { dir }),
-  });
+  result.html = injectHead(result.html, mergedHead, language);
 
   // Inject <script type="module"> for npm $elements (cherry-picked component imports)
   const npmElements = (layoutDoc.$elements ?? []).filter(

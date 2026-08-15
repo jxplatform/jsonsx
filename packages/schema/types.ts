@@ -603,6 +603,15 @@ export interface ProjectConfig {
     string,
     string | { destination: string; status?: number } | { destination: string; rewrite: true }
   >;
+  /**
+   * Locale routing. Tags are BCP 47; a malformed one is a build error, since a locale is a URL
+   * prefix, an `hreflang` value and an `<html lang>` at once.
+   */
+  i18n?: {
+    defaultLocale?: string;
+    locales?: string[];
+    routing?: "prefix-except-default" | "prefix-always";
+  };
   defaults?: {
     /** Default layout path; `null` means explicitly no layout. */
     layout?: string | null;

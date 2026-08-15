@@ -206,6 +206,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `site-architecture.md`
 
+- **0.5.0-draft** (2026-08-15) — i18n: BCP 47 validation and canonicalization, route prefixes resolve to locales, per-page lang and script-derived dir, $page.locale (§13, §13.2, §13.4).
 - **0.4.1-draft** (2026-08-15) — Emit a Content-Security-Policy derived from the built pages: strict script-src from constant inline-script hashes, style-src divergence recorded (§14.3.1).
 - **0.4.0-draft** (2026-08-15) — Responsive images: <picture> per format, one owner for loading attributes, fetchpriority honoured, lazyLoad independent of optimize (§9.2, §9.2.7).
 - **0.3.3-draft** (2026-08-15) — $head bare specifiers copy into /assets/ and $elements bundle there; an unresolvable one is a build error (§8.7).
