@@ -2,9 +2,9 @@
 
 ## JSON Schema 2020-12 Meta-Schema Generator
 
-**Version:** 0.3.1-draft
+**Version:** 0.3.2-draft
 **Status:** Partial
-**Updated:** 2026-08-10
+**Updated:** 2026-08-15
 **License:** MIT
 
 ---
@@ -139,6 +139,12 @@ All 13 built-in prototypes with their specific configuration properties:
 
 ### 3.2 Project Schema (`project-schema.json`)
 
+> **Status: Partial.** Two declared keys do not describe what the rest of the platform reads.
+> `redirects` values are typed `string` only, while the compiler, `types.ts` and the Studio
+> redirects grid all implement `{ destination, status }` — so a redirect authored in Studio with any
+> non-301 status fails `jx validate`. And `i18n.defaultLocale`/`locales` are bare strings with no
+> pattern, so an invalid language tag validates. See §7.
+
 **`$id`:** `https://jxsuite.com/schema/project/v1`
 
 Validates `project.json` files with:
@@ -214,8 +220,21 @@ Three JSON Schema 2020-12 documents:
 | `@webref/elements` | HTML element definitions      |
 | `@webref/idl`      | Web IDL interface definitions |
 
+## 7. Standards Alignment
+
+External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md). `@webref/*` is a tooling package rather than a standard; what it carries are extracts of the specifications cited below.
+
+| Standard                                                            | Class       | Binds  | Evidence                                                            | Note                                                                                                                                                                                                                                                                                      |
+| ------------------------------------------------------------------- | ----------- | ------ | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [JSON Schema 2020-12](https://json-schema.org/draft/2020-12/schema) | **Adopted** | §3, §5 | packages/schema/src/schema.ts, packages/schema/tests/schema.test.ts | The emitted meta-schemas are conformant 2020-12, so any 2020-12 validator can check a Jx document as an instance. Jx is not a _dialect_: it declares no `$vocabulary`, and its reserved keywords are not JSON Schema vocabulary — a standards-only processor ignores them (spec.md §3.2). |
+| [WHATWG HTML](https://html.spec.whatwg.org/)                        | **Subset**  | §3, §4 | packages/schema/src/schema.ts                                       | Only the element and IDL-attribute inventories are used, extracted via `@webref/elements` and `@webref/idl` to build the `tagName` enumeration, the DOM property set and the `EventHandler` names. Nothing else of the standard is implemented here.                                      |
+| [CSSOM](https://www.w3.org/TR/cssom-1/)                             | **Subset**  | §3, §4 | packages/schema/src/schema.ts                                       | Only the camelCase IDL attribute names for CSS properties are used, to type the `style` object. Neither the object model nor its serialization rules are implemented.                                                                                                                     |
+| [BCP 47](https://www.rfc-editor.org/info/bcp47)                     | **Pending** | §3.2   | —                                                                   | `gap:bcp47-locale-validation` `i18n.defaultLocale` and `i18n.locales[]` are bare strings, so nothing rejects a malformed language tag or canonicalizes `en-us` to `en-US`.                                                                                                                |
+| [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110)                  | **Pending** | §3.2   | —                                                                   | `gap:redirect-status-enum` The `redirects` value shape admits no status at all, so there is no enumeration of the §15.4 redirection codes and 303/307/308 cannot be expressed in a validating `project.json`.                                                                             |
+
 ## Changelog
 
+- **0.3.2-draft** (2026-08-15) — Add §7 Standards Alignment; §3.2 marked Partial — redirects and i18n do not describe what the rest of the platform reads.
 - **0.3.1-draft** (2026-08-10) — §3.1 ElementTagName admits a TagExpression on ElementDef alone — a closed two-branch def whose every result $refs TagName, so the pattern is kept and the candidates stay enumerable; $head items are pinned to HeadEntry so a head tag cannot become choosable.
 - **0.3.0-draft** (2026-08-09) — §3.1 TagName gains a pattern — a tag name is a name, never an expression, because no consumer evaluates one and each failed differently and silently; SwitchNode is admitted as a child under ChildrenValue (anyOf, so a switch child may still carry its container tagName); ExternalClassDef.filter widened to a union like sort, since one flat property set is shared by every $prototype and was overriding extension classes' own declared parameters.
 - **0.2.8-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
@@ -234,4 +253,4 @@ Three JSON Schema 2020-12 documents:
 
 ---
 
-_`@jxsuite/schema` Specification v0.3.1-draft_
+_`@jxsuite/schema` Specification v0.3.2-draft_

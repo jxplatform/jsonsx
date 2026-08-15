@@ -9,6 +9,48 @@
       "note": "RFC 2119 + RFC 8174."
     },
     {
+      "id": "BCP 47",
+      "org": "IETF",
+      "title": "Tags for Identifying Languages",
+      "url": "https://www.rfc-editor.org/info/bcp47"
+    },
+    {
+      "id": "CSP Level 3",
+      "org": "W3C",
+      "title": "Content Security Policy Level 3",
+      "url": "https://www.w3.org/TR/CSP3/"
+    },
+    {
+      "id": "CSSOM",
+      "org": "W3C",
+      "title": "CSS Object Model (CSSOM)",
+      "url": "https://www.w3.org/TR/cssom-1/"
+    },
+    {
+      "id": "CommonMark",
+      "org": "Other",
+      "title": "CommonMark Spec",
+      "url": "https://spec.commonmark.org/current/"
+    },
+    {
+      "id": "ECMA-262",
+      "org": "Ecma",
+      "title": "ECMAScript Language Specification",
+      "url": "https://ecma-international.org/publications-and-standards/standards/ecma-262/"
+    },
+    {
+      "id": "Fetch Metadata Request Headers",
+      "org": "W3C",
+      "title": "Fetch Metadata Request Headers",
+      "url": "https://www.w3.org/TR/fetch-metadata/"
+    },
+    {
+      "id": "GFM",
+      "org": "Other",
+      "title": "GitHub Flavored Markdown Spec",
+      "url": "https://github.github.com/gfm/"
+    },
+    {
       "id": "IANA IPv4 Special-Purpose Address Registry",
       "org": "IANA",
       "title": "IANA IPv4 Special-Purpose Address Registry",
@@ -27,10 +69,28 @@
       "url": "https://json-schema.org/draft/2020-12/schema"
     },
     {
+      "id": "RFC 3339",
+      "org": "IETF",
+      "title": "Date and Time on the Internet: Timestamps",
+      "url": "https://www.rfc-editor.org/rfc/rfc3339"
+    },
+    {
       "id": "RFC 3986",
       "org": "IETF",
       "title": "Uniform Resource Identifier (URI): Generic Syntax",
       "url": "https://www.rfc-editor.org/rfc/rfc3986"
+    },
+    {
+      "id": "RFC 4180",
+      "org": "IETF",
+      "title": "Common Format and MIME Type for CSV Files",
+      "url": "https://www.rfc-editor.org/rfc/rfc4180"
+    },
+    {
+      "id": "RFC 6265",
+      "org": "IETF",
+      "title": "HTTP State Management Mechanism",
+      "url": "https://www.rfc-editor.org/rfc/rfc6265"
     },
     {
       "id": "RFC 6455",
@@ -39,10 +99,34 @@
       "url": "https://www.rfc-editor.org/rfc/rfc6455"
     },
     {
+      "id": "RFC 6838",
+      "org": "IETF",
+      "title": "Media Type Specifications and Registration Procedures",
+      "url": "https://www.rfc-editor.org/rfc/rfc6838"
+    },
+    {
       "id": "RFC 6901",
       "org": "IETF",
       "title": "JavaScript Object Notation (JSON) Pointer",
       "url": "https://www.rfc-editor.org/rfc/rfc6901"
+    },
+    {
+      "id": "RFC 6902",
+      "org": "IETF",
+      "title": "JavaScript Object Notation (JSON) Patch",
+      "url": "https://www.rfc-editor.org/rfc/rfc6902"
+    },
+    {
+      "id": "RFC 7464",
+      "org": "IETF",
+      "title": "JavaScript Object Notation (JSON) Text Sequences",
+      "url": "https://www.rfc-editor.org/rfc/rfc7464"
+    },
+    {
+      "id": "RFC 7636",
+      "org": "IETF",
+      "title": "Proof Key for Code Exchange by OAuth Public Clients",
+      "url": "https://www.rfc-editor.org/rfc/rfc7636"
     },
     {
       "id": "RFC 7692",
@@ -51,10 +135,64 @@
       "url": "https://www.rfc-editor.org/rfc/rfc7692"
     },
     {
+      "id": "RFC 7763",
+      "org": "IETF",
+      "title": "The text/markdown Media Type",
+      "url": "https://www.rfc-editor.org/rfc/rfc7763"
+    },
+    {
+      "id": "RFC 8252",
+      "org": "IETF",
+      "title": "OAuth 2.0 for Native Apps",
+      "url": "https://www.rfc-editor.org/rfc/rfc8252"
+    },
+    {
+      "id": "RFC 9110",
+      "org": "IETF",
+      "title": "HTTP Semantics",
+      "url": "https://www.rfc-editor.org/rfc/rfc9110"
+    },
+    {
+      "id": "RFC 9111",
+      "org": "IETF",
+      "title": "HTTP Caching",
+      "url": "https://www.rfc-editor.org/rfc/rfc9111"
+    },
+    {
       "id": "RFC 9457",
       "org": "IETF",
       "title": "Problem Details for HTTP APIs",
       "url": "https://www.rfc-editor.org/rfc/rfc9457"
+    },
+    {
+      "id": "RFC 9512",
+      "org": "IETF",
+      "title": "YAML Media Type",
+      "url": "https://www.rfc-editor.org/rfc/rfc9512"
+    },
+    {
+      "id": "Subresource Integrity",
+      "org": "W3C",
+      "title": "Subresource Integrity",
+      "url": "https://www.w3.org/TR/SRI/"
+    },
+    {
+      "id": "UAX #15",
+      "org": "Unicode",
+      "title": "Unicode Normalization Forms",
+      "url": "https://www.unicode.org/reports/tr15/"
+    },
+    {
+      "id": "UAX #29",
+      "org": "Unicode",
+      "title": "Unicode Text Segmentation",
+      "url": "https://www.unicode.org/reports/tr29/"
+    },
+    {
+      "id": "WHATWG Fetch",
+      "org": "WHATWG",
+      "title": "Fetch Standard",
+      "url": "https://fetch.spec.whatwg.org/"
     },
     {
       "id": "WHATWG HTML",

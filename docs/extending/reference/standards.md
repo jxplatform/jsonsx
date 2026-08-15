@@ -14,73 +14,126 @@ This page is generated from the `## N. Standards Alignment` tables in the specif
 
 | Class       | Standards | Bindings |
 | ----------- | --------- | -------- |
-| `Adopted`   | 1         | 1        |
-| `Subset`    | 5         | 5        |
+| `Adopted`   | 4         | 8        |
+| `Subset`    | 11        | 17       |
 | `Divergent` | 0         | 0        |
 | `Borrowed`  | 1         | 1        |
-| `Pending`   | 2         | 2        |
-| `Rejected`  | 1         | 1        |
+| `Pending`   | 14        | 17       |
+| `Rejected`  | 3         | 3        |
 
 ## Standards Jx implements
 
-| Standard                                                                                                                                               | Body        | Class      | Where                 | Evidence                                                                                       |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------- | ---------- | --------------------- | ---------------------------------------------------------------------------------------------- |
-| [IANA IPv4 Special-Purpose Address Registry](https://www.iana.org/assignments/iana-ipv4-special-registry) `IANA IPv4 Special-Purpose Address Registry` | IANA        | `Subset`   | `ai.md` §4            | `packages/server/src/ai-api.ts`                                                                |
-| [IANA IPv6 Special-Purpose Address Registry](https://www.iana.org/assignments/iana-ipv6-special-registry) `IANA IPv6 Special-Purpose Address Registry` | IANA        | `Subset`   | `ai.md` §4            | `packages/server/src/ai-api.ts`                                                                |
-| [Uniform Resource Identifier (URI): Generic Syntax](https://www.rfc-editor.org/rfc/rfc3986) `RFC 3986`                                                 | IETF        | `Subset`   | `standards.md` §5.2   | `scripts/docs/lib/standards.ts`                                                                |
-| [The WebSocket Protocol](https://www.rfc-editor.org/rfc/rfc6455) `RFC 6455`                                                                            | IETF        | `Subset`   | `collab.md` §2        | `packages/collab/src/envelope.ts`, `packages/server/src/collab.ts`                             |
-| [JavaScript Object Notation (JSON) Pointer](https://www.rfc-editor.org/rfc/rfc6901) `RFC 6901`                                                         | IETF        | `Borrowed` | `relationships.md` §1 | `packages/schema/schemas/project.core.schema.json`                                             |
-| [JSON Schema, draft 2020-12](https://json-schema.org/draft/2020-12/schema) `JSON Schema 2020-12`                                                       | JSON Schema | `Adopted`  | `relationships.md` §1 | `packages/schema/defs/field-schema.schema.ts`, `packages/schema/tests/project-schemas.test.ts` |
-| [HTML Standard](https://html.spec.whatwg.org/) `WHATWG HTML`                                                                                           | WHATWG      | `Subset`   | `ai.md` §2            | `packages/server/src/ai-api.ts`                                                                |
+| Standard                                                                                                                                               | Body        | Class      | Where                              | Evidence                                                                                       |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------- | ---------- | ---------------------------------- | ---------------------------------------------------------------------------------------------- |
+| [ECMAScript Language Specification](https://ecma-international.org/publications-and-standards/standards/ecma-262/) `ECMA-262`                          | Ecma        | `Adopted`  | `compiler.md` §4, `compiler.md` §5 | `packages/compiler/src/targets/compile-element.ts`, `packages/compiler/tests/no-eval.test.ts`  |
+| [IANA IPv4 Special-Purpose Address Registry](https://www.iana.org/assignments/iana-ipv4-special-registry) `IANA IPv4 Special-Purpose Address Registry` | IANA        | `Subset`   | `ai.md` §4                         | `packages/server/src/ai-api.ts`                                                                |
+| [IANA IPv6 Special-Purpose Address Registry](https://www.iana.org/assignments/iana-ipv6-special-registry) `IANA IPv6 Special-Purpose Address Registry` | IANA        | `Subset`   | `ai.md` §4                         | `packages/server/src/ai-api.ts`                                                                |
+| [Uniform Resource Identifier (URI): Generic Syntax](https://www.rfc-editor.org/rfc/rfc3986) `RFC 3986`                                                 | IETF        | `Subset`   | `standards.md` §5.2                | `scripts/docs/lib/standards.ts`                                                                |
+| [Common Format and MIME Type for CSV Files](https://www.rfc-editor.org/rfc/rfc4180) `RFC 4180`                                                         | IETF        | `Subset`   | `parser.md` §4                     | `extensions/parser/src/csv.ts`, `extensions/parser/tests/csv.test.ts`                          |
+| [The WebSocket Protocol](https://www.rfc-editor.org/rfc/rfc6455) `RFC 6455`                                                                            | IETF        | `Subset`   | `collab.md` §2                     | `packages/collab/src/envelope.ts`, `packages/server/src/collab.ts`                             |
+| [Media Type Specifications and Registration Procedures](https://www.rfc-editor.org/rfc/rfc6838) `RFC 6838`                                             | IETF        | `Subset`   | `extensions.md` §7                 | `packages/schema/defs/class-def.schema.ts`                                                     |
+| [JavaScript Object Notation (JSON) Pointer](https://www.rfc-editor.org/rfc/rfc6901) `RFC 6901`                                                         | IETF        | `Borrowed` | `relationships.md` §1              | `packages/schema/schemas/project.core.schema.json`                                             |
+| [The text/markdown Media Type](https://www.rfc-editor.org/rfc/rfc7763) `RFC 7763`                                                                      | IETF        | `Subset`   | `parser.md` §3                     | `extensions/parser/src/Markdown.class.json`                                                    |
+| [HTTP Caching](https://www.rfc-editor.org/rfc/rfc9111) `RFC 9111`                                                                                      | IETF        | `Adopted`  | `server.md` §3                     | `packages/server/src/server.ts`                                                                |
+| [JSON Schema, draft 2020-12](https://json-schema.org/draft/2020-12/schema) `JSON Schema 2020-12`                                                       | JSON Schema | `Adopted`  | `extensions.md` §5                 | `packages/schema/src/project-schemas.ts`, `packages/schema/tests/project-schemas.test.ts`      |
+| [JSON Schema, draft 2020-12](https://json-schema.org/draft/2020-12/schema) `JSON Schema 2020-12`                                                       | JSON Schema | `Adopted`  | `relationships.md` §1              | `packages/schema/defs/field-schema.schema.ts`, `packages/schema/tests/project-schemas.test.ts` |
+| [JSON Schema, draft 2020-12](https://json-schema.org/draft/2020-12/schema) `JSON Schema 2020-12`                                                       | JSON Schema | `Adopted`  | `schema.md` §3, `schema.md` §5     | `packages/schema/src/schema.ts`, `packages/schema/tests/schema.test.ts`                        |
+| [CommonMark Spec](https://spec.commonmark.org/current/) `CommonMark`                                                                                   | Other       | `Subset`   | `parser.md` §3                     | `extensions/parser/src/md.ts`, `extensions/parser/tests/transpile.test.ts`                     |
+| [GitHub Flavored Markdown Spec](https://github.github.com/gfm/) `GFM`                                                                                  | Other       | `Subset`   | `parser.md` §3                     | `extensions/parser/src/md.ts`                                                                  |
+| [CSS Object Model (CSSOM)](https://www.w3.org/TR/cssom-1/) `CSSOM`                                                                                     | W3C         | `Subset`   | `schema.md` §3, `schema.md` §4     | `packages/schema/src/schema.ts`                                                                |
+| [Fetch Standard](https://fetch.spec.whatwg.org/) `WHATWG Fetch`                                                                                        | WHATWG      | `Adopted`  | `server.md` §4.2                   | `packages/server/src/net-guard.ts`, `packages/server/tests/net-guard.test.ts`                  |
+| [HTML Standard](https://html.spec.whatwg.org/) `WHATWG HTML`                                                                                           | WHATWG      | `Subset`   | `ai.md` §2                         | `packages/server/src/ai-api.ts`                                                                |
+| [HTML Standard](https://html.spec.whatwg.org/) `WHATWG HTML`                                                                                           | WHATWG      | `Subset`   | `compiler.md` §3, `compiler.md` §4 | `packages/compiler/src/targets/compile-element.ts`                                             |
+| [HTML Standard](https://html.spec.whatwg.org/) `WHATWG HTML`                                                                                           | WHATWG      | `Subset`   | `schema.md` §3, `schema.md` §4     | `packages/schema/src/schema.ts`                                                                |
+| [HTML Standard](https://html.spec.whatwg.org/) `WHATWG HTML`                                                                                           | WHATWG      | `Subset`   | `server.md` §3.1                   | `packages/server/src/watch.ts`                                                                 |
 
 ## Tracked gaps
 
 ### Near
 
 - <a id="gap-normative-keywords"></a>`gap:normative-keywords` — **Key words for use in RFCs to Indicate Requirement Levels** (BCP 14, `Pending`) in `standards.md` §1 — Jx specifications use MUST and SHOULD informally; none declares the BCP 14 boilerplate that would make them normative.
+- <a id="gap-bcp47-locale-validation"></a>`gap:bcp47-locale-validation` — **Tags for Identifying Languages** (BCP 47, `Pending`) in `schema.md` §3.2 — `i18n.defaultLocale` and `i18n.locales[]` are bare strings, so nothing rejects a malformed language tag or canonicalizes `en-us` to `en-US`.
+- <a id="gap-content-date-coercion"></a>`gap:content-date-coercion` — **Date and Time on the Internet: Timestamps** (RFC 3339, `Pending`) in `parser.md` §3, `parser.md` §4 — No date coercion exists in either format class. Sorting compares raw strings, which is right for ISO 8601 by accident and silently wrong for any other form, and the filter comparators push both sides through `Number()`, so a date comparison is always false.
+- <a id="gap-markdown-variant"></a>`gap:markdown-variant` — **The text/markdown Media Type** (RFC 7763, `Subset`) in `parser.md` §3 — The class declares `text/markdown`, but not the `variant` parameter RFC 7764 registers — so nothing on the wire says which flavour a `.md` file is.
+- <a id="gap-redirect-status-enum"></a>`gap:redirect-status-enum` — **HTTP Semantics** (RFC 9110, `Pending`) in `schema.md` §3.2 — The `redirects` value shape admits no status at all, so there is no enumeration of the §15.4 redirection codes and 303/307/308 cannot be expressed in a validating `project.json`.
 - <a id="gap-ai-problem-details"></a>`gap:ai-problem-details` — **Problem Details for HTTP APIs** (RFC 9457, `Pending`) in `ai.md` §2 — Failures answer as `{error}` JSON, and an upstream failure answers 200 carrying `upstreamError`. Neither is `application/problem+json`.
+- <a id="gap-backend-failure-contract"></a>`gap:backend-failure-contract` — **Problem Details for HTTP APIs** (RFC 9457, `Pending`) in `desktop.md` §5 — The contract defines no failure shape, so each backend invents one and the Studio client carries a separate reader for each.
+- <a id="gap-studio-problem-details"></a>`gap:studio-problem-details` — **Problem Details for HTTP APIs** (RFC 9457, `Pending`) in `server.md` §4 — No route answers `application/problem+json`; there is no shared error helper on either side, and the Studio client carries five different readers for the shapes that result.
+- <a id="gap-yaml-media-type"></a>`gap:yaml-media-type` — **YAML Media Type** (RFC 9512, `Pending`) in `parser.md` §3 — Frontmatter is YAML and carries no declared media type, so a host cannot tell what it is holding.
+- <a id="gap-heading-slug-normalization"></a>`gap:heading-slug-normalization` — **Unicode Normalization Forms** (UAX #15, `Pending`) in `parser.md` §3 — `slugifyHeading` does not normalize before casing, so the same heading typed on macOS (decomposed) and on Windows (precomposed) produces two different anchors.
+- <a id="gap-word-segmentation"></a>`gap:word-segmentation` — **Unicode Text Segmentation** (UAX #29, `Pending`) in `parser.md` §3 — `$wordCount` and `$readingTime` split on whitespace rather than segmenting words, so a script that does not space its words is counted as a single word.
+- <a id="gap-emit-csp"></a>`gap:emit-csp` — **Content Security Policy Level 3** (CSP Level 3, `Pending`) in `compiler.md` §3 — No policy is emitted for any tier, and the inline import map and pre-paint script would both need hashing before a strict one could be.
+- <a id="gap-fetch-metadata"></a>`gap:fetch-metadata` — **Fetch Metadata Request Headers** (Fetch Metadata Request Headers, `Pending`) in `server.md` §4.2 — The gate infers cross-origin intent from `Origin` and `Host`, and must accept an absent `Origin` because same-origin GETs omit it. `Sec-Fetch-Site` states the intent directly and does not have that hole.
+- <a id="gap-sri-cdn-runtime"></a>`gap:sri-cdn-runtime` — **Subresource Integrity** (Subresource Integrity, `Pending`) in `compiler.md` §3 — The import map resolves `@vue/reactivity` and `lit-html` to `esm.sh` with no integrity metadata, so every interactive page trusts a third party at load time.
+
+### Later
+
+- <a id="gap-cookie-prefixes"></a>`gap:cookie-prefixes` — **HTTP State Management Mechanism** (RFC 6265, `Pending`) in `desktop.md` §10 — Session cookies carry no `__Host-` or `__Secure-` prefix, so nothing stops a same-site attacker on a sibling origin from overwriting one.
+- <a id="gap-oauth-pkce"></a>`gap:oauth-pkce` — **Proof Key for Code Exchange by OAuth Public Clients** (RFC 7636, `Pending`) in `desktop.md` §10 — No authorization-code exchange binds a code verifier, so an intercepted code is replayable.
+- <a id="gap-native-oauth"></a>`gap:native-oauth` — **OAuth 2.0 for Native Apps** (RFC 8252, `Pending`) in `desktop.md` §10 — No native authorization flow exists. The one sign-in the desktop shell performs uses GitHub's device flow, which is designed for input-constrained devices; a desktop app with a browser and a keyboard should use a loopback redirect, which the loopback server is already positioned to host.
 
 ### Untiered
 
 _These bind a section carrying no status marker, so no tier can be derived._
 
 - <a id="gap-collab-subprotocol"></a>`gap:collab-subprotocol` — **The WebSocket Protocol** (RFC 6455, `Subset`) in `collab.md` §2 — The transport is used as specified. Subprotocol negotiation (§1.9, §4.2.2) is not: no `Sec-WebSocket-Protocol` is offered or echoed, so two peers with incompatible envelopes can share a room — §5 records the consequence.
+- <a id="gap-media-type-validation"></a>`gap:media-type-validation` — **Media Type Specifications and Registration Procedures** (RFC 6838, `Subset`) in `extensions.md` §7 — The `type/subtype` form is used as an identifier for icons, labels and HTTP, but the field is typed as a bare string: nothing checks the syntax, and no Jx-defined format registers its type.
+- <a id="gap-sse-reconnect"></a>`gap:sse-reconnect` — **HTML Standard** (WHATWG HTML, `Subset`) in `server.md` §3.1 — Server-Sent Events only, and without the reconnection half: no `retry:` field and no event ids are sent, so a client that misses a reload while the server restarts stays stale until the next save.
 
 ## Declined
 
-| Standard                                                                                  | Where          | Because                                                                                                                                                                                                                                                                                                                                 |
-| ----------------------------------------------------------------------------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [Compression Extensions for WebSocket](https://www.rfc-editor.org/rfc/rfc7692) `RFC 7692` | `collab.md` §2 | lib0-encoded Yjs updates are near-incompressible, the dominant frame volume is awareness cursors whose payload is smaller than a deflate block header, both transports are loopback or already compressed at the edge, and Bun allocates a zlib context per socket — a real cost for a server whose purpose is many concurrent sockets. |
+| Standard                                                                                              | Where                | Because                                                                                                                                                                                                                                                                                                                                      |
+| ----------------------------------------------------------------------------------------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [JavaScript Object Notation (JSON) Patch](https://www.rfc-editor.org/rfc/rfc6902) `RFC 6902`          | `extensions.md` §8.3 | `lower` rewrites a section value into the document tree as a whole-value transform, and a patch document would describe the same result less legibly while adding a format an extension author would have to learn. The capability signature is the contract instead.                                                                        |
+| [JavaScript Object Notation (JSON) Text Sequences](https://www.rfc-editor.org/rfc/rfc7464) `RFC 7464` | `server.md` §4.1     | the only advantage over the `application/x-ndjson` already in use is that a record containing a raw newline cannot break framing, and the producer is always `JSON.stringify`, which escapes newlines — so the framing is unambiguous already. Adopting it would break every client and test and make a dev-server debug stream ungreppable. |
+| [Compression Extensions for WebSocket](https://www.rfc-editor.org/rfc/rfc7692) `RFC 7692`             | `collab.md` §2       | lib0-encoded Yjs updates are near-incompressible, the dominant frame volume is awareness cursors whose payload is smaller than a deflate block header, both transports are loopback or already compressed at the edge, and Bun allocates a zlib context per socket — a real cost for a server whose purpose is many concurrent sockets.      |
 
 ## Standards catalog
 
 Every identifier a specification may cite, with the canonical URL the citation must use.
 
-| Id                                           | Body        | Title                                                    | Canonical URL                                                 |
-| -------------------------------------------- | ----------- | -------------------------------------------------------- | ------------------------------------------------------------- |
-| `BCP 14`                                     | IETF        | Key words for use in RFCs to Indicate Requirement Levels | <https://www.rfc-editor.org/info/bcp14>                       |
-| `IANA IPv4 Special-Purpose Address Registry` | IANA        | IANA IPv4 Special-Purpose Address Registry               | <https://www.iana.org/assignments/iana-ipv4-special-registry> |
-| `IANA IPv6 Special-Purpose Address Registry` | IANA        | IANA IPv6 Special-Purpose Address Registry               | <https://www.iana.org/assignments/iana-ipv6-special-registry> |
-| `JSON Schema 2020-12`                        | JSON Schema | JSON Schema, draft 2020-12                               | <https://json-schema.org/draft/2020-12/schema>                |
-| `RFC 3986`                                   | IETF        | Uniform Resource Identifier (URI): Generic Syntax        | <https://www.rfc-editor.org/rfc/rfc3986>                      |
-| `RFC 6455`                                   | IETF        | The WebSocket Protocol                                   | <https://www.rfc-editor.org/rfc/rfc6455>                      |
-| `RFC 6901`                                   | IETF        | JavaScript Object Notation (JSON) Pointer                | <https://www.rfc-editor.org/rfc/rfc6901>                      |
-| `RFC 7692`                                   | IETF        | Compression Extensions for WebSocket                     | <https://www.rfc-editor.org/rfc/rfc7692>                      |
-| `RFC 9457`                                   | IETF        | Problem Details for HTTP APIs                            | <https://www.rfc-editor.org/rfc/rfc9457>                      |
-| `WHATWG HTML`                                | WHATWG      | HTML Standard                                            | <https://html.spec.whatwg.org/>                               |
+| Id                                           | Body        | Title                                                    | Canonical URL                                                                   |
+| -------------------------------------------- | ----------- | -------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `BCP 14`                                     | IETF        | Key words for use in RFCs to Indicate Requirement Levels | <https://www.rfc-editor.org/info/bcp14>                                         |
+| `BCP 47`                                     | IETF        | Tags for Identifying Languages                           | <https://www.rfc-editor.org/info/bcp47>                                         |
+| `CSP Level 3`                                | W3C         | Content Security Policy Level 3                          | <https://www.w3.org/TR/CSP3/>                                                   |
+| `CSSOM`                                      | W3C         | CSS Object Model (CSSOM)                                 | <https://www.w3.org/TR/cssom-1/>                                                |
+| `CommonMark`                                 | Other       | CommonMark Spec                                          | <https://spec.commonmark.org/current/>                                          |
+| `ECMA-262`                                   | Ecma        | ECMAScript Language Specification                        | <https://ecma-international.org/publications-and-standards/standards/ecma-262/> |
+| `Fetch Metadata Request Headers`             | W3C         | Fetch Metadata Request Headers                           | <https://www.w3.org/TR/fetch-metadata/>                                         |
+| `GFM`                                        | Other       | GitHub Flavored Markdown Spec                            | <https://github.github.com/gfm/>                                                |
+| `IANA IPv4 Special-Purpose Address Registry` | IANA        | IANA IPv4 Special-Purpose Address Registry               | <https://www.iana.org/assignments/iana-ipv4-special-registry>                   |
+| `IANA IPv6 Special-Purpose Address Registry` | IANA        | IANA IPv6 Special-Purpose Address Registry               | <https://www.iana.org/assignments/iana-ipv6-special-registry>                   |
+| `JSON Schema 2020-12`                        | JSON Schema | JSON Schema, draft 2020-12                               | <https://json-schema.org/draft/2020-12/schema>                                  |
+| `RFC 3339`                                   | IETF        | Date and Time on the Internet: Timestamps                | <https://www.rfc-editor.org/rfc/rfc3339>                                        |
+| `RFC 3986`                                   | IETF        | Uniform Resource Identifier (URI): Generic Syntax        | <https://www.rfc-editor.org/rfc/rfc3986>                                        |
+| `RFC 4180`                                   | IETF        | Common Format and MIME Type for CSV Files                | <https://www.rfc-editor.org/rfc/rfc4180>                                        |
+| `RFC 6265`                                   | IETF        | HTTP State Management Mechanism                          | <https://www.rfc-editor.org/rfc/rfc6265>                                        |
+| `RFC 6455`                                   | IETF        | The WebSocket Protocol                                   | <https://www.rfc-editor.org/rfc/rfc6455>                                        |
+| `RFC 6838`                                   | IETF        | Media Type Specifications and Registration Procedures    | <https://www.rfc-editor.org/rfc/rfc6838>                                        |
+| `RFC 6901`                                   | IETF        | JavaScript Object Notation (JSON) Pointer                | <https://www.rfc-editor.org/rfc/rfc6901>                                        |
+| `RFC 6902`                                   | IETF        | JavaScript Object Notation (JSON) Patch                  | <https://www.rfc-editor.org/rfc/rfc6902>                                        |
+| `RFC 7464`                                   | IETF        | JavaScript Object Notation (JSON) Text Sequences         | <https://www.rfc-editor.org/rfc/rfc7464>                                        |
+| `RFC 7636`                                   | IETF        | Proof Key for Code Exchange by OAuth Public Clients      | <https://www.rfc-editor.org/rfc/rfc7636>                                        |
+| `RFC 7692`                                   | IETF        | Compression Extensions for WebSocket                     | <https://www.rfc-editor.org/rfc/rfc7692>                                        |
+| `RFC 7763`                                   | IETF        | The text/markdown Media Type                             | <https://www.rfc-editor.org/rfc/rfc7763>                                        |
+| `RFC 8252`                                   | IETF        | OAuth 2.0 for Native Apps                                | <https://www.rfc-editor.org/rfc/rfc8252>                                        |
+| `RFC 9110`                                   | IETF        | HTTP Semantics                                           | <https://www.rfc-editor.org/rfc/rfc9110>                                        |
+| `RFC 9111`                                   | IETF        | HTTP Caching                                             | <https://www.rfc-editor.org/rfc/rfc9111>                                        |
+| `RFC 9457`                                   | IETF        | Problem Details for HTTP APIs                            | <https://www.rfc-editor.org/rfc/rfc9457>                                        |
+| `RFC 9512`                                   | IETF        | YAML Media Type                                          | <https://www.rfc-editor.org/rfc/rfc9512>                                        |
+| `Subresource Integrity`                      | W3C         | Subresource Integrity                                    | <https://www.w3.org/TR/SRI/>                                                    |
+| `UAX #15`                                    | Unicode     | Unicode Normalization Forms                              | <https://www.unicode.org/reports/tr15/>                                         |
+| `UAX #29`                                    | Unicode     | Unicode Text Segmentation                                | <https://www.unicode.org/reports/tr29/>                                         |
+| `WHATWG Fetch`                               | WHATWG      | Fetch Standard                                           | <https://fetch.spec.whatwg.org/>                                                |
+| `WHATWG HTML`                                | WHATWG      | HTML Standard                                            | <https://html.spec.whatwg.org/>                                                 |
 
 ## Specs without a Standards Alignment section
 
 | Spec                      | Why                                                       |
 | ------------------------- | --------------------------------------------------------- |
-| `compiler.md`             | Cited in the standards-citations PR.                      |
-| `desktop.md`              | Cited in the standards-citations PR.                      |
-| `extensions.md`           | Cited in the standards-citations PR.                      |
 | `imports.md`              | No numbered headings; number the spec first, then cite.   |
 | `jx-markdown.md`          | No numbered headings; number the spec first, then cite.   |
-| `parser.md`               | Cited in the standards-citations PR.                      |
-| `schema.md`               | Cited in the standards-citations PR.                      |
-| `server.md`               | Cited in the standards-citations PR.                      |
 | `site-architecture.md`    | Cited in the standards-citations PR.                      |
 | `spec.md`                 | §18 is prose today; it becomes the machine-checked table. |
 | `studio-ui-guidelines.md` | Cited in the standards-citations PR.                      |

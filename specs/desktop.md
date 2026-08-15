@@ -2,9 +2,9 @@
 
 ## Platform Abstraction, Project Loading, and Component Scoping
 
-**Version:** 0.3.8-draft
+**Version:** 0.3.9-draft
 **Status:** Pending
-**Updated:** 2026-08-13
+**Updated:** 2026-08-15
 **License:** MIT
 
 ---
@@ -22,6 +22,7 @@
 9. [NixOS Chromium App-Mode](#9-nixos-chromium-app-mode)
 10. [SaaS / Cloud Mode](#10-saas--cloud-mode)
 11. [Implementation Roadmap](#11-implementation-roadmap)
+12. [Standards Alignment](#12-standards-alignment)
 
 ---
 
@@ -338,6 +339,11 @@ A live preview under the fields shows the resolved destination (`/home/you/Sites
 ---
 
 ## 5. Backend API Contract
+
+> **Status: Partial.** The success half is specified — the route table is canonical and complete.
+> The **failure** half is not specified at all: this section names no status codes, no error body
+> and no media type, and the four incompatible shapes the reference backend actually returns are
+> therefore not a deviation from anything. See §12.
 
 The Backend API Contract defines the operations that any Studio backend must support. The current `@jxsuite/server` endpoints map directly to these operations. Other backends (ElectroBun Bun process, cloud API) implement the same operations through their own transport.
 
@@ -859,8 +865,20 @@ Ensure desktop app matches dev-mode capabilities:
 - [ ] Project authentication and authorization
 - [ ] Real-time collaboration via WebSocket change feed
 
+## 12. Standards Alignment
+
+External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md). ElectroBun and Chromium are implementations rather than standards, so §7–§9 cite nothing.
+
+| Standard                                           | Class       | Binds | Evidence | Note                                                                                                                                                                                                                                                                                                                |
+| -------------------------------------------------- | ----------- | ----- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) | **Pending** | §5    | —        | `gap:backend-failure-contract` The contract defines no failure shape, so each backend invents one and the Studio client carries a separate reader for each.                                                                                                                                                         |
+| [RFC 8252](https://www.rfc-editor.org/rfc/rfc8252) | **Pending** | §10   | —        | `gap:native-oauth` No native authorization flow exists. The one sign-in the desktop shell performs uses GitHub's device flow, which is designed for input-constrained devices; a desktop app with a browser and a keyboard should use a loopback redirect, which the loopback server is already positioned to host. |
+| [RFC 7636](https://www.rfc-editor.org/rfc/rfc7636) | **Pending** | §10   | —        | `gap:oauth-pkce` No authorization-code exchange binds a code verifier, so an intercepted code is replayable.                                                                                                                                                                                                        |
+| [RFC 6265](https://www.rfc-editor.org/rfc/rfc6265) | **Pending** | §10   | —        | `gap:cookie-prefixes` Session cookies carry no `__Host-` or `__Secure-` prefix, so nothing stops a same-site attacker on a sibling origin from overwriting one.                                                                                                                                                     |
+
 ## Changelog
 
+- **0.3.9-draft** (2026-08-15) — Add §12 Standards Alignment; §5 marked Partial — the Backend API Contract specifies no failure shape.
 - **0.3.8-draft** (2026-08-13) — Open Project asks where a project should open (§4.2a): New Window is routed through pickProject + openProjectInNewWindow, and the outcome is reported rather than the target.
 - **0.3.7-draft** (2026-08-11) — Name the pane context bar's resolving-with popover rather than the tab bar, which P8 deleted.
 - **0.3.6-draft** (2026-08-03) — §3.1/§5.1: findReferences? PAL member and the GET /__studio/references route — the read side of the rename refactor's walker.
@@ -888,4 +906,4 @@ Ensure desktop app matches dev-mode capabilities:
 
 ---
 
-_Jx Studio Desktop Architecture Specification v0.3.8-draft_
+_Jx Studio Desktop Architecture Specification v0.3.9-draft_

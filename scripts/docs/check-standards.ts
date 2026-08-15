@@ -110,12 +110,6 @@ export interface UncitedEntry {
  * When it reaches empty, a new spec with numbered headings and no table fails on its first PR.
  */
 export const UNCITED: UncitedEntry[] = [
-  { file: "compiler.md", why: "Cited in the standards-citations PR." },
-  { file: "desktop.md", why: "Cited in the standards-citations PR." },
-  { file: "extensions.md", why: "Cited in the standards-citations PR." },
-  { file: "parser.md", why: "Cited in the standards-citations PR." },
-  { file: "schema.md", why: "Cited in the standards-citations PR." },
-  { file: "server.md", why: "Cited in the standards-citations PR." },
   { file: "site-architecture.md", why: "Cited in the standards-citations PR." },
   { file: "spec.md", why: "§18 is prose today; it becomes the machine-checked table." },
   { file: "studio-ui-guidelines.md", why: "Cited in the standards-citations PR." },

@@ -2,9 +2,9 @@
 
 ## Development Server with Live Reload, Proxy Resolution, and Studio API
 
-**Version:** 0.2.1
+**Version:** 0.2.2
 **Status:** Implemented
-**Updated:** 2026-07-25
+**Updated:** 2026-08-15
 **License:** MIT
 
 ---
@@ -118,6 +118,12 @@ The server imports the module and calls the exported function as `fn(args, env)`
 
 ## 4. Studio API (`/__studio/*`)
 
+> **Status: Partial.** The routes ship. The **failure** half of the contract does not: errors are
+> returned in four incompatible shapes across roughly 97 sites (a `{error}` body, a bare-text
+> response, a 200 carrying an embedded error, and in-stream error frames), `desktop.md` §5 documents
+> none of them, and the one failure the route table does publish — `gitPull`'s `409 {conflicts}` —
+> is never produced by this backend. See §8.
+
 The reference implementation of the Studio Backend Protocol, serving Studio's Platform Abstraction Layer (specs/desktop.md §3, §5).
 
 ### 4.1 Endpoints
@@ -139,6 +145,11 @@ Handlers are dispatched inside the `/__studio/*` branch in this order: collab �
 > **Status: Implemented.** `src/studio-api.ts` and companions.
 
 ### 4.2 Security
+
+> **Status: Partial.** The dev server applies the gate as described below. The **loopback project
+> server does not apply it uniformly**: `/_jx/*` extension mounts and `/__studio__/ai/*` are
+> dispatched ahead of any gate there, so this section's claim that the mounts are gated holds for
+> one entry point and not the other. `/__reload` is likewise served before the gate. See §8.
 
 Both server entry points share one set of primitives (`src/net-guard.ts`), applied at different strengths:
 
@@ -201,8 +212,22 @@ Incremental rebuild triggered by the file watcher: only entries whose `match` (R
 
 `oxfmt` and `oxlint` are resolved from the workspace for the code services. Bun built-ins: `Bun.serve`, `Bun.build`, `Bun.Transpiler`, `Bun.file`, `Bun.Glob`.
 
+## 8. Standards Alignment
+
+External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md).
+
+| Standard                                                                | Class        | Binds | Evidence                                                                  | Note                                                                                                                                                                                                                                                                                                                                                  |
+| ----------------------------------------------------------------------- | ------------ | ----- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [WHATWG Fetch](https://fetch.spec.whatwg.org/)                          | **Adopted**  | §4.2  | packages/server/src/net-guard.ts, packages/server/tests/net-guard.test.ts | The same-origin policy is the containment, so **no** response from either entry point carries an `Access-Control-Allow-*` header. Emitting one would hand the containment away.                                                                                                                                                                       |
+| [WHATWG HTML](https://html.spec.whatwg.org/)                            | **Subset**   | §3.1  | packages/server/src/watch.ts                                              | `gap:sse-reconnect` Server-Sent Events only, and without the reconnection half: no `retry:` field and no event ids are sent, so a client that misses a reload while the server restarts stays stale until the next save.                                                                                                                              |
+| [RFC 9111](https://www.rfc-editor.org/rfc/rfc9111)                      | **Adopted**  | §3    | packages/server/src/server.ts                                             | Every dev-server response carries `Cache-Control: no-cache`, so a browser revalidates rather than applying its heuristic freshness to an edited file.                                                                                                                                                                                                 |
+| [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457)                      | **Pending**  | §4    | —                                                                         | `gap:studio-problem-details` No route answers `application/problem+json`; there is no shared error helper on either side, and the Studio client carries five different readers for the shapes that result.                                                                                                                                            |
+| [Fetch Metadata Request Headers](https://www.w3.org/TR/fetch-metadata/) | **Pending**  | §4.2  | —                                                                         | `gap:fetch-metadata` The gate infers cross-origin intent from `Origin` and `Host`, and must accept an absent `Origin` because same-origin GETs omit it. `Sec-Fetch-Site` states the intent directly and does not have that hole.                                                                                                                      |
+| [RFC 7464](https://www.rfc-editor.org/rfc/rfc7464)                      | **Rejected** | §4.1  | —                                                                         | because: the only advantage over the `application/x-ndjson` already in use is that a record containing a raw newline cannot break framing, and the producer is always `JSON.stringify`, which escapes newlines — so the framing is unambiguous already. Adopting it would break every client and test and make a dev-server debug stream ungreppable. |
+
 ## Changelog
 
+- **0.2.2** (2026-08-15) — Add §8 Standards Alignment; §4 and §4.2 marked Partial — the failure contract is unspecified and the project server does not gate uniformly.
 - **0.2.1** (2026-07-25) — Activation admits an existing project of the account's own (project.json under the home directory); a refused activation must surface as an error rather than fall back to the server root.
 - **0.2.0** (2026-07-25) — POST /__studio/create-project requires an explicit absolute destination parent — the server no longer falls back to its own root. Adds assertCreatableParent (root, allowedRoots, or home; absolute only), remembers created roots for a following activate, and returns an absolute root for projects outside the server root.
 - **0.1.9** (2026-07-23) — Serve extension asset mounts ahead of the project root in the static-file chain (§3).
@@ -218,4 +243,4 @@ Incremental rebuild triggered by the file watcher: only entries whose `match` (R
 
 ---
 
-_`@jxsuite/server` Specification v0.2.1_
+_`@jxsuite/server` Specification v0.2.2_

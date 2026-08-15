@@ -16,15 +16,15 @@ This page is generated from the `> **Status: …**` markers in the specification
 | ------------------------- | ------------ | ----------- | ---------- |
 | `ai.md`                   | 0.1.5-draft  | Partial     | 2026-08-15 |
 | `collab.md`               | 0.2.3-draft  | Partial     | 2026-08-15 |
-| `compiler.md`             | 0.1.26-draft | Partial     | 2026-08-14 |
-| `desktop.md`              | 0.3.8-draft  | Pending     | 2026-08-13 |
-| `extensions.md`           | 0.3.4-draft  | Partial     | 2026-08-08 |
+| `compiler.md`             | 0.1.27-draft | Partial     | 2026-08-15 |
+| `desktop.md`              | 0.3.9-draft  | Pending     | 2026-08-15 |
+| `extensions.md`           | 0.3.5-draft  | Partial     | 2026-08-15 |
 | `imports.md`              | 0.1.7-draft  | Partial     | 2026-08-02 |
 | `jx-markdown.md`          | 0.1.7-draft  | Partial     | 2026-07-22 |
-| `parser.md`               | 0.2.4-draft  | Partial     | 2026-07-23 |
+| `parser.md`               | 0.2.5-draft  | Partial     | 2026-08-15 |
 | `relationships.md`        | 0.1.4-draft  | Partial     | 2026-08-15 |
-| `schema.md`               | 0.3.1-draft  | Partial     | 2026-08-10 |
-| `server.md`               | 0.2.1        | Implemented | 2026-07-25 |
+| `schema.md`               | 0.3.2-draft  | Partial     | 2026-08-15 |
+| `server.md`               | 0.2.2        | Implemented | 2026-08-15 |
 | `site-architecture.md`    | 0.1.44-draft | Partial     | 2026-08-12 |
 | `spec.md`                 | 0.4.28-draft | Partial     | 2026-08-10 |
 | `standards.md`            | 0.1.1-draft  | Partial     | 2026-08-15 |
@@ -36,6 +36,12 @@ This page is generated from the `> **Status: …**` markers in the specification
 ### Partial
 
 - `ai.md` §2 — Provider Contract
+- `compiler.md` §3 — Output Tiers
+- `desktop.md` §5 — Backend API Contract
+- `parser.md` §3 — `Markdown` — the markdown format class
+- `schema.md` §3.2 — Project Schema (`project-schema.json`)
+- `server.md` §4 — Studio API (`/__studio/*`)
+- `server.md` §4.2 — Security
 - `site-architecture.md` §9.4 — Studio Media Browser
 - `spec.md` §5.6 — Private State (`#` prefix)
 - `spec.md` §11.4 — Server Timing — RPC Function Boundary

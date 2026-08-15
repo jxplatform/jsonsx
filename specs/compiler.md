@@ -2,9 +2,9 @@
 
 ## Static HTML Compiler, Custom Element Emitter, and Island Detector
 
-**Version:** 0.1.26-draft
+**Version:** 0.1.27-draft
 **Status:** Partial
-**Updated:** 2026-08-14
+**Updated:** 2026-08-15
 **License:** MIT
 
 ---
@@ -53,6 +53,14 @@ Bare strings and numbers in `children` arrays compile to text nodes in all three
 ---
 
 ## 3. Output Tiers
+
+> **Status: Partial.** The tiers themselves are complete. Two properties of the emitted page are
+> not: every tier emits an **inline** import map, and a project declaring a colour-scheme query also
+> gets an inline pre-paint script, so no tier is servable under a strict `script-src` and none emits
+> a Content-Security-Policy. And the import map's two entries resolve to `esm.sh`, while bare
+> `$elements` and `$head` specifiers are emitted as `/node_modules/…` URLs that **nothing copies
+> into `dist/`** — so those requests 404 in production, though not in dev, where the server serves
+> that path. See §13.
 
 | Component surface                        | Compiler output                                 |
 | ---------------------------------------- | ----------------------------------------------- |
@@ -783,6 +791,17 @@ The site build bundles Function-def `$src` modules for the browser
 
 ---
 
+## 13. Standards Alignment
+
+External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md). `lit-html` and `@vue/reactivity` are libraries rather than standards; Appendix A records them as dependencies.
+
+| Standard                                                                                  | Class       | Binds  | Evidence                                                                                  | Note                                                                                                                                                                                                                                                        |
+| ----------------------------------------------------------------------------------------- | ----------- | ------ | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [ECMA-262](https://ecma-international.org/publications-and-standards/standards/ecma-262/) | **Adopted** | §4, §5 | packages/compiler/src/targets/compile-element.ts, packages/compiler/tests/no-eval.test.ts | Emitted modules are plain ECMAScript modules containing no `new Function` and no `eval`, which is what lets compiled output run under a policy without `'unsafe-eval'` — asserted by a committed test.                                                      |
+| [WHATWG HTML](https://html.spec.whatwg.org/)                                              | **Subset**  | §3, §4 | packages/compiler/src/targets/compile-element.ts                                          | Custom elements are defined and rendered into the **light** DOM; `<slot>` is emulated by splicing saved children, and no shadow root is ever attached. Declarative Shadow DOM, `::part` and `ElementInternals` are therefore unavailable to a Jx component. |
+| [CSP Level 3](https://www.w3.org/TR/CSP3/)                                                | **Pending** | §3     | —                                                                                         | `gap:emit-csp` No policy is emitted for any tier, and the inline import map and pre-paint script would both need hashing before a strict one could be.                                                                                                      |
+| [Subresource Integrity](https://www.w3.org/TR/SRI/)                                       | **Pending** | §3     | —                                                                                         | `gap:sri-cdn-runtime` The import map resolves `@vue/reactivity` and `lit-html` to `esm.sh` with no integrity metadata, so every interactive page trusts a third party at load time.                                                                         |
+
 ## Appendix A — Production Dependency Stack
 
 | Package           | Size (gzip) | Purpose                                |
@@ -793,6 +812,7 @@ The site build bundles Function-def `$src` modules for the browser
 
 ## Changelog
 
+- **0.1.27-draft** (2026-08-15) — Add §13 Standards Alignment; §3 marked Partial — inline scripts block a strict CSP and node_modules URLs 404 in production.
 - **0.1.26-draft** (2026-08-14) — $switch compiles on dynamic pages (§9.2); branch subtrees hoisted out of $switch and chosen-tagName constructs (§4.8); prerender treats handler-written entries and computeds reading them as runtime-only, and keeps an array any surviving reader still references (§8.1).
 - **0.1.25-draft** (2026-07-30) — Element modules: props.* attribute intake and $props template bindings, one effect registry stopped on disconnect, state.$map published for map handlers; prerender keeps a repeater whose build-time expansion is empty (§4.1, §4.2, §4.4, §4.7, §8.1).
 - **0.1.24-draft** (2026-07-30) — Element modules: $export aliasing, Request auto-fetch on connect with effect teardown, $map bound in map callbacks, tagName-based output naming; prerender leaves runtime-only reads unresolved (§4.1, §4.7, §8.1).
@@ -823,4 +843,4 @@ The site build bundles Function-def `$src` modules for the browser
 
 ---
 
-_`@jxsuite/compiler` Specification v0.1.26-draft_
+_`@jxsuite/compiler` Specification v0.1.27-draft_

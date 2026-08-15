@@ -2,9 +2,9 @@
 
 ## Content Formats and the Reference Format-Extension Classes
 
-**Version:** 0.2.4-draft
+**Version:** 0.2.5-draft
 **Status:** Partial
-**Updated:** 2026-07-23
+**Updated:** 2026-08-15
 **License:** MIT
 
 ---
@@ -39,6 +39,12 @@ Built on the `unified` / `remark` pipeline (markdown) and a minimal RFC 4180 par
 ---
 
 ## 3. `Markdown` — the markdown format class
+
+> **Status: Partial.** The class and every capability ship. Two derived values are **correct only
+> for Latin script**: `slugifyHeading` strips on an ASCII-only character class, so a heading in any
+> other script slugifies to the empty string and falls back to `section`, `section-2`, … — which
+> means the deep-linkable anchors this section promises are not delivered for those documents; and
+> `$wordCount`/`$readingTime` split on whitespace, which reports a CJK article as one word. See §10.
 
 A single class carrying every capability (`Markdown.class.json`):
 
@@ -193,8 +199,24 @@ Entries address media relative to themselves, so a collection reads correctly in
 
 Because the rewrite happens in the loader, every consumer of `projectData` — site build, dev server, studio preview, search indexing — sees the same mounted URLs with no extra work.
 
+## 10. Standards Alignment
+
+External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md). `remark`, `unified` and the MDAST node model are libraries rather than published standards, so they are described in §2 rather than cited here.
+
+| Standard                                           | Class       | Binds  | Evidence                                                               | Note                                                                                                                                                                                                                                                                                          |
+| -------------------------------------------------- | ----------- | ------ | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [CommonMark](https://spec.commonmark.org/current/) | **Subset**  | §3     | extensions/parser/src/md.ts, extensions/parser/tests/transpile.test.ts | Parsing is CommonMark via `remark`, but only the constructs §8 maps reach a Jx node — an unmapped construct is dropped rather than mis-rendered.                                                                                                                                              |
+| [GFM](https://github.github.com/gfm/)              | **Subset**  | §3     | extensions/parser/src/md.ts                                            | Tables, strikethrough, task lists and autolinks are parsed; the mapping restriction above applies to them too.                                                                                                                                                                                |
+| [RFC 7763](https://www.rfc-editor.org/rfc/rfc7763) | **Subset**  | §3     | extensions/parser/src/Markdown.class.json                              | `gap:markdown-variant` The class declares `text/markdown`, but not the `variant` parameter RFC 7764 registers — so nothing on the wire says which flavour a `.md` file is.                                                                                                                    |
+| [RFC 4180](https://www.rfc-editor.org/rfc/rfc4180) | **Subset**  | §4     | extensions/parser/src/csv.ts, extensions/parser/tests/csv.test.ts      | Quoted fields, embedded separators and CRLF records are handled. There is no dialect negotiation and no header-less mode: the first record is always the header.                                                                                                                              |
+| [RFC 9512](https://www.rfc-editor.org/rfc/rfc9512) | **Pending** | §3     | —                                                                      | `gap:yaml-media-type` Frontmatter is YAML and carries no declared media type, so a host cannot tell what it is holding.                                                                                                                                                                       |
+| [UAX #15](https://www.unicode.org/reports/tr15/)   | **Pending** | §3     | —                                                                      | `gap:heading-slug-normalization` `slugifyHeading` does not normalize before casing, so the same heading typed on macOS (decomposed) and on Windows (precomposed) produces two different anchors.                                                                                              |
+| [UAX #29](https://www.unicode.org/reports/tr29/)   | **Pending** | §3     | —                                                                      | `gap:word-segmentation` `$wordCount` and `$readingTime` split on whitespace rather than segmenting words, so a script that does not space its words is counted as a single word.                                                                                                              |
+| [RFC 3339](https://www.rfc-editor.org/rfc/rfc3339) | **Pending** | §3, §4 | —                                                                      | `gap:content-date-coercion` No date coercion exists in either format class. Sorting compares raw strings, which is right for ISO 8601 by accident and silently wrong for any other form, and the filter comparators push both sides through `Number()`, so a date comparison is always false. |
+
 ## Changelog
 
+- **0.2.5-draft** (2026-08-15) — Add §10 Standards Alignment; §3 marked Partial — heading slugs and word counts are correct only for Latin script.
 - **0.2.4-draft** (2026-07-23) — Document the Content project-section class: asset mounts and content-relative reference rewriting (§9).
 - **0.2.3-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.2.2-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
@@ -210,4 +232,4 @@ Because the rewrite happens in the loader, every consumer of `projectData` — s
 
 ---
 
-_`@jxsuite/parser` Specification v0.2.4-draft_
+_`@jxsuite/parser` Specification v0.2.5-draft_

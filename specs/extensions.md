@@ -2,9 +2,9 @@
 
 ## Extension Packages, Schema Composition, and the Capability Contract
 
-**Version:** 0.3.4-draft
+**Version:** 0.3.5-draft
 **Status:** Partial
-**Updated:** 2026-08-08
+**Updated:** 2026-08-15
 **License:** MIT
 
 Supersedes v1 ("Format-Extension Classes and the Capability Contract"). The
@@ -1007,8 +1007,19 @@ db push`, and has a moderated, auth-gated guestbook — with project.json
 validation, a studio settings section, and dev-server parity, none of it
 requiring changes to any core package.
 
+## 16. Standards Alignment
+
+External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md).
+
+| Standard                                                            | Class        | Binds | Evidence                                                                              | Note                                                                                                                                                                                                                                                                           |
+| ------------------------------------------------------------------- | ------------ | ----- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [JSON Schema 2020-12](https://json-schema.org/draft/2020-12/schema) | **Adopted**  | §5    | packages/schema/src/project-schemas.ts, packages/schema/tests/project-schemas.test.ts | Fragment composition, `$id` shadowing and `unevaluatedProperties: false` closure are all standard vocabulary — an extension contributes a schema, not a plugin hook.                                                                                                           |
+| [RFC 6838](https://www.rfc-editor.org/rfc/rfc6838)                  | **Subset**   | §7    | packages/schema/defs/class-def.schema.ts                                              | `gap:media-type-validation` The `type/subtype` form is used as an identifier for icons, labels and HTTP, but the field is typed as a bare string: nothing checks the syntax, and no Jx-defined format registers its type.                                                      |
+| [RFC 6902](https://www.rfc-editor.org/rfc/rfc6902)                  | **Rejected** | §8.3  | —                                                                                     | because: `lower` rewrites a section value into the document tree as a whole-value transform, and a patch document would describe the same result less legibly while adding a format an extension author would have to learn. The capability signature is the contract instead. |
+
 ## Changelog
 
+- **0.3.5-draft** (2026-08-15) — Add §16 Standards Alignment: JSON Schema composition, media-type registration, and why JSON Patch is declined for lower.
 - **0.3.4-draft** (2026-08-08) — §5.4 states first-party schema resolution — an @jxsuite/*.json ref reads from the host workspace before any project-local file at the same path, with no fallback in that direction, so a stray install inside a starter can no longer answer for the core; and a validator composes a stale entry document in memory rather than writing over the one it is checking.
 - **0.3.3-draft** (2026-07-25) — Composition is host-agnostic: one pure function with an injected loader, so the cloud session composes the same entry documents in-Worker with no filesystem (§5.5).
 - **0.3.2-draft** (2026-07-25) — $schema bindings must be satisfied by by-id registration, never fetching — an in-document $schema overrides fileMatch and an unresolvable one voids validation entirely (§5.4).
@@ -1028,4 +1039,4 @@ requiring changes to any core package.
 
 ---
 
-_Jx Extensions Specification v0.3.4-draft_
+_Jx Extensions Specification v0.3.5-draft_
