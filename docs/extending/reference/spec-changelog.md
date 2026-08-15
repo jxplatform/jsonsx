@@ -203,6 +203,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `site-architecture.md`
 
+- **0.4.0-draft** (2026-08-15) — Responsive images: <picture> per format, one owner for loading attributes, fetchpriority honoured, lazyLoad independent of optimize (§9.2, §9.2.7).
 - **0.3.3-draft** (2026-08-15) — $head bare specifiers copy into /assets/ and $elements bundle there; an unresolvable one is a build error (§8.7).
 - **0.3.2-draft** (2026-08-15) — §8.4.1 <lastmod> is a full RFC 3339 timestamp; the per-template lastmod wart is named rather than implied.
 - **0.3.1-draft** (2026-08-15) — Add §6.7 syndication feeds: Atom and JSON Feed via @jxsuite/feed, RFC 5005 archives, RSS declined.

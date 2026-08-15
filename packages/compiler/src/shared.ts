@@ -909,15 +909,6 @@ export function buildAttrs(def: JxElement | JxMutableNode, scope: Record<string,
     }
   }
 
-  if (def.tagName === "img") {
-    if (!def.attributes?.loading) {
-      out += ` loading="lazy"`;
-    }
-    if (!def.attributes?.decoding) {
-      out += ` decoding="async"`;
-    }
-  }
-
   if (def.$static) {
     out += ` data-jx-static`;
   } else if (def.$prerendered) {

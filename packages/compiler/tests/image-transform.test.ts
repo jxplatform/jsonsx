@@ -89,6 +89,14 @@ const defaultConfig = {
   widths: [640, 1200],
 };
 
+/**
+ * The `<img>` a transform produced, whether or not it ended up inside a `<picture>`. A multi-format
+ * image is wrapped (the sources carry the candidate lists); everything else stays a bare `<img>`.
+ */
+const imgOf = (node: any) => (node.tagName === "picture" ? node.children.at(-1) : node);
+/** The `<source>` elements of a generated `<picture>`. */
+const sourcesOf = (node: any) => (node.children ?? []).filter((c: any) => c.tagName === "source");
+
 describe("image-transform", () => {
   beforeEach(() => {
     setup();
@@ -117,7 +125,12 @@ describe("image-transform", () => {
       expect(result.imageRefs.size).toBe(0);
     });
 
-    test("transforms an img node with srcset, sizes, and lazy loading", async () => {
+    /*
+     * Two formats, so the node becomes a `<picture>`. A bare `<img srcset>` cannot say which
+     * candidate is AVIF, so a browser that cannot decode AVIF would pick one anyway; `<source
+     * type>` is the only markup that lets it decline.
+     */
+    test("wraps a multi-format image in a picture, one source per format", async () => {
       const doc: any = {
         attributes: { src: "/images/hero.png" },
         tagName: "img",
@@ -126,14 +139,49 @@ describe("image-transform", () => {
 
       const result = await transformImageNodes(doc, defaultConfig, TMP, cache);
 
-      expect(doc.attributes.srcset).toContain("/_optimized/hero-640-abc.avif 640w");
-      expect(doc.attributes.srcset).toContain("/_optimized/hero-1200-abc.avif 1200w");
-      expect(doc.attributes.sizes).toBe("(max-width: 768px) 100vw, 50vw");
-      expect(doc.attributes.width).toBe("1200");
-      expect(doc.attributes.height).toBe("800");
-      expect(doc.attributes.loading).toBe("lazy");
-      expect(doc.attributes.decoding).toBe("async");
+      expect(doc.tagName).toBe("picture");
+      const sources = sourcesOf(doc);
+      expect(sources.map((s: any) => s.attributes.type)).toEqual(["image/avif", "image/webp"]);
+      expect(sources[0].attributes.srcset).toContain("/_optimized/hero-640-abc.avif 640w");
+      expect(sources[0].attributes.srcset).toContain("/_optimized/hero-1200-abc.avif 1200w");
+      expect(sources[1].attributes.srcset).toContain("/_optimized/hero-640-abc.webp 640w");
+      expect(sources[0].attributes.sizes).toBe("(max-width: 768px) 100vw, 50vw");
+
+      // The <img> is the fallback: the original src, no candidate list to mis-select from.
+      const img = imgOf(doc);
+      expect(img.attributes.src).toBe("/images/hero.png");
+      expect(img.attributes.srcset).toBeUndefined();
+      expect(img.attributes.sizes).toBeUndefined();
+      expect(img.attributes.width).toBe("1200");
+      expect(img.attributes.height).toBe("800");
+      expect(img.attributes.loading).toBe("lazy");
+      expect(img.attributes.decoding).toBe("async");
       expect(result.imageRefs.size).toBe(1);
+    });
+
+    test("a single configured format stays a bare img with a srcset", async () => {
+      const doc: any = { attributes: { src: "/images/hero.png" }, tagName: "img" };
+
+      await transformImageNodes(doc, { ...defaultConfig, formats: ["webp"] }, TMP, {
+        entries: {},
+        version: 1,
+      });
+
+      expect(doc.tagName).toBe("img");
+      expect(doc.attributes.srcset).toContain("/_optimized/hero-640-abc.webp 640w");
+      expect(doc.attributes.sizes).toBe("(max-width: 768px) 100vw, 50vw");
+    });
+
+    test("images.picture false keeps the bare img even with two formats", async () => {
+      const doc: any = { attributes: { src: "/images/hero.png" }, tagName: "img" };
+
+      await transformImageNodes(doc, { ...defaultConfig, picture: false }, TMP, {
+        entries: {},
+        version: 1,
+      });
+
+      expect(doc.tagName).toBe("img");
+      expect(doc.attributes.srcset).toContain(".avif");
     });
 
     test("does not override existing width/height attributes", async () => {
@@ -145,8 +193,8 @@ describe("image-transform", () => {
 
       await transformImageNodes(doc, defaultConfig, TMP, cache);
 
-      expect(doc.attributes.width).toBe("400");
-      expect(doc.attributes.height).toBe("300");
+      expect(imgOf(doc).attributes.width).toBe("400");
+      expect(imgOf(doc).attributes.height).toBe("300");
     });
 
     test("does not add lazy loading when loading is eager", async () => {
@@ -158,8 +206,44 @@ describe("image-transform", () => {
 
       await transformImageNodes(doc, defaultConfig, TMP, cache);
 
-      expect(doc.attributes.loading).toBe("eager");
-      expect(doc.attributes.decoding).toBeUndefined();
+      expect(imgOf(doc).attributes.loading).toBe("eager");
+      expect(imgOf(doc).attributes.decoding).toBeUndefined();
+    });
+
+    /*
+     * `fetchpriority="high"` marks the LCP image. Lazy-loading it would defeat the only lever an
+     * author has over that metric, so the two never appear together.
+     */
+    test("does not add lazy loading when the author marked the image high priority", async () => {
+      const doc: any = {
+        attributes: { fetchpriority: "high", src: "/images/hero.png" },
+        tagName: "img",
+      };
+
+      await transformImageNodes(doc, defaultConfig, TMP, { entries: {}, version: 1 });
+
+      const img = imgOf(doc);
+      expect(img.attributes.fetchpriority).toBe("high");
+      expect(img.attributes.loading).toBeUndefined();
+      expect(img.attributes.decoding).toBeUndefined();
+    });
+
+    /*
+     * The loading pass is not the optimizer. Turning variant generation off says nothing about
+     * when the browser should fetch the image, and it used to be the static emitter — which knew
+     * nothing about either setting — that decided.
+     */
+    test("still applies lazy loading when optimize is off", async () => {
+      const doc: any = { attributes: { src: "/images/hero.png" }, tagName: "img" };
+
+      await transformImageNodes(doc, { ...defaultConfig, optimize: false }, TMP, {
+        entries: {},
+        version: 1,
+      });
+
+      expect(doc.attributes.loading).toBe("lazy");
+      expect(doc.attributes.decoding).toBe("async");
+      expect(doc.attributes.srcset).toBeUndefined();
     });
 
     test("does not add lazy loading when config.lazyLoad is false", async () => {
@@ -284,8 +368,8 @@ describe("image-transform", () => {
       // ProcessImage should only be called once for the same absolute path
       expect(processImage).toHaveBeenCalledTimes(1);
       // Both img nodes should be transformed
-      expect(doc.children[0].attributes.srcset).toBeDefined();
-      expect(doc.children[1].attributes.srcset).toBeDefined();
+      expect(sourcesOf(doc.children[0])).toHaveLength(2);
+      expect(sourcesOf(doc.children[1])).toHaveLength(2);
     });
 
     test("resolves relative (non-slash) src paths via projectRoot", async () => {
@@ -302,7 +386,7 @@ describe("image-transform", () => {
       await transformImageNodes(doc, defaultConfig, TMP, cache);
 
       // Should resolve to TMP/images/photo.jpg and transform it
-      expect(doc.attributes.srcset).toBeDefined();
+      expect(sourcesOf(doc)).toHaveLength(2);
       expect(processImage).toHaveBeenCalled();
     });
 
@@ -321,7 +405,7 @@ describe("image-transform", () => {
     });
 
     test("does not set srcset when buildSrcset returns empty string", async () => {
-      // Make buildSrcset return empty
+      // Make buildSrcset return empty for the one configured format
       buildSrcset.mockReturnValueOnce("");
 
       const doc: any = {
@@ -330,9 +414,11 @@ describe("image-transform", () => {
       };
       const cache = { entries: {}, version: 1 };
 
-      await transformImageNodes(doc, defaultConfig, TMP, cache);
+      await transformImageNodes(doc, { ...defaultConfig, formats: ["webp"] }, TMP, cache);
 
       expect(doc.attributes.srcset).toBeUndefined();
+      // Dimensions survive: they prevent layout shift whether or not variants exist.
+      expect(doc.attributes.width).toBe("1200");
     });
 
     test("preserves existing sizes attribute on img node", async () => {
@@ -344,7 +430,9 @@ describe("image-transform", () => {
 
       await transformImageNodes(doc, defaultConfig, TMP, cache);
 
-      expect(doc.attributes.sizes).toBe("100vw");
+      // The author's sizes moves onto the sources, which are what the browser now selects from.
+      expect(sourcesOf(doc).map((s: any) => s.attributes.sizes)).toEqual(["100vw", "100vw"]);
+      expect(imgOf(doc).attributes.sizes).toBeUndefined();
     });
 
     test("walks children recursively", async () => {
@@ -361,7 +449,8 @@ describe("image-transform", () => {
 
       await transformImageNodes(doc, defaultConfig, TMP, cache);
 
-      expect(doc.children[0].children[0].attributes.srcset).toBeDefined();
+      expect(doc.children[0].children[0].tagName).toBe("picture");
+      expect(sourcesOf(doc.children[0].children[0])).toHaveLength(2);
     });
 
     test("transforms img tags embedded in innerHTML strings", async () => {
@@ -373,11 +462,14 @@ describe("image-transform", () => {
 
       await transformImageNodes(doc, defaultConfig, TMP, cache);
 
-      expect(doc.innerHTML).toContain("srcset=");
-      expect(doc.innerHTML).toContain("sizes=");
+      expect(doc.innerHTML).toContain("<picture>");
+      expect(doc.innerHTML).toContain('<source type="image/avif"');
+      expect(doc.innerHTML).toContain('<source type="image/webp"');
       expect(doc.innerHTML).toContain('loading="lazy"');
       expect(doc.innerHTML).toContain('decoding="async"');
       expect(doc.innerHTML).toContain('width="1200" height="800"');
+      // The <img> fallback carries no candidate list, exactly as in the node path.
+      expect(/<img[^>]*srcset=/.test(doc.innerHTML)).toBe(false);
     });
 
     test("handles img node with src on node directly (not in attributes)", async () => {
@@ -390,7 +482,27 @@ describe("image-transform", () => {
 
       await transformImageNodes(doc, defaultConfig, TMP, cache);
 
-      expect(doc.attributes.srcset).toBeDefined();
+      expect(sourcesOf(doc)).toHaveLength(2);
+      expect(imgOf(doc).attributes.src).toBe("/images/hero.png");
+      expect(doc.src).toBeUndefined();
+    });
+
+    /*
+     * The static emitter renders a fixed set of node-level DOM properties and `src` is not among
+     * them, so an image written this way used to reach the page with a `srcset` and no `src` — the
+     * fallback the candidate list exists to have. Normalizing it is the pipeline's job because the
+     * pipeline is what rewrites this image's markup.
+     */
+    test("normalizes a node-level src into attributes even with optimize off", async () => {
+      const doc: any = { attributes: {}, src: "/images/hero.png", tagName: "img" };
+
+      await transformImageNodes(doc, { ...defaultConfig, optimize: false }, TMP, {
+        entries: {},
+        version: 1,
+      });
+
+      expect(doc.attributes.src).toBe("/images/hero.png");
+      expect(doc.src).toBeUndefined();
     });
   });
 
@@ -630,7 +742,10 @@ describe("image-transform", () => {
 
       await transformImageNodes(doc, cfConfig, TMP, null, new Map());
 
-      expect(doc.innerHTML).toBe(html);
+      // The author's candidate list is untouched — but when to fetch is still this pass's call.
+      expect(doc.innerHTML).toContain('srcset="/x.avif 640w"');
+      expect(doc.innerHTML).not.toContain("cdn-cgi");
+      expect(doc.innerHTML).toContain('loading="lazy"');
       expect(getImageMetadata).not.toHaveBeenCalled();
     });
 
@@ -760,8 +875,8 @@ describe("image-transform", () => {
         mounts,
       );
 
-      expect(doc.attributes.srcset).toContain("/_optimized/hero-640-abc.avif 640w");
-      expect(doc.attributes.src).toBe("/content/docs/images/diagram.png");
+      expect(sourcesOf(doc)[0].attributes.srcset).toContain("/_optimized/hero-640-abc.avif 640w");
+      expect(imgOf(doc).attributes.src).toBe("/content/docs/images/diagram.png");
     });
 
     test("a mounted URL with no file behind it is left alone", async () => {

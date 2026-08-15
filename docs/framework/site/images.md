@@ -6,6 +6,7 @@ spec:
   - compiler.md#7
 code:
   - packages/compiler/src/site/image-transform.ts
+  - packages/compiler/src/site/img-loading.ts
   - packages/compiler/src/site/asset-mounts.ts
   - packages/compiler/src/site/image-optimizer.ts
   - packages/compiler/src/site/image-cache.ts
@@ -28,6 +29,7 @@ All properties are optional; these are the defaults:
     "quality": { "webp": 80, "avif": 65, "jpeg": 80, "png": 80 },
     "sizes": "(max-width: 768px) 100vw, 50vw",
     "lazyLoad": true,
+    "picture": true,
     "service": "build"
   }
 }
@@ -40,7 +42,8 @@ All properties are optional; these are the defaults:
 | `formats`       | Output formats (`"webp"`, `"avif"`, `"jpeg"`, `"png"`)                                        |
 | `quality`       | Per-format compression quality (0–100)                                                        |
 | `sizes`         | Default CSS `sizes` attribute injected alongside `srcset`                                     |
-| `lazyLoad`      | Adds `loading="lazy"` and `decoding="async"`                                                  |
+| `lazyLoad`      | Adds `loading="lazy"` and `decoding="async"` — applies whether or not `optimize` is on        |
+| `picture`       | Wrap a multi-format image in a `<picture>`, one `<source>` per format (default `true`)        |
 | `service`       | `"build"` = Sharp at build time; `"cloudflare"` = transform URLs served by Cloudflare (below) |
 | `remoteDomains` | Https hostnames whose remote images also get transform srcsets — `"cloudflare"` service only  |
 
@@ -50,9 +53,35 @@ For each eligible image, the pipeline (powered by [Sharp](https://sharp.pixelplu
 
 1. **Filters widths** to those at or below the image's natural width — no upscaling; the original width is always included as a breakpoint.
 2. **Generates one variant per width × format** and writes it to `dist/images/_optimized/{stem}-{width}-{hash}.{format}` (e.g. `hero-640-a1b2c3d4.webp`).
-3. **Mutates the `<img>`** in the compiled HTML: a `srcset` listing the variants in the best configured format (AVIF when configured, otherwise the first format), plus `sizes` from config (unless the node already sets one), and `loading="lazy"` / `decoding="async"` when `lazyLoad` is on. The original `src` stays as the fallback.
+3. **Rewrites the markup.** With one configured format, the `<img>` gets a `srcset` of those variants plus `sizes` from config (unless the node already sets one). With two or more, it is wrapped in a `<picture>`:
+
+```html
+<picture>
+  <source type="image/avif" srcset="/images/_optimized/hero-640-a1b2.avif 640w, …" sizes="…" />
+  <source type="image/webp" srcset="/images/_optimized/hero-640-a1b2.webp 640w, …" sizes="…" />
+  <img src="/images/hero.jpg" alt="Hero" width="1200" height="800" loading="lazy" />
+</picture>
+```
+
+The `<img>` keeps the original `src` and carries no `srcset`, which is what makes it a real fallback. A bare `srcset` says nothing about format, so a browser that can't decode AVIF picks an AVIF candidate anyway and shows nothing; `<source type>` is the only markup that lets it decline. Set `"picture": false` if you'd rather have the flat `<img>` and accept that.
 
 Images embedded in pre-rendered Markdown content go through the same transformation, so a `![hero](./images/hero.jpg)` in a blog post is optimized like any hand-placed `<img>`.
+
+## When images load
+
+`loading` and `decoding` are decided by `lazyLoad` alone, for every image on the site — including ones the optimizer skipped, and every image in a project with `"optimize": false`. Whether an image is worth re-encoding says nothing about when it should be fetched.
+
+Three things stop `loading="lazy"` from being added:
+
+| You write                     | The build does                               |
+| ----------------------------- | -------------------------------------------- |
+| `"lazyLoad": false`           | Nothing, anywhere                            |
+| `loading="eager"` or `"lazy"` | Leaves it exactly as you wrote it            |
+| `fetchpriority="high"`        | Nothing — the two contradict, and yours wins |
+
+:::doc-tip
+Mark your hero image `fetchpriority="high"`. The build can't work out which image is the largest contentful paint — that depends on the visitor's viewport, not on the document — so it doesn't guess, and an unmarked hero is lazy-loaded like everything else.
+:::
 
 ## Which images are eligible
 
@@ -88,13 +117,14 @@ Individual images can override the global config through ordinary attributes:
     "src": "/images/hero.jpg",
     "alt": "Hero image",
     "sizes": "(max-width: 640px) 80vw, 40vw",
-    "loading": "eager"
+    "fetchpriority": "high"
   }
 }
 ```
 
 - `sizes` — replaces the configured default for this image
 - `loading="eager"` — keeps `loading="lazy"` off an above-the-fold image
+- `fetchpriority="high"` — marks the LCP image: fetched at high priority, never lazy-loaded
 - `data-no-optimize` — skips the pipeline entirely
 
 ## Caching

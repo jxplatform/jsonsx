@@ -216,6 +216,8 @@ export interface ImageConfig {
   quality?: { webp?: number; avif?: number; jpeg?: number; png?: number };
   sizes?: string;
   lazyLoad?: boolean;
+  /** Wrap a multi-format image in a `<picture>` with one `<source>` per format. Default true. */
+  picture?: boolean;
   service?: "build" | "cloudflare";
   remoteDomains?: string[];
 }

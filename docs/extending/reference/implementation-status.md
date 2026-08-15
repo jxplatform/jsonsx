@@ -25,7 +25,7 @@ This page is generated from the `> **Status: …**` markers in the specification
 | `relationships.md`        | 0.1.4-draft  | Partial     | 2026-08-15 |
 | `schema.md`               | 0.4.4-draft  | Partial     | 2026-08-15 |
 | `server.md`               | 0.2.2        | Implemented | 2026-08-15 |
-| `site-architecture.md`    | 0.3.3-draft  | Partial     | 2026-08-15 |
+| `site-architecture.md`    | 0.4.0-draft  | Partial     | 2026-08-15 |
 | `spec.md`                 | 0.4.29-draft | Partial     | 2026-08-15 |
 | `standards.md`            | 0.1.4-draft  | Partial     | 2026-08-15 |
 | `studio-ui-guidelines.md` | 0.3.9        | Implemented | 2026-08-15 |

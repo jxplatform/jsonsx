@@ -4,6 +4,13 @@ export const imageConfigSchema = {
     formats: { items: { type: "string" }, type: "array" },
     lazyLoad: { type: "boolean" },
     optimize: { type: "boolean" },
+    picture: {
+      description:
+        "Wrap a multi-format image in a <picture> with one <source> per format (default true). " +
+        "With it off the <img> carries a srcset in the preferred format alone, which browsers " +
+        "that cannot decode that format will still select from.",
+      type: "boolean",
+    },
     quality: {
       properties: {
         avif: { type: "number" },

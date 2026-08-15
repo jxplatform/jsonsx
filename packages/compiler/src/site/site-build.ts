@@ -917,8 +917,12 @@ async function compilePage(
     mergedHead.splice(2, 0, { tagName: "script", textContent: colorSchemePrePaintScript() });
   }
 
-  // Transform <img> nodes for responsive image optimization
-  if (projectConfig.images?.optimize && (imageCache || imageMetaCache)) {
+  /*
+   * Responsive images. This runs whether or not `images.optimize` is on: the loading pass inside
+   * it is governed by `images.lazyLoad`, and declining to generate variants for an image says
+   * nothing about when the browser should fetch it.
+   */
+  if (projectConfig.images) {
     await transformImageNodes(
       layoutDoc,
       projectConfig.images as ImageConfig,

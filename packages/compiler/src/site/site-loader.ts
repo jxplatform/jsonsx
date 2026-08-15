@@ -48,6 +48,7 @@ const DEFAULTS = {
     formats: ["webp", "avif"],
     lazyLoad: true,
     optimize: true,
+    picture: true,
     quality: { avif: 65, jpeg: 80, png: 80, webp: 80 },
     service: "build",
     sizes: "(max-width: 768px) 100vw, 50vw",
