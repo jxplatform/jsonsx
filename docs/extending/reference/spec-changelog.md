@@ -206,6 +206,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `site-architecture.md`
 
+- **0.5.2-draft** (2026-08-15) — Generate manifest.webmanifest and .well-known/security.txt (§14.5).
 - **0.5.1-draft** (2026-08-15) — hreflang alternates in <head> and sitemap xhtml:link for translated pages (§13, §13.5).
 - **0.5.0-draft** (2026-08-15) — i18n: BCP 47 validation and canonicalization, route prefixes resolve to locales, per-page lang and script-derived dir, $page.locale (§13, §13.2, §13.4).
 - **0.4.1-draft** (2026-08-15) — Emit a Content-Security-Policy derived from the built pages: strict script-src from constant inline-script hashes, style-src divergence recorded (§14.3.1).
@@ -314,6 +315,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `standards.md`
 
+- **0.1.6-draft** (2026-08-15) — Web App Manifest, RFC 9116 and RFC 8615 graduate to bound rows in site-architecture.md §14.5.
 - **0.1.5-draft** (2026-08-15) — UAX #9 and UTS #35 graduate to bound rows in site-architecture.md §13.4.
 - **0.1.4-draft** (2026-08-15) — RFC 4287, JSON Feed 1.1 and RFC 5005 graduate to bound rows in site-architecture.md §6.7.
 - **0.1.3-draft** (2026-08-15) — Three backlog entries graduate to bound rows in site-architecture.md §14.3 (HSTS, Referrer-Policy, Permissions-Policy).

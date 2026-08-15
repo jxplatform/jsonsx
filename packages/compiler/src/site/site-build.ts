@@ -67,6 +67,12 @@ import { resolvePrototypes } from "./prototype-resolver.ts";
 import { transformImageNodes } from "./image-transform.ts";
 import { collectCspSources, emptyCspSources } from "./csp.ts";
 import {
+  buildManifest,
+  buildSecurityTxt,
+  manifestHeadEntries,
+  writeWellKnown,
+} from "./well-known.ts";
+import {
   localeAlternates,
   localeOfRoute,
   pageLanguage,
@@ -782,6 +788,34 @@ export async function buildSite(
     fileCount += ensureRobotsSitemap(outDir, siteUrl);
   }
 
+  // ── 7d.1 manifest.webmanifest and .well-known/security.txt ──────────────
+  /*
+   * After the public/ copy, and skipping anything already there. That skip is how an author ships
+   * a **clearsigned** security.txt: signing needs a private key at build time, so the build cannot
+   * do it, but `public/.well-known/security.txt` shadows this at zero cost.
+   */
+  {
+    const generated = [buildManifest(projectConfig), buildSecurityTxt(projectConfig, new Date())];
+    for (const output of generated) {
+      for (const error of output.errors) {
+        errors.push(error);
+        console.error(error);
+      }
+      for (const warning of output.warnings) {
+        console.warn(warning);
+      }
+    }
+    const { skipped, written } = writeWellKnown(
+      generated.flatMap((o) => o.files),
+      outDir,
+      existsSync,
+    );
+    fileCount += written;
+    for (const path of skipped) {
+      log(`  ${path} — kept the copy from public/`);
+    }
+  }
+
   // ── 7e. Response headers and the Jekyll opt-out ─────────────────────────
   // Also after the public/ copy, for the same reason — but PREPENDING rather than appending, since
   // A later `_headers` rule wins for a duplicate header name and the author's block must override.
@@ -987,6 +1021,9 @@ async function compilePage(
    * its own feed link keeps it — the same "author wins" rule every auto-injected entry follows.
    */
   const resolvedSiteHead = [
+    // The manifest link and theme colour are first-party and unconditional once declared, so they
+    // Sit with the extension contributions: below the project's own $head, which still wins.
+    ...(manifestHeadEntries(projectConfig) as JxHeadEntry[]),
     ...extensionHead,
     ...resolveHeadBareSpecifiers(projectConfig.$head ?? [], rewriteNpmAsset),
   ];

@@ -2,7 +2,7 @@
 
 ## File-Based Routing, Content Collections, Layouts, and Static Site Generation
 
-**Version:** 0.5.1-draft
+**Version:** 0.5.2-draft
 **Status:** Partial
 **Updated:** 2026-08-15
 **License:** MIT
@@ -2032,6 +2032,41 @@ Written unconditionally. GitHub Pages runs Jekyll, which excludes every `_`-pref
 `_headers`, `_redirects`, `_worker.js`, `_routes.json` and `_islands/`. One empty file closes the
 whole class of "works locally, half-broken on Pages", which is why it is not an adapter option.
 
+### 14.5 Installability and Disclosure Output
+
+> **Status: Implemented.** `well-known.ts`, written after the `public/` copy in step 7d.1.
+
+Two files a site is expected to publish and nothing generated. Both are pure functions of
+`project.json` plus what the build already knows, which is the argument for generating them rather
+than leaving them in `public/`: an author copying either between projects also copies the values
+that were right for the other one.
+
+**`manifest.webmanifest`** (W3C Web App Manifest) is emitted when the `manifest` section is present
+— absence means no manifest, because a manifest is a claim that a site is meant to be installed and
+most are not. `name` falls back to the project's own and `start_url` to `/`; camelCase config maps
+onto the standard's `snake_case` keys, and a key the project did not set is absent rather than
+null. `<link rel="manifest">` and, when a theme colour is set, `<meta name="theme-color">` join the
+site-level `$head` below the author's own entries.
+
+Icons at 192px and 512px are the installability criterion, and their absence is a **warning**, not
+an error: the manifest is still valid and still supplies the name and colour a browser shows, so
+refusing to emit it would be a worse trade than saying so.
+
+**`.well-known/security.txt`** (RFC 9116) is emitted when `securityTxt` is present. `.well-known`
+only — §3 makes it canonical, and a second copy at the root is a second thing to forget to update.
+`preferredLanguages` runs through the same BCP 47 canonicalization as `i18n.locales` (§13.2): one
+implementation for the repo.
+
+**`Expires` is required and a past value is a build error.** §2.5.5 requires it, it is the field
+everyone forgets, and an expired file is worse than a missing one — it advertises a reporting
+channel while telling the reporter not to trust what it says. A missing `Contact` (§2.5.3) fails for
+the same reason.
+
+**Clearsigning is not implemented** and does not need to be. It requires a private key at build
+time, which a build cannot have; a hand-placed `public/.well-known/security.txt` is copied before
+this step and is kept rather than overwritten, so shipping a signed file costs zero code. The same
+shadowing applies to the manifest.
+
 ## 15. Application Tier
 
 Sections 1–14 describe a project's static surface: pages prerendered from files on disk. That surface is not the ceiling. A Jx project may also have signed-in users, application data, and server-side logic — the **application tier** — and this section is the map of where those pieces live and what they change about the build. It is an orientation section: the normative contracts are in `extensions.md` §11–§13 (server mounts, connectors, secrets), `spec.md` §11.4 (`timing: "server"`), and §14.1 above (adapter output).
@@ -2098,6 +2133,9 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 | [RFC 8246](https://www.rfc-editor.org/rfc/rfc8246)                                        | **Adopted**   | §14.3             | packages/compiler/src/site/headers-emitter.ts, packages/compiler/tests/headers-emitter.test.ts                                        | `immutable` is emitted for `/images/_optimized/*` alone. A test asserts no other path can acquire it, because every other filename is reused when its content changes.                                                                                                                                                                                                                                                           |
 | [RFC 6797](https://www.rfc-editor.org/rfc/rfc6797)                                        | **Subset**    | §14.3             | packages/compiler/src/site/headers-emitter.ts                                                                                         | Off by default and opt-in per project, with `max-age`, `includeSubDomains` and `preload`. `preload` without `includeSubDomains` is refused rather than emitted, since the preload list would reject it.                                                                                                                                                                                                                          |
 | [Referrer Policy](https://www.w3.org/TR/referrer-policy/)                                 | **Adopted**   | §14.3             | packages/compiler/src/site/headers-emitter.ts                                                                                         | `strict-origin-when-cross-origin` by default; any policy token from the standard, or `false` to omit the header.                                                                                                                                                                                                                                                                                                                 |
+| [Web Application Manifest](https://www.w3.org/TR/appmanifest/)                            | **Subset**    | §14.5             | packages/compiler/src/site/well-known.ts, packages/compiler/tests/well-known.test.ts                                                  | Identity, presentation and icons: `name`, `short_name`, `start_url`, `scope`, `display`, `orientation`, colours, `lang`/`dir`, `categories`. Not offered: `shortcuts`, `share_target`, `file_handlers`, `protocol_handlers`, `screenshots` and the other members that describe an app's integration with an OS rather than a site's identity.                                                                                    |
+| [RFC 9116](https://www.rfc-editor.org/rfc/rfc9116)                                        | **Subset**    | §14.5             | packages/compiler/src/site/well-known.ts, packages/compiler/tests/well-known.test.ts                                                  | Every field the standard defines, at the canonical `.well-known` location, with `Expires` (§2.5.5) and `Contact` (§2.5.3) enforced as build errors. Clearsigning (§2.3) is not implemented — it needs a private key at build time — but a hand-placed `public/.well-known/security.txt` shadows the generated file, which is how a signed one ships.                                                                             |
+| [RFC 8615](https://www.rfc-editor.org/rfc/rfc8615)                                        | **Adopted**   | §14.5             | packages/compiler/src/site/well-known.ts                                                                                              | The `/.well-known/` prefix is used as the registry defines it and nothing else is placed there.                                                                                                                                                                                                                                                                                                                                  |
 | [WHATWG HTML](https://html.spec.whatwg.org/)                                              | **Subset**    | §9.2              | packages/compiler/src/site/image-transform.ts, packages/compiler/src/site/img-loading.ts, packages/compiler/tests/img-loading.test.ts | Responsive images: `srcset` with `w` descriptors, `sizes`, `<picture>` with one `<source type>` per format, and the `loading`/`decoding`/`fetchpriority` interaction. Art direction is not offered — no `media` on a source, and no `x` descriptors — because both are per-image authoring decisions a build-time pass cannot infer.                                                                                             |
 | [CSP Level 3](https://www.w3.org/TR/CSP3/)                                                | **Divergent** | §14.3.1           | packages/compiler/src/site/csp.ts, packages/compiler/tests/csp.test.ts, packages/compiler/tests/site-build.test.ts                    | `script-src` is strict — `'self'` plus a hash per constant inline script, no `'unsafe-inline'` and no `'unsafe-eval'`, verified in a browser against a real build. `style-src` keeps `'unsafe-inline'`: per-page `<style>` blocks and per-element `style=` attributes have no site-wide hash, and a partial set would cancel the keyword and blank the page. Off by default, because a policy governs code the build cannot see. |
 | [UAX #9](https://www.unicode.org/reports/tr9/)                                            | **Subset**    | §13.4             | packages/schema/src/locale.ts, packages/schema/tests/locale.test.ts                                                                   | The `<html dir>` half: a tag's script decides direction, tested against the ISO 15924 right-to-left set, and `dir` is emitted only when it is not the default. The algorithm itself — bidi resolution within a run of text — belongs to the browser; Jx neither implements nor overrides it, and emits no `bdi`, `bdo` or isolate controls of its own.                                                                           |
@@ -2228,6 +2266,7 @@ This spec builds on existing Jx primitives wherever possible:
 
 ## Changelog
 
+- **0.5.2-draft** (2026-08-15) — Generate manifest.webmanifest and .well-known/security.txt (§14.5).
 - **0.5.1-draft** (2026-08-15) — hreflang alternates in <head> and sitemap xhtml:link for translated pages (§13, §13.5).
 - **0.5.0-draft** (2026-08-15) — i18n: BCP 47 validation and canonicalization, route prefixes resolve to locales, per-page lang and script-derived dir, $page.locale (§13, §13.2, §13.4).
 - **0.4.1-draft** (2026-08-15) — Emit a Content-Security-Policy derived from the built pages: strict script-src from constant inline-script hashes, style-src divergence recorded (§14.3.1).

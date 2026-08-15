@@ -537,6 +537,49 @@ export interface CspConfig {
   reportUri?: string;
 }
 
+/**
+ * W3C Web App Manifest. Off unless declared — a manifest is a claim that a site is meant to be
+ * installed, and most are not.
+ */
+export interface ManifestConfig {
+  enabled?: boolean;
+  /** Defaults to the project `name`. */
+  name?: string;
+  shortName?: string;
+  description?: string;
+  /** Defaults to `/`. */
+  startUrl?: string;
+  scope?: string;
+  display?: "fullscreen" | "standalone" | "minimal-ui" | "browser";
+  orientation?: string;
+  themeColor?: string;
+  backgroundColor?: string;
+  lang?: string;
+  dir?: "ltr" | "rtl" | "auto";
+  categories?: string[];
+  icons?: { src: string; sizes?: string; type?: string; purpose?: string }[];
+}
+
+/**
+ * RFC 9116 `security.txt`. `expires` is required by §2.5.5 and an absent or past one is a build
+ * error: an expired file advertises a reporting channel while telling the reporter not to trust
+ * it.
+ */
+export interface SecurityTxtConfig {
+  enabled?: boolean;
+  /** At least one is required (§2.5.3): a `mailto:`, `https:` or `tel:` URI. */
+  contact?: string[];
+  /** RFC 3339 date-time; §2.5.5. */
+  expires?: string;
+  encryption?: string[];
+  acknowledgments?: string[];
+  /** BCP 47 tags, validated and canonicalized like `i18n.locales`. */
+  preferredLanguages?: string[];
+  canonical?: string;
+  policy?: string[];
+  hiring?: string[];
+}
+
 export interface HeadersConfig {
   /** Emit the file at all. Default true. */
   enabled?: boolean;
@@ -603,6 +646,10 @@ export interface ProjectConfig {
     string,
     string | { destination: string; status?: number } | { destination: string; rewrite: true }
   >;
+  /** W3C Web App Manifest, emitted as `manifest.webmanifest`. */
+  manifest?: ManifestConfig;
+  /** RFC 9116, emitted as `.well-known/security.txt`. */
+  securityTxt?: SecurityTxtConfig;
   /**
    * Locale routing. Tags are BCP 47; a malformed one is a build error, since a locale is a URL
    * prefix, an `hreflang` value and an `<html lang>` at once.

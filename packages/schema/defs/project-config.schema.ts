@@ -306,6 +306,78 @@ export const projectConfigSchema = {
       items: { type: "string" },
       type: "array",
     },
+    manifest: {
+      additionalProperties: false,
+      description:
+        'W3C Web App Manifest, emitted as manifest.webmanifest with a <link rel="manifest"> ' +
+        "on every page. Absent means no manifest: it is a claim that a site is meant to be " +
+        "installed, and most are not.",
+      properties: {
+        backgroundColor: { type: "string" },
+        categories: { items: { type: "string" }, type: "array" },
+        description: { type: "string" },
+        dir: { enum: ["ltr", "rtl", "auto"], type: "string" },
+        display: {
+          default: "standalone",
+          enum: ["fullscreen", "standalone", "minimal-ui", "browser"],
+          type: "string",
+        },
+        enabled: { default: true, type: "boolean" },
+        icons: {
+          description:
+            "Icons at 192px and 512px are what browsers require before offering to install " +
+            "the site; the build warns when either is missing.",
+          items: {
+            additionalProperties: false,
+            properties: {
+              purpose: { type: "string" },
+              sizes: { examples: ["192x192"], type: "string" },
+              src: { type: "string" },
+              type: { type: "string" },
+            },
+            required: ["src"],
+            type: "object",
+          },
+          type: "array",
+        },
+        lang: { type: "string" },
+        name: { description: "Defaults to the project name.", type: "string" },
+        orientation: { type: "string" },
+        scope: { type: "string" },
+        shortName: { type: "string" },
+        startUrl: { default: "/", type: "string" },
+        themeColor: { type: "string" },
+      },
+      type: "object",
+    },
+    securityTxt: {
+      additionalProperties: false,
+      description:
+        "RFC 9116 security.txt, emitted at .well-known/security.txt. `expires` is required by " +
+        "§2.5.5 and an absent or past value is a build error — an expired file advertises a " +
+        "reporting channel while telling the reporter not to trust it. A hand-placed " +
+        "public/.well-known/security.txt shadows this, which is how a clearsigned file ships.",
+      properties: {
+        acknowledgments: { items: { type: "string" }, type: "array" },
+        canonical: { type: "string" },
+        contact: {
+          description: "At least one mailto:, https: or tel: URI (§2.5.3).",
+          items: { type: "string" },
+          type: "array",
+        },
+        enabled: { default: true, type: "boolean" },
+        encryption: { items: { type: "string" }, type: "array" },
+        expires: { format: "date-time", type: "string" },
+        hiring: { items: { type: "string" }, type: "array" },
+        policy: { items: { type: "string" }, type: "array" },
+        preferredLanguages: {
+          description: "BCP 47 tags, validated and canonicalized like i18n.locales.",
+          items: { type: "string" },
+          type: "array",
+        },
+      },
+      type: "object",
+    },
     i18n: {
       description: "Internationalization configuration.",
       properties: {

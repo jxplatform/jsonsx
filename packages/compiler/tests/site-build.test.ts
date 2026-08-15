@@ -1744,6 +1744,70 @@ describe("buildSite — a malformed BCP 47 tag", () => {
   }, 30_000);
 });
 
+// ── manifest.webmanifest and .well-known/security.txt ────────────────────────
+
+describe("buildSite — installability and disclosure files", () => {
+  const WK_TMP = resolve(import.meta.dir, "__test-site-wellknown__");
+
+  beforeAll(() => {
+    rmSync(WK_TMP, { force: true, recursive: true });
+    mkdirSync(resolve(WK_TMP, "pages"), { recursive: true });
+    writeFileSync(
+      resolve(WK_TMP, "project.json"),
+      JSON.stringify({
+        build: { outDir: "./dist" },
+        manifest: {
+          icons: [
+            { sizes: "192x192", src: "/i192.png" },
+            { sizes: "512x512", src: "/i512.png" },
+          ],
+          themeColor: "#0b3d91",
+        },
+        name: "PWA Site",
+        securityTxt: {
+          contact: ["mailto:security@pwa.example"],
+          expires: "2099-01-01T00:00:00Z",
+          preferredLanguages: ["EN"],
+        },
+        url: "https://pwa.example",
+      }),
+      "utf8",
+    );
+    writeFileSync(
+      resolve(WK_TMP, "pages/index.json"),
+      JSON.stringify({ children: ["hi"], tagName: "main", title: "Home" }),
+      "utf8",
+    );
+  });
+
+  afterAll(() => {
+    rmSync(WK_TMP, { force: true, recursive: true });
+  });
+
+  /*
+   * The three halves have to agree, which is why this is one test: the file exists, the page
+   * points at it, and `_headers` names a content type no host would infer for either extension.
+   */
+  it("writes both files, links them, and names their content types", async () => {
+    const result = await buildSite(WK_TMP, { verbose: false });
+    expect(result.errors).toHaveLength(0);
+    const read = (rel: string) => readFileSync(resolve(WK_TMP, "dist", rel), "utf8");
+
+    expect(JSON.parse(read("manifest.webmanifest")).short_name).toBe("PWA Site");
+    expect(read(".well-known/security.txt")).toContain("Expires: 2099-01-01T00:00:00Z");
+    // Canonicalized through the same BCP 47 implementation as i18n.locales.
+    expect(read(".well-known/security.txt")).toContain("Preferred-Languages: en");
+
+    const html = read("index.html");
+    expect(html).toContain('<link href="/manifest.webmanifest" rel="manifest">');
+    expect(html).toContain('<meta content="#0b3d91" name="theme-color">');
+
+    const headers = read("_headers");
+    expect(headers).toContain("Content-Type: application/manifest+json; charset=utf-8");
+    expect(headers).toContain("Content-Type: text/plain; charset=utf-8");
+  }, 30_000);
+});
+
 // ── Unresolvable bare specifiers ─────────────────────────────────────────────
 
 describe("buildSite — unresolvable bare specifier in $head", () => {

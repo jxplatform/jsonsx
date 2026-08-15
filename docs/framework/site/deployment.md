@@ -7,6 +7,7 @@ code:
   - packages/compiler/src/site/site-build.ts
   - packages/compiler/src/site/headers-emitter.ts
   - packages/compiler/src/site/csp.ts
+  - packages/compiler/src/site/well-known.ts
   - packages/compiler/src/cli.ts
 ---
 
@@ -127,6 +128,55 @@ Start with `"csp": "report-only"`. You get `Content-Security-Policy-Report-Only`
 ```
 
 A string replaces a directive wholesale — restate the defaults you still want — and `false` removes it. `reportUri` emits `report-to`, the deprecated-but-widely-implemented `report-uri`, and the `Reporting-Endpoints` header that the first of those needs to mean anything.
+
+## Manifest and security.txt
+
+Two files a site is usually expected to publish. Both are generated from `project.json`, and both step aside if you put your own copy in `public/`.
+
+### manifest.webmanifest
+
+Declare a `manifest` section and the build writes `dist/manifest.webmanifest`, adds `<link rel="manifest">` to every page, and adds `<meta name="theme-color">` if you set one:
+
+```json
+{
+  "manifest": {
+    "shortName": "Acme",
+    "themeColor": "#0b3d91",
+    "backgroundColor": "#ffffff",
+    "icons": [
+      { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+      { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+    ]
+  }
+}
+```
+
+`name` falls back to your project name and `start_url` to `/`, so the shortest useful manifest is a `manifest` key with icons in it. There's no manifest at all unless you declare the section — it's a claim that your site is meant to be installed, and most aren't.
+
+:::doc-tip
+The 192px and 512px icons are what a browser wants before it will offer to install the site. Leave one out and the build warns; it still writes the manifest, which is useful on its own for the name and theme colour.
+:::
+
+### .well-known/security.txt
+
+```json
+{
+  "securityTxt": {
+    "contact": ["mailto:security@example.com"],
+    "expires": "2027-01-01T00:00:00Z",
+    "preferredLanguages": ["en", "fr-ca"],
+    "policy": ["https://example.com/security-policy"]
+  }
+}
+```
+
+Written to `.well-known/security.txt` and nowhere else — [RFC 9116](https://www.rfc-editor.org/rfc/rfc9116) §3 makes that the canonical spot, and a second copy at the root is a second thing to forget.
+
+:::doc-warning
+`expires` is required, and a date in the past **fails the build**. That's deliberate: an expired `security.txt` is worse than none at all, because it advertises a reporting channel while telling the reporter its information is stale. Pick a date you'll actually revisit.
+:::
+
+Want a clearsigned file? Put it at `public/.well-known/security.txt` and the build keeps yours. Signing needs a private key, which the build has no business holding.
 
 ## Build options
 
