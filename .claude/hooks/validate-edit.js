@@ -11,6 +11,8 @@
 // problem back into the session as feedback. The edit itself is left untouched.
 
 import { execFileSync } from "node:child_process";
+import { realpathSync } from "node:fs";
+import { relative as relativePath, resolve as resolvePath } from "node:path";
 
 const raw = await new Promise((resolve) => {
   let data = "";
@@ -31,6 +33,24 @@ const file = input.tool_input?.file_path ?? input.tool_input?.notebook_path ?? "
 // Only files oxfmt/oxlint understand. Anything else (e.g. .ipynb, images) is skipped.
 if (!file || !/\.(ts|tsx|js|jsx|json|css|md)$/.test(file)) {
   process.exit(0);
+}
+
+// The wrapper in settings.json only proves the SESSION is rooted in this repo; the
+// edit itself may land anywhere — plan-mode writes go to ~/.claude/plans/*.md, and
+// linting those is pure noise. Validate only files that actually live under the
+// project root. Both sides are realpath'd so a symlinked checkout still matches.
+const realOrSelf = (path) => {
+  try {
+    return realpathSync(path);
+  } catch {
+    return path; // unreadable/removed since the edit — fall back to the literal path
+  }
+};
+const root = realOrSelf(process.cwd());
+const target = realOrSelf(resolvePath(process.cwd(), file));
+const rel = relativePath(root, target);
+if (rel === "" || rel.startsWith("..") || resolvePath(root, rel) !== target) {
+  process.exit(0); // outside the source tree — not ours to police
 }
 
 // Call the locally-installed binaries directly (fast; no bunx re-resolution).
