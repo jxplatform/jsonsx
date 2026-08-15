@@ -33,10 +33,28 @@
       "url": "https://www.w3.org/TR/CSP3/"
     },
     {
+      "id": "CSS Cascade Layers",
+      "org": "W3C",
+      "title": "CSS Cascading and Inheritance Level 5",
+      "url": "https://www.w3.org/TR/css-cascade-5/"
+    },
+    {
       "id": "CSS Color 4",
       "org": "W3C",
       "title": "CSS Color Module Level 4",
       "url": "https://www.w3.org/TR/css-color-4/"
+    },
+    {
+      "id": "CSS Containment 3",
+      "org": "W3C",
+      "title": "CSS Containment Module Level 3",
+      "url": "https://www.w3.org/TR/css-contain-3/"
+    },
+    {
+      "id": "CSS Shadow Parts",
+      "org": "W3C",
+      "title": "CSS Shadow Parts",
+      "url": "https://www.w3.org/TR/css-shadow-parts-1/"
     },
     {
       "id": "CSSOM",
@@ -93,6 +111,12 @@
       "url": "https://www.iana.org/assignments/iana-ipv6-special-registry"
     },
     {
+      "id": "JSON Feed 1.1",
+      "org": "Other",
+      "title": "JSON Feed Version 1.1",
+      "url": "https://www.jsonfeed.org/version/1.1/"
+    },
+    {
       "id": "JSON Schema 2020-12",
       "org": "JSON Schema",
       "title": "JSON Schema, draft 2020-12",
@@ -103,6 +127,18 @@
       "org": "W3C",
       "title": "JSON-LD 1.1",
       "url": "https://www.w3.org/TR/json-ld11/"
+    },
+    {
+      "id": "Media Queries 5",
+      "org": "W3C",
+      "title": "Media Queries Level 5",
+      "url": "https://www.w3.org/TR/mediaqueries-5/"
+    },
+    {
+      "id": "Permissions Policy",
+      "org": "W3C",
+      "title": "Permissions Policy",
+      "url": "https://www.w3.org/TR/permissions-policy/"
     },
     {
       "id": "RFC 3339",
@@ -123,10 +159,22 @@
       "url": "https://www.rfc-editor.org/rfc/rfc4180"
     },
     {
+      "id": "RFC 4287",
+      "org": "IETF",
+      "title": "The Atom Syndication Format",
+      "url": "https://www.rfc-editor.org/rfc/rfc4287"
+    },
+    {
       "id": "RFC 4647",
       "org": "IETF",
       "title": "Matching of Language Tags",
       "url": "https://www.rfc-editor.org/rfc/rfc4647"
+    },
+    {
+      "id": "RFC 5005",
+      "org": "IETF",
+      "title": "Feed Paging and Archiving",
+      "url": "https://www.rfc-editor.org/rfc/rfc5005"
     },
     {
       "id": "RFC 6265",
@@ -139,6 +187,12 @@
       "org": "IETF",
       "title": "The WebSocket Protocol",
       "url": "https://www.rfc-editor.org/rfc/rfc6455"
+    },
+    {
+      "id": "RFC 6797",
+      "org": "IETF",
+      "title": "HTTP Strict Transport Security (HSTS)",
+      "url": "https://www.rfc-editor.org/rfc/rfc6797"
     },
     {
       "id": "RFC 6838",
@@ -201,6 +255,18 @@
       "url": "https://www.rfc-editor.org/rfc/rfc8288"
     },
     {
+      "id": "RFC 8414",
+      "org": "IETF",
+      "title": "OAuth 2.0 Authorization Server Metadata",
+      "url": "https://www.rfc-editor.org/rfc/rfc8414"
+    },
+    {
+      "id": "RFC 8615",
+      "org": "IETF",
+      "title": "Well-Known Uniform Resource Identifiers",
+      "url": "https://www.rfc-editor.org/rfc/rfc8615"
+    },
+    {
       "id": "RFC 9110",
       "org": "IETF",
       "title": "HTTP Semantics",
@@ -211,6 +277,12 @@
       "org": "IETF",
       "title": "HTTP Caching",
       "url": "https://www.rfc-editor.org/rfc/rfc9111"
+    },
+    {
+      "id": "RFC 9116",
+      "org": "IETF",
+      "title": "A File Format to Aid in Security Vulnerability Disclosure",
+      "url": "https://www.rfc-editor.org/rfc/rfc9116"
     },
     {
       "id": "RFC 9309",
@@ -235,6 +307,18 @@
       "org": "IETF",
       "title": "JSONPath: Query Expressions for JSON",
       "url": "https://www.rfc-editor.org/rfc/rfc9535"
+    },
+    {
+      "id": "Referrer Policy",
+      "org": "W3C",
+      "title": "Referrer Policy",
+      "url": "https://www.w3.org/TR/referrer-policy/"
+    },
+    {
+      "id": "Service Workers",
+      "org": "W3C",
+      "title": "Service Workers",
+      "url": "https://www.w3.org/TR/service-workers/"
     },
     {
       "id": "Sitemaps 0.9",
@@ -265,6 +349,18 @@
       "org": "Unicode",
       "title": "Unicode Text Segmentation",
       "url": "https://www.unicode.org/reports/tr29/"
+    },
+    {
+      "id": "UAX #9",
+      "org": "Unicode",
+      "title": "Unicode Bidirectional Algorithm",
+      "url": "https://www.unicode.org/reports/tr9/"
+    },
+    {
+      "id": "UTS #35",
+      "org": "Unicode",
+      "title": "Unicode Locale Data Markup Language (LDML)",
+      "url": "https://www.unicode.org/reports/tr35/"
     },
     {
       "id": "WAI-ARIA",
@@ -301,6 +397,24 @@
       "org": "WHATWG",
       "title": "URL Pattern Standard",
       "url": "https://urlpattern.spec.whatwg.org/"
+    },
+    {
+      "id": "Web Application Manifest",
+      "org": "W3C",
+      "title": "Web Application Manifest",
+      "url": "https://www.w3.org/TR/appmanifest/"
+    },
+    {
+      "id": "WebAuthn Level 3",
+      "org": "W3C",
+      "title": "Web Authentication Level 3",
+      "url": "https://www.w3.org/TR/webauthn-3/"
+    },
+    {
+      "id": "WebDriver BiDi",
+      "org": "W3C",
+      "title": "WebDriver BiDi",
+      "url": "https://www.w3.org/TR/webdriver-bidi/"
     }
   ]
 }

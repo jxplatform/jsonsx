@@ -108,6 +108,7 @@ function reg(
     catalog,
     catalogOrder: entries.map((e) => e.id),
     rows: specs.flatMap((s) => s.rows.map((r) => ({ ...r, file: s.file }))),
+    backlog: specs.flatMap((s) => s.backlog.map((b) => ({ ...b, file: s.file }))),
   };
 }
 
@@ -714,6 +715,125 @@ describe("notes", () => {
       ),
       "rejection-missing",
     );
+  });
+});
+
+/* ── Adoption backlog ───────────────────────────────────────────────────────── */
+
+const BL_HEADER = "| Standard | Target | Why not yet |\n| --- | --- | --- |";
+
+function backlogSpec(rows: string, file = "standards.md"): string {
+  void file;
+  return [
+    "# F",
+    "",
+    "## 1. Overview",
+    "",
+    "> **Status: Partial.** …",
+    "",
+    "## 2. Standards Alignment",
+    "",
+    HEADER,
+    "",
+    "## 3. Adoption Backlog",
+    "",
+    BL_HEADER,
+    rows,
+    "",
+    "## Changelog",
+    "",
+    "- **0.1.0-draft** (2026-01-01) — x.",
+  ].join("\n");
+}
+
+const OK_BACKLOG =
+  "| [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110) | `standards.md` — a future section | Nothing owns it yet. |";
+
+describe("adoption backlog", () => {
+  test("a well-formed backlog entry is accepted, and keeps its catalog entry alive", () => {
+    const out = check(backlogSpec(OK_BACKLOG), {
+      file: "standards.md",
+      catalog: catalogFor("RFC 9110"),
+    });
+    expectNoViolation(out, "catalog-stale");
+    expectNoViolation(out, "backlog-target-unknown");
+  });
+
+  test("backlog-target-unknown: the target must be a real spec", () => {
+    const row = "| [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110) | `nope.md` | Later. |";
+    expectViolation(
+      check(backlogSpec(row), { file: "standards.md", catalog: catalogFor("RFC 9110") }),
+      "backlog-target-unknown",
+    );
+  });
+
+  test("backlog-id-unknown: a typo'd identifier still fails", () => {
+    const row = "| [RFC 9119](https://www.rfc-editor.org/rfc/rfc9119) | `standards.md` | Later. |";
+    expectViolation(
+      check(backlogSpec(row), { file: "standards.md", catalog: catalogFor("RFC 9110") }),
+      "backlog-id-unknown",
+    );
+  });
+
+  test("backlog-url-mismatch", () => {
+    const row = "| [RFC 9110](https://www.rfc-editor.org/rfc/rfc6901) | `standards.md` | Later. |";
+    expectViolation(
+      check(backlogSpec(row), { file: "standards.md", catalog: catalogFor("RFC 9110") }),
+      "backlog-url-mismatch",
+    );
+  });
+
+  test("backlog-why-missing", () => {
+    const row = "| [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110) | `standards.md` | — |";
+    expectViolation(
+      check(backlogSpec(row), { file: "standards.md", catalog: catalogFor("RFC 9110") }),
+      "backlog-why-missing",
+    );
+  });
+
+  test("backlog-duplicate", () => {
+    const row = `${OK_BACKLOG}\n${OK_BACKLOG}`;
+    expectViolation(
+      check(backlogSpec(row), { file: "standards.md", catalog: catalogFor("RFC 9110") }),
+      "backlog-duplicate",
+    );
+  });
+
+  /* A standard is either waiting for a section or bound to one — never advertised as both. */
+  test("backlog-already-cited: a backlogged standard that a row also binds", () => {
+    const src = backlogSpec(OK_BACKLOG).replace(
+      HEADER,
+      `${HEADER}\n| [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110) | **Adopted** | §1 | package.json | — |`,
+    );
+    expectViolation(
+      check(src, { file: "standards.md", catalog: catalogFor("RFC 9110") }),
+      "backlog-already-cited",
+    );
+  });
+
+  test("backlog-misplaced: the backlog belongs to standards.md alone", () => {
+    expectViolation(
+      check(backlogSpec(OK_BACKLOG), { file: "server.md", catalog: catalogFor("RFC 9110") }),
+      "backlog-misplaced",
+    );
+  });
+
+  test("backlog-header-mismatch", () => {
+    const src = backlogSpec(OK_BACKLOG).replace(
+      "| Standard | Target | Why not yet |",
+      "| Standard | Owner | Why not yet |",
+    );
+    expectViolation(
+      check(src, { file: "standards.md", catalog: catalogFor("RFC 9110") }),
+      "backlog-header-mismatch",
+    );
+  });
+
+  test("backlog-row-arity and backlog-standard-cell-grammar", () => {
+    const row = "| RFC 9110 | `standards.md` |";
+    const out = check(backlogSpec(row), { file: "standards.md", catalog: catalogFor("RFC 9110") });
+    expectViolation(out, "backlog-row-arity");
+    expectViolation(out, "backlog-standard-cell-grammar");
   });
 });
 

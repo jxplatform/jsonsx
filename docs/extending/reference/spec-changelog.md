@@ -292,6 +292,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `standards.md`
 
+- **0.1.2-draft** (2026-08-15) — Add §11 Adoption Backlog: standards whose owning section does not exist yet, each naming the spec that will own it.
 - **0.1.1-draft** (2026-08-15) — A Subset may name a gap for the half it omits; a non-standard is prose rather than a Rejected row.
 - **0.1.0-draft** (2026-08-14) — Initial specification: the conformance vocabulary, the `## N. Standards Alignment` table contract, citation and canonical-URL rules, gap tiers derived from section status, and governance for declining a standard.
 

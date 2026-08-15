@@ -128,14 +128,15 @@ export function generateStandards(): string {
     "| --- | --- | --- |",
   ];
 
+  const rowsOut: string[] = [];
   for (const cls of CONFORMANCE_VOCAB) {
     const matching = rows.filter((r) => r.cls === cls);
     const ids = new Set(matching.map((r) => r.id));
     const bindings = matching.reduce((n, r) => n + r.binds.length, 0);
-    lines.push(`| \`${cls}\` | ${ids.size} | ${bindings} |`);
+    rowsOut.push(`| \`${cls}\` | ${ids.size} | ${bindings} |`);
   }
-
-  lines.push("", "## Standards Jx implements", "");
+  rowsOut.push(`| _(backlog)_ | ${new Set(reg.backlog.map((b) => b.id)).size} | — |`);
+  lines.push(...rowsOut, "", "## Standards Jx implements", "");
   const cited = rows.filter((r) => CITED.has(r.cls as never));
   if (cited.length === 0) {
     lines.push("_No standards are cited yet._");
@@ -201,6 +202,31 @@ export function generateStandards(): string {
     for (const r of declined) {
       const entry = reg.catalog.get(r.id);
       lines.push(`| ${link(entry, r)} | ${where(r)} | ${r.rejection ?? r.note} |`);
+    }
+    lines.push("");
+  }
+
+  lines.push("## Adoption backlog", "");
+  if (reg.backlog.length === 0) {
+    lines.push("_Nothing is waiting on a section that does not exist yet._", "");
+  } else {
+    lines.push(
+      "Standards whose owning spec section does not exist yet, so no row can bind them. Each names " +
+        "the spec that will own it; when that section is written the entry becomes a tracked gap.",
+      "",
+      "| Standard | Target | Why not yet |",
+      "| --- | --- | --- |",
+    );
+    for (const b of [...reg.backlog].toSorted((x, y) => compareIds(x.id, y.id))) {
+      const entry = reg.catalog.get(b.id);
+      const sep = b.targetNote.startsWith("§") ? " " : " — ";
+      const target =
+        b.targetNote === "" ? `\`${b.target}\`` : `\`${b.target}\`${sep}${b.targetNote}`;
+      const name =
+        entry === undefined || entry.title === b.id
+          ? `[${b.id}](${entry?.url ?? ""})`
+          : `[${entry.title}](${entry.url}) \`${b.id}\``;
+      lines.push(`| ${name} | ${target} | ${b.why} |`);
     }
     lines.push("");
   }

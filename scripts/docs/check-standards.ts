@@ -11,6 +11,7 @@ import { existsSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import type { SpecStandards, StandardsRegistry, StandardsRow } from "./lib/standards.ts";
 import {
+  BACKLOG_HEADER_CELLS,
   BIND_ENTRY,
   buildRegistry,
   CITED,
@@ -82,6 +83,17 @@ export const VIOLATION_CODES = [
   "gap-id-duplicate",
   "gap-id-on-non-pending",
   "rejection-missing",
+  // Adoption backlog
+  "backlog-header-mismatch",
+  "backlog-row-arity",
+  "backlog-standard-cell-grammar",
+  "backlog-id-unknown",
+  "backlog-url-mismatch",
+  "backlog-duplicate",
+  "backlog-already-cited",
+  "backlog-target-unknown",
+  "backlog-why-missing",
+  "backlog-misplaced",
   // Ratchets
   "uncited-stale",
   "exempt-stale",
@@ -189,8 +201,125 @@ function recordGapId(
   }
 }
 
+/**
+ * The adoption backlog: standards the audit found relevant whose owning spec section does not exist
+ * yet, so no row can bind them. It lives in standards.md alone, and every entry must still name a
+ * catalog identifier and a real target spec — otherwise "we will get to it" is a note nobody can
+ * act on and a typo nobody catches.
+ */
+function checkBacklog(reg: StandardsRegistry, out: Violation[]): void {
+  const citedIds = new Set(reg.rows.map((r) => r.id));
+  const specFiles = new Set(reg.specs.map((sp) => sp.file));
+  const seen = new Map<string, number>();
+
+  for (const spec of reg.specs) {
+    if (spec.backlog.length === 0 && spec.backlogHeaderCells === undefined) {
+      continue;
+    }
+    if (spec.file !== "standards.md") {
+      out.push(
+        v(
+          "backlog-misplaced",
+          spec.file,
+          "the adoption backlog lives in standards.md alone — a spec tracks what it binds, not " +
+            "what some other spec might one day bind",
+          spec.backlog[0]?.line,
+        ),
+      );
+      continue;
+    }
+    const header = spec.backlogHeaderCells ?? [];
+    if (
+      header.length !== BACKLOG_HEADER_CELLS.length ||
+      header.some((c, i) => c !== BACKLOG_HEADER_CELLS[i])
+    ) {
+      out.push(
+        v(
+          "backlog-header-mismatch",
+          spec.file,
+          `backlog header must be exactly | ${BACKLOG_HEADER_CELLS.join(" | ")} |`,
+        ),
+      );
+    }
+    for (const b of spec.backlog) {
+      if (b.cellCount !== BACKLOG_HEADER_CELLS.length) {
+        out.push(
+          v("backlog-row-arity", spec.file, `backlog row has ${b.cellCount} cell(s)`, b.line),
+        );
+      }
+      if (!STANDARD_CELL.test(`[${b.id}](${b.url})`) || b.url === "") {
+        out.push(
+          v(
+            "backlog-standard-cell-grammar",
+            spec.file,
+            `the Standard cell must be [<id>](https://…), found "${b.id}"`,
+            b.line,
+          ),
+        );
+      }
+      const entry = reg.catalog.get(b.id);
+      if (!entry) {
+        out.push(v("backlog-id-unknown", spec.file, `"${b.id}" is not in the catalog`, b.line));
+      } else if (b.url !== "" && b.url !== entry.url) {
+        out.push(
+          v(
+            "backlog-url-mismatch",
+            spec.file,
+            `"${b.id}" cites ${b.url}, catalog has ${entry.url}`,
+            b.line,
+          ),
+        );
+      }
+      const prior = seen.get(b.id);
+      if (prior !== undefined) {
+        out.push(
+          v(
+            "backlog-duplicate",
+            spec.file,
+            `"${b.id}" is already on the backlog at line ${prior}`,
+            b.line,
+          ),
+        );
+      }
+      seen.set(b.id, b.line);
+      if (citedIds.has(b.id)) {
+        out.push(
+          v(
+            "backlog-already-cited",
+            spec.file,
+            `"${b.id}" is on the backlog and also bound by a real row — a standard is one or the ` +
+              "other, and the row is the stronger claim",
+            b.line,
+          ),
+        );
+      }
+      if (!specFiles.has(b.target)) {
+        out.push(
+          v(
+            "backlog-target-unknown",
+            spec.file,
+            `"${b.id}" targets \`${b.target}\`, which is not a spec — an adoption target must name ` +
+              "the spec that will own the standard",
+            b.line,
+          ),
+        );
+      }
+      if (b.why.trim() === "" || b.why.trim() === EMPTY_CELL) {
+        out.push(
+          v(
+            "backlog-why-missing",
+            spec.file,
+            `"${b.id}" must say why it is not yet bindable`,
+            b.line,
+          ),
+        );
+      }
+    }
+  }
+}
+
 function checkCatalog(reg: StandardsRegistry, out: Violation[]): void {
-  const cited = new Set(reg.rows.map((r) => r.id));
+  const cited = new Set([...reg.rows.map((r) => r.id), ...reg.backlog.map((b) => b.id)]);
   const seen = new Set<string>();
   for (const id of reg.catalogOrder) {
     if (seen.has(id)) {
@@ -657,6 +786,7 @@ export function checkStandards(
     }
   }
 
+  checkBacklog(reg, out);
   checkCatalog(reg, out);
   return out;
 }

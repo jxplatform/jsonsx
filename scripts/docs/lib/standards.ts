@@ -66,6 +66,14 @@ export function tierOf(status: Status | undefined): GapTier | null {
 export const STANDARDS_HEADING = /^(#{2,6})\s+(\d+(?:\.\d+)*[a-z]?)\.?\s+Standards Alignment\s*$/;
 
 /**
+ * The backlog lives in `standards.md` alone: standards the audit found relevant whose owning spec
+ * section does not exist yet, so no row could bind them. Without it a standard identified before
+ * its feature was designed would survive only in someone's notes.
+ */
+export const BACKLOG_HEADING = /^(#{2,6})\s+(\d+(?:\.\d+)*[a-z]?)\.?\s+Adoption Backlog\s*$/;
+export const BACKLOG_HEADER_CELLS = ["Standard", "Target", "Why not yet"] as const;
+
+/**
  * The appendix trap: an UNNUMBERED heading with this title. `check-doc-refs.ts`'s HEADING_RE and
  * `spec-status.ts`'s NUMBERED_HEADING are both blind to it, so it is not an anchor, it never
  * reaches implementation-status.md, and a `> **Status:**` under it is credited to the last numbered
@@ -147,6 +155,18 @@ export interface StandardsSection {
   depth: number;
 }
 
+export interface BacklogRow {
+  id: string;
+  url: string;
+  /** The spec file that will own it, e.g. "site-architecture.md". */
+  target: string;
+  /** Prose after the target — the prospective section, when one is named. */
+  targetNote: string;
+  why: string;
+  cellCount: number;
+  line: number;
+}
+
 export interface SpecStandards {
   /** Basename, e.g. "spec.md". */
   file: string;
@@ -160,6 +180,9 @@ export interface SpecStandards {
   sectionCount: number;
   headerCells?: string[];
   rows: StandardsRow[];
+  /** Only ever non-empty for standards.md. */
+  backlog: BacklogRow[];
+  backlogHeaderCells?: string[];
   badForms: { line: number; text: string; reason: string }[];
 }
 
@@ -196,6 +219,8 @@ export interface StandardsRegistry {
   catalogOrder: string[];
   /** Flattened rows, in (file, line) order. */
   rows: (StandardsRow & { file: string })[];
+  /** The adoption backlog, from standards.md. */
+  backlog: (BacklogRow & { file: string })[];
 }
 
 /* ── Cell helpers ───────────────────────────────────────────────────────────── */
@@ -301,6 +326,7 @@ export function parseStandardsSource(source: string, file: string): SpecStandard
     strayLines: [],
     sectionCount: 0,
     rows: [],
+    backlog: [],
     badForms: [],
   };
 
@@ -411,7 +437,81 @@ export function parseStandardsSource(source: string, file: string): SpecStandard
   }
 
   void sawProse;
+  parseBacklog(lines, out);
   return out;
+}
+
+/**
+ * The target names the spec that will own the standard, optionally with the section that exists
+ * today (`§9`) or the prospective one that does not (`— feed generation`). Both forms matter: one
+ * says "this belongs in a section already there", the other names a section still to be written.
+ */
+const BACKLOG_TARGET = /^`([^`]+\.md)`(?:\s+§(\d+(?:\.\d+)*[a-z]?))?(?:\s+—\s+(\S.*))?$/;
+
+function parseBacklog(lines: readonly string[], out: SpecStandards): void {
+  let start = -1;
+  let depth = 0;
+  let inFence = false;
+  for (let i = 0; i < lines.length; i++) {
+    if (FENCE.test(lines[i]!)) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) {
+      continue;
+    }
+    const h = lines[i]!.match(BACKLOG_HEADING);
+    if (h) {
+      start = i;
+      depth = h[1]!.length;
+      break;
+    }
+  }
+  if (start === -1) {
+    return;
+  }
+  let headerSeen = false;
+  inFence = false;
+  for (let i = start + 1; i < lines.length; i++) {
+    const line = lines[i]!;
+    if (FENCE.test(line)) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence || CHANGELOG_HEADING.test(line)) {
+      if (CHANGELOG_HEADING.test(line)) {
+        break;
+      }
+      continue;
+    }
+    const hh = line.match(ANY_HEADING);
+    if (hh && hh[1]!.length <= depth) {
+      break;
+    }
+    const cells = splitRow(line);
+    if (!cells || isSeparatorRow(cells)) {
+      continue;
+    }
+    if (!headerSeen) {
+      out.backlogHeaderCells = cells;
+      headerSeen = true;
+      continue;
+    }
+    const [standard = "", target = "", why = ""] = cells;
+    const sm = standard.match(STANDARD_CELL);
+    const tm = target.match(BACKLOG_TARGET);
+    const anchor = tm?.[2] === undefined ? "" : `§${tm[2]}`;
+    const prose = tm?.[3]?.trim() ?? "";
+    out.backlog.push({
+      id: sm?.[1]?.trim() ?? standard,
+      url: sm?.[2] ?? "",
+      target: tm?.[1] ?? target,
+      targetNote: [anchor, prose].filter(Boolean).join(" — "),
+      why,
+      cellCount: cells.length,
+      line: i + 1,
+    });
+  }
 }
 
 function parseRow(cells: readonly string[], line: number): StandardsRow {
@@ -487,12 +587,14 @@ export function buildRegistry(specsDir: string, catalogPath: string): StandardsR
     }
   }
   const rows = specs.flatMap((s) => s.rows.map((r) => ({ ...r, file: s.file })));
+  const backlog = specs.flatMap((s) => s.backlog.map((b) => ({ ...b, file: s.file })));
   return {
     specs,
     statuses,
     catalog,
     catalogOrder: cat.standards.map((e) => e.id),
     rows,
+    backlog,
   };
 }
 
