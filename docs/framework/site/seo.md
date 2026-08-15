@@ -117,7 +117,7 @@ Template strings resolve inside the object, at any depth — so the block can re
 When `url` is set in `project.json`, the build emits `dist/sitemap.xml` from the route table — one `<url>` per compiled page, with:
 
 - `<loc>` — absolute, built from `url` + the route, identical to the page's canonical URL
-- `<lastmod>` — the page source file's modification date (`YYYY-MM-DD`)
+- `<lastmod>` — the page source file's modification time, as a full timestamp (`2025-03-04T16:00:00Z`)
 
 Dynamic routes appear as their expanded concrete URLs; pages generated from one template share that template file's `<lastmod>`. Redirect sources are not pages and never appear.
 

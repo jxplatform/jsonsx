@@ -2,7 +2,7 @@
 
 ## File-Based Routing, Content Collections, Layouts, and Static Site Generation
 
-**Version:** 0.3.1-draft
+**Version:** 0.3.2-draft
 **Status:** Partial
 **Updated:** 2026-08-15
 **License:** MIT
@@ -1018,12 +1018,12 @@ The compiler automatically generates certain tags if not explicitly declared:
 
 #### 8.4.1 Sitemap & `robots.txt`
 
-When `url` is set in `project.json`, the build emits `dist/sitemap.xml` from the route table — one `<url>` entry per compiled page, each with a `<loc>` (absolute, built from `url` + the route via `new URL(route, url)`, so it is identical to the page's `<link rel="canonical">`) and a `<lastmod>` (the page source file's modification date, `YYYY-MM-DD`).
+When `url` is set in `project.json`, the build emits `dist/sitemap.xml` from the route table — one `<url>` entry per compiled page, each with a `<loc>` (absolute, built from `url` + the route via `new URL(route, url)`, so it is identical to the page's `<link rel="canonical">`) and a `<lastmod>` — the page source file's modification time as a **full RFC 3339 timestamp**. The W3C Datetime profile sitemaps.org cites admits both that and a bare `YYYY-MM-DD`; the date-only form threw away any way to tell two edits on one day apart.
 
 - **Requires `url`.** Absolute `<loc>` values cannot be built without it; if `url` is absent the sitemap is skipped with a build warning.
 - **Per-page opt-out.** A page sets `$sitemap: false` at its root to be excluded (e.g. thank-you pages, or drafts while build-time draft filtering is still pending). Every other page is included.
 - **Disable entirely.** Set `build.sitemap: false` (§14.1.1).
-- **Dynamic routes** are listed by their expanded concrete URLs. Pages generated from a single template share that template file's `<lastmod>`.
+- **Dynamic routes** are listed by their expanded concrete URLs. Pages generated from a single template still share that template file's `<lastmod>`, which is wrong for a collection — every post looks edited whenever the template is. Entries now carry `_meta.mtime` (`parser.md` §9.3), so the data exists; routing it through `$paths` expansion to the route is the remaining work, tracked as `gap:sitemap-fields`.
 - **`<loc>` form** follows the canonical URL exactly and is not re-normalized for `build.trailingSlash`, keeping sitemap and canonical URLs in agreement.
 - **`robots.txt`.** After the `public/` copy, a `Sitemap: <url>/sitemap.xml` line is appended to `dist/robots.txt` (creating a minimal `robots.txt` if none was provided). An existing `Sitemap:` line is left untouched.
 
@@ -1882,7 +1882,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 | [JSON Feed 1.1](https://www.jsonfeed.org/version/1.1/)                                    | **Subset**  | §6.7       | extensions/feed/src/json-feed.ts, extensions/feed/tests/feed.test.ts                           | Feed identity, `language`, and per-item content, dates and authors. Attachments, tags, `banner_image` and hubs are not emitted; `next_url` is available but archives are offered in Atom alone rather than mixing two pagination conventions in one feed.                           |
 | [RFC 5005](https://www.rfc-editor.org/rfc/rfc5005)                                        | **Subset**  | §6.7       | extensions/feed/src/feed.ts, extensions/feed/tests/feed.test.ts                                | The archived-feeds flavour (§2) plus `<fh:complete/>` (§4), which is the one designed for static hosting. Paged feeds (§3) are not offered: they are explicitly unstable for subscription, which is the only thing a static site publishes.                                         |
 | [RFC 9309](https://www.rfc-editor.org/rfc/rfc9309)                                        | **Adopted** | §8.4.1     | packages/compiler/src/site/site-build.ts                                                       | A minimal `robots.txt` is created when none was provided, and an existing one is appended to rather than replaced. The `Sitemap:` line the build adds is a sitemaps.org extension, not part of this standard.                                                                       |
-| [Sitemaps 0.9](https://www.sitemaps.org/protocol.html)                                    | **Subset**  | §8.4.1     | packages/compiler/src/site/site-build.ts                                                       | `gap:sitemap-fields` `<loc>` and `<lastmod>` only. No `<changefreq>`, no `<priority>`, and no `xhtml:link` alternates — the last of which §13 will need.                                                                                                                            |
+| [Sitemaps 0.9](https://www.sitemaps.org/protocol.html)                                    | **Subset**  | §8.4.1     | packages/compiler/src/site/site-build.ts, packages/compiler/tests/site-build.test.ts           | `gap:sitemap-fields` `<loc>` and a full RFC 3339 `<lastmod>`. No `<changefreq>` or `<priority>` — both are advisory and widely ignored — and no `xhtml:link` alternates, which §13 will need. A page generated from a template still reports the template's timestamp.              |
 | [WHATWG URLPattern](https://urlpattern.spec.whatwg.org/)                                  | **Subset**  | §11.1      | packages/compiler/src/site/site-build.ts                                                       | Pattern strings are passed through to `_redirects` verbatim; the compiler neither parses nor validates them, so a malformed pattern is a deploy-time failure rather than a build-time one.                                                                                          |
 | [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110)                                        | **Subset**  | §11.3      | packages/compiler/src/site/site-build.ts                                                       | `gap:redirect-status-codes` Only 301 and 302 are documented as redirects. 303, 307 and 308 are absent, so a redirect cannot preserve a request method. The `200` value listed alongside them is not a redirection status at all — it is the host's rewrite convention.              |
 | [RFC 8288](https://www.rfc-editor.org/rfc/rfc8288)                                        | **Subset**  | §8.1, §8.3 | packages/compiler/src/site/head-merger.ts, packages/compiler/tests/head-merger.test.ts         | `gap:link-relation-validation` Link identity now accounts for the target attributes — `rel`, `href`, and whichever of `hreflang`, `type`, `media` or `sizes` distinguishes two links sharing the first two. `rel` values are still not checked against the IANA registry.           |
@@ -2020,6 +2020,7 @@ This spec builds on existing Jx primitives wherever possible:
 
 ## Changelog
 
+- **0.3.2-draft** (2026-08-15) — §8.4.1 <lastmod> is a full RFC 3339 timestamp; the per-template lastmod wart is named rather than implied.
 - **0.3.1-draft** (2026-08-15) — Add §6.7 syndication feeds: Atom and JSON Feed via @jxsuite/feed, RFC 5005 archives, RSS declined.
 - **0.3.0-draft** (2026-08-15) — §8.3 link identity includes hreflang/type/media/sizes; §8.5 JSON-LD objects serialize; §8.4 lang and dir come from the page.
 - **0.2.1-draft** (2026-08-15) — Add §14.3 response headers and §14.4 .nojekyll; §14's header gap is closed and vercel.json is declined.

@@ -411,7 +411,9 @@ describe("buildSite", () => {
     expect(sitemap).toContain("<loc>https://test.com/blog</loc>");
 
     // <lastmod> is a W3C date
-    expect(sitemap).toMatch(/<lastmod>\d{4}-\d{2}-\d{2}<\/lastmod>/);
+    // Full RFC 3339, not date-only: the W3C Datetime profile admits both, and the date-only form
+    // Threw away any way to tell two edits on one day apart.
+    expect(sitemap).toMatch(/<lastmod>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z<\/lastmod>/);
 
     // Redirect sources are not pages and must not appear
     expect(sitemap).not.toContain("/old");

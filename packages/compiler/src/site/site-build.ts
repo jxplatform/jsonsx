@@ -366,7 +366,7 @@ export async function buildSite(
   // (absolute <loc> URLs require it) and not explicitly disabled via build.sitemap: false.
   const siteUrl = projectConfig.url;
   const sitemapEnabled = Boolean(siteUrl) && projectConfig.build.sitemap !== false;
-  const sitemapEntries: { loc: string; lastmod: Date }[] = [];
+  const sitemapEntries: { loc: string; lastmod: string }[] = [];
 
   for (const route of routes) {
     try {
@@ -421,7 +421,7 @@ export async function buildSite(
       const isConcrete = !route.urlPattern.includes(":") && !route.urlPattern.includes("*");
       if (sitemapEnabled && !result.excludeFromSitemap && isConcrete) {
         sitemapEntries.push({
-          lastmod: statSync(route.sourcePath).mtime,
+          lastmod: toRfc3339(statSync(route.sourcePath).mtime),
           loc: new URL(route.urlPattern, siteUrl).href,
         });
       }
@@ -1857,13 +1857,21 @@ function escapeXml(str: string) {
 
 /**
  * Write a sitemap.xml from the collected page entries (sitemaps.org urlset 0.9). Each entry emits a
- * `<loc>` plus a `<lastmod>` date (W3C YYYY-MM-DD).
+ * `<loc>` plus a full RFC 3339 `<lastmod>`.
  *
- * @param {{ loc: string; lastmod: Date }[]} entries
+ * The W3C Datetime profile sitemaps.org cites admits both `YYYY-MM-DD` and a complete timestamp.
+ * The date-only form threw away the time and, with it, any way to tell two edits on one day apart.
+ *
+ * @param {{ loc: string; lastmod: string }[]} entries
  * @param {string} outDir
  * @returns {number} Number of files written
  */
-function generateSitemap(entries: { loc: string; lastmod: Date }[], outDir: string) {
+/** A `Date` to RFC 3339 in UTC, without fractional seconds. */
+function toRfc3339(d: Date): string {
+  return d.toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
+function generateSitemap(entries: { loc: string; lastmod: string }[], outDir: string) {
   if (entries.length === 0) {
     return 0;
   }
@@ -1871,7 +1879,7 @@ function generateSitemap(entries: { loc: string; lastmod: Date }[], outDir: stri
     .map(
       (e) =>
         `  <url>\n    <loc>${escapeXml(e.loc)}</loc>\n` +
-        `    <lastmod>${e.lastmod.toISOString().slice(0, 10)}</lastmod>\n  </url>`,
+        `    <lastmod>${e.lastmod}</lastmod>\n  </url>`,
     )
     .join("\n");
   const xml =
