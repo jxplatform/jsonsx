@@ -119,6 +119,7 @@
         { "path": "framework/site/seo", "label": "SEO and metadata" },
         { "path": "framework/site/images", "label": "Images" },
         { "path": "framework/site/redirects", "label": "Redirects" },
+        { "path": "framework/site/feeds", "label": "Feeds" },
         { "path": "framework/site/search", "label": "Site search" },
         { "path": "framework/site/deployment", "label": "Build output and adapters" },
         { "path": "framework/build", "label": "How compilation works" },

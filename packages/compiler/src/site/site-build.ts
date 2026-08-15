@@ -30,7 +30,12 @@ import {
 } from "./bundler.ts";
 import { loadProjectConfig } from "./site-loader.ts";
 import { discoverPages, expandDynamicRoutes, readPageDocument } from "./pages-discovery.ts";
-import { buildHeaderRules, writeHeaders, writeNoJekyll } from "./headers-emitter.ts";
+import {
+  buildHeaderRules,
+  contentTypeRules,
+  writeHeaders,
+  writeNoJekyll,
+} from "./headers-emitter.ts";
 import { buildProjectExtensionRegistry } from "./format-host.ts";
 import { loadProjectSections } from "./project-sections.ts";
 import { collectAssetRefs, copyMountedAssets, loadAssetMounts } from "./asset-mounts.ts";
@@ -232,6 +237,10 @@ export async function buildSite(
   const assetRefs = new Set<string>();
 
   // ── 4. Expand dynamic routes ────────────────────────────────────────────
+  const extensionHead = registry
+    ? await collectExtensionHead(registry, projectConfig, projectRoot)
+    : [];
+
   const routes = await expandDynamicRoutes(
     staticRoutes,
     projectRoot,
@@ -374,6 +383,7 @@ export async function buildSite(
         registry,
         rewriteSidecarSrc,
         assetMounts,
+        extensionHead,
       );
 
       // Determine which component tags are fully static (for script omission)
@@ -654,8 +664,10 @@ export async function buildSite(
   // Also after the public/ copy, for the same reason — but PREPENDING rather than appending, since
   // A later `_headers` rule wins for a duplicate header name and the author's block must override.
   {
-    const { errors: headerErrors, rules } = buildHeaderRules(projectConfig.build);
+    const { errors: headerErrors, rules: securityRules } = buildHeaderRules(projectConfig.build);
     errors.push(...headerErrors);
+    // Runs here, after every emitter, so it can see which of these files the build actually wrote.
+    const rules = [...securityRules, ...contentTypeRules(outDir)];
     if (rules.length > 0) {
       log("Writing response headers...");
       fileCount += writeHeaders(outDir, rules);
@@ -721,6 +733,7 @@ async function compilePage(
   registry?: ExtensionRegistry,
   rewriteSidecarSrc?: (specifier: string, docDir: string | null) => string,
   assetMounts: readonly AssetMount[] = [],
+  extensionHead: readonly JxHeadEntry[] = [],
 ) {
   // Load the raw page document (.json natively, other formats via the registry)
   const pageDoc = await readPageDocument(route.sourcePath as string, formatRegistry);
@@ -829,7 +842,14 @@ async function compilePage(
   }
 
   // Resolve bare npm specifiers in $head (e.g. "@pkg/name/file.css" → "/node_modules/@pkg/name/file.css")
-  const resolvedSiteHead = resolveHeadBareSpecifiers(projectConfig.$head ?? []);
+  /*
+   * Extension `head` contributions sit BELOW the project's own `$head`, so a project that writes
+   * its own feed link keeps it — the same "author wins" rule every auto-injected entry follows.
+   */
+  const resolvedSiteHead = [
+    ...extensionHead,
+    ...resolveHeadBareSpecifiers(projectConfig.$head ?? []),
+  ];
 
   // Merge $head from site + layout + page
   const mergedHead = mergeHead(resolvedSiteHead, resolvedLayoutHead, resolvedPageHead, {
@@ -1018,6 +1038,39 @@ function buildMountSpecs(
   }
 
   return { connectors, mounts };
+}
+
+/**
+ * Gather every extension's `<head>` contribution, once, before the first page is built.
+ *
+ * Separate from `emit` because the two answer different questions at different times: `emit`
+ * derives files from loaded content long after every page was written, while this derives entries
+ * from CONFIGURATION and must run first. Gated like every other section capability — a class only
+ * contributes when the project declares a non-empty value for its section key.
+ */
+async function collectExtensionHead(
+  registry: ExtensionRegistry,
+  projectConfig: ProjectConfig,
+  projectRoot: string,
+): Promise<JxHeadEntry[]> {
+  const out: JxHeadEntry[] = [];
+  for (const entry of registry.headProviders()) {
+    const key = entry.project?.key;
+    const sectionValue = key === undefined ? null : (projectConfig as Record<string, unknown>)[key];
+    if (key !== undefined && (sectionValue === undefined || sectionValue === null)) {
+      continue;
+    }
+    try {
+      const contributed = (await entry.call("head", sectionValue ?? null, {
+        projectConfig,
+        root: projectRoot,
+      })) as JxHeadEntry[] | null;
+      out.push(...(contributed ?? []));
+    } catch (error) {
+      console.warn(`${entry.name} head capability failed: ${(error as Error).message}`);
+    }
+  }
+  return out;
 }
 
 /**

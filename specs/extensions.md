@@ -2,7 +2,7 @@
 
 ## Extension Packages, Schema Composition, and the Capability Contract
 
-**Version:** 0.3.5-draft
+**Version:** 0.3.6-draft
 **Status:** Partial
 **Updated:** 2026-08-15
 **License:** MIT
@@ -652,6 +652,34 @@ runtime cannot be discovered by the build scan, so those files belong in
 
 ---
 
+### 8.6 `head`
+
+> **Status: Implemented.**
+
+`head` lets a section-owner class contribute `<head>` entries to every compiled page:
+
+```
+head(sectionValue, { projectConfig, root }) → JxHeadEntry[]
+```
+
+- **Timing** is `["compiler"]`, and it runs **once, before the first page is built** — not per page.
+- **Gating** is the same as `emit` and `assets`: a class owning a project section contributes only
+  when the project declares a non-empty value for its key.
+- **Placement.** Contributions sit below the project's own `$head`, so the ordinary dedup rule
+  (§8.3 of `site-architecture.md`) lets an author override one by writing the same entry themselves.
+- **Failure** is a warning naming the class, not a build error. A missing discovery link is not
+  worth failing a build over.
+
+**Why this is not `emit`.** The two answer different questions at different times. `emit` derives
+_files_ from loaded content and runs after the last page has been written; `head` derives _entries_
+from **configuration** and must run before the first one. A feed needs both — the document from
+`emit`, the `<link rel="alternate">` from here — and a capability that ran at `emit`'s point could
+not reach any page's `<head>`, because they were all written already.
+
+It is deliberately narrow: the context carries `projectConfig` and `root` and **not** the loaded
+sections, because a contribution that depends on content is a contribution that cannot run early
+enough to be used.
+
 ## 9. The `project` block
 
 A class owns a project.json section iff it has a top-level `project` object:
@@ -1019,6 +1047,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.3.6-draft** (2026-08-15) — Add §8.6 head: a section owner contributes <head> entries from configuration, before the first page is built.
 - **0.3.5-draft** (2026-08-15) — Add §16 Standards Alignment: JSON Schema composition, media-type registration, and why JSON Patch is declined for lower.
 - **0.3.4-draft** (2026-08-08) — §5.4 states first-party schema resolution — an @jxsuite/*.json ref reads from the host workspace before any project-local file at the same path, with no fallback in that direction, so a stray install inside a starter can no longer answer for the core; and a validator composes a stale entry document in memory rather than writing over the one it is checking.
 - **0.3.3-draft** (2026-07-25) — Composition is host-agnostic: one pure function with an injected loader, so the cloud session composes the same entry documents in-Worker with no filesystem (§5.5).
@@ -1039,4 +1068,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx Extensions Specification v0.3.5-draft_
+_Jx Extensions Specification v0.3.6-draft_

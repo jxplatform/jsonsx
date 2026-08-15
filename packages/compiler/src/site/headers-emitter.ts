@@ -129,6 +129,36 @@ export function buildHeaderRules(build: ProjectConfig["build"]): {
   return { errors, rules };
 }
 
+/**
+ * Content-Type rules for output whose extension no host maps.
+ *
+ * `.xml` is served as `application/xml` and `.json` as `application/json` by default, which is not
+ * wrong but is not what a feed reader looks for. Only files that actually exist get a rule, so the
+ * emitted block never describes output this build did not produce.
+ */
+export function contentTypeRules(outDir: string): HeaderRule[] {
+  const known: [string, string][] = [
+    ["feed.xml", "application/atom+xml; charset=utf-8"],
+    ["feed.json", "application/feed+json; charset=utf-8"],
+    ["manifest.webmanifest", "application/manifest+json; charset=utf-8"],
+    [".well-known/security.txt", "text/plain; charset=utf-8"],
+  ];
+  const rules: HeaderRule[] = [];
+  for (const [name, type] of known) {
+    if (existsSync(join(outDir, name))) {
+      rules.push({ headers: { "Content-Type": type }, pattern: `/${name}` });
+    }
+  }
+  // The RFC 5005 archives share the feed's type.
+  if (existsSync(join(outDir, "feed", "archive"))) {
+    rules.push({
+      headers: { "Content-Type": "application/atom+xml; charset=utf-8" },
+      pattern: "/feed/archive/*",
+    });
+  }
+  return rules;
+}
+
 /** Render rules in the Netlify / Cloudflare Pages `_headers` format. */
 export function renderHeaders(rules: readonly HeaderRule[]): string {
   const blocks = rules.map((rule) => {

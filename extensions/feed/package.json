@@ -1,0 +1,44 @@
+{
+  "name": "@jxsuite/feed",
+  "version": "0.1.0",
+  "description": "Syndication feeds for Jx: Atom (RFC 4287) and JSON Feed emitted from content collections at build time",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jxsuite/jx.git",
+    "directory": "extensions/feed"
+  },
+  "files": [
+    "src/",
+    "dist",
+    "jx-extension.json",
+    "schemas/"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./src/feed.ts",
+    "./atom": "./src/atom.ts",
+    "./json-feed": "./src/json-feed.ts",
+    "./shared": "./src/shared.ts",
+    "./jx-extension.json": "./jx-extension.json",
+    "./schemas/project.fragment.schema.json": "./schemas/project.fragment.schema.json",
+    "./Feed.class.json": "./src/Feed.class.json"
+  },
+  "publishConfig": {
+    "provenance": true
+  },
+  "scripts": {
+    "prepare": "bun build src/feed.ts --outdir=dist --format=esm --target=node",
+    "build": "bun run prepare",
+    "test": "bun test --isolate",
+    "test:coverage": "bun test --isolate --coverage",
+    "upgrade": "bunx npm-check-updates -u && bun install"
+  },
+  "dependencies": {
+    "@jxsuite/schema": "workspace:^"
+  },
+  "devDependencies": {
+    "ajv": "^8.20.0"
+  },
+  "jx": "./jx-extension.json"
+}

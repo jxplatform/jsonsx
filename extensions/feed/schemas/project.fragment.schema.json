@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jxsuite.com/schema/extensions/feed/v1",
+  "title": "@jxsuite/feed project section",
+  "type": "object",
+  "properties": {
+    "feed": {
+      "type": "object",
+      "description": "Syndication feeds generated from content collections (@jxsuite/feed)",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "required": ["collection", "basePath"],
+        "additionalProperties": false,
+        "properties": {
+          "collection": {
+            "type": "string",
+            "description": "The content collection this feed syndicates"
+          },
+          "basePath": {
+            "type": "string",
+            "pattern": "^/",
+            "description": "URL prefix the collection's entries are served under, e.g. \"/blog/\""
+          },
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "formats": {
+            "type": "array",
+            "items": { "enum": ["atom", "json"] },
+            "default": ["atom", "json"],
+            "description": "RSS 2.0 is deliberately not offered: it has no standards body and every reader handles Atom."
+          },
+          "output": {
+            "type": "string",
+            "pattern": "^/",
+            "default": "/feed",
+            "description": "Base path; .xml and .json are appended"
+          },
+          "pageSize": { "type": "integer", "minimum": 1, "default": 20 },
+          "archive": {
+            "type": "boolean",
+            "default": false,
+            "description": "Emit RFC 5005 archived feeds for entries beyond pageSize"
+          },
+          "author": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string" },
+              "uri": { "type": "string" },
+              "email": { "type": "string" }
+            }
+          },
+          "dateField": { "type": "string", "default": "date" },
+          "updatedField": { "type": "string", "default": "updated" },
+          "contentMode": { "enum": ["full", "summary", "none"], "default": "summary" },
+          "language": {
+            "type": "string",
+            "description": "BCP 47 language tag; defaults to defaults.lang"
+          }
+        }
+      }
+    }
+  }
+}

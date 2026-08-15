@@ -156,6 +156,18 @@ export class ExtensionRegistry {
     return this.#classes.filter((e) => e.capabilities.emit !== undefined);
   }
 
+  /**
+   * Classes declaring a `head` capability (§8.6), in declaration order.
+   *
+   * Separate from `emit` because the two answer different questions at different times: `emit`
+   * derives files from loaded content and runs long after every page was written, while `head`
+   * derives `<head>` entries from CONFIGURATION and must run before the first page is built. A feed
+   * needs both — the file from `emit`, the `<link rel="alternate">` from here.
+   */
+  headProviders(): FormatEntry[] {
+    return this.#classes.filter((e) => e.capabilities.head !== undefined);
+  }
+
   /** Classes declaring an `assets` capability (static asset mounts, §8.5), in declaration order. */
   assetProviders(): FormatEntry[] {
     return this.#classes.filter((e) => e.capabilities.assets !== undefined);

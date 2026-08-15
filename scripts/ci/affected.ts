@@ -113,6 +113,12 @@ const EXTRA_EDGES: ExtraEdge[] = [
     ],
     why: "An INVERTED edge: extensions depend on schema, yet schema's tests read parser's committed fragment and walk every extension's src for class definitions.",
   },
+  {
+    patterns: ["extensions/feed/src/**", "extensions/parser/src/**"],
+    seeds: ["packages/compiler"],
+    evidence: ["packages/compiler/tests/feed-integration.test.ts"],
+    why: "The compiler's one end-to-end feed test builds a project that loads @jxsuite/parser and @jxsuite/feed, so a change to either extension's src can break a compiler test.",
+  },
 ];
 
 /**

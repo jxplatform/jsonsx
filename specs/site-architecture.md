@@ -2,7 +2,7 @@
 
 ## File-Based Routing, Content Collections, Layouts, and Static Site Generation
 
-**Version:** 0.3.0-draft
+**Version:** 0.3.1-draft
 **Status:** Partial
 **Updated:** 2026-08-15
 **License:** MIT
@@ -755,6 +755,49 @@ content/                         # Schemas live in project.json `content`
 - The collection directory name matches the key in the `content` section of `project.json`
 
 ---
+
+### 6.7 Syndication feeds
+
+> **Status: Implemented.** Provided by `@jxsuite/feed`, a first-party extension rather than a
+> compiler built-in: a feed is derived from a content collection, and hard-coding the compiler to
+> one extension's section is the coupling `extensions.md` §1 exists to prevent.
+
+A `feed` section names a collection and the URL prefix its entries are served under:
+
+```json
+{
+  "feed": {
+    "blog": {
+      "collection": "posts",
+      "basePath": "/blog/",
+      "title": "Example Blog",
+      "archive": true
+    }
+  }
+}
+```
+
+**Atom (RFC 4287) and JSON Feed 1.1. RSS 2.0 is deliberately not offered** — it has no standards
+body, its `<guid>` semantics were never settled, and every reader handles Atom. The omission is a
+decision rather than an oversight, which is why it is written down.
+
+**Dates come from the entry, never the build.** The `date` and `updated` frontmatter fields are
+already normalized to RFC 3339 by the parser (`parser.md` §9.3); an entry with no authored date
+falls back to `_meta.mtime`. The feed-level `<updated>` is the newest **item** — a feed stamped with
+the build time re-notifies every subscriber on every deploy.
+
+**RFC 5005.** With `archive: true`, entries beyond `pageSize` are written to
+`/feed/archive/<n>.xml`, linked by `prev-archive` and `next-archive`, each pointing back at the
+subscription document with `rel="current"`. Archives are chunked **from the oldest end**, so
+archive 1 keeps its contents as entries are added and only the newest archive changes — RFC 5005 §2
+asks that a published archive not change. When a feed holds its entire history it says so with
+`<fh:complete/>`, and only then: a document trimmed by `pageSize` is not complete even with no
+archives, and claiming otherwise would be believed.
+
+**Discovery.** The `<link rel="alternate">` tags come from the `head` capability
+(`extensions.md` §8.6), not from `emit` — emitters run after every page is written and cannot reach
+a `<head>`. Both formats' links survive the merge because §8.3 keys a link on its `type` as well as
+its `rel` and `href`.
 
 ## 7. Data Management in Studio
 
@@ -1835,6 +1878,9 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 | Standard                                                                                  | Class       | Binds      | Evidence                                                                                       | Note                                                                                                                                                                                                                                                                                |
 | ----------------------------------------------------------------------------------------- | ----------- | ---------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [RFC 4287](https://www.rfc-editor.org/rfc/rfc4287)                                        | **Subset**  | §6.7       | extensions/feed/src/atom.ts, extensions/feed/tests/feed.test.ts                                | Feed and entry documents carry the required `id`, `title` and `updated`, plus `self` and `alternate` links. Not implemented: `<category>`, `<contributor>`, `<rights>`, and Atom's own paging — RFC 5005 covers the last of those.                                                  |
+| [JSON Feed 1.1](https://www.jsonfeed.org/version/1.1/)                                    | **Subset**  | §6.7       | extensions/feed/src/json-feed.ts, extensions/feed/tests/feed.test.ts                           | Feed identity, `language`, and per-item content, dates and authors. Attachments, tags, `banner_image` and hubs are not emitted; `next_url` is available but archives are offered in Atom alone rather than mixing two pagination conventions in one feed.                           |
+| [RFC 5005](https://www.rfc-editor.org/rfc/rfc5005)                                        | **Subset**  | §6.7       | extensions/feed/src/feed.ts, extensions/feed/tests/feed.test.ts                                | The archived-feeds flavour (§2) plus `<fh:complete/>` (§4), which is the one designed for static hosting. Paged feeds (§3) are not offered: they are explicitly unstable for subscription, which is the only thing a static site publishes.                                         |
 | [RFC 9309](https://www.rfc-editor.org/rfc/rfc9309)                                        | **Adopted** | §8.4.1     | packages/compiler/src/site/site-build.ts                                                       | A minimal `robots.txt` is created when none was provided, and an existing one is appended to rather than replaced. The `Sitemap:` line the build adds is a sitemaps.org extension, not part of this standard.                                                                       |
 | [Sitemaps 0.9](https://www.sitemaps.org/protocol.html)                                    | **Subset**  | §8.4.1     | packages/compiler/src/site/site-build.ts                                                       | `gap:sitemap-fields` `<loc>` and `<lastmod>` only. No `<changefreq>`, no `<priority>`, and no `xhtml:link` alternates — the last of which §13 will need.                                                                                                                            |
 | [WHATWG URLPattern](https://urlpattern.spec.whatwg.org/)                                  | **Subset**  | §11.1      | packages/compiler/src/site/site-build.ts                                                       | Pattern strings are passed through to `_redirects` verbatim; the compiler neither parses nor validates them, so a malformed pattern is a deploy-time failure rather than a build-time one.                                                                                          |
@@ -1969,11 +2015,12 @@ This spec builds on existing Jx primitives wherever possible:
 - [ ] Internationalization routing (locale prefix, default locale handling)
 - [ ] Content localization (per-locale content directories)
 - [ ] Pagination helpers
-- [ ] RSS/Atom feed generation (unblocked by the `emit` capability, extensions.md §8.4)
+- [x] Atom and JSON Feed generation — `@jxsuite/feed` (§6.7), via the `emit` and `head` capabilities (extensions.md §8.4, §8.6). RSS 2.0 is **declined**: no standards body, and every reader handles Atom.
 - [x] Search index generation — via the extension `emit` capability (extensions.md §8.4)
 
 ## Changelog
 
+- **0.3.1-draft** (2026-08-15) — Add §6.7 syndication feeds: Atom and JSON Feed via @jxsuite/feed, RFC 5005 archives, RSS declined.
 - **0.3.0-draft** (2026-08-15) — §8.3 link identity includes hreflang/type/media/sizes; §8.5 JSON-LD objects serialize; §8.4 lang and dir come from the page.
 - **0.2.1-draft** (2026-08-15) — Add §14.3 response headers and §14.4 .nojekyll; §14's header gap is closed and vercel.json is declined.
 - **0.2.0-draft** (2026-08-15) — §11.3 separates redirects from rewrites: an RFC 9110 status enum, a per-status HTML-fallback policy, and no file for a rewrite.

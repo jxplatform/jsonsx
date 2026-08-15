@@ -70,6 +70,16 @@
         "hono": "^4.13.2",
       },
     },
+    "extensions/feed": {
+      "name": "@jxsuite/feed",
+      "version": "0.1.0",
+      "dependencies": {
+        "@jxsuite/schema": "workspace:^",
+      },
+      "devDependencies": {
+        "ajv": "^8.20.0",
+      },
+    },
     "extensions/parser": {
       "name": "@jxsuite/parser",
       "version": "1.4.1",
@@ -827,6 +837,8 @@
     "@jxsuite/desktop": ["@jxsuite/desktop@workspace:packages/desktop"],
 
     "@jxsuite/examples": ["@jxsuite/examples@workspace:examples"],
+
+    "@jxsuite/feed": ["@jxsuite/feed@workspace:extensions/feed"],
 
     "@jxsuite/formulas": ["@jxsuite/formulas@workspace:packages/formulas"],
 

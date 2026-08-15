@@ -2,7 +2,7 @@
 
 ## Which External Standards Jx Adopts, and How That Is Recorded
 
-**Version:** 0.1.3-draft
+**Version:** 0.1.4-draft
 **Status:** Partial
 **Updated:** 2026-08-15
 **License:** MIT
@@ -230,27 +230,25 @@ Standards the audit found relevant whose **owning spec section does not exist ye
 
 An entry names the spec that will own it. When that section is written, the entry moves out of this table and becomes a `Pending` row bound to it; `backlog-already-cited` fails if it is left in both places.
 
-| Standard                                                       | Target                                     | Why not yet                                                                                                                                                        |
-| -------------------------------------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [RFC 4287](https://www.rfc-editor.org/rfc/rfc4287)             | `site-architecture.md` — feed generation   | No section owns syndication. The `emit` capability (extensions.md §8.4) is the unblocker, and a feed needs real dates first, which is `gap:content-date-coercion`. |
-| [JSON Feed 1.1](https://www.jsonfeed.org/version/1.1/)         | `site-architecture.md` — feed generation   | Ships with Atom or not at all; same blocker.                                                                                                                       |
-| [RFC 5005](https://www.rfc-editor.org/rfc/rfc5005)             | `site-architecture.md` — feed generation   | Paged and archived feeds only matter once a feed exists.                                                                                                           |
-| [Web Application Manifest](https://www.w3.org/TR/appmanifest/) | `site-architecture.md` — installability    | No section owns PWA output. Emitting a manifest is small; deciding it belongs in the build is the open question.                                                   |
-| [Service Workers](https://www.w3.org/TR/service-workers/)      | `site-architecture.md` — installability    | A generated worker survives redeploys and can serve stale HTML indefinitely, so it needs a tombstone contract specified before any code.                           |
-| [RFC 9116](https://www.rfc-editor.org/rfc/rfc9116)             | `site-architecture.md` — well-known output | Nothing emits `.well-known`, so there is no section for `security.txt` to attach to.                                                                               |
-| [RFC 8615](https://www.rfc-editor.org/rfc/rfc8615)             | `site-architecture.md` — well-known output | Same: the URI namespace has no owner in the build.                                                                                                                 |
-| [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414)             | `desktop.md` §10                           | Discovery is only reachable once an authorization flow exists (`gap:native-oauth`), and the one provider in use publishes no metadata document.                    |
-| [WebAuthn Level 3](https://www.w3.org/TR/webauthn-3/)          | `desktop.md` §10                           | Passkeys need a registered relying-party id and a recovery story, neither of which is designed.                                                                    |
-| [UAX #9](https://www.unicode.org/reports/tr9/)                 | `site-architecture.md` §13                 | Bidirectional text needs `<html dir>`, which needs the locale plumbing `gap:site-locale-tags` describes.                                                           |
-| [UTS #35](https://www.unicode.org/reports/tr35/)               | `site-architecture.md` §13                 | Locale data has no consumer until a project locale reaches the runtime.                                                                                            |
-| [CSS Cascade Layers](https://www.w3.org/TR/css-cascade-5/)     | `spec.md` §9                               | The style model has no layer concept; adding one is a design change, not a citation.                                                                               |
-| [CSS Containment 3](https://www.w3.org/TR/css-contain-3/)      | `spec.md` §9                               | `$media` is viewport-only. Container queries would need a named-container model in the style object.                                                               |
-| [Media Queries 5](https://www.w3.org/TR/mediaqueries-5/)       | `spec.md` §9.4                             | `$media` borrows `@custom-media`'s shape from this level, but Jx resolves it itself and no browser ships it — so there is nothing to conform to until one does.    |
-| [CSS Shadow Parts](https://www.w3.org/TR/css-shadow-parts-1/)  | `spec.md` §13                              | `::part` is meaningless without shadow roots, and Declarative Shadow DOM is opt-in work not yet specified.                                                         |
-| [WebDriver BiDi](https://www.w3.org/TR/webdriver-bidi/)        | `studio.md` — screenshot pipeline          | The pipeline drives Chrome over CDP from `scripts/`, which no spec section describes.                                                                              |
+| Standard                                                       | Target                                     | Why not yet                                                                                                                                                     |
+| -------------------------------------------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Web Application Manifest](https://www.w3.org/TR/appmanifest/) | `site-architecture.md` — installability    | No section owns PWA output. Emitting a manifest is small; deciding it belongs in the build is the open question.                                                |
+| [Service Workers](https://www.w3.org/TR/service-workers/)      | `site-architecture.md` — installability    | A generated worker survives redeploys and can serve stale HTML indefinitely, so it needs a tombstone contract specified before any code.                        |
+| [RFC 9116](https://www.rfc-editor.org/rfc/rfc9116)             | `site-architecture.md` — well-known output | Nothing emits `.well-known`, so there is no section for `security.txt` to attach to.                                                                            |
+| [RFC 8615](https://www.rfc-editor.org/rfc/rfc8615)             | `site-architecture.md` — well-known output | Same: the URI namespace has no owner in the build.                                                                                                              |
+| [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414)             | `desktop.md` §10                           | Discovery is only reachable once an authorization flow exists (`gap:native-oauth`), and the one provider in use publishes no metadata document.                 |
+| [WebAuthn Level 3](https://www.w3.org/TR/webauthn-3/)          | `desktop.md` §10                           | Passkeys need a registered relying-party id and a recovery story, neither of which is designed.                                                                 |
+| [UAX #9](https://www.unicode.org/reports/tr9/)                 | `site-architecture.md` §13                 | Bidirectional text needs `<html dir>`, which needs the locale plumbing `gap:site-locale-tags` describes.                                                        |
+| [UTS #35](https://www.unicode.org/reports/tr35/)               | `site-architecture.md` §13                 | Locale data has no consumer until a project locale reaches the runtime.                                                                                         |
+| [CSS Cascade Layers](https://www.w3.org/TR/css-cascade-5/)     | `spec.md` §9                               | The style model has no layer concept; adding one is a design change, not a citation.                                                                            |
+| [CSS Containment 3](https://www.w3.org/TR/css-contain-3/)      | `spec.md` §9                               | `$media` is viewport-only. Container queries would need a named-container model in the style object.                                                            |
+| [Media Queries 5](https://www.w3.org/TR/mediaqueries-5/)       | `spec.md` §9.4                             | `$media` borrows `@custom-media`'s shape from this level, but Jx resolves it itself and no browser ships it — so there is nothing to conform to until one does. |
+| [CSS Shadow Parts](https://www.w3.org/TR/css-shadow-parts-1/)  | `spec.md` §13                              | `::part` is meaningless without shadow roots, and Declarative Shadow DOM is opt-in work not yet specified.                                                      |
+| [WebDriver BiDi](https://www.w3.org/TR/webdriver-bidi/)        | `studio.md` — screenshot pipeline          | The pipeline drives Chrome over CDP from `scripts/`, which no spec section describes.                                                                           |
 
 ## Changelog
 
+- **0.1.4-draft** (2026-08-15) — RFC 4287, JSON Feed 1.1 and RFC 5005 graduate to bound rows in site-architecture.md §6.7.
 - **0.1.3-draft** (2026-08-15) — Three backlog entries graduate to bound rows in site-architecture.md §14.3 (HSTS, Referrer-Policy, Permissions-Policy).
 - **0.1.2-draft** (2026-08-15) — Add §11 Adoption Backlog: standards whose owning section does not exist yet, each naming the spec that will own it.
 - **0.1.1-draft** (2026-08-15) — A Subset may name a gap for the half it omits; a non-standard is prose rather than a Rejected row.
@@ -258,4 +256,4 @@ An entry names the spec that will own it. When that section is written, the entr
 
 ---
 
-_Jx Standards Alignment Specification v0.1.3-draft_
+_Jx Standards Alignment Specification v0.1.4-draft_

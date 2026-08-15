@@ -2,7 +2,7 @@
 
 ## JSON Schema 2020-12 Meta-Schema Generator
 
-**Version:** 0.4.3-draft
+**Version:** 0.4.4-draft
 **Status:** Partial
 **Updated:** 2026-08-15
 **License:** MIT
@@ -235,6 +235,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.4.4-draft** (2026-08-15) — The class method role enum gains head (extensions.md §8.6).
 - **0.4.3-draft** (2026-08-15) — §3.1 records the root fields the 0.4.2 entry described.
 - **0.4.2-draft** (2026-08-15) — Document $lang, $dir and the previously undeclared $sitemap; defaults.dir; HeadEntry.textContent admits an object.
 - **0.4.1-draft** (2026-08-15) — build.headers declares the response-header output (site-architecture.md §14.3).
@@ -258,4 +259,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/schema` Specification v0.4.3-draft_
+_`@jxsuite/schema` Specification v0.4.4-draft_

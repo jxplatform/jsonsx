@@ -2,7 +2,7 @@
 
 ## Content Formats and the Reference Format-Extension Classes
 
-**Version:** 0.2.6-draft
+**Version:** 0.2.7-draft
 **Status:** Partial
 **Updated:** 2026-08-15
 **License:** MIT
@@ -231,6 +231,11 @@ is the feature.
 When coercion rewrote a value the authored text is kept at `_meta.rawDates[field]`, because a
 collection that genuinely means "7pm local" has had that thrown away by the normalized instant.
 
+**`_meta.mtime`.** Every loaded entry carries its source file's modification time as RFC 3339. It is
+the only date a file always has, so it is the fallback a feed uses when the frontmatter carries none
+(`site-architecture.md` §6.7) — and it is what would let the sitemap stop giving every page
+generated from one template that template's `<lastmod>`.
+
 **A schemaless collection is not covered.** `MarkdownCollection` (§6) globs and sorts without a
 content-type schema, so nothing can know which of its frontmatter fields is a date. Its default
 `sortBy: "frontmatter.date"` compares text, which is correct for `YYYY-MM-DD` and wrong for an
@@ -254,6 +259,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.2.7-draft** (2026-08-15) — §9.3 records _meta.mtime as the date fallback a feed uses.
 - **0.2.6-draft** (2026-08-15) — Add §9.3 date coercion: schema-declared date fields normalize to RFC 3339, ambiguous values are refused rather than guessed.
 - **0.2.5-draft** (2026-08-15) — Add §10 Standards Alignment; §3 marked Partial — heading slugs and word counts are correct only for Latin script.
 - **0.2.4-draft** (2026-07-23) — Document the Content project-section class: asset mounts and content-relative reference rewriting (§9).
@@ -271,4 +277,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/parser` Specification v0.2.6-draft_
+_`@jxsuite/parser` Specification v0.2.7-draft_

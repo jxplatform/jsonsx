@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   buildHeaderRules,
+  contentTypeRules,
   IMMUTABLE_PATTERN,
   NEVER_IMMUTABLE,
   renderHeaders,
@@ -161,6 +162,20 @@ describe("writing", () => {
     const dir = tmp();
     expect(writeHeaders(dir, [])).toBe(0);
     expect(existsSync(join(dir, "_headers"))).toBe(false);
+    rmSync(dir, { force: true, recursive: true });
+  });
+
+  it("names a content type only for output that exists", () => {
+    const dir = tmp();
+    expect(contentTypeRules(dir)).toEqual([]);
+    // No host maps .xml to Atom, so the build has to say so.
+    writeFileSync(join(dir, "feed.xml"), "", "utf8");
+    const rules = contentTypeRules(dir);
+    expect(rules).toHaveLength(1);
+    expect(rules[0]).toEqual({
+      headers: { "Content-Type": "application/atom+xml; charset=utf-8" },
+      pattern: "/feed.xml",
+    });
     rmSync(dir, { force: true, recursive: true });
   });
 
