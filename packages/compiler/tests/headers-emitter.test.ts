@@ -18,6 +18,7 @@ import {
   writeHeaders,
   writeNoJekyll,
 } from "../src/site/headers-emitter.ts";
+import { collectCspSources, emptyCspSources } from "../src/site/csp.ts";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 
 type Build = ProjectConfig["build"];
@@ -31,6 +32,51 @@ function headersAt(build: Build, pattern: string): Record<string, string> | unde
 }
 
 const EMPTY: Build = {};
+
+describe("the Content-Security-Policy", () => {
+  const sourcesFor = (html: string) => {
+    const sources = emptyCspSources();
+    collectCspSources(html, sources);
+    return sources;
+  };
+  const cspFor = (build: Build, html = "<p>hi</p>") =>
+    buildHeaderRules(build, sourcesFor(html)).rules.find((r) => r.pattern === "/*")?.headers?.[
+      "Content-Security-Policy"
+    ];
+
+  /*
+   * Off by default, unlike every other security header here. This one governs code the build
+   * cannot see — a third-party script that loads a second script, a widget that opens a frame —
+   * so a wrong default leaves a blank page rather than a missing header.
+   */
+  it("is absent unless the project asks for it", () => {
+    expect(cspFor(EMPTY)).toBeUndefined();
+    expect(cspFor({ headers: { security: { csp: false } } })).toBeUndefined();
+  });
+
+  it("carries the hash of each inline script the pages actually shipped", () => {
+    const value = cspFor({ headers: { security: { csp: true } } }, "<script>go()</script>");
+    expect(value).toContain("script-src 'self' 'sha256-");
+  });
+
+  it("report-only sends the other header name", () => {
+    const headers = buildHeaderRules(
+      { headers: { security: { csp: "report-only" } } },
+      emptyCspSources(),
+    ).rules.find((r) => r.pattern === "/*")?.headers;
+    expect(headers?.["Content-Security-Policy-Report-Only"]).toContain("default-src 'self'");
+    expect(headers?.["Content-Security-Policy"]).toBeUndefined();
+  });
+
+  /*
+   * Asking for a policy without scanning a page would hash nothing and block every inline script
+   * the build emitted — a blank site. Better to fail the build and say so.
+   */
+  it("is a build error when no page was scanned", () => {
+    const { errors } = buildHeaderRules({ headers: { security: { csp: true } } });
+    expect(errors[0]).toContain("no page was scanned");
+  });
+});
 
 describe("the default rule set", () => {
   it("revalidates everything and marks only the content-addressed variants immutable", () => {

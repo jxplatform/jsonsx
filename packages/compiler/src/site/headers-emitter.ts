@@ -13,6 +13,8 @@
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { buildCspHeaders, normalizeCspConfig } from "./csp.ts";
+import type { CspSources } from "./csp.ts";
 import type { HeadersConfig, ProjectConfig } from "@jxsuite/schema/types";
 
 /** One `_headers` stanza: a path pattern and the headers it sets. */
@@ -50,7 +52,10 @@ const AUTHOR_BANNER =
  * matching rule wins for a duplicate header name, so the specific `immutable` stanza must follow
  * the catch-all that revalidates.
  */
-export function buildHeaderRules(build: ProjectConfig["build"]): {
+export function buildHeaderRules(
+  build: ProjectConfig["build"],
+  cspSources?: CspSources,
+): {
   rules: HeaderRule[];
   errors: string[];
 } {
@@ -100,6 +105,23 @@ export function buildHeaderRules(build: ProjectConfig["build"]): {
       ]
         .filter(Boolean)
         .join("; ");
+    }
+  }
+
+  /*
+   * One policy for the whole site, from the inline scripts and external origins the build actually
+   * emitted. It goes in the `/*` stanza rather than per page because the hashes are constants —
+   * and because a per-page policy would exhaust the host's rule budget on any real site.
+   */
+  const cspConfig = normalizeCspConfig(security);
+  if (cspConfig) {
+    if (cspSources === undefined) {
+      errors.push(
+        "build.headers.security.csp is set, but no page was scanned for inline scripts — the " +
+          "policy would block every one of them.",
+      );
+    } else {
+      Object.assign(wide, buildCspHeaders(cspSources, cspConfig));
     }
   }
 

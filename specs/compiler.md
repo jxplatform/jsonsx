@@ -2,7 +2,7 @@
 
 ## Static HTML Compiler, Custom Element Emitter, and Island Detector
 
-**Version:** 0.2.0-draft
+**Version:** 0.2.1-draft
 **Status:** Partial
 **Updated:** 2026-08-15
 **License:** MIT
@@ -813,7 +813,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 | ----------------------------------------------------------------------------------------- | ------------- | ------ | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [ECMA-262](https://ecma-international.org/publications-and-standards/standards/ecma-262/) | **Adopted**   | §4, §5 | packages/compiler/src/targets/compile-element.ts, packages/compiler/tests/no-eval.test.ts    | Emitted modules are plain ECMAScript modules containing no `new Function` and no `eval`, which is what lets compiled output run under a policy without `'unsafe-eval'` — asserted by a committed test.                                                                                                                                             |
 | [WHATWG HTML](https://html.spec.whatwg.org/)                                              | **Subset**    | §3, §4 | packages/compiler/src/targets/compile-element.ts                                             | Custom elements are defined and rendered into the **light** DOM; `<slot>` is emulated by splicing saved children, and no shadow root is ever attached. Declarative Shadow DOM, `::part` and `ElementInternals` are therefore unavailable to a Jx component.                                                                                        |
-| [CSP Level 3](https://www.w3.org/TR/CSP3/)                                                | **Pending**   | §3     | —                                                                                            | `gap:emit-csp` No policy is emitted for any tier. Both inline blocks are constants whose hashes are stable site-wide, and nothing is loaded cross-origin any more, so a strict `script-src` is now reachable — it is simply not emitted yet.                                                                                                       |
+| [CSP Level 3](https://www.w3.org/TR/CSP3/)                                                | **Subset**    | §3     | packages/compiler/tests/no-eval.test.ts, packages/compiler/src/site/csp.ts                   | What the tiers owe the policy: no `eval`, no `new Function`, and no `onclick=` attribute — handlers are bound as listeners — plus two inline blocks that are byte-identical across a build, so one hash each names them site-wide. The policy itself is assembled and emitted by the site build (`site-architecture.md` §14.3.1).                  |
 | [Subresource Integrity](https://www.w3.org/TR/SRI/)                                       | **Divergent** | §12    | packages/compiler/src/site/client-runtime.ts, packages/compiler/tests/client-runtime.test.ts | The gap this standard existed to close is closed by **removal** rather than by attestation: the runtime is served from the site, so there is no cross-origin subresource left to hash. SRI would apply again only if a project overrode the import map back to a URL, and the build cannot compute an integrity value for a file it never fetched. |
 
 ## Appendix A — Production Dependency Stack
@@ -833,6 +833,7 @@ is doing the only size work in the pipeline.
 
 ## Changelog
 
+- **0.2.1-draft** (2026-08-15) — §3 Implemented — the tiers' inline blocks are hash-nameable and the site build emits the policy.
 - **0.2.0-draft** (2026-08-15) — Client runtime is served from /assets/ instead of esm.sh; browser bundles resolve production export conditions under both backends (§3, §12).
 - **0.1.28-draft** (2026-08-15) — §3: node_modules URLs resolved — bare $head/$elements specifiers land in /assets/.
 - **0.1.27-draft** (2026-08-15) — Add §13 Standards Alignment; §3 marked Partial — inline scripts block a strict CSP and node_modules URLs 404 in production.
@@ -866,4 +867,4 @@ is doing the only size work in the pipeline.
 
 ---
 
-_`@jxsuite/compiler` Specification v0.2.0-draft_
+_`@jxsuite/compiler` Specification v0.2.1-draft_

@@ -161,6 +161,38 @@ export const projectConfigSchema = {
               additionalProperties: false,
               properties: {
                 contentTypeOptions: { default: true, type: "boolean" },
+                csp: {
+                  default: false,
+                  description:
+                    "CSP Level 3. Off by default: unlike the other security headers this one " +
+                    "governs code the build cannot see — a third-party script that loads a " +
+                    "second script, a widget that opens a frame — so turning it on is a change " +
+                    "to verify in the browser console, not a safe default. `script-src` is " +
+                    "derived from the inline scripts and external origins the build emitted; " +
+                    "`style-src` keeps 'unsafe-inline', because per-page <style> blocks and " +
+                    "per-element style attributes have no site-wide hash.",
+                  oneOf: [
+                    { type: "boolean" },
+                    { const: "report-only" },
+                    {
+                      additionalProperties: false,
+                      properties: {
+                        directives: {
+                          additionalProperties: {
+                            oneOf: [{ type: "string" }, { const: false }],
+                          },
+                          description:
+                            "Replace (string) or remove (false) a computed directive. A " +
+                            "replacement is wholesale, so an addition restates the defaults.",
+                          type: "object",
+                        },
+                        mode: { default: "enforce", enum: ["enforce", "report-only"] },
+                        reportUri: { format: "uri-reference", type: "string" },
+                      },
+                      type: "object",
+                    },
+                  ],
+                },
                 frameOptions: {
                   default: "SAMEORIGIN",
                   oneOf: [{ enum: ["DENY", "SAMEORIGIN"], type: "string" }, { const: false }],

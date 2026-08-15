@@ -517,6 +517,26 @@ export type AdapterId = "static" | "cloudflare-pages" | "cloudflare-workers" | "
  * tell whether publishing is set up.
  */
 /** `dist/_headers` output — the response headers only the build can know (RFC 9111, RFC 8246). */
+/**
+ * CSP Level 3, as far as a static build can go.
+ *
+ * Off by default. Every other security header the build emits is safe to turn on for a site that
+ * has never seen one; a policy is the one that can leave a page blank, because it governs code the
+ * build cannot see — a third-party script that loads a second script, a widget that opens a frame.
+ * Turning it on is one line and one look at the browser console.
+ */
+export interface CspConfig {
+  /** `"report-only"` sends `Content-Security-Policy-Report-Only`. Default `"enforce"`. */
+  mode?: "enforce" | "report-only";
+  /**
+   * Replace or remove a computed directive. `false` removes it; a string replaces it wholesale, so
+   * an addition means restating the default's sources alongside the new one.
+   */
+  directives?: Record<string, string | false>;
+  /** Where violation reports go. Emits `report-to`, `report-uri` and `Reporting-Endpoints`. */
+  reportUri?: string;
+}
+
 export interface HeadersConfig {
   /** Emit the file at all. Default true. */
   enabled?: boolean;
@@ -539,6 +559,8 @@ export interface HeadersConfig {
      * and the mistake is not visible until a certificate lapses.
      */
     hsts?: boolean | { maxAge?: number; includeSubDomains?: boolean; preload?: boolean };
+    /** CSP Level 3. Off by default — see {@link CspConfig}. */
+    csp?: boolean | "report-only" | CspConfig;
   };
   /** Verbatim rules, merged after the generated block. Keys are path patterns. */
   rules?: Record<string, Record<string, string>>;

@@ -18,6 +18,7 @@ import { resolveLayout } from "../src/site/layout-resolver";
 import { mergeHead, renderHead } from "../src/site/head-merger";
 import { injectContext } from "../src/site/context-injection";
 import { buildSite } from "../src/site/site-build";
+import { hashOf } from "../src/site/csp.ts";
 import { _testResetNpmCacheBase, _testSetNpmCacheBase } from "../src/site/image-cache.ts";
 
 const TMP = resolve(import.meta.dir, "__test-site__");
@@ -1525,6 +1526,97 @@ describe("buildSite — the import map points at the site, not a CDN", () => {
     // And the URLs it names are real files, which is the half a bare rewrite would have missed.
     expect(existsSync(resolve(RT_TMP, "dist/assets/vue-reactivity.js"))).toBe(true);
     expect(existsSync(resolve(RT_TMP, "dist/assets/lit-html.js"))).toBe(true);
+  }, 30_000);
+});
+
+// ── Content-Security-Policy over a real build ────────────────────────────────
+
+describe("buildSite — the emitted policy authorizes the page it was built from", () => {
+  const CSP_TMP = resolve(import.meta.dir, "__test-site-csp__");
+
+  beforeAll(() => {
+    rmSync(CSP_TMP, { force: true, recursive: true });
+    mkdirSync(resolve(CSP_TMP, "components"), { recursive: true });
+    mkdirSync(resolve(CSP_TMP, "pages"), { recursive: true });
+    writeFileSync(
+      resolve(CSP_TMP, "project.json"),
+      JSON.stringify({
+        $head: [
+          {
+            attributes: { type: "application/ld+json" },
+            tagName: "script",
+            textContent: { "@context": "https://schema.org", "@type": "WebSite" },
+          },
+        ],
+        $media: { dark: "(prefers-color-scheme: dark)" },
+        build: { headers: { security: { csp: true } }, outDir: "./dist" },
+        name: "CSP Site",
+        url: "https://csp.example",
+      }),
+      "utf8",
+    );
+    writeFileSync(
+      resolve(CSP_TMP, "components/csp-counter.json"),
+      JSON.stringify({
+        children: [
+          { onclick: { $ref: "#/state/bump" }, tagName: "button", textContent: "${state.n}" },
+        ],
+        state: {
+          bump: { $expression: { operator: "+=", target: { $ref: "#/state/n" }, value: 1 } },
+          n: 0,
+        },
+        tagName: "csp-counter",
+      }),
+      "utf8",
+    );
+    writeFileSync(
+      resolve(CSP_TMP, "pages/index.json"),
+      JSON.stringify({ children: [{ tagName: "csp-counter" }], tagName: "main", title: "Home" }),
+      "utf8",
+    );
+  });
+
+  afterAll(() => {
+    rmSync(CSP_TMP, { force: true, recursive: true });
+  });
+
+  /*
+   * The load-bearing assertion of the whole feature: every inline script in the shipped HTML is
+   * named by a hash in the shipped header. A hash that does not match the bytes is worse than no
+   * policy, so this compares the two artifacts rather than either one against an expectation.
+   *
+   * Verified in Chrome as well, on this exact shape: the pre-paint script and import map run, the
+   * JSON-LD survives without a hash, the counter increments on click, and an injected inline
+   * script is blocked.
+   */
+  it("hashes every executable inline script, and nothing else", async () => {
+    const result = await buildSite(CSP_TMP, { verbose: false });
+    expect(result.errors).toHaveLength(0);
+
+    const html = readFileSync(resolve(CSP_TMP, "dist/index.html"), "utf8");
+    const csp = /\n {2}Content-Security-Policy: (.*)/.exec(
+      readFileSync(resolve(CSP_TMP, "dist/_headers"), "utf8"),
+    )?.[1];
+    expect(csp).toBeDefined();
+
+    const inline = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)].filter(
+      (m) => !/\bsrc\s*=/.test(m[1] ?? ""),
+    );
+    const executable = inline.filter((m) => !/ld\+json/.test(m[1] ?? ""));
+    // The pre-paint script and the import map, both present and both hashed.
+    expect(executable.length).toBeGreaterThanOrEqual(2);
+    for (const match of executable) {
+      expect(csp).toContain(hashOf(match[2] ?? ""));
+    }
+
+    // The data block is present and deliberately unhashed — CSP never checks it.
+    const dataBlock = inline.find((m) => /ld\+json/.test(m[1] ?? ""));
+    expect(dataBlock).toBeDefined();
+    expect(csp).not.toContain(hashOf(dataBlock?.[2] ?? ""));
+
+    // Nothing cross-origin is left to allow.
+    expect(csp).toContain("default-src 'self'");
+    expect(csp).not.toContain("https://");
   }, 30_000);
 });
 

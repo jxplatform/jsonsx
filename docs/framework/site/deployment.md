@@ -5,6 +5,8 @@ spec:
   - site-architecture.md#14
 code:
   - packages/compiler/src/site/site-build.ts
+  - packages/compiler/src/site/headers-emitter.ts
+  - packages/compiler/src/site/csp.ts
   - packages/compiler/src/cli.ts
 ---
 
@@ -74,6 +76,57 @@ Your own `public/_headers` still works: it is appended below the generated block
 :::doc-warning
 HSTS is off by default on purpose. `Strict-Transport-Security` tells browsers to refuse plain HTTP for your domain for `maxAge` seconds, and they remember it — so a wrong value locks the domain to HTTPS long after you notice. Turn it on once your certificate setup is settled.
 :::
+
+## Content-Security-Policy
+
+Also off by default, and also on purpose. Turn it on with one line:
+
+```json
+{ "build": { "headers": { "security": { "csp": true } } } }
+```
+
+The build then derives the policy from the pages it just produced:
+
+```
+Content-Security-Policy: base-uri 'self'; default-src 'self'; font-src 'self'; form-action 'self';
+  frame-ancestors 'self'; frame-src 'self'; img-src 'self' data:; object-src 'none';
+  script-src 'self' 'sha256-…' 'sha256-…'; style-src 'self' 'unsafe-inline'
+```
+
+`script-src` is the strict part, and it costs you nothing: compiled Jx output contains no `eval` and no `new Function`, event handlers are attached as listeners rather than written as `onclick=` attributes, and the runtime is served from your own site. The only inline scripts on a page are the import map and the colour-scheme pre-paint script — both identical on every page, so two hashes cover the whole site.
+
+If your pages load anything from another origin — an analytics script, Google Fonts, a YouTube embed — the build sees it in the finished HTML and adds that origin to the right directive. What it can't see is the second hop: a third-party script that loads _another_ script at runtime. That's the case to check.
+
+:::doc-tip
+Start with `"csp": "report-only"`. You get `Content-Security-Policy-Report-Only`, the browser reports what it _would_ have blocked in the console, and nothing on your site breaks while you look. Switch to `true` when the console is clean.
+:::
+
+### style-src is not strict
+
+`style-src` keeps `'unsafe-inline'`, and will until the style pipeline changes. Every page carries a generated `<style>` block whose content differs per page, and per-element `style=` attributes have no hash form in CSP at all. Half-measures are worse than none here: a hash and `'unsafe-inline'` in the same directive cancel each other out, so adding a few style hashes would leave your pages unstyled.
+
+### Overriding a directive
+
+```json
+{
+  "build": {
+    "headers": {
+      "security": {
+        "csp": {
+          "mode": "enforce",
+          "reportUri": "https://example.report-uri.com/r/d/csp/enforce",
+          "directives": {
+            "connect-src": "'self' https://api.example.com",
+            "frame-src": false
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+A string replaces a directive wholesale — restate the defaults you still want — and `false` removes it. `reportUri` emits `report-to`, the deprecated-but-widely-implemented `report-uri`, and the `Reporting-Endpoints` header that the first of those needs to mean anything.
 
 ## Build options
 

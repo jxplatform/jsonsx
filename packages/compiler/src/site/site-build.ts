@@ -65,6 +65,7 @@ import {
 } from "../shared.ts";
 import { resolvePrototypes } from "./prototype-resolver.ts";
 import { transformImageNodes } from "./image-transform.ts";
+import { collectCspSources, emptyCspSources } from "./csp.ts";
 import { renderImportMap, resolveClientRuntime, writeClientRuntime } from "./client-runtime.ts";
 import { getImageCacheDir, loadCache, saveCache } from "./image-cache.ts";
 import type { ImageConfig } from "./image-optimizer.ts";
@@ -145,6 +146,11 @@ export async function buildSite(
   const clientRuntime = resolveClientRuntime();
   const runtimeImports = clientRuntime.imports;
   const runtimeAssetsUsed = new Set<string>();
+  /*
+   * Scanned from every finished page, so the hashes name the exact bytes shipped rather than what
+   * some emission site believed it wrote.
+   */
+  const cspSources = emptyCspSources();
   for (const warning of clientRuntime.warnings) {
     console.warn(warning);
   }
@@ -453,6 +459,7 @@ export async function buildSite(
       // Mounted assets this page actually references — scanned from the finished HTML so a
       // Reference is caught wherever it came from (markdown image, hand-authored page, $head).
       collectAssetRefs(result.html, assetMounts, assetRefs);
+      collectCspSources(result.html, cspSources);
 
       // Determine output path
       const outPath = routeToOutputPath(route.urlPattern, outDir, trailingSlash);
@@ -733,7 +740,10 @@ export async function buildSite(
   // Also after the public/ copy, for the same reason — but PREPENDING rather than appending, since
   // A later `_headers` rule wins for a duplicate header name and the author's block must override.
   {
-    const { errors: headerErrors, rules: securityRules } = buildHeaderRules(projectConfig.build);
+    const { errors: headerErrors, rules: securityRules } = buildHeaderRules(
+      projectConfig.build,
+      cspSources,
+    );
     errors.push(...headerErrors);
     // Runs here, after every emitter, so it can see which of these files the build actually wrote.
     const rules = [...securityRules, ...contentTypeRules(outDir)];
