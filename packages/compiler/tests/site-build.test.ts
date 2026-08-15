@@ -348,6 +348,22 @@ describe("buildSite", () => {
     });
   });
 
+  it("emits _headers and .nojekyll", async () => {
+    await buildSite(TMP, { verbose: false });
+
+    const headers = readFileSync(resolve(TMP, "dist/_headers"), "utf8");
+    expect(headers).toContain("/*\n");
+    expect(headers).toContain("Cache-Control: public, max-age=0, must-revalidate");
+    expect(headers).toContain("/images/_optimized/*");
+    expect(headers).toContain("immutable");
+    expect(headers).toContain("X-Content-Type-Options: nosniff");
+    // The build knows which filenames carry a content hash and which do not.
+    expect(headers).not.toContain("/components/*");
+
+    // Jekyll excludes every `_`-prefixed path, which is most of what the build just wrote.
+    expect(existsSync(resolve(TMP, "dist/.nojekyll"))).toBe(true);
+  });
+
   it("generates sitemap.xml from the route table", async () => {
     await buildSite(TMP, { verbose: false });
 

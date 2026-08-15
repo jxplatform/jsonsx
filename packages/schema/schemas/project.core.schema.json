@@ -254,6 +254,118 @@
           "description": "Output directory for compiled site.",
           "type": "string"
         },
+        "headers": {
+          "additionalProperties": false,
+          "description": "Emit dist/_headers — the response headers only the build can know. Honored by Cloudflare Pages/Workers assets and Netlify; on the node/bun adapters the file documents what a reverse proxy in front of them must send.",
+          "properties": {
+            "cache": {
+              "default": "auto",
+              "description": "\"auto\" marks the content-addressed image variants immutable (RFC 8246) and revalidates everything else (RFC 9111). \"off\" emits no Cache-Control at all.",
+              "enum": ["auto", "off"],
+              "type": "string"
+            },
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "rules": {
+              "additionalProperties": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "description": "Verbatim rules, merged after the generated block.",
+              "propertyNames": {
+                "pattern": "^/"
+              },
+              "type": "object"
+            },
+            "security": {
+              "additionalProperties": false,
+              "properties": {
+                "contentTypeOptions": {
+                  "default": true,
+                  "type": "boolean"
+                },
+                "frameOptions": {
+                  "default": "SAMEORIGIN",
+                  "oneOf": [
+                    {
+                      "enum": ["DENY", "SAMEORIGIN"],
+                      "type": "string"
+                    },
+                    {
+                      "const": false
+                    }
+                  ]
+                },
+                "hsts": {
+                  "default": false,
+                  "description": "RFC 6797. Off by default: a wrong max-age locks the apex domain to HTTPS for that long, and the mistake is invisible until a certificate lapses. `preload` requires `includeSubDomains` and is a build error without it.",
+                  "oneOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "includeSubDomains": {
+                          "default": true,
+                          "type": "boolean"
+                        },
+                        "maxAge": {
+                          "default": 31536000,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "preload": {
+                          "default": false,
+                          "type": "boolean"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  ]
+                },
+                "permissionsPolicy": {
+                  "default": "camera=(), microphone=(), geolocation=()",
+                  "oneOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "const": false
+                    }
+                  ]
+                },
+                "referrerPolicy": {
+                  "default": "strict-origin-when-cross-origin",
+                  "oneOf": [
+                    {
+                      "enum": [
+                        "no-referrer",
+                        "no-referrer-when-downgrade",
+                        "origin",
+                        "origin-when-cross-origin",
+                        "same-origin",
+                        "strict-origin",
+                        "strict-origin-when-cross-origin",
+                        "unsafe-url"
+                      ],
+                      "type": "string"
+                    },
+                    {
+                      "const": false
+                    }
+                  ]
+                }
+              },
+              "type": "object"
+            }
+          },
+          "type": "object"
+        },
         "sitemap": {
           "default": true,
           "description": "Generate sitemap.xml from the route table (requires `url`). Set false to disable.",

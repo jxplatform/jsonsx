@@ -510,6 +510,34 @@ export type AdapterId = "static" | "cloudflare-pages" | "cloudflare-workers" | "
  * Identifiers only — no secrets — so it travels with the repo and any Studio (local or cloud) can
  * tell whether publishing is set up.
  */
+/** `dist/_headers` output — the response headers only the build can know (RFC 9111, RFC 8246). */
+export interface HeadersConfig {
+  /** Emit the file at all. Default true. */
+  enabled?: boolean;
+  /**
+   * `"auto"` marks the content-addressed image variants immutable and revalidates everything else.
+   * `"off"` emits no `Cache-Control` at all, for a host that manages caching itself.
+   */
+  cache?: "auto" | "off";
+  security?: {
+    /** `X-Content-Type-Options: nosniff`. Default true. */
+    contentTypeOptions?: boolean;
+    /** `X-Frame-Options`, or false to omit. Default `"SAMEORIGIN"`. */
+    frameOptions?: "DENY" | "SAMEORIGIN" | false;
+    /** `Referrer-Policy`, or false to omit. Default `"strict-origin-when-cross-origin"`. */
+    referrerPolicy?: string | false;
+    /** `Permissions-Policy`, or false to omit. */
+    permissionsPolicy?: string | false;
+    /**
+     * RFC 6797. **Off by default**: a wrong `max-age` locks an apex domain to HTTPS for that long,
+     * and the mistake is not visible until a certificate lapses.
+     */
+    hsts?: boolean | { maxAge?: number; includeSubDomains?: boolean; preload?: boolean };
+  };
+  /** Verbatim rules, merged after the generated block. Keys are path patterns. */
+  rules?: Record<string, Record<string, string>>;
+}
+
 export interface DeployConfig {
   provider: "cloudflare-pages";
   accountId: string;
@@ -531,6 +559,7 @@ export interface ProjectConfig {
     adapter?: AdapterId | (string & Record<never, never>);
     deploy?: DeployConfig;
     sitemap?: boolean;
+    headers?: HeadersConfig;
     [key: string]: unknown;
   };
   images?: ImageConfig;

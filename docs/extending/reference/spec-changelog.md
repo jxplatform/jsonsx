@@ -159,6 +159,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `schema.md`
 
+- **0.4.1-draft** (2026-08-15) — build.headers declares the response-header output (site-architecture.md §14.3).
 - **0.4.0-draft** (2026-08-15) — redirects admits the object form the compiler and Studio already write, with an RFC 9110 status enum and a distinct rewrite shape; §3.2's redirect defect is resolved.
 - **0.3.2-draft** (2026-08-15) — Add §7 Standards Alignment; §3.2 marked Partial — redirects and i18n do not describe what the rest of the platform reads.
 - **0.3.1-draft** (2026-08-10) — §3.1 ElementTagName admits a TagExpression on ElementDef alone — a closed two-branch def whose every result $refs TagName, so the pattern is kept and the candidates stay enumerable; $head items are pinned to HeadEntry so a head tag cannot become choosable.
@@ -195,6 +196,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `site-architecture.md`
 
+- **0.2.1-draft** (2026-08-15) — Add §14.3 response headers and §14.4 .nojekyll; §14's header gap is closed and vercel.json is declined.
 - **0.2.0-draft** (2026-08-15) — §11.3 separates redirects from rewrites: an RFC 9110 status enum, a per-status HTML-fallback policy, and no file for a rewrite.
 - **0.1.45-draft** (2026-08-15) — Add §16 Standards Alignment; §8.5 marked Pending — the JSON-LD object form is unimplemented — and §14 Partial: no _headers or .nojekyll is emitted.
 - **0.1.44-draft** (2026-08-12) — Header status corrected from Pending to Partial — all seven marked sections were Implemented while the header claimed nothing was; §9.4's marker and its own Still-planned list contradicted each other (metadata and the delete warning ship; browsable usage does not); §12.3 and §13 marked Pending, having no dependency graph and no reader of the i18n config respectively.
@@ -294,6 +296,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `standards.md`
 
+- **0.1.3-draft** (2026-08-15) — Three backlog entries graduate to bound rows in site-architecture.md §14.3 (HSTS, Referrer-Policy, Permissions-Policy).
 - **0.1.2-draft** (2026-08-15) — Add §11 Adoption Backlog: standards whose owning section does not exist yet, each naming the spec that will own it.
 - **0.1.1-draft** (2026-08-15) — A Subset may name a gap for the half it omits; a non-standard is prose rather than a Rejected row.
 - **0.1.0-draft** (2026-08-14) — Initial specification: the conformance vocabulary, the `## N. Standards Alignment` table contract, citation and canonical-URL rules, gap tiers derived from section status, and governance for declining a standard.

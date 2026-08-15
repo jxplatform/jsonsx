@@ -30,6 +30,7 @@ import {
 } from "./bundler.ts";
 import { loadProjectConfig } from "./site-loader.ts";
 import { discoverPages, expandDynamicRoutes, readPageDocument } from "./pages-discovery.ts";
+import { buildHeaderRules, writeHeaders, writeNoJekyll } from "./headers-emitter.ts";
 import { buildProjectExtensionRegistry } from "./format-host.ts";
 import { loadProjectSections } from "./project-sections.ts";
 import { collectAssetRefs, copyMountedAssets, loadAssetMounts } from "./asset-mounts.ts";
@@ -647,6 +648,26 @@ export async function buildSite(
   // Runs after the public/ copy so it edits the deployed dist/robots.txt.
   if (sitemapEnabled) {
     fileCount += ensureRobotsSitemap(outDir, siteUrl);
+  }
+
+  // ── 7e. Response headers and the Jekyll opt-out ─────────────────────────
+  // Also after the public/ copy, for the same reason — but PREPENDING rather than appending, since
+  // A later `_headers` rule wins for a duplicate header name and the author's block must override.
+  {
+    const { errors: headerErrors, rules } = buildHeaderRules(projectConfig.build);
+    errors.push(...headerErrors);
+    if (rules.length > 0) {
+      log("Writing response headers...");
+      fileCount += writeHeaders(outDir, rules);
+      const { adapter } = projectConfig.build;
+      if (adapter === "node" || adapter === "bun") {
+        console.warn(
+          `The "${adapter}" adapter serves no static assets, so dist/_headers is documentation ` +
+            `rather than configuration — apply these headers at the reverse proxy in front of it.`,
+        );
+      }
+    }
+    fileCount += writeNoJekyll(outDir);
   }
 
   // ── 8. Copy declarative file mappings ──────────────────────────────────

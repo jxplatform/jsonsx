@@ -28,11 +28,52 @@ dist/
 ├── sitemap.xml               # When url is set in project.json
 ├── robots.txt                # From public/, with a Sitemap: line appended
 ├── _redirects                # From the redirects map
+├── _headers                  # Response headers (below)
+├── .nojekyll                 # So GitHub Pages doesn't eat the _-prefixed files above
 ├── favicon.svg               # public/ is copied in verbatim
 └── worker.js                 # Only with a server adapter (see below)
 ```
 
 Pages only load JavaScript for components that actually need it — a fully static component ships as pre-rendered HTML and CSS with no script. Files from `public/` are copied verbatim, and the `copy` map in `project.json` can place additional files at chosen output paths.
+
+## Response headers
+
+The build writes `dist/_headers` because cacheability is something only the build can decide — it chose the filenames, so it is the only party that knows which of them contain a content hash:
+
+```
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  X-Frame-Options: SAMEORIGIN
+  Cache-Control: public, max-age=0, must-revalidate
+
+/images/_optimized/*
+  Cache-Control: public, max-age=31536000, immutable
+```
+
+Only the optimized images are cached forever, because their filenames embed a hash of the source — a changed image is a changed URL. **Your component JS and CSS are not**, deliberately: `components/site-header.js` keeps the same URL when you edit the component, so caching it forever would serve stale code to everyone who visited before the edit.
+
+**Cloudflare Pages, Cloudflare Workers and Netlify** read this file. The `node` and `bun` adapters serve no static assets, so there it is a description of what the reverse proxy in front of them should send — the build says so when you use one.
+
+To add your own rules, or turn parts off:
+
+```json
+{
+  "build": {
+    "headers": {
+      "security": { "hsts": { "maxAge": 31536000, "includeSubDomains": true } },
+      "rules": { "/downloads/*": { "X-Robots-Tag": "none" } }
+    }
+  }
+}
+```
+
+Your own `public/_headers` still works: it is appended below the generated block, verbatim, and a later rule wins — so anything you write there overrides what the build set.
+
+:::doc-warning
+HSTS is off by default on purpose. `Strict-Transport-Security` tells browsers to refuse plain HTTP for your domain for `maxAge` seconds, and they remember it — so a wrong value locks the domain to HTTPS long after you notice. Turn it on once your certificate setup is settled.
+:::
 
 ## Build options
 
@@ -44,6 +85,7 @@ The `build` section of `project.json`:
 | `trailingSlash` | `"always"` | URL shape: `"always"` or `"never"` (below)                         |
 | `sitemap`       | `true`     | Set `false` to skip [sitemap generation](/docs/framework/site/seo) |
 | `adapter`       | _(none)_   | `"cloudflare-workers"`, `"cloudflare-pages"`, `"node"`, or `"bun"` |
+| `headers`       | _(on)_     | Response headers written to `_headers` (below)                     |
 
 ### trailingSlash
 
