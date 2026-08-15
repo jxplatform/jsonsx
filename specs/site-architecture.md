@@ -2,7 +2,7 @@
 
 ## File-Based Routing, Content Collections, Layouts, and Static Site Generation
 
-**Version:** 0.3.2-draft
+**Version:** 0.3.3-draft
 **Status:** Partial
 **Updated:** 2026-08-15
 **License:** MIT
@@ -1097,6 +1097,30 @@ feeds — `Search result` (description, viewport, icon) and `Social card` (the O
 Ungrouped they collide: Open Graph carries its own `Title`, `Description` and `Image`, so one flat
 column gave `Description` two meanings. Every field commits live, and the previews redraw with it.
 
+### 8.7 Bare Specifiers in `$head` and `$elements`
+
+> **Status: Implemented.** `rewriteNpmAsset` in `site-build.ts`; the copy step runs beside sidecar
+> bundling.
+
+A `$head` entry may name a file inside an installed package by bare specifier rather than by URL —
+`"@shoelace-style/shoelace/dist/themes/light.css"`. The build **resolves it against the project
+root and copies the file into `/assets/`** under a flattened, hash-free name derived from the
+specifier: `/assets/shoelace-style-shoelace-dist-themes-light.css`. The extension is preserved,
+because both the browser and the host dispatch on it.
+
+`$elements` entries name modules rather than files, so they are **bundled** through the same path a
+Function-def `$src` takes (`spec.md` §12) and land at the same kind of URL. Bundling rather than
+copying is what makes the package's own bare imports resolvable: the emitted import map carries two
+entries, and a component package imports far more than that.
+
+Copies and bundles share one output directory, so they share one namespace. Two different files
+that flatten to the same name is a **build error** naming both, never a last-writer-wins overwrite.
+
+An unresolvable specifier is a build error too. It was previously rewritten to
+`/node_modules/<specifier>`, which the dev server happens to serve and which nothing copies into
+`dist/` — so the page worked while it was being written and lost the file on deploy. A missing
+dependency now fails the build that would have shipped it.
+
 ---
 
 ## 9. Media Management
@@ -2020,6 +2044,7 @@ This spec builds on existing Jx primitives wherever possible:
 
 ## Changelog
 
+- **0.3.3-draft** (2026-08-15) — $head bare specifiers copy into /assets/ and $elements bundle there; an unresolvable one is a build error (§8.7).
 - **0.3.2-draft** (2026-08-15) — §8.4.1 <lastmod> is a full RFC 3339 timestamp; the per-template lastmod wart is named rather than implied.
 - **0.3.1-draft** (2026-08-15) — Add §6.7 syndication feeds: Atom and JSON Feed via @jxsuite/feed, RFC 5005 archives, RSS declined.
 - **0.3.0-draft** (2026-08-15) — §8.3 link identity includes hreflang/type/media/sizes; §8.5 JSON-LD objects serialize; §8.4 lang and dir come from the page.

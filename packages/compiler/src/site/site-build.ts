@@ -20,7 +20,7 @@ import {
 } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { isMappedArray, isRef } from "@jxsuite/schema/guards";
-import { isNpmSpecifier, sidecarAssetPath } from "@jxsuite/schema/asset-paths";
+import { isNpmSpecifier, npmAssetPath, sidecarAssetPath } from "@jxsuite/schema/asset-paths";
 import {
   CLIENT_EXTERNALS,
   bundleEntry,
@@ -127,6 +127,28 @@ export async function buildSite(
   // Hints) are rewritten to their /assets/ URL during compilation, registered here, and bundled
   // In step 6d (spec.md §12). Keyed by asset path so duplicate specifiers bundle once.
   const sidecarBundles = new Map<string, { entryPath: string; specifier: string }>();
+  /*
+   * Files a `$head` entry names by bare specifier — a package's stylesheet, most often. Copied
+   * rather than bundled.
+   *
+   * These used to be rewritten to `/node_modules/<specifier>`, which resolves in dev, where the
+   * server serves that path, and 404s in production, where nothing copies node_modules into dist.
+   */
+  const npmAssets = new Map<string, string>();
+  /*
+   * Bundles and copies land in one URL directory, so one map arbitrates it. Two different files
+   * that slug to the same name is a build error, not a silent last-writer-wins overwrite.
+   */
+  const assetClaims = new Map<string, { entryPath: string; specifier: string }>();
+  const claimAsset = (assetPath: string, entryPath: string, specifier: string) => {
+    const existing = assetClaims.get(assetPath);
+    if (existing !== undefined && existing.entryPath !== entryPath) {
+      throw new Error(
+        `"${specifier}" and "${existing.specifier}" both map to ${assetPath} — rename one`,
+      );
+    }
+    assetClaims.set(assetPath, { entryPath, specifier });
+  };
   const rewriteSidecarSrc = (specifier: string, docDir: string | null): string => {
     if (!isBundleableSrc(specifier)) {
       return specifier;
@@ -146,16 +168,26 @@ export async function buildSite(
         ? specifier
         : `./${relative(projectRoot, entryPath)}`;
       const assetPath = sidecarAssetPath(assetKey);
-      const existing = sidecarBundles.get(assetPath);
-      if (existing && existing.entryPath !== entryPath) {
-        throw new Error(
-          `"${specifier}" and "${existing.specifier}" both bundle to ${assetPath} — rename one`,
-        );
-      }
+      claimAsset(assetPath, entryPath, specifier);
       sidecarBundles.set(assetPath, { entryPath, specifier });
       return assetPath;
     } catch (error) {
       errors.push(`Sidecar "${specifier}": ${(error as Error).message}`);
+      return specifier;
+    }
+  };
+
+  const rewriteNpmAsset = (specifier: string): string => {
+    const assetPath = npmAssetPath(specifier);
+    try {
+      const entryPath = resolveSidecarEntry(`npm:${specifier}`, projectRoot, projectRoot);
+      claimAsset(assetPath, entryPath, specifier);
+      npmAssets.set(assetPath, entryPath);
+      return assetPath;
+    } catch (error) {
+      // A missing dependency is a hard error, like an unresolvable sidecar: the alternative is a
+      // Page that looks fine in dev and loses its stylesheet on deploy.
+      errors.push(`$head specifier "${specifier}": ${(error as Error).message}`);
       return specifier;
     }
   };
@@ -384,6 +416,7 @@ export async function buildSite(
         rewriteSidecarSrc,
         assetMounts,
         extensionHead,
+        rewriteNpmAsset,
       );
 
       // Determine which component tags are fully static (for script omission)
@@ -555,6 +588,17 @@ export async function buildSite(
   }
 
   // ── 6d. Bundle client sidecar modules (spec.md §12) ─────────────────────
+  if (npmAssets.size > 0) {
+    log(`Copying ${npmAssets.size} package asset(s)...`);
+    for (const [assetPath, entryPath] of npmAssets) {
+      const outfile = resolve(outDir, assetPath.replace(/^\//, ""));
+      mkdirSync(dirname(outfile), { recursive: true });
+      cpSync(entryPath, outfile);
+      fileCount += 1;
+      log(`  ${entryPath} → ${assetPath}`);
+    }
+  }
+
   if (sidecarBundles.size > 0) {
     log(`Bundling ${sidecarBundles.size} client sidecar module(s)...`);
     for (const [assetPath, bundle] of sidecarBundles) {
@@ -734,6 +778,7 @@ async function compilePage(
   rewriteSidecarSrc?: (specifier: string, docDir: string | null) => string,
   assetMounts: readonly AssetMount[] = [],
   extensionHead: readonly JxHeadEntry[] = [],
+  rewriteNpmAsset: (specifier: string) => string = (s) => s,
 ) {
   // Load the raw page document (.json natively, other formats via the registry)
   const pageDoc = await readPageDocument(route.sourcePath as string, formatRegistry);
@@ -848,7 +893,7 @@ async function compilePage(
    */
   const resolvedSiteHead = [
     ...extensionHead,
-    ...resolveHeadBareSpecifiers(projectConfig.$head ?? []),
+    ...resolveHeadBareSpecifiers(projectConfig.$head ?? [], rewriteNpmAsset),
   ];
 
   // Merge $head from site + layout + page
@@ -927,7 +972,15 @@ async function compilePage(
     (e: JxElement | string) => typeof e === "string" && !e.startsWith("./") && !e.startsWith("../"),
   );
   if (npmElements.length > 0) {
-    result.html = injectNpmElementScripts(result.html, npmElements as string[]);
+    /*
+     * Bundled through the same sidecar path as a Function-def `$src`, with the `npm:` prefix the
+     * resolver expects. A component package imports its own dependencies by bare specifier, and
+     * the emitted import map only ever carried `@vue/reactivity` and `lit-html` — so linking the
+     * package file directly left those imports unresolvable even before the URL was wrong.
+     */
+    const bundleNpmElement = (specifier: string) =>
+      rewriteSidecarSrc === undefined ? specifier : rewriteSidecarSrc(`npm:${specifier}`, null);
+    result.html = injectNpmElementScripts(result.html, npmElements as string[], bundleNpmElement);
   }
 
   // Compile server handler if applicable (skip when provider bundles site-wide)
@@ -1128,14 +1181,19 @@ function resolveHeadTemplates(headEntries: JxHeadEntry[], scope: Record<string, 
 }
 
 /**
- * Resolve bare npm specifiers in $head entry attributes (href, src). e.g.
- * "@shoelace-style/shoelace/dist/themes/light.css" →
- * "/node_modules/@shoelace-style/shoelace/dist/themes/light.css"
+ * Resolve bare npm specifiers in $head entry attributes (href, src) to their copied `/assets/` URL.
+ *
+ * `"@shoelace-style/shoelace/dist/themes/light.css"` →
+ * `"/assets/shoelace-style-shoelace-dist-themes-light.css"`.
  *
  * @param {JxHeadEntry[]} headEntries
+ * @param {(specifier: string) => string} rewrite
  * @returns {JxHeadEntry[]}
  */
-function resolveHeadBareSpecifiers(headEntries: JxHeadEntry[]) {
+function resolveHeadBareSpecifiers(
+  headEntries: JxHeadEntry[],
+  rewrite: (specifier: string) => string,
+) {
   return headEntries.map((entry: JxHeadEntry) => {
     if (!entry || typeof entry !== "object" || !entry.attributes) {
       return entry;
@@ -1144,7 +1202,7 @@ function resolveHeadBareSpecifiers(headEntries: JxHeadEntry[]) {
     for (const key of ["href", "src"]) {
       const val = resolved.attributes[key];
       if (typeof val === "string" && isBareSpecifier(val)) {
-        resolved.attributes[key] = `/node_modules/${val}`;
+        resolved.attributes[key] = rewrite(val);
       }
     }
     return resolved;
@@ -1596,16 +1654,23 @@ function injectComponentScripts(
 
 /**
  * Inject <script type="module"> tags for npm package $elements (cherry-picked component imports).
- * Bare specifiers are resolved to /node_modules/ paths.
+ *
+ * Bare specifiers are BUNDLED to `/assets/`, not linked into node_modules. Bundling rather than
+ * copying because a component package imports its own dependencies by bare specifier too, and the
+ * import map only ever carried two entries.
  *
  * @param {string} html
  * @param {string[]} npmElements - Bare specifier strings, e.g.
  *   "@shoelace-style/shoelace/components/button/button.js"
  * @returns {string}
  */
-function injectNpmElementScripts(html: string, npmElements: string[]) {
+function injectNpmElementScripts(
+  html: string,
+  npmElements: string[],
+  rewrite: (specifier: string) => string,
+) {
   const scripts = npmElements
-    .map((spec: string) => `<script type="module" src="/node_modules/${spec}"></script>`)
+    .map((spec: string) => `<script type="module" src="${rewrite(spec)}"></script>`)
     .join("\n  ");
 
   return html.replace("</body>", `  ${scripts}\n</body>`);

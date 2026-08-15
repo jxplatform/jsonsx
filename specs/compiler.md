@@ -2,7 +2,7 @@
 
 ## Static HTML Compiler, Custom Element Emitter, and Island Detector
 
-**Version:** 0.1.27-draft
+**Version:** 0.1.28-draft
 **Status:** Partial
 **Updated:** 2026-08-15
 **License:** MIT
@@ -57,10 +57,9 @@ Bare strings and numbers in `children` arrays compile to text nodes in all three
 > **Status: Partial.** The tiers themselves are complete. Two properties of the emitted page are
 > not: every tier emits an **inline** import map, and a project declaring a colour-scheme query also
 > gets an inline pre-paint script, so no tier is servable under a strict `script-src` and none emits
-> a Content-Security-Policy. And the import map's two entries resolve to `esm.sh`, while bare
-> `$elements` and `$head` specifiers are emitted as `/node_modules/…` URLs that **nothing copies
-> into `dist/`** — so those requests 404 in production, though not in dev, where the server serves
-> that path. See §13.
+> a Content-Security-Policy. The import map's two entries also resolve to `esm.sh` with no integrity
+> metadata. See §13. (Bare `$elements` and `$head` specifiers no longer emit `/node_modules/…` URLs;
+> they are bundled and copied into `/assets/` — `site-architecture.md` §8.7.)
 
 | Component surface                        | Compiler output                                 |
 | ---------------------------------------- | ----------------------------------------------- |
@@ -812,6 +811,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.1.28-draft** (2026-08-15) — §3: node_modules URLs resolved — bare $head/$elements specifiers land in /assets/.
 - **0.1.27-draft** (2026-08-15) — Add §13 Standards Alignment; §3 marked Partial — inline scripts block a strict CSP and node_modules URLs 404 in production.
 - **0.1.26-draft** (2026-08-14) — $switch compiles on dynamic pages (§9.2); branch subtrees hoisted out of $switch and chosen-tagName constructs (§4.8); prerender treats handler-written entries and computeds reading them as runtime-only, and keeps an array any surviving reader still references (§8.1).
 - **0.1.25-draft** (2026-07-30) — Element modules: props.* attribute intake and $props template bindings, one effect registry stopped on disconnect, state.$map published for map handlers; prerender keeps a repeater whose build-time expansion is empty (§4.1, §4.2, §4.4, §4.7, §8.1).
@@ -843,4 +843,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/compiler` Specification v0.1.27-draft_
+_`@jxsuite/compiler` Specification v0.1.28-draft_

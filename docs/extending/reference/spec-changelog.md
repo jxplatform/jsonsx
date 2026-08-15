@@ -32,6 +32,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `compiler.md`
 
+- **0.1.28-draft** (2026-08-15) — §3: node_modules URLs resolved — bare $head/$elements specifiers land in /assets/.
 - **0.1.27-draft** (2026-08-15) — Add §13 Standards Alignment; §3 marked Partial — inline scripts block a strict CSP and node_modules URLs 404 in production.
 - **0.1.26-draft** (2026-08-14) — $switch compiles on dynamic pages (§9.2); branch subtrees hoisted out of $switch and chosen-tagName constructs (§4.8); prerender treats handler-written entries and computeds reading them as runtime-only, and keeps an array any surviving reader still references (§8.1).
 - **0.1.25-draft** (2026-07-30) — Element modules: props.* attribute intake and $props template bindings, one effect registry stopped on disconnect, state.$map published for map handlers; prerender keeps a repeater whose build-time expansion is empty (§4.1, §4.2, §4.4, §4.7, §8.1).
@@ -202,6 +203,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `site-architecture.md`
 
+- **0.3.3-draft** (2026-08-15) — $head bare specifiers copy into /assets/ and $elements bundle there; an unresolvable one is a build error (§8.7).
 - **0.3.2-draft** (2026-08-15) — §8.4.1 <lastmod> is a full RFC 3339 timestamp; the per-template lastmod wart is named rather than implied.
 - **0.3.1-draft** (2026-08-15) — Add §6.7 syndication feeds: Atom and JSON Feed via @jxsuite/feed, RFC 5005 archives, RSS declined.
 - **0.3.0-draft** (2026-08-15) — §8.3 link identity includes hreflang/type/media/sizes; §8.5 JSON-LD objects serialize; §8.4 lang and dir come from the page.

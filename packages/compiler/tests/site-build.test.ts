@@ -1315,7 +1315,7 @@ describe("buildSite — npm $elements injection", () => {
     writeFileSync(
       resolve(EL_TMP, "pages/index.json"),
       JSON.stringify({
-        $elements: ["@shoelace-style/shoelace/components/button/button.js"],
+        $elements: ["@shoelace-style/shoelace/dist/components/button/button.js"],
         children: [{ children: ["Click Me"], tagName: "sl-button" }],
         title: "Home",
       }),
@@ -1327,13 +1327,20 @@ describe("buildSite — npm $elements injection", () => {
     rmSync(EL_TMP, { force: true, recursive: true });
   });
 
-  it("injects npm element scripts as module scripts", async () => {
+  /*
+   * The script is BUNDLED, not linked. A component package imports its own dependencies by bare
+   * specifier, and the emitted import map only ever carried `@vue/reactivity` and `lit-html`, so
+   * the old `/node_modules/<specifier>` URL was doubly broken: the path 404s in production, and
+   * even where it resolved the module's own imports did not.
+   */
+  it("bundles npm element scripts into /assets/", async () => {
     const result = await buildSite(EL_TMP);
     expect(result.errors).toHaveLength(0);
     const html = readFileSync(resolve(EL_TMP, "dist/index.html"), "utf8");
-    expect(html).toContain(
-      'src="/node_modules/@shoelace-style/shoelace/components/button/button.js"',
-    );
+    expect(html).toContain('src="/assets/');
+    expect(html).not.toContain("/node_modules/");
+    const src = /src="(\/assets\/[^"]+)"/.exec(html)?.[1] ?? "";
+    expect(existsSync(resolve(EL_TMP, `dist${src}`))).toBe(true);
   });
 });
 
@@ -1357,7 +1364,7 @@ describe("buildSite — bare specifier resolution in $head", () => {
             tagName: "link",
           },
           {
-            attributes: { src: "@pkg/lib/index.js", type: "module" },
+            attributes: { src: "@vue/reactivity", type: "module" },
             tagName: "script",
           },
         ],
@@ -1381,12 +1388,125 @@ describe("buildSite — bare specifier resolution in $head", () => {
     rmSync(BS_TMP, { force: true, recursive: true });
   });
 
-  it("resolves bare specifiers to /node_modules/ paths", async () => {
+  /*
+   * `/node_modules/<specifier>` resolved in `jx dev`, where the server serves that path, and 404d
+   * on every deployed site, because nothing copies node_modules into dist. The file is copied to
+   * `/assets/` under a flattened name instead.
+   */
+  it("copies bare-specifier $head files into /assets/", async () => {
     const result = await buildSite(BS_TMP);
     expect(result.errors).toHaveLength(0);
     const html = readFileSync(resolve(BS_TMP, "dist/index.html"), "utf8");
-    expect(html).toContain("/node_modules/@shoelace-style/shoelace/dist/themes/light.css");
-    expect(html).toContain("/node_modules/@pkg/lib/index.js");
+    expect(html).not.toContain("/node_modules/");
+    expect(html).toContain("/assets/shoelace-style-shoelace-dist-themes-light.css");
+    expect(html).toContain("/assets/vue-reactivity");
+    expect(
+      existsSync(resolve(BS_TMP, "dist/assets/shoelace-style-shoelace-dist-themes-light.css")),
+    ).toBe(true);
+  });
+});
+
+// ── /assets/ name collisions across copies and bundles ──────────────────────
+
+describe("buildSite — a $head copy and a sidecar bundle claiming one asset name", () => {
+  const CLASH_TMP = resolve(import.meta.dir, "__test-site-asset-clash__");
+  const pkg = (dir: string, files: Record<string, string>) => {
+    for (const [rel, body] of Object.entries(files)) {
+      const abs = resolve(CLASH_TMP, "node_modules", dir, rel);
+      mkdirSync(resolve(abs, ".."), { recursive: true });
+      writeFileSync(abs, body, "utf8");
+    }
+  };
+
+  beforeAll(() => {
+    rmSync(CLASH_TMP, { force: true, recursive: true });
+    mkdirSync(CLASH_TMP, { recursive: true });
+    // `@x/a-b` bundles to /assets/x-a-b.js; `@x/a/b.js` copies to the same name.
+    pkg("@x/a-b", {
+      "index.js": "export function aOne() {\n  return 1;\n}\n",
+      "package.json": '{ "name": "@x/a-b", "main": "index.js" }',
+    });
+    pkg("@x/a", { "b.js": "export const b = 1;\n", "package.json": '{ "name": "@x/a" }' });
+    writeFileSync(
+      resolve(CLASH_TMP, "project.json"),
+      JSON.stringify({
+        $head: [{ attributes: { src: "@x/a/b.js", type: "module" }, tagName: "script" }],
+        build: { outDir: "./dist" },
+        name: "Asset Clash",
+      }),
+      "utf8",
+    );
+    mkdirSync(resolve(CLASH_TMP, "components"), { recursive: true });
+    writeFileSync(
+      resolve(CLASH_TMP, "components/clash-widget.json"),
+      JSON.stringify({
+        children: [{ tagName: "span", textContent: "${state.n}" }],
+        state: {
+          aOne: { $prototype: "Function", $src: "npm:@x/a-b", parameters: ["state"] },
+          n: 0,
+        },
+        tagName: "clash-widget",
+      }),
+      "utf8",
+    );
+    mkdirSync(resolve(CLASH_TMP, "pages"), { recursive: true });
+    writeFileSync(
+      resolve(CLASH_TMP, "pages/index.json"),
+      JSON.stringify({ children: [{ tagName: "clash-widget" }], tagName: "main", title: "Home" }),
+      "utf8",
+    );
+  });
+
+  afterAll(() => {
+    rmSync(CLASH_TMP, { force: true, recursive: true });
+  });
+
+  // Copies and bundles share one URL directory, so the second claim is an error rather than an
+  // Overwrite that quietly serves one file under the other's name.
+  it("reports the clash instead of letting one overwrite the other", async () => {
+    const result = await buildSite(CLASH_TMP, { verbose: false });
+    expect(result.errors.some((e) => e.includes("both map to /assets/x-a-b.js"))).toBe(true);
+  });
+});
+
+// ── Unresolvable bare specifiers ─────────────────────────────────────────────
+
+describe("buildSite — unresolvable bare specifier in $head", () => {
+  const MISS_TMP = resolve(import.meta.dir, "__test-site-bare-missing__");
+
+  beforeAll(() => {
+    rmSync(MISS_TMP, { force: true, recursive: true });
+    mkdirSync(MISS_TMP, { recursive: true });
+    writeFileSync(
+      resolve(MISS_TMP, "project.json"),
+      JSON.stringify({
+        $head: [
+          {
+            attributes: { href: "@nope/not-installed/theme.css", rel: "stylesheet" },
+            tagName: "link",
+          },
+        ],
+        build: { outDir: "./dist" },
+        name: "Missing Spec Test",
+      }),
+      "utf8",
+    );
+    mkdirSync(resolve(MISS_TMP, "pages"), { recursive: true });
+    writeFileSync(
+      resolve(MISS_TMP, "pages/index.json"),
+      JSON.stringify({ children: [{ children: ["Hi"], tagName: "p" }], title: "Home" }),
+      "utf8",
+    );
+  });
+
+  afterAll(() => {
+    rmSync(MISS_TMP, { force: true, recursive: true });
+  });
+
+  // A missing dependency is a build error. It used to be a URL that looked fine until deploy.
+  it("reports the specifier rather than emitting a dead URL", async () => {
+    const result = await buildSite(MISS_TMP);
+    expect(result.errors.some((e) => e.includes("@nope/not-installed/theme.css"))).toBe(true);
   });
 });
 
