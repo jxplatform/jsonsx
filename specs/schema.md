@@ -2,7 +2,7 @@
 
 ## JSON Schema 2020-12 Meta-Schema Generator
 
-**Version:** 0.4.2-draft
+**Version:** 0.4.3-draft
 **Status:** Partial
 **Updated:** 2026-08-15
 **License:** MIT
@@ -41,8 +41,11 @@ The component schema is derived at generation time from web standards data (`@we
 
 **`$id`:** `https://jxsuite.com/schema/v1`
 
-Root-level fields: `$schema`, `$id`, `$defs`, `state`, `tagName`, `children`, `$media`, `$elements`, `$head`, `$layout`, `$paths`, `title`, `imports`, `observedAttributes`, `cases`, `style`, `attributes`.
+Root-level fields: `$schema`, `$id`, `$defs`, `state`, `tagName`, `children`, `$media`, `$elements`, `$head`, `$layout`, `$paths`, `$lang`, `$dir`, `$sitemap`, `title`, `imports`, `observedAttributes`, `cases`, `style`, `attributes`.
 
+- `$lang` and `$dir` are page-level overrides of `defaults.lang` / `defaults.dir`, written onto `<html>` (site-architecture.md §8.4)
+- **`$sitemap` was read by the build and declared nowhere**, so a page opting out of the sitemap failed `jx validate` against its own closed entry document
+- **`HeadEntry.textContent` accepts an object** as well as a string: that is how a JSON-LD block is authored, and the compiler serializes it (site-architecture.md §8.5)
 - `tagName` is optional (pages with `$layout` may omit it)
 - `tagName` enumeration: all standard HTML elements derived from `@webref/elements`
 - `children`: array of element definitions and/or text nodes, or Array namespace (`$prototype: "Array"`)
@@ -232,6 +235,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.4.3-draft** (2026-08-15) — §3.1 records the root fields the 0.4.2 entry described.
 - **0.4.2-draft** (2026-08-15) — Document $lang, $dir and the previously undeclared $sitemap; defaults.dir; HeadEntry.textContent admits an object.
 - **0.4.1-draft** (2026-08-15) — build.headers declares the response-header output (site-architecture.md §14.3).
 - **0.4.0-draft** (2026-08-15) — redirects admits the object form the compiler and Studio already write, with an RFC 9110 status enum and a distinct rewrite shape; §3.2's redirect defect is resolved.
@@ -254,4 +258,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/schema` Specification v0.4.2-draft_
+_`@jxsuite/schema` Specification v0.4.3-draft_
