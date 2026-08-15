@@ -1647,6 +1647,8 @@ describe("buildSite — locale routing", () => {
     page("index.json", { children: ["${$page.locale}"], tagName: "main", title: "Home" });
     page("fr-ca/index.json", { children: ["fr"], tagName: "main", title: "Accueil" });
     page("ar/index.json", { children: ["ar"], tagName: "main", title: "AR" });
+    page("about.json", { children: ["about"], tagName: "main", title: "About" });
+    page("fr-ca/about.json", { children: ["a propos"], tagName: "main", title: "A propos" });
     page("en/quebec.json", { $lang: "fr-CA", children: ["mixed"], tagName: "main", title: "Q" });
   });
 
@@ -1670,6 +1672,40 @@ describe("buildSite — locale routing", () => {
     expect(/<html[^>]*lang="fr-CA"/.test(html("en/quebec/index.html"))).toBe(true);
     // And the resolved locale is readable from a template.
     expect(html("index.html")).toContain("en");
+  }, 30_000);
+
+  /*
+   * Discovery, which is the half that makes a translated site legible to anything but a reader.
+   * The set is reciprocal and includes each page itself — that is what the annotation means and
+   * what a validator checks for — and it only exists because `headEntryKey` keys a link on its
+   * qualifying attribute. Before that these four collapsed into one.
+   */
+  it("advertises its translations in <head> and in the sitemap", async () => {
+    await buildSite(I18N_TMP, { verbose: false });
+    const html = readFileSync(resolve(I18N_TMP, "dist/index.html"), "utf8");
+    const alternates = [...html.matchAll(/hreflang="([^"]+)"/g)].map((m) => m[1]);
+    expect(alternates.toSorted()).toEqual(["ar", "en", "fr-CA", "x-default"]);
+    // The `x-default` entry names the default locale's URL: where an unmatched visitor goes.
+    expect(html).toContain('href="https://multi.example/" hreflang="x-default"');
+
+    const sitemap = readFileSync(resolve(I18N_TMP, "dist/sitemap.xml"), "utf8");
+    expect(sitemap).toContain('xmlns:xhtml="http://www.w3.org/1999/xhtml"');
+    expect(sitemap).toContain(
+      '<xhtml:link rel="alternate" hreflang="ar" href="https://multi.example/ar"/>',
+    );
+  }, 30_000);
+
+  // A page with no translations gets none: a lone hreflang pointing at itself is noise.
+  it("says nothing about a page that has no siblings", async () => {
+    writeFileSync(
+      resolve(I18N_TMP, "pages/solo.json"),
+      JSON.stringify({ children: ["solo"], tagName: "main", title: "Solo" }),
+      "utf8",
+    );
+    await buildSite(I18N_TMP, { verbose: false });
+    expect(readFileSync(resolve(I18N_TMP, "dist/solo/index.html"), "utf8")).not.toContain(
+      "hreflang",
+    );
   }, 30_000);
 });
 

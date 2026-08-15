@@ -88,7 +88,7 @@ Two tags are added automatically: `<link rel="canonical">` (built from `url` in 
 }
 ```
 
-`dir` is omitted entirely when neither is set, rather than being guessed.
+`dir` is omitted entirely when neither is set, rather than being guessed. On a site with [locales](./i18n.md) configured, both are derived from the route's language — and translated pages also gain `rel="alternate"` links pointing at each other.
 
 ## Package files in `$head`
 

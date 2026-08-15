@@ -146,6 +146,101 @@ export function undeclaredLocalePrefix(
 }
 
 /**
+ * A route's identity across locales: its path with the locale prefix removed.
+ *
+ * `/fr-ca/about/` and `/about/` share the key `about/`, which is what makes them translations of
+ * one another. Nothing else could establish that — Jx has no translation metadata, and there is no
+ * per-page id to join on — so the directory layout **is** the mapping. That is a real limitation: a
+ * localized slug (`/fr-ca/a-propos/`) is not recognized as a translation of `/about/`.
+ *
+ * @param {string} urlPattern
+ * @param {ResolvedI18n | null} i18n
+ * @returns {string}
+ */
+export function translationKey(urlPattern: string, i18n: ResolvedI18n | null): string {
+  const segments = urlPattern.split("/").filter(Boolean);
+  const canonical = canonicalizeLocale(segments[0]);
+  if (i18n !== null && canonical !== null && i18n.locales.includes(canonical)) {
+    return segments.slice(1).join("/");
+  }
+  return segments.join("/");
+}
+
+/** One `<link rel="alternate">` / sitemap `xhtml:link`. */
+export interface LocaleAlternate {
+  hreflang: string;
+  href: string;
+}
+
+/**
+ * Group routes into translation sets and give each one its alternates.
+ *
+ * A page with no translations gets **none** — a lone `hreflang` pointing at itself is noise, and
+ * the standards it would satisfy expect a set. `x-default` names the default locale's URL, which is
+ * the convention search engines act on for "the page to send an unmatched visitor to"; it is
+ * omitted when the set has no default-locale member, since inventing one would advertise a URL that
+ * does not exist.
+ *
+ * Reciprocity is automatic: every member of a set lists every member **including itself**, which is
+ * what the annotation is specified to do and what validators check for.
+ *
+ * @param {readonly { urlPattern: string }[]} routes - Concrete routes only
+ * @param {ResolvedI18n | null} i18n
+ * @param {string} siteUrl - Absolute site URL; alternates must be absolute
+ * @returns {Map<string, LocaleAlternate[]>} Keyed by `urlPattern`
+ */
+export function localeAlternates(
+  routes: readonly { urlPattern: string }[],
+  i18n: ResolvedI18n | null,
+  siteUrl: string,
+): Map<string, LocaleAlternate[]> {
+  const out = new Map<string, LocaleAlternate[]>();
+  if (i18n === null || siteUrl === "") {
+    return out;
+  }
+
+  const sets = new Map<string, { locale: string; urlPattern: string }[]>();
+  for (const route of routes) {
+    const key = translationKey(route.urlPattern, i18n);
+    const locale = localeOfRoute(route.urlPattern, i18n);
+    if (locale === null) {
+      continue;
+    }
+    const members = sets.get(key) ?? [];
+    // A duplicate locale in one set means two routes claim the same translation; the first wins,
+    // Which keeps the annotation single-valued rather than emitting a contradiction.
+    if (!members.some((m) => m.locale === locale)) {
+      members.push({ locale, urlPattern: route.urlPattern });
+    }
+    sets.set(key, members);
+  }
+
+  for (const members of sets.values()) {
+    if (members.length < 2) {
+      continue;
+    }
+    const ordered = members.toSorted((a, b) =>
+      a.locale === b.locale ? 0 : a.locale < b.locale ? -1 : 1,
+    );
+    const alternates: LocaleAlternate[] = ordered.map((m) => ({
+      href: new URL(m.urlPattern, siteUrl).href,
+      hreflang: m.locale,
+    }));
+    const fallback = ordered.find((m) => m.locale === i18n.defaultLocale);
+    if (fallback !== undefined) {
+      alternates.push({
+        href: new URL(fallback.urlPattern, siteUrl).href,
+        hreflang: "x-default",
+      });
+    }
+    for (const member of members) {
+      out.set(member.urlPattern, alternates);
+    }
+  }
+  return out;
+}
+
+/**
  * The `lang` and `dir` a page ships with.
  *
  * An explicit `$lang` on the document wins over the locale its route implies: a page really can be

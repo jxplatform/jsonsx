@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import {
+  localeAlternates,
   localeOfRoute,
   pageLanguage,
   resolveI18n,
+  translationKey,
   undeclaredLocalePrefix,
 } from "../src/site/i18n.ts";
 import type { ProjectConfig } from "@jxsuite/schema/types";
@@ -144,5 +146,83 @@ describe("pageLanguage", () => {
       dir: "ltr",
       lang: "ar",
     });
+  });
+});
+
+describe("translationKey", () => {
+  const { i18n } = resolveI18n(project({ defaultLocale: "en", locales: ["en", "fr-ca"] }));
+
+  /*
+   * The directory layout IS the translation mapping — Jx has no per-page id to join on. Which also
+   * names the limitation: a localized slug is not recognized as a translation.
+   */
+  test("strips a declared locale prefix and nothing else", () => {
+    expect(translationKey("/fr-ca/about/", i18n)).toBe("about");
+    expect(translationKey("/about/", i18n)).toBe("about");
+    expect(translationKey("/docs/guide/", i18n)).toBe("docs/guide");
+    expect(translationKey("/", i18n)).toBe("");
+  });
+
+  test("a localized slug is a different page, and says so", () => {
+    expect(translationKey("/fr-ca/a-propos/", i18n)).not.toBe(translationKey("/about/", i18n));
+  });
+});
+
+describe("localeAlternates", () => {
+  const { i18n } = resolveI18n(project({ defaultLocale: "en", locales: ["en", "fr-ca", "ar"] }));
+  const routes = [
+    { urlPattern: "/about/" },
+    { urlPattern: "/fr-ca/about/" },
+    { urlPattern: "/ar/about/" },
+    { urlPattern: "/only-english/" },
+  ];
+  const map = localeAlternates(routes, i18n, "https://x.example");
+
+  // Reciprocity including self is what the annotation means, and what a validator checks for.
+  test("every member of a set lists every member, itself included", () => {
+    for (const pattern of ["/about/", "/fr-ca/about/", "/ar/about/"]) {
+      expect(map.get(pattern)?.map((a) => a.hreflang)).toEqual(["ar", "en", "fr-CA", "x-default"]);
+    }
+  });
+
+  test("hrefs are absolute", () => {
+    expect(map.get("/about/")?.find((a) => a.hreflang === "fr-CA")?.href).toBe(
+      "https://x.example/fr-ca/about/",
+    );
+  });
+
+  test("x-default points at the default locale", () => {
+    expect(map.get("/ar/about/")?.find((a) => a.hreflang === "x-default")?.href).toBe(
+      "https://x.example/about/",
+    );
+  });
+
+  // A lone hreflang pointing at itself is noise; the annotation is about a set.
+  test("a page with no translations gets none", () => {
+    expect(map.has("/only-english/")).toBe(false);
+  });
+
+  test("nothing without i18n, and nothing without an absolute site URL", () => {
+    expect(localeAlternates(routes, null, "https://x.example").size).toBe(0);
+    expect(localeAlternates(routes, i18n, "").size).toBe(0);
+  });
+
+  // Two routes claiming one translation would emit a contradiction; the first wins instead.
+  test("a duplicate locale in a set is ignored rather than emitted twice", () => {
+    const dup = localeAlternates(
+      [{ urlPattern: "/about/" }, { urlPattern: "/also-about/" }, { urlPattern: "/ar/about/" }],
+      i18n,
+      "https://x.example",
+    );
+    expect(dup.get("/about/")?.filter((a) => a.hreflang === "en")).toHaveLength(1);
+  });
+
+  test("x-default is omitted when the set has no default-locale member", () => {
+    const noDefault = localeAlternates(
+      [{ urlPattern: "/ar/about/" }, { urlPattern: "/fr-ca/about/" }],
+      i18n,
+      "https://x.example",
+    );
+    expect(noDefault.get("/ar/about/")?.map((a) => a.hreflang)).toEqual(["ar", "fr-CA"]);
   });
 });

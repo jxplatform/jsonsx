@@ -66,8 +66,14 @@ import {
 import { resolvePrototypes } from "./prototype-resolver.ts";
 import { transformImageNodes } from "./image-transform.ts";
 import { collectCspSources, emptyCspSources } from "./csp.ts";
-import { localeOfRoute, pageLanguage, resolveI18n, undeclaredLocalePrefix } from "./i18n.ts";
-import type { ResolvedI18n } from "./i18n.ts";
+import {
+  localeAlternates,
+  localeOfRoute,
+  pageLanguage,
+  resolveI18n,
+  undeclaredLocalePrefix,
+} from "./i18n.ts";
+import type { LocaleAlternate, ResolvedI18n } from "./i18n.ts";
 import { renderImportMap, resolveClientRuntime, writeClientRuntime } from "./client-runtime.ts";
 import { getImageCacheDir, loadCache, saveCache } from "./image-cache.ts";
 import type { ImageConfig } from "./image-optimizer.ts";
@@ -427,10 +433,21 @@ export async function buildSite(
   // (absolute <loc> URLs require it) and not explicitly disabled via build.sitemap: false.
   const siteUrl = projectConfig.url;
   const sitemapEnabled = Boolean(siteUrl) && projectConfig.build.sitemap !== false;
-  const sitemapEntries: { loc: string; lastmod: string }[] = [];
+  const sitemapEntries: SitemapEntry[] = [];
 
   // Warned once per distinct prefix rather than once per route: one mistyped directory is one
   // Mistake, however many pages live under it.
+  /*
+   * Translation sets, computed from the whole route table before the first page is compiled: a
+   * page's alternates include its siblings, which do not exist until every route is known.
+   * Dynamic patterns are excluded — an unexpanded `:slug` is not a URL.
+   */
+  const alternateMap = localeAlternates(
+    routes.filter((r) => !r.urlPattern.includes(":") && !r.urlPattern.includes("*")),
+    i18n,
+    siteUrl ?? "",
+  );
+
   const warnedLocalePrefixes = new Set<string>();
   for (const route of routes) {
     const mismatch = undeclaredLocalePrefix(route.urlPattern, i18n);
@@ -459,6 +476,7 @@ export async function buildSite(
         extensionHead,
         rewriteNpmAsset,
         i18n,
+        alternateMap.get(route.urlPattern) ?? [],
       );
 
       // Determine which component tags are fully static (for script omission)
@@ -498,9 +516,11 @@ export async function buildSite(
       // The two always agree.
       const isConcrete = !route.urlPattern.includes(":") && !route.urlPattern.includes("*");
       if (sitemapEnabled && !result.excludeFromSitemap && isConcrete) {
+        const routeAlternates = alternateMap.get(route.urlPattern) ?? [];
         sitemapEntries.push({
           lastmod: toRfc3339(statSync(route.sourcePath).mtime),
           loc: new URL(route.urlPattern, siteUrl).href,
+          ...(routeAlternates.length > 0 && { alternates: routeAlternates }),
         });
       }
 
@@ -841,6 +861,7 @@ async function compilePage(
   extensionHead: readonly JxHeadEntry[] = [],
   rewriteNpmAsset: (specifier: string) => string = (s) => s,
   i18n: ResolvedI18n | null = null,
+  alternates: readonly LocaleAlternate[] = [],
 ) {
   // Load the raw page document (.json natively, other formats via the registry)
   const pageDoc = await readPageDocument(route.sourcePath as string, formatRegistry);
@@ -976,6 +997,7 @@ async function compilePage(
     charset: projectConfig.defaults?.charset ?? "utf8",
     ...(projectConfig.name != null && { siteName: projectConfig.name }),
     ...(projectConfig.url != null && { siteUrl: projectConfig.url }),
+    ...(alternates.length > 0 && { alternates }),
     pageUrl: route.urlPattern,
   });
 
@@ -2003,20 +2025,46 @@ function toRfc3339(d: Date): string {
   return d.toISOString().replace(/\.\d{3}Z$/, "Z");
 }
 
-function generateSitemap(entries: { loc: string; lastmod: string }[], outDir: string) {
+/** The namespace `xhtml:link` alternates live in, declared only when some entry has them. */
+const XHTML_NS = "http://www.w3.org/1999/xhtml";
+
+interface SitemapEntry {
+  loc: string;
+  lastmod: string;
+  alternates?: readonly LocaleAlternate[];
+}
+
+function generateSitemap(entries: SitemapEntry[], outDir: string) {
   if (entries.length === 0) {
     return 0;
   }
   const urls = entries
-    .map(
-      (e) =>
+    .map((e) => {
+      /*
+       * Every member of a translation set lists every member including itself — that reciprocity
+       * is what the annotation means, and a validator checks for it.
+       */
+      const links = (e.alternates ?? [])
+        .map(
+          (a) =>
+            `    <xhtml:link rel="alternate" hreflang="${escapeXml(a.hreflang)}" ` +
+            `href="${escapeXml(a.href)}"/>`,
+        )
+        .join("\n");
+      return (
         `  <url>\n    <loc>${escapeXml(e.loc)}</loc>\n` +
-        `    <lastmod>${e.lastmod}</lastmod>\n  </url>`,
-    )
+        `    <lastmod>${e.lastmod}</lastmod>\n${links === "" ? "" : `${links}\n`}  </url>`
+      );
+    })
     .join("\n");
+  // The namespace declaration is conditional: a monolingual sitemap should not carry a namespace
+  // It never uses.
+  const ns = entries.some((e) => (e.alternates?.length ?? 0) > 0)
+    ? ` xmlns:xhtml="${XHTML_NS}"`
+    : "";
   const xml =
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
-    `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
+    `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"${ns}>\n${urls}\n</urlset>\n`;
   writeFileSync(join(outDir, "sitemap.xml"), xml, "utf8");
   return 1;
 }

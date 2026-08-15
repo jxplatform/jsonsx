@@ -91,6 +91,26 @@ export function mergeHead(
     });
   }
 
+  /*
+   * Locale alternates (site-architecture.md §13.5). Keyed through `headEntryKey` like everything
+   * else, which is what keeps a set of them from collapsing: they share `rel="alternate"` and
+   * differ only in `hreflang`, and `x-default` conventionally shares its `href` with the default
+   * locale's entry. Before the key accounted for the qualifying attribute this whole feature was
+   * impossible — the set became one link.
+   *
+   * An author-supplied alternate for the same `hreflang` wins, like every other auto entry.
+   */
+  for (const alternate of context.alternates ?? []) {
+    const entry: JxHeadEntry = {
+      attributes: { href: alternate.href, hreflang: alternate.hreflang, rel: "alternate" },
+      tagName: "link",
+    };
+    const key = headEntryKey(entry);
+    if (!merged.has(key)) {
+      merged.set(key, entry);
+    }
+  }
+
   return [...merged.values()];
 }
 
