@@ -29,6 +29,7 @@ import type {
   JxMutableNode,
   ProjectConfig,
 } from "@jxsuite/schema/types";
+import { coerceEntryDates, isCoercedDate, isDateFormat } from "./dates.ts";
 import type { ContentLoaderEntry, ContentTypeDef } from "./types.ts";
 
 export type { ContentEntry, ContentLoaderEntry, TocEntry } from "./types.ts";
@@ -470,8 +471,15 @@ async function loadContentType(
     entries.push(...fileEntries);
   }
 
-  // Validate entries against schema if present
+  /*
+   * Coerce declared date fields before validating. This is the one point in the pipeline that holds
+   * both the entries and the schema: `Csv.load` receives a schema and `Markdown.load` does not, so
+   * doing it per-format would mean doing it twice and missing every third-party format class.
+   */
   if (schema) {
+    for (const warning of coerceEntryDates(entries, schema, name)) {
+      console.warn(warning.message);
+    }
     validateEntries(entries, schema, name);
   }
 
@@ -526,7 +534,12 @@ function validateEntries(
         continue;
       }
 
-      if (def.type === "string" && typeof value !== "string") {
+      if (isDateFormat(def.format) && typeof value === "string" && !isCoercedDate(value)) {
+        console.warn(
+          `Content validation: "${contentTypeName}/${entry.id}" field "${field}" is declared ` +
+            `${def.format} but "${value}" was not coerced — it will sort and filter as plain text.`,
+        );
+      } else if (def.type === "string" && typeof value !== "string") {
         console.warn(
           `Content validation: "${contentTypeName}/${entry.id}" field "${field}" expected string, got ${typeof value}`,
         );

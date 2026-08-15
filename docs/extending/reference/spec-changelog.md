@@ -135,6 +135,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `parser.md`
 
+- **0.2.6-draft** (2026-08-15) — Add §9.3 date coercion: schema-declared date fields normalize to RFC 3339, ambiguous values are refused rather than guessed.
 - **0.2.5-draft** (2026-08-15) — Add §10 Standards Alignment; §3 marked Partial — heading slugs and word counts are correct only for Latin script.
 - **0.2.4-draft** (2026-07-23) — Document the Content project-section class: asset mounts and content-relative reference rewriting (§9).
 - **0.2.3-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).

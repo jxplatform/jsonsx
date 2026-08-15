@@ -15,10 +15,10 @@ This page is generated from the `## N. Standards Alignment` tables in the specif
 | Class       | Standards | Bindings |
 | ----------- | --------- | -------- |
 | `Adopted`   | 11        | 17       |
-| `Subset`    | 21        | 35       |
+| `Subset`    | 22        | 36       |
 | `Divergent` | 2         | 3        |
 | `Borrowed`  | 3         | 4        |
-| `Pending`   | 18        | 24       |
+| `Pending`   | 17        | 22       |
 | `Rejected`  | 3         | 3        |
 | _(backlog)_ | 16        | —        |
 
@@ -32,6 +32,7 @@ This page is generated from the `## N. Standards Alignment` tables in the specif
 | [The JSON Data Interchange Syntax](https://ecma-international.org/publications-and-standards/standards/ecma-404/) `ECMA-404`                           | Ecma        | `Adopted`   | `spec.md` §3                                                                              | `packages/schema/src/parse.ts`                                                                                                   |
 | [IANA IPv4 Special-Purpose Address Registry](https://www.iana.org/assignments/iana-ipv4-special-registry) `IANA IPv4 Special-Purpose Address Registry` | IANA        | `Subset`    | `ai.md` §4                                                                                | `packages/server/src/ai-api.ts`                                                                                                  |
 | [IANA IPv6 Special-Purpose Address Registry](https://www.iana.org/assignments/iana-ipv6-special-registry) `IANA IPv6 Special-Purpose Address Registry` | IANA        | `Subset`    | `ai.md` §4                                                                                | `packages/server/src/ai-api.ts`                                                                                                  |
+| [Date and Time on the Internet: Timestamps](https://www.rfc-editor.org/rfc/rfc3339) `RFC 3339`                                                         | IETF        | `Subset`    | `parser.md` §9.3                                                                          | `extensions/parser/src/dates.ts`, `extensions/parser/tests/dates.test.ts`                                                        |
 | [Uniform Resource Identifier (URI): Generic Syntax](https://www.rfc-editor.org/rfc/rfc3986) `RFC 3986`                                                 | IETF        | `Subset`    | `standards.md` §5.2                                                                       | `scripts/docs/lib/standards.ts`                                                                                                  |
 | [Common Format and MIME Type for CSV Files](https://www.rfc-editor.org/rfc/rfc4180) `RFC 4180`                                                         | IETF        | `Subset`    | `parser.md` §4                                                                            | `extensions/parser/src/csv.ts`, `extensions/parser/tests/csv.test.ts`                                                            |
 | [The WebSocket Protocol](https://www.rfc-editor.org/rfc/rfc6455) `RFC 6455`                                                                            | IETF        | `Subset`    | `collab.md` §2                                                                            | `packages/collab/src/envelope.ts`, `packages/server/src/collab.ts`                                                               |
@@ -81,7 +82,6 @@ This page is generated from the `## N. Standards Alignment` tables in the specif
 
 - <a id="gap-normative-keywords"></a>`gap:normative-keywords` — **Key words for use in RFCs to Indicate Requirement Levels** (BCP 14, `Pending`) in `standards.md` §1 — Jx specifications use MUST and SHOULD informally; none declares the BCP 14 boilerplate that would make them normative.
 - <a id="gap-bcp47-locale-validation"></a>`gap:bcp47-locale-validation` — **Tags for Identifying Languages** (BCP 47, `Pending`) in `schema.md` §3.2 — `i18n.defaultLocale` and `i18n.locales[]` are bare strings, so nothing rejects a malformed language tag or canonicalizes `en-us` to `en-US`.
-- <a id="gap-content-date-coercion"></a>`gap:content-date-coercion` — **Date and Time on the Internet: Timestamps** (RFC 3339, `Pending`) in `parser.md` §3, `parser.md` §4 — No date coercion exists in either format class. Sorting compares raw strings, which is right for ISO 8601 by accident and silently wrong for any other form, and the filter comparators push both sides through `Number()`, so a date comparison is always false.
 - <a id="gap-markdown-variant"></a>`gap:markdown-variant` — **The text/markdown Media Type** (RFC 7763, `Subset`) in `parser.md` §3 — The class declares `text/markdown`, but not the `variant` parameter RFC 7764 registers — so nothing on the wire says which flavour a `.md` file is.
 - <a id="gap-ai-problem-details"></a>`gap:ai-problem-details` — **Problem Details for HTTP APIs** (RFC 9457, `Pending`) in `ai.md` §2 — Failures answer as `{error}` JSON, and an upstream failure answers 200 carrying `upstreamError`. Neither is `application/problem+json`.
 - <a id="gap-backend-failure-contract"></a>`gap:backend-failure-contract` — **Problem Details for HTTP APIs** (RFC 9457, `Pending`) in `desktop.md` §5 — The contract defines no failure shape, so each backend invents one and the Studio client carries a separate reader for each.
