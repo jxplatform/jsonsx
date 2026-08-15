@@ -1,8 +1,8 @@
 # Jx Markdown Specification
 
-**Version:** 0.1.7-draft
+**Version:** 0.1.8-draft
 **Status:** Partial
-**Updated:** 2026-07-22
+**Updated:** 2026-08-15
 **License:** MIT
 
 ---
@@ -11,7 +11,7 @@ Jx Markdown is a first-class authoring format for Jx components and content page
 
 Jx Markdown is primarily intended for content-heavy components. JSON remains the preferred format for technically complex components. The studio visual editor works transparently on both formats.
 
-## Relationship to JSON
+## 1. Relationship to JSON
 
 Markdown is a transpilation source — `.md` files compile to the same JSON document structure the runtime and compiler already consume. The transpiler (`transpileJxMarkdown`, exposed as the `Markdown` format class's `parse` capability) produces a standard Jx JSON document from markdown source. Round-tripping is supported via `serializeJxMarkdown` (`@jxsuite/parser/serialize`, the `Markdown` class's `serialize` capability). Markdown support is opt-in: a project must import the `Markdown` format class (see specs/extensions.md) — there is no implicit `.md` handling in any host.
 
@@ -21,7 +21,7 @@ author.md → transpileJxMarkdown() → Jx JSON → compiler/runtime
                             serializeJxMarkdown() ← studio editor / site export
 ```
 
-## Format Overview
+## 2. Format Overview
 
 A Jx Markdown file consists of:
 
@@ -29,7 +29,7 @@ A Jx Markdown file consists of:
 2. **Directive body** — element tree using remark-directive syntax
 3. **Standard markdown** — headings, paragraphs, lists, etc. (mapped to HTML elements)
 
-### Minimal Example
+### 2.1 Minimal Example
 
 ```markdown
 ---
@@ -47,7 +47,7 @@ state:
 :::
 ```
 
-## YAML Frontmatter
+## 3. YAML Frontmatter
 
 All top-level Jx document properties are declared in YAML frontmatter. The `$` prefix is preserved in YAML (unlike directive attributes — see below).
 
@@ -70,15 +70,15 @@ Supported frontmatter keys:
 
 Any additional frontmatter keys are passed through to the document.
 
-### Detection
+### 3.1 Detection
 
 A `.md` file is recognized as a Jx component (vs content markdown) when its frontmatter contains a `tagName` key whose value includes a hyphen. The `isJxMarkdown(source)` utility performs this check. However, detection does **not** gate the pipeline — all markdown goes through `transpileJxMarkdown()`. Content documents (no `tagName`) produce a Jx element tree that is wrapped in a `{ tagName: "div", $id: "content" }` root by the studio. This enables gradual enhancement: any `.md` file can add Jx schema at any point without changing how it is processed.
 
-## Directive Syntax
+## 4. Directive Syntax
 
 Jx Markdown uses the three directive types defined by the [directive proposal](https://talk.commonmark.org/t/generic-directives-plugins-syntax/444):
 
-### Container Directives
+### 4.1 Container Directives
 
 Container directives wrap children. Outer containers use **more** colons, inner containers use **fewer**. Closing fences must match the opening colon count.
 
@@ -93,7 +93,7 @@ Get started today.
 ::::
 ```
 
-### Leaf Directives
+### 4.2 Leaf Directives
 
 Leaf directives are self-closing (no children).
 
@@ -105,7 +105,7 @@ Leaf directives are self-closing (no children).
 ::img{src="/photo.jpg" alt="A photo"}
 ```
 
-### Text Directives
+### 4.3 Text Directives
 
 Inline directives within text.
 
@@ -113,7 +113,7 @@ Inline directives within text.
 Click :a[here]{href="/about"} for details.
 ```
 
-## Nesting Convention
+## 5. Nesting Convention
 
 Outer containers use **more** colons than inner ones. This is the standard remark-directive convention.
 
@@ -131,9 +131,9 @@ Home
 
 The minimum is 3 colons for a container directive. Each nesting level reduces by one, with a floor of 2 (which becomes a leaf directive).
 
-## Attribute Conventions
+## 6. Attribute Conventions
 
-### Standard Attributes
+### 6.1 Standard Attributes
 
 Directive attributes use the standard HTML-like syntax:
 
@@ -141,7 +141,7 @@ Directive attributes use the standard HTML-like syntax:
 ::div{className="card" id="main-card"}
 ```
 
-### `$`-Prefix Keywords
+### 6.2 `$`-Prefix Keywords
 
 The `$` character cannot appear at the start of remark-directive attribute keys. The following Jx keywords are written **without** the `$` prefix in directive attributes, and the transpiler re-adds it:
 
@@ -160,7 +160,7 @@ DOM properties like `src`, `id`, and `export` are **not** mapped — they pass t
 ::children{prototype="Array" items.ref="#/state/items"}
 ```
 
-### `--` Annotation Keys
+### 6.3 `--` Annotation Keys
 
 Element annotations use the `--` prefix in markdown directives to avoid collision with the HTML `title` attribute:
 
@@ -179,7 +179,7 @@ These are developer-facing metadata annotations, dropped during HTML compilation
 :::
 ```
 
-### Dot-Path Attributes
+### 6.4 Dot-Path Attributes
 
 Nested objects are encoded as dot-separated attribute keys:
 
@@ -204,7 +204,7 @@ This expands to:
 }
 ```
 
-### Prototype Directives (`:::Array`)
+### 6.5 Prototype Directives (`:::Array`)
 
 An array pseudo-element (repeater) has no `tagName`, so it serializes as a directive **named after
 its `$prototype`** — e.g. `:::Array`. The directive's attributes carry `items`/`filter`/`sort`
@@ -234,7 +234,7 @@ This is the canonical, round-trippable encoding. The older dot-path form
 (`children.prototype="Array" …` on the parent directive) is still accepted on parse for backward
 compatibility.
 
-### HTML Attributes
+### 6.6 HTML Attributes
 
 Attributes matching `aria-*`, `data-*`, or `slot` are routed to the `attributes` sub-object. All other attributes become top-level DOM properties.
 
@@ -255,11 +255,11 @@ Produces:
 }
 ```
 
-## Style Attributes
+## 7. Style Attributes
 
 Element styles are expressed as `style.*` dot-path attributes on the element directive. Root-level styles go in YAML frontmatter.
 
-### Element Styles
+### 7.1 Element Styles
 
 ```markdown
 ::button{className="primary" style.backgroundColor="blue" style.color="white" style.padding="8px 16px"}
@@ -280,7 +280,7 @@ Produces:
 }
 ```
 
-### Root Styles (YAML Frontmatter)
+### 7.2 Root Styles (YAML Frontmatter)
 
 Root-level styles are declared in YAML frontmatter under the `style` key. YAML has no attribute-key restrictions, so `:hover`, `@--dark`, etc. are written directly:
 
@@ -296,7 +296,7 @@ style:
 ---
 ```
 
-### Pseudo-Classes in Style Attributes
+### 7.3 Pseudo-Classes in Style Attributes
 
 The `:` character cannot start a remark-directive attribute key. CSS pseudo-class names are written **without** the `:` prefix inside `style.*` attributes, and the transpiler adds it:
 
@@ -319,7 +319,7 @@ Produces:
 
 Recognized pseudo-class names: `hover`, `focus`, `active`, `visited`, `disabled`, `checked`, `valid`, `invalid`, `required`, `empty`, `first-child`, `last-child`, `focus-within`, `focus-visible`, `placeholder`, `selection`, `before`, `after`.
 
-### Media Queries in Style Attributes
+### 7.4 Media Queries in Style Attributes
 
 The `@` character cannot start an attribute key. Media query keys starting with `--` are written without the `@` prefix:
 
@@ -339,7 +339,7 @@ Produces:
 }
 ```
 
-## Array Children
+## 8. Array Children
 
 Arrays (mapped lists) are encoded using `children.*` dot-path attributes on the parent container element:
 
@@ -350,7 +350,7 @@ Arrays (mapped lists) are encoded using `children.*` dot-path attributes on the 
 
 The `children.*` attributes expand to a `children` descriptor object (not an array). The transpiler detects this and preserves the object form, skipping the normal content-children array.
 
-## Standard Markdown Mapping
+## 9. Standard Markdown Mapping
 
 Standard markdown nodes map to Jx elements:
 
@@ -381,14 +381,14 @@ and bare fences keep plain `textContent`. The browser-safe transpile module
 (`@jxsuite/parser/transpile`) never highlights — Studio and other browser callers see plain
 fences.
 
-## Limitations
+## 10. Limitations
 
 1. **No runtime format** — `.md` always transpiles to JSON before compilation or rendering
 2. **Attribute key restrictions** — `:`, `@`, and `$` cannot start directive attribute keys (use the conventions above)
 3. **Complex state logic** — components with intricate `$prototype: Function` bodies or deeply nested state may be clearer in JSON
 4. **No inline JavaScript** — event handler bodies and computed expressions live in YAML frontmatter `state` definitions, not in the directive body
 
-## When to Use JSON vs Markdown
+## 11. When to Use JSON vs Markdown
 
 | Use Markdown                           | Use JSON                                   |
 | -------------------------------------- | ------------------------------------------ |
@@ -397,37 +397,37 @@ fences.
 | Landing pages, marketing content       | Deeply nested element hierarchies          |
 | Quick prototyping                      | Components with complex `$prototype` usage |
 
-## Transpiler API
+## 12. Transpiler API
 
-### `transpileJxMarkdown(source: string): object`
+### 12.1 `transpileJxMarkdown(source: string): object`
 
 Converts a Jx Markdown string to a Jx JSON document. Available from both `@jxsuite/parser` (Node.js) and `@jxsuite/parser/transpile` (browser-safe).
 
-### `isJxMarkdown(source: string): boolean`
+### 12.2 `isJxMarkdown(source: string): boolean`
 
 Returns `true` if the markdown source is a Jx component (frontmatter has `tagName` with a hyphen).
 
-### `expandDotPaths(attrs: Record<string, string>): Record<string, any>`
+### 12.3 `expandDotPaths(attrs: Record<string, string>): Record<string, any>`
 
 Expands flat dot-path attribute keys into nested objects with Jx `$`-prefix restoration.
 
-### `expandStylePaths(attrs: Record<string, string>): Record<string, any>`
+### 12.4 `expandStylePaths(attrs: Record<string, string>): Record<string, any>`
 
 Like `expandDotPaths` but also maps CSS pseudo-class names to `:` prefix and `--` keys to `@` prefix. Used for top-level style attribute expansion.
 
-### `applyStyleKeyMapping(styleObj: Record<string, any>): Record<string, any>`
+### 12.5 `applyStyleKeyMapping(styleObj: Record<string, any>): Record<string, any>`
 
 Maps top-level keys of a style object: pseudo-class names get `:` prefix, `--` keys get `@` prefix. Used internally by `routeAttributes()` to transform `style.*` dot-path attributes after generic expansion.
 
-### `collapseDotPaths(obj: Record<string, any>): Record<string, string>`
+### 12.6 `collapseDotPaths(obj: Record<string, any>): Record<string, string>`
 
 Inverse of `expandDotPaths` — flattens a nested object to dot-path attributes.
 
-### `collapseStylePaths(styleObj: Record<string, any>): Record<string, string>`
+### 12.7 `collapseStylePaths(styleObj: Record<string, any>): Record<string, string>`
 
 Inverse of `expandStylePaths` — strips `:` and `@` prefixes before flattening.
 
-### `serializeJxMarkdown(doc: object, options?): string`
+### 12.8 `serializeJxMarkdown(doc: object, options?): string`
 
 Converts a Jx JSON document back to markdown source (`@jxsuite/parser/serialize`). Two modes:
 
@@ -436,8 +436,17 @@ Converts a Jx JSON document back to markdown source (`@jxsuite/parser/serialize`
 
 This is the single Jx→markdown serializer — the studio and the compiler both dispatch to it through the `Markdown` format class.
 
+## 13. Standards Alignment
+
+External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md). `remark-directive` is a library rather than a standard; the directive syntax it implements is a CommonMark _proposal_ that was never accepted, which is why §4 is described rather than cited. The frontmatter media type is tracked against `parser.md` §3, where the format class that reads it lives.
+
+| Standard                                           | Class      | Binds | Evidence                                                                      | Note                                                                                                                                                                                    |
+| -------------------------------------------------- | ---------- | ----- | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [CommonMark](https://spec.commonmark.org/current/) | **Subset** | §9    | extensions/parser/src/transpile.ts, extensions/parser/tests/transpile.test.ts | The block and inline constructs §9 tabulates map to Jx nodes. §10 names what does not: a construct outside that table has no Jx representation and is dropped rather than approximated. |
+
 ## Changelog
 
+- **0.1.8-draft** (2026-08-15) — Number the sections so they are addressable, and add §13 Standards Alignment.
 - **0.1.7-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.1.6-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
 - **0.1.5-draft** (2026-07-17) — Build-time syntax highlighting for markdown code fences (`b2e7a561`).

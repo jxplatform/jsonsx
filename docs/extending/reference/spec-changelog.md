@@ -111,6 +111,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `imports.md`
 
+- **0.1.8-draft** (2026-08-15) — Number the sections so they are addressable, and add §7 Standards Alignment.
 - **0.1.7-draft** (2026-08-02) — Imports panel section renamed to Imported Modules in the UI.
 - **0.1.6-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.1.5-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
@@ -122,6 +123,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `jx-markdown.md`
 
+- **0.1.8-draft** (2026-08-15) — Number the sections so they are addressable, and add §13 Standards Alignment.
 - **0.1.7-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.1.6-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
 - **0.1.5-draft** (2026-07-17) — Build-time syntax highlighting for markdown code fences (`b2e7a561`).
@@ -192,6 +194,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `site-architecture.md`
 
+- **0.1.45-draft** (2026-08-15) — Add §16 Standards Alignment; §8.5 marked Pending — the JSON-LD object form is unimplemented — and §14 Partial: no _headers or .nojekyll is emitted.
 - **0.1.44-draft** (2026-08-12) — Header status corrected from Pending to Partial — all seven marked sections were Implemented while the header claimed nothing was; §9.4's marker and its own Still-planned list contradicted each other (metadata and the delete warning ship; browsable usage does not); §12.3 and §13 marked Pending, having no dependency graph and no reader of the i18n config respectively.
 - **0.1.43-draft** (2026-08-11) — Studio SEO previews move from a Document Header disclosure into the Search appearance modal (document.openSeo), reachable from the card, the Page panel and the palette; fields grouped by the preview each feeds.
 - **0.1.42-draft** (2026-08-06) — §7.2 the Library and its window contract, §7.5 the CRUD table corrected — rename, delete and CSV editing already shipped and were listed Pending, §7.6 the draft pill, §8.6 merged-$head previews with no score, §9.4 usage keyed on the authored ref, §11.4 redirects as a GridSource with chain, loop and shadow validation.
@@ -240,6 +243,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `spec.md`
 
+- **0.4.29-draft** (2026-08-15) — §18 becomes the machine-checked standards table; §2.5 renamed Platform Precedents to free the reserved title; §21 marked Partial — no Trusted Types policy is installed.
 - **0.4.28-draft** (2026-08-10) — §19.6 $expression gains a third position — an element's tagName, narrowed to a TagExpression whose every branch is a literal TagName so the candidate set is enumerable without evaluating; it is the one $expression position that is not live, resolved once at element creation, and the document root's and $head entries' tagNames stay literal.
 - **0.4.27-draft** (2026-07-30) — Clarify that a bare `return;` is an early-exit guard, not a value return, when classifying a Function body as a computed (§5.3 4b).
 - **0.4.26-draft** (2026-07-30) — Define the handler-side iteration context: an event handler bound inside a map reads its row via state.$map (§10.2).
@@ -293,6 +297,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio-ui-guidelines.md`
 
+- **0.3.9** (2026-08-15) — Add §14 Standards Alignment; §8 marked Partial — drag and drop has no non-dragging alternative (WCAG 2.2 SC 2.5.7).
 - **0.3.8** (2026-08-13) — A row wraps and never overflows (§4.6); the floating bar's visibility rule.
 - **0.3.7** (2026-08-12) — blockbar/format joins the level × placement matrix, with its own chrome budget.
 - **0.3.6** (2026-08-10) — §12.4 the agent counts as a surface — an assistant tool that writes what a command writes binds to the command's rule by reading the same CommandContext, not by recomputing it; the element-tree writers move to a document-tree tier gated on the registry's own editor.kind.
@@ -318,6 +323,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.9.25-draft** (2026-08-15) — Add §19 Standards Alignment; six bare **Status:** lines converted to the blockquote form no tool could read, and §16 marked Partial — the one status channel has no live region for the error tier.
 - **0.9.24-draft** (2026-08-13) — Open in Browser serves the built site on its own origin; the build reports the URL.
 - **0.9.23-draft** (2026-08-13) — Open in Browser opens the page's route on a server that serves the built site there, and builds it first.
 - **0.9.22-draft** (2026-08-13) — The slash menu is recognised at the editing host and gains a named door (insert.openSlashMenu).

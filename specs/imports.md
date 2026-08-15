@@ -1,17 +1,17 @@
 # Imports
 
-**Version:** 0.1.7-draft
+**Version:** 0.1.8-draft
 **Status:** Partial
-**Updated:** 2026-08-02
+**Updated:** 2026-08-15
 **License:** MIT
 
 ---
 
 The JX import system provides a unified way to manage three types of external dependencies: JX class files, npm packages, and web component libraries.
 
-## Import Types
+## 1. Import Types
 
-### JX Class Imports
+### 1.1 JX Class Imports
 
 Class imports map short names to file paths, enabling `$prototype` resolution without full paths. Defined in `project.json` under `imports`:
 
@@ -26,7 +26,7 @@ Class imports map short names to file paths, enabling `$prototype` resolution wi
 
 These cascade from site level into every page. Page-level `imports` merge on top (page wins on conflict).
 
-### Format Class Auto-Discovery
+### 1.2 Format Class Auto-Discovery
 
 Imports are also the registration mechanism for **format-extension classes** (see `specs/extensions.md`). Hosts (compiler, dev server, studio) scan the **project-level** `imports` map for `.class.json` files carrying a top-level `format` block and build a format registry from them:
 
@@ -41,7 +41,7 @@ Imports are also the registration mechanism for **format-extension classes** (se
 
 With these imports in place, `.md` files are discoverable as pages/components, content types can use `"format": "Markdown"` / `"format": "Csv"`, and the studio offers the formats' editing surfaces. Without them, only `.json` is handled — there are no implicit format defaults. Page-level imports continue to drive `$prototype` state resolution but do not participate in file-extension dispatch (they cannot be read before the page itself is parsed).
 
-### `$elements` - Component Registration
+### 1.3 `$elements` - Component Registration
 
 `$elements` declares which custom elements a page uses. It accepts two formats:
 
@@ -58,7 +58,7 @@ With these imports in place, `.md` files are discoverable as pages/components, c
 - **`{ $ref }` objects**: JX custom element definitions. The runtime fetches the JSON, registers the custom element via `defineElement()`.
 - **Bare strings**: npm package specifiers. The runtime calls `import(pkgName)` as a side-effect import, which registers the package's custom elements globally.
 
-### Cascading
+### 1.4 Cascading
 
 `$elements` defined in `project.json` apply to every page. Page-level `$elements` merge with site-level via union (deduplicated by `$ref` value or string value). Page entries take precedence on conflict.
 
@@ -66,7 +66,7 @@ With these imports in place, `.md` files are discoverable as pages/components, c
 project.json $elements  +  page $elements  =  effective $elements (union, dedup)
 ```
 
-## npm Web Component Discovery
+## 2. npm Web Component Discovery
 
 Packages that ship a [Custom Elements Manifest](https://custom-elements-manifest.open-wc.org/) (CEM) are auto-discovered. The server scans `package.json` dependencies for packages whose own `package.json` declares a `customElements` field pointing to their CEM JSON.
 
@@ -79,9 +79,9 @@ The CEM provides:
 
 This metadata powers the Studio property inspector and enables drag-and-drop of npm web components onto the canvas.
 
-## Runtime Behavior
+## 3. Runtime Behavior
 
-### `$ref` entries
+### 3.1 `$ref` entries
 
 ```js
 // For each { $ref } in $elements:
@@ -90,7 +90,7 @@ const doc = await fetch(url).then((r) => r.json());
 defineElement(doc); // registers <tag-name> custom element
 ```
 
-### Bare string entries
+### 3.2 Bare string entries
 
 ```js
 // For each string in $elements:
@@ -99,9 +99,9 @@ await import(entry); // side-effect import, registers custom elements globally
 
 Failed imports log a warning but do not block page rendering.
 
-## Server API
+## 4. Server API
 
-### `GET /__studio/components?dir=<path>`
+### 4.1 `GET /__studio/components?dir=<path>`
 
 Returns the component registry for a project. Each entry includes:
 
@@ -125,23 +125,23 @@ For npm packages with CEM:
 }
 ```
 
-### `GET /__studio/packages`
+### 4.2 `GET /__studio/packages`
 
 Lists CEM-bearing npm dependencies from `package.json`.
 
-### `GET /__studio/cem?pkg=<name>`
+### 4.3 `GET /__studio/cem?pkg=<name>`
 
 Returns the full Custom Elements Manifest JSON for a package.
 
-### `POST /__studio/packages/add`
+### 4.4 `POST /__studio/packages/add`
 
 Body: `{ "name": "<package-name>" }`. Runs `bun add <name>`.
 
-### `POST /__studio/packages/remove`
+### 4.5 `POST /__studio/packages/remove`
 
 Body: `{ "name": "<package-name>" }`. Runs `bun remove <name>`.
 
-## Studio Imports Panel
+## 5. Studio Imports Panel
 
 The left sidebar "Imports" tab provides three sections:
 
@@ -149,7 +149,7 @@ The left sidebar "Imports" tab provides three sections:
 2. **Components** - JX custom elements (`source: "jx"`) with live preview and drag-drop.
 3. **Packages** - npm web components (`source: "npm"`) grouped by package, with drag-drop of individual tags and package add/remove.
 
-### Auto-Import on Drag-Drop
+### 5.1 Auto-Import on Drag-Drop
 
 When a component is dragged from the imports panel onto the canvas:
 
@@ -158,7 +158,7 @@ When a component is dragged from the imports panel onto the canvas:
 
 Duplicates are not added if the component is already imported.
 
-## Content Collection `$elements`
+## 6. Content Collection `$elements`
 
 Content collections support `$elements` in their `project.json `collections``, controlling which custom element directives are available in that collection's markdown files:
 
@@ -178,8 +178,18 @@ Collection `$elements` merge with site-level `$elements` to determine the full s
 
 The compiler's `injectContext()` also merges site-level `$elements` into page-level `$elements` during the build, using the same union-dedup strategy as the runtime.
 
+## 7. Standards Alignment
+
+External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md). The Custom Elements Manifest (§2) is a community format with no standards body, so it is described there rather than cited here. Subresource Integrity for a bare-specifier `$elements` script is tracked against `compiler.md` §3, where the emitted-script contract lives.
+
+| Standard                                                                                  | Class        | Binds | Evidence                                 | Note                                                                                                                                                                                                                                                                                                  |
+| ----------------------------------------------------------------------------------------- | ------------ | ----- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [ECMA-262](https://ecma-international.org/publications-and-standards/standards/ecma-262/) | **Adopted**  | §3    | packages/runtime/src/runtime.ts          | A bare-string `$elements` entry is loaded with a dynamic `import()` for its registration side effect — the standard's own module semantics, with no loader of Jx's own.                                                                                                                               |
+| [WHATWG HTML](https://html.spec.whatwg.org/)                                              | **Borrowed** | §1    | packages/compiler/src/site/site-build.ts | The project-level `imports` map has an import map's shape — bare specifier to URL — but it is resolved by Jx at build and load time and is never emitted as a `<script type="importmap">`, so a browser never sees it. The import map the compiler _does_ emit is a separate, fixed two-entry object. |
+
 ## Changelog
 
+- **0.1.8-draft** (2026-08-15) — Number the sections so they are addressable, and add §7 Standards Alignment.
 - **0.1.7-draft** (2026-08-02) — Imports panel section renamed to Imported Modules in the UI.
 - **0.1.6-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.1.5-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).

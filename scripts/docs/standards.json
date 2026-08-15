@@ -2,6 +2,18 @@
   "$comment": "The standards LEXICON: what each identifier IS (issuing body, title, canonical URL). It is not the registry — the specs' `## N. Standards Alignment` tables say what Jx DOES about each standard, and scripts/docs/check-standards.ts joins the two. An id no spec cites fails (catalog-stale); an id no entry vouches for fails (id-unknown). That is the only offline way a typo'd RFC number can fail, since a wrong-but-well-formed rfc-editor.org URL is indistinguishable from a right one. Keep entries sorted by id (codepoint order).",
   "standards": [
     {
+      "id": "ATAG 2.0",
+      "org": "W3C",
+      "title": "Authoring Tool Accessibility Guidelines (ATAG) 2.0",
+      "url": "https://www.w3.org/TR/ATAG20/"
+    },
+    {
+      "id": "Accessible Name and Description Computation",
+      "org": "W3C",
+      "title": "Accessible Name and Description Computation 1.2",
+      "url": "https://www.w3.org/TR/accname-1.2/"
+    },
+    {
       "id": "BCP 14",
       "org": "IETF",
       "title": "Key words for use in RFCs to Indicate Requirement Levels",
@@ -21,6 +33,12 @@
       "url": "https://www.w3.org/TR/CSP3/"
     },
     {
+      "id": "CSS Color 4",
+      "org": "W3C",
+      "title": "CSS Color Module Level 4",
+      "url": "https://www.w3.org/TR/css-color-4/"
+    },
+    {
       "id": "CSSOM",
       "org": "W3C",
       "title": "CSS Object Model (CSSOM)",
@@ -37,6 +55,18 @@
       "org": "Ecma",
       "title": "ECMAScript Language Specification",
       "url": "https://ecma-international.org/publications-and-standards/standards/ecma-262/"
+    },
+    {
+      "id": "ECMA-402",
+      "org": "Ecma",
+      "title": "ECMAScript Internationalization API Specification",
+      "url": "https://ecma-international.org/publications-and-standards/standards/ecma-402/"
+    },
+    {
+      "id": "ECMA-404",
+      "org": "Ecma",
+      "title": "The JSON Data Interchange Syntax",
+      "url": "https://ecma-international.org/publications-and-standards/standards/ecma-404/"
     },
     {
       "id": "Fetch Metadata Request Headers",
@@ -69,6 +99,12 @@
       "url": "https://json-schema.org/draft/2020-12/schema"
     },
     {
+      "id": "JSON-LD 1.1",
+      "org": "W3C",
+      "title": "JSON-LD 1.1",
+      "url": "https://www.w3.org/TR/json-ld11/"
+    },
+    {
       "id": "RFC 3339",
       "org": "IETF",
       "title": "Date and Time on the Internet: Timestamps",
@@ -85,6 +121,12 @@
       "org": "IETF",
       "title": "Common Format and MIME Type for CSV Files",
       "url": "https://www.rfc-editor.org/rfc/rfc4180"
+    },
+    {
+      "id": "RFC 4647",
+      "org": "IETF",
+      "title": "Matching of Language Tags",
+      "url": "https://www.rfc-editor.org/rfc/rfc4647"
     },
     {
       "id": "RFC 6265",
@@ -141,10 +183,22 @@
       "url": "https://www.rfc-editor.org/rfc/rfc7763"
     },
     {
+      "id": "RFC 8246",
+      "org": "IETF",
+      "title": "HTTP Immutable Responses",
+      "url": "https://www.rfc-editor.org/rfc/rfc8246"
+    },
+    {
       "id": "RFC 8252",
       "org": "IETF",
       "title": "OAuth 2.0 for Native Apps",
       "url": "https://www.rfc-editor.org/rfc/rfc8252"
+    },
+    {
+      "id": "RFC 8288",
+      "org": "IETF",
+      "title": "Web Linking",
+      "url": "https://www.rfc-editor.org/rfc/rfc8288"
     },
     {
       "id": "RFC 9110",
@@ -159,6 +213,12 @@
       "url": "https://www.rfc-editor.org/rfc/rfc9111"
     },
     {
+      "id": "RFC 9309",
+      "org": "IETF",
+      "title": "Robots Exclusion Protocol",
+      "url": "https://www.rfc-editor.org/rfc/rfc9309"
+    },
+    {
       "id": "RFC 9457",
       "org": "IETF",
       "title": "Problem Details for HTTP APIs",
@@ -171,10 +231,28 @@
       "url": "https://www.rfc-editor.org/rfc/rfc9512"
     },
     {
+      "id": "RFC 9535",
+      "org": "IETF",
+      "title": "JSONPath: Query Expressions for JSON",
+      "url": "https://www.rfc-editor.org/rfc/rfc9535"
+    },
+    {
+      "id": "Sitemaps 0.9",
+      "org": "Other",
+      "title": "Sitemaps XML format",
+      "url": "https://www.sitemaps.org/protocol.html"
+    },
+    {
       "id": "Subresource Integrity",
       "org": "W3C",
       "title": "Subresource Integrity",
       "url": "https://www.w3.org/TR/SRI/"
+    },
+    {
+      "id": "Trusted Types",
+      "org": "W3C",
+      "title": "Trusted Types",
+      "url": "https://www.w3.org/TR/trusted-types/"
     },
     {
       "id": "UAX #15",
@@ -189,6 +267,24 @@
       "url": "https://www.unicode.org/reports/tr29/"
     },
     {
+      "id": "WAI-ARIA",
+      "org": "W3C",
+      "title": "Accessible Rich Internet Applications (WAI-ARIA) 1.2",
+      "url": "https://www.w3.org/TR/wai-aria-1.2/"
+    },
+    {
+      "id": "WCAG 2.2",
+      "org": "W3C",
+      "title": "Web Content Accessibility Guidelines (WCAG) 2.2",
+      "url": "https://www.w3.org/TR/WCAG22/"
+    },
+    {
+      "id": "WHATWG DOM",
+      "org": "WHATWG",
+      "title": "DOM Standard",
+      "url": "https://dom.spec.whatwg.org/"
+    },
+    {
       "id": "WHATWG Fetch",
       "org": "WHATWG",
       "title": "Fetch Standard",
@@ -199,6 +295,12 @@
       "org": "WHATWG",
       "title": "HTML Standard",
       "url": "https://html.spec.whatwg.org/"
+    },
+    {
+      "id": "WHATWG URLPattern",
+      "org": "WHATWG",
+      "title": "URL Pattern Standard",
+      "url": "https://urlpattern.spec.whatwg.org/"
     }
   ]
 }

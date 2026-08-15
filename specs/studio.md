@@ -2,9 +2,9 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.24-draft
+**Version:** 0.9.25-draft
 **Status:** Partial
-**Updated:** 2026-08-13
+**Updated:** 2026-08-15
 **License:** MIT
 
 ---
@@ -1336,7 +1336,8 @@ See the [Site Architecture Specification](site-architecture.md) for full design 
 
 ## 13. Command Registry and Context Keys
 
-**Status:** Partial — the registry, the keymap and the CI checks ship; the surfaces are being ported onto them.
+> **Status: Partial.** The registry, the keymap and the CI checks ship; the surfaces are being
+> ported onto them.
 
 Every capability Studio has is one **command record**. The Command Bar, the palette, the Navigator
 rail, the context menus, the block action bar, the keymap, `__jxAutomation` and the assistant's tool
@@ -1572,7 +1573,8 @@ are its own arithmetic and a caller outside the app can only guess at them.
 
 ## 14. Tabs and Document Identity
 
-**Status:** Partial — the identity model and the strip ship; per-pane tab strips and preview tabs are pending.
+> **Status: Partial.** The identity model and the strip ship; per-pane tab strips and preview tabs
+> are pending.
 
 ### 14.1 A tab's id IS its document
 
@@ -1708,8 +1710,8 @@ instruction and wins. A bare `?project=<dir>` means "open this project", and tha
 
 ## 15. Application Preferences
 
-**Status:** Partial — Appearance, Assistant, Accounts and a read-only Keyboard sheet ship; Editor
-behaviour, rebinding and Updates/About are pending.
+> **Status: Partial.** Appearance, Assistant, Accounts and a read-only Keyboard sheet ship; Editor
+> behaviour, rebinding and Updates/About are pending.
 
 `project.json` configures a **project** and is edited as a project document (`⌘⇧,`, command id
 `settings.open`). **Preferences** (`⌘,`, command id `app.preferences`) configures the
@@ -1746,8 +1748,11 @@ setup notice) repaint without Preferences having to know they exist.
 
 ## 16. Feedback, Problems and Progress
 
-**Status:** Implemented — the notification substrate, the Bottom dock and all three of its tabs
-(Problems, Logic, Activity), and the inline field slot.
+> **Status: Partial.** The notification substrate, the Bottom dock and all three of its tabs
+> (Problems, Logic, Activity), and the inline field slot all ship. What does not is the
+> **announcement**: the toast host is the only live region, and the default tier routes an error
+> to the Problems panel, which has none — so the app's one status channel is silent to assistive
+> technology for exactly the tier that matters most. See §19.
 
 Studio's predecessor had one feedback surface: a 24px status bar carrying 78 outcomes — successes
 and failures alike — in identical 11px grey text, destroyed after 3000ms. Nothing persisted, nothing
@@ -1867,8 +1872,8 @@ from a panel that has stopped working.
 
 ## 17. Project Documents (Settings and Styles)
 
-**Status:** Partial — `project.json` is a document under the transaction log and both surfaces
-render from it; the formatting-preserving writer described in §17.2 is not built.
+> **Status: Partial.** `project.json` is a document under the transaction log and both surfaces
+> render from it; the formatting-preserving writer described in §17.2 is not built.
 
 Project configuration used to be edited through a modal by **29 fire-and-forget call sites across
 eight files**, twenty-one of which dropped a rejected write on the floor — `void
@@ -1924,8 +1929,8 @@ inline (§16), rather than writing and hoping.
 
 ## 18. Panes
 
-**Status:** Implemented — the pane grid, two live Canvas panes, per-pane canvas state, the jump bar,
-the dock takeovers and derived panes.
+> **Status: Implemented.** The pane grid, two live Canvas panes, per-pane canvas state, the jump
+> bar, the dock takeovers and derived panes.
 
 ### 18.1 A pane is where a document is shown
 
@@ -2057,8 +2062,19 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ---
 
+## 19. Standards Alignment
+
+External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md). Detailed accessibility conventions live in [`studio-ui-guidelines.md`](./studio-ui-guidelines.md) §14; this section cites what the Studio _shell_ binds.
+
+| Standard                                           | Class       | Binds | Evidence                         | Note                                                                                                                                                                                                                                    |
+| -------------------------------------------------- | ----------- | ----- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [WAI-ARIA](https://www.w3.org/TR/wai-aria-1.2/)    | **Subset**  | §16   | packages/studio/src/ui/layers.ts | The toast host is a live region and modals carry `role="dialog"` with `aria-modal`. The Problems panel, which is where the default tier sends an error, is not a live region at all.                                                    |
+| [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) | **Pending** | §16   | —                                | `gap:studio-error-reader` A Problem's `message` is whatever shape the backend happened to return; the platform layer carries five separate readers, so a failure can surface with no detail at all.                                     |
+| [ATAG 2.0](https://www.w3.org/TR/ATAG20/)          | **Pending** | §16   | —                                | `gap:authoring-accessibility-review` Studio checks a document's search appearance and its redirects, and files both as Problems. It does not check the accessibility of the content the author is producing, which is Part B's subject. |
+
 ## Changelog
 
+- **0.9.25-draft** (2026-08-15) — Add §19 Standards Alignment; six bare **Status:** lines converted to the blockquote form no tool could read, and §16 marked Partial — the one status channel has no live region for the error tier.
 - **0.9.24-draft** (2026-08-13) — Open in Browser serves the built site on its own origin; the build reports the URL.
 - **0.9.23-draft** (2026-08-13) — Open in Browser opens the page's route on a server that serves the built site there, and builds it first.
 - **0.9.22-draft** (2026-08-13) — The slash menu is recognised at the editing host and gains a named door (insert.openSlashMenu).
@@ -2138,4 +2154,4 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.24-draft_
+_`@jxsuite/studio` Specification v0.9.25-draft_

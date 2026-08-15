@@ -1,8 +1,8 @@
 # Jx Studio UI/UX Interface Guidelines
 
-**Version:** 0.3.8
+**Version:** 0.3.9
 **Status:** Implemented
-**Updated:** 2026-08-13
+**Updated:** 2026-08-15
 **Applies to:** `packages/studio/`
 
 ---
@@ -379,6 +379,12 @@ No formal spacing scale — use these established values consistently:
 ---
 
 ## 8. Interactive Patterns
+
+> **Status: Partial.** Selection and the canvas caret are built. **Drag and drop has no
+> non-dragging alternative**: the drag surface declares no roles, installs no keyboard path, and
+> announces nothing, so every reordering and insertion it offers is unavailable without a pointer.
+> The tree and layers panels are the counter-example — both carry full roving-tabindex keyboard
+> navigation — which is why the gap is a gap rather than a house style. See §14.
 
 ### 8.1 Selection
 
@@ -892,8 +898,20 @@ that must be fixed is a Problem, and an error the user cannot act on is a toast 
 
 ---
 
+## 14. Standards Alignment
+
+External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md). Spectrum Web Components is a component library rather than a standard; §6 records which of its components are in use.
+
+| Standard                                                                          | Class       | Binds       | Evidence                                                                                                                   | Note                                                                                                                                                                                                                                                                                                 |
+| --------------------------------------------------------------------------------- | ----------- | ----------- | -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [WAI-ARIA](https://www.w3.org/TR/wai-aria-1.2/)                                   | **Subset**  | §6, §8, §12 | packages/studio/src/files/files.ts, packages/studio/src/panels/layers-panel.ts, packages/studio/src/editor/context-menu.ts | `gap:apg-coverage` The tree, menu, toolbar and radiogroup patterns are implemented with their full state and keyboard contracts. The tab strips carry no tab semantics at all, the command palette has combobox roles but no `aria-activedescendant`, and the data grid is whatever Tabulator emits. |
+| [Accessible Name and Description Computation](https://www.w3.org/TR/accname-1.2/) | **Adopted** | §10         | packages/studio/src/panels/problems-panel.ts                                                                               | §10's rule that a control carries exactly one accessible name — `title` and `aria-label` with the same string announce it twice — is this algorithm's precedence order restated.                                                                                                                     |
+| [WCAG 2.2](https://www.w3.org/TR/WCAG22/)                                         | **Pending** | §8          | —                                                                                                                          | `gap:wcag-conformance` No conformance level is claimed or tested. SC 2.5.7 (Dragging Movements) is the concrete failure: §8's drag surface offers no single-pointer alternative, and SC 2.1.1 is failed with it.                                                                                     |
+| [ATAG 2.0](https://www.w3.org/TR/ATAG20/)                                         | **Pending** | §8          | —                                                                                                                          | `gap:atag-authoring-support` Studio is an authoring tool, so Part B applies: nothing checks the accessibility of the content an author produces, and nothing helps repair it. The `Search appearance` modal is the shape such a surface would take.                                                  |
+
 ## Changelog
 
+- **0.3.9** (2026-08-15) — Add §14 Standards Alignment; §8 marked Partial — drag and drop has no non-dragging alternative (WCAG 2.2 SC 2.5.7).
 - **0.3.8** (2026-08-13) — A row wraps and never overflows (§4.6); the floating bar's visibility rule.
 - **0.3.7** (2026-08-12) — blockbar/format joins the level × placement matrix, with its own chrome budget.
 - **0.3.6** (2026-08-10) — §12.4 the agent counts as a surface — an assistant tool that writes what a command writes binds to the command's rule by reading the same CommandContext, not by recomputing it; the element-tree writers move to a document-tree tier gated on the registry's own editor.kind.

@@ -90,6 +90,13 @@ function link(entry: CatalogEntry | undefined, r: FlatRow): string {
   return `[${title}](${url}) \`${r.id}\``;
 }
 
+/** "**Title** (RFC NNNN, `Class`)", collapsing the id when it is already the title. */
+function gapHead(entry: CatalogEntry | undefined, r: FlatRow): string {
+  const title = entry?.title ?? r.id;
+  const qualifier = title === r.id ? `\`${r.cls}\`` : `${r.id}, \`${r.cls}\``;
+  return `**${title}** (${qualifier})`;
+}
+
 function where(r: FlatRow): string {
   return r.binds.map((b) => `\`${r.file}\` §${b}`).join(", ");
 }
@@ -160,7 +167,7 @@ export function generateStandards(): string {
         const anchor = r.gapId === undefined ? "" : `<a id="gap-${r.gapId}"></a>`;
         const slug = r.gapId === undefined ? "" : `\`gap:${r.gapId}\` — `;
         lines.push(
-          `- ${anchor}${slug}**${entry?.title ?? r.id}** (${r.id}, \`${r.cls}\`) in ${where(r)} — ${r.gapText ?? r.note}`,
+          `- ${anchor}${slug}${gapHead(entry, r)} in ${where(r)} — ${r.gapText ?? r.note}`,
         );
       }
       lines.push("");
@@ -178,7 +185,7 @@ export function generateStandards(): string {
         const anchor = r.gapId === undefined ? "" : `<a id="gap-${r.gapId}"></a>`;
         const slug = r.gapId === undefined ? "" : `\`gap:${r.gapId}\` — `;
         lines.push(
-          `- ${anchor}${slug}**${entry?.title ?? r.id}** (${r.id}, \`${r.cls}\`) in ${where(r)} — ${r.gapText ?? r.note}`,
+          `- ${anchor}${slug}${gapHead(entry, r)} in ${where(r)} — ${r.gapText ?? r.note}`,
         );
       }
       lines.push("");

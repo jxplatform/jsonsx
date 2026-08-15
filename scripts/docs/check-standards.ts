@@ -109,18 +109,10 @@ export interface UncitedEntry {
  * Foundation can land before the citations without leaving the requirement unenforced afterwards.
  * When it reaches empty, a new spec with numbered headings and no table fails on its first PR.
  */
-export const UNCITED: UncitedEntry[] = [
-  { file: "site-architecture.md", why: "Cited in the standards-citations PR." },
-  { file: "spec.md", why: "§18 is prose today; it becomes the machine-checked table." },
-  { file: "studio-ui-guidelines.md", why: "Cited in the standards-citations PR." },
-  { file: "studio.md", why: "Cited in the standards-citations PR." },
-];
+export const UNCITED: UncitedEntry[] = [];
 
 /** Specs with no numbered headings at all: there is no anchor a `Binds` cell could name. */
-export const EXEMPT_UNNUMBERED: UncitedEntry[] = [
-  { file: "imports.md", why: "No numbered headings; number the spec first, then cite." },
-  { file: "jx-markdown.md", why: "No numbered headings; number the spec first, then cite." },
-];
+export const EXEMPT_UNNUMBERED: UncitedEntry[] = [];
 
 function v(code: ViolationCode, file: string, message: string, line?: number): Violation {
   return line === undefined ? { code, file, message } : { code, file, line, message };
@@ -437,7 +429,7 @@ function checkRow(
       );
       continue;
     }
-    const key = `${row.id} ${anchor}`;
+    const key = `${row.id} ${anchor}`;
     if (seenBindings.has(key)) {
       out.push(v("binding-duplicate", spec.file, `"${row.id}" binds §${anchor} twice`, row.line));
     }

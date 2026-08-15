@@ -2,9 +2,9 @@
 
 ## Declarative Document Object Model — JSON Edition
 
-**Version:** 0.4.28-draft
+**Version:** 0.4.29-draft
 **Status:** Partial
-**Updated:** 2026-08-10
+**Updated:** 2026-08-15
 **License:** MIT
 
 ---
@@ -83,9 +83,9 @@ Signal scope does not leak across component boundaries. Every dependency a compo
 
 Within a single component, state declared in `state` is available to all descendant elements of that component without explicit passing.
 
-### 2.5 Standards Alignment
+### 2.5 Platform Precedents
 
-Where a web platform standard exists, Jx follows it:
+Where a web platform standard exists, Jx follows it. This section is the design principle; the machine-checked register of what Jx actually claims about each standard is §18.
 
 | Jx Feature                         | Platform Precedent                                           |
 | ---------------------------------- | ------------------------------------------------------------ |
@@ -1531,30 +1531,20 @@ Custom elements may carry annotations compatible with the Custom Elements Manife
 
 ## 18. Standards Alignment
 
-Genuine alignment — Jx uses these as specified:
+External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md). Two things once listed here are **not** standards and are therefore prose rather than rows: reactivity is `@vue/reactivity`, a library; and the `$media` breakpoint syntax borrows the shape of CSS `@custom-media`, a Media Queries Level 5 feature no browser ships, which Jx resolves itself at build and run time. The Custom Elements Manifest (§16.8) is a community format with no standards body.
 
-| Feature                   | Standard                                                    |
-| ------------------------- | ----------------------------------------------------------- |
-| `$defs` type definitions  | JSON Schema 2020-12 (validated as document instances, §3.2) |
-| Reactivity                | `@vue/reactivity` (Vue 3) — a library, not a web standard   |
-| Custom elements           | Web Components v1                                           |
-| Style properties          | CSSOM camelCase                                             |
-| Media breakpoints         | CSS `@custom-media` convention                              |
-| Module loading            | ECMAScript Modules / `import()`                             |
-| `$expression` operators   | ECMAScript operator punctuators (no new tokens, §19)        |
-| Array / aggregate ops     | ECMAScript `Array.prototype`                                |
-| `dispatchEvent` statement | WHATWG DOM `CustomEvent` (§20)                              |
-| Custom-elements manifest  | CEM 2.1.0 export (§16.8)                                    |
-
-Borrowed shape, Jx-specific semantics — named after a standard but **not** conformant to it:
-
-| Feature                      | Borrows from                      | Where it diverges                                                                                             |
-| ---------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `$ref` paths                 | JSON Pointer (RFC 6901)           | Live-state binding, not schema substitution; `~0`/`~1` escapes unimplemented; `.` treated as a separator (§7) |
-| `$id`                        | JSON Schema `$id`                 | Used as a display name; does **not** establish a base URI for relative `$ref`                                 |
-| `$schema`                    | JSON Schema `$schema`             | Editor "schema-for-instance" pointer, not a dialect/meta-schema declaration (§3.2)                            |
-| `$prototype` names           | Web API constructor names         | `Request` auto-fetches, `LocalStorage`/`Cookie` aren't real constructor names, etc. (§12)                     |
-| Statement `if`/`then`/`else` | ECMAScript `if` (not JSON Schema) | Imperative control flow over a statement list, not schema applicators (§20)                                   |
+| Standard                                                                                  | Class         | Binds    | Evidence                                                                      | Note                                                                                                                                                                                                                                                                                                                                                                  |
+| ----------------------------------------------------------------------------------------- | ------------- | -------- | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [ECMA-404](https://ecma-international.org/publications-and-standards/standards/ecma-404/) | **Adopted**   | §3       | packages/schema/src/parse.ts                                                  | A Jx document is JSON. Nothing in the format extends the syntax.                                                                                                                                                                                                                                                                                                      |
+| [JSON Schema 2020-12](https://json-schema.org/draft/2020-12/schema)                       | **Divergent** | §3.2, §5 | packages/schema/src/schema.ts, packages/schema/tests/schema.test.ts           | `$defs` holds genuine 2020-12 type definitions and a document validates as an _instance_ against a conformant meta-schema. Three deviations: Jx declares no `$vocabulary`, so it is not a dialect; `$id` is a display name and establishes no base URI for relative `$ref`; and `$schema` is an editor "schema for this instance" pointer, not a dialect declaration. |
+| [ECMA-262](https://ecma-international.org/publications-and-standards/standards/ecma-262/) | **Subset**    | §19, §20 | packages/runtime/src/expression.ts, packages/runtime/tests/expression.test.ts | Operator punctuators and their arity are ECMAScript's, and aggregate operations follow `Array.prototype` semantics — but only an allow-listed subset is evaluable, and `if`/`then`/`else` statements are imperative control flow over a statement list rather than anything from JSON Schema.                                                                         |
+| [WHATWG DOM](https://dom.spec.whatwg.org/)                                                | **Subset**    | §16, §20 | packages/compiler/src/targets/compile-element.ts                              | Custom elements are defined and `dispatchEvent` emits a real `CustomEvent`. Shadow trees are not used at all (§16.6).                                                                                                                                                                                                                                                 |
+| [CSSOM](https://www.w3.org/TR/cssom-1/)                                                   | **Adopted**   | §9.1     | packages/runtime/src/runtime.ts                                               | `style` keys are the CSSOM camelCase IDL attribute names, so a property name needs no translation table.                                                                                                                                                                                                                                                              |
+| [CSS Color 4](https://www.w3.org/TR/css-color-4/)                                         | **Adopted**   | §9.5     | packages/compiler/src/shared.ts, packages/compiler/tests/shared.test.ts       | `color-scheme: light dark` is emitted with per-attribute overrides, so native controls follow a forced scheme rather than only the author's own rules.                                                                                                                                                                                                                |
+| [RFC 6901](https://www.rfc-editor.org/rfc/rfc6901)                                        | **Borrowed**  | §7       | packages/runtime/src/runtime.ts                                               | Shape only. A `$ref` binds live reactive state rather than substituting a value, `~0`/`~1` escapes are unimplemented, and `.` is treated as a separator.                                                                                                                                                                                                              |
+| [RFC 9535](https://www.rfc-editor.org/rfc/rfc9535)                                        | **Borrowed**  | §7       | packages/runtime/src/runtime.ts                                               | The dotted segment form `#/state/user.name` is JSONPath's shape rather than a deviation from JSON Pointer — but no JSONPath selector, filter or wildcard is supported, so nothing here is a JSONPath query.                                                                                                                                                           |
+| [CSP Level 3](https://www.w3.org/TR/CSP3/)                                                | **Divergent** | §21      | packages/compiler/tests/no-eval.test.ts                                       | Compiled output contains no `new Function` and no `eval`, proven by a committed test, so it runs under a policy without `'unsafe-eval'`. The **interpreting** runtime compiles templates and function bodies at load time and therefore requires `'unsafe-eval'` permanently — §21.3 states this as a property, not a defect.                                         |
+| [Trusted Types](https://www.w3.org/TR/trusted-types/)                                     | **Pending**   | §21      | —                                                                             | `gap:trusted-types` No policy is installed. The DOM-sink surface is small, but `require-trusted-types-for 'script'` also governs the runtime's template compilation, so enforcing it needs a decision about that path rather than only about the sinks.                                                                                                               |
 
 ---
 
@@ -2086,6 +2076,10 @@ Every statement kind reuses a web-platform name — §19.4's law extended to sta
 
 ## 21. Evaluation Surface
 
+> **Status: Partial.** The surface is stated accurately, which is what this section is for. What is
+> absent is a **guard**: no Trusted Types policy is installed, so the DOM sinks the runtime and
+> Studio use are unprotected even where the eval requirement does not apply. See §18.
+
 Jx documents contain executable code — `${}` templates and `body`/`$src` functions. Where and how that code runs differs by mode, and the security posture differs with it. This section states the surface honestly so hosts can make an informed decision.
 
 ### 21.1 Compiled Output — No Runtime Eval
@@ -2331,6 +2325,7 @@ This rewrites the mutating handlers of Appendix A's idiom using `$expression`, l
 
 ## Changelog
 
+- **0.4.29-draft** (2026-08-15) — §18 becomes the machine-checked standards table; §2.5 renamed Platform Precedents to free the reserved title; §21 marked Partial — no Trusted Types policy is installed.
 - **0.4.28-draft** (2026-08-10) — §19.6 $expression gains a third position — an element's tagName, narrowed to a TagExpression whose every branch is a literal TagName so the candidate set is enumerable without evaluating; it is the one $expression position that is not live, resolved once at element creation, and the document root's and $head entries' tagNames stay literal.
 - **0.4.27-draft** (2026-07-30) — Clarify that a bare `return;` is an early-exit guard, not a value return, when classifying a Function body as a computed (§5.3 4b).
 - **0.4.26-draft** (2026-07-30) — Define the handler-side iteration context: an event handler bound inside a map reads its row via state.$map (§10.2).
@@ -2379,4 +2374,4 @@ This rewrites the mutating handlers of Appendix A's idiom using `$expression`, l
 
 ---
 
-_Jx Specification v0.4.28-draft — subject to revision_
+_Jx Specification v0.4.29-draft — subject to revision_

@@ -17,6 +17,7 @@ import {
   orgOfId,
   parseStandardsSource,
   splitRow,
+  STANDARD_ID,
   tierOf,
 } from "./standards.ts";
 import { parseSpecSource, STATUS_VOCAB } from "./spec-status.ts";
@@ -226,6 +227,13 @@ describe("pure helpers", () => {
     expect(orgOfId("WebAuthn Level 3")).toBeNull();
   });
 
+  test("a hyphenated name is a valid identifier", () => {
+    // WAI-ARIA and JSON-LD carry a hyphen in their FIRST token.
+    for (const id of ["WAI-ARIA", "JSON-LD 1.1", "WCAG 2.2", "ATAG 2.0"]) {
+      expect(STANDARD_ID.test(id), `${id} should be a valid identifier`).toBe(true);
+    }
+  });
+
   test("canonicalUrlProblem accepts the canonical form and rejects the rest", () => {
     expect(canonicalUrlProblem("IETF", "https://www.rfc-editor.org/rfc/rfc9110")).toBeNull();
     expect(canonicalUrlProblem("IETF", "https://www.rfc-editor.org/info/bcp47")).toBeNull();
@@ -233,6 +241,8 @@ describe("pure helpers", () => {
       canonicalUrlProblem("IETF", "https://datatracker.ietf.org/doc/html/rfc9110"),
     ).not.toBeNull();
     expect(canonicalUrlProblem("W3C", "https://www.w3.org/TR/wcag22/")).toBeNull();
+    // W3C shortnames carry a version dot — accname-1.2, wai-aria-1.2.
+    expect(canonicalUrlProblem("W3C", "https://www.w3.org/TR/accname-1.2/")).toBeNull();
     expect(
       canonicalUrlProblem("W3C", "https://www.w3.org/TR/2023/REC-wcag22-20231005/"),
     ).not.toBeNull();
@@ -268,6 +278,28 @@ describe("pure helpers", () => {
   test("compareIds is codepoint order, not locale order", () => {
     expect(compareIds("RFC 2", "RFC 10")).toBeGreaterThan(0);
     expect(compareIds("BCP 14", "RFC 3986")).toBeLessThan(0);
+  });
+});
+
+describe("source hygiene", () => {
+  /*
+   * A NUL byte in a source file is invisible to the formatter and the linter, survives every
+   * gate, and makes ripgrep treat the file as binary — which is how the first one was found.
+   * Two had crept in through scripted edits before this test existed.
+   */
+  test("no script or spec source contains a NUL byte", async () => {
+    const files = [
+      ...new Bun.Glob("scripts/**/*.ts").scanSync(ROOT),
+      ...new Bun.Glob("specs/*.md").scanSync(ROOT),
+    ];
+    const offenders: string[] = [];
+    for (const rel of files) {
+      const bytes = await Bun.file(resolve(ROOT, rel)).bytes();
+      if (bytes.includes(0)) {
+        offenders.push(rel);
+      }
+    }
+    expect(offenders).toEqual([]);
   });
 });
 

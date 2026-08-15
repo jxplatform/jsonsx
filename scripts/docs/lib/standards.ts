@@ -87,7 +87,7 @@ export const HEADER_CELLS = ["Standard", "Class", "Binds", "Evidence", "Note"] a
 export const EMPTY_CELL = "—";
 
 export const STANDARD_ID =
-  /^(?:RFC \d{3,5}|BCP \d{1,3}|STD \d{1,3}|UAX #\d{1,3}|UTS #\d{1,3}|UTR #\d{1,3}|ECMA-\d{2,3}|ISO(?:\/IEC)? \d{4,5}(?::\d{4})?|[A-Z][A-Za-z0-9]*(?:[ /][A-Za-z0-9.#+-]+)*)$/;
+  /^(?:RFC \d{3,5}|BCP \d{1,3}|STD \d{1,3}|UAX #\d{1,3}|UTS #\d{1,3}|UTR #\d{1,3}|ECMA-\d{2,3}|ISO(?:\/IEC)? \d{4,5}(?::\d{4})?|[A-Z][A-Za-z0-9-]*(?:[ /][A-Za-z0-9.#+-]+)*)$/;
 
 /** Legacy / near-miss forms the checker rejects, in spec-status.ts's `badForms` idiom. */
 const LEGACY = [
@@ -245,7 +245,7 @@ const CANONICAL: Record<Org, { test: RegExp; form: string } | null> = {
     form: "https://www.rfc-editor.org/rfc/rfcNNNN (or /info/bcpNN)",
   },
   W3C: {
-    test: /^https:\/\/www\.w3\.org\/TR\/[A-Za-z0-9-]+\/$/,
+    test: /^https:\/\/www\.w3\.org\/TR\/[A-Za-z0-9.-]+\/$/,
     form: "https://www.w3.org/TR/<shortname>/",
   },
   WHATWG: {

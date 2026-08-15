@@ -2,9 +2,9 @@
 
 ## File-Based Routing, Content Collections, Layouts, and Static Site Generation
 
-**Version:** 0.1.44-draft
+**Version:** 0.1.45-draft
 **Status:** Partial
-**Updated:** 2026-08-12
+**Updated:** 2026-08-15
 **License:** MIT
 
 ---
@@ -26,6 +26,7 @@
 13. [Internationalization](#13-internationalization)
 14. [Deployment](#14-deployment)
 15. [Application Tier](#15-application-tier)
+16. [Standards Alignment](#16-standards-alignment)
 
 ---
 
@@ -982,6 +983,11 @@ Redirect sources are not pages and never appear in the sitemap.
 
 ### 8.5 Structured Data (JSON-LD)
 
+> **Status: Pending.** The object form below is **not** implemented. A head entry's
+> `textContent` is typed as a string and template resolution only runs on strings, so an
+> object written here renders as `[object Object]`. A JSON-LD block can be authored today
+> only by writing the serialized JSON out as a string. See §16.
+
 Pages may include JSON-LD for rich search results:
 
 ```json
@@ -1604,6 +1610,12 @@ The collection config can specify locale awareness:
 
 ## 14. Deployment
 
+> **Status: Partial.** The adapters and their worker output ship. No **header** output does:
+> the build emits no `_headers`, so the content-addressed image variants it just wrote —
+> the one output whose filename embeds a content hash — cannot be cached beyond a
+> revalidation, and no security header is emitted anywhere. `.nojekyll` is likewise absent,
+> which silently breaks every `_`-prefixed output on GitHub Pages. See §16 and Appendix C.
+
 ### 14.1 Output Targets
 
 The build output is standard static files deployable anywhere. When `build.adapter` is set, the compiler additionally generates platform-specific files:
@@ -1731,6 +1743,24 @@ Locally, `jx dev` (server.md) stands in for the worker: it dispatches to the sam
 
 ---
 
+## 16. Standards Alignment
+
+External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md). Feed generation is not cited: no numbered section owes it yet, and it is tracked as a roadmap item in Appendix C.
+
+| Standard                                                                                  | Class       | Binds  | Evidence                                  | Note                                                                                                                                                                                                                                                                          |
+| ----------------------------------------------------------------------------------------- | ----------- | ------ | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [RFC 9309](https://www.rfc-editor.org/rfc/rfc9309)                                        | **Adopted** | §8.4.1 | packages/compiler/src/site/site-build.ts  | A minimal `robots.txt` is created when none was provided, and an existing one is appended to rather than replaced. The `Sitemap:` line the build adds is a sitemaps.org extension, not part of this standard.                                                                 |
+| [Sitemaps 0.9](https://www.sitemaps.org/protocol.html)                                    | **Subset**  | §8.4.1 | packages/compiler/src/site/site-build.ts  | `gap:sitemap-fields` `<loc>` and `<lastmod>` only. No `<changefreq>`, no `<priority>`, and no `xhtml:link` alternates — the last of which §13 will need.                                                                                                                      |
+| [WHATWG URLPattern](https://urlpattern.spec.whatwg.org/)                                  | **Subset**  | §11.1  | packages/compiler/src/site/site-build.ts  | Pattern strings are passed through to `_redirects` verbatim; the compiler neither parses nor validates them, so a malformed pattern is a deploy-time failure rather than a build-time one.                                                                                    |
+| [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110)                                        | **Subset**  | §11.3  | packages/compiler/src/site/site-build.ts  | `gap:redirect-status-codes` Only 301 and 302 are documented as redirects. 303, 307 and 308 are absent, so a redirect cannot preserve a request method. The `200` value listed alongside them is not a redirection status at all — it is the host's rewrite convention.        |
+| [RFC 8288](https://www.rfc-editor.org/rfc/rfc8288)                                        | **Subset**  | §8.1   | packages/compiler/src/site/head-merger.ts | `gap:link-relation-validation` `rel` values are emitted as authored and deduplicated on `rel` plus `href`. Nothing checks a value against the IANA registry, and the dedup key ignores `hreflang` and `type` — so two alternates that differ only in those collapse into one. |
+| [JSON-LD 1.1](https://www.w3.org/TR/json-ld11/)                                           | **Pending** | §8.5   | —                                         | `gap:jsonld-serialization` §8.5 specifies an object that the compiler serializes; it does not, so structured data can only be authored as a pre-serialized string.                                                                                                            |
+| [BCP 47](https://www.rfc-editor.org/info/bcp47)                                           | **Pending** | §13    | —                                         | `gap:site-locale-tags` `defaultLocale` and `locales` are declared and read by nothing, and no tag is validated or canonicalized.                                                                                                                                              |
+| [RFC 4647](https://www.rfc-editor.org/rfc/rfc4647)                                        | **Pending** | §13    | —                                         | `gap:locale-lookup` Nothing selects a locale for a request. The routing modes §13.2 describes have no implementation, so the bare `/` cannot resolve to a visitor's language.                                                                                                 |
+| [ECMA-402](https://ecma-international.org/publications-and-standards/standards/ecma-402/) | **Pending** | §13    | —                                         | `gap:locale-formatting` No project locale reaches the formatting helpers, so a date or number formatted at build time uses the build machine's locale and the same source produces different output on different machines.                                                    |
+| [RFC 9111](https://www.rfc-editor.org/rfc/rfc9111)                                        | **Pending** | §14    | —                                         | `gap:emit-cache-headers` The build emits no cache policy, so every host applies its own default to output whose cacheability the build alone knows.                                                                                                                           |
+| [RFC 8246](https://www.rfc-editor.org/rfc/rfc8246)                                        | **Pending** | §14    | —                                         | `gap:immutable-variants` `dist/images/_optimized/*` filenames embed a content hash and are therefore safe to mark immutable; nothing does.                                                                                                                                    |
+
 ## Appendix: Element Annotations
 
 Jx elements support `$title` and `$description` as developer-facing annotation metadata. These are inspired by JSON Schema's annotation keywords and are never compiled to HTML output.
@@ -1855,6 +1885,7 @@ This spec builds on existing Jx primitives wherever possible:
 
 ## Changelog
 
+- **0.1.45-draft** (2026-08-15) — Add §16 Standards Alignment; §8.5 marked Pending — the JSON-LD object form is unimplemented — and §14 Partial: no _headers or .nojekyll is emitted.
 - **0.1.44-draft** (2026-08-12) — Header status corrected from Pending to Partial — all seven marked sections were Implemented while the header claimed nothing was; §9.4's marker and its own Still-planned list contradicted each other (metadata and the delete warning ship; browsable usage does not); §12.3 and §13 marked Pending, having no dependency graph and no reader of the i18n config respectively.
 - **0.1.43-draft** (2026-08-11) — Studio SEO previews move from a Document Header disclosure into the Search appearance modal (document.openSeo), reachable from the card, the Page panel and the palette; fields grouped by the preview each feeds.
 - **0.1.42-draft** (2026-08-06) — §7.2 the Library and its window contract, §7.5 the CRUD table corrected — rename, delete and CSV editing already shipped and were listed Pending, §7.6 the draft pill, §8.6 merged-$head previews with no score, §9.4 usage keyed on the authored ref, §11.4 redirects as a GridSource with chain, loop and shadow validation.

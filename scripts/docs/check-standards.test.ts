@@ -143,6 +143,17 @@ describe("golden — the real tree", () => {
     }
   });
 
+  /*
+   * The terminal invariant. Both ratchets are empty, which is what makes the requirement
+   * universal: a new spec with numbered headings and no Standards Alignment table now fails
+   * `section-missing` on its first pull request. Re-adding an entry to either list is a
+   * deliberate act that has to argue with this test.
+   */
+  test("both ratchet lists are empty", () => {
+    expect(UNCITED).toEqual([]);
+    expect(EXEMPT_UNNUMBERED).toEqual([]);
+  });
+
   test("every EXEMPT_UNNUMBERED spec really has no numbered headings", () => {
     const registry = buildRegistry(SPECS_DIR, CATALOG);
     for (const e of EXEMPT_UNNUMBERED) {

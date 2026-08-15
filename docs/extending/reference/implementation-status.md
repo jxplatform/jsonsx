@@ -19,17 +19,17 @@ This page is generated from the `> **Status: …**` markers in the specification
 | `compiler.md`             | 0.1.27-draft | Partial     | 2026-08-15 |
 | `desktop.md`              | 0.3.9-draft  | Pending     | 2026-08-15 |
 | `extensions.md`           | 0.3.5-draft  | Partial     | 2026-08-15 |
-| `imports.md`              | 0.1.7-draft  | Partial     | 2026-08-02 |
-| `jx-markdown.md`          | 0.1.7-draft  | Partial     | 2026-07-22 |
+| `imports.md`              | 0.1.8-draft  | Partial     | 2026-08-15 |
+| `jx-markdown.md`          | 0.1.8-draft  | Partial     | 2026-08-15 |
 | `parser.md`               | 0.2.5-draft  | Partial     | 2026-08-15 |
 | `relationships.md`        | 0.1.4-draft  | Partial     | 2026-08-15 |
 | `schema.md`               | 0.3.2-draft  | Partial     | 2026-08-15 |
 | `server.md`               | 0.2.2        | Implemented | 2026-08-15 |
-| `site-architecture.md`    | 0.1.44-draft | Partial     | 2026-08-12 |
-| `spec.md`                 | 0.4.28-draft | Partial     | 2026-08-10 |
+| `site-architecture.md`    | 0.1.45-draft | Partial     | 2026-08-15 |
+| `spec.md`                 | 0.4.29-draft | Partial     | 2026-08-15 |
 | `standards.md`            | 0.1.1-draft  | Partial     | 2026-08-15 |
-| `studio-ui-guidelines.md` | 0.3.8        | Implemented | 2026-08-13 |
-| `studio.md`               | 0.9.24-draft | Partial     | 2026-08-13 |
+| `studio-ui-guidelines.md` | 0.3.9        | Implemented | 2026-08-15 |
+| `studio.md`               | 0.9.25-draft | Partial     | 2026-08-15 |
 
 ## Sections not yet implemented
 
@@ -43,15 +43,24 @@ This page is generated from the `> **Status: …**` markers in the specification
 - `server.md` §4 — Studio API (`/__studio/*`)
 - `server.md` §4.2 — Security
 - `site-architecture.md` §9.4 — Studio Media Browser
+- `site-architecture.md` §14 — Deployment
 - `spec.md` §5.6 — Private State (`#` prefix)
 - `spec.md` §11.4 — Server Timing — RPC Function Boundary
 - `spec.md` §16.8 — CEM-Compatible Annotations
+- `spec.md` §21 — Evaluation Surface
 - `standards.md` §1 — Overview
+- `studio-ui-guidelines.md` §8 — Interactive Patterns
+- `studio.md` §13 — Command Registry and Context Keys
+- `studio.md` §14 — Tabs and Document Identity
+- `studio.md` §15 — Application Preferences
+- `studio.md` §16 — Feedback, Problems and Progress
+- `studio.md` §17 — Project Documents (Settings and Styles)
 
 ### Pending
 
 - `collab.md` §5 — Version Skew
 - `desktop.md` §4.3 — Single File Mode
+- `site-architecture.md` §8.5 — Structured Data (JSON-LD)
 - `site-architecture.md` §12.3 — Incremental Builds
 - `site-architecture.md` §13 — Internationalization
 
