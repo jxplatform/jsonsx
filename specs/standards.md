@@ -2,7 +2,7 @@
 
 ## Which External Standards Jx Adopts, and How That Is Recorded
 
-**Version:** 0.1.4-draft
+**Version:** 0.1.5-draft
 **Status:** Partial
 **Updated:** 2026-08-15
 **License:** MIT
@@ -246,6 +246,7 @@ An entry names the spec that will own it. When that section is written, the entr
 
 ## Changelog
 
+- **0.1.5-draft** (2026-08-15) — UAX #9 and UTS #35 graduate to bound rows in site-architecture.md §13.4.
 - **0.1.4-draft** (2026-08-15) — RFC 4287, JSON Feed 1.1 and RFC 5005 graduate to bound rows in site-architecture.md §6.7.
 - **0.1.3-draft** (2026-08-15) — Three backlog entries graduate to bound rows in site-architecture.md §14.3 (HSTS, Referrer-Policy, Permissions-Policy).
 - **0.1.2-draft** (2026-08-15) — Add §11 Adoption Backlog: standards whose owning section does not exist yet, each naming the spec that will own it.
@@ -254,4 +255,4 @@ An entry names the spec that will own it. When that section is written, the entr
 
 ---
 
-_Jx Standards Alignment Specification v0.1.4-draft_
+_Jx Standards Alignment Specification v0.1.5-draft_
