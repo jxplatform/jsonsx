@@ -44,7 +44,13 @@ beforeAll(() => {
     build: { outDir: "./dist" },
     defaults: { lang: "en", layout: "./layouts/base.json" },
     name: "Test Site",
-    redirects: { "/old": "/new" },
+    redirects: {
+      "/api/*": { destination: "https://api.example.com/*", rewrite: true },
+      "/moved": { destination: "/here", status: 308 },
+      "/old": "/new",
+      "/seeother": { destination: "/other", status: 303 },
+      "/temp": { destination: "/now", status: 302 },
+    },
     url: "https://test.com",
   });
 
@@ -276,6 +282,70 @@ describe("buildSite", () => {
     const redirectHtml = readFileSync(resolve(TMP, "dist/old/index.html"), "utf8");
     expect(redirectHtml).toContain('http-equiv="refresh"');
     expect(redirectHtml).toContain("/new");
+  });
+
+  /*
+   * An HTML meta-refresh is a CLIENT-side redirect, so it is a stand-in for some statuses and a
+   * misrepresentation of the others. Every rule reaches `_redirects`; only some get a file.
+   */
+  describe("the HTML fallback follows the status (RFC 9110 §15.4)", () => {
+    it("301 gets a canonical link — the permanent case is the one it fits", async () => {
+      await buildSite(TMP, { verbose: false });
+      const html = readFileSync(resolve(TMP, "dist/old/index.html"), "utf8");
+      expect(html).toContain('rel="canonical"');
+      expect(html).not.toContain('name="robots"');
+    });
+
+    it("302 and 303 get a file, but noindex instead of a canonical link", async () => {
+      await buildSite(TMP, { verbose: false });
+      for (const path of ["dist/temp/index.html", "dist/seeother/index.html"]) {
+        const html = readFileSync(resolve(TMP, path), "utf8");
+        expect(html).toContain('http-equiv="refresh"');
+        // A canonical link on a temporary redirect asserts the permanence the status denies.
+        expect(html).not.toContain('rel="canonical"');
+        expect(html).toContain('name="robots"');
+      }
+    });
+
+    it("308 gets no file — a meta-refresh would convert POST to GET", async () => {
+      await buildSite(TMP, { verbose: false });
+      expect(existsSync(resolve(TMP, "dist/moved/index.html"))).toBe(false);
+      expect(readFileSync(resolve(TMP, "dist/_redirects"), "utf8")).toContain("/moved /here 308");
+    });
+
+    it("a rewrite gets no file, and reaches _redirects as 200", async () => {
+      await buildSite(TMP, { verbose: false });
+      const redirects = readFileSync(resolve(TMP, "dist/_redirects"), "utf8");
+      expect(redirects).toContain("/api/* https://api.example.com/* 200");
+      // A file at the source URL would shadow the rewrite on hosts that honour _redirects, and
+      // Turn it into a redirect on the hosts that do not. This was the bug.
+      expect(existsSync(resolve(TMP, "dist/api"))).toBe(false);
+    });
+
+    it("an off-enum status is a build error naming the rule", async () => {
+      const root = mkdtempSync(join(tmpdir(), "jx-redirect-"));
+      mkdirSync(join(root, "pages"), { recursive: true });
+      writeFileSync(
+        join(root, "project.json"),
+        JSON.stringify({
+          build: { outDir: "./dist" },
+          name: "Bad Redirect",
+          redirects: { "/bad": { destination: "/x", status: 418 } },
+        }),
+        "utf8",
+      );
+      writeFileSync(
+        join(root, "pages/index.json"),
+        JSON.stringify({ children: ["hi"], tagName: "div" }),
+        "utf8",
+      );
+      const result = await buildSite(root, { verbose: false });
+      expect(result.errors.some((e) => e.includes("/bad") && e.includes("418"))).toBe(true);
+      // The rule is refused outright rather than written through to the host.
+      const emitted = join(root, "dist/_redirects");
+      expect(existsSync(emitted) && readFileSync(emitted, "utf8").includes("418")).toBe(false);
+      rmSync(root, { force: true, recursive: true });
+    });
   });
 
   it("generates sitemap.xml from the route table", async () => {
@@ -2201,9 +2271,9 @@ describe("redirect conflict warnings", () => {
       console.warn = origWarn;
     }
 
-    expect(warnings.some((w) => w.includes('Redirect "/about" overwrites a compiled page'))).toBe(
-      true,
-    );
+    expect(
+      warnings.some((w) => w.includes('The redirect "/about" collides with a compiled page')),
+    ).toBe(true);
     expect(warnings.some((w) => w.includes('"/gone"'))).toBe(false);
   });
 });

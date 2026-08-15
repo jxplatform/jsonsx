@@ -609,8 +609,12 @@ export async function buildSite(
   if (projectConfig.redirects && Object.keys(projectConfig.redirects).length > 0) {
     log("Generating redirects...");
     const compiledUrls = new Set(routes.map((r) => r.urlPattern));
-    const redirectFiles = generateRedirects(projectConfig.redirects, outDir, compiledUrls);
-    fileCount += redirectFiles;
+    const redirects = generateRedirects(projectConfig.redirects, outDir, {
+      compiledUrls,
+      trailingSlash: projectConfig.build.trailingSlash,
+    });
+    fileCount += redirects.files;
+    errors.push(...redirects.errors);
   }
 
   // ── 7b. Generate sitemap.xml ────────────────────────────────────────────
@@ -1574,41 +1578,113 @@ function routeToOutputPath(urlPattern: string, outDir: string, trailingSlash: st
  * @param {Set<string>} [compiledUrls] - URL patterns of compiled routes, for conflict warnings
  * @returns {number} Number of files written
  */
+/**
+ * Which statuses get an HTML fallback, and why each other one does not.
+ *
+ * An HTML meta-refresh is a _client-side_ redirect: the browser fetches the source, then navigates.
+ * That is a reasonable stand-in for a 301 or a 303 on a host that ignores `_redirects`, and it is
+ * actively wrong for everything else.
+ */
+const REDIRECT_HTML_POLICY: Record<number, { html: boolean; canonical: boolean; why: string }> = {
+  // The permanent case: a canonical link is exactly the right signal.
+  301: { canonical: true, html: true, why: "" },
+  // Temporary — a canonical link would assert the permanence the status denies.
+  302: { canonical: false, html: true, why: "" },
+  // "See other, with GET" is what a meta-refresh already does.
+  303: { canonical: false, html: true, why: "" },
+  307: {
+    canonical: false,
+    html: false,
+    why: "307 preserves the request method and body; a meta-refresh silently converts POST to GET",
+  },
+  308: {
+    canonical: false,
+    html: false,
+    why: "308 preserves the request method and body; a meta-refresh silently converts POST to GET",
+  },
+};
+
+/**
+ * Emit `dist/_redirects` plus an HTML fallback for the literal sources whose status has one.
+ *
+ * @param {Record<
+ *   string,
+ *   string | { destination: string; status?: number } | { destination: string; rewrite: true }
+ * >} redirects
+ * @param {string} outDir
+ * @param {{ compiledUrls?: Set<string>; trailingSlash?: string }} [opts]
+ * @returns {{ files: number; errors: string[] }}
+ */
 function generateRedirects(
-  redirects: Record<string, string | { destination: string; status?: number }>,
+  redirects: Record<
+    string,
+    string | { destination: string; status?: number } | { destination: string; rewrite: true }
+  >,
   outDir: string,
-  compiledUrls = new Set<string>(),
+  opts: { compiledUrls?: Set<string>; trailingSlash?: string } = {},
 ) {
-  let count = 0;
+  let files = 0;
+  const errors: string[] = [];
   const redirectLines: string[] = [];
   const normalizeUrl = (u: string) => (u.length > 1 && u.endsWith("/") ? u.slice(0, -1) : u);
-  const compiled = new Set([...compiledUrls].map((u) => normalizeUrl(u)));
+  const compiled = new Set([...(opts.compiledUrls ?? [])].map((u) => normalizeUrl(u)));
+  const trailingSlash = opts.trailingSlash ?? "always";
 
   for (const [source, target] of Object.entries(redirects)) {
     const dest = typeof target === "object" ? target.destination : target;
-    const status = typeof target === "object" ? (target.status ?? 301) : 301;
+    const isRewrite = typeof target === "object" && "rewrite" in target && target.rewrite;
+    const status = isRewrite
+      ? 200
+      : typeof target === "object" && "status" in target
+        ? (target.status ?? 301)
+        : 301;
 
-    // Skip patterns with :param or * — these need platform-specific handling
+    if (!isRewrite && REDIRECT_HTML_POLICY[status] === undefined) {
+      errors.push(
+        `Redirect "${source}" has status ${status}, which is not an RFC 9110 §15.4 redirection ` +
+          `status. Use one of ${Object.keys(REDIRECT_HTML_POLICY).join(", ")}, or ` +
+          `{ destination, rewrite: true } for a proxy.`,
+      );
+      continue;
+    }
+
+    redirectLines.push(`${source} ${dest} ${status}`);
+
+    // A pattern source cannot be a file on disk, so it lives only in `_redirects`.
     if (source.includes(":") || source.includes("*")) {
-      redirectLines.push(`${source} ${dest} ${status}`);
       continue;
     }
 
     if (compiled.has(normalizeUrl(source))) {
+      const what = isRewrite ? "rewrite" : "redirect";
       console.warn(
-        `Redirect "${source}" overwrites a compiled page at the same route — ` +
-          `remove the redirect or the page.`,
+        `The ${what} "${source}" collides with a compiled page at the same route — ` +
+          `remove one or the other.`,
       );
     }
 
-    // Static redirect — emit an HTML file with meta refresh
-    const htmlPath = routeToOutputPath(source, outDir, "always");
+    /*
+     * A rewrite serves the destination's content AT the source URL. Writing an HTML file there
+     * shadows the rewrite on hosts that honour `_redirects`, and turns it into a redirect on the
+     * hosts that do not — so it is wrong in both directions. This was the bug.
+     */
+    if (isRewrite) {
+      continue;
+    }
+    const policy = REDIRECT_HTML_POLICY[status]!;
+    if (!policy.html) {
+      continue;
+    }
+
+    const htmlPath = routeToOutputPath(source, outDir, trailingSlash);
+    const canonical = policy.canonical
+      ? `\n  <link rel="canonical" href="${escapeAttr(dest)}">`
+      : `\n  <meta name="robots" content="noindex">`;
     const html = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="refresh" content="0;url=${escapeAttr(dest)}">
-  <link rel="canonical" href="${escapeAttr(dest)}">
+  <meta http-equiv="refresh" content="0;url=${escapeAttr(dest)}">${canonical}
   <title>Redirecting...</title>
 </head>
 <body>
@@ -1617,17 +1693,15 @@ function generateRedirects(
 </html>`;
     mkdirSync(dirname(htmlPath), { recursive: true });
     writeFileSync(htmlPath, html, "utf8");
-    count += 1;
-    redirectLines.push(`${source} ${dest} ${status}`);
+    files += 1;
   }
 
-  // Write _redirects file (Netlify/Cloudflare format)
   if (redirectLines.length > 0) {
     writeFileSync(join(outDir, "_redirects"), `${redirectLines.join("\n")}\n`, "utf8");
-    count += 1;
+    files += 1;
   }
 
-  return count;
+  return { errors, files };
 }
 
 /**

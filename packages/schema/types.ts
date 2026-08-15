@@ -542,7 +542,10 @@ export interface ProjectConfig {
    */
   extensions?: string[];
   /** Redirect map: source path → destination (or destination with HTTP status). */
-  redirects?: Record<string, string | { destination: string; status?: number }>;
+  redirects?: Record<
+    string,
+    string | { destination: string; status?: number } | { destination: string; rewrite: true }
+  >;
   defaults?: {
     /** Default layout path; `null` means explicitly no layout. */
     layout?: string | null;

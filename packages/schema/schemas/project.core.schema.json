@@ -360,14 +360,62 @@
     },
     "redirects": {
       "additionalProperties": {
-        "type": "string"
+        "oneOf": [
+          {
+            "description": "Destination path or URL; implies a 301.",
+            "type": "string"
+          },
+          {
+            "additionalProperties": false,
+            "description": "A redirect with an explicit RFC 9110 §15.4 status.",
+            "properties": {
+              "destination": {
+                "type": "string"
+              },
+              "status": {
+                "default": 301,
+                "description": "RFC 9110 §15.4 redirection status. 307 and 308 preserve the request method; 301 and 302 historically do not.",
+                "enum": [301, 302, 303, 307, 308],
+                "type": "integer"
+              }
+            },
+            "required": ["destination"],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "A rewrite (proxy): the destination's content is served AT the source URL, with no redirect. Emitted as status 200 in `_redirects`, which is the host convention — not an HTTP redirection status.",
+            "properties": {
+              "destination": {
+                "type": "string"
+              },
+              "rewrite": {
+                "const": true,
+                "type": "boolean"
+              }
+            },
+            "required": ["destination", "rewrite"],
+            "type": "object"
+          }
+        ]
       },
-      "description": "Static redirect rules. Maps source paths to destination paths.",
+      "description": "Static redirect and rewrite rules. Keys are source paths in URLPattern pathname syntax.",
       "examples": [
         {
+          "/api/*": {
+            "destination": "https://api.example.com/*",
+            "rewrite": true
+          },
+          "/legacy/*": {
+            "destination": "/archive/*",
+            "status": 308
+          },
           "/old-about": "/about"
         }
       ],
+      "propertyNames": {
+        "pattern": "^/"
+      },
       "type": "object"
     },
     "state": {

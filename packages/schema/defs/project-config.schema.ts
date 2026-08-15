@@ -1,3 +1,12 @@
+/**
+ * The RFC 9110 §15.4 redirection statuses a static host can express. 303 preserves the "see other,
+ * with GET" semantics; 307 and 308 preserve the request method, which 301 and 302 historically do
+ * not. **200 is not here**: a host's rewrite/proxy convention is not a redirection status, and
+ * modelling it as one is what let the compiler emit a meta-refresh page for a rewrite. Rewrites are
+ * `{ destination, rewrite: true }`.
+ */
+export const REDIRECT_STATUSES = [301, 302, 303, 307, 308] as const;
+
 export const projectConfigSchema = {
   description:
     "Schema for Jx project.json files. " +
@@ -222,9 +231,51 @@ export const projectConfigSchema = {
       type: "string",
     },
     redirects: {
-      additionalProperties: { type: "string" },
-      description: "Static redirect rules. Maps source paths to destination paths.",
-      examples: [{ "/old-about": "/about" }],
+      additionalProperties: {
+        oneOf: [
+          { description: "Destination path or URL; implies a 301.", type: "string" },
+          {
+            additionalProperties: false,
+            description: "A redirect with an explicit RFC 9110 §15.4 status.",
+            properties: {
+              destination: { type: "string" },
+              status: {
+                default: 301,
+                description:
+                  "RFC 9110 §15.4 redirection status. 307 and 308 preserve the request method; " +
+                  "301 and 302 historically do not.",
+                enum: [...REDIRECT_STATUSES],
+                type: "integer",
+              },
+            },
+            required: ["destination"],
+            type: "object",
+          },
+          {
+            additionalProperties: false,
+            description:
+              "A rewrite (proxy): the destination's content is served AT the source URL, with no " +
+              "redirect. Emitted as status 200 in `_redirects`, which is the host convention — " +
+              "not an HTTP redirection status.",
+            properties: {
+              destination: { type: "string" },
+              rewrite: { const: true, type: "boolean" },
+            },
+            required: ["destination", "rewrite"],
+            type: "object",
+          },
+        ],
+      },
+      description:
+        "Static redirect and rewrite rules. Keys are source paths in URLPattern pathname syntax.",
+      examples: [
+        {
+          "/api/*": { destination: "https://api.example.com/*", rewrite: true },
+          "/legacy/*": { destination: "/archive/*", status: 308 },
+          "/old-about": "/about",
+        },
+      ],
+      propertyNames: { pattern: "^/" },
       type: "object",
     },
     state: {

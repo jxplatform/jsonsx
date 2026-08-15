@@ -15,10 +15,10 @@ This page is generated from the `## N. Standards Alignment` tables in the specif
 | Class       | Standards | Bindings |
 | ----------- | --------- | -------- |
 | `Adopted`   | 9         | 14       |
-| `Subset`    | 18        | 30       |
+| `Subset`    | 18        | 31       |
 | `Divergent` | 2         | 3        |
 | `Borrowed`  | 3         | 4        |
-| `Pending`   | 22        | 28       |
+| `Pending`   | 21        | 27       |
 | `Rejected`  | 3         | 3        |
 | _(backlog)_ | 19        | —        |
 
@@ -40,6 +40,7 @@ This page is generated from the `## N. Standards Alignment` tables in the specif
 | [JavaScript Object Notation (JSON) Pointer](https://www.rfc-editor.org/rfc/rfc6901) `RFC 6901`                                                         | IETF        | `Borrowed`  | `spec.md` §7                                                                              | `packages/runtime/src/runtime.ts`                                                                                                |
 | [The text/markdown Media Type](https://www.rfc-editor.org/rfc/rfc7763) `RFC 7763`                                                                      | IETF        | `Subset`    | `parser.md` §3                                                                            | `extensions/parser/src/Markdown.class.json`                                                                                      |
 | [Web Linking](https://www.rfc-editor.org/rfc/rfc8288) `RFC 8288`                                                                                       | IETF        | `Subset`    | `site-architecture.md` §8.1                                                               | `packages/compiler/src/site/head-merger.ts`                                                                                      |
+| [HTTP Semantics](https://www.rfc-editor.org/rfc/rfc9110) `RFC 9110`                                                                                    | IETF        | `Subset`    | `schema.md` §3.2                                                                          | `packages/schema/defs/project-config.schema.ts`                                                                                  |
 | [HTTP Semantics](https://www.rfc-editor.org/rfc/rfc9110) `RFC 9110`                                                                                    | IETF        | `Subset`    | `site-architecture.md` §11.3                                                              | `packages/compiler/src/site/site-build.ts`                                                                                       |
 | [HTTP Caching](https://www.rfc-editor.org/rfc/rfc9111) `RFC 9111`                                                                                      | IETF        | `Adopted`   | `server.md` §3                                                                            | `packages/server/src/server.ts`                                                                                                  |
 | [Robots Exclusion Protocol](https://www.rfc-editor.org/rfc/rfc9309) `RFC 9309`                                                                         | IETF        | `Adopted`   | `site-architecture.md` §8.4.1                                                             | `packages/compiler/src/site/site-build.ts`                                                                                       |
@@ -77,7 +78,6 @@ This page is generated from the `## N. Standards Alignment` tables in the specif
 - <a id="gap-content-date-coercion"></a>`gap:content-date-coercion` — **Date and Time on the Internet: Timestamps** (RFC 3339, `Pending`) in `parser.md` §3, `parser.md` §4 — No date coercion exists in either format class. Sorting compares raw strings, which is right for ISO 8601 by accident and silently wrong for any other form, and the filter comparators push both sides through `Number()`, so a date comparison is always false.
 - <a id="gap-markdown-variant"></a>`gap:markdown-variant` — **The text/markdown Media Type** (RFC 7763, `Subset`) in `parser.md` §3 — The class declares `text/markdown`, but not the `variant` parameter RFC 7764 registers — so nothing on the wire says which flavour a `.md` file is.
 - <a id="gap-immutable-variants"></a>`gap:immutable-variants` — **HTTP Immutable Responses** (RFC 8246, `Pending`) in `site-architecture.md` §14 — `dist/images/_optimized/*` filenames embed a content hash and are therefore safe to mark immutable; nothing does.
-- <a id="gap-redirect-status-enum"></a>`gap:redirect-status-enum` — **HTTP Semantics** (RFC 9110, `Pending`) in `schema.md` §3.2 — The `redirects` value shape admits no status at all, so there is no enumeration of the §15.4 redirection codes and 303/307/308 cannot be expressed in a validating `project.json`.
 - <a id="gap-emit-cache-headers"></a>`gap:emit-cache-headers` — **HTTP Caching** (RFC 9111, `Pending`) in `site-architecture.md` §14 — The build emits no cache policy, so every host applies its own default to output whose cacheability the build alone knows.
 - <a id="gap-ai-problem-details"></a>`gap:ai-problem-details` — **Problem Details for HTTP APIs** (RFC 9457, `Pending`) in `ai.md` §2 — Failures answer as `{error}` JSON, and an upstream failure answers 200 carrying `upstreamError`. Neither is `application/problem+json`.
 - <a id="gap-backend-failure-contract"></a>`gap:backend-failure-contract` — **Problem Details for HTTP APIs** (RFC 9457, `Pending`) in `desktop.md` §5 — The contract defines no failure shape, so each backend invents one and the Studio client carries a separate reader for each.

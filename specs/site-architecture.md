@@ -2,7 +2,7 @@
 
 ## File-Based Routing, Content Collections, Layouts, and Static Site Generation
 
-**Version:** 0.1.45-draft
+**Version:** 0.2.0-draft
 **Status:** Partial
 **Updated:** 2026-08-15
 **License:** MIT
@@ -1378,7 +1378,7 @@ Defined in `project.json`:
 
 The compiler emits two outputs:
 
-- **HTML meta-refresh pages** — every literal (pattern-free) source compiles to an HTML file with a `<meta http-equiv="refresh">` tag and a `<link rel="canonical">` to the destination. A literal source that collides with a compiled page logs a build **warning** (the redirect file overwrites the page — remove one or the other).
+- **HTML meta-refresh pages** — a literal (pattern-free) source compiles to an HTML file with a `<meta http-equiv="refresh">` tag, **for the statuses that have an HTML equivalent** (§11.3). A literal source that collides with a compiled page logs a build **warning** (the redirect file overwrites the page — remove one or the other).
 - **`_redirects` file** — every rule (literal and pattern) is written to `dist/_redirects` in the Netlify/Cloudflare format. Sources containing `:param` or `*` cannot be expressed as static HTML, so they appear **only** here, for platforms that process it.
 
 No `vercel.json` or other platform-specific redirect map is generated.
@@ -1394,17 +1394,43 @@ Redirect rules support `:param` and `*` wildcard syntax:
 }
 ```
 
-### 11.3 Status Codes
+### 11.3 Status Codes and Rewrites
+
+A rule is either a **redirect**, carrying an RFC 9110 §15.4 redirection status, or a **rewrite**,
+which is a different thing wearing a status code's clothes.
 
 ```json
 {
   "/moved-permanently": { "destination": "/new-location", "status": 301 },
   "/temporary-redirect": { "destination": "/other-page", "status": 302 },
-  "/api/*": { "destination": "https://api.example.com/*", "status": 200 }
+  "/method-preserving": { "destination": "/new-endpoint", "status": 308 },
+  "/api/*": { "destination": "https://api.example.com/*", "rewrite": true }
 }
 ```
 
-Status 200 redirects function as rewrites (proxy-style).
+A bare string is a 301. An unrecognised status is a **build error naming the rule**, not a value
+written through to the host.
+
+| Status | Means                           | HTML fallback                                      |
+| ------ | ------------------------------- | -------------------------------------------------- |
+| `301`  | Permanent                       | yes, with `<link rel="canonical">`                 |
+| `302`  | Temporary                       | yes, with `<meta name="robots" content="noindex">` |
+| `303`  | See other, with GET             | yes, with `noindex`                                |
+| `307`  | Temporary, **method preserved** | **no**                                             |
+| `308`  | Permanent, **method preserved** | **no**                                             |
+
+**Why the fallback is not universal.** An HTML meta-refresh is a _client-side_ redirect: the browser
+fetches the source, then navigates. That is a fair stand-in for a 301 on a host that ignores
+`_redirects`, and a misrepresentation of a 307 or 308, which exist precisely to preserve the request
+method and body — a meta-refresh silently converts a POST into a GET. A canonical link is likewise
+correct only for 301: on a temporary redirect it asserts the permanence the status denies, so 302
+and 303 get `noindex` instead.
+
+**A rewrite is not status 200.** It serves the destination's content _at_ the source URL, with no
+redirect at all; the `200` that reaches `_redirects` is the host's convention for saying so. It is
+written `{ "destination": …, "rewrite": true }`, and it gets **no** HTML file — a file at the source
+URL shadows the rewrite on hosts that honour `_redirects` and turns it into a redirect on the hosts
+that do not, which is wrong in both directions.
 
 ### 11.4 Studio Redirect Editor
 
@@ -1885,6 +1911,7 @@ This spec builds on existing Jx primitives wherever possible:
 
 ## Changelog
 
+- **0.2.0-draft** (2026-08-15) — §11.3 separates redirects from rewrites: an RFC 9110 status enum, a per-status HTML-fallback policy, and no file for a rewrite.
 - **0.1.45-draft** (2026-08-15) — Add §16 Standards Alignment; §8.5 marked Pending — the JSON-LD object form is unimplemented — and §14 Partial: no _headers or .nojekyll is emitted.
 - **0.1.44-draft** (2026-08-12) — Header status corrected from Pending to Partial — all seven marked sections were Implemented while the header claimed nothing was; §9.4's marker and its own Still-planned list contradicted each other (metadata and the delete warning ship; browsable usage does not); §12.3 and §13 marked Pending, having no dependency graph and no reader of the i18n config respectively.
 - **0.1.43-draft** (2026-08-11) — Studio SEO previews move from a Document Header disclosure into the Search appearance modal (document.openSeo), reachable from the card, the Page panel and the palette; fields grouped by the preview each feeds.
