@@ -27,6 +27,7 @@ This page is generated from the `> **Status: …**` markers in the specification
 | `server.md`               | 0.2.1        | Implemented | 2026-07-25 |
 | `site-architecture.md`    | 0.1.44-draft | Partial     | 2026-08-12 |
 | `spec.md`                 | 0.4.28-draft | Partial     | 2026-08-10 |
+| `standards.md`            | 0.1.0-draft  | Partial     | 2026-08-14 |
 | `studio-ui-guidelines.md` | 0.3.8        | Implemented | 2026-08-13 |
 | `studio.md`               | 0.9.24-draft | Partial     | 2026-08-13 |
 
@@ -39,6 +40,7 @@ This page is generated from the `> **Status: …**` markers in the specification
 - `spec.md` §5.6 — Private State (`#` prefix)
 - `spec.md` §11.4 — Server Timing — RPC Function Boundary
 - `spec.md` §16.8 — CEM-Compatible Annotations
+- `standards.md` §1 — Overview
 
 ### Pending
 

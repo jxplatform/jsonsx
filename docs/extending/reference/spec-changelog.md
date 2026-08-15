@@ -277,6 +277,10 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 - **0.1.1-draft** (2026-04-04) — Rebrand as JSONsx (`0daa94f7`).
 - **0.1.0-draft** (2026-04-04) — Init (`a93852ac`).
 
+## `standards.md`
+
+- **0.1.0-draft** (2026-08-14) — Initial specification: the conformance vocabulary, the `## N. Standards Alignment` table contract, citation and canonical-URL rules, gap tiers derived from section status, and governance for declining a standard.
+
 ## `studio-ui-guidelines.md`
 
 - **0.3.8** (2026-08-13) — A row wraps and never overflows (§4.6); the floating bar's visibility rule.

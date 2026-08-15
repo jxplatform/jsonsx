@@ -10,6 +10,7 @@ import { generateFormulas } from "./generators/formulas.ts";
 import { generateImplementationStatus } from "./generators/implementation-status.ts";
 import { generateOperators } from "./generators/operators.ts";
 import { generateSpecChangelog } from "./generators/spec-changelog.ts";
+import { generateStandards } from "./generators/standards.ts";
 import { generateStarters } from "./generators/starters.ts";
 import { generateCommands, generateShortcuts } from "./generators/studio-commands.ts";
 import { generateStudioRoutes } from "./generators/studio-routes.ts";
@@ -20,6 +21,7 @@ const PAGES: Record<string, () => string> = {
   "docs/extending/reference/studio-routes.md": generateStudioRoutes,
   "docs/extending/reference/implementation-status.md": generateImplementationStatus,
   "docs/extending/reference/spec-changelog.md": generateSpecChangelog,
+  "docs/extending/reference/standards.md": generateStandards,
   "docs/framework/reference/formulas.md": generateFormulas,
   "docs/framework/reference/operators.md": generateOperators,
   "docs/studio/projects/starters.md": generateStarters,

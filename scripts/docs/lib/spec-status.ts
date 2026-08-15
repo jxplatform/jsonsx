@@ -50,7 +50,7 @@ export interface SpecStatus {
  * §15's "Implemented" was being reported against §14.2, which carries no marker at all.
  * `check-doc-refs.ts:80` has always used `\b` here and resolved the same headings correctly.
  */
-const NUMBERED_HEADING = /^#{2,6}\s+(\d+(?:\.\d+)*[a-z]?)\.?\s+(.*)$/;
+export const NUMBERED_HEADING = /^#{2,6}\s+(\d+(?:\.\d+)*[a-z]?)\.?\s+(.*)$/;
 const BLOCKQUOTE_STATUS = /^>\s*\*\*Status:\s*([A-Za-z]+)/;
 const HEADER_VERSION = /^\*\*Version:\*\*\s*(.+)$/;
 const HEADER_STATUS = /^\*\*Status:\*\*\s*(.+)$/;

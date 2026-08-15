@@ -156,6 +156,7 @@
         { "path": "extending/reference/studio-routes", "label": "Protocol routes" },
         { "path": "extending/reference/implementation-status", "label": "Implementation status" },
         { "path": "extending/reference/spec-changelog", "label": "Spec changelog" },
+        { "path": "extending/reference/standards", "label": "Standards alignment" },
         { "path": "extending/contributing/monorepo", "label": "Working in the monorepo" },
         { "path": "extending/contributing/docs", "label": "Contributing to these docs" },
         { "path": "extending/contributing/ai-evals", "label": "AI assistant evals" }

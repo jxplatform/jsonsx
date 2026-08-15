@@ -75,12 +75,13 @@ They are deliberately bullets rather than headings so changelog versions never c
 
 ## Gates
 
-| Command                   | Enforces                                                                                              |
-| ------------------------- | ----------------------------------------------------------------------------------------------------- |
-| bun run docs:status       | Header fields, status vocabulary, footer/header version agreement, changelog ordering and consistency |
-| bun run docs:spec-release | A spec whose body changed also advanced its version (this is what keeps versions meaningful)          |
-| bun run docs:check        | Docs spec: anchors resolve to real numbered headings                                                  |
-| bun run docs:verify       | The generated reference pages match the specs they derive from                                        |
+| Command                   | Enforces                                                                                                                                   |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| bun run docs:status       | Header fields, status vocabulary, footer/header version agreement, changelog ordering and consistency                                      |
+| bun run docs:spec-release | A spec whose body changed also advanced its version (this is what keeps versions meaningful)                                               |
+| bun run docs:standards    | The `## N. Standards Alignment` tables: vocabulary, canonical citations, resolvable bindings, committed evidence, and the tracked gap list |
+| bun run docs:check        | Docs spec: anchors resolve to real numbered headings                                                                                       |
+| bun run docs:verify       | The generated reference pages match the specs they derive from                                                                             |
 
 A spec's "body" is everything except the release metadata — the `**Version:**` and `**Updated:**` lines, the `## Changelog` section, and the footer version. Header `**Status:**` and the per-section `> **Status: …**` markers _are_ body: changing what is built is a change worth releasing.
 

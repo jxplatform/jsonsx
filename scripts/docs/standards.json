@@ -1,0 +1,18 @@
+{
+  "$comment": "The standards LEXICON: what each identifier IS (issuing body, title, canonical URL). It is not the registry — the specs' `## N. Standards Alignment` tables say what Jx DOES about each standard, and scripts/docs/check-standards.ts joins the two. An id no spec cites fails (catalog-stale); an id no entry vouches for fails (id-unknown). That is the only offline way a typo'd RFC number can fail, since a wrong-but-well-formed rfc-editor.org URL is indistinguishable from a right one. Keep entries sorted by id (codepoint order).",
+  "standards": [
+    {
+      "id": "BCP 14",
+      "org": "IETF",
+      "title": "Key words for use in RFCs to Indicate Requirement Levels",
+      "url": "https://www.rfc-editor.org/info/bcp14",
+      "note": "RFC 2119 + RFC 8174."
+    },
+    {
+      "id": "RFC 3986",
+      "org": "IETF",
+      "title": "Uniform Resource Identifier (URI): Generic Syntax",
+      "url": "https://www.rfc-editor.org/rfc/rfc3986"
+    }
+  ]
+}
