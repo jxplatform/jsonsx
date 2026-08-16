@@ -125,3 +125,37 @@ The canonical Studio Backend Protocol route table (protocol version 1), from `@j
 | Route     | Method | Path                 | Summary                                                                     | Optional | Degradation                                                      |
 | --------- | ------ | -------------------- | --------------------------------------------------------------------------- | -------- | ---------------------------------------------------------------- |
 | `cfProxy` | POST   | `/__studio/cf/proxy` | Allowlisted Cloudflare API passthrough {path, method?, body?} (backs cfApi) | yes      | The Publish panel explains the git-push publishing path instead. |
+
+## Failures
+
+Every failure is an RFC 9457 problem document at `application/problem+json`. The `type` URI is what a client keys on; `detail` is the line a human reads, and `title` describes the type rather than the occurrence. The status belongs to the type — a type answerable with two statuses is two types.
+
+`error` is emitted as a deprecated alias of `detail` for one release, so a client written against the older shape keeps working. Do not write new readers against it.
+
+### The request
+
+| Name               | Status | Type                                              | Title                                        | Extensions  |
+| ------------------ | ------ | ------------------------------------------------- | -------------------------------------------- | ----------- |
+| `invalidRequest`   | 400    | `https://jxsuite.com/problems/invalid-request`    | The request was malformed or incomplete      | —           |
+| `notFound`         | 404    | `https://jxsuite.com/problems/not-found`          | The requested resource does not exist        | —           |
+| `methodNotAllowed` | 405    | `https://jxsuite.com/problems/method-not-allowed` | That method is not allowed on this route     | —           |
+| `conflict`         | 409    | `https://jxsuite.com/problems/conflict`           | The request conflicts with the current state | `conflicts` |
+| `payloadTooLarge`  | 413    | `https://jxsuite.com/problems/payload-too-large`  | The request body is too large                | —           |
+
+### Access
+
+| Name                      | Status | Type                                                     | Title                                            | Extensions   |
+| ------------------------- | ------ | -------------------------------------------------------- | ------------------------------------------------ | ------------ |
+| `unauthorized`            | 401    | `https://jxsuite.com/problems/unauthorized`              | Credentials are missing or not accepted          | —            |
+| `forbidden`               | 403    | `https://jxsuite.com/problems/forbidden`                 | The request was refused                          | —            |
+| `needsInstallationAccess` | 403    | `https://jxsuite.com/problems/needs-installation-access` | The GitHub App is not installed for that account | `installUrl` |
+| `pathOutsideProject`      | 403    | `https://jxsuite.com/problems/path-outside-project`      | The path resolves outside the active project     | —            |
+
+### Backend state
+
+| Name                    | Status | Type                                                  | Title                                         | Extensions |
+| ----------------------- | ------ | ----------------------------------------------------- | --------------------------------------------- | ---------- |
+| `noActiveProject`       | 409    | `https://jxsuite.com/problems/no-active-project`      | No project is active on this backend          | —          |
+| `capabilityUnavailable` | 501    | `https://jxsuite.com/problems/capability-unavailable` | This backend does not provide that capability | —          |
+| `upstreamFailure`       | 502    | `https://jxsuite.com/problems/upstream-failure`       | An upstream service failed                    | `upstream` |
+| `internalError`         | 500    | `https://jxsuite.com/problems/internal-error`         | The backend failed to complete the request    | —          |

@@ -214,7 +214,13 @@ describe("dev server — absolute paths under the active project", () => {
       method: "POST",
     });
     expect(activate.status).toBe(403);
-    expect(await activate.json()).toEqual({ error: "root not permitted", ok: false });
+    // A problem document, with `ok: false` carried as the extension member the client branches on.
+    expect(activate.headers.get("content-type")).toBe("application/problem+json");
+    expect(await activate.json()).toMatchObject({
+      detail: "root not permitted",
+      ok: false,
+      type: "https://jxsuite.com/problems/forbidden",
+    });
   });
 
   test("activate permits an external project dir listed in allowedRoots", async () => {
@@ -299,7 +305,9 @@ describe("project server — coverage gaps", () => {
       headers: { connection: "upgrade", upgrade: "websocket" },
     });
     expect(res.status).toBe(400);
-    expect(await res.text()).toBe("Upgrade failed");
+    const body = (await res.json()) as { detail: string; type: string };
+    expect(body.detail).toBe("Upgrade failed");
+    expect(body.type).toBe("https://jxsuite.com/problems/invalid-request");
   });
 
   test("answers the AI models listing under the studio namespace", async () => {

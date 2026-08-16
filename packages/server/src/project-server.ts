@@ -38,6 +38,7 @@ import {
   serveContained,
   serveProjectFile,
 } from "./net-guard.ts";
+import { problem } from "./problem.ts";
 
 /** A resolved per-window session: its project root plus its RPC handler map. */
 export interface ProjectServerSession {
@@ -121,7 +122,7 @@ export function createProjectServer(options: CreateProjectServerOptions): Projec
         if (srv.upgrade(req, { data: { winId } })) {
           return;
         }
-        return new Response("Upgrade failed", { status: 400 });
+        return problem("invalidRequest", "Upgrade failed");
       }
 
       // 2. AI SSE — keep the existing handleAiApi behavior (rewrite the studio-ai prefix).
@@ -139,7 +140,7 @@ export function createProjectServer(options: CreateProjectServerOptions): Projec
       if (normPath === "/__studio__/import-site" && req.method === "POST") {
         const { importApi } = options;
         if (!importApi) {
-          return new Response("Not found", { status: 404 });
+          return problem("notFound", "Not found");
         }
         const gate = loopbackGate(req, url, rpcToken);
         if (gate) {
@@ -168,17 +169,17 @@ export function createProjectServer(options: CreateProjectServerOptions): Projec
           headers.set("Referrer-Policy", "same-origin");
           return new Response(res.body, { headers, status: res.status });
         }
-        return new Response("Not found", { status: 404 });
+        return problem("notFound", "Not found");
       }
 
       // 4. Resolve the session (fail-closed).
       const session = resolveSession(winId);
       if (!session) {
-        return new Response("Unknown window", { status: 404 });
+        return problem("notFound", "Unknown window");
       }
       const root = session.projectRoot;
       if (!root) {
-        return new Response("No project", { status: 404 });
+        return problem("notFound", "No project");
       }
 
       // 4b. Extension server mounts (/_jx/data etc.) — registry-driven, same wire contract as
@@ -242,7 +243,7 @@ export function createProjectServer(options: CreateProjectServerOptions): Projec
          server's paths mean the project's SOURCES, and a built page means its own output by the
          very same paths; `site-preview.ts` gives that output its own origin, which is what
          `View: Open in Browser` opens. */
-      return new Response("Not found", { status: 404 });
+      return problem("notFound", "Not found");
     },
 
     websocket: {

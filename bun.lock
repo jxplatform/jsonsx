@@ -123,6 +123,7 @@
       "name": "@jxsuite/ai",
       "version": "0.34.0",
       "dependencies": {
+        "@jxsuite/protocol": "workspace:^",
         "@vue/reactivity": "3.5.41",
       },
       "devDependencies": {

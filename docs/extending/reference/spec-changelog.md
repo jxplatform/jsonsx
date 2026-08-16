@@ -14,6 +14,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `ai.md`
 
+- **0.1.6-draft** (2026-08-16) — §2 failures are problem documents and the mid-stream frame carries one; gap:ai-problem-details closed.
 - **0.1.5-draft** (2026-08-15) — Add §5 Standards Alignment: SSE, the IANA special-purpose address registries the SSRF guard uses, and the problem+json gap.
 - **0.1.4-draft** (2026-08-12) — The assistant's six capabilities are command records, gated on ai.configured and ai.streaming.
 - **0.1.3-draft** (2026-08-04) — §3.2 the turn is accountable (per-write disk marking, Restore to here, chip outcomes, partial success) and §3.3 the batch follows the document, not the tab.
@@ -66,6 +67,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `desktop.md`
 
+- **0.3.10-draft** (2026-08-16) — §5 the contract's failure half is specified — one RFC 9457 registry; gap:backend-failure-contract closed.
 - **0.3.9-draft** (2026-08-15) — Add §12 Standards Alignment; §5 marked Partial — the Backend API Contract specifies no failure shape.
 - **0.3.8-draft** (2026-08-13) — Open Project asks where a project should open (§4.2a): New Window is routed through pickProject + openProjectInNewWindow, and the outcome is reported rather than the target.
 - **0.3.7-draft** (2026-08-11) — Name the pane context bar's resolving-with popover rather than the tab bar, which P8 deleted.
@@ -197,6 +199,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `server.md`
 
+- **0.2.6** (2026-08-16) — §4.3 every failure is an RFC 9457 problem document, guarded; gitPull produces the 409 the route table publishes; gap:studio-problem-details closed.
 - **0.2.5** (2026-08-16) — §5 and §8 record the source-map decision — a constant header offset is not a source map (ECMA-426, Rejected).
 - **0.2.4** (2026-08-16) — §3 static responses correct the two content types where the platform default disagrees with the registration.
 - **0.2.3** (2026-08-16) — §3.1 the SSE stream advertises retry: 500 and answers Last-Event-ID with one reload; gap:sse-reconnect closed.
@@ -375,6 +378,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.9.26-draft** (2026-08-16) — §16 one Problem reader over every backend failure shape; gap:studio-error-reader closed.
 - **0.9.25-draft** (2026-08-15) — Add §19 Standards Alignment; six bare **Status:** lines converted to the blockquote form no tool could read, and §16 marked Partial — the one status channel has no live region for the error tier.
 - **0.9.24-draft** (2026-08-13) — Open in Browser serves the built site on its own origin; the build reports the URL.
 - **0.9.23-draft** (2026-08-13) — Open in Browser opens the page's route on a server that serves the built site there, and builds it first.

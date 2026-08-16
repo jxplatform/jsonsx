@@ -20,6 +20,7 @@ import { isAbsolute, relative, resolve, sep } from "node:path";
 import { realpathSync } from "node:fs";
 import { resolveAssetUrl } from "@jxsuite/schema/asset-paths";
 import type { AssetMount } from "@jxsuite/schema/asset-paths";
+import { problem } from "./problem.ts";
 
 export const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
 
@@ -78,7 +79,7 @@ export function hostIsLoopbackOrAbsent(req: Request): boolean {
  */
 export function originHostGate(req: Request): Response | null {
   if (!originIsLoopbackOrAbsent(req) || !hostIsLoopbackOrAbsent(req)) {
-    return new Response("Forbidden", { status: 403 });
+    return problem("forbidden", "Forbidden");
   }
   return null;
 }
@@ -90,7 +91,7 @@ export function originHostGate(req: Request): Response | null {
  */
 export function loopbackGate(req: Request, url: URL, token: string | null): Response | null {
   if (token !== null && url.searchParams.get("token") !== token) {
-    return new Response("Forbidden", { status: 403 });
+    return problem("forbidden", "Forbidden");
   }
   return originHostGate(req);
 }
@@ -224,10 +225,10 @@ export function decodeAndNormalizePath(url: URL): DecodedPath {
   try {
     path = decodeURIComponent(url.pathname);
   } catch {
-    return { reject: new Response("Bad request", { status: 400 }) };
+    return { reject: problem("invalidRequest", "Bad request") };
   }
   if (/%2e|%2f/i.test(path)) {
-    return { reject: new Response("Not found", { status: 404 }) };
+    return { reject: problem("notFound", "Not found") };
   }
   const normPath = path.replace(/^\/{2,}/, "/");
   return { path, normPath };

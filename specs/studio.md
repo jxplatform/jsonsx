@@ -2,9 +2,9 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.25-draft
+**Version:** 0.9.26-draft
 **Status:** Partial
-**Updated:** 2026-08-15
+**Updated:** 2026-08-16
 **License:** MIT
 
 ---
@@ -2066,14 +2066,15 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md). Detailed accessibility conventions live in [`studio-ui-guidelines.md`](./studio-ui-guidelines.md) §14; this section cites what the Studio _shell_ binds.
 
-| Standard                                           | Class       | Binds | Evidence                         | Note                                                                                                                                                                                                                                    |
-| -------------------------------------------------- | ----------- | ----- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [WAI-ARIA](https://www.w3.org/TR/wai-aria-1.2/)    | **Subset**  | §16   | packages/studio/src/ui/layers.ts | The toast host is a live region and modals carry `role="dialog"` with `aria-modal`. The Problems panel, which is where the default tier sends an error, is not a live region at all.                                                    |
-| [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) | **Pending** | §16   | —                                | `gap:studio-error-reader` A Problem's `message` is whatever shape the backend happened to return; the platform layer carries five separate readers, so a failure can surface with no detail at all.                                     |
-| [ATAG 2.0](https://www.w3.org/TR/ATAG20/)          | **Pending** | §16   | —                                | `gap:authoring-accessibility-review` Studio checks a document's search appearance and its redirects, and files both as Problems. It does not check the accessibility of the content the author is producing, which is Part B's subject. |
+| Standard                                           | Class       | Binds | Evidence                                                                                                                          | Note                                                                                                                                                                                                                                                                                                                                          |
+| -------------------------------------------------- | ----------- | ----- | --------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [WAI-ARIA](https://www.w3.org/TR/wai-aria-1.2/)    | **Subset**  | §16   | packages/studio/src/ui/layers.ts                                                                                                  | The toast host is a live region and modals carry `role="dialog"` with `aria-modal`. The Problems panel, which is where the default tier sends an error, is not a live region at all.                                                                                                                                                          |
+| [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) | **Subset**  | §16   | packages/studio/src/platform-errors.ts, packages/studio/src/platforms/devserver.ts, packages/studio/tests/platform-errors.test.ts | A Problem's message comes from one reader over every shape a backend has sent, so a failure can no longer surface blank because the reader that ran was not the one for the shape that arrived. `problemDetail` answers `null` rather than a generic string, which is what lets each call site keep its own better words. Absent: `instance`. |
+| [ATAG 2.0](https://www.w3.org/TR/ATAG20/)          | **Pending** | §16   | —                                                                                                                                 | `gap:authoring-accessibility-review` Studio checks a document's search appearance and its redirects, and files both as Problems. It does not check the accessibility of the content the author is producing, which is Part B's subject.                                                                                                       |
 
 ## Changelog
 
+- **0.9.26-draft** (2026-08-16) — §16 one Problem reader over every backend failure shape; gap:studio-error-reader closed.
 - **0.9.25-draft** (2026-08-15) — Add §19 Standards Alignment; six bare **Status:** lines converted to the blockquote form no tool could read, and §16 marked Partial — the one status channel has no live region for the error tier.
 - **0.9.24-draft** (2026-08-13) — Open in Browser serves the built site on its own origin; the build reports the URL.
 - **0.9.23-draft** (2026-08-13) — Open in Browser opens the page's route on a server that serves the built site there, and builds it first.
@@ -2154,4 +2155,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.25-draft_
+_`@jxsuite/studio` Specification v0.9.26-draft_

@@ -11,6 +11,7 @@ import { loadAssetMounts } from "@jxsuite/compiler/asset-mounts";
 import type { AssetMount } from "@jxsuite/schema/asset-paths";
 import type { DynamicClass } from "@jxsuite/runtime/types";
 import type { JxClassDef, ProjectConfig } from "@jxsuite/schema/types";
+import { problem } from "./problem.ts";
 
 interface ModuleNamespace {
   default?: Record<string, unknown>;
@@ -126,12 +127,12 @@ export async function handleResolve(
   try {
     body = (await req.json()) as ResolveBody;
   } catch {
-    return new Response("Invalid JSON body", { status: 400 });
+    return problem("invalidRequest", "Invalid JSON body");
   }
 
   const { $src, $prototype, $export: xport, $base, ...config } = body;
   if (!$src) {
-    return new Response("Missing $src", { status: 400 });
+    return problem("invalidRequest", "Missing $src");
   }
 
   let moduleAbsPath;
@@ -200,7 +201,7 @@ export async function handleResolve(
         // A trusted (bare-specifier) class file names its own sibling implementation; only a
         // Project-local relative $src is held to the root-escape guard.
         if (!trustedResolution && !isImportable(implPath, root, activeProjectRoot)) {
-          return new Response(`$implementation escapes the project root`, { status: 403 });
+          return problem("pathOutsideProject", "$implementation escapes the project root");
         }
         const exportName = xport ?? classDef.title ?? $prototype;
         const mod = (await import(implPath)) as ModuleNamespace;
@@ -236,7 +237,7 @@ export async function handleResolve(
             : instance;
       return Response.json(value);
     } catch (error) {
-      return Response.json({ error: errorMessage(error) }, { status: 500 });
+      return problem("internalError", errorMessage(error));
     }
   }
 
@@ -260,12 +261,12 @@ export async function handleServerFunction(req: Request, root: string) {
   try {
     body = (await req.json()) as ServerFunctionBody;
   } catch {
-    return new Response("Invalid JSON body", { status: 400 });
+    return problem("invalidRequest", "Invalid JSON body");
   }
 
   const { $src, $export: xport, $base, arguments: args = {} } = body;
   if (!$src || !xport) {
-    return new Response("Missing $src or $export", { status: 400 });
+    return problem("invalidRequest", "Missing $src or $export");
   }
 
   let moduleAbsPath;
@@ -278,9 +279,7 @@ export async function handleServerFunction(req: Request, root: string) {
       moduleAbsPath = resolve(root, $src);
     }
   } catch (error) {
-    return new Response(`Cannot resolve $src: ${errorMessage(error)}`, {
-      status: 400,
-    });
+    return problem("invalidRequest", `Cannot resolve $src: ${errorMessage(error)}`);
   }
 
   if (!isImportable(moduleAbsPath, root, null)) {
@@ -312,7 +311,7 @@ export async function handleServerFunction(req: Request, root: string) {
     );
     return Response.json(result ?? null);
   } catch (error) {
-    return Response.json({ error: errorMessage(error) }, { status: 500 });
+    return problem("internalError", errorMessage(error));
   }
 }
 

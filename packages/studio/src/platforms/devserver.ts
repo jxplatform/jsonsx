@@ -35,6 +35,7 @@ import type {
   SiteBuildResult,
   StarterInfo,
 } from "../types";
+import { problemDetail, problemMessage } from "@jxsuite/protocol";
 
 /** A directory entry from the server, tolerating extra wire fields. */
 type WireDirEntry = DirEntry & Record<string, unknown>;
@@ -144,7 +145,7 @@ export function createDevServerPlatform() {
       if (!res.ok) {
         const body = (await readJson<ErrorBody>(res).catch(() => ({}))) as ErrorBody;
         throw new Error(
-          `Could not open ${r}: ${body.error || `activation failed (${res.status})`}`,
+          `Could not open ${r}: ${problemDetail(body) ?? `activation failed (${res.status})`}`,
         );
       }
     },
@@ -283,7 +284,7 @@ export function createDevServerPlatform() {
       });
       if (!res.ok) {
         const data = await readJson<ErrorBody>(res);
-        throw new Error(data.error || "Failed to create project");
+        throw new Error(problemDetail(data) ?? "Failed to create project");
       }
       return await res.json();
     },
@@ -742,7 +743,7 @@ export function createDevServerPlatform() {
       );
       if (!res.ok) {
         const data = await readJson<ErrorBody>(res);
-        throw new Error(data.error || "Failed to list connections");
+        throw new Error(problemDetail(data) ?? "Failed to list connections");
       }
       return await readJson<DataConnectionsResponse>(res);
     },
@@ -759,7 +760,7 @@ export function createDevServerPlatform() {
       );
       const data = await readJson<DataConnectionTestResult & ErrorBody>(res);
       if (!res.ok) {
-        throw new Error(data.error || "Connection test failed");
+        throw new Error(problemDetail(data) ?? "Connection test failed");
       }
       return data;
     },
@@ -773,7 +774,7 @@ export function createDevServerPlatform() {
       });
       const data = await readJson<DataPushResult & ErrorBody>(res);
       if (!res.ok) {
-        throw new Error(data.error || "Schema push failed");
+        throw new Error(problemDetail(data) ?? "Schema push failed");
       }
       return data;
     },
@@ -799,7 +800,7 @@ export function createDevServerPlatform() {
       const res = await fetch(`/__studio/data/rows?${params}`);
       const data = await readJson<DataRowsResult & ErrorBody>(res);
       if (!res.ok) {
-        throw new Error(data.error || "Failed to load rows");
+        throw new Error(problemDetail(data) ?? "Failed to load rows");
       }
       return data;
     },
@@ -812,7 +813,7 @@ export function createDevServerPlatform() {
       });
       const data = await readJson<{ row: Record<string, unknown> } & ErrorBody>(res);
       if (!res.ok) {
-        throw new Error(data.error || "Insert failed");
+        throw new Error(problemDetail(data) ?? "Insert failed");
       }
       return data;
     },
@@ -825,7 +826,7 @@ export function createDevServerPlatform() {
       });
       const data = await readJson<{ row: Record<string, unknown> } & ErrorBody>(res);
       if (!res.ok) {
-        throw new Error(data.error || "Update failed");
+        throw new Error(problemDetail(data) ?? "Update failed");
       }
       return data;
     },
@@ -842,7 +843,7 @@ export function createDevServerPlatform() {
       const res = await fetch(`/__studio/data/rows?${params}`, { method: "DELETE" });
       const data = await readJson<{ ok: boolean } & ErrorBody>(res);
       if (!res.ok) {
-        throw new Error(data.error || "Delete failed");
+        throw new Error(problemDetail(data) ?? "Delete failed");
       }
       return data;
     },
@@ -852,7 +853,7 @@ export function createDevServerPlatform() {
       const res = await fetch(`/__studio/secrets?dir=${encodeURIComponent(serverPath("."))}`);
       if (!res.ok) {
         const data = await readJson<ErrorBody>(res);
-        throw new Error(data.error || "Failed to list secrets");
+        throw new Error(problemDetail(data) ?? "Failed to list secrets");
       }
       const data = await readJson<{ names: string[] }>(res);
       return data.names;
@@ -867,7 +868,7 @@ export function createDevServerPlatform() {
       });
       const data = await readJson<SecretsSetResponse & ErrorBody>(res);
       if (!res.ok) {
-        throw new Error(data.error || "Failed to write secrets");
+        throw new Error(problemDetail(data) ?? "Failed to write secrets");
       }
       return data;
     },
@@ -885,7 +886,7 @@ export function createDevServerPlatform() {
       });
       const data = await readJson<{ error?: string; result?: unknown }>(res);
       if (!res.ok) {
-        throw new Error(data.error || "Format action failed");
+        throw new Error(problemDetail(data) ?? "Format action failed");
       }
       return data.result;
     },
@@ -965,7 +966,7 @@ export function createDevServerPlatform() {
       });
       if (!res.ok) {
         const body = await readJson<ErrorBody>(res);
-        throw new Error(body.error);
+        throw new Error(problemMessage(body));
       }
       return await res.json();
     },
@@ -979,7 +980,7 @@ export function createDevServerPlatform() {
       });
       if (!res.ok) {
         const body = await readJson<ErrorBody>(res);
-        throw new Error(body.error);
+        throw new Error(problemMessage(body));
       }
       return await res.json();
     },
@@ -993,7 +994,7 @@ export function createDevServerPlatform() {
       });
       if (!res.ok) {
         const body = await readJson<ErrorBody>(res);
-        throw new Error(body.error);
+        throw new Error(problemMessage(body));
       }
       return await res.json();
     },
@@ -1007,7 +1008,7 @@ export function createDevServerPlatform() {
       });
       if (!res.ok) {
         const body = await readJson<ErrorBody>(res);
-        throw new Error(body.error);
+        throw new Error(problemMessage(body));
       }
       return await res.json();
     },
@@ -1016,7 +1017,7 @@ export function createDevServerPlatform() {
       const res = await fetch("/__studio/git/pull", { method: "POST" });
       if (!res.ok) {
         const body = await readJson<ErrorBody>(res);
-        throw new Error(body.error);
+        throw new Error(problemMessage(body));
       }
       return await res.json();
     },
@@ -1025,7 +1026,7 @@ export function createDevServerPlatform() {
       const res = await fetch("/__studio/git/fetch", { method: "POST" });
       if (!res.ok) {
         const body = await readJson<ErrorBody>(res);
-        throw new Error(body.error);
+        throw new Error(problemMessage(body));
       }
       return await res.json();
     },
@@ -1039,7 +1040,7 @@ export function createDevServerPlatform() {
       });
       if (!res.ok) {
         const body = await readJson<ErrorBody>(res);
-        throw new Error(body.error);
+        throw new Error(problemMessage(body));
       }
       return await res.json();
     },
@@ -1053,7 +1054,7 @@ export function createDevServerPlatform() {
       });
       if (!res.ok) {
         const body = await readJson<ErrorBody>(res);
-        throw new Error(body.error);
+        throw new Error(problemMessage(body));
       }
       return await res.json();
     },
@@ -1090,7 +1091,7 @@ export function createDevServerPlatform() {
       });
       if (!res.ok) {
         const body = await readJson<ErrorBody>(res);
-        throw new Error(body.error);
+        throw new Error(problemMessage(body));
       }
       return await res.json();
     },
@@ -1104,7 +1105,7 @@ export function createDevServerPlatform() {
       });
       if (!res.ok) {
         const body = await readJson<ErrorBody>(res);
-        throw new Error(body.error);
+        throw new Error(problemMessage(body));
       }
       return await res.json();
     },
@@ -1113,14 +1114,14 @@ export function createDevServerPlatform() {
       const res = await fetch("/__studio/git/init", { method: "POST" });
       if (!res.ok) {
         const body = await readJson<ErrorBody>(res);
-        throw new Error(body.error);
+        throw new Error(problemMessage(body));
       }
     },
     async buildSite() {
       const res = await fetch("/__studio/build", { method: "POST" });
       if (!res.ok) {
         const body = await readJson<ErrorBody>(res);
-        throw new Error(body.error || "The site could not be built.");
+        throw new Error(problemDetail(body) ?? "The site could not be built.");
       }
       return (await res.json()) as SiteBuildResult;
     },
@@ -1137,7 +1138,7 @@ export function createDevServerPlatform() {
       });
       if (!res.ok) {
         const body = await readJson<ErrorBody>(res);
-        throw new Error(body.error);
+        throw new Error(problemMessage(body));
       }
     },
 

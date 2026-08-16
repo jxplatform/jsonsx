@@ -31,6 +31,7 @@ import type {
   StarterInfo,
   StudioPlatform,
 } from "../types";
+import { problemDetail, problemSlug } from "@jxsuite/protocol";
 
 export interface CloudProject {
   owner: string;
@@ -53,7 +54,13 @@ interface SessionEventWire {
   sha?: string;
 }
 
-/** Message-level failure body every platform route uses. */
+/**
+ * Message-level failure body every platform route uses.
+ *
+ * `error` is the pre-RFC-9457 name and is read through `problemDetail`, which also reads a problem
+ * document's `detail` — so this one reader covers a backend that has migrated and one that has
+ * not.
+ */
 interface ErrorBody {
   error?: string;
   code?: string;
@@ -61,8 +68,7 @@ interface ErrorBody {
 
 async function errorMessage(res: Response, fallback: string): Promise<string> {
   try {
-    const body = (await res.json()) as ErrorBody;
-    return body.error ?? fallback;
+    return problemDetail(await res.json()) ?? fallback;
   } catch {
     return fallback;
   }
@@ -743,10 +749,17 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
         // Preserve the structured 403 (needs_installation_access + installUrl) so the New
         // Project modal can render an install link instead of flattened text.
         const body = (await res.json().catch(() => null)) as
-          | (ErrorBody & { installUrl?: string })
+          | (ErrorBody & { installUrl?: string; type?: string })
           | null;
-        throw Object.assign(new Error(body?.error ?? "Failed to create project"), {
-          ...(body?.code ? { code: body.code } : {}),
+        /*
+         * `code` survives as the machine-readable discriminator the modal branches on, and a
+         * problem document supplies it from its `type` — `problemSlug` derives the same string the
+         * old `code` field carried, so the modal's branch is unchanged either way.
+         */
+        throw Object.assign(new Error(problemDetail(body) ?? "Failed to create project"), {
+          ...((problemSlug(body?.type) ?? body?.code)
+            ? { code: problemSlug(body?.type) ?? body?.code }
+            : {}),
           ...(body?.installUrl ? { installUrl: body.installUrl } : {}),
         });
       }

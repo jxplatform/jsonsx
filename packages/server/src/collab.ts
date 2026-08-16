@@ -20,6 +20,7 @@ import { createCollabHost } from "@jxsuite/collab/room";
 import { assertAccessible } from "./studio-api";
 import type { ServerWebSocket, WebSocketHandler } from "bun";
 import type { HostConnection } from "@jxsuite/collab/room";
+import { problem } from "./problem.ts";
 
 const EMPTY_ROOM_GRACE_MS = 30_000;
 
@@ -193,7 +194,7 @@ export function createCollabRegistry(opts: {
     handleRequest(req, server) {
       if (req.headers.get("upgrade")?.toLowerCase() === "websocket") {
         const upgraded = server.upgrade(req, { data: { connection: null } });
-        return upgraded ? undefined : new Response("Upgrade failed", { status: 400 });
+        return upgraded ? undefined : problem("invalidRequest", "Upgrade failed");
       }
       return Response.json({ collab: true, version: 1 });
     },

@@ -36,6 +36,7 @@ import { handleAiApi } from "./ai-api.ts";
 import { handleImportApi } from "./import-api.ts";
 import { mediaTypeForPath } from "@jxsuite/schema/media-type";
 import { existsSync, readFileSync } from "node:fs";
+import { problem } from "./problem.ts";
 
 /**
  * Resolve an npm-style bare specifier from a URL path via node_modules. Handles scoped packages
@@ -374,7 +375,9 @@ export async function createDevServer(options: {
             createdRoots.some((created) => containedPath(requested, created) !== null) ||
             isOwnedProjectDir(requested);
           if (!permitted) {
-            return Response.json({ ok: false, error: "root not permitted" }, { status: 403 });
+            // `ok: false` rides along as an extension member: the Studio client branches on it,
+            // And RFC 9457 §3.2 exists precisely so a problem can carry what a type documents.
+            return problem("forbidden", "root not permitted", { ok: false });
           }
           activeProjectRoot = requested;
           return Response.json({ ok: true, root: activeProjectRoot });
@@ -538,7 +541,7 @@ export async function createDevServer(options: {
            404s from the output looked like it worked and handed the reader whichever of the two
            happened to be missing. `site-preview.ts` gives the built site its own origin instead,
            where every path has exactly one meaning. */
-        return new Response("Not found", { status: 404 });
+        return problem("notFound", "Not found");
       }
 
       // Inject the live-reload script into served HTML — but NOT into the Studio editor.

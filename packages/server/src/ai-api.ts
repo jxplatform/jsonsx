@@ -19,6 +19,8 @@
  *
  * @license MIT
  */
+import { problem, problemTypeForStatus } from "./problem.ts";
+import { problemDetails } from "@jxsuite/protocol";
 
 // ─── Configuration ───────────────────────────────────────────────────────────
 
@@ -141,15 +143,15 @@ function writeSSE(controller: ReadableStreamDefaultController, event: unknown): 
   controller.enqueue(new TextEncoder().encode(`data: ${data}\n\n`));
 }
 
-/** Write a JSON error response (for non-streaming endpoints and error cases). */
+/**
+ * Write a failure response for the non-streaming endpoints.
+ *
+ * The status is chosen by the caller here rather than by the type, because this file's callers
+ * forward an upstream provider's status — which is information, and collapsing it to the type's own
+ * would throw it away.
+ */
 function jsonError(status: number, message: string): Response {
-  return Response.json(
-    { error: message },
-    {
-      status,
-      headers: { "Content-Type": "application/json" },
-    },
-  );
+  return problem(problemTypeForStatus(status), message);
 }
 
 // ─── /__studio/ai/chat — SSE streaming proxy ───────────────────────────────
@@ -233,9 +235,16 @@ export async function handleChat(req: Request): Promise<Response> {
         if ((error as Error).name === "AbortError") {
           writeSSE(controller, { type: "done", stopReason: "cancelled" });
         } else {
+          const message = `Network error: ${(error as Error).message}`;
           writeSSE(controller, {
+            message,
+            /*
+             * The frame carries a problem rather than being one: the response began with a 200
+             * long before this failed, so nothing can change the status now. `message` stays for
+             * the readers that already show it (server.md §4.3).
+             */
+            problem: problemDetails("upstreamFailure", message),
             type: "error",
-            message: `Network error: ${(error as Error).message}`,
           });
         }
         controller.close();
@@ -264,9 +273,11 @@ export async function handleChat(req: Request): Promise<Response> {
           /* Not JSON — use the raw body. */
         }
         writeSSE(controller, {
-          type: "error",
-          message: cleanMessage,
           code: String(response.status),
+          message: cleanMessage,
+          // The upstream's own status is preserved in `code`; the problem names the KIND.
+          problem: problemDetails(problemTypeForStatus(response.status), cleanMessage),
+          type: "error",
         });
         controller.close();
         return;
@@ -274,7 +285,11 @@ export async function handleChat(req: Request): Promise<Response> {
 
       const reader = response.body?.getReader();
       if (!reader) {
-        writeSSE(controller, { type: "error", message: "No response body from upstream" });
+        writeSSE(controller, {
+          message: "No response body from upstream",
+          problem: problemDetails("upstreamFailure", "No response body from upstream"),
+          type: "error",
+        });
         controller.close();
         return;
       }
@@ -407,9 +422,11 @@ export async function handleChat(req: Request): Promise<Response> {
           controller.close();
           return;
         }
+        const message = `Stream error: ${(error as Error).message}`;
         writeSSE(controller, {
+          message,
+          problem: problemDetails("upstreamFailure", message),
           type: "error",
-          message: `Stream error: ${(error as Error).message}`,
         });
         controller.close();
       }
