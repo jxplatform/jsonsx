@@ -28,6 +28,8 @@ The interpreting runtime — the dev server, the Studio canvas, and `@jxsuite/ru
 `${}` templates are **full JavaScript**, not a sandbox. A template has the component's `state` in scope, but also the entire global environment, and it can assign or call side effects. Do not render a template built from untrusted input in the interpreting runtime.
 :::
 
+**This is two settings, permanently — not one with a fix pending.** A compiled site never needs `'unsafe-eval'`; a page hosting the interpreter always will. The interpreter _is_ the code that compiles expressions as it reads them, so "remove eval from the runtime" would mean removing the interpreter. Ship compiled output to production and the requirement is simply not there.
+
 ## Treat documents as code
 
 A Jx document is executable input. Loading and rendering an untrusted document in the interpreter runs its code; **compiling** an untrusted document runs its code at build time (template text becomes code in the bundle). Give a `.json` document the same trust you would give a `.js` file from the same source.

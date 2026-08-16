@@ -291,6 +291,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `spec.md`
 
+- **0.4.33-draft** (2026-08-16) — §21.5 two CSP profiles, permanently: compiled output never needs 'unsafe-eval' and the interpreting canvas always will. A Trusted Types policy guards the shell's one injection sink and refuses to build scripts; the runtime's four innerHTML writes became replaceChildren().
 - **0.4.32-draft** (2026-08-16) — §11.2a the Cookie prototype derives Secure/Path/Domain from a name prefix and from SameSite=None; HttpOnly and Expires are absent on purpose; a cookie name is data, never pattern syntax.
 - **0.4.31-draft** (2026-08-16) — Shadow DOM opt-in: $shadow and defaults.shadow emit a declarative shadow root the element adopts; :host translation keeps one style object valid in both modes (§16.6).
 - **0.4.30-draft** (2026-08-16) — §9.1 and §16.6: style scoping is a tag-name prefix and generated classes, not data-jx attribute selectors; cite the light-DOM divergence.
