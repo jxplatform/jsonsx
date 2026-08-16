@@ -155,3 +155,63 @@ export function isUnregisteredMediaType(value: unknown): boolean {
   const media = parseMediaType(value);
   return media !== null && (media.tree === "x" || media.subtype.startsWith("x-"));
 }
+
+/**
+ * `text/markdown` with the flavour Jx actually parses, per RFC 7763 §2 and the `variant` values RFC
+ * 7764 registers. Bare `text/markdown` is a family, not a syntax — the `variant` is the only thing
+ * on the wire that says which dialect a `.md` file is written in.
+ */
+export const MARKDOWN_MEDIA_TYPE = "text/markdown; variant=GFM";
+
+/**
+ * YAML's registered media type, per RFC 9512 §4.
+ *
+ * Deliberately **not** `text/yaml`. RFC 9512 §5 names `text/yaml`, `text/x-yaml` and
+ * `application/x-yaml` as the pre-registration spellings and asks new implementations not to use
+ * them — but they are still what most platform lookup tables answer, Bun's included, so serving a
+ * `.yaml` file without an opinion here means serving a deprecated type.
+ */
+export const YAML_MEDIA_TYPE = "application/yaml";
+
+/**
+ * The media type Jx serves a file extension with, where the platform's own table is absent or
+ * disagrees with the registration.
+ *
+ * This is not a general MIME table and must not grow into one: every host already has one for the
+ * ordinary types, and duplicating those would create a second source of truth for `image/png`. What
+ * is here is the short list where the platform answer is **wrong**, which is why each entry carries
+ * the RFC that makes it wrong:
+ *
+ * - `.md` — every table answers bare `text/markdown`, which does not say which markdown (RFC 7763,
+ *   RFC 7764). Jx knows: its parser is GFM, and the format class declares exactly this.
+ * - `.yaml`/`.yml` — Bun answers `text/yaml` and Node's tables usually answer nothing at all;
+ *   `application/yaml` is the registration (RFC 9512).
+ *
+ * Keys are lower-cased extensions including the dot; values carry `charset` because both types are
+ * text and a browser that guesses the encoding of a UTF-8 document guesses wrong for exactly the
+ * non-Latin content the rest of this repo works to support.
+ */
+export const MEDIA_TYPE_BY_EXTENSION: Readonly<Record<string, string>> = {
+  ".markdown": `${MARKDOWN_MEDIA_TYPE}; charset=utf-8`,
+  ".md": `${MARKDOWN_MEDIA_TYPE}; charset=utf-8`,
+  ".yaml": `${YAML_MEDIA_TYPE}; charset=utf-8`,
+  ".yml": `${YAML_MEDIA_TYPE}; charset=utf-8`,
+};
+
+/**
+ * The media type for a path, or null to leave the host's own answer alone.
+ *
+ * Null is the common case and the point: a host calls this to _correct_ its table, not to replace
+ * it, so anything absent from {@link MEDIA_TYPE_BY_EXTENSION} keeps whatever the host already
+ * decided.
+ *
+ * @param {string} path - A file path or name; only its extension is read
+ * @returns {string | null}
+ */
+export function mediaTypeForPath(path: string): string | null {
+  const dot = path.lastIndexOf(".");
+  if (dot <= path.lastIndexOf("/") || dot <= path.lastIndexOf("\\")) {
+    return null;
+  }
+  return MEDIA_TYPE_BY_EXTENSION[path.slice(dot).toLowerCase()] ?? null;
+}

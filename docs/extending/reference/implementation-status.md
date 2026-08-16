@@ -21,10 +21,10 @@ This page is generated from the `> **Status: …**` markers in the specification
 | `extensions.md`           | 0.3.7-draft  | Partial     | 2026-08-15 |
 | `imports.md`              | 0.1.9-draft  | Partial     | 2026-08-15 |
 | `jx-markdown.md`          | 0.1.8-draft  | Partial     | 2026-08-15 |
-| `parser.md`               | 0.2.7-draft  | Partial     | 2026-08-15 |
+| `parser.md`               | 0.2.8-draft  | Partial     | 2026-08-16 |
 | `relationships.md`        | 0.1.4-draft  | Partial     | 2026-08-15 |
 | `schema.md`               | 0.4.7-draft  | Partial     | 2026-08-16 |
-| `server.md`               | 0.2.3        | Implemented | 2026-08-16 |
+| `server.md`               | 0.2.4        | Implemented | 2026-08-16 |
 | `site-architecture.md`    | 0.5.5-draft  | Partial     | 2026-08-16 |
 | `spec.md`                 | 0.4.31-draft | Partial     | 2026-08-16 |
 | `standards.md`            | 0.1.10-draft | Partial     | 2026-08-16 |

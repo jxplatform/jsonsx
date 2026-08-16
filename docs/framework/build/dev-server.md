@@ -98,6 +98,8 @@ Extensions that declare server mounts (for example the data API) are served unde
 
 Anything the other routes don't claim is served from disk: files under `root` at their natural URLs, then files under the active Studio project, then the project's `public/` directory mapped to the site root — mirroring where assets live in production. Bare npm specifiers in URLs (such as `@jxsuite/parser/…`) are resolved through `node_modules`, bundled on demand with `Bun.build`, and cached for the life of the server. All responses are sent with `Cache-Control: no-cache` so a plain reload never serves a stale bundle.
 
+Content types come from Bun's own inference, with two corrections: a `.md` file is sent as `text/markdown; variant=GFM` (bare `text/markdown` doesn't say which markdown), and a `.yaml` file as `application/yaml` rather than the deprecated `text/yaml`. Every other extension keeps the inferred type.
+
 ## Related
 
 - [CLI commands](/docs/framework/build/cli) — what `bun create @jxsuite` scaffolds and what `jx` can run

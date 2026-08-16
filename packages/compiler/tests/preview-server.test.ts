@@ -18,6 +18,8 @@ beforeAll(() => {
   writeFileSync(join(TMP, "about/index.html"), "<h1>About</h1>", "utf8");
   writeFileSync(join(TMP, "style.css"), "body{}", "utf8");
   writeFileSync(join(TMP, "404.html"), "<h1>Missing</h1>", "utf8");
+  writeFileSync(join(TMP, "readme.md"), "# Hi", "utf8");
+  writeFileSync(join(TMP, "data.yaml"), "a: 1\n", "utf8");
 
   server = startPreviewServer(TMP, 0);
   const { port } = server.address() as AddressInfo;
@@ -68,6 +70,25 @@ describe("startPreviewServer", () => {
   test("serves assets with their mime type", async () => {
     const res = await fetch(`${base}/style.css`);
     expect(res.headers.get("content-type")).toContain("text/css");
+  });
+
+  /*
+   * The two extensions Jx has an opinion about. `text/markdown` alone does not say WHICH markdown
+   * (RFC 7763/7764), and `text/yaml` is the spelling RFC 9512 §5 asks implementations to retire —
+   * so neither the platform default nor "no entry, send octet-stream" is the right answer here.
+   */
+  test("serves markdown with the variant that names its flavour", async () => {
+    const res = await fetch(`${base}/readme.md`);
+    const type = res.headers.get("content-type") ?? "";
+    expect(type).toContain("text/markdown");
+    expect(type).toContain("variant=GFM");
+  });
+
+  test("serves yaml as application/yaml, not text/yaml or a download", async () => {
+    const res = await fetch(`${base}/data.yaml`);
+    const type = res.headers.get("content-type") ?? "";
+    expect(type).toContain("application/yaml");
+    expect(type).not.toContain("octet-stream");
   });
 
   test("falls back to 404.html", async () => {

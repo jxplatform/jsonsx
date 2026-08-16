@@ -12,6 +12,8 @@ function setupFixtures() {
   // Static files at server root
   writeFileSync(join(FIXTURES, "hello.txt"), "hello root");
   writeFileSync(join(FIXTURES, "page.html"), "<html><body><p>hi</p></body></html>");
+  writeFileSync(join(FIXTURES, "notes.md"), "# Notes");
+  writeFileSync(join(FIXTURES, "conf.yaml"), "a: 1\n");
 
   // Build entrypoint
   mkdirSync(join(FIXTURES, "src"), { recursive: true });
@@ -189,6 +191,31 @@ describe("createDevServer", () => {
       expect(builtRes.headers.get("cache-control")).toBe("no-cache");
       const htmlRes = await fetch(`${base}/page.html`);
       expect(htmlRes.headers.get("cache-control")).toBe("no-cache");
+    });
+
+    /*
+     * Bun infers a type from the extension and is right about almost everything; these two are the
+     * exceptions Jx corrects. Bare `text/markdown` does not say which markdown (RFC 7763/7764), and
+     * `text/yaml` is the spelling RFC 9512 §5 asks implementations to stop sending.
+     */
+    test("markdown is served with the variant that names its flavour", async () => {
+      const res = await fetch(`${base}/notes.md`);
+      const type = res.headers.get("content-type") ?? "";
+      expect(type).toContain("text/markdown");
+      expect(type).toContain("variant=GFM");
+      expect(res.headers.get("cache-control")).toBe("no-cache");
+    });
+
+    test("yaml is served as application/yaml, not the deprecated text/yaml", async () => {
+      const res = await fetch(`${base}/conf.yaml`);
+      const type = res.headers.get("content-type") ?? "";
+      expect(type).toContain("application/yaml");
+      expect(type).not.toContain("text/yaml");
+    });
+
+    test("an extension Jx has no opinion about keeps Bun's own inference", async () => {
+      const res = await fetch(`${base}/hello.txt`);
+      expect(res.headers.get("content-type")).toContain("text/plain");
     });
 
     test("serves html without SSE injection when watch is off", async () => {

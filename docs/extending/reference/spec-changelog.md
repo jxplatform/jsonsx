@@ -141,6 +141,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `parser.md`
 
+- **0.2.8-draft** (2026-08-16) — §3 the markdown variant and YAML media type are what hosts serve, not only what the class declares; gap:markdown-variant and gap:yaml-media-type closed.
 - **0.2.7-draft** (2026-08-15) — §9.3 records _meta.mtime as the date fallback a feed uses.
 - **0.2.6-draft** (2026-08-15) — Add §9.3 date coercion: schema-declared date fields normalize to RFC 3339, ambiguous values are refused rather than guessed.
 - **0.2.5-draft** (2026-08-15) — Add §10 Standards Alignment; §3 marked Partial — heading slugs and word counts are correct only for Latin script.
@@ -194,6 +195,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `server.md`
 
+- **0.2.4** (2026-08-16) — §3 static responses correct the two content types where the platform default disagrees with the registration.
 - **0.2.3** (2026-08-16) — §3.1 the SSE stream advertises retry: 500 and answers Last-Event-ID with one reload; gap:sse-reconnect closed.
 - **0.2.2** (2026-08-15) — Add §8 Standards Alignment; §4 and §4.2 marked Partial — the failure contract is unspecified and the project server does not gate uniformly.
 - **0.2.1** (2026-07-25) — Activation admits an existing project of the account's own (project.json under the home directory); a refused activation must surface as an error rather than fall back to the server root.

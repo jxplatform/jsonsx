@@ -9,6 +9,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { CLASS_METHOD_ROLES } from "../defs/class-def.schema";
 import { EXTENSION_CAPABILITIES } from "../src/format-registry";
+import { MEDIA_TYPE_BY_EXTENSION, mediaTypeEssence, parseMediaType } from "../src/media-type";
 import { generateClassSchema, validateClass, validateWithSchema } from "../src/schema";
 
 describe("class schema ↔ format-registry drift guard", () => {
@@ -66,6 +67,29 @@ describe("class schema ↔ format-registry drift guard", () => {
         throw new Error(`${file} failed class-schema validation: ${JSON.stringify(errors)}`);
       }
     }
+  });
+
+  /*
+   * Two statements of the same fact that live in files which cannot import each other: a format
+   * class is JSON, and a static file server has no format registry to consult. So a `.md` served
+   * off disk and a `.md` dispatched through the registry could quietly come to disagree about which
+   * markdown they are — which is the whole point of RFC 7763's `variant`. This is the join.
+   */
+  test("the served media type for an extension matches the class that claims it", () => {
+    const classFile = resolve(
+      import.meta.dir,
+      "../../../extensions/parser/src/Markdown.class.json",
+    );
+    const declared = (
+      JSON.parse(readFileSync(classFile, "utf8")) as { format?: { mediaType?: string } }
+    ).format?.mediaType;
+    const served = MEDIA_TYPE_BY_EXTENSION[".md"];
+
+    expect(mediaTypeEssence(declared)).toBe(mediaTypeEssence(served));
+    // The variant is the parameter that carries the flavour, so equal essences are not enough.
+    expect(parseMediaType(declared)?.parameters.variant).toBe(
+      parseMediaType(served)?.parameters.variant,
+    );
   });
 
   test("validateWithSchema validates against an arbitrary self-contained schema", async () => {

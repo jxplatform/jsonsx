@@ -2,7 +2,7 @@
 
 ## Development Server with Live Reload, Proxy Resolution, and Studio API
 
-**Version:** 0.2.3
+**Version:** 0.2.4
 **Status:** Implemented
 **Updated:** 2026-08-16
 **License:** MIT
@@ -68,7 +68,7 @@ The request path is matched in this order (`src/server.ts`):
 4. `/_jx/*` — extension server mounts
 5. `/__studio/*` — Studio API (collab WebSocket/probe, activate, AI proxy, site import, code services, then the main studio handler)
 6. Custom `middleware`
-7. Static files — the active project's extension asset mounts ([extensions.md §8.5](./extensions.md)), then the server root, then the active project root, then its `public/` (mirroring production), then npm bare specifiers resolved through `node_modules` and bundled on demand with `Bun.build`. Served HTML gets the live-reload client injected (except the Studio shell, which manages its own state); all responses carry `Cache-Control: no-cache`.
+7. Static files — the active project's extension asset mounts ([extensions.md §8.5](./extensions.md)), then the server root, then the active project root, then its `public/` (mirroring production), then npm bare specifiers resolved through `node_modules` and bundled on demand with `Bun.build`. Served HTML gets the live-reload client injected (except the Studio shell, which manages its own state); all responses carry `Cache-Control: no-cache`. Content types come from `Bun.file`'s own inference, corrected only where a registration disagrees with it — `.md` carries the `variant` that names its dialect and `.yaml` is `application/yaml` rather than the retired `text/yaml` (`MEDIA_TYPE_BY_EXTENSION` in `@jxsuite/schema/media-type`, shared with `jx preview`); every other extension keeps the inferred type.
 
 **Asset mounts.** A mount publishes a directory that may sit outside the project root — a content collection's co-located images — at the same site URL the built site will use, so a dev preview and a production page render identically. Each candidate is contained against the mount's own directory (lexical + realpath), and the URL→path mapping refuses `.`/`..`, empty segments, and still-encoded dots or slashes. Mounts come from the section owner's `assets` capability via the per-project context cache, so they refresh when `project.json` changes on disk. The desktop loopback server (`project-server.ts`) resolves them through the same `serveProjectFile` path.
 
@@ -231,6 +231,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.2.4** (2026-08-16) — §3 static responses correct the two content types where the platform default disagrees with the registration.
 - **0.2.3** (2026-08-16) — §3.1 the SSE stream advertises retry: 500 and answers Last-Event-ID with one reload; gap:sse-reconnect closed.
 - **0.2.2** (2026-08-15) — Add §8 Standards Alignment; §4 and §4.2 marked Partial — the failure contract is unspecified and the project server does not gate uniformly.
 - **0.2.1** (2026-07-25) — Activation admits an existing project of the account's own (project.json under the home directory); a refused activation must surface as an error rather than fall back to the server root.
@@ -248,4 +249,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/server` Specification v0.2.3_
+_`@jxsuite/server` Specification v0.2.4_

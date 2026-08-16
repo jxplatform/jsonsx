@@ -22,7 +22,7 @@ The parser's `Markdown.class.json` declares, verbatim:
 ```json
 "format": {
   "extensions": [".md"],
-  "mediaType": "text/markdown",
+  "mediaType": "text/markdown; variant=GFM",
   "documentKinds": ["page", "component", "content"],
   "exportTarget": true,
   "remote": false
@@ -61,6 +61,22 @@ Parameters are welcome and carry meaning. `@jxsuite/parser` declares `text/markd
 :::doc-note
 If you write code that **keys** on a media type — a file-picker `accept` map, an editor language id — use the _essence_ (`text/markdown`), not the declared string. `mediaTypeEssence` on the registry entry gives you that. Two Studio call sites broke the moment the `variant` parameter was declared, which is why the distinction exists.
 :::
+
+### What a static file server sends
+
+Your `format` block only reaches code that went through the registry. A `.md` file served straight off disk — by the dev server, or by `jx preview` — never touches it, and the platform's own table answers instead.
+
+For most extensions that's fine. For two it isn't, so Jx overrides them:
+
+| Extension       | Platform says           | Jx sends                     | Why                                                                  |
+| --------------- | ----------------------- | ---------------------------- | -------------------------------------------------------------------- |
+| `.md`           | `text/markdown`         | `text/markdown; variant=GFM` | Bare `text/markdown` doesn't say _which_ markdown ([RFC 7763][7763]) |
+| `.yaml`, `.yml` | `text/yaml`, or nothing | `application/yaml`           | `text/yaml` is the pre-registration spelling ([RFC 9512][9512] §5)   |
+
+[7763]: https://www.rfc-editor.org/rfc/rfc7763
+[9512]: https://www.rfc-editor.org/rfc/rfc9512
+
+Everything else keeps whatever the host already decided — this list corrects a lookup, it isn't a second MIME table. A test asserts that the `.md` entry and the parser's declared `mediaType` agree, because they live in files that can't import each other.
 
 ## Format capabilities
 

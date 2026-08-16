@@ -34,6 +34,7 @@ import {
 import { handleCodeApi } from "./code-api.ts";
 import { handleAiApi } from "./ai-api.ts";
 import { handleImportApi } from "./import-api.ts";
+import { mediaTypeForPath } from "@jxsuite/schema/media-type";
 import { existsSync, readFileSync } from "node:fs";
 
 /**
@@ -255,8 +256,19 @@ export async function createDevServer(options: {
   // Studio.js/canvas bundle — which shows up as half-updated UI after a rebuild (the iframe assets
   // Are query-cache-busted per mount, the parent bundle is not).
   const NO_CACHE = { "Cache-Control": "no-cache" };
-  const fileResponse = (file: ReturnType<typeof Bun.file>) =>
-    new Response(file, { headers: NO_CACHE });
+  /*
+   * `Bun.file` already infers a type from the extension, and for almost everything it is right. The
+   * exceptions are the two RFCs Jx has an opinion about: `.md` comes back as bare `text/markdown`
+   * with no `variant`, and `.yaml` comes back as `text/yaml`, the spelling RFC 9512 §5 asks
+   * implementations to stop using. `mediaTypeForPath` answers null everywhere else, so the
+   * inference stays in charge of the ordinary cases.
+   */
+  const fileResponse = (file: ReturnType<typeof Bun.file>) => {
+    const corrected = file.name === undefined ? null : mediaTypeForPath(file.name);
+    return new Response(file, {
+      headers: corrected === null ? NO_CACHE : { ...NO_CACHE, "Content-Type": corrected },
+    });
+  };
 
   // Active studio project root (set via /__studio/activate, used for static file fallback)
   let activeProjectRoot: string | null = null;
