@@ -24,7 +24,7 @@ This page is generated from the `> **Status: …**` markers in the specification
 | `parser.md`               | 0.2.8-draft  | Partial     | 2026-08-16 |
 | `relationships.md`        | 0.1.4-draft  | Partial     | 2026-08-15 |
 | `schema.md`               | 0.4.8-draft  | Partial     | 2026-08-16 |
-| `server.md`               | 0.2.6        | Implemented | 2026-08-16 |
+| `server.md`               | 0.2.7        | Implemented | 2026-08-16 |
 | `site-architecture.md`    | 0.5.8-draft  | Partial     | 2026-08-16 |
 | `spec.md`                 | 0.4.31-draft | Partial     | 2026-08-16 |
 | `standards.md`            | 0.1.12-draft | Partial     | 2026-08-16 |
@@ -38,7 +38,6 @@ This page is generated from the `> **Status: …**` markers in the specification
 - `ai.md` §2 — Provider Contract
 - `compiler.md` §3 — Output Tiers
 - `parser.md` §3 — `Markdown` — the markdown format class
-- `server.md` §4.2 — Security
 - `site-architecture.md` §9.4 — Studio Media Browser
 - `site-architecture.md` §13 — Internationalization
 - `site-architecture.md` §13.6 — Locale Negotiation

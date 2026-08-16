@@ -35,6 +35,7 @@ import type { ImportApiOptions } from "./import-api.ts";
 import {
   decodeAndNormalizePath,
   loopbackGate,
+  originHostGate,
   serveContained,
   serveProjectFile,
 } from "./net-guard.ts";
@@ -125,8 +126,17 @@ export function createProjectServer(options: CreateProjectServerOptions): Projec
         return problem("invalidRequest", "Upgrade failed");
       }
 
-      // 2. AI SSE — keep the existing handleAiApi behavior (rewrite the studio-ai prefix).
+      /*
+       * 2. AI proxy. Gated with the token, like every other surface that spends something: this
+       *    route forwards to a provider on the user's key, so an ungated one is an open relay for
+       *    any local process — and it was dispatched ahead of every gate. The token is what the
+       *    desktop shell appends to this URL; a request without one is refused.
+       */
       if (normPath.startsWith("/__studio__/ai/")) {
+        const gate = loopbackGate(req, url, rpcToken);
+        if (gate) {
+          return gate;
+        }
         const aiUrl = new URL(req.url);
         aiUrl.pathname = normPath.replace("/__studio__/ai/", "/__studio/ai/");
         const aiResponse = await handleAiApi(req, aiUrl);
@@ -182,9 +192,21 @@ export function createProjectServer(options: CreateProjectServerOptions): Projec
         return problem("notFound", "No project");
       }
 
-      // 4b. Extension server mounts (/_jx/data etc.) — registry-driven, same wire contract as
-      //     The generated site worker and the dev server (specs/extensions.md §11).
+      /*
+       * 4b. Extension server mounts (/_jx/data etc.) — registry-driven, same wire contract as the
+       *     generated site worker and the dev server (specs/extensions.md §11).
+       *
+       *     Gated on **Origin/Host and Fetch Metadata, not the token**, and the distinction is the
+       *     point: these are fetched by the canvas iframe's own page, whose requests carry no
+       *     `?token=` — a page cannot rewrite the URLs its own content asks for. So the token is
+       *     the wrong instrument here and the origin check is the right one. The policy is
+       *     `embeddable` because that iframe is cross-origin by construction.
+       */
       if (normPath.startsWith("/_jx/")) {
+        const gate = originHostGate(req, "embeddable");
+        if (gate) {
+          return gate;
+        }
         const mountRes = await handleJxMounts(req, url, root);
         if (mountRes) {
           return mountRes;
@@ -207,8 +229,17 @@ export function createProjectServer(options: CreateProjectServerOptions): Projec
         return handleServerFunction(req, root);
       }
 
-      // 6. Project files at natural URLs, including extension asset mounts (§8.5) — that is what
-      // Lets a canvas preview show an image a content entry references relative to itself.
+      /*
+       * 6. Project files at natural URLs, including extension asset mounts (§8.5) — that is what
+       *    lets a canvas preview show an image a content entry references relative to itself.
+       *
+       *    `embeddable`, for the same reason as the mounts: these ARE the canvas iframe's
+       *    subresources, and a cross-origin iframe's images arrive `cross-site`.
+       */
+      const staticGate = originHostGate(req, "embeddable");
+      if (staticGate) {
+        return staticGate;
+      }
       const fileRes = await serveProjectFile(normPath, root, await projectAssetMounts(root));
       if (fileRes) {
         return fileRes;

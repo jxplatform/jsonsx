@@ -1,6 +1,6 @@
 # Standards Adoption Program
 
-**Status: build track complete (B1–B15), services track not started (S1–S9).** Branch: `feat/standards-registry`. Started 2026-08-14.
+**Status: build track complete (B1–B15); §4.1 and §4.11 closed; services track S1–S2 shipped, S3–S9 remain.** Branch: `claude/standards-adoption-impl-4f3ald` (was `feat/standards-registry`). Started 2026-08-14.
 
 This document is the working plan **and** the status board. It was migrated into the repository so the program can be continued from anywhere — everything needed to pick up the next phase is here, including the operational knowledge that is not derivable from the code.
 
@@ -14,7 +14,7 @@ That gap was not cosmetic. It showed up as real defects: a redirect shape the sc
 
 **Intended outcome:** every standard Jx relies on is cited next to the contract it binds, in a table a machine reads; every standard it _should_ rely on and does not is a tracked, addressable gap; and the highest-leverage gaps are closed.
 
-**Current state:** 103 bindings across 16 specs, 8 standards on the adoption backlog, and a green `bun run docs:standards`.
+**Current state:** 108 bindings across 16 specs, 7 standards on the adoption backlog, 12 gaps closed and 12 remaining, and a green `bun run docs:standards`.
 
 ## 1\. Decisions taken — do not re-litigate
 
@@ -61,14 +61,14 @@ PR 0 shipped `specs/standards.md` (the contract), `scripts/docs/lib/standards.ts
 | B14 | Opt-in Declarative Shadow DOM            | ✅     | 1d9954b4 4a8f2e59 |
 | B15 | Media types + I-JSON                     | ✅     | 3e7db19e 1934e7c1 |
 
-**B11 is the one partial.** Discovery shipped (alternates in `<head>` and the sitemap). **Negotiation did not**: nothing reads `Accept-Language`, so a bare `/` always serves the default locale, and RFC 4647 lookup is unimplemented. See §4.1.
+**B11 is complete.** Discovery shipped first (alternates in `<head>` and the sitemap); negotiation followed — see §4.1, now closed.
 
 ### Services track — not started
 
 | PR  | Title                               | Status | Depends on |
 | --- | ----------------------------------- | ------ | ---------- |
-| S1  | RFC 9457 Problem Details            | ◻      | —          |
-| S2  | Fetch Metadata + loopback hardening | ◻      | —          |
+| S1  | RFC 9457 Problem Details            | ✅     | —          |
+| S2  | Fetch Metadata + loopback hardening | ✅     | —          |
 | S3  | Collab subprotocol                  | ◻      | —          |
 | S4  | Auth hardening (RFC 8252 + cookies) | ◻      | S2         |
 | S5  | ECMA-402 + Unicode                  | ◻      | —          |
@@ -76,6 +76,27 @@ PR 0 shipped `specs/standards.md` (the contract), `scripts/docs/lib/standards.ts
 | S7  | ATAG Part B surface                 | ◻      | S6         |
 | S8  | Trusted Types + Studio-shell CSP    | ◻      | —          |
 | S9  | WebDriver BiDi for screenshots      | ◻      | —          |
+
+### Smaller items track — complete
+
+Everything §4.11 named, plus two red gates the work uncovered:
+
+| Item                                                                      | Status |
+| ------------------------------------------------------------------------- | ------ |
+| `gap:bcp47-locale-validation` — a schema `pattern` on the language tags   | ✅     |
+| `gap:sse-reconnect` — `retry:` and one reload on `Last-Event-ID`          | ✅     |
+| `gap:markdown-variant`, `gap:yaml-media-type` — what hosts actually serve | ✅     |
+| `gap:link-relation-validation` — the IANA registry, checked               | ✅     |
+| `gap:identifier-syntax` — UAX #31 §R4 at the parse boundary               | ✅     |
+| `gap:sitemap-fields` — a generated route's own `<lastmod>`                | ✅     |
+| BCP 14 — `standards.md` §12, gated by `docs:status`                       | ✅     |
+| ECMA-426 source maps — recorded `Rejected`                                | ✅     |
+| RFC 7464 — already `Rejected`; the NDJSON drop counter shipped            | ✅     |
+
+**Two gates were already red before any of this work**, and both are worth remembering as a pattern:
+
+- `bun run schema:verify` failed on the branch: B8b, B13 and B14 each added a project-config key and none re-ran `generate:schema`, so the committed core schema and all 25 per-project entry documents described a config three phases behind the compiler. **A phase that changes `defs/` must run `generate:schema` and `schema:generate-all`, not one or the other.**
+- The container's Bun was one patch behind the CI pin, which produced **29 phantom test failures** in `packages/schema` from an ajv ESM-interop difference. Match `.github/actions/setup-bun` before believing a failure.
 
 ## 3\. What the build track actually shipped
 
@@ -97,7 +118,16 @@ Read this before touching any of it — several phases established contracts lat
 
 ## 4\. Remaining work
 
-### 4.1 i18n negotiation — the open half of B11
+### 4.1 i18n negotiation — the open half of B11 ✅ **shipped**
+
+> Shipped as `packages/compiler/src/site/locale-negotiation.ts`, with `site-architecture.md` §13.6.
+> The design below was followed; two things are worth carrying forward. The negotiation is
+> **middleware, not a route** — when the negotiated locale is the one `/` already serves the request
+> has to continue down whatever chain the adapter uses, and a route would have to reproduce it. And
+> the algorithm exists twice, in TypeScript and as the JavaScript the worker gets, because the worker
+> bundles from the _project_ root and cannot import the compiler; a test evaluates the emitted source
+> and drives it through the same corpus as the implementation, which is the only thing standing
+> between two copies and a silent divergence.
 
 `gap:locale-lookup` (RFC 4647) and the `Accept-Language` half of RFC 9110 §12.5.4.
 
@@ -110,7 +140,15 @@ Discovery is done. What is missing is sending a visitor to their own language, w
 
 Also still open here: **`{locale}` in a collection `source` is not expanded** (§13.3 is `Pending`), and **`prefix-always` is accepted but not enforced** — a page outside the locale tree still builds and serves as the default locale.
 
-### 4.2 S1 — RFC 9457 Problem Details
+### 4.2 S1 — RFC 9457 Problem Details ✅ **shipped**
+
+> Shipped as `packages/protocol/src/{problem,problems}.ts`, `packages/server/src/problem.ts` and
+> `packages/server/scripts/check-error-shapes.ts`, with `server.md` §4.3. The plan held, including
+> the `error`-alias sequencing and all three "would be wrong" exemptions. Two things it did not
+> anticipate: **401 and 403 needed separate types** (the status belongs to the type, and collapsing
+> them made a missing API key indistinguishable from a refused root), and `gitPull`'s documented
+> `409 {conflicts}` was **structurally impossible** to produce — `runGit` threw `stderr` alone and
+> git writes every CONFLICT line to stdout. Both are fixed.
 
 `@jxsuite/protocol` is the home: the only package both the server and Studio already depend on. Two new files — `problem.ts` (shape and constructors) and `problems.ts` (a `PROBLEM_TYPES` registry in `STUDIO_ROUTES`'s exact idiom, so the same generator and drift machinery applies).
 
@@ -126,7 +164,15 @@ Guard regrowth with `packages/server/scripts/check-error-shapes.ts` in `check-st
 
 Gaps closed: `gap:backend-failure-contract`, `gap:studio-problem-details`, `gap:studio-error-reader`, `gap:ai-problem-details`.
 
-### 4.3 S2 — Fetch Metadata and loopback hardening
+### 4.3 S2 — Fetch Metadata and loopback hardening ✅ **shipped**
+
+> Shipped in `packages/server/src/net-guard.ts`, with `server.md` §4.2. Everything the design named
+> landed, including the `embeddable` policy and the `fetchMetadataAbsentIsAccepted` test. One thing
+> it did not: tokening `/__studio__/ai/*` meant the desktop had to append the token, and
+> `ai-models.ts` derived the models URL with `chatUrl.replace(/\/chat$/, …)` — a regex anchored on
+> the end of the string, which silently stopped matching the moment a query appeared and would have
+> pointed the models request at the chat endpoint. **A "one-line" gate change reached three
+> packages.**
 
 One predicate folded into the existing `originHostGate`, so **zero new call sites**. `Sec-Fetch-Site: same-origin`/`none` allow; `cross-site` allows only a top-level document navigation; `same-site` **denies** — stricter than the standard Resource Isolation Policy and justified: on `127.0.0.1` there is no meaningful "site" broader than the origin, so `same-site` means a different port on the same host, which is precisely the other-local-process threat the loopback bind cannot address.
 
@@ -232,7 +278,7 @@ Contained to `scripts/screenshots/`, which is what the shot contract requires (n
 
 **If BiDi cannot drive `__jxAutomation`'s `idle()` handshake, abandon it and record a `Rejected` row with the reason** — that is exactly what the Rejected class is for.
 
-### 4.11 Smaller open items
+### 4.11 Smaller open items ✅ **all shipped** — kept for the reasoning
 
 - **`gap:sitemap-fields`** — a page generated from a template reports the template's `<lastmod>`. Entries now carry `_meta.mtime` (`parser.md` §9.3), so the data exists; routing it through `$paths` expansion is the remaining work. **Attempted once and reverted**: `Content.resolvePaths` could not be shown to run in a probe build even after rebuilding `dist`. Do not re-attempt without first proving the hook is reached.
 - **`gap:sse-reconnect`** — `retry: 500` on `/__reload` is one line and worth it. Full `id:`/`Last-Event-ID` replay is not. Emit an id purely to arm the header, no buffer, and on a reconnect carrying `Last-Event-ID` push one reload. The comment must say this is deliberately not replay, so nobody later "completes" it.
@@ -250,13 +296,13 @@ Worth naming as a pattern, not just as two fixes. A phase that closes a gap must
 - The RFC 9110 redirect row still said "only 301 and 302 are documented" three phases after B1 shipped all five. Its gap id is now retired; the row states what the build does.
 - `gap:bcp47-locale-validation` still said "nothing reads the key" after B9 made the compiler read it. Narrowed to the half that is still true — the schema, not the build.
 
-Both were found by diffing the gap ids this document names against the ids the specs actually carry. That diff is cheap, should come out empty, and is worth re-running after every phase:
+Both were found by diffing the gap ids this document names against the ids the specs actually carry. That diff is cheap and worth re-running after every phase — but it must read **table rows only**. A closed gap keeps being named in the spec's changelog entry that closed it, and a naive `grep` counts those as live:
 
 ```
-grep -o 'gap:[a-z0-9][a-z0-9-]*' STANDARDS-ADOPTION.md | LC_ALL=C sort -u > /tmp/planned
-rg -o 'gap:[a-z0-9][a-z0-9-]*' specs/*.md | sed 's/^.*gap:/gap:/' | LC_ALL=C sort -u > /tmp/actual
-LC_ALL=C comm -3 /tmp/planned /tmp/actual
+rg '^\| \[' specs/*.md | grep -o 'gap:[a-z0-9][a-z0-9-]*' | LC_ALL=C sort -u
 ```
+
+Everything that prints is a gap a row still carries. `gap:example-only` is reserved for `standards.md` §4.4's worked examples and names no work.
 
 ## 5\. The adoption backlog
 

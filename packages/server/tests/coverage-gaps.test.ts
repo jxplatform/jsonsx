@@ -310,11 +310,22 @@ describe("project server — coverage gaps", () => {
     expect(body.type).toBe("https://jxsuite.com/problems/invalid-request");
   });
 
-  test("answers the AI models listing under the studio namespace", async () => {
-    const res = await fetch(`${projectServer.url}/__studio__/ai/models`);
+  test("answers the AI models listing under the studio namespace, with the token", async () => {
+    const res = await fetch(
+      `${projectServer.url}/__studio__/ai/models?token=${projectServer.rpcToken}`,
+    );
     expect(res.status).toBe(200);
     const body = (await res.json()) as { models: unknown[] };
     expect(Array.isArray(body.models)).toBe(true);
+  });
+
+  /*
+   * The route forwards to a provider on the user's own key, so an ungated one is an open relay for
+   * any process on the machine — and it was dispatched ahead of every gate.
+   */
+  test("refuses the AI proxy without the token", async () => {
+    const res = await fetch(`${projectServer.url}/__studio__/ai/models`);
+    expect(res.status).toBe(403);
   });
 
   test("dispatches /_jx to the project's extension mounts", async () => {

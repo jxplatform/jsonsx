@@ -238,7 +238,13 @@ describe("chromium platform: search, formats and packages", () => {
 // ─── AI assistant helpers (HTTP, not WebSocket) ─────────────────────────────
 
 describe("chromium platform: AI assistant endpoints", () => {
-  test("aiChatUrl points at the chromium AI chat route", () => {
-    expect(platform.aiChatUrl()).toBe("/__studio__/ai/chat");
+  /*
+   * Tokened, like every surface that spends something: the route forwards to a provider on the
+   * user's own key, so an ungated one is an open relay for any process on the machine.
+   */
+  test("aiChatUrl points at the chromium AI chat route, carrying the token", () => {
+    const url = new URL(platform.aiChatUrl(), "http://127.0.0.1");
+    expect(url.pathname).toBe("/__studio__/ai/chat");
+    expect(url.searchParams.get("token")).not.toBeNull();
   });
 });

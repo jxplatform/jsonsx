@@ -401,7 +401,7 @@ describe("misc surfaces", () => {
   test("an unmatched AI route falls through to a project-file 404", async () => {
     // HandleAiApi returns null for a non-AI/unknown path; the request then falls through to the
     // Project-file lookup (no such file) and 404s. This exercises the AI prefix-rewrite branch.
-    expect(await statusOf(`${base}/__studio__/ai/does-not-exist`)).toBe(404);
+    expect(await statusOf(`${base}/__studio__/ai/does-not-exist?token=${token}`)).toBe(404);
   });
 
   test("a bare npm specifier is resolved and bundled", async () => {

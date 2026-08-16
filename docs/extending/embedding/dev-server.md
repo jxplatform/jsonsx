@@ -54,11 +54,16 @@ The dev server and the desktop's `createProjectServer` share one set of primitiv
 
 - **Loopback bind** (`127.0.0.1`) by default is the primary control — other local processes and LAN pages can't read a loopback page's location. A `hostname` option (`jx dev --host`) can widen the bind for containers, but that removes the control and should only be used behind trusted isolation.
 - **Origin/Host gate** guards every privileged surface — the RCE-capable `/__jx_resolve__` / `/__jx_server__` routes, the `/_jx/` mounts, and the whole `/__studio/*` API. A loopback (or absent) Origin passes; a cross-origin Origin or a rebinding Host is rejected. The browser Studio and the served site are same-origin, so they pass — a malicious external page does not. The dev server needs no token because it is same-origin; the desktop server, whose canvas iframe is cross-origin, adds a per-server token on top.
+- **Fetch Metadata** is read on the same surfaces. `Sec-Fetch-Site` says what a request _intends_, which `Origin` can't: a same-origin `GET` sends no `Origin` at all, so that check has to accept an absent one. `same-origin` and `none` pass; `cross-site` passes only as a top-level document navigation (a person clicking a link); **`same-site` is rejected** — on loopback there's no "site" bigger than the origin, so `same-site` means _another port on your machine_. A request with no `Sec-Fetch-*` at all passes, because curl, Bun's fetch and the desktop bridge don't send it and the threat here is a browser page, which always does.
 - **File containment** (`containedPath`) pairs a lexical `relative()` check with a `realpath` re-check, so a `../` or absolute path can't escape and a symlink can't point outside the project root. It guards static serving, `assertAccessible` for the filesystem API, and every `$src` / `$base` / `$implementation` resolved before a dynamic `import()`. Over-encoded paths are rejected after a single decode.
 - **Two-root activation**: `assertAccessible(filePath, root, activeProjectRoot)` allows a path under the server root or the project root Studio bound via `POST /__studio/activate`. Activation itself accepts four kinds of root: one contained under the server root, an explicit `allowedRoots` entry, a project this server just created, or a project the account already owns — an absolute directory holding a `project.json` under the user's home directory. That last kind is what opens an _existing_ project: projects normally live outside whatever tree the server happens to serve. Anything else is a `403`, and a refused activation is an error to show the user — the endpoints that take no `dir` (the git surface especially) fall back to the server's own root, so swallowing the refusal would quietly act on the wrong tree.
 
 :::doc-warning
 The resolve proxies import and execute arbitrary project code by design. Keep the loopback bind, and if you must widen it, put the server behind trusted isolation — the Origin/Host gate assumes the network itself is not hostile.
+:::
+
+:::doc-note
+**No response ever carries an `Access-Control-Allow-` header.** The entire model rests on the browser refusing cross-origin reads, so one CORS header would give that away. A check enforces the absence rather than trusting it — nothing in the code makes a load-bearing absence visible.
 :::
 
 ## Related

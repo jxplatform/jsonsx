@@ -199,6 +199,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `server.md`
 
+- **0.2.7** (2026-08-16) — §4.2 Fetch Metadata on every gated surface, the loopback block, a constant-time token, and the three ungated project-server routes closed; gap:fetch-metadata closed.
 - **0.2.6** (2026-08-16) — §4.3 every failure is an RFC 9457 problem document, guarded; gitPull produces the 409 the route table publishes; gap:studio-problem-details closed.
 - **0.2.5** (2026-08-16) — §5 and §8 record the source-map decision — a constant header offset is not a source map (ECMA-426, Rejected).
 - **0.2.4** (2026-08-16) — §3 static responses correct the two content types where the platform default disagrees with the registration.

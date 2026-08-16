@@ -478,9 +478,15 @@ export function createDesktopPlatform() {
       );
     },
 
-    // AI Assistant (Stack B: OpenAI-compatible SSE proxy on the local chromium server)
+    /*
+     * AI Assistant (Stack B: OpenAI-compatible SSE proxy on the local chromium server).
+     *
+     * Tokened, like every other surface that spends something. The route forwards to a provider on
+     * the user's own key, so an ungated one is an open relay for any process on the machine — and
+     * the project server dispatched it ahead of every gate until it was closed (server.md §4.2).
+     */
     aiChatUrl() {
-      return "/__studio__/ai/chat";
+      return `/__studio__/ai/chat?token=${encodeURIComponent(token)}`;
     },
   };
 
