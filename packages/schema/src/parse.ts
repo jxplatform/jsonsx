@@ -4,10 +4,17 @@
  * Raw `JSON.parse()` returns `any`, which silently disables checking for everything downstream.
  * These helpers are the single sanctioned crossing point: they parse, structurally verify, and
  * return the domain type — failures carry the source path.
+ *
+ * Being the single crossing point is also what makes it the right place to enforce I-JSON (RFC
+ * 7493). `JSON.parse` accepts documents that mean something other than what they say — a repeated
+ * key whose first value it discards, an integer it rounds — and a Jx document does not stay JSON:
+ * it round-trips through markdown frontmatter and a CRDT, each rebuilding the object from the
+ * parsed value. Whatever was dropped here is dropped for good.
  */
 
 import type { JxClassDef, JxDocument, ProjectConfig } from "../types";
 import { isJsonObject } from "./guards";
+import { describeIJsonProblem, findIJsonProblems } from "./ijson";
 
 // ─── Error helpers ──────────────────────────────────────────────────────────────
 
@@ -34,6 +41,16 @@ function parseObject(text: string, sourcePath: string, what: string): Record<str
   }
   if (!isJsonObject(parsed)) {
     throw new Error(`Invalid ${what} at ${sourcePath}: expected a JSON object`);
+  }
+  /*
+   * An error rather than a warning, because both problems are silent data loss and neither has a
+   * reading under which the author got what they wrote. The whole repository — 375 documents —
+   * was already clean when this landed, so this rejects mistakes rather than existing work.
+   */
+  const problems = findIJsonProblems(text);
+  if (problems.length > 0) {
+    const described = problems.map((problem) => describeIJsonProblem(problem)).join("; ");
+    throw new Error(`Invalid ${what} at ${sourcePath}: ${described}`);
   }
   return parsed;
 }

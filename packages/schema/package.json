@@ -17,6 +17,8 @@
     "./types": "./types.ts",
     "./guards": "./src/guards.ts",
     "./locale": "./src/locale.ts",
+    "./media-type": "./src/media-type.ts",
+    "./ijson": "./src/ijson.ts",
     "./parse": "./src/parse.ts",
     "./defs": "./defs/index.ts",
     "./schema.json": "./schema.json",

@@ -112,14 +112,12 @@ export function localeDirection(tag: unknown): TextDirection {
   if (canonical === null) {
     return "ltr";
   }
-  try {
-    const locale = new Intl.Locale(canonical);
-    // An explicit script wins; otherwise CLDR's likely-subtags (UTS #35) supplies one.
-    const script = locale.script ?? locale.maximize().script;
-    return script !== undefined && RTL_SCRIPTS.has(script) ? "rtl" : "ltr";
-  } catch {
-    return "ltr";
-  }
+  // No try/catch: `canonicalizeLocale` already constructed this exact tag, so the constructor
+  // Cannot throw here and a guard would be an untestable branch pretending otherwise.
+  const locale = new Intl.Locale(canonical);
+  // An explicit script wins; otherwise CLDR's likely-subtags (UTS #35) supplies one.
+  const script = locale.script ?? locale.maximize().script;
+  return script !== undefined && RTL_SCRIPTS.has(script) ? "rtl" : "ltr";
 }
 
 /** The primary language subtag of a tag: `en` for `en-GB`, `zh` for `zh-Hant-TW`. */

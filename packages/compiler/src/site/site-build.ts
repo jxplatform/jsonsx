@@ -879,23 +879,26 @@ export async function buildSite(
  *   serverHandler: string | null;
  *   doc: JxDocument;
  * }>}
+ *   Every parameter is required. There is exactly one caller and it passes all fifteen, so the
+ *   defaults this list used to carry described no reachable call — and one of them, an identity
+ *   `rewriteNpmAsset`, was a function that could never run pretending to be a safety net.
  */
 async function compilePage(
   route: SiteRoute,
   projectConfig: ProjectConfig,
   projectRoot: string,
-  sections: Record<string, unknown> = {},
-  imageCache: CacheManifest | null = null,
-  componentDefs = new Map<string, JxElement>(),
-  imageMetaCache: ImageMetaCache | null = null,
-  formatRegistry?: FormatRegistry,
-  registry?: ExtensionRegistry,
-  rewriteSidecarSrc?: (specifier: string, docDir: string | null) => string,
-  assetMounts: readonly AssetMount[] = [],
-  extensionHead: readonly JxHeadEntry[] = [],
-  rewriteNpmAsset: (specifier: string) => string = (s) => s,
-  i18n: ResolvedI18n | null = null,
-  alternates: readonly LocaleAlternate[] = [],
+  sections: Record<string, unknown>,
+  imageCache: CacheManifest | null,
+  componentDefs: Map<string, JxElement>,
+  imageMetaCache: ImageMetaCache | null,
+  formatRegistry: FormatRegistry | undefined,
+  registry: ExtensionRegistry | undefined,
+  rewriteSidecarSrc: ((specifier: string, docDir: string | null) => string) | undefined,
+  assetMounts: readonly AssetMount[],
+  extensionHead: readonly JxHeadEntry[],
+  rewriteNpmAsset: (specifier: string) => string,
+  i18n: ResolvedI18n | null,
+  alternates: readonly LocaleAlternate[],
 ) {
   // Load the raw page document (.json natively, other formats via the registry)
   const pageDoc = await readPageDocument(route.sourcePath as string, formatRegistry);

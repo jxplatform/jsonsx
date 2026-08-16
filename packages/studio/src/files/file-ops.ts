@@ -42,6 +42,7 @@ import {
 } from "../format/format-host";
 import type { StudioFormat } from "../format/format-host";
 import type { Tab } from "../tabs/tab.js";
+import { mediaTypeEssence } from "@jxsuite/schema/media-type";
 
 /**
  * Parse a format-class source string into document + frontmatter + mode per the format's
@@ -86,7 +87,9 @@ export async function openFile() {
       ...formats
         .filter((f) => f.capabilities.parse)
         .map((f) => ({
-          accept: { [f.mediaType ?? "text/plain"]: f.extensions },
+          // The essence, not the declared type: a File System Access `accept` key is a bare
+          // MIME type, and `text/markdown; variant=GFM` is not one.
+          accept: { [mediaTypeEssence(f.mediaType) ?? "text/plain"]: f.extensions },
           description: f.name,
         })),
     ];
@@ -303,7 +306,9 @@ export async function exportFile() {
     await loadFormats();
     const format = tabFormat(tab);
     const output = await serializeDocument(tab);
-    const mimeType = format ? (format.mediaType ?? "text/plain") : "application/json";
+    const mimeType = format
+      ? (mediaTypeEssence(format.mediaType) ?? "text/plain")
+      : "application/json";
     const ext = format ? format.extensions[0] : ".json";
     const description = format ? format.name : "Jx Component";
     const fallbackName = format ? `content${ext}` : "component.json";

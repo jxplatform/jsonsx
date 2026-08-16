@@ -2,7 +2,7 @@
 
 ## JSON Schema 2020-12 Meta-Schema Generator
 
-**Version:** 0.4.4-draft
+**Version:** 0.4.5-draft
 **Status:** Partial
 **Updated:** 2026-08-15
 **License:** MIT
@@ -180,6 +180,33 @@ Validates `.class.json` files with:
 - Admission blocks (specs/extensions.md §6): `format` (`extensions`, `mediaType`, `documentKinds`, `exportTarget`, `remote`), `project` (`key` required; `title`, `description`, `referenceable`), `server` (`basePath` required; `order`, `module`), and `connector` (`provider` + `kind` required; `local`, `serve`, `module`, open for provider extras)
 - `$studio` — studio control-surface hints (modes, documentMode, newFileTemplate, element/nesting constraints)
 
+### 3.4 I-JSON at the Parse Boundary
+
+> **Status: Implemented.** `ijson.ts`, enforced by `parse.ts` for every document, project config
+> and class definition.
+
+`JSON.parse` accepts documents that mean something other than what they say, and RFC 7493 names the
+two that matter here:
+
+- **A repeated name** (§2.3). `JSON.parse` keeps the last and says nothing, so a document with two
+  `state` keys — a bad merge, most often — loses the first one's contents silently.
+- **An integer outside what a double holds** (§2.2). `9007199254740993` parses as
+  `9007199254740992`, and the next serialization writes the wrong number back to disk.
+
+Both are **parse failures**, not warnings. They are silent data loss, and neither has a reading
+under which the author got what they wrote. The whole repository — 375 JSON documents — was already
+clean when this landed, so the rule rejects mistakes rather than existing work.
+
+This matters more in Jx than it would elsewhere. A Jx document does not stay JSON: it round-trips
+through markdown frontmatter (`parser.md`) and through a Yjs CRDT (`collab.md`), and each crossing
+rebuilds the object from the **parsed value**. Whatever `JSON.parse` discarded at the boundary is
+discarded for good, and the file the author reopens is not the file they wrote.
+
+Detection is a scan of the source text rather than a `JSON.parse` reviver, because by the time a
+reviver runs the duplicate is already gone. **Fractions are never judged**: `0.1` is not exactly
+representable either, so flagging them would flag most real documents while saying nothing about
+whether the author's value survived.
+
 ---
 
 ## 4. Generation Pipeline
@@ -225,16 +252,18 @@ Three JSON Schema 2020-12 documents:
 
 External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md). `@webref/*` is a tooling package rather than a standard; what it carries are extracts of the specifications cited below.
 
-| Standard                                                            | Class       | Binds  | Evidence                                                            | Note                                                                                                                                                                                                                                                                                      |
-| ------------------------------------------------------------------- | ----------- | ------ | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [JSON Schema 2020-12](https://json-schema.org/draft/2020-12/schema) | **Adopted** | §3, §5 | packages/schema/src/schema.ts, packages/schema/tests/schema.test.ts | The emitted meta-schemas are conformant 2020-12, so any 2020-12 validator can check a Jx document as an instance. Jx is not a _dialect_: it declares no `$vocabulary`, and its reserved keywords are not JSON Schema vocabulary — a standards-only processor ignores them (spec.md §3.2). |
-| [WHATWG HTML](https://html.spec.whatwg.org/)                        | **Subset**  | §3, §4 | packages/schema/src/schema.ts                                       | Only the element and IDL-attribute inventories are used, extracted via `@webref/elements` and `@webref/idl` to build the `tagName` enumeration, the DOM property set and the `EventHandler` names. Nothing else of the standard is implemented here.                                      |
-| [CSSOM](https://www.w3.org/TR/cssom-1/)                             | **Subset**  | §3, §4 | packages/schema/src/schema.ts                                       | Only the camelCase IDL attribute names for CSS properties are used, to type the `style` object. Neither the object model nor its serialization rules are implemented.                                                                                                                     |
-| [BCP 47](https://www.rfc-editor.org/info/bcp47)                     | **Pending** | §3.2   | —                                                                   | `gap:bcp47-locale-validation` `i18n.defaultLocale` and `i18n.locales[]` are bare strings, so nothing rejects a malformed language tag or canonicalizes `en-us` to `en-US`.                                                                                                                |
-| [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110)                  | **Subset**  | §3.2   | packages/schema/defs/project-config.schema.ts                       | `REDIRECT_STATUSES` enumerates the five §15.4 statuses a static host can express, and the compiler and the Studio grid both import it rather than declaring their own. A rewrite is a separate shape, not a sixth status — see site-architecture.md §11.3.                                |
+| Standard                                                            | Class       | Binds  | Evidence                                                                                               | Note                                                                                                                                                                                                                                                                                      |
+| ------------------------------------------------------------------- | ----------- | ------ | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [JSON Schema 2020-12](https://json-schema.org/draft/2020-12/schema) | **Adopted** | §3, §5 | packages/schema/src/schema.ts, packages/schema/tests/schema.test.ts                                    | The emitted meta-schemas are conformant 2020-12, so any 2020-12 validator can check a Jx document as an instance. Jx is not a _dialect_: it declares no `$vocabulary`, and its reserved keywords are not JSON Schema vocabulary — a standards-only processor ignores them (spec.md §3.2). |
+| [RFC 7493](https://www.rfc-editor.org/rfc/rfc7493)                  | **Subset**  | §3.4   | packages/schema/src/ijson.ts, packages/schema/tests/ijson.test.ts, packages/schema/tests/parse.test.ts | The two constraints that are silent data loss: duplicate names (§2.3) and integers a double cannot hold (§2.2), both parse failures. Not enforced: the top-level-value and unpaired-surrogate rules, neither of which can lose an author's content the way these two do.                  |
+| [WHATWG HTML](https://html.spec.whatwg.org/)                        | **Subset**  | §3, §4 | packages/schema/src/schema.ts                                                                          | Only the element and IDL-attribute inventories are used, extracted via `@webref/elements` and `@webref/idl` to build the `tagName` enumeration, the DOM property set and the `EventHandler` names. Nothing else of the standard is implemented here.                                      |
+| [CSSOM](https://www.w3.org/TR/cssom-1/)                             | **Subset**  | §3, §4 | packages/schema/src/schema.ts                                                                          | Only the camelCase IDL attribute names for CSS properties are used, to type the `style` object. Neither the object model nor its serialization rules are implemented.                                                                                                                     |
+| [BCP 47](https://www.rfc-editor.org/info/bcp47)                     | **Pending** | §3.2   | —                                                                                                      | `gap:bcp47-locale-validation` `i18n.defaultLocale` and `i18n.locales[]` are bare strings, so nothing rejects a malformed language tag or canonicalizes `en-us` to `en-US`.                                                                                                                |
+| [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110)                  | **Subset**  | §3.2   | packages/schema/defs/project-config.schema.ts                                                          | `REDIRECT_STATUSES` enumerates the five §15.4 statuses a static host can express, and the compiler and the Studio grid both import it rather than declaring their own. A rewrite is a separate shape, not a sixth status — see site-architecture.md §11.3.                                |
 
 ## Changelog
 
+- **0.4.5-draft** (2026-08-15) — I-JSON enforced at the parse boundary: duplicate names and unrepresentable integers are parse failures (§3.4).
 - **0.4.4-draft** (2026-08-15) — The class method role enum gains head (extensions.md §8.6).
 - **0.4.3-draft** (2026-08-15) — §3.1 records the root fields the 0.4.2 entry described.
 - **0.4.2-draft** (2026-08-15) — Document $lang, $dir and the previously undeclared $sitemap; defaults.dir; HeadEntry.textContent admits an object.
@@ -259,4 +288,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/schema` Specification v0.4.4-draft_
+_`@jxsuite/schema` Specification v0.4.5-draft_

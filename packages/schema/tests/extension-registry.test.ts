@@ -322,6 +322,35 @@ describe("ExtensionRegistry accessors", () => {
     expect(reg.emitters().map((e) => e.name)).toEqual(["Tables"]);
   });
 
+  /*
+   * `head` is separate from `emit` because the two answer different questions at different times:
+   * `emit` derives files from loaded content, long after every page was written, while `head`
+   * derives `<head>` entries from configuration and must run before the first page is built. A
+   * feed needs both, which is why declaring one must not imply the other.
+   */
+  test("headProviders filters to classes with a head capability (§8.6)", async () => {
+    const files = standardFiles();
+    files["/nm/@acme/auth/src/Auth.class.json"] = {
+      ...AUTH_MOUNT_CLASS,
+      $defs: {
+        methods: {
+          ...AUTH_MOUNT_CLASS.$defs.methods,
+          head: { identifier: "head", role: "head", scope: "static", timing: ["compiler"] },
+        },
+      },
+    };
+    const reg = await buildExtensionRegistry(["@acme/data", "@acme/auth"], makeIO(files), BASE);
+
+    expect(reg.headProviders().map((e) => e.name)).toEqual(["AuthMount"]);
+    // The emit-only class is not a head provider, and the head provider is not an emitter.
+    expect(reg.emitters().map((e) => e.name)).toEqual(["Tables"]);
+  });
+
+  test("headProviders is empty when nothing declares one", async () => {
+    const reg = await standardRegistry();
+    expect(reg.headProviders()).toEqual([]);
+  });
+
   test("mounts without an order default to 100 and tie-break by name", async () => {
     const files = standardFiles();
     files["/nm/@acme/auth/src/Auth.class.json"] = {

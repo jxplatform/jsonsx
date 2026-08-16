@@ -10,6 +10,8 @@
  * (fetch + dynamic import) hosts.
  */
 
+import { mediaTypeEssence, mediaTypeProblem } from "./media-type";
+
 export type FormatCapability = "parse" | "serialize" | "discover" | "load";
 
 export const FORMAT_CAPABILITIES: readonly FormatCapability[] = [
@@ -163,6 +165,15 @@ export class FormatEntry {
   readonly classDef: ClassDefLike;
   readonly extensions: string[];
   readonly mediaType: string | null;
+  /**
+   * The media type without its parameters — `text/markdown` for `text/markdown; variant=GFM`.
+   *
+   * Anything that keys on a type rather than describing one wants this: a File System Access
+   * `accept` map, an editor language id. Those broke the moment a format declared the `variant`
+   * parameter RFC 7763 defines, which is a good reason for the distinction to exist in the type
+   * rather than in each caller's split.
+   */
+  readonly mediaTypeEssence: string | null;
   readonly documentKinds: FormatDocumentKind[];
   readonly exportTarget: boolean;
   readonly remote: boolean;
@@ -186,6 +197,7 @@ export class FormatEntry {
     const { format } = classDef;
     this.extensions = (format?.extensions ?? []).map((e) => e.toLowerCase());
     this.mediaType = format?.mediaType ?? null;
+    this.mediaTypeEssence = mediaTypeEssence(this.mediaType);
     this.documentKinds = format?.documentKinds ?? [];
     this.exportTarget = format?.exportTarget === true;
     this.remote = format?.remote === true;
@@ -236,6 +248,21 @@ export class FormatRegistry {
 
   constructor(entries: FormatEntry[]) {
     this.#entries = entries;
+
+    /*
+     * A declared media type reaches an HTTP header, an editor's file association and a Studio
+     * label. Nothing checked it before, so `text/markdown;variant GFM` — one missing `=` — would
+     * have been served to a browser verbatim as a malformed header value (RFC 6838 §4.2).
+     */
+    for (const entry of entries) {
+      if (entry.mediaType === null) {
+        continue;
+      }
+      const problem = mediaTypeProblem(entry.mediaType);
+      if (problem !== null) {
+        throw new Error(`Format "${entry.name}" declares an invalid mediaType: ${problem}`);
+      }
+    }
 
     // Ambiguous (extension, capability) claims are a configuration error.
     for (const cap of FORMAT_CAPABILITIES) {

@@ -110,3 +110,34 @@ describe("parseClassDef", () => {
     );
   });
 });
+
+describe("the I-JSON boundary", () => {
+  /*
+   * A duplicate key parses cleanly and loses the first value. That matters more here than in most
+   * codebases: a Jx document is rebuilt from the parsed value every time it crosses into markdown
+   * frontmatter or the CRDT, so whatever `JSON.parse` dropped never comes back.
+   */
+  test("a duplicate key is a parse failure, naming the key", () => {
+    expect(() =>
+      parseJxDocument(`{"state":{"a":1},"state":{"b":2}}`, "/site/pages/dup.json"),
+    ).toThrow(/duplicate key "state"/);
+  });
+
+  test("an integer a double cannot hold is a parse failure", () => {
+    expect(() => parseProjectConfig(`{"id":9007199254740993}`, "/site/project.json")).toThrow(
+      /9007199254740993/,
+    );
+  });
+
+  test("the message names the file and cites the RFC", () => {
+    expect(() => parseJxDocument(`{"k":1,"k":2}`, "/site/pages/x.json")).toThrow(
+      /Invalid Jx document at \/site\/pages\/x\.json.*RFC 7493/,
+    );
+  });
+
+  test("an ordinary document still parses", () => {
+    expect(parseJxDocument(`{"tagName":"div","state":{"n":1}}`, "/site/ok.json").tagName).toBe(
+      "div",
+    );
+  });
+});

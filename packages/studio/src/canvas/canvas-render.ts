@@ -105,6 +105,7 @@ import type { CanvasPanel, GitDiffState } from "../types";
 import type { AnyCommand, CommandRegistry } from "../commands/registry";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { Tab } from "../tabs/tab.js";
+import { mediaTypeEssence } from "@jxsuite/schema/media-type";
 
 interface CanvasRenderCtx {
   setCanvasMode: (tab: Tab | null, mode: string) => void;
@@ -135,7 +136,8 @@ export function initCanvasRender(ctx: CanvasRenderCtx) {
  */
 function sourceLang(tab: Tab) {
   const format = formatByName(tab.doc.sourceFormat);
-  return format ? (format.mediaType?.split("/").pop() ?? "plaintext") : "json";
+  // The essence: splitting the declared type would yield `markdown; variant=GFM` as a language id.
+  return format ? (mediaTypeEssence(format.mediaType)?.split("/").pop() ?? "plaintext") : "json";
 }
 
 /**

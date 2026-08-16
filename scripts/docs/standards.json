@@ -1,5 +1,5 @@
 {
-  "$comment": "The standards LEXICON: what each identifier IS (issuing body, title, canonical URL). It is not the registry — the specs' `## N. Standards Alignment` tables say what Jx DOES about each standard, and scripts/docs/check-standards.ts joins the two. An id no spec cites fails (catalog-stale); an id no entry vouches for fails (id-unknown). That is the only offline way a typo'd RFC number can fail, since a wrong-but-well-formed rfc-editor.org URL is indistinguishable from a right one. Keep entries sorted by id (codepoint order).",
+  "$comment": "The standards LEXICON: what each identifier IS (issuing body, title, canonical URL). It is not the registry \u2014 the specs' `## N. Standards Alignment` tables say what Jx DOES about each standard, and scripts/docs/check-standards.ts joins the two. An id no spec cites fails (catalog-stale); an id no entry vouches for fails (id-unknown). That is the only offline way a typo'd RFC number can fail, since a wrong-but-well-formed rfc-editor.org URL is indistinguishable from a right one. Keep entries sorted by id (codepoint order).",
   "standards": [
     {
       "id": "ATAG 2.0",
@@ -219,6 +219,12 @@
       "url": "https://www.rfc-editor.org/rfc/rfc7464"
     },
     {
+      "id": "RFC 7493",
+      "org": "IETF",
+      "title": "The I-JSON Message Format",
+      "url": "https://www.rfc-editor.org/rfc/rfc7493"
+    },
+    {
       "id": "RFC 7636",
       "org": "IETF",
       "title": "Proof Key for Code Exchange by OAuth Public Clients",
@@ -235,6 +241,12 @@
       "org": "IETF",
       "title": "The text/markdown Media Type",
       "url": "https://www.rfc-editor.org/rfc/rfc7763"
+    },
+    {
+      "id": "RFC 7764",
+      "org": "IETF",
+      "title": "Guidance on Markdown: Design Philosophies, Stability Strategies, and Select Registrations",
+      "url": "https://www.rfc-editor.org/rfc/rfc7764"
     },
     {
       "id": "RFC 8246",

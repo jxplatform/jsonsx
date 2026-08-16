@@ -94,6 +94,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `extensions.md`
 
+- **0.3.7-draft** (2026-08-15) — mediaType is validated against RFC 6838 and carries RFC 7763 variant parameters; mediaTypeEssence for callers that key on a type (§7).
 - **0.3.6-draft** (2026-08-15) — Add §8.6 head: a section owner contributes <head> entries from configuration, before the first page is built.
 - **0.3.5-draft** (2026-08-15) — Add §16 Standards Alignment: JSON Schema composition, media-type registration, and why JSON Patch is declined for lower.
 - **0.3.4-draft** (2026-08-08) — §5.4 states first-party schema resolution — an @jxsuite/*.json ref reads from the host workspace before any project-local file at the same path, with no fallback in that direction, so a stray install inside a starter can no longer answer for the core; and a validator composes a stale entry document in memory rather than writing over the one it is checking.
@@ -166,6 +167,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `schema.md`
 
+- **0.4.5-draft** (2026-08-15) — I-JSON enforced at the parse boundary: duplicate names and unrepresentable integers are parse failures (§3.4).
 - **0.4.4-draft** (2026-08-15) — The class method role enum gains head (extensions.md §8.6).
 - **0.4.3-draft** (2026-08-15) — §3.1 records the root fields the 0.4.2 entry described.
 - **0.4.2-draft** (2026-08-15) — Document $lang, $dir and the previously undeclared $sitemap; defaults.dir; HeadEntry.textContent admits an object.

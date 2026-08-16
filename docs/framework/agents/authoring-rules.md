@@ -7,6 +7,7 @@ code:
   - packages/schema/project-schema.json
   - packages/schema/class-schema.json
   - packages/compiler/src/site/validate-command.ts
+  - packages/schema/src/ijson.ts
 ---
 
 # Authoring rules for agents
@@ -18,6 +19,26 @@ Everything below is the briefing. Paste it into a system prompt, drop it in the 
 :::doc-tip
 Whatever form you use, include the **check your work** section at the end. A briefing without a verification step tells the agent what good looks like but gives it no way to find out whether it got there.
 :::
+
+## Two ways valid JSON still loses your work
+
+Both of these parse without complaint in any JSON tool, and both are **build errors** in Jx:
+
+```json
+{ "state": { "count": 0 }, "tagName": "div", "state": { "other": 1 } }
+```
+
+A repeated key. `JSON.parse` keeps the last one and discards the first without a word — so the first `state` object is gone, and nothing downstream can tell it ever existed.
+
+```json
+{ "id": 9007199254740993 }
+```
+
+An integer larger than a double can hold. It parses as `9007199254740992`, and the next save writes that wrong number back to your file.
+
+These are errors rather than warnings because a Jx document doesn't stay JSON. It round-trips through markdown frontmatter and through the collaborative editing layer, and each crossing rebuilds the object from the parsed value — so whatever was dropped at the boundary is dropped for good.
+
+Fractions are never flagged. `0.1` isn't exactly representable in binary floating point either, so complaining about it would mean complaining about most real documents while telling you nothing about whether your value survived.
 
 ## The three schemas
 
