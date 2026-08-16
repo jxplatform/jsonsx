@@ -2,9 +2,9 @@
 
 ## JSON Schema 2020-12 Meta-Schema Generator
 
-**Version:** 0.4.5-draft
+**Version:** 0.4.6-draft
 **Status:** Partial
-**Updated:** 2026-08-15
+**Updated:** 2026-08-16
 **License:** MIT
 
 ---
@@ -143,8 +143,9 @@ All 13 built-in prototypes with their specific configuration properties:
 ### 3.2 Project Schema (`project-schema.json`)
 
 > **Status: Partial.** `i18n.defaultLocale` and `i18n.locales` are bare strings with no pattern, so
-> an invalid language tag validates and nothing canonicalizes `en-us`. Nothing reads the key either
-> (site-architecture.md §13). See §7.
+> `jx validate` accepts a malformed language tag that the **build** then rejects
+> (site-architecture.md §13.2 validates and canonicalizes every tag). The two disagree, and the
+> schema is the half that is wrong. See §7.
 
 **`$id`:** `https://jxsuite.com/schema/project/v1`
 
@@ -252,17 +253,18 @@ Three JSON Schema 2020-12 documents:
 
 External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md). `@webref/*` is a tooling package rather than a standard; what it carries are extracts of the specifications cited below.
 
-| Standard                                                            | Class       | Binds  | Evidence                                                                                               | Note                                                                                                                                                                                                                                                                                      |
-| ------------------------------------------------------------------- | ----------- | ------ | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [JSON Schema 2020-12](https://json-schema.org/draft/2020-12/schema) | **Adopted** | §3, §5 | packages/schema/src/schema.ts, packages/schema/tests/schema.test.ts                                    | The emitted meta-schemas are conformant 2020-12, so any 2020-12 validator can check a Jx document as an instance. Jx is not a _dialect_: it declares no `$vocabulary`, and its reserved keywords are not JSON Schema vocabulary — a standards-only processor ignores them (spec.md §3.2). |
-| [RFC 7493](https://www.rfc-editor.org/rfc/rfc7493)                  | **Subset**  | §3.4   | packages/schema/src/ijson.ts, packages/schema/tests/ijson.test.ts, packages/schema/tests/parse.test.ts | The two constraints that are silent data loss: duplicate names (§2.3) and integers a double cannot hold (§2.2), both parse failures. Not enforced: the top-level-value and unpaired-surrogate rules, neither of which can lose an author's content the way these two do.                  |
-| [WHATWG HTML](https://html.spec.whatwg.org/)                        | **Subset**  | §3, §4 | packages/schema/src/schema.ts                                                                          | Only the element and IDL-attribute inventories are used, extracted via `@webref/elements` and `@webref/idl` to build the `tagName` enumeration, the DOM property set and the `EventHandler` names. Nothing else of the standard is implemented here.                                      |
-| [CSSOM](https://www.w3.org/TR/cssom-1/)                             | **Subset**  | §3, §4 | packages/schema/src/schema.ts                                                                          | Only the camelCase IDL attribute names for CSS properties are used, to type the `style` object. Neither the object model nor its serialization rules are implemented.                                                                                                                     |
-| [BCP 47](https://www.rfc-editor.org/info/bcp47)                     | **Pending** | §3.2   | —                                                                                                      | `gap:bcp47-locale-validation` `i18n.defaultLocale` and `i18n.locales[]` are bare strings, so nothing rejects a malformed language tag or canonicalizes `en-us` to `en-US`.                                                                                                                |
-| [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110)                  | **Subset**  | §3.2   | packages/schema/defs/project-config.schema.ts                                                          | `REDIRECT_STATUSES` enumerates the five §15.4 statuses a static host can express, and the compiler and the Studio grid both import it rather than declaring their own. A rewrite is a separate shape, not a sixth status — see site-architecture.md §11.3.                                |
+| Standard                                                            | Class       | Binds  | Evidence                                                                                               | Note                                                                                                                                                                                                                                                                                                                      |
+| ------------------------------------------------------------------- | ----------- | ------ | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [JSON Schema 2020-12](https://json-schema.org/draft/2020-12/schema) | **Adopted** | §3, §5 | packages/schema/src/schema.ts, packages/schema/tests/schema.test.ts                                    | The emitted meta-schemas are conformant 2020-12, so any 2020-12 validator can check a Jx document as an instance. Jx is not a _dialect_: it declares no `$vocabulary`, and its reserved keywords are not JSON Schema vocabulary — a standards-only processor ignores them (spec.md §3.2).                                 |
+| [RFC 7493](https://www.rfc-editor.org/rfc/rfc7493)                  | **Subset**  | §3.4   | packages/schema/src/ijson.ts, packages/schema/tests/ijson.test.ts, packages/schema/tests/parse.test.ts | The two constraints that are silent data loss: duplicate names (§2.3) and integers a double cannot hold (§2.2), both parse failures. Not enforced: the top-level-value and unpaired-surrogate rules, neither of which can lose an author's content the way these two do.                                                  |
+| [WHATWG HTML](https://html.spec.whatwg.org/)                        | **Subset**  | §3, §4 | packages/schema/src/schema.ts                                                                          | Only the element and IDL-attribute inventories are used, extracted via `@webref/elements` and `@webref/idl` to build the `tagName` enumeration, the DOM property set and the `EventHandler` names. Nothing else of the standard is implemented here.                                                                      |
+| [CSSOM](https://www.w3.org/TR/cssom-1/)                             | **Subset**  | §3, §4 | packages/schema/src/schema.ts                                                                          | Only the camelCase IDL attribute names for CSS properties are used, to type the `style` object. Neither the object model nor its serialization rules are implemented.                                                                                                                                                     |
+| [BCP 47](https://www.rfc-editor.org/info/bcp47)                     | **Pending** | §3.2   | —                                                                                                      | `gap:bcp47-locale-validation` The **build** validates and canonicalizes every tag (`site-architecture.md` §13.2), but the schema does not: `defaultLocale` and `locales[]` carry no `pattern`, so `jx validate` accepts `en_US` and the build then fails on it. Author-time and build-time disagree about the same value. |
+| [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110)                  | **Subset**  | §3.2   | packages/schema/defs/project-config.schema.ts                                                          | `REDIRECT_STATUSES` enumerates the five §15.4 statuses a static host can express, and the compiler and the Studio grid both import it rather than declaring their own. A rewrite is a separate shape, not a sixth status — see site-architecture.md §11.3.                                                                |
 
 ## Changelog
 
+- **0.4.6-draft** (2026-08-16) — §3.2 and §7: BCP 47 validation exists in the build; the schema is the half that still lacks it.
 - **0.4.5-draft** (2026-08-15) — I-JSON enforced at the parse boundary: duplicate names and unrepresentable integers are parse failures (§3.4).
 - **0.4.4-draft** (2026-08-15) — The class method role enum gains head (extensions.md §8.6).
 - **0.4.3-draft** (2026-08-15) — §3.1 records the root fields the 0.4.2 entry described.
@@ -288,4 +290,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/schema` Specification v0.4.5-draft_
+_`@jxsuite/schema` Specification v0.4.6-draft_
