@@ -2,7 +2,7 @@
 
 ## Which External Standards Jx Adopts, and How That Is Recorded
 
-**Version:** 0.1.12-draft
+**Version:** 0.1.13-draft
 **Status:** Partial
 **Updated:** 2026-08-16
 **License:** MIT
@@ -234,7 +234,6 @@ An entry names the spec that will own it. When that section is written, the entr
 
 | Standard                                                      | Target                                  | Why not yet                                                                                                                                                                                                         |
 | ------------------------------------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414)            | `desktop.md` §10                        | Discovery is only reachable once an authorization flow exists (`gap:native-oauth`), and the one provider in use publishes no metadata document.                                                                     |
 | [WebAuthn Level 3](https://www.w3.org/TR/webauthn-3/)         | `desktop.md` §10                        | Passkeys need a registered relying-party id and a recovery story, neither of which is designed.                                                                                                                     |
 | [CSS Cascade Layers](https://www.w3.org/TR/css-cascade-5/)    | `spec.md` §9                            | The style model has no layer concept; adding one is a design change, not a citation.                                                                                                                                |
 | [CSS Containment 3](https://www.w3.org/TR/css-contain-3/)     | `spec.md` §9                            | `$media` is viewport-only. Container queries would need a named-container model in the style object.                                                                                                                |
@@ -271,6 +270,7 @@ the failure the gate exists to make loud.
 
 ## Changelog
 
+- **0.1.13-draft** (2026-08-16) — §11 RFC 8414 leaves the adoption backlog — the flow it would configure now exists, and it is recorded Rejected in desktop.md for the reason that remains.
 - **0.1.12-draft** (2026-08-16) — §12 declares the BCP 14 normative keywords for the whole corpus, gated by docs:status; BCP 14 graduates off the backlog.
 - **0.1.11-draft** (2026-08-16) — §4.4 worked examples use a reserved gap:example-only slug so an illustration cannot squat on a real gap id.
 - **0.1.10-draft** (2026-08-16) — §1 is Implemented — both ratchets are empty; BCP 14 moves to the backlog, since no section declares the corpus's keyword convention.
@@ -287,4 +287,4 @@ the failure the gate exists to make loud.
 
 ---
 
-_Jx Standards Alignment Specification v0.1.12-draft_
+_Jx Standards Alignment Specification v0.1.13-draft_

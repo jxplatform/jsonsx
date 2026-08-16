@@ -18,6 +18,12 @@ import { listStarters } from "@jxsuite/starters";
 import { createProjectSession, pickProjectFile } from "./project-session";
 import { readRecents, writeRecents } from "./recent-store";
 import { readSettings, writeSettings } from "./settings-store";
+import {
+  githubSignIn,
+  githubSignOut,
+  githubTokenStatus,
+  setAuthorizationHost,
+} from "./github-signin";
 import { studioDir } from "./canvas-runtime";
 import type { ProjectServerHandle } from "@jxsuite/server/project-server";
 import type { ProjectSession } from "./project-session";
@@ -190,6 +196,18 @@ export function openProjectWindow(projectRoot: string | null): BrowserWindow {
     resolveSession: () => windowSession,
     studioDir: studioDir(),
   });
+  /*
+   * The OAuth redirect lands on THIS window's loopback server, so the newest window owns the
+   * redirect. That is the right answer for a flow the user starts from a window and finishes in a
+   * browser seconds later; a sign-in outstanding when another window opens is abandoned, and says
+   * so, rather than silently redirecting to a port nobody is listening on.
+   */
+  if (entry.server) {
+    setAuthorizationHost({
+      authorizer: entry.server.authorizer,
+      port: entry.server.server.port ?? 0,
+    });
+  }
   entry.win.on("close", () => disposeWindow(entry.win.id));
   return entry.win;
 }
@@ -336,6 +354,11 @@ function buildWindowRpc(entry: WindowEntry, getWin: () => BrowserWindow) {
         // User settings (process-shared, user-level store)
         getSettings: () => readSettings(),
         saveSettings: (params) => writeSettings(params.settings),
+
+        // GitHub sign-in (RFC 8252 loopback + PKCE, hosted on this window's own server)
+        githubSignIn: (params) => githubSignIn(params),
+        githubSignOut: () => githubSignOut(),
+        githubToken: () => githubTokenStatus(),
 
         // Updater (process-shared)
         updaterApplyUpdate: () => applyUpdate(),

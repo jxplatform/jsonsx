@@ -213,6 +213,9 @@ interface FakeServer {
   url: string;
   canvasUrl: string;
   rpcToken: string;
+  /* The window installs its server as the OAuth redirect host, so the fake needs both members. */
+  authorizer: { stop: ReturnType<typeof mock> };
+  server: { port: number };
   stop: ReturnType<typeof mock>;
 }
 const createdServers: FakeServer[] = [];
@@ -222,9 +225,11 @@ const createProjectServer = mock((opts: { resolveSession: () => never; studioDir
   nextPort += 1;
   const url = `http://127.0.0.1:${port}`;
   const handle: FakeServer = {
+    authorizer: { stop: mock(() => {}) },
     canvasUrl: `${url}/__studio__/canvas.html`,
     resolveSession: opts.resolveSession,
     rpcToken: `tok-${port}`,
+    server: { port },
     stop: mock(() => {}),
     url,
   };
@@ -232,6 +237,20 @@ const createProjectServer = mock((opts: { resolveSession: () => never; studioDir
   return handle;
 });
 void mock.module("@jxsuite/server/project-server", () => ({ createProjectServer }));
+
+/*
+ * GitHub sign-in. Mocked at the module boundary because the real one opens a browser and talks to
+ * GitHub; what this file tests is that each window wires the requests and claims the redirect.
+ */
+const setAuthorizationHostMock = mock((_host: unknown) => {});
+void mock.module("../src/github-signin", () => ({
+  githubSignIn: mock(async (params: { force?: boolean }) => ({
+    token: params.force ? "gho_fresh" : "gho_stored",
+  })),
+  githubSignOut: mock(async () => ({ ok: true })),
+  githubTokenStatus: mock(async () => ({ stored: true })),
+  setAuthorizationHost: setAuthorizationHostMock,
+}));
 
 // ─── Import module under test ────────────────────────────────────────────────
 
@@ -443,6 +462,22 @@ describe("per-window RPC", () => {
     const settings = { aiApiKey: "sk-new", theme: "dark" };
     await reqs.saveSettings({ settings } as never);
     expect(writeSettingsMock).toHaveBeenLastCalledWith(settings);
+  });
+
+  test("GitHub sign-in handlers reach the loopback flow", async () => {
+    openProjectWindow("/proj/github");
+    const reqs = lastRequests();
+    expect(await reqs.githubToken()).toEqual({ stored: true });
+    expect(await reqs.githubSignIn({ force: true })).toEqual({ token: "gho_fresh" });
+    expect(await reqs.githubSignOut()).toEqual({ ok: true });
+  });
+
+  test("each window installs its own server as the OAuth redirect host", () => {
+    // The redirect lands on a specific port, so the newest window owns it.
+    setAuthorizationHostMock.mockClear();
+    openProjectWindow("/proj/redirect");
+    const host = setAuthorizationHostMock.mock.calls.at(-1)![0] as { port: number };
+    expect(host.port).toBe(createdServers.at(-1)!.server.port);
   });
 
   test("window controls target this window and maximize toggles", () => {

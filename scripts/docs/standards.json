@@ -237,6 +237,12 @@
       "url": "https://www.rfc-editor.org/rfc/rfc7493"
     },
     {
+      "id": "RFC 7519",
+      "org": "IETF",
+      "title": "JSON Web Token (JWT)",
+      "url": "https://www.rfc-editor.org/rfc/rfc7519"
+    },
+    {
       "id": "RFC 7636",
       "org": "IETF",
       "title": "Proof Key for Code Exchange by OAuth Public Clients",

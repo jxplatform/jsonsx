@@ -63,6 +63,10 @@ The resolve proxies import and execute arbitrary project code by design. Keep th
 :::
 
 :::doc-note
+**One route is exempt from the token, and only from the token: the OAuth callback** (`/__jx_oauth__/callback`) on the desktop's project server. An identity provider redirects the user's own browser there, and a page cannot append a secret to a URL it does not compose — a token gate would make sign-in impossible rather than safe. The `state` parameter does that job: unguessable, single-use, short-lived, compared in constant time. The Host and Fetch Metadata checks still apply, and an IdP redirect is exactly the one cross-site shape they admit — a top-level document navigation.
+:::
+
+:::doc-note
 **No response ever carries an `Access-Control-Allow-` header.** The entire model rests on the browser refusing cross-origin reads, so one CORS header would give that away. A check enforces the absence rather than trusting it — nothing in the code makes a load-bearing absence visible.
 :::
 

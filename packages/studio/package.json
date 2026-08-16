@@ -29,6 +29,7 @@
     "./base64": "./src/utils/base64.ts",
     "./directory-picker": "./src/services/directory-picker.ts",
     "./import-client": "./src/services/import-client.ts",
+    "./github-auth": "./src/github/github-auth.ts",
     "./platforms/cloud": "./src/platforms/cloud.ts",
     "./preview-navigate": "./src/canvas/preview-navigate.ts"
   },

@@ -159,6 +159,16 @@ export function createDesktopPlatform() {
       await request("saveRecentProjects", { projects });
     },
 
+    /*
+     * GitHub sign-in, launcher-only like the electrobun launcher's: the browser Studio has no
+     * loopback server to redirect to and keeps the device flow, so this is not a PAL member.
+     */
+    githubAuth: {
+      signIn: (force = false) => request("githubSignIn", { force }) as Promise<{ token: string }>,
+      signOut: () => request("githubSignOut") as Promise<{ ok: boolean }>,
+      status: () => request("githubToken") as Promise<{ stored: boolean }>,
+    },
+
     // ─── User settings (user-level store, shared across per-project profiles) ──
 
     async getSettings() {

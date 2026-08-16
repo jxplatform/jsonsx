@@ -537,6 +537,23 @@ export interface StudioRPC {
         params: { settings: Record<string, string> };
         response: void;
       };
+      /*
+       * GitHub sign-in (RFC 8252 loopback + PKCE). Deliberately three narrow requests rather than
+       * one credential map: the token is stored at 0600 outside the settings store precisely so the
+       * webview cannot enumerate it, and `githubToken` answers only whether one exists.
+       */
+      githubSignIn: {
+        params: { force?: boolean };
+        response: { token: string };
+      };
+      githubToken: {
+        params: void;
+        response: { stored: boolean };
+      };
+      githubSignOut: {
+        params: void;
+        response: { ok: boolean };
+      };
     };
     messages: Record<string, never>;
   }>;

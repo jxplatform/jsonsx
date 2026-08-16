@@ -41,6 +41,7 @@ import {
   paramNames,
 } from "@jxsuite/schema/guards";
 import { runStatements } from "./statements.ts";
+import { readCookie, serializeCookie } from "./cookie.ts";
 import type {
   JxAttributeValue,
   JxClassDef,
@@ -1480,38 +1481,21 @@ export async function resolvePrototype(
     case "Cookie": {
       const name = def.name ?? key;
       const read = () => {
-        const m = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
-        if (!m) {
+        const raw = readCookie(document.cookie, name);
+        if (raw === null) {
           return null;
         }
         try {
-          return JSON.parse(decodeURIComponent(m[1]!));
+          return JSON.parse(decodeURIComponent(raw));
         } catch {
-          return m[1];
+          return raw;
         }
       };
       const cookieState: Ref<unknown> = ref(read() ?? def.default ?? null);
       // Persist on change
       effect(() => {
-        const v = cookieState.value;
-        let s = `${name}=${encodeURIComponent(JSON.stringify(v))}`;
-        if (def.maxAge !== undefined) {
-          s += `; Max-Age=${def.maxAge}`;
-        }
-        if (def.path) {
-          s += `; Path=${def.path}`;
-        }
-        if (def.domain) {
-          s += `; Domain=${def.domain}`;
-        }
-        if (def.secure) {
-          s += `; Secure`;
-        }
-        if (def.sameSite) {
-          s += `; SameSite=${def.sameSite}`;
-        }
         // oxlint-disable-next-line unicorn/no-document-cookie -- the Cookie $prototype IS the cookie store binding
-        document.cookie = s;
+        document.cookie = serializeCookie(name, cookieState.value, def);
       });
       return cookieState;
     }

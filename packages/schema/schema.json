@@ -958,9 +958,6 @@
         "domain": {
           "type": "string"
         },
-        "expires": {
-          "type": "string"
-        },
         "filter": {
           "anyOf": [
             {

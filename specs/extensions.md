@@ -2,7 +2,7 @@
 
 ## Extension Packages, Schema Composition, and the Capability Contract
 
-**Version:** 0.3.8-draft
+**Version:** 0.3.9-draft
 **Status:** Partial
 **Updated:** 2026-08-16
 **License:** MIT
@@ -908,6 +908,39 @@ object plus the connector capabilities (§8):
   dev server's loopback/token boundary. Cloud backends must gate them on
   collaboration permission.
 
+### 13.1 Auth session cookies
+
+> **Status: Implemented.**
+
+The `auth` section's Better Auth options are not left at the library's defaults, because two of
+those defaults are wrong for the platform Jx deploys to:
+
+- **Cookies default to secure, and step down only for an origin positively known to be plain HTTP.**
+  Better Auth derives `useSecureCookies` from the base URL, falling back to
+  `NODE_ENV === "production"` — which is unset on Cloudflare Workers, so the library's own default
+  produced non-`Secure`, unprefixed session cookies in exactly the place it matters. The one host
+  that genuinely serves auth over plain HTTP is the local dev server, and it pins `BETTER_AUTH_URL`
+  to its own origin so the answer is read rather than guessed.
+- **Rate limiting is on everywhere.** The library gates its own default on the same `NODE_ENV`, so
+  the limit was off in production and off in development — a limit nobody ever finds out is broken.
+  Storage is the in-memory default, which on a serverless runtime is per-isolate: a speed bump for
+  credential stuffing, not a wall.
+
+A secure deployment names its cookies **`__Host-`**, not `__Secure-`
+([RFC 6265bis](https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-rfc6265bis) §4.1.3.2).
+`__Secure-` only promises the cookie was set with `Secure`; a page on a sibling origin can still
+overwrite it by setting a `Domain`. `__Host-` forbids `Domain` and pins `Path=/`, which Better
+Auth's defaults already satisfy — so the stronger prefix costs nothing.
+
+**`Partitioned` is not set, and must not default on.** CHIPS is for cookies in a _third-party_
+context; Jx auth cookies are first-party to the site that serves them. Setting it would force
+`SameSite=None; Secure` and partition the session per top-level site, signing a visitor out whenever
+the embedding page changed.
+
+Session lifetime (7 days, extended on activity after a day) is stated in the options rather than
+inherited, so it shows up in a diff when it changes. A session lifetime that lives only in a
+dependency's default is one nobody chose.
+
 ---
 
 ## 14. Worked example: a third-party TOML format
@@ -1065,16 +1098,18 @@ requiring changes to any core package.
 
 External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md).
 
-| Standard                                                            | Class        | Binds | Evidence                                                                              | Note                                                                                                                                                                                                                                                                           |
-| ------------------------------------------------------------------- | ------------ | ----- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [JSON Schema 2020-12](https://json-schema.org/draft/2020-12/schema) | **Adopted**  | §5    | packages/schema/src/project-schemas.ts, packages/schema/tests/project-schemas.test.ts | Fragment composition, `$id` shadowing and `unevaluatedProperties: false` closure are all standard vocabulary — an extension contributes a schema, not a plugin hook.                                                                                                           |
-| [RFC 6838](https://www.rfc-editor.org/rfc/rfc6838)                  | **Adopted**  | §7    | packages/schema/src/media-type.ts, packages/schema/tests/media-type.test.ts           | The §4.2 grammar is enforced on every declared `mediaType` and a malformed value fails the registry build; the `vnd.`, `prs.` and `x.` trees and `+suffix` are parsed out. Registration itself is out of scope — this checks the syntax, not the IANA registry.                |
-| [RFC 7763](https://www.rfc-editor.org/rfc/rfc7763)                  | **Adopted**  | §7    | extensions/parser/src/Markdown.class.json, packages/schema/tests/media-type.test.ts   | `text/markdown` with the `variant` parameter the standard defines, so a format says _which_ markdown it speaks rather than leaving it to be guessed.                                                                                                                           |
-| [RFC 7764](https://www.rfc-editor.org/rfc/rfc7764)                  | **Subset**   | §7    | extensions/parser/src/Markdown.class.json                                             | `variant=GFM` names the registered GitHub Flavored Markdown variant, which is what `remark-gfm` implements. The other registered variants are not offered; the parser speaks one dialect.                                                                                      |
-| [RFC 6902](https://www.rfc-editor.org/rfc/rfc6902)                  | **Rejected** | §8.3  | —                                                                                     | because: `lower` rewrites a section value into the document tree as a whole-value transform, and a patch document would describe the same result less legibly while adding a format an extension author would have to learn. The capability signature is the contract instead. |
+| Standard                                                            | Class        | Binds | Evidence                                                                              | Note                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ------------------------------------------------------------------- | ------------ | ----- | ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [JSON Schema 2020-12](https://json-schema.org/draft/2020-12/schema) | **Adopted**  | §5    | packages/schema/src/project-schemas.ts, packages/schema/tests/project-schemas.test.ts | Fragment composition, `$id` shadowing and `unevaluatedProperties: false` closure are all standard vocabulary — an extension contributes a schema, not a plugin hook.                                                                                                                                                                                                                                                                                                                     |
+| [RFC 6838](https://www.rfc-editor.org/rfc/rfc6838)                  | **Adopted**  | §7    | packages/schema/src/media-type.ts, packages/schema/tests/media-type.test.ts           | The §4.2 grammar is enforced on every declared `mediaType` and a malformed value fails the registry build; the `vnd.`, `prs.` and `x.` trees and `+suffix` are parsed out. Registration itself is out of scope — this checks the syntax, not the IANA registry.                                                                                                                                                                                                                          |
+| [RFC 7763](https://www.rfc-editor.org/rfc/rfc7763)                  | **Adopted**  | §7    | extensions/parser/src/Markdown.class.json, packages/schema/tests/media-type.test.ts   | `text/markdown` with the `variant` parameter the standard defines, so a format says _which_ markdown it speaks rather than leaving it to be guessed.                                                                                                                                                                                                                                                                                                                                     |
+| [RFC 7764](https://www.rfc-editor.org/rfc/rfc7764)                  | **Subset**   | §7    | extensions/parser/src/Markdown.class.json                                             | `variant=GFM` names the registered GitHub Flavored Markdown variant, which is what `remark-gfm` implements. The other registered variants are not offered; the parser speaks one dialect.                                                                                                                                                                                                                                                                                                |
+| [RFC 6902](https://www.rfc-editor.org/rfc/rfc6902)                  | **Rejected** | §8.3  | —                                                                                     | because: `lower` rewrites a section value into the document tree as a whole-value transform, and a patch document would describe the same result less legibly while adding a format an extension author would have to learn. The capability signature is the contract instead.                                                                                                                                                                                                           |
+| [RFC 6265](https://www.rfc-editor.org/rfc/rfc6265)                  | **Adopted**  | §13.1 | extensions/auth/src/config.ts, extensions/auth/tests/config.test.ts                   | Auth session cookies carry the `__Host-` name prefix ([6265bis](https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-rfc6265bis) §4.1.3.2) wherever the origin is not known to be plain HTTP — the stronger of the two prefixes, since `__Secure-` still lets a page on a sibling origin overwrite the cookie by setting a `Domain`. `Partitioned` is deliberately not set. The `Cookie` state prototype applies the same derivations to what an author declares (`spec.md` §11.2a). |
 
 ## Changelog
 
+- **0.3.9-draft** (2026-08-16) — §13.1 auth session cookies: __Host- prefix derived from the origin's scheme, rate limiting on everywhere, session lifetime stated, Partitioned never set. Closes gap:cookie-prefixes.
 - **0.3.8-draft** (2026-08-16) — §8 _meta is reserved in a resolvePaths result — it carries the source entry's facts, never a route parameter.
 - **0.3.7-draft** (2026-08-15) — mediaType is validated against RFC 6838 and carries RFC 7763 variant parameters; mediaTypeEssence for callers that key on a type (§7).
 - **0.3.6-draft** (2026-08-15) — Add §8.6 head: a section owner contributes <head> entries from configuration, before the first page is built.
@@ -1098,4 +1133,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx Extensions Specification v0.3.8-draft_
+_Jx Extensions Specification v0.3.9-draft_

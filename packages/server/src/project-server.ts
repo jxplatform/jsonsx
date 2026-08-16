@@ -40,6 +40,8 @@ import {
   serveProjectFile,
 } from "./net-guard.ts";
 import { problem } from "./problem.ts";
+import { createLoopbackAuthorizer, OAUTH_CALLBACK_PATH } from "./oauth-loopback.ts";
+import type { LoopbackAuthorizer } from "./oauth-loopback.ts";
 
 /** A resolved per-window session: its project root plus its RPC handler map. */
 export interface ProjectServerSession {
@@ -75,6 +77,11 @@ export interface ProjectServerHandle {
   wsUrl: string;
   rpcToken: string;
   canvasUrl: string;
+  /**
+   * The RFC 8252 loopback authorization host. The desktop launcher drives it: `begin()` for the URL
+   * to open in the user's browser, then `await pending.code` and {@link exchangeCode}.
+   */
+  authorizer: LoopbackAuthorizer;
   stop: () => void;
 }
 
@@ -96,6 +103,9 @@ export function createProjectServer(options: CreateProjectServerOptions): Projec
   // Bundle cache for npm bare specifiers (mirrors server.ts).
   const bundleCache = new Map<string, string>();
 
+  /* Outstanding OAuth authorizations (RFC 8252). Per server, so a stopped server abandons them. */
+  const authorizer: LoopbackAuthorizer = createLoopbackAuthorizer();
+
   const server = Bun.serve<{ winId: string | null }>({
     hostname,
     port,
@@ -112,6 +122,30 @@ export function createProjectServer(options: CreateProjectServerOptions): Projec
       const { normPath } = decoded;
 
       const winId = url.searchParams.get("win");
+
+      /*
+       * 0. The OAuth loopback redirect (RFC 8252 §7.3).
+       *
+       *    **Exempt from the token, and only from the token.** The provider redirects the user's
+       *    own browser here; that navigation carries whatever the provider's `redirect_uri` said,
+       *    and a page cannot append a secret to a URL it does not compose. Gating it on the token
+       *    would make the flow impossible rather than safe.
+       *
+       *    What replaces the token is the `state` parameter, which is unguessable, single-use and
+       *    compared in constant time — plus the Host and Fetch Metadata checks, which still apply.
+       *    An IdP redirect is exactly the one cross-site shape the strict policy admits: a
+       *    top-level GET document navigation, a person following a link.
+       */
+      if (normPath === OAUTH_CALLBACK_PATH) {
+        const gate = originHostGate(req, "strict");
+        if (gate) {
+          return gate;
+        }
+        const callback = authorizer.handleCallback(url);
+        if (callback) {
+          return callback;
+        }
+      }
 
       // 1. WebSocket upgrade — token + loopback Origin/Host are the hard gate.
       const upgrade = req.headers.get("upgrade");
@@ -327,7 +361,10 @@ export function createProjectServer(options: CreateProjectServerOptions): Projec
     wsUrl,
     rpcToken,
     canvasUrl,
+    authorizer,
     stop: () => {
+      // Abandon outstanding sign-ins first: their callbacks can no longer arrive.
+      authorizer.stop();
       void server.stop(true);
     },
   };

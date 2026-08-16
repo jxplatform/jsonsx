@@ -57,7 +57,6 @@ export const externalClassDefSchema = {
     default: {},
     description: { type: "string" },
     domain: { type: "string" },
-    expires: { type: "string" },
     /* Widened to mirror `sort` below, because this one grab-bag of properties is shared by EVERY
        state `$prototype` with no discrimination on which prototype is in play. `filter` as a
        reactive `$ref` is what the built-in `Array` prototype wants; `@jxsuite/parser`'s

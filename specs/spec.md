@@ -2,7 +2,7 @@
 
 ## Declarative Document Object Model — JSON Edition
 
-**Version:** 0.4.31-draft
+**Version:** 0.4.32-draft
 **Status:** Partial
 **Updated:** 2026-08-16
 **License:** MIT
@@ -1021,13 +1021,38 @@ Web APIs are accessed via `$prototype` in a `state` entry:
 | `FormData`        | FormData API | **Implemented** — basic field population                                |
 | `LocalStorage`    | Storage API  | **Implemented** — reactive read/write with persistence                  |
 | `SessionStorage`  | Storage API  | **Implemented** — session-scoped reactive storage                       |
-| `Cookie`          | Cookie API   | **Implemented** — maxAge, path, domain, secure, sameSite                |
+| `Cookie`          | Cookie API   | **Implemented** — maxAge, path, domain, secure, sameSite (see §11.2a)   |
 | `IndexedDB`       | IDB API      | **Implemented** — store creation, indexes, CRUD helper                  |
 | `Array`           | —            | **Implemented** — dynamic mapped list (see §10)                         |
 | `Set`             | —            | **Implemented** — `new Set(default)`                                    |
 | `Map`             | —            | **Implemented** — `new Map(Object.entries(default))`                    |
 | `Blob`            | Blob API     | **Implemented** — parts and type                                        |
 | `ReadableStream`  | Streams API  | **Pending** — stub returns `null`                                       |
+
+#### 11.2a The `Cookie` prototype's attribute rules
+
+> **Status: Implemented.**
+
+Three attributes are **derived rather than taken as declared**, because a browser that disagrees
+with a cookie's attributes drops it silently — the write appears to succeed and the value is simply
+never there again ([RFC 6265bis](https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-rfc6265bis)
+§4.1.3, §5.4.7):
+
+- A **`__Host-`** name forces `Secure`, forces `Path=/`, and drops any declared `Domain`. Honoring a
+  declared path or domain would produce a cookie no browser stores.
+- A **`__Secure-`** name forces `Secure`, and leaves path and domain alone.
+- **`SameSite=None`** forces `Secure`.
+
+Two attributes are absent on purpose, and neither is a missing feature:
+
+- **`HttpOnly`** cannot be set from script and would make the value unreadable to the binding that
+  wrote it. Its absence is the correct behavior for a script-written cookie.
+- **`Expires`** is not supported. `Max-Age` covers the same ground, §5.5 makes `Max-Age` win
+  wherever both appear, and `Expires` takes an HTTP-date whose mis-spelling fails silently in the
+  direction of a cookie that never expires.
+
+The cookie **name is data, never pattern syntax**: the reader splits the cookie header rather than
+building a regular expression from an author-supplied name.
 
 ### 11.3 Timing Values
 
@@ -2383,6 +2408,7 @@ This rewrites the mutating handlers of Appendix A's idiom using `$expression`, l
 
 ## Changelog
 
+- **0.4.32-draft** (2026-08-16) — §11.2a the Cookie prototype derives Secure/Path/Domain from a name prefix and from SameSite=None; HttpOnly and Expires are absent on purpose; a cookie name is data, never pattern syntax.
 - **0.4.31-draft** (2026-08-16) — Shadow DOM opt-in: $shadow and defaults.shadow emit a declarative shadow root the element adopts; :host translation keeps one style object valid in both modes (§16.6).
 - **0.4.30-draft** (2026-08-16) — §9.1 and §16.6: style scoping is a tag-name prefix and generated classes, not data-jx attribute selectors; cite the light-DOM divergence.
 - **0.4.29-draft** (2026-08-15) — §18 becomes the machine-checked standards table; §2.5 renamed Platform Precedents to free the reserved title; §21 marked Partial — no Trusted Types policy is installed.
@@ -2434,4 +2460,4 @@ This rewrites the mutating handlers of Appendix A's idiom using `$expression`, l
 
 ---
 
-_Jx Specification v0.4.31-draft — subject to revision_
+_Jx Specification v0.4.32-draft — subject to revision_

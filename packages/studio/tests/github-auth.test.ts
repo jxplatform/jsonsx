@@ -228,3 +228,90 @@ describe("authenticateGithub", () => {
     expect(result).toBeNull();
   });
 });
+
+// ─── The desktop's loopback flow (RFC 8252) ──────────────────────────────────
+
+const { hydrateGithubToken, githubTokenStored, githubTokenLocation } =
+  await import("../src/github/github-auth.js");
+
+interface NativeStub {
+  signIn: (force?: boolean) => Promise<{ token: string }>;
+  signOut: () => Promise<{ ok: boolean }>;
+  status: () => Promise<{ stored: boolean }>;
+}
+
+function installNative(stub: Partial<NativeStub>): { signOuts: number } {
+  const counters = { signOuts: 0 };
+  (globalThis as unknown as { __jxPlatform?: unknown }).__jxPlatform = {
+    githubAuth: {
+      signIn: stub.signIn ?? (async () => ({ token: "gho_native" })),
+      signOut:
+        stub.signOut ??
+        (async () => {
+          counters.signOuts += 1;
+          return { ok: true };
+        }),
+      status: stub.status ?? (async () => ({ stored: false })),
+    },
+  };
+  return counters;
+}
+
+describe("the desktop loopback flow", () => {
+  beforeEach(() => {
+    // Runs before installNative, so the launcher stub is absent and no sign-out is dispatched.
+    clearGithubToken();
+    notifications.length = 0;
+  });
+
+  afterEach(() => {
+    delete (globalThis as unknown as Record<string, unknown>).__jxPlatform;
+  });
+
+  test("a desktop build signs in through the launcher, never the device endpoints", async () => {
+    installNative({});
+    // No fetch stub at all: a single call to GitHub's device endpoint would throw here.
+    globalThis.fetch = originalFetch;
+    expect(await authenticateGithub()).toBe("gho_native");
+    expect(githubTokenStored()).toBe(true);
+    expect(githubTokenLocation()).toBe("desktop");
+    // The token stays out of localStorage — the 0600 store is where it lives at rest.
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+  });
+
+  test("a refused native sign-in reports rather than falling back to the device flow", async () => {
+    /*
+     * Falling back would be worse than failing: the device endpoints are the ones a desktop app
+     * should not be using, and a silent downgrade hides that the loopback flow broke.
+     */
+    installNative({ signIn: () => Promise.reject(new Error("The user denied the request")) });
+    globalThis.fetch = originalFetch;
+    expect(await authenticateGithub()).toBeNull();
+    expect(notifications.at(-1)?.options.detail).toContain("The user denied the request");
+  });
+
+  test("hydration reports a stored token without the token crossing over", () => {
+    installNative({});
+    expect(githubTokenStored()).toBe(false);
+    hydrateGithubToken(true);
+    expect(githubTokenStored()).toBe(true);
+    // Still nothing to hand out: the boolean is all the webview was given.
+    expect(getGithubToken()).toBeNull();
+  });
+
+  test("revoking clears the local view and tells the launcher to forget it", async () => {
+    const counters = installNative({});
+    globalThis.fetch = originalFetch;
+    await authenticateGithub();
+    hydrateGithubToken(true);
+
+    clearGithubToken();
+    expect(githubTokenStored()).toBe(false);
+    await Bun.sleep(1);
+    expect(counters.signOuts).toBe(1);
+  });
+
+  test("a browser build says its token lives in the browser", () => {
+    expect(githubTokenLocation()).toBe("browser");
+  });
+});
