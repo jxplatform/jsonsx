@@ -86,6 +86,7 @@ import {
   pageLanguage,
   resolveI18n,
   undeclaredLocalePrefix,
+  unprefixedRoutes,
 } from "./i18n.ts";
 import type { LocaleAlternate, ResolvedI18n } from "./i18n.ts";
 import { renderImportMap, resolveClientRuntime, writeClientRuntime } from "./client-runtime.ts";
@@ -328,6 +329,7 @@ export async function buildSite(
     sections,
     registry,
     projectConfig,
+    i18n,
   );
   log(`  ${routes.length} route(s) after expansion`);
 
@@ -475,6 +477,22 @@ export async function buildSite(
     i18n,
     siteUrl ?? "",
   );
+
+  /*
+   * `prefix-always` says every URL names its language, and until now nothing checked it: a page
+   * outside the locale tree built, served, and claimed the default locale, so a site that promised
+   * no unprefixed URLs shipped them silently. Reported once with the whole list, not once per
+   * page — an author who moved a directory wants to see the extent of it.
+   */
+  const unprefixed = unprefixedRoutes(routes, i18n);
+  if (unprefixed.length > 0) {
+    console.warn(
+      `i18n.routing is "prefix-always", but ${unprefixed.length} route(s) sit outside the locale ` +
+        `tree and are served as "${i18n?.defaultLocale}": ${unprefixed.slice(0, 10).join(", ")}` +
+        `${unprefixed.length > 10 ? `, and ${unprefixed.length - 10} more` : ""}. ` +
+        `Move them under a locale directory, or use "prefix-except-default".`,
+    );
+  }
 
   const warnedLocalePrefixes = new Set<string>();
   /*
@@ -676,7 +694,7 @@ export async function buildSite(
     const skipWorker = adapter === "cloudflare-pages" && deduped.size === 0 && mounts.length === 0;
     const workerSource = skipWorker
       ? null
-      : compileSiteServer([...deduped.values()], { adapter, connectors, mounts });
+      : compileSiteServer([...deduped.values()], { adapter, connectors, i18n, mounts });
 
     if (workerSource) {
       // Bundle the worker self-contained for the adapter's runtime (compiler.md §12): mount
@@ -701,7 +719,17 @@ export async function buildSite(
         // Only invoke the worker for server routes; everything else stays static.
         writeFileSync(
           resolve(outDir, "_routes.json"),
-          `${JSON.stringify({ exclude: [], include: ["/_jx/*"], version: 1 }, null, 2)}\n`,
+          // `/` joins the include list only when there is a locale to negotiate: Pages invokes
+          // The worker for included paths only, so an uninvoked middleware is an inert one.
+          `${JSON.stringify(
+            {
+              exclude: [],
+              include: i18n && i18n.locales.length > 1 ? ["/", "/_jx/*"] : ["/_jx/*"],
+              version: 1,
+            },
+            null,
+            2,
+          )}\n`,
           "utf8",
         );
         fileCount += 1;

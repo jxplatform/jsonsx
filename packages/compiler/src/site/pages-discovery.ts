@@ -17,6 +17,8 @@ import { extname, join, relative, resolve } from "node:path";
 import type { ExtensionRegistry } from "@jxsuite/schema/extension-registry";
 import type { FormatRegistry } from "@jxsuite/schema/format-registry";
 import type { JxDocument, JxPathsDef, ProjectConfig } from "@jxsuite/schema/types";
+import { localeOfRoute } from "./i18n.ts";
+import type { ResolvedI18n } from "./i18n.ts";
 
 interface Route {
   urlPattern: string; // URL pattern (e.g. "/blog/:slug")
@@ -262,6 +264,7 @@ export async function expandDynamicRoutes(
   sections: Record<string, unknown> = {},
   registry?: ExtensionRegistry,
   projectConfig?: ProjectConfig,
+  i18n?: ResolvedI18n | null,
 ) {
   const expanded: Route[] = [];
 
@@ -292,6 +295,9 @@ export async function expandDynamicRoutes(
       sections,
       registry,
       projectConfig,
+      // The template's OWN prefix, read before expansion: `/fr/blog/:slug` is a French route
+      // Whatever its entries turn out to be called, and that is what scopes a localized collection.
+      localeOfRoute(route.urlPattern, i18n ?? null),
     );
 
     for (const pathEntry of pathEntries) {
@@ -344,6 +350,7 @@ async function resolvePathEntries(
   sections: Record<string, unknown>,
   registry?: ExtensionRegistry,
   projectConfig?: ProjectConfig,
+  locale?: string | null,
 ): Promise<Record<string, unknown>[]> {
   // Legacy: array of param objects
   if (Array.isArray($paths)) {
@@ -388,6 +395,7 @@ async function resolvePathEntries(
     }
     return (await entry.call("resolvePaths", $paths, {
       data: sections[entry.project.key],
+      locale,
       projectConfig,
       root: projectRoot,
     })) as Record<string, unknown>[];

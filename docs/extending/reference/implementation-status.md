@@ -25,7 +25,7 @@ This page is generated from the `> **Status: …**` markers in the specification
 | `relationships.md`        | 0.1.4-draft  | Partial     | 2026-08-15 |
 | `schema.md`               | 0.4.8-draft  | Partial     | 2026-08-16 |
 | `server.md`               | 0.2.5        | Implemented | 2026-08-16 |
-| `site-architecture.md`    | 0.5.7-draft  | Partial     | 2026-08-16 |
+| `site-architecture.md`    | 0.5.8-draft  | Partial     | 2026-08-16 |
 | `spec.md`                 | 0.4.31-draft | Partial     | 2026-08-16 |
 | `standards.md`            | 0.1.12-draft | Partial     | 2026-08-16 |
 | `studio-ui-guidelines.md` | 0.3.9        | Implemented | 2026-08-15 |
@@ -43,6 +43,7 @@ This page is generated from the `> **Status: …**` markers in the specification
 - `server.md` §4.2 — Security
 - `site-architecture.md` §9.4 — Studio Media Browser
 - `site-architecture.md` §13 — Internationalization
+- `site-architecture.md` §13.6 — Locale Negotiation
 - `site-architecture.md` §14 — Deployment
 - `spec.md` §5.6 — Private State (`#` prefix)
 - `spec.md` §11.4 — Server Timing — RPC Function Boundary
@@ -60,7 +61,6 @@ This page is generated from the `> **Status: …**` markers in the specification
 - `collab.md` §5 — Version Skew
 - `desktop.md` §4.3 — Single File Mode
 - `site-architecture.md` §12.3 — Incremental Builds
-- `site-architecture.md` §13.3 — Content Localization
 
 ### Future
 

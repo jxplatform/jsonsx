@@ -6,6 +6,7 @@ import {
   resolveI18n,
   translationKey,
   undeclaredLocalePrefix,
+  unprefixedRoutes,
 } from "../src/site/i18n.ts";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 
@@ -224,5 +225,57 @@ describe("localeAlternates", () => {
       "https://x.example",
     );
     expect(noDefault.get("/ar/about/")?.map((a) => a.hreflang)).toEqual(["ar", "fr-CA"]);
+  });
+});
+
+describe("unprefixedRoutes", () => {
+  const always = {
+    defaultLocale: "en",
+    locales: ["en", "fr-CA"],
+    routing: "prefix-always" as const,
+  };
+
+  /*
+   * `prefix-always` is a promise that every URL names its language. A page outside the tree breaks
+   * it silently — it builds, it serves, and `localeOfRoute` calls it the default — so the only
+   * reader who finds out is a visitor who lands on it and sees the wrong language.
+   */
+  test("names every route sitting outside the locale tree", () => {
+    expect(
+      unprefixedRoutes(
+        [
+          { urlPattern: "/en/about/" },
+          { urlPattern: "/fr-ca/a-propos/" },
+          { urlPattern: "/stray/" },
+          { urlPattern: "/docs/api/" },
+        ],
+        always,
+      ),
+    ).toEqual(["/stray/", "/docs/api/"]);
+  });
+
+  /*
+   * `/` is the one URL that exists to send a visitor somewhere else under prefix-always, and
+   * negotiation is what it is for — reporting it would be reporting the feature.
+   */
+  test("never reports the site root", () => {
+    expect(unprefixedRoutes([{ urlPattern: "/" }], always)).toEqual([]);
+  });
+
+  test("a segment that parses as a tag but is not declared still counts", () => {
+    expect(unprefixedRoutes([{ urlPattern: "/de/impressum/" }], always)).toEqual([
+      "/de/impressum/",
+    ]);
+  });
+
+  // Under prefix-except-default an unprefixed route is the whole point of the mode.
+  test("says nothing under prefix-except-default, or with no i18n at all", () => {
+    expect(
+      unprefixedRoutes([{ urlPattern: "/about/" }], {
+        ...always,
+        routing: "prefix-except-default",
+      }),
+    ).toEqual([]);
+    expect(unprefixedRoutes([{ urlPattern: "/about/" }], null)).toEqual([]);
   });
 });

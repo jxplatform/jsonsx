@@ -817,5 +817,12 @@ export interface ContentLoaderEntry {
     mtime?: string;
     /** Authored text of a field the date-coercion pass rewrote, keyed by field name. */
     rawDates?: Record<string, unknown>;
+    /**
+     * The locale this entry was loaded for, set only when its content type's `source` carried a
+     * `{locale}` placeholder. It is what lets a `[slug]` route under `/fr/` expand the French
+     * entries and not the English ones — without it, two translations of one post share an id and
+     * the second silently overwrites the first's route.
+     */
+    locale?: string;
   };
 }

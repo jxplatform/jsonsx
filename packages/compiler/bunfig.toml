@@ -5,9 +5,12 @@ coveragePathIgnorePatterns = [
   "**/tests/**",
   "./result/**",
   # Transient /tmp modules some tests import (portability worker copy, importImplementation
-  # fixtures) — loaded artifacts, not compiler source.
+  # fixtures, the bundled locale worker) — loaded artifacts, not compiler source. Each is a
+  # BUNDLE: the coverage it reports is hono's plus the generated entry's, so instrumenting it
+  # measures a dependency and fails the per-file gate on code this workspace does not own.
   "**/jx-worker-portability-*/**",
   "**/jx-import-impl-*/**",
+  "**/jx-locale-worker-*/**",
   "../../extensions/**",
   "../create/**",
   "../desktop/**",

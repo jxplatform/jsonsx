@@ -216,6 +216,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `site-architecture.md`
 
+- **0.5.8-draft** (2026-08-16) — §13.3 {locale} sources expand and scope route expansion; §13.6 Accept-Language negotiation in the generated worker; prefix-always is checked; gap:locale-lookup closed.
 - **0.5.7-draft** (2026-08-16) — §8.4.1 a generated route's lastmod comes from the entry it was generated from; gap:sitemap-fields closed.
 - **0.5.6-draft** (2026-08-16) — §8.3 link relations are checked against the IANA registry, warning once per build; gap:link-relation-validation closed.
 - **0.5.5-draft** (2026-08-16) — §16: the RFC 9110 row states the five statuses B1 shipped instead of the two that predated it.
