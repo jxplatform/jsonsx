@@ -129,7 +129,20 @@ A component whose `tagName` contains a hyphen is a custom element:
 }
 ```
 
-Custom elements render to the light DOM (no Shadow DOM). Style scoping uses `data-jx` attributes.
+Custom elements render to the **light DOM**. Nothing attaches a shadow root, so scoping is done with selectors instead: a component's own rules are prefixed with its tag name, and a nested element with its own `style` gets a generated `.<tagName>-<n>` class.
+
+```css
+sty-card {
+  color: red;
+}
+sty-card .inner {
+  color: blue;
+}
+```
+
+:::doc-note
+This cuts both ways, and it's worth knowing which. Your page CSS **can** reach into a component and restyle it — handy when you want it, and the reason a stray global rule can change a component you didn't touch. There's no encapsulation boundary to stop either one.
+:::
 
 ## Props and Encapsulation
 

@@ -48,7 +48,19 @@ Keys beginning with `:`, `.`, `&`, or `[` are treated as nested selectors:
 }
 ```
 
-Inline properties apply directly to the element. Nested rules are emitted as a scoped `<style>` block using a generated `data-jx` attribute selector.
+Inline properties apply directly to the element. Nested rules are emitted as a scoped `<style>` block keyed on a **generated class** — `.<tagName>-<n>`, which the build also puts on the element:
+
+```html
+<div class="sty-card-0">…</div>
+```
+
+```css
+.sty-card-0:hover {
+  padding: 8px;
+}
+```
+
+(You'll also see `data-jx-static` and `data-jx-prerendered` in compiled output. Those mark hydration state and are never used as CSS selectors.)
 
 ## Named Media Breakpoints
 

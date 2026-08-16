@@ -208,6 +208,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `site-architecture.md`
 
+- **0.5.3-draft** (2026-08-16) — Cascade layer 6 describes the scoping that exists — there is no shadow DOM.
 - **0.5.2-draft** (2026-08-15) — Generate manifest.webmanifest and .well-known/security.txt (§14.5).
 - **0.5.1-draft** (2026-08-15) — hreflang alternates in <head> and sitemap xhtml:link for translated pages (§13, §13.5).
 - **0.5.0-draft** (2026-08-15) — i18n: BCP 47 validation and canonicalization, route prefixes resolve to locales, per-page lang and script-derived dir, $page.locale (§13, §13.2, §13.4).
@@ -268,6 +269,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `spec.md`
 
+- **0.4.30-draft** (2026-08-16) — §9.1 and §16.6: style scoping is a tag-name prefix and generated classes, not data-jx attribute selectors; cite the light-DOM divergence.
 - **0.4.29-draft** (2026-08-15) — §18 becomes the machine-checked standards table; §2.5 renamed Platform Precedents to free the reserved title; §21 marked Partial — no Trusted Types policy is installed.
 - **0.4.28-draft** (2026-08-10) — §19.6 $expression gains a third position — an element's tagName, narrowed to a TagExpression whose every branch is a literal TagName so the candidate set is enumerable without evaluating; it is the one $expression position that is not live, resolved once at element creation, and the document root's and $head entries' tagNames stay literal.
 - **0.4.27-draft** (2026-07-30) — Clarify that a bare `return;` is an early-exit guard, not a value return, when classifying a Function body as a computed (§5.3 4b).
@@ -317,6 +319,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `standards.md`
 
+- **0.1.7-draft** (2026-08-16) — Retarget the CSS Shadow Parts backlog entry at spec.md §16.6, which now owns the shadow-DOM question.
 - **0.1.6-draft** (2026-08-15) — Web App Manifest, RFC 9116 and RFC 8615 graduate to bound rows in site-architecture.md §14.5.
 - **0.1.5-draft** (2026-08-15) — UAX #9 and UTS #35 graduate to bound rows in site-architecture.md §13.4.
 - **0.1.4-draft** (2026-08-15) — RFC 4287, JSON Feed 1.1 and RFC 5005 graduate to bound rows in site-architecture.md §6.7.

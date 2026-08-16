@@ -2,9 +2,9 @@
 
 ## File-Based Routing, Content Collections, Layouts, and Static Site Generation
 
-**Version:** 0.5.2-draft
+**Version:** 0.5.3-draft
 **Status:** Partial
-**Updated:** 2026-08-15
+**Updated:** 2026-08-16
 **License:** MIT
 
 ---
@@ -1449,7 +1449,7 @@ The global stylesheet is emitted in this order:
 3. The `color-scheme` declaration triplet, when a scheme query is declared
 4. Layout-level styles
 5. Page-level styles
-6. Component-level styles (scoped to custom element shadow DOM or via class namespacing)
+6. Component-level styles (scoped by tag-name prefix and generated `.<tagName>-<n>` classes — there is no shadow DOM; `spec.md` §16.6)
 
 This follows the natural CSS cascade — more specific sources override less specific ones, and
 base rules always precede their conditional overrides so equal-specificity variants win by
@@ -2266,6 +2266,7 @@ This spec builds on existing Jx primitives wherever possible:
 
 ## Changelog
 
+- **0.5.3-draft** (2026-08-16) — Cascade layer 6 describes the scoping that exists — there is no shadow DOM.
 - **0.5.2-draft** (2026-08-15) — Generate manifest.webmanifest and .well-known/security.txt (§14.5).
 - **0.5.1-draft** (2026-08-15) — hreflang alternates in <head> and sitemap xhtml:link for translated pages (§13, §13.5).
 - **0.5.0-draft** (2026-08-15) — i18n: BCP 47 validation and canonicalization, route prefixes resolve to locales, per-page lang and script-derived dir, $page.locale (§13, §13.2, §13.4).
