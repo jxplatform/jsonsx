@@ -14,6 +14,7 @@ import { projectState, renderOnly } from "../store";
 import type { DirEntry, JsonValue } from "../types";
 import { activeTab } from "../workspace/workspace";
 import { activeRegistry } from "../commands/active-registry";
+import { clearProblems, notify } from "../services/notify";
 import { renderEmptyState } from "./empty-state";
 import { registerPanel } from "./panel-registry";
 import { mutateUpdateFrontmatter, transact } from "../tabs/transact";
@@ -472,6 +473,38 @@ export interface SeoWarning {
   /** The head key the warning is about, so the field row can carry it. */
   field: string;
   message: string;
+}
+
+/** The Problems `source` the SEO warnings carry, so a re-run replaces rather than stacks. */
+export const SEO_PROBLEM_SOURCE = "Search appearance";
+
+/**
+ * File the SEO warnings as Problems as well as rendering them in the modal.
+ *
+ * The modal is a window someone has to open. A page shipped with no description is a fact worth
+ * knowing whether or not you thought to look, and Problems is where this app already keeps facts
+ * that outlive the frame you were not watching — which is the same argument the accessibility
+ * report makes, and the redirects checks before it.
+ *
+ * Cleared first, so a fixed page stops being listed; keyed by warning id, so the two surfaces name
+ * the same thing.
+ *
+ * @param {SeoPreview} preview
+ * @param {string} [path] The document's path, so a row can open the file it is about.
+ * @returns {number} How many Problems were filed.
+ */
+export function reportSeoProblems(preview: SeoPreview, path?: string): number {
+  clearProblems((record) => record.source === SEO_PROBLEM_SOURCE);
+  for (const warning of preview.warnings) {
+    notify.warn(warning.message, {
+      action: "document.openSeo",
+      key: `seo.${warning.id}`,
+      source: SEO_PROBLEM_SOURCE,
+      tier: "problem",
+      ...(path === undefined ? {} : { path }),
+    });
+  }
+  return preview.warnings.length;
 }
 
 /** Everything the two preview cards, the field list and the warning list render. */

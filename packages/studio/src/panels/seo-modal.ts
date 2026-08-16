@@ -41,6 +41,7 @@ import {
   findLinkEntry,
   renderMetaFieldRow,
   seoField,
+  reportSeoProblems,
   seoPreviewFor,
   upsertLink,
   visibleLength,
@@ -328,6 +329,15 @@ export function openSeoModal(tab: Tab): void {
     _handle = openModal(html``, { label: "Search appearance", onDismiss: closeSeoModal });
   }
   renderSeoModal();
+  /*
+   * File the same warnings as Problems on the way in.
+   *
+   * A window someone has to open is not where a fact should live alone: a page shipped with no
+   * description is worth knowing whether or not you thought to look, and Problems is where this app
+   * keeps the records that outlive the frame you were not watching. Same list, keyed by warning id,
+   * so the two surfaces are naming one thing rather than two.
+   */
+  reportSeoProblems(seoPreviewFor(tab, tab.doc.document), tab.documentPath ?? undefined);
 }
 
 /** Close it, and forget the document it was about. */

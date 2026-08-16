@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.26-draft
+**Version:** 0.9.27-draft
 **Status:** Partial
 **Updated:** 2026-08-16
 **License:** MIT
@@ -1868,6 +1868,37 @@ beats being current — and that deferral is now visible rather than silent. A p
 from before the last edit is correct; a panel showing it with no indication is indistinguishable
 from a panel that has stopped working.
 
+### 16.6 Reports about the author's own content
+
+> **Status: Implemented.**
+
+Two checks run over the document rather than over the app, and both file their findings as
+**Problems**: the accessibility report (`services/a11y-report.ts`) and the SEO warnings the Search
+appearance window already computed.
+
+**Why Problems and not a panel of their own.** Problems is where this app keeps the records that
+outlive the frame the reader was not watching, and both of these are exactly that: a page shipped
+with no description, or with an unlabelled image, is a fact worth knowing whether or not the author
+thought to open a window. The Search appearance window keeps rendering its own list — the previews
+are what that window is for — and files the same warnings, keyed by warning id, so the two surfaces
+are naming one thing rather than two.
+
+**No score, in either report.** A single figure out of a hundred aggregates unrelated facts into a
+verdict, and the verdict is what gets optimised. The list is the report.
+
+**Every accessibility finding names its WCAG criterion**, which is what ATAG 2.0 B.3.1 asks a report
+to carry. B.3.2 — a repair the author can invoke from the finding — is only partly answered: a
+finding whose repair is a command carries it, and most repairs ("give this image alt text") have no
+command yet, so those findings carry none. Naming a command that merely reopens a panel would put a
+button on a finding that does not do what the button says.
+
+**A run says what it could NOT check.** Colour contrast between computed colours, target size in
+rendered pixels, focus order and reading order are all properties of built output in a browser, not
+of a document tree; answering them means running the page with an engine like axe-core. Two
+Problems name that absence on every run, because a report that lists nothing otherwise reads as
+"this page is accessible" — a claim the run cannot make. This is the `redirects-grid.ts` idiom, for
+the same reason it exists there.
+
 ---
 
 ## 17. Project Documents (Settings and Styles)
@@ -2066,14 +2097,15 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md). Detailed accessibility conventions live in [`studio-ui-guidelines.md`](./studio-ui-guidelines.md) §14; this section cites what the Studio _shell_ binds.
 
-| Standard                                           | Class       | Binds | Evidence                                                                                                                          | Note                                                                                                                                                                                                                                                                                                                                          |
-| -------------------------------------------------- | ----------- | ----- | --------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [WAI-ARIA](https://www.w3.org/TR/wai-aria-1.2/)    | **Subset**  | §16   | packages/studio/src/ui/layers.ts                                                                                                  | The toast host is a live region and modals carry `role="dialog"` with `aria-modal`. The Problems panel, which is where the default tier sends an error, is not a live region at all.                                                                                                                                                          |
-| [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) | **Subset**  | §16   | packages/studio/src/platform-errors.ts, packages/studio/src/platforms/devserver.ts, packages/studio/tests/platform-errors.test.ts | A Problem's message comes from one reader over every shape a backend has sent, so a failure can no longer surface blank because the reader that ran was not the one for the shape that arrived. `problemDetail` answers `null` rather than a generic string, which is what lets each call site keep its own better words. Absent: `instance`. |
-| [ATAG 2.0](https://www.w3.org/TR/ATAG20/)          | **Pending** | §16   | —                                                                                                                                 | `gap:authoring-accessibility-review` Studio checks a document's search appearance and its redirects, and files both as Problems. It does not check the accessibility of the content the author is producing, which is Part B's subject.                                                                                                       |
+| Standard                                           | Class      | Binds | Evidence                                                                                                                          | Note                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| -------------------------------------------------- | ---------- | ----- | --------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [WAI-ARIA](https://www.w3.org/TR/wai-aria-1.2/)    | **Subset** | §16   | packages/studio/src/ui/layers.ts                                                                                                  | The toast host is a live region and modals carry `role="dialog"` with `aria-modal`. The Problems panel, which is where the default tier sends an error, is not a live region at all.                                                                                                                                                                                                                                                                                                                                                                  |
+| [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) | **Subset** | §16   | packages/studio/src/platform-errors.ts, packages/studio/src/platforms/devserver.ts, packages/studio/tests/platform-errors.test.ts | A Problem's message comes from one reader over every shape a backend has sent, so a failure can no longer surface blank because the reader that ran was not the one for the shape that arrived. `problemDetail` answers `null` rather than a generic string, which is what lets each call site keep its own better words. Absent: `instance`.                                                                                                                                                                                                         |
+| [ATAG 2.0](https://www.w3.org/TR/ATAG20/)          | **Subset** | §16.6 | packages/studio/src/services/a11y-report.ts, packages/studio/tests/a11y-report.test.ts, packages/studio/src/panels/head-panel.ts  | Part B.3.1 is met: a check over the author's document files a Problem per finding, each naming its WCAG criterion, and names what it could not check rather than reporting a clean bill. B.3.2 is partial — a repair command is carried where one exists, and most repairs have none yet. Part A is `studio-ui-guidelines.md` §13.1a and §8.2. Everything needing layout or the cascade is a property of built output and is out of scope for a document-tree check; the two Problems that say so are how the boundary is stated rather than implied. |
 
 ## Changelog
 
+- **0.9.27-draft** (2026-08-16) — §16.6 reports about the author's own content — an ATAG Part B accessibility check and the SEO warnings both file Problems, each finding naming its WCAG criterion, and each run naming what it could not check. Closes gap:atag-authoring-support.
 - **0.9.26-draft** (2026-08-16) — §16 one Problem reader over every backend failure shape; gap:studio-error-reader closed.
 - **0.9.25-draft** (2026-08-15) — Add §19 Standards Alignment; six bare **Status:** lines converted to the blockquote form no tool could read, and §16 marked Partial — the one status channel has no live region for the error tier.
 - **0.9.24-draft** (2026-08-13) — Open in Browser serves the built site on its own origin; the build reports the URL.
@@ -2155,4 +2187,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.26-draft_
+_`@jxsuite/studio` Specification v0.9.27-draft_
