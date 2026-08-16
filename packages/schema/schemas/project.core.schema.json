@@ -292,6 +292,46 @@
                   "default": true,
                   "type": "boolean"
                 },
+                "csp": {
+                  "default": false,
+                  "description": "CSP Level 3. Off by default: unlike the other security headers this one governs code the build cannot see — a third-party script that loads a second script, a widget that opens a frame — so turning it on is a change to verify in the browser console, not a safe default. `script-src` is derived from the inline scripts and external origins the build emitted; `style-src` keeps 'unsafe-inline', because per-page <style> blocks and per-element style attributes have no site-wide hash.",
+                  "oneOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "const": "report-only"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "directives": {
+                          "additionalProperties": {
+                            "oneOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "const": false
+                              }
+                            ]
+                          },
+                          "description": "Replace (string) or remove (false) a computed directive. A replacement is wholesale, so an addition restates the defaults.",
+                          "type": "object"
+                        },
+                        "mode": {
+                          "default": "enforce",
+                          "enum": ["enforce", "report-only"]
+                        },
+                        "reportUri": {
+                          "format": "uri-reference",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  ]
+                },
                 "frameOptions": {
                   "default": "SAMEORIGIN",
                   "oneOf": [
@@ -421,6 +461,20 @@
               "type": "null"
             }
           ]
+        },
+        "shadow": {
+          "default": false,
+          "description": "Default shadow-DOM mode for every component (spec.md §16.6). Off unless set: a shadow root isolates component styles from the page and replaces the <slot> emulation with real slot distribution. A component's own `$shadow` overrides this in both directions.",
+          "oneOf": [
+            {
+              "enum": ["open", "closed"],
+              "type": "string"
+            },
+            {
+              "const": false,
+              "type": "boolean"
+            }
+          ]
         }
       },
       "type": "object"
@@ -432,6 +486,176 @@
         "type": "string"
       },
       "type": "array"
+    },
+    "manifest": {
+      "additionalProperties": false,
+      "description": "W3C Web App Manifest, emitted as manifest.webmanifest with a <link rel=\"manifest\"> on every page. Absent means no manifest: it is a claim that a site is meant to be installed, and most are not.",
+      "properties": {
+        "backgroundColor": {
+          "type": "string"
+        },
+        "categories": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "description": {
+          "type": "string"
+        },
+        "dir": {
+          "enum": ["ltr", "rtl", "auto"],
+          "type": "string"
+        },
+        "display": {
+          "default": "standalone",
+          "enum": ["fullscreen", "standalone", "minimal-ui", "browser"],
+          "type": "string"
+        },
+        "enabled": {
+          "default": true,
+          "type": "boolean"
+        },
+        "icons": {
+          "description": "Icons at 192px and 512px are what browsers require before offering to install the site; the build warns when either is missing.",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "purpose": {
+                "type": "string"
+              },
+              "sizes": {
+                "examples": ["192x192"],
+                "type": "string"
+              },
+              "src": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              }
+            },
+            "required": ["src"],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "lang": {
+          "type": "string"
+        },
+        "name": {
+          "description": "Defaults to the project name.",
+          "type": "string"
+        },
+        "orientation": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string"
+        },
+        "shortName": {
+          "type": "string"
+        },
+        "startUrl": {
+          "default": "/",
+          "type": "string"
+        },
+        "themeColor": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "serviceWorker": {
+      "default": false,
+      "description": "W3C Service Worker, emitted as sw.js. Off unless declared — a worker is sticky, so it is the one output that can keep breaking visitors after a deploy tries to fix them. **Turning it off means `false`, not deleting the key**: `false` emits a tombstone at the same URL that unregisters the old worker and clears its caches, and a 404 there is not an instruction to stop. HTML is always network-first; only the content-addressed /images/_optimized/* is served cache-first.",
+      "oneOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "offlineFallback": {
+              "description": "Page served for a failed navigation. Added to `precache` if not already there.",
+              "type": "string"
+            },
+            "precache": {
+              "description": "Site-absolute URLs fetched at install time. Each must be a file this build produces; one that is not fails the build, because a single unreachable entry stops the worker installing at all.",
+              "items": {
+                "pattern": "^/",
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "scope": {
+              "default": "/",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        }
+      ]
+    },
+    "securityTxt": {
+      "additionalProperties": false,
+      "description": "RFC 9116 security.txt, emitted at .well-known/security.txt. `expires` is required by §2.5.5 and an absent or past value is a build error — an expired file advertises a reporting channel while telling the reporter not to trust it. A hand-placed public/.well-known/security.txt shadows this, which is how a clearsigned file ships.",
+      "properties": {
+        "acknowledgments": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "canonical": {
+          "type": "string"
+        },
+        "contact": {
+          "description": "At least one mailto:, https: or tel: URI (§2.5.3).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "enabled": {
+          "default": true,
+          "type": "boolean"
+        },
+        "encryption": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "expires": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "hiring": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "policy": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "preferredLanguages": {
+          "description": "BCP 47 tags, validated and canonicalized like i18n.locales.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
     },
     "i18n": {
       "description": "Internationalization configuration.",
