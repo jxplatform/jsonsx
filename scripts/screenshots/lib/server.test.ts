@@ -227,8 +227,25 @@ describe("materialiseGitFixture", () => {
     const dest = join(root, "showcase");
     await materialiseGitFixture(source, dest);
 
-    const log = await run(dest, ["log", "--format=%s|%ad|%an", "--date=iso-strict"]);
-    expect(log.trim().split("\n")).toEqual([
+    /*
+     * `%at` — the author date as epoch seconds — and not `--date=iso-strict`.
+     *
+     * The fixture pins each date as `…Z`, git stores it as an instant plus an offset, and
+     * `iso-strict` renders a zero offset as `+00:00`. So an assertion written against the fixture's
+     * own spelling never matched git's, and the test failed on the FORMAT while the thing it exists
+     * to prove — that the instant is pinned — was correct all along. Epoch seconds have one
+     * spelling in every git version; `toISOString` gives the readable form back.
+     */
+    const log = await run(dest, ["log", "--format=%s|%at|%an"]);
+    const commits = log
+      .trim()
+      .split("\n")
+      .map((row) => {
+        const [subject, at, author] = row.split("|");
+        const when = new Date(Number(at) * 1000).toISOString().replace(".000Z", "Z");
+        return `${subject}|${when}|${author}`;
+      });
+    expect(commits).toEqual([
       "Add the listings page and its card|2026-01-14T16:42:00Z|Rae Okonjo",
       "Add the Showcase site skeleton|2026-01-12T09:14:00Z|Rae Okonjo",
     ]);

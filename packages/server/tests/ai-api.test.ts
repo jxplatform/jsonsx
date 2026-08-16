@@ -7,8 +7,21 @@
  * @module @jxsuite/server/tests
  */
 
-import { describe, it, expect } from "bun:test";
+import { beforeEach, describe, it, expect } from "bun:test";
 import { handleAiApi } from "../src/ai-api.js";
+
+/*
+ * Clear the upstream configuration before every test.
+ *
+ * Each test used to set `OPENAI_API_KEY` and delete it on the last line, which works right up until
+ * a test fails or times out — then the key survives into the next one, and a test written for the
+ * NO-KEY path silently takes the has-key path and calls the real OpenAI. That is how one hanging
+ * test became two: the second was only ever failing because the first leaked.
+ */
+beforeEach(() => {
+  delete process.env.OPENAI_API_KEY;
+  delete process.env.OPENAI_BASE_URL;
+});
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -301,44 +314,99 @@ describe("POST /__studio/ai/chat — SSE streaming", () => {
 
 describe("POST /__studio/ai/chat — SSE event shape", () => {
   it("events from error response have correct shape", async () => {
-    // Force a 401 by using an obviously invalid key against OpenAI
-    process.env.OPENAI_API_KEY = "invalid-key-for-testing";
+    /*
+     * The upstream 401 is MOCKED, as in the streaming test above.
+     *
+     * This used to send a deliberately invalid key to the real api.openai.com and assert on what
+     * came back — so it tested OpenAI's error behaviour and a working network connection, not this
+     * proxy's. Offline or under load it simply hung for the full timeout. What the test is actually
+     * for is the SHAPE this code emits when upstream refuses, and a stub states that refusal
+     * exactly.
+     */
+    process.env.OPENAI_API_KEY = "test-key";
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (() =>
+      Promise.resolve(
+        Response.json(
+          { error: { message: "Incorrect API key provided.", type: "invalid_request_error" } },
+          { status: 401 },
+        ),
+      )) as unknown as typeof fetch;
 
-    const req = mockReq("/__studio/ai/chat", {
-      method: "POST",
-      body: {
-        messages: [{ role: "user", content: "Hello" }],
-        tools: [],
-        systemPrompt: "",
-        model: "gpt-4o",
-      },
-      headers: { "X-Api-Key": "invalid-key-for-testing" },
-    });
-    const url = new URL("http://localhost/__studio/ai/chat");
-    const res = await handleAiApi(req, url);
+    try {
+      const req = mockReq("/__studio/ai/chat", {
+        method: "POST",
+        body: {
+          messages: [{ role: "user", content: "Hello" }],
+          tools: [],
+          systemPrompt: "",
+          model: "gpt-4o",
+        },
+        headers: { "X-Api-Key": "test-key" },
+      });
+      const url = new URL("http://localhost/__studio/ai/chat");
+      const res = await handleAiApi(req, url);
 
-    expect(res).not.toBeNull();
-    const events = await readSSEEvents(res!);
+      expect(res).not.toBeNull();
+      const events = await readSSEEvents(res!);
 
-    // Should have an error event with proper shape
-    const errorEvent = events.find((e) => e.type === "error");
-    expect(errorEvent).toBeDefined();
-    const message = errorEvent!.message as string;
-    expect(typeof message).toBe("string");
-    expect(message.length).toBeGreaterThan(0);
-
-    delete process.env.OPENAI_API_KEY;
+      // An error event, carrying a non-empty message — the contract the assistant panel reads.
+      const errorEvent = events.find((e) => e.type === "error");
+      expect(errorEvent).toBeDefined();
+      const message = errorEvent!.message as string;
+      expect(typeof message).toBe("string");
+      expect(message.length).toBeGreaterThan(0);
+    } finally {
+      globalThis.fetch = realFetch;
+    }
   });
 
-  it("model list returns at least gpt-4o and gpt-4.1", async () => {
+  it("model list returns at least gpt-4o and gpt-4.1 with no key configured", async () => {
+    /*
+     * The no-key path, which is the one this assertion was always describing: with no credential
+     * there is nothing to proxy to, so the endpoint answers a hardcoded list and the UI can still
+     * render a picker. It only reached the network because the test before it leaked a key — see
+     * the `beforeEach` at the top of this file.
+     */
     const req = mockReq("/__studio/ai/models");
     const url = new URL("http://localhost/__studio/ai/models");
     const res = await handleAiApi(req, url);
-    const data = await res!.json();
+    const data = (await res!.json()) as { configured: boolean; models: { id: string }[] };
 
-    const ids = data.models.map((m: { id: string }) => m.id);
+    expect(data.configured).toBe(false);
+    const ids = data.models.map((m) => m.id);
     expect(ids).toContain("gpt-4o");
     expect(ids).toContain("gpt-4.1");
+  });
+
+  it("an unreachable upstream degrades to defaults rather than failing the request", async () => {
+    /*
+     * 200 with a usable list, not a 4xx — one of the three surfaces `server.md` §4.3 exempts from
+     * RFC 9457, because the catalogue IS still delivered. `upstreamError` is how a caller can tell
+     * the difference without the status line changing under it.
+     */
+    process.env.OPENAI_API_KEY = "test-key";
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (() =>
+      Promise.reject(new Error("getaddrinfo ENOTFOUND"))) as unknown as typeof fetch;
+
+    try {
+      const res = await handleAiApi(
+        mockReq("/__studio/ai/models"),
+        new URL("http://localhost/__studio/ai/models"),
+      );
+      expect(res!.status).toBe(200);
+      const data = (await res!.json()) as {
+        configured: boolean;
+        models: { id: string }[];
+        upstreamError?: string;
+      };
+      expect(data.configured).toBe(true);
+      expect(data.upstreamError).toBe("network");
+      expect(data.models.map((m) => m.id)).toContain("gpt-4o");
+    } finally {
+      globalThis.fetch = realFetch;
+    }
   });
 });
 
