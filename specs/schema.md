@@ -2,7 +2,7 @@
 
 ## JSON Schema 2020-12 Meta-Schema Generator
 
-**Version:** 0.4.7-draft
+**Version:** 0.4.8-draft
 **Status:** Partial
 **Updated:** 2026-08-16
 **License:** MIT
@@ -219,6 +219,35 @@ reviver runs the duplicate is already gone. **Fractions are never judged**: `0.1
 representable either, so flagging them would flag most real documents while saying nothing about
 whether the author's value survived.
 
+### 3.5 Unicode Normalization at the Parse Boundary
+
+> **Status: Implemented.** `parse.ts` puts every key and every string value into NFC, for documents,
+> project configs and class definitions alike.
+
+A state name is an **identifier**: declared as a key in `state`, referenced as `${state.état}` in a
+template and as `#/state/état` in a `$ref`. Typed on macOS it arrives decomposed (`e` + U+0301);
+typed on Windows, or pasted from most of the web, it arrives precomposed (U+00E9).
+
+Those are two different JavaScript property names. A document whose declaration and reference were
+typed on different machines therefore **builds cleanly, emits a valid bundle, and renders nothing** —
+`state.état` is `undefined`, there is no error, and no search finds the problem because both
+spellings look identical in every editor. UAX #31 §R4 exists for this case, and NFC is the form the
+rest of the web platform assumes.
+
+Two consequences are worth stating, because both look like overreach until the reason is given:
+
+- **String values are normalized too, and that is not a content change.** Two canonically equivalent
+  strings are the same text by UAX #15's own definition: a conforming renderer must display them
+  identically and no process may distinguish them. It is also unavoidable — Jx has no syntactic
+  boundary between content and code, since `"Café ${state.été}"` is one string carrying both, and
+  normalizing "only identifier positions" would mean parsing every template to find them.
+- **It runs on the parsed value, not on the source text.** `"état"` is pure ASCII until
+  `JSON.parse` turns the escapes into a combining mark, so normalizing the text would miss exactly
+  the documents a generator wrote.
+
+NFC composes; it does not fold or strip. Scripts with no composed forms, CJK and emoji all survive
+byte for byte, and a test asserts it.
+
 ---
 
 ## 4. Generation Pipeline
@@ -264,17 +293,19 @@ Three JSON Schema 2020-12 documents:
 
 External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md). `@webref/*` is a tooling package rather than a standard; what it carries are extracts of the specifications cited below.
 
-| Standard                                                            | Class       | Binds  | Evidence                                                                                                                                                           | Note                                                                                                                                                                                                                                                                                                                                                                                                     |
-| ------------------------------------------------------------------- | ----------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [JSON Schema 2020-12](https://json-schema.org/draft/2020-12/schema) | **Adopted** | §3, §5 | packages/schema/src/schema.ts, packages/schema/tests/schema.test.ts                                                                                                | The emitted meta-schemas are conformant 2020-12, so any 2020-12 validator can check a Jx document as an instance. Jx is not a _dialect_: it declares no `$vocabulary`, and its reserved keywords are not JSON Schema vocabulary — a standards-only processor ignores them (spec.md §3.2).                                                                                                                |
-| [RFC 7493](https://www.rfc-editor.org/rfc/rfc7493)                  | **Subset**  | §3.4   | packages/schema/src/ijson.ts, packages/schema/tests/ijson.test.ts, packages/schema/tests/parse.test.ts                                                             | The two constraints that are silent data loss: duplicate names (§2.3) and integers a double cannot hold (§2.2), both parse failures. Not enforced: the top-level-value and unpaired-surrogate rules, neither of which can lose an author's content the way these two do.                                                                                                                                 |
-| [WHATWG HTML](https://html.spec.whatwg.org/)                        | **Subset**  | §3, §4 | packages/schema/src/schema.ts                                                                                                                                      | Only the element and IDL-attribute inventories are used, extracted via `@webref/elements` and `@webref/idl` to build the `tagName` enumeration, the DOM property set and the `EventHandler` names. Nothing else of the standard is implemented here.                                                                                                                                                     |
-| [CSSOM](https://www.w3.org/TR/cssom-1/)                             | **Subset**  | §3, §4 | packages/schema/src/schema.ts                                                                                                                                      | Only the camelCase IDL attribute names for CSS properties are used, to type the `style` object. Neither the object model nor its serialization rules are implemented.                                                                                                                                                                                                                                    |
-| [BCP 47](https://www.rfc-editor.org/info/bcp47)                     | **Subset**  | §3.2   | packages/schema/src/locale.ts, packages/schema/defs/project-config.schema.ts, packages/schema/tests/locale.test.ts, packages/schema/tests/validate-project.test.ts | `LANGUAGE_TAG_PATTERN` puts the separator and subtag-length rules into the schema, so `jx validate` refuses `en_US`, `en--US` and `e` exactly as the build does. Absent here: subtag ordering, the singleton rules, and registry membership — all of which stay with `Intl.Locale` at build time (`site-architecture.md` §13.2), and a test pins that the pattern accepts everything that parse accepts. |
-| [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110)                  | **Subset**  | §3.2   | packages/schema/defs/project-config.schema.ts                                                                                                                      | `REDIRECT_STATUSES` enumerates the five §15.4 statuses a static host can express, and the compiler and the Studio grid both import it rather than declaring their own. A rewrite is a separate shape, not a sixth status — see site-architecture.md §11.3.                                                                                                                                               |
+| Standard                                                            | Class       | Binds  | Evidence                                                                                                                                                           | Note                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------------------------------------------------- | ----------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [JSON Schema 2020-12](https://json-schema.org/draft/2020-12/schema) | **Adopted** | §3, §5 | packages/schema/src/schema.ts, packages/schema/tests/schema.test.ts                                                                                                | The emitted meta-schemas are conformant 2020-12, so any 2020-12 validator can check a Jx document as an instance. Jx is not a _dialect_: it declares no `$vocabulary`, and its reserved keywords are not JSON Schema vocabulary — a standards-only processor ignores them (spec.md §3.2).                                                                                                                                                                                                                           |
+| [RFC 7493](https://www.rfc-editor.org/rfc/rfc7493)                  | **Subset**  | §3.4   | packages/schema/src/ijson.ts, packages/schema/tests/ijson.test.ts, packages/schema/tests/parse.test.ts                                                             | The two constraints that are silent data loss: duplicate names (§2.3) and integers a double cannot hold (§2.2), both parse failures. Not enforced: the top-level-value and unpaired-surrogate rules, neither of which can lose an author's content the way these two do.                                                                                                                                                                                                                                            |
+| [WHATWG HTML](https://html.spec.whatwg.org/)                        | **Subset**  | §3, §4 | packages/schema/src/schema.ts                                                                                                                                      | Only the element and IDL-attribute inventories are used, extracted via `@webref/elements` and `@webref/idl` to build the `tagName` enumeration, the DOM property set and the `EventHandler` names. Nothing else of the standard is implemented here.                                                                                                                                                                                                                                                                |
+| [CSSOM](https://www.w3.org/TR/cssom-1/)                             | **Subset**  | §3, §4 | packages/schema/src/schema.ts                                                                                                                                      | Only the camelCase IDL attribute names for CSS properties are used, to type the `style` object. Neither the object model nor its serialization rules are implemented.                                                                                                                                                                                                                                                                                                                                               |
+| [BCP 47](https://www.rfc-editor.org/info/bcp47)                     | **Subset**  | §3.2   | packages/schema/src/locale.ts, packages/schema/defs/project-config.schema.ts, packages/schema/tests/locale.test.ts, packages/schema/tests/validate-project.test.ts | `LANGUAGE_TAG_PATTERN` puts the separator and subtag-length rules into the schema, so `jx validate` refuses `en_US`, `en--US` and `e` exactly as the build does. Absent here: subtag ordering, the singleton rules, and registry membership — all of which stay with `Intl.Locale` at build time (`site-architecture.md` §13.2), and a test pins that the pattern accepts everything that parse accepts.                                                                                                            |
+| [UAX #31](https://www.unicode.org/reports/tr31/)                    | **Subset**  | §3.5   | packages/schema/src/parse.ts, packages/schema/tests/parse.test.ts                                                                                                  | §R4 Equivalent Normalized Identifiers: every key and string value crosses the parse boundary in NFC, so a name typed decomposed and referenced precomposed is one identifier rather than two. Absent: §R1's identifier profiles — Jx restricts what a state name may contain no further than ECMAScript does, since the name becomes a property on the `state` proxy. A document arriving through a format extension's own `parse` capability rather than through this boundary is that extension's responsibility. |
+| [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110)                  | **Subset**  | §3.2   | packages/schema/defs/project-config.schema.ts                                                                                                                      | `REDIRECT_STATUSES` enumerates the five §15.4 statuses a static host can express, and the compiler and the Studio grid both import it rather than declaring their own. A rewrite is a separate shape, not a sixth status — see site-architecture.md §11.3.                                                                                                                                                                                                                                                          |
 
 ## Changelog
 
+- **0.4.8-draft** (2026-08-16) — §3.5 documents, configs and class definitions cross the parse boundary in NFC (UAX #31 §R4).
 - **0.4.7-draft** (2026-08-16) — §3.2 language-tag keys carry a BCP 47 pattern, so author-time and build-time agree; gap:bcp47-locale-validation closed.
 - **0.4.6-draft** (2026-08-16) — §3.2 and §7: BCP 47 validation exists in the build; the schema is the half that still lacks it.
 - **0.4.5-draft** (2026-08-15) — I-JSON enforced at the parse boundary: duplicate names and unrepresentable integers are parse failures (§3.4).
@@ -302,4 +333,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/schema` Specification v0.4.7-draft_
+_`@jxsuite/schema` Specification v0.4.8-draft_

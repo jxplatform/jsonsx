@@ -23,11 +23,11 @@ This page is generated from the `> **Status: …**` markers in the specification
 | `jx-markdown.md`          | 0.1.8-draft  | Partial     | 2026-08-15 |
 | `parser.md`               | 0.2.8-draft  | Partial     | 2026-08-16 |
 | `relationships.md`        | 0.1.4-draft  | Partial     | 2026-08-15 |
-| `schema.md`               | 0.4.7-draft  | Partial     | 2026-08-16 |
+| `schema.md`               | 0.4.8-draft  | Partial     | 2026-08-16 |
 | `server.md`               | 0.2.4        | Implemented | 2026-08-16 |
 | `site-architecture.md`    | 0.5.6-draft  | Partial     | 2026-08-16 |
 | `spec.md`                 | 0.4.31-draft | Partial     | 2026-08-16 |
-| `standards.md`            | 0.1.10-draft | Partial     | 2026-08-16 |
+| `standards.md`            | 0.1.11-draft | Partial     | 2026-08-16 |
 | `studio-ui-guidelines.md` | 0.3.9        | Implemented | 2026-08-15 |
 | `studio.md`               | 0.9.25-draft | Partial     | 2026-08-15 |
 

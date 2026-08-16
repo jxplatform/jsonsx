@@ -40,6 +40,14 @@ These are errors rather than warnings because a Jx document doesn't stay JSON. I
 
 Fractions are never flagged. `0.1` isn't exactly representable in binary floating point either, so complaining about it would mean complaining about most real documents while telling you nothing about whether your value survived.
 
+### Names are normalized, so an accent means one thing
+
+A state name is an identifier — declared as a key in `state`, referenced as `${state.été}` in a template and as `#/state/été` in a `$ref`. Typed on macOS an accented letter arrives decomposed (`e` plus a combining acute); typed on Windows, or pasted from most of the web, it arrives precomposed as a single character.
+
+Those are two different property names. A document whose declaration and reference came from different machines used to build cleanly, emit a valid bundle, and render nothing at all — no error, and no way to see the difference in any editor.
+
+Every key and every string value is now put into Unicode Normalization Form C when the file is read, so both spellings become the same name. Values are normalized too: canonically equivalent text is the _same text_ by definition, so nothing about your content changes. NFC composes and never folds or strips — CJK, emoji, and scripts with no composed forms survive exactly as written.
+
 ## The three schemas
 
 Every Jx file validates against one of three JSON Schema 2020-12 documents, published at stable URLs:

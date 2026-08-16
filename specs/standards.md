@@ -2,7 +2,7 @@
 
 ## Which External Standards Jx Adopts, and How That Is Recorded
 
-**Version:** 0.1.10-draft
+**Version:** 0.1.11-draft
 **Status:** Partial
 **Updated:** 2026-08-16
 **License:** MIT
@@ -119,17 +119,19 @@ Five columns, in this order and with exactly these headings:
 One row per class:
 
 ```markdown
-| Standard                                                                                  | Class         | Binds | Evidence                           | Note                                                                                                                                                 |
-| ----------------------------------------------------------------------------------------- | ------------- | ----- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [JSON Schema 2020-12](https://json-schema.org/draft/2020-12/schema)                       | **Adopted**   | §3.2  | packages/schema/src/schema.ts      | —                                                                                                                                                    |
-| [RFC 4180](https://www.rfc-editor.org/rfc/rfc4180)                                        | **Subset**    | §4    | extensions/parser/src/csv.ts       | Quoted fields and CRLF records only; no dialect negotiation and no header-less mode.                                                                 |
-| [ECMA-262](https://ecma-international.org/publications-and-standards/standards/ecma-262/) | **Divergent** | §19   | packages/runtime/src/expression.ts | Operator punctuators and arity are ECMAScript's; evaluation is total, with no exceptions.                                                            |
-| [RFC 6901](https://www.rfc-editor.org/rfc/rfc6901)                                        | **Borrowed**  | §7    | packages/runtime/src/runtime.ts    | Shape only. A `$ref` binds live state rather than substituting a schema; `~0`/`~1` escapes are unimplemented and `.` is a separator.                 |
-| [UAX #31](https://www.unicode.org/reports/tr31/)                                          | **Pending**   | §5    | —                                  | `gap:identifier-syntax` State names are ASCII-restricted; UAX #31 identifier profiles are not applied.                                               |
-| [RFC 7386](https://www.rfc-editor.org/rfc/rfc7386)                                        | **Rejected**  | §20   | —                                  | because: JSON Merge Patch cannot express positional array edits, and statement lists need splices; Jx defines an explicit statement grammar instead. |
+| Standard                                                                                  | Class         | Binds | Evidence                           | Note                                                                                                                                                     |
+| ----------------------------------------------------------------------------------------- | ------------- | ----- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [JSON Schema 2020-12](https://json-schema.org/draft/2020-12/schema)                       | **Adopted**   | §3.2  | packages/schema/src/schema.ts      | —                                                                                                                                                        |
+| [RFC 4180](https://www.rfc-editor.org/rfc/rfc4180)                                        | **Subset**    | §4    | extensions/parser/src/csv.ts       | Quoted fields and CRLF records only; no dialect negotiation and no header-less mode.                                                                     |
+| [ECMA-262](https://ecma-international.org/publications-and-standards/standards/ecma-262/) | **Divergent** | §19   | packages/runtime/src/expression.ts | Operator punctuators and arity are ECMAScript's; evaluation is total, with no exceptions.                                                                |
+| [RFC 6901](https://www.rfc-editor.org/rfc/rfc6901)                                        | **Borrowed**  | §7    | packages/runtime/src/runtime.ts    | Shape only. A `$ref` binds live state rather than substituting a schema; `~0`/`~1` escapes are unimplemented and `.` is a separator.                     |
+| [Media Queries 5](https://www.w3.org/TR/mediaqueries-5/)                                  | **Pending**   | §5    | —                                  | `gap:example-only` The worked examples use a reserved slug: a real id here would be a second, unreachable definition of a gap that is tracked elsewhere. |
+| [RFC 7386](https://www.rfc-editor.org/rfc/rfc7386)                                        | **Rejected**  | §20   | —                                  | because: JSON Merge Patch cannot express positional array edits, and statement lists need splices; Jx defines an explicit statement grammar instead.     |
 ```
 
 Tables inside fenced blocks — including the two above — are skipped by the parser, so a specification may show examples without registering them.
+
+That skip is why the example rows above can be freely wrong about the code. It is **not** why their gap slug is `gap:example-only`: a slug is unique across the repository (§3.5), and a plausible-looking one in an example is a second definition of a gap tracked for real somewhere else — indistinguishable from the real thing to a `grep`, and to anyone auditing the gap list against the specs. `gap:example-only` is reserved for these rows and names no work.
 
 ## 5. Citation Rules
 
@@ -242,6 +244,7 @@ An entry names the spec that will own it. When that section is written, the entr
 
 ## Changelog
 
+- **0.1.11-draft** (2026-08-16) — §4.4 worked examples use a reserved gap:example-only slug so an illustration cannot squat on a real gap id.
 - **0.1.10-draft** (2026-08-16) — §1 is Implemented — both ratchets are empty; BCP 14 moves to the backlog, since no section declares the corpus's keyword convention.
 - **0.1.9-draft** (2026-08-16) — Service Workers graduates to a bound row in site-architecture.md §14.6.
 - **0.1.8-draft** (2026-08-16) — CSS Shadow Parts backlog entry now waits on part attributes, not on shadow roots.
@@ -256,4 +259,4 @@ An entry names the spec that will own it. When that section is written, the entr
 
 ---
 
-_Jx Standards Alignment Specification v0.1.10-draft_
+_Jx Standards Alignment Specification v0.1.11-draft_
