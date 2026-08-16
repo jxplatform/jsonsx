@@ -68,6 +68,12 @@ import { transformImageNodes } from "./image-transform.ts";
 import { collectCspSources, emptyCspSources } from "./csp.ts";
 import { resolveShadowMode } from "../shadow.ts";
 import {
+  buildServiceWorker,
+  normalizeServiceWorker,
+  registrationScript,
+  tombstoneServiceWorker,
+} from "./service-worker.ts";
+import {
   buildManifest,
   buildSecurityTxt,
   manifestHeadEntries,
@@ -832,6 +838,30 @@ export async function buildSite(
     }
   }
 
+  // ── 7d.2 The service worker, or the tombstone that removes one ──────────
+  /*
+   * `serviceWorker: false` is not the same as omitting the key, and this is the one place in the
+   * build where that distinction carries weight. A worker is sticky: deleting the file leaves
+   * every previous visitor running the old one forever, because a 404 at that URL is not an
+   * instruction to stop. `false` says "I had one" and emits the instruction.
+   */
+  {
+    const sw = normalizeServiceWorker(projectConfig.serviceWorker);
+    if (sw !== null) {
+      const output = sw === false ? tombstoneServiceWorker() : buildServiceWorker(sw, outDir);
+      for (const warning of output.warnings) {
+        console.warn(warning);
+      }
+      for (const error of output.errors) {
+        errors.push(error);
+        console.error(error);
+      }
+      writeFileSync(join(outDir, output.path as string), output.source, "utf8");
+      fileCount += 1;
+      log(sw === false ? "  sw.js — tombstone (unregisters and clears)" : "  sw.js");
+    }
+  }
+
   // ── 7e. Response headers and the Jekyll opt-out ─────────────────────────
   // Also after the public/ copy, for the same reason — but PREPENDING rather than appending, since
   // A later `_headers` rule wins for a duplicate header name and the author's block must override.
@@ -1040,10 +1070,22 @@ async function compilePage(
    * Extension `head` contributions sit BELOW the project's own `$head`, so a project that writes
    * its own feed link keeps it — the same "author wins" rule every auto-injected entry follows.
    */
+  /*
+   * The registration script. Byte-identical on every page, so a strict `script-src` needs exactly
+   * one hash for it (§14.3.1) — and it is only emitted when a worker actually exists, since a
+   * tombstone must not be registered by the page that is trying to get rid of it.
+   */
+  const swConfig = normalizeServiceWorker(projectConfig.serviceWorker);
+  const swHead: JxHeadEntry[] =
+    swConfig === null || swConfig === false
+      ? []
+      : [{ tagName: "script", textContent: registrationScript(swConfig.scope ?? "/") }];
+
   const resolvedSiteHead = [
     // The manifest link and theme colour are first-party and unconditional once declared, so they
     // Sit with the extension contributions: below the project's own $head, which still wins.
     ...(manifestHeadEntries(projectConfig) as JxHeadEntry[]),
+    ...swHead,
     ...extensionHead,
     ...resolveHeadBareSpecifiers(projectConfig.$head ?? [], rewriteNpmAsset),
   ];

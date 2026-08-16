@@ -1808,6 +1808,92 @@ describe("buildSite — installability and disclosure files", () => {
   }, 30_000);
 });
 
+// ── The service worker and its tombstone ─────────────────────────────────────
+
+describe("buildSite — service worker", () => {
+  const SW_TMP = resolve(import.meta.dir, "__test-site-sw__");
+  /** `undefined` means the key is absent, which is a different instruction from `false`. */
+  const project = (serviceWorker?: unknown) =>
+    writeFileSync(
+      resolve(SW_TMP, "project.json"),
+      JSON.stringify({
+        build: { outDir: "./dist" },
+        name: "SW Site",
+        url: "https://sw.example",
+        ...(serviceWorker === undefined ? {} : { serviceWorker }),
+      }),
+      "utf8",
+    );
+
+  beforeAll(() => {
+    rmSync(SW_TMP, { force: true, recursive: true });
+    mkdirSync(resolve(SW_TMP, "pages"), { recursive: true });
+    writeFileSync(
+      resolve(SW_TMP, "pages/index.json"),
+      JSON.stringify({ children: ["hi"], tagName: "main", title: "Home" }),
+      "utf8",
+    );
+    writeFileSync(
+      resolve(SW_TMP, "pages/offline.json"),
+      JSON.stringify({ children: ["offline"], tagName: "main", title: "Offline" }),
+      "utf8",
+    );
+  });
+
+  afterAll(() => {
+    rmSync(SW_TMP, { force: true, recursive: true });
+  });
+
+  // A worker nobody asked for is a caching layer nobody debugged.
+  it("emits nothing at all when the project never mentions one", async () => {
+    project();
+    const result = await buildSite(SW_TMP, { verbose: false });
+    expect(result.errors).toHaveLength(0);
+    expect(existsSync(resolve(SW_TMP, "dist/sw.js"))).toBe(false);
+    expect(readFileSync(resolve(SW_TMP, "dist/index.html"), "utf8")).not.toContain("serviceWorker");
+  }, 30_000);
+
+  it("emits the worker and registers it from every page", async () => {
+    project({ offlineFallback: "/offline/", precache: ["/"] });
+    const result = await buildSite(SW_TMP, { verbose: false });
+    expect(result.errors).toHaveLength(0);
+
+    const worker = readFileSync(resolve(SW_TMP, "dist/sw.js"), "utf8");
+    // The fallback joined precache, since a page never cached cannot be served offline.
+    expect(worker).toContain('const PRECACHE = ["/","/offline/"]');
+    expect(readFileSync(resolve(SW_TMP, "dist/index.html"), "utf8")).toContain(
+      "navigator.serviceWorker.register('/sw.js'",
+    );
+  }, 30_000);
+
+  /*
+   * The distinction the whole feature turns on. `false` is not the same as deleting the key: a
+   * worker is sticky, and a 404 at its URL is not an instruction to stop. Verified in a browser —
+   * flipping a live deploy from the worker to the tombstone left zero registrations, zero caches
+   * and an uncontrolled page.
+   */
+  it("false emits a tombstone at the same URL, and stops registering it", async () => {
+    project(false);
+    const result = await buildSite(SW_TMP, { verbose: false });
+    expect(result.errors).toHaveLength(0);
+
+    const worker = readFileSync(resolve(SW_TMP, "dist/sw.js"), "utf8");
+    expect(worker).toContain("self.registration.unregister()");
+    expect(worker).not.toContain("PRECACHE");
+    // Registering a tombstone from the page trying to shed it would be self-defeating.
+    expect(readFileSync(resolve(SW_TMP, "dist/index.html"), "utf8")).not.toContain(
+      "serviceWorker.register",
+    );
+  }, 30_000);
+
+  // `cache.addAll()` is all-or-nothing, so one bad URL stops the worker installing — silently.
+  it("fails the build on a precache URL it did not produce", async () => {
+    project({ precache: ["/", "/never-built/"] });
+    const result = await buildSite(SW_TMP, { verbose: false });
+    expect(result.errors.some((e) => e.includes("/never-built/"))).toBe(true);
+  }, 30_000);
+});
+
 // ── Unresolvable bare specifiers ─────────────────────────────────────────────
 
 describe("buildSite — unresolvable bare specifier in $head", () => {

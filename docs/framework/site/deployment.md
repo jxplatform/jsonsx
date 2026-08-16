@@ -8,6 +8,7 @@ code:
   - packages/compiler/src/site/headers-emitter.ts
   - packages/compiler/src/site/csp.ts
   - packages/compiler/src/site/well-known.ts
+  - packages/compiler/src/site/service-worker.ts
   - packages/compiler/src/cli.ts
 ---
 
@@ -177,6 +178,43 @@ Written to `.well-known/security.txt` and nowhere else — [RFC 9116](https://ww
 :::
 
 Want a clearsigned file? Put it at `public/.well-known/security.txt` and the build keeps yours. Signing needs a private key, which the build has no business holding.
+
+## Service worker
+
+Also off by default, and this one for a sharper reason than the rest: a service worker is **sticky**. It survives your next deploy, keeps running against a site that has moved on, and the people it breaks are the ones who came back.
+
+```json
+{
+  "serviceWorker": {
+    "precache": ["/", "/offline/"],
+    "offlineFallback": "/offline/"
+  }
+}
+```
+
+That writes `dist/sw.js` and adds a small registration script to every page. What it does:
+
+- **HTML is always network-first.** The cache is a fallback for a request that failed, never a substitute for one — otherwise a stale page outlives every attempt you make to fix it.
+- **Only `/images/_optimized/*` is cache-first**, because it's the one output whose filename contains a hash of its own contents. A cached hit there can't be wrong. Your components and assets aren't cached first for the same reason they aren't marked `immutable`: editing one reuses its URL.
+- **`offlineFallback` is served for a failed navigation.** If you forget to precache it, the build adds it and tells you — a page that was never cached can't be served offline.
+
+:::doc-warning
+Every URL in `precache` must be a page or file this build actually produces, and the build fails if one isn't. That's not pedantry: the browser's `cache.addAll()` is all-or-nothing, so a single typo'd URL stops the worker from installing **at all**, with no error anywhere you'd think to look. The symptom is "the service worker just doesn't do anything".
+:::
+
+### Turning it off
+
+```json
+{ "serviceWorker": false }
+```
+
+**Not by deleting the key.** This is the one setting where "remove the config" is the wrong move, and it's worth understanding why.
+
+Once a visitor's browser registers a worker, it keeps running it. Removing `sw.js` from your deploy doesn't help — a 404 at that URL isn't an instruction to stop, it's just a failed update check. Every previous visitor stays on the old worker, serving whatever it cached, and you have no way to reach them.
+
+So `"serviceWorker": false` writes a **tombstone** at the same URL: a worker whose only job is to unregister itself, delete its caches, and reload the tab onto your live site. The next time a returning visitor's browser checks for an update, they get it and they're free.
+
+Leave `false` in place for as long as you think old visitors might come back. Deleting the key later stops emitting the tombstone.
 
 ## Build options
 

@@ -2,7 +2,7 @@
 
 ## File-Based Routing, Content Collections, Layouts, and Static Site Generation
 
-**Version:** 0.5.3-draft
+**Version:** 0.5.4-draft
 **Status:** Partial
 **Updated:** 2026-08-16
 **License:** MIT
@@ -2067,6 +2067,50 @@ time, which a build cannot have; a hand-placed `public/.well-known/security.txt`
 this step and is kept rather than overwritten, so shipping a signed file costs zero code. The same
 shadowing applies to the manifest.
 
+### 14.6 Service Worker
+
+> **Status: Implemented.** `service-worker.ts`, written in step 7d.2. **Off by default.**
+
+A service worker is unlike every other output in this section: it is **sticky**. It survives
+redeploys, it keeps running against a site that has moved on, and the visitors it breaks are
+precisely the ones who came back. Nothing else the build emits can do that, which is why it is off
+by default and why most of the contract below is about getting rid of one.
+
+**`serviceWorker: false` is not the same as omitting the key**, and this is the load-bearing
+distinction. Absence means "never had one" and emits nothing. `false` means "had one, remove it"
+and emits a **tombstone** at the same URL: a worker whose only job is to unregister itself, delete
+every cache it made, and reload its clients onto the live site. Deleting the file instead would
+leave every previous visitor running the old worker forever — a 404 at that URL is not an
+instruction to stop, and there is no other channel to reach them through.
+
+**HTML is always network-first.** The cache is a fallback for a failed request, never a substitute
+for one. A cache-first worker serves a stale page indefinitely and the author's next deploy cannot
+reach the visitor to fix it. The single exception is `/images/_optimized/*`, which is the build's
+only content-addressed output (§14.3) — its filename embeds a digest, so a cached hit can never be
+wrong. `/components/*` and `/assets/*` are deliberately **not** cache-first for the same reason
+they are not `immutable`: they are named after what they contain, not after their content.
+
+**A precache URL that this build did not produce is a build error.** `cache.addAll()` is
+all-or-nothing, so one unreachable entry rejects the install and the worker never activates — with
+no error anywhere the author would look. The symptom is "the service worker does nothing", which is
+how it presented the first time this was run against a browser. The emitted worker also fetches
+precache entries individually rather than through `addAll()`, covering what the build cannot see.
+
+An `offlineFallback` is added to `precache` if it is not already there, with a warning: a page that
+was never cached cannot be served when the network is gone, which is the only moment it exists for.
+
+**The cache name rotates on a configuration change, not on every build.** HTML is network-first and
+images are content-addressed, so a content-only deploy needs no rotation, and rotating anyway would
+discard a warm cache on every deploy for nothing.
+
+The registration script is inline, byte-identical on every page, and therefore one hash in a strict
+`script-src` (§14.3.1). It registers on `load` rather than immediately — a worker competing with
+the page's own resources makes the first visit slower, and that is the visit that matters. It is
+emitted only when a worker exists: registering a tombstone from the page trying to shed it would be
+self-defeating.
+
+---
+
 ## 15. Application Tier
 
 Sections 1–14 describe a project's static surface: pages prerendered from files on disk. That surface is not the ceiling. A Jx project may also have signed-in users, application data, and server-side logic — the **application tier** — and this section is the map of where those pieces live and what they change about the build. It is an orientation section: the normative contracts are in `extensions.md` §11–§13 (server mounts, connectors, secrets), `spec.md` §11.4 (`timing: "server"`), and §14.1 above (adapter output).
@@ -2133,6 +2177,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 | [RFC 8246](https://www.rfc-editor.org/rfc/rfc8246)                                        | **Adopted**   | §14.3             | packages/compiler/src/site/headers-emitter.ts, packages/compiler/tests/headers-emitter.test.ts                                        | `immutable` is emitted for `/images/_optimized/*` alone. A test asserts no other path can acquire it, because every other filename is reused when its content changes.                                                                                                                                                                                                                                                           |
 | [RFC 6797](https://www.rfc-editor.org/rfc/rfc6797)                                        | **Subset**    | §14.3             | packages/compiler/src/site/headers-emitter.ts                                                                                         | Off by default and opt-in per project, with `max-age`, `includeSubDomains` and `preload`. `preload` without `includeSubDomains` is refused rather than emitted, since the preload list would reject it.                                                                                                                                                                                                                          |
 | [Referrer Policy](https://www.w3.org/TR/referrer-policy/)                                 | **Adopted**   | §14.3             | packages/compiler/src/site/headers-emitter.ts                                                                                         | `strict-origin-when-cross-origin` by default; any policy token from the standard, or `false` to omit the header.                                                                                                                                                                                                                                                                                                                 |
+| [Service Workers](https://www.w3.org/TR/service-workers/)                                 | **Subset**    | §14.6             | packages/compiler/src/site/service-worker.ts, packages/compiler/tests/service-worker.test.ts                                          | Install/activate/fetch with a network-first strategy, precaching, an offline fallback, and a tombstone that unregisters a previously deployed worker. Not offered: push, background sync, periodic sync, or navigation preload — every one of them is a capability rather than a caching decision, and none is derivable from a static build's own output.                                                                       |
 | [Web Application Manifest](https://www.w3.org/TR/appmanifest/)                            | **Subset**    | §14.5             | packages/compiler/src/site/well-known.ts, packages/compiler/tests/well-known.test.ts                                                  | Identity, presentation and icons: `name`, `short_name`, `start_url`, `scope`, `display`, `orientation`, colours, `lang`/`dir`, `categories`. Not offered: `shortcuts`, `share_target`, `file_handlers`, `protocol_handlers`, `screenshots` and the other members that describe an app's integration with an OS rather than a site's identity.                                                                                    |
 | [RFC 9116](https://www.rfc-editor.org/rfc/rfc9116)                                        | **Subset**    | §14.5             | packages/compiler/src/site/well-known.ts, packages/compiler/tests/well-known.test.ts                                                  | Every field the standard defines, at the canonical `.well-known` location, with `Expires` (§2.5.5) and `Contact` (§2.5.3) enforced as build errors. Clearsigning (§2.3) is not implemented — it needs a private key at build time — but a hand-placed `public/.well-known/security.txt` shadows the generated file, which is how a signed one ships.                                                                             |
 | [RFC 8615](https://www.rfc-editor.org/rfc/rfc8615)                                        | **Adopted**   | §14.5             | packages/compiler/src/site/well-known.ts                                                                                              | The `/.well-known/` prefix is used as the registry defines it and nothing else is placed there.                                                                                                                                                                                                                                                                                                                                  |
@@ -2266,6 +2311,7 @@ This spec builds on existing Jx primitives wherever possible:
 
 ## Changelog
 
+- **0.5.4-draft** (2026-08-16) — Optional service worker with a tombstone contract: off by default, network-first HTML, precache validated against the build's own output (§14.6).
 - **0.5.3-draft** (2026-08-16) — Cascade layer 6 describes the scoping that exists — there is no shadow DOM.
 - **0.5.2-draft** (2026-08-15) — Generate manifest.webmanifest and .well-known/security.txt (§14.5).
 - **0.5.1-draft** (2026-08-15) — hreflang alternates in <head> and sitemap xhtml:link for translated pages (§13, §13.5).

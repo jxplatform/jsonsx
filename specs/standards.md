@@ -2,7 +2,7 @@
 
 ## Which External Standards Jx Adopts, and How That Is Recorded
 
-**Version:** 0.1.8-draft
+**Version:** 0.1.9-draft
 **Status:** Partial
 **Updated:** 2026-08-16
 **License:** MIT
@@ -232,7 +232,6 @@ An entry names the spec that will own it. When that section is written, the entr
 
 | Standard                                                      | Target                                  | Why not yet                                                                                                                                                                                                         |
 | ------------------------------------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [Service Workers](https://www.w3.org/TR/service-workers/)     | `site-architecture.md` — installability | A generated worker survives redeploys and can serve stale HTML indefinitely, so it needs a tombstone contract specified before any code.                                                                            |
 | [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414)            | `desktop.md` §10                        | Discovery is only reachable once an authorization flow exists (`gap:native-oauth`), and the one provider in use publishes no metadata document.                                                                     |
 | [WebAuthn Level 3](https://www.w3.org/TR/webauthn-3/)         | `desktop.md` §10                        | Passkeys need a registered relying-party id and a recovery story, neither of which is designed.                                                                                                                     |
 | [CSS Cascade Layers](https://www.w3.org/TR/css-cascade-5/)    | `spec.md` §9                            | The style model has no layer concept; adding one is a design change, not a citation.                                                                                                                                |
@@ -243,6 +242,7 @@ An entry names the spec that will own it. When that section is written, the entr
 
 ## Changelog
 
+- **0.1.9-draft** (2026-08-16) — Service Workers graduates to a bound row in site-architecture.md §14.6.
 - **0.1.8-draft** (2026-08-16) — CSS Shadow Parts backlog entry now waits on part attributes, not on shadow roots.
 - **0.1.7-draft** (2026-08-16) — Retarget the CSS Shadow Parts backlog entry at spec.md §16.6, which now owns the shadow-DOM question.
 - **0.1.6-draft** (2026-08-15) — Web App Manifest, RFC 9116 and RFC 8615 graduate to bound rows in site-architecture.md §14.5.
@@ -255,4 +255,4 @@ An entry names the spec that will own it. When that section is written, the entr
 
 ---
 
-_Jx Standards Alignment Specification v0.1.8-draft_
+_Jx Standards Alignment Specification v0.1.9-draft_

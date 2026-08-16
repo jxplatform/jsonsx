@@ -561,6 +561,21 @@ export interface ManifestConfig {
 }
 
 /**
+ * W3C Service Worker. **Off unless declared, and turning it off means `false`, not deleting the
+ * key** — a worker is sticky, so a site that once had one must keep serving something at that URL
+ * to tell previous visitors to stop.
+ */
+export interface ServiceWorkerConfig {
+  enabled?: boolean;
+  /** Registration scope. Cannot exceed the worker's own path. Default `"/"`. */
+  scope?: string;
+  /** URLs fetched and cached at install time. */
+  precache?: string[];
+  /** Page served for a failed navigation. Added to `precache` if it is not already there. */
+  offlineFallback?: string;
+}
+
+/**
  * RFC 9116 `security.txt`. `expires` is required by §2.5.5 and an absent or past one is a build
  * error: an expired file advertises a reporting channel while telling the reporter not to trust
  * it.
@@ -650,6 +665,11 @@ export interface ProjectConfig {
   manifest?: ManifestConfig;
   /** RFC 9116, emitted as `.well-known/security.txt`. */
   securityTxt?: SecurityTxtConfig;
+  /**
+   * W3C Service Worker, emitted as `sw.js`. Off unless declared; `false` emits a tombstone that
+   * unregisters a previously deployed worker (site-architecture.md §14.6).
+   */
+  serviceWorker?: ServiceWorkerConfig | boolean;
   /**
    * Locale routing. Tags are BCP 47; a malformed one is a build error, since a locale is a URL
    * prefix, an `hreflang` value and an `<html lang>` at once.

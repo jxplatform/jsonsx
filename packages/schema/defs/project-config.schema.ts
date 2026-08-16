@@ -362,6 +362,40 @@ export const projectConfigSchema = {
       },
       type: "object",
     },
+    serviceWorker: {
+      default: false,
+      description:
+        "W3C Service Worker, emitted as sw.js. Off unless declared — a worker is sticky, so it " +
+        "is the one output that can keep breaking visitors after a deploy tries to fix them. " +
+        "**Turning it off means `false`, not deleting the key**: `false` emits a tombstone at " +
+        "the same URL that unregisters the old worker and clears its caches, and a 404 there is " +
+        "not an instruction to stop. HTML is always network-first; only the content-addressed " +
+        "/images/_optimized/* is served cache-first.",
+      oneOf: [
+        { type: "boolean" },
+        {
+          additionalProperties: false,
+          properties: {
+            enabled: { default: true, type: "boolean" },
+            offlineFallback: {
+              description:
+                "Page served for a failed navigation. Added to `precache` if not already there.",
+              type: "string",
+            },
+            precache: {
+              description:
+                "Site-absolute URLs fetched at install time. Each must be a file this build " +
+                "produces; one that is not fails the build, because a single unreachable entry " +
+                "stops the worker installing at all.",
+              items: { pattern: "^/", type: "string" },
+              type: "array",
+            },
+            scope: { default: "/", type: "string" },
+          },
+          type: "object",
+        },
+      ],
+    },
     securityTxt: {
       additionalProperties: false,
       description:

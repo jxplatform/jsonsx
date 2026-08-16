@@ -15,12 +15,12 @@ This page is generated from the `## N. Standards Alignment` tables in the specif
 | Class       | Standards | Bindings |
 | ----------- | --------- | -------- |
 | `Adopted`   | 14        | 20       |
-| `Subset`    | 33        | 52       |
+| `Subset`    | 34        | 53       |
 | `Divergent` | 3         | 5        |
 | `Borrowed`  | 4         | 5        |
 | `Pending`   | 14        | 18       |
 | `Rejected`  | 3         | 3        |
-| _(backlog)_ | 8         | —        |
+| _(backlog)_ | 7         | —        |
 
 ## Standards Jx implements
 
@@ -80,6 +80,7 @@ This page is generated from the `## N. Standards Alignment` tables in the specif
 | [JSON-LD 1.1](https://www.w3.org/TR/json-ld11/) `JSON-LD 1.1`                                                                                          | W3C         | `Subset`    | `site-architecture.md` §8.5                                                               | `packages/compiler/src/site/head-merger.ts`, `packages/compiler/tests/head-merger.test.ts`                                                  |
 | [Permissions Policy](https://www.w3.org/TR/permissions-policy/) `Permissions Policy`                                                                   | W3C         | `Subset`    | `site-architecture.md` §14.3                                                              | `packages/compiler/src/site/headers-emitter.ts`                                                                                             |
 | [Referrer Policy](https://www.w3.org/TR/referrer-policy/) `Referrer Policy`                                                                            | W3C         | `Adopted`   | `site-architecture.md` §14.3                                                              | `packages/compiler/src/site/headers-emitter.ts`                                                                                             |
+| [Service Workers](https://www.w3.org/TR/service-workers/) `Service Workers`                                                                            | W3C         | `Subset`    | `site-architecture.md` §14.6                                                              | `packages/compiler/src/site/service-worker.ts`, `packages/compiler/tests/service-worker.test.ts`                                            |
 | [Subresource Integrity](https://www.w3.org/TR/SRI/) `Subresource Integrity`                                                                            | W3C         | `Divergent` | `compiler.md` §12                                                                         | `packages/compiler/src/site/client-runtime.ts`, `packages/compiler/tests/client-runtime.test.ts`                                            |
 | [Accessible Rich Internet Applications (WAI-ARIA) 1.2](https://www.w3.org/TR/wai-aria-1.2/) `WAI-ARIA`                                                 | W3C         | `Subset`    | `studio-ui-guidelines.md` §6, `studio-ui-guidelines.md` §8, `studio-ui-guidelines.md` §12 | `packages/studio/src/files/files.ts`, `packages/studio/src/panels/layers-panel.ts`, `packages/studio/src/editor/context-menu.ts`            |
 | [Accessible Rich Internet Applications (WAI-ARIA) 1.2](https://www.w3.org/TR/wai-aria-1.2/) `WAI-ARIA`                                                 | W3C         | `Subset`    | `studio.md` §16                                                                           | `packages/studio/src/ui/layers.ts`                                                                                                          |
@@ -153,7 +154,6 @@ Standards whose owning spec section does not exist yet, so no row can bind them.
 | [CSS Shadow Parts](https://www.w3.org/TR/css-shadow-parts-1/)                                      | `spec.md` §16.6 — `::part` from outside | Shadow roots exist now (the `$shadow` opt-in), so `::part` is finally _possible_ — but nothing emits a `part` attribute and no selector addresses one from a page stylesheet, so there is no behaviour to cite yet. |
 | [Media Queries Level 5](https://www.w3.org/TR/mediaqueries-5/) `Media Queries 5`                   | `spec.md` §9.4                          | `$media` borrows `@custom-media`'s shape from this level, but Jx resolves it itself and no browser ships it — so there is nothing to conform to until one does.                                                     |
 | [OAuth 2.0 Authorization Server Metadata](https://www.rfc-editor.org/rfc/rfc8414) `RFC 8414`       | `desktop.md` §10                        | Discovery is only reachable once an authorization flow exists (`gap:native-oauth`), and the one provider in use publishes no metadata document.                                                                     |
-| [Service Workers](https://www.w3.org/TR/service-workers/)                                          | `site-architecture.md` — installability | A generated worker survives redeploys and can serve stale HTML indefinitely, so it needs a tombstone contract specified before any code.                                                                            |
 | [Web Authentication Level 3](https://www.w3.org/TR/webauthn-3/) `WebAuthn Level 3`                 | `desktop.md` §10                        | Passkeys need a registered relying-party id and a recovery story, neither of which is designed.                                                                                                                     |
 | [WebDriver BiDi](https://www.w3.org/TR/webdriver-bidi/)                                            | `studio.md` — screenshot pipeline       | The pipeline drives Chrome over CDP from `scripts/`, which no spec section describes.                                                                                                                               |
 

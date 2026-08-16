@@ -208,6 +208,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `site-architecture.md`
 
+- **0.5.4-draft** (2026-08-16) — Optional service worker with a tombstone contract: off by default, network-first HTML, precache validated against the build's own output (§14.6).
 - **0.5.3-draft** (2026-08-16) — Cascade layer 6 describes the scoping that exists — there is no shadow DOM.
 - **0.5.2-draft** (2026-08-15) — Generate manifest.webmanifest and .well-known/security.txt (§14.5).
 - **0.5.1-draft** (2026-08-15) — hreflang alternates in <head> and sitemap xhtml:link for translated pages (§13, §13.5).
@@ -320,6 +321,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `standards.md`
 
+- **0.1.9-draft** (2026-08-16) — Service Workers graduates to a bound row in site-architecture.md §14.6.
 - **0.1.8-draft** (2026-08-16) — CSS Shadow Parts backlog entry now waits on part attributes, not on shadow roots.
 - **0.1.7-draft** (2026-08-16) — Retarget the CSS Shadow Parts backlog entry at spec.md §16.6, which now owns the shadow-DOM question.
 - **0.1.6-draft** (2026-08-15) — Web App Manifest, RFC 9116 and RFC 8615 graduate to bound rows in site-architecture.md §14.5.
