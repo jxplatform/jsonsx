@@ -12,7 +12,7 @@
  *
  * Pure string math — no node imports — so browser hosts can import this module.
  *
- * @docs extending/extensions/capabilities
+ * @docs extending/extensions/formats
  */
 
 /** RFC 6838 §4.2: the first character, then up to 126 more from the restricted set. */
