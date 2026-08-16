@@ -72,6 +72,24 @@ const RTL_SCRIPTS = new Set([
 export type TextDirection = "ltr" | "rtl";
 
 /**
+ * The shape of a language tag, as a regular expression a JSON Schema `pattern` can hold.
+ *
+ * Deliberately **looser** than {@link canonicalizeLocale}, and deliberately not RFC 5646's grammar.
+ * That grammar distinguishes subtags by length _and_ position, and admits grandfathered and
+ * private-use forms (`i-klingon`, `x-whatever`); a regex encoding all of it would be unreadable and
+ * still wrong at the edges. What this catches is the class of mistake an author actually makes — an
+ * underscore where a hyphen belongs (`en_US`), an empty subtag (`en--US`, `en-US-`), a one-letter
+ * primary language, a subtag past eight characters.
+ *
+ * The direction of the inequality is the contract: this accepts **every** tag `Intl.Locale`
+ * accepts, so a value the build canonicalizes can never fail `jx validate`. The reverse is allowed
+ * and expected — `zh-min-nan` matches here and throws there — because the build stays the authority
+ * on well-formedness. This only closes the case where author-time accepted a value build-time was
+ * certain to reject.
+ */
+export const LANGUAGE_TAG_PATTERN = "^[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*$";
+
+/**
  * The canonical spelling of a well-formed language tag, or null when the tag is malformed.
  *
  * Canonical case is BCP 47's: language lowercase, script titlecase, region uppercase. `EN-us`

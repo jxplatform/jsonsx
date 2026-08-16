@@ -23,7 +23,7 @@ This page is generated from the `> **Status: …**` markers in the specification
 | `jx-markdown.md`          | 0.1.8-draft  | Partial     | 2026-08-15 |
 | `parser.md`               | 0.2.7-draft  | Partial     | 2026-08-15 |
 | `relationships.md`        | 0.1.4-draft  | Partial     | 2026-08-15 |
-| `schema.md`               | 0.4.6-draft  | Partial     | 2026-08-16 |
+| `schema.md`               | 0.4.7-draft  | Partial     | 2026-08-16 |
 | `server.md`               | 0.2.2        | Implemented | 2026-08-15 |
 | `site-architecture.md`    | 0.5.5-draft  | Partial     | 2026-08-16 |
 | `spec.md`                 | 0.4.31-draft | Partial     | 2026-08-16 |
@@ -39,7 +39,6 @@ This page is generated from the `> **Status: …**` markers in the specification
 - `compiler.md` §3 — Output Tiers
 - `desktop.md` §5 — Backend API Contract
 - `parser.md` §3 — `Markdown` — the markdown format class
-- `schema.md` §3.2 — Project Schema (`project-schema.json`)
 - `server.md` §4 — Studio API (`/__studio/*`)
 - `server.md` §4.2 — Security
 - `site-architecture.md` §9.4 — Studio Media Browser

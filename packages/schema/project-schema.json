@@ -659,6 +659,7 @@
         "preferredLanguages": {
           "description": "BCP 47 tags, validated and canonicalized like i18n.locales.",
           "items": {
+            "pattern": "^[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*$",
             "type": "string"
           },
           "type": "array"
@@ -670,14 +671,15 @@
       "description": "Internationalization configuration.",
       "properties": {
         "defaultLocale": {
-          "description": "Default locale code.",
+          "description": "Default locale, as a BCP 47 language tag. The pattern catches shape errors (`en_US`, `en--US`); the build is the authority on well-formedness.",
           "examples": [
             "en"
           ],
+          "pattern": "^[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*$",
           "type": "string"
         },
         "locales": {
-          "description": "Available locale codes.",
+          "description": "Available locales, as BCP 47 language tags.",
           "examples": [
             [
               "en",
@@ -686,6 +688,7 @@
             ]
           ],
           "items": {
+            "pattern": "^[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*$",
             "type": "string"
           },
           "type": "array"

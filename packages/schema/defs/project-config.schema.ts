@@ -1,3 +1,5 @@
+import { LANGUAGE_TAG_PATTERN } from "../src/locale.ts";
+
 /**
  * The RFC 9110 §15.4 redirection statuses a static host can express. 303 preserves the "see other,
  * with GET" semantics; 307 and 308 preserve the request method, which 301 and 302 historically do
@@ -418,7 +420,7 @@ export const projectConfigSchema = {
         policy: { items: { type: "string" }, type: "array" },
         preferredLanguages: {
           description: "BCP 47 tags, validated and canonicalized like i18n.locales.",
-          items: { type: "string" },
+          items: { pattern: LANGUAGE_TAG_PATTERN, type: "string" },
           type: "array",
         },
       },
@@ -428,14 +430,17 @@ export const projectConfigSchema = {
       description: "Internationalization configuration.",
       properties: {
         defaultLocale: {
-          description: "Default locale code.",
+          description:
+            "Default locale, as a BCP 47 language tag. The pattern catches shape errors " +
+            "(`en_US`, `en--US`); the build is the authority on well-formedness.",
           examples: ["en"],
+          pattern: LANGUAGE_TAG_PATTERN,
           type: "string",
         },
         locales: {
-          description: "Available locale codes.",
+          description: "Available locales, as BCP 47 language tags.",
           examples: [["en", "fr", "de"]],
-          items: { type: "string" },
+          items: { pattern: LANGUAGE_TAG_PATTERN, type: "string" },
           type: "array",
         },
         routing: {
