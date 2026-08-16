@@ -60,6 +60,57 @@ describe("layers after init", () => {
       expect(layer("dialog").querySelector("#dlg-btn")).toBeNull();
     });
 
+    test("a dialog says it is one, and that everything behind it is inert", async () => {
+      /*
+       * `aria-modal` is what constrains a screen reader's virtual cursor, which a Tab trap cannot:
+       * the virtual cursor does not use Tab. It is also why not trapping Tab is still correct — the
+       * wrapper's action buttons live in a shadow root a light-DOM cycle cannot enumerate.
+       */
+      let doneFn: ((v: string) => void) | null = null;
+      const promise = showDialog<string>((done) => {
+        doneFn = done;
+        return html`<sp-dialog-wrapper headline="Delete page?"></sp-dialog-wrapper>`;
+      });
+      const slot = layer("dialog").querySelector("[role='dialog']") as HTMLElement;
+      expect(slot).not.toBeNull();
+      expect(slot.getAttribute("aria-modal")).toBe("true");
+      // The name comes off the wrapper's headline, which only exists after the template has run.
+      expect(slot.getAttribute("aria-label")).toBe("Delete page?");
+      doneFn!("x");
+      await promise;
+    });
+
+    test("an explicit label wins, and a nameless dialog is left nameless", async () => {
+      let doneFn: ((v: string) => void) | null = null;
+      const labelled = showDialog<string>(
+        (done) => {
+          doneFn = done;
+          return html`<sp-dialog-wrapper headline="Ignored"></sp-dialog-wrapper>`;
+        },
+        { label: "Chosen" },
+      );
+      expect(
+        (layer("dialog").querySelector("[role='dialog']") as HTMLElement).getAttribute(
+          "aria-label",
+        ),
+      ).toBe("Chosen");
+      doneFn!("x");
+      await labelled;
+
+      // A caller that supplies neither has a defect of its own; inventing a name would hide it.
+      const bare = showDialog<string>((done) => {
+        doneFn = done;
+        return html`<span>body</span>`;
+      });
+      expect(
+        (layer("dialog").querySelector("[role='dialog']") as HTMLElement).hasAttribute(
+          "aria-label",
+        ),
+      ).toBe(false);
+      doneFn!("x");
+      await bare;
+    });
+
     test("second done() call is ignored", async () => {
       let doneFn: ((v: number) => void) | null = null;
       const promise = showDialog<number>((done) => {

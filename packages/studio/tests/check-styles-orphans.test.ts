@@ -25,8 +25,12 @@ import {
   extractStyleBlocks,
   countBareCatches,
   focusKey,
+  contrastFindings,
+  contrastRatio,
+  guidelineTokenFindings,
   normalizeSelector,
   report,
+  tokenFallbacks,
   scanBannedIdentifiers,
   scanHex,
   stackedClasses,
@@ -501,6 +505,8 @@ describe("report", () => {
     silentCatches: [],
     focusRings: [],
     staleFocusRings: [],
+    contrast: [],
+    guidelineTokens: [],
     underScrim: [],
   };
   const finding = (text: string): { file: string; line: number; text: string } => ({
@@ -697,5 +703,77 @@ describe("stackedClasses", () => {
 
   test("z-index: auto and 0 stack nothing — they are the defect", () => {
     expect([...stackedClasses(".d { z-index: auto }\n.e { z-index: 0 }")]).toEqual([]);
+  });
+});
+
+// ─── Contrast and the documented palette ─────────────────────────────────────
+
+describe("contrastRatio", () => {
+  test("matches the WCAG reference values", () => {
+    expect(contrastRatio("#ffffff", "#000000")).toBeCloseTo(21, 2);
+    expect(contrastRatio("#000000", "#ffffff")).toBeCloseTo(21, 2);
+    expect(contrastRatio("#777777", "#ffffff")).toBeCloseTo(4.48, 1);
+    // Order does not matter — the lighter is always the numerator.
+    expect(contrastRatio("#3b82f6", "#ffffff")).toBeCloseTo(contrastRatio("#ffffff", "#3b82f6"), 5);
+  });
+
+  test("expands shorthand and ignores an alpha channel", () => {
+    expect(contrastRatio("#fff", "#000")).toBeCloseTo(21, 2);
+    expect(contrastRatio("#ffffff80", "#000000")).toBeCloseTo(21, 2);
+  });
+});
+
+describe("tokenFallbacks", () => {
+  test("reads the hex fallback out of each token declaration", () => {
+    const css = "sp-theme {\n  --bg: var(--spectrum-x, #111111);\n  --fg: var(--y, #E4E4E7);\n}";
+    expect(tokenFallbacks(css).get("--bg")).toBe("#111111");
+    // Lowercased, so a spec row and a declaration cannot differ only by case.
+    expect(tokenFallbacks(css).get("--fg")).toBe("#e4e4e7");
+  });
+
+  test("a token with no hex fallback is simply absent", () => {
+    expect(tokenFallbacks("sp-theme { --hover-bg: rgba(255,255,255,0.04); }").size).toBe(0);
+  });
+});
+
+describe("guidelineTokenFindings", () => {
+  const css = "sp-theme {\n  --bg: var(--spectrum-x, #111111);\n  --radius: var(--r, 3px);\n}";
+
+  test("catches a documented value the app does not ship", () => {
+    /*
+     * The defect this rule exists for: §1.1 named `#1e1e1e` for `--bg` where the app had shipped
+     * `#111111` for months, so the documented palette was one nobody could design against.
+     */
+    const spec = "| `--bg` | App background | `#1e1e1e` |";
+    const findings = guidelineTokenFindings(spec, css);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]!.text).toContain("#111111");
+  });
+
+  test("accepts a correct row, and a fallback quoted without its var()", () => {
+    const spec = "| `--bg` | App background | `#111111` |\n| `--radius` | Radius | `3px` |";
+    expect(guidelineTokenFindings(spec, css)).toEqual([]);
+  });
+
+  test("a table that stopped parsing is itself the finding", () => {
+    // Otherwise moving the table would silently turn the rule into a no-op that always passes.
+    const findings = guidelineTokenFindings("no table here", css);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]!.text).toContain("zero rows");
+  });
+});
+
+describe("contrastFindings", () => {
+  test("reports a pair that misses its ratio, and says by how much", () => {
+    const css = "sp-theme {\n  --bg: var(--x, #111111);\n  --fg: var(--y, #222222);\n}";
+    const findings = contrastFindings(css);
+    const bodyText = findings.find((f) => f.text.startsWith("--fg on --bg"));
+    expect(bodyText?.text).toContain("4.5:1");
+  });
+
+  test("a token with no fallback is reported rather than skipped", () => {
+    // A pair that cannot be checked must not look like a pair that passed.
+    const findings = contrastFindings("sp-theme { --bg: var(--x, #111111); }");
+    expect(findings.some((f) => f.text.includes("no hex fallback"))).toBe(true);
   });
 });

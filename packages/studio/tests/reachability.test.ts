@@ -288,6 +288,7 @@ const KNOWN_UNREACHABLE: Record<string, Record<string, string>> = {
       "these two are the remainder, and what a remembered deployment entitles the checklist to " +
       "skip is a Publish decision",
   },
+  "services/announce.ts": { resetAnnouncer: TEST_RESET },
   "services/ai-models.ts": {
     getProxyDefaultModel:
       "the proxy's preferred model id. The picker offers the full list and defaults to the first, " +
