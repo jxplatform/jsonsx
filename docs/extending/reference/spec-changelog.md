@@ -194,6 +194,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `server.md`
 
+- **0.2.3** (2026-08-16) — §3.1 the SSE stream advertises retry: 500 and answers Last-Event-ID with one reload; gap:sse-reconnect closed.
 - **0.2.2** (2026-08-15) — Add §8 Standards Alignment; §4 and §4.2 marked Partial — the failure contract is unspecified and the project server does not gate uniformly.
 - **0.2.1** (2026-07-25) — Activation admits an existing project of the account's own (project.json under the home directory); a refused activation must surface as an error rather than fall back to the server root.
 - **0.2.0** (2026-07-25) — POST /__studio/create-project requires an explicit absolute destination parent — the server no longer falls back to its own root. Adds assertCreatableParent (root, allowedRoots, or home; absolute only), remembers created roots for a following activate, and returns an absolute root for projects outside the server root.

@@ -10,6 +10,15 @@
 import type { ImportProgressEvent, ImportSiteOptions } from "../types";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 
+/**
+ * The `phase` of the one progress line this client emits itself rather than forwarding.
+ *
+ * Exported so a caller can recognize it without matching a bare string: the import log renders
+ * every phase verbatim, but a warning also needs to outlive the log, which vanishes the moment a
+ * successful import hands off to the new project.
+ */
+export const IMPORT_WARNING_PHASE = "warning";
+
 interface StreamLine {
   type: string;
   phase?: string;
@@ -77,6 +86,13 @@ export async function streamImport(
   const decoder = new TextDecoder();
   let buffer = "";
   let result: { root: string; config: ProjectConfig } | null = null;
+  /*
+   * Lines the parser could not read. Tolerating one is right — an import that ran for two minutes
+   * should not die on a garbled progress line — but doing it *silently* is not: the import then
+   * finishes looking clean while the user never sees the pages it skipped. Counted here and
+   * surfaced once at the end, so the tolerance stays visible instead of becoming a hiding place.
+   */
+  let unreadable = 0;
 
   const handleLine = (line: string) => {
     const trimmed = line.trim();
@@ -87,6 +103,7 @@ export async function streamImport(
     try {
       parsed = JSON.parse(trimmed) as StreamLine;
     } catch {
+      unreadable += 1;
       return; // Tolerate a mangled line rather than killing the whole import.
     }
     if (parsed.type === "progress") {
@@ -125,6 +142,15 @@ export async function streamImport(
     } catch {
       /* The stream is already closed (e.g. after an abort). */
     }
+  }
+
+  if (unreadable > 0) {
+    onProgress({
+      message:
+        `${unreadable} progress line${unreadable === 1 ? "" : "s"} could not be read and ` +
+        `${unreadable === 1 ? "was" : "were"} skipped — the import may be missing steps.`,
+      phase: IMPORT_WARNING_PHASE,
+    });
   }
 
   if (!result) {

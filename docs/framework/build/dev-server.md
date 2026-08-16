@@ -58,6 +58,12 @@ The server watches `root` (ignoring `node_modules/`, `dist/`, `.git/`, and frien
 
 Save a file and every connected page reloads. When the changed file matches a `builds` entry's `match` pattern, that bundle is rebuilt first, so the reload picks up fresh output. The one exception is the Studio editor itself: Studio pages never get the reload script, because Studio refreshes edited files in place and a full reload would discard open tabs and undo history.
 
+### Restarting the server
+
+Restart the dev server and the page reconnects in about half a second, then reloads once — so a save made during the restart still lands. Without that, the browser's own reconnection delay is measured in seconds, which is long enough for the save to look like it did nothing.
+
+You get exactly one reload no matter how many changes happened while the connection was down. That's deliberate: the page in front of you was built before the disconnect, and one full reload already covers everything you missed.
+
 ## How Studio is served
 
 Studio is a static web app plus a REST API — the dev server provides both. With `studio: true` (the default), the server mounts `/__studio/*`: project metadata, file listing, read/write/delete/rename, component discovery, content search, code formatting and linting for the function-body editor, and a realtime co-editing WebSocket at `/__studio/collab`. Every filesystem operation is validated to stay under `root`, so path traversal is rejected.

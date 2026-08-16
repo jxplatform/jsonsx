@@ -350,8 +350,16 @@ describe("createDevServer", () => {
         expect(res.status).toBe(200);
         expect(res.headers.get("Content-Type")).toBe("text/event-stream");
         const reader = (res.body as ReadableStream).getReader();
-        const { value } = await reader.read();
-        expect(new TextDecoder().decode(value)).toContain("data: reload");
+        // The stream opens with its reconnection time; the reload is a later frame.
+        const decoder = new TextDecoder();
+        const opening = await reader.read();
+        expect(decoder.decode(opening.value)).toMatch(/^retry: \d+\n\n$/);
+        let reloaded = false;
+        while (!reloaded) {
+          const { value } = await reader.read();
+          reloaded = value !== undefined && decoder.decode(value).includes("data: reload");
+        }
+        expect(reloaded).toBe(true);
         void reader.cancel();
       } finally {
         clearInterval(interval);

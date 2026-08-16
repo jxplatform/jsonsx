@@ -1,9 +1,19 @@
 import { describe, expect, test } from "bun:test";
-import { SSE_SCRIPT, createWatcher, injectSSE, shouldIgnore } from "../src/watch";
+import { RECONNECT_MS, SSE_SCRIPT, createWatcher, injectSSE, shouldIgnore } from "../src/watch";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const FIXTURES = join(import.meta.dir, "_fixtures_watch");
+
+/**
+ * Consume the `retry:` field every stream opens with, so a test that cares about the NEXT frame
+ * does not have to know it is there. Asserted rather than skipped: the reconnection contract is
+ * cheap to keep true here and expensive to notice broken anywhere else.
+ */
+async function readOpeningRetry(reader: ReadableStreamDefaultReader<Uint8Array>) {
+  const opening = await reader.read();
+  expect(new TextDecoder().decode(opening.value)).toBe(`retry: ${RECONNECT_MS}\n\n`);
+}
 
 // ─── injectSSE ──────────────────────────────────────────────────────────────
 
@@ -72,6 +82,7 @@ describe("createWatcher", () => {
       const { broadcast, handleSSE } = createWatcher(FIXTURES, []);
       const response = handleSSE();
       const reader = (response.body as ReadableStream).getReader();
+      await readOpeningRetry(reader);
 
       broadcast();
 
@@ -91,6 +102,7 @@ describe("createWatcher", () => {
     try {
       const response = handleSSE();
       const reader = (response.body as ReadableStream).getReader();
+      await readOpeningRetry(reader);
 
       await new Promise<void>((resolve) => {
         watcher.on("ready", () => resolve());
@@ -136,6 +148,7 @@ describe("createWatcher", () => {
       });
       const response = handleSSE();
       const reader = (response.body as ReadableStream).getReader();
+      await readOpeningRetry(reader);
 
       // Wait for chokidar to be ready before writing
       await new Promise<void>((resolve) => {

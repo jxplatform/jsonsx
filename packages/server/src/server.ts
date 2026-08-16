@@ -296,7 +296,7 @@ export async function createDevServer(options: {
 
       // SSE live reload
       if (handleSSE && path === "/__reload") {
-        return handleSSE();
+        return handleSSE(req);
       }
 
       /*
