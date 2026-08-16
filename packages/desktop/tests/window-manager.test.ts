@@ -3,7 +3,23 @@ import { rpcParity } from "./_rpc-parity";
 
 // ─── Mock electrobun/bun ────────────────────────────────────────────────────
 
-const rpcConfigs: { handlers: { requests: Record<string, (p?: never) => unknown> } }[] = [];
+/*
+ * The window's RPC handler map, typed as the handlers actually are.
+ *
+ * The parameter is an open bag, not `never`. `p?: never` admits no argument at all, so every
+ * parameterised call in this file had to write `as never` — forty-five casts that documented
+ * nothing and defeated the check on each one — and a handler that genuinely takes an argument
+ * (`githubSignIn({ force })`) still could not be called, because `as never` cannot conjure a
+ * parameter the signature does not have.
+ *
+ * The return stays `unknown` on purpose: this map holds a MIX of sync and async handlers
+ * (`getCanvasUrl` returns a value, `pickProject` returns a promise), so promising a `Promise` here
+ * would be as wrong in the other direction. Call sites await.
+ */
+interface RpcConfig {
+  handlers: { requests: Record<string, (params?: Record<string, unknown>) => unknown> };
+}
+const rpcConfigs: RpcConfig[] = [];
 const rpcObjects: {
   send: { updateReady: ReturnType<typeof mock>; onFileEvents: ReturnType<typeof mock> };
 }[] = [];
@@ -35,7 +51,7 @@ class MockWindow {
 
 void mock.module("electrobun/bun", () => ({
   BrowserView: {
-    defineRPC: (config: { handlers: { requests: Record<string, (p?: never) => unknown> } }) => {
+    defineRPC: (config: RpcConfig) => {
       rpcConfigs.push(config);
       const rpc = {
         send: {
@@ -345,13 +361,13 @@ describe("per-window RPC", () => {
     const git = gitInstances.at(-1)!;
     const pkg = pkgInstances.at(-1)!;
 
-    await reqs.readFile({ path: "x" } as never);
+    await reqs.readFile({ path: "x" });
     expect(session.handleReadFile).toHaveBeenCalledWith({ path: "x" });
-    await reqs.writeFile({ content: "c", path: "p" } as never);
+    await reqs.writeFile({ content: "c", path: "p" });
     expect(session.handleWriteFile).toHaveBeenCalledWith({ content: "c", path: "p" });
     await reqs.gitStatus();
     expect(git.gitStatus).toHaveBeenCalledTimes(1);
-    await reqs.addPackage({ name: "p" } as never);
+    await reqs.addPackage({ name: "p" });
     expect(pkg.addPackage).toHaveBeenCalledWith({ name: "p" });
   });
 
@@ -363,22 +379,22 @@ describe("per-window RPC", () => {
     const pkg = pkgInstances.at(-1)!;
 
     // File / project handlers (each forwards to the window's session).
-    await reqs.deleteFile({ path: "a.json" } as never);
-    await reqs.renameFile({ from: "a", to: "b" } as never);
-    await reqs.findReferences({ path: "components/card.json" } as never);
-    await reqs.createDirectory({ path: "d" } as never);
-    await reqs.uploadFile({ data: "x", path: "p" } as never);
-    await reqs.resolveSiteContext({ filePath: "pages/a.json" } as never);
-    await reqs.listDirectory({ dir: "src" } as never);
-    await reqs.discoverComponents({} as never);
-    await reqs.codeService({ action: "lint", payload: {} } as never);
-    await reqs.locateFile({ name: "x.json" } as never);
-    await reqs.searchFiles({ extensions: [".md"], query: "abo" } as never);
-    await reqs.openExternal({ url: "https://example.com" } as never);
-    await reqs.fetchPluginSchema({ src: "m.js" } as never);
-    await reqs.formatAction({ action: "parse", format: "md" } as never);
-    await reqs.jxResolve({ body: "{}" } as never);
-    await reqs.jxServerFunction({ body: "{}" } as never);
+    await reqs.deleteFile({ path: "a.json" });
+    await reqs.renameFile({ from: "a", to: "b" });
+    await reqs.findReferences({ path: "components/card.json" });
+    await reqs.createDirectory({ path: "d" });
+    await reqs.uploadFile({ data: "x", path: "p" });
+    await reqs.resolveSiteContext({ filePath: "pages/a.json" });
+    await reqs.listDirectory({ dir: "src" });
+    await reqs.discoverComponents({});
+    await reqs.codeService({ action: "lint", payload: {} });
+    await reqs.locateFile({ name: "x.json" });
+    await reqs.searchFiles({ extensions: [".md"], query: "abo" });
+    await reqs.openExternal({ url: "https://example.com" });
+    await reqs.fetchPluginSchema({ src: "m.js" });
+    await reqs.formatAction({ action: "parse", format: "md" });
+    await reqs.jxResolve({ body: "{}" });
+    await reqs.jxServerFunction({ body: "{}" });
     await reqs.listFormats();
     // `View: Open in Browser` builds through this window and opens the origin the reply names.
     expect(await reqs.buildSite()).toEqual({
@@ -397,14 +413,14 @@ describe("per-window RPC", () => {
 
     // Data surface + secrets handlers (each forwards to the window's session).
     await reqs.dataConnections();
-    await reqs.dataConnectionTest({ connection: "main" } as never);
-    await reqs.dataPush({ dryRun: true } as never);
-    await reqs.dataRows({ table: "posts" } as never);
-    await reqs.dataInsertRow({ table: "posts", values: {} } as never);
-    await reqs.dataUpdateRow({ pk: "n", set: {}, table: "posts" } as never);
-    await reqs.dataDeleteRow({ pk: "n", table: "posts" } as never);
+    await reqs.dataConnectionTest({ connection: "main" });
+    await reqs.dataPush({ dryRun: true });
+    await reqs.dataRows({ table: "posts" });
+    await reqs.dataInsertRow({ table: "posts", values: {} });
+    await reqs.dataUpdateRow({ pk: "n", set: {}, table: "posts" });
+    await reqs.dataDeleteRow({ pk: "n", table: "posts" });
     await reqs.listSecrets();
-    await reqs.setSecrets({ set: { A: "1" } } as never);
+    await reqs.setSecrets({ set: { A: "1" } });
     expect(session.dataConnections).toHaveBeenCalledTimes(1);
     expect(session.dataConnectionTest).toHaveBeenCalledWith({ connection: "main" });
     expect(session.dataPush).toHaveBeenCalledWith({ dryRun: true });
@@ -417,27 +433,27 @@ describe("per-window RPC", () => {
 
     // Git handlers.
     await reqs.gitBranches();
-    await reqs.gitLog({ limit: 5 } as never);
-    await reqs.gitStage({ files: ["a"] } as never);
-    await reqs.gitUnstage({ files: ["a"] } as never);
-    await reqs.gitCommit({ message: "m" } as never);
-    await reqs.gitPush({} as never);
+    await reqs.gitLog({ limit: 5 });
+    await reqs.gitStage({ files: ["a"] });
+    await reqs.gitUnstage({ files: ["a"] });
+    await reqs.gitCommit({ message: "m" });
+    await reqs.gitPush({});
     await reqs.gitPull();
     await reqs.gitFetch();
-    await reqs.gitCheckout({ branch: "dev" } as never);
-    await reqs.gitCreateBranch({ name: "f" } as never);
-    await reqs.gitDiff({} as never);
-    await reqs.gitShow({ path: "a.json", ref: "HEAD" } as never);
-    await reqs.gitDiscard({ files: ["a"] } as never);
+    await reqs.gitCheckout({ branch: "dev" });
+    await reqs.gitCreateBranch({ name: "f" });
+    await reqs.gitDiff({});
+    await reqs.gitShow({ path: "a.json", ref: "HEAD" });
+    await reqs.gitDiscard({ files: ["a"] });
     await reqs.gitInit();
-    await reqs.gitAddRemote({ name: "origin", url: "u" } as never);
+    await reqs.gitAddRemote({ name: "origin", url: "u" });
     expect(git.gitBranches).toHaveBeenCalledTimes(1);
     expect(git.gitCommit).toHaveBeenCalledWith({ message: "m" });
     expect(git.gitShow).toHaveBeenCalledWith({ path: "a.json", ref: "HEAD" });
 
     // Package handlers.
     await reqs.listPackages();
-    await reqs.removePackage({ name: "lodash" } as never);
+    await reqs.removePackage({ name: "lodash" });
     expect(pkg.listPackages).toHaveBeenCalledTimes(1);
 
     // Process-shared handlers.
@@ -460,7 +476,7 @@ describe("per-window RPC", () => {
     expect(readSettingsMock.mock.calls.length).toBe(readsBefore + 1);
 
     const settings = { aiApiKey: "sk-new", theme: "dark" };
-    await reqs.saveSettings({ settings } as never);
+    await reqs.saveSettings({ settings });
     expect(writeSettingsMock).toHaveBeenLastCalledWith(settings);
   });
 
@@ -489,7 +505,7 @@ describe("per-window RPC", () => {
     expect(reqs.windowGetFrame()).toEqual({ height: 10, width: 20, x: 1, y: 2 });
     reqs.windowMinimize();
     expect(win.minimize).toHaveBeenCalledTimes(1);
-    reqs.windowSetFrame({ height: 6, width: 5, x: 3, y: 4 } as never);
+    reqs.windowSetFrame({ height: 6, width: 5, x: 3, y: 4 });
     expect(win.setFrame).toHaveBeenLastCalledWith(3, 4, 5, 6);
 
     reqs.windowMaximize();
@@ -528,9 +544,9 @@ describe("per-window RPC", () => {
     reqs.newWindow();
     expect(listOpenWindows().length).toBe(before + 1);
     expect(createdWindows.at(-1)!.opts.title).toBe("Jx Studio");
-    const res = reqs.openProjectInNewWindow({ root: "/proj/sibling" } as never);
+    const res = reqs.openProjectInNewWindow({ root: "/proj/sibling" });
     expect(createdWindows.at(-1)!.opts.title).toBe(`sibling ${DASH} Jx Studio`);
-    expect(res).toEqual({ focused: false } as never);
+    expect(res).toEqual({ focused: false });
   });
 
   test("openProjectInNewWindow reports a FOCUS when the project is already open", () => {
@@ -542,14 +558,14 @@ describe("per-window RPC", () => {
     const reqs = lastRequests();
     const created = createdWindows.length;
 
-    expect(reqs.openProjectInNewWindow({ root: "/proj/twice" } as never)).toEqual({
+    expect(reqs.openProjectInNewWindow({ root: "/proj/twice" })).toEqual({
       focused: true,
-    } as never);
+    });
     expect(createdWindows.length).toBe(created); // Nothing new was built…
     expect(owner.activate).toHaveBeenCalled(); // …the one that had it was raised.
   });
 
-  test("pickProject answers WHICH project without binding this window to it", () => {
+  test("pickProject answers WHICH project without binding this window to it", async () => {
     // The whole reason this request exists beside `openProject`: the New Window branch has to ask
     // The question without suffering the answer. A session bound here would leave the window that
     // Merely asked serving a project it is not showing.
@@ -557,13 +573,11 @@ describe("per-window RPC", () => {
     const session = sessions.at(-1)!;
     const reqs = lastRequests();
 
-    return reqs.pickProject().then((res) => {
-      expect(res).toEqual({ name: "Picked", root: "/proj/picked" } as never);
-      expect(session.setProjectRoot).not.toHaveBeenCalled();
-      expect(session.openProject).not.toHaveBeenCalled();
-      expect(win.setTitle).not.toHaveBeenCalled();
-      expect(listOpenWindows().find((w) => w.id === win.id)?.projectRoot).toBe("/proj/asking");
-    });
+    expect(await reqs.pickProject()).toEqual({ name: "Picked", root: "/proj/picked" });
+    expect(session.setProjectRoot).not.toHaveBeenCalled();
+    expect(session.openProject).not.toHaveBeenCalled();
+    expect(win.setTitle).not.toHaveBeenCalled();
+    expect(listOpenWindows().find((w) => w.id === win.id)?.projectRoot).toBe("/proj/asking");
   });
 
   test("pickProject passes a cancelled picker straight through as null", async () => {
@@ -597,17 +611,17 @@ describe("setWindowProject", () => {
     openProjectWindow(null);
     const reqs = lastRequests();
     const session = sessions.at(-1)!;
-    const res = await reqs.setWindowProject({ root: "/proj/inplace" } as never);
+    const res = await reqs.setWindowProject({ root: "/proj/inplace" });
     expect(session.setProjectRoot).toHaveBeenCalledWith("/proj/inplace");
-    expect(res).toEqual({ config: { name: "Proj" }, deduped: false } as never);
+    expect(res).toEqual({ config: { name: "Proj" }, deduped: false });
   });
 
   test("dedupes to an existing window instead of loading twice", async () => {
     const owner = openProjectWindow("/proj/shared") as unknown as MockWindow;
     openProjectWindow(null);
     const reqs = lastRequests();
-    const res = await reqs.setWindowProject({ root: "/proj/shared" } as never);
-    expect(res).toEqual({ config: null, deduped: true } as never);
+    const res = await reqs.setWindowProject({ root: "/proj/shared" });
+    expect(res).toEqual({ config: null, deduped: true });
     expect(owner.activate).toHaveBeenCalled();
   });
 });
@@ -722,7 +736,7 @@ describe("openProject request handler", () => {
     expect(result).toEqual({
       config: { name: "Proj" },
       handle: { name: "Proj", projectConfig: {}, root: "." },
-    } as never);
+    });
     expect(listOpenWindows().find((w) => w.id === win.id)?.projectRoot).toBe("/proj/opened");
     expect(win.setTitle).toHaveBeenLastCalledWith(`opened ${DASH} Jx Studio`);
   });
@@ -739,12 +753,12 @@ describe("createProject request handler", () => {
       directory: "shiny",
       name: "New",
     };
-    const result = await reqs.createProject(params as never);
+    const result = await reqs.createProject(params);
     expect(session.createProject).toHaveBeenCalledTimes(1);
     // The window layer is a pass-through: the destination the modal chose reaches the session
     // Intact, so the project is written only where the user said.
     expect(session.createProject).toHaveBeenCalledWith(params);
-    expect(result).toEqual({ config: { name: "New" }, root: "/home/dev/Sites/shiny" } as never);
+    expect(result).toEqual({ config: { name: "New" }, root: "/home/dev/Sites/shiny" });
     expect(listOpenWindows().find((w) => w.id === win.id)?.projectRoot).toBe(
       "/home/dev/Sites/shiny",
     );
