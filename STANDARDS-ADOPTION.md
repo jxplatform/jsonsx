@@ -1,6 +1,6 @@
 # Standards Adoption Program
 
-**Status: build track complete (B1–B15); §4.1 and §4.11 closed; services track S1–S2 shipped, S3–S9 remain.** Branch: `claude/standards-adoption-impl-4f3ald` (was `feat/standards-registry`). Started 2026-08-14.
+**Status: complete. Build track B1–B15, smaller items §4.11, and services track S1–S9 all shipped.** Branch: `claude/standards-adoption-impl-4f3ald` (was `feat/standards-registry`). Started 2026-08-14, finished 2026-08-16.
 
 This document is the working plan **and** the status board. It was migrated into the repository so the program can be continued from anywhere — everything needed to pick up the next phase is here, including the operational knowledge that is not derivable from the code.
 
@@ -14,7 +14,17 @@ That gap was not cosmetic. It showed up as real defects: a redirect shape the sc
 
 **Intended outcome:** every standard Jx relies on is cited next to the contract it binds, in a table a machine reads; every standard it _should_ rely on and does not is a tracked, addressable gap; and the highest-leverage gaps are closed.
 
-**Current state:** 108 bindings across 16 specs, 7 standards on the adoption backlog, 12 gaps closed and 12 remaining, and a green `bun run docs:standards`.
+**Current state:** 116 bindings across 16 specs, 5 standards on the adoption backlog, and a green `bun run docs:standards`.
+
+**Three gap ids remain, and each is a live `Subset` row rather than unstarted work** — they name the part of a standard the repo does not claim, which is what a gap id is for:
+
+| Gap                    | Where                                      | What is left                                                                                                                                                                                                                       |
+| ---------------------- | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `gap:wcag-conformance` | `studio-ui-guidelines.md` §1.1, §8.2, §8.7 | Four criteria are met and checked (4.1.3, 2.5.7, 1.4.3/1.4.11, 1.4.1). **No level is claimed**, because claiming one needs an end-to-end audit in a browser.                                                                       |
+| `gap:apg-coverage`     | `studio-ui-guidelines.md` §6, §8, §12      | Tree, menu, toolbar, radiogroup, combobox and dialog are done. The **tab strips** still carry no tab semantics; the Tabulator grid is deliberately left alone (hand-authoring `role="grid"` over virtualized rows makes it worse). |
+| `gap:trusted-types`    | `spec.md` §21.5                            | The policy exists and refuses. **Enforcement** — a deployment sending `require-trusted-types-for` — waits on a report-only run, for the reason §4.9 gives.                                                                         |
+
+`gap:example-only` is reserved for `standards.md` §4.4's worked examples and names no work.
 
 ## 1\. Decisions taken — do not re-litigate
 
@@ -69,13 +79,52 @@ PR 0 shipped `specs/standards.md` (the contract), `scripts/docs/lib/standards.ts
 | --- | ----------------------------------- | ------ | ---------- |
 | S1  | RFC 9457 Problem Details            | ✅     | —          |
 | S2  | Fetch Metadata + loopback hardening | ✅     | —          |
-| S3  | Collab subprotocol                  | ◻      | —          |
-| S4  | Auth hardening (RFC 8252 + cookies) | ◻      | S2         |
-| S5  | ECMA-402 + Unicode                  | ◻      | —          |
-| S6  | Accessibility (live region first)   | ◻      | —          |
-| S7  | ATAG Part B surface                 | ◻      | S6         |
-| S8  | Trusted Types + Studio-shell CSP    | ◻      | —          |
-| S9  | WebDriver BiDi for screenshots      | ◻      | —          |
+| S3  | Collab subprotocol                  | ✅     | —          |
+| S4  | Auth hardening (RFC 8252 + cookies) | ✅     | S2         |
+| S5  | ECMA-402 + Unicode                  | ✅     | —          |
+| S6  | Accessibility (live region first)   | ✅     | —          |
+| S7  | ATAG Part B surface                 | ✅     | S6         |
+| S8  | Trusted Types + Studio-shell CSP    | ✅     | —          |
+| S9  | WebDriver BiDi for screenshots      | ✅     | —          |
+
+### What each phase changed, and what it found
+
+The designs below held. What follows is only what they did **not** anticipate — the part worth
+reading before touching any of this again.
+
+- **S3.** The probe had to become the negotiation input, as designed. What the design missed is that
+  `new WebSocket(url, [])` is **not** the same as `new WebSocket(url)` — an empty array still sends
+  the header, and a server that echoes nothing then fails the connection. The client offers no
+  `protocols` argument at all when the list is empty, and a test pins the distinction.
+- **S4.** Two Better Auth defaults were wrong for Cloudflare Workers in the same way: both
+  `useSecureCookies` and `rateLimit.enabled` fall back to `NODE_ENV === "production"`, which is
+  **unset** there. The library's own defaults therefore shipped non-`Secure`, unprefixed session
+  cookies with rate limiting off, in production. Reaching `__Host-` also meant setting
+  `useSecureCookies: false` and restoring `Secure` by hand, because the library prepends
+  `__Secure-` to whatever name it is given — a test asserts the resulting names so a library upgrade
+  is loud.
+- **S5.** `i18n.timeZone` was **not** added. The determinism fix is a fixed `UTC` default in the
+  helpers, which is what the test proves; a config key nothing reads is the exact defect §4.1 of this
+  document records `i18n` itself having had. Also: Bun's `Intl.Segmenter` answers
+  `isWordLike: false` for a mixed alphanumeric segment (`v3`, `h1`), so the word-count predicate is
+  spelled out as "contains a letter or a digit" rather than trusting the flag.
+- **S6.** The live region was the whole point and it landed. The contrast gate found one real
+  failure — white on the brand blue is **3.68:1**, below the 4.5:1 normal text owes — and it is on
+  the debt list rather than fixed, because darkening the brand is a design decision. The
+  guidelines-vs-tokens rule found **seven** wrong hex values, one more than the six this document
+  predicted.
+- **S7.** Shipped as a model plus a Problems reporter and a command, **not** a modal: Problems is
+  already the surface for records that outlive the frame you were not watching, and a second one
+  would have been a window to open. B.3.2 is partial and says so — most repairs have no command yet,
+  and naming one that merely reopens a panel would put a button on a finding that does not do what
+  the button says.
+- **S8.** The scope check was worth doing: under Trusted Types `eval` and `new Function` **are**
+  gated, so the shell ships the policy and does not enforce. The policy refuses rather than passing
+  through, which is the difference between a control and a ceremony.
+- **S9.** BiDi drives everything the pipeline needs, and the captured bytes are **identical** —
+  verified by capturing the same shot over each protocol and hashing. One real difference: BiDi
+  refuses a pointer move outside the viewport, where CDP allowed `(-1, -1)`. Fixed in the pipeline
+  rather than worked around.
 
 ### Smaller items track — complete
 
@@ -188,7 +237,7 @@ Gap closed: `gap:fetch-metadata`.
 
 One free fix while in there: `normalizeForCompare` does not normalize Unicode, so an NFD path from `readdir` and an NFC path from a picker compare unequal and containment silently fails on any accented path. One `.normalize("NFC")`.
 
-### 4.4 S3 — Collab subprotocol
+### 4.4 S3 — Collab subprotocol ✅ **shipped**
 
 `jx.collab.v1` — one token per wire-envelope major. Bump when `decodeFrame` would mis-parse a peer's frame; **do not** bump for a new frame type, since both sides tolerate unknowns.
 
@@ -200,7 +249,7 @@ Gap closed: `gap:collab-subprotocol`.
 
 **permessage-deflate: do not adopt**, and write the reasons into §5 so it is not re-litigated. lib0 Yjs updates are near-incompressible; the dominant frame volume is awareness cursors, where the deflate block header exceeds the payload; both transports are loopback or already compressed at the edge; and `Bun.serve` allocates a zlib context per socket.
 
-### 4.5 S4 — Auth (depends on S2)
+### 4.5 S4 — Auth (depends on S2) ✅ **shipped**
 
 **Device Flow is wrong for desktop and right for browser Studio.** RFC 8628 exists for input-constrained devices; a desktop app with a browser and a keyboard is not one. Desktop gets RFC 8252 loopback + PKCE; browser Studio keeps Device Flow; cloud keeps its brokered flow.
 
@@ -216,7 +265,7 @@ Cookies: `buildAuthOptions` sets **no** cookie, session, rate-limit or password 
 
 Gaps: `gap:oauth-pkce`, `gap:native-oauth`, `gap:cookie-prefixes`.
 
-### 4.6 S5 — ECMA-402 and Unicode
+### 4.6 S5 — ECMA-402 and Unicode ✅ **shipped**
 
 **`i18n.timeZone` belongs in scope and was missing from the audit.** `Intl.DateTimeFormat` with no `timeZone` uses the host's — the identical determinism bug to the locale one, and worse, because a date can shift by a whole day. Both default deterministically on the compiler path (`"en-US"`, `"UTC"`), and the test that proves it compiles the same document twice under different `TZ`/`LANG` and asserts byte-identical output.
 
@@ -230,7 +279,7 @@ New helpers: `formatList`, `plural`, `compare` (collation — `sort()` on string
 
 Gaps: `gap:locale-formatting`, `gap:heading-slug-normalization`, `gap:word-segmentation`.
 
-### 4.7 S6 — Accessibility
+### 4.7 S6 — Accessibility ✅ **shipped**
 
 **The single highest-value change in the program is a live region.** `notify.ts`'s own doc calls itself the app's only way to say what happened, and its default tier routes **error ⇒ problem** — but the `role="status"` host covers only _toasts_, and `problems-panel.ts` has no live region at all. So a failure currently reaches **no** live region. A panel-local region would also announce nothing while another Bottom-dock tab is showing. The fix is one shared announcer called from `notify()` itself — one call site, assertive for errors.
 
@@ -248,7 +297,7 @@ Then, in order of harm × cheapness: `showDialog` gains `role="dialog"`/`aria-mo
 
 Gaps: `gap:wcag-conformance`, `gap:apg-coverage`, `gap:authoring-accessibility-review`.
 
-### 4.8 S7 — ATAG Part B surface (depends on S6)
+### 4.8 S7 — ATAG Part B surface (depends on S6) ✅ **shipped**
 
 Modelled directly on `Search appearance`, whose "no score, warnings only" argument transfers verbatim. A pure `a11y-report.ts` model beside an `a11y-modal.ts` render, a command registered like `document.openSeo`, and findings routed through `notify(..., {tier: "problem"})` in the byte-for-byte shape of `reportRedirectProblems`. Each finding carries a `criterion` and, where possible, an `action` command id that **repairs** it — which is ATAG B.3.2, not just B.3.1.
 
@@ -262,7 +311,7 @@ While in there, route the existing SEO warnings to Problems too — five lines.
 
 Gap: `gap:atag-authoring-support`.
 
-### 4.9 S8 — Trusted Types and the Studio-shell CSP
+### 4.9 S8 — Trusted Types and the Studio-shell CSP ✅ **shipped**
 
 **Verify the scope before committing to the staging.** The tempting claim is that `require-trusted-types-for 'script'` governs only DOM injection sinks and leaves `new Function` to `script-src 'unsafe-eval'`. **That is not right as stated** — under TT, `eval()` and `new Function()` are _also_ gated and throw with no default policy. The escape hatch is a default policy whose `createScript` passes through, which re-permits the interpreter and makes TT's script half a rubber stamp.
 
@@ -272,7 +321,7 @@ The two-profile CSP conclusion survives and is the real win: compiled output alr
 
 Gap: `gap:trusted-types`.
 
-### 4.10 S9 — WebDriver BiDi for the screenshot pipeline
+### 4.10 S9 — WebDriver BiDi for the screenshot pipeline ✅ **shipped**
 
 Contained to `scripts/screenshots/`, which is what the shot contract requires (nothing may exist in `src/` to serve the pipeline). `launchBrowser()` at `scripts/screenshots/lib/browser.ts:59-80` calls puppeteer-core's `launch({ executablePath, … })` over CDP; puppeteer-core ≥23 accepts `protocol: "webDriverBiDi"`. The change is that option plus a verification run, and the acceptance criterion is that `scripts/screenshots/capture.lock.json` either does not change or changes only in ways the lane's before/after review accepts.
 
