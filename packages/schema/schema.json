@@ -1556,7 +1556,7 @@
           "title": "Pure method — genuine prototype methods; receiver in target, args in value"
         },
         {
-          "description": "Invoke a callable, pure in formula position: target is the callee pointer — a named formula entry (#/state/…) or a blessed pure global via window#/ (Math.*, JSON.*, Object.keys/values/entries, and the Intl helpers Intl/formatNumber, Intl/formatDate, Intl/formatRelativeTime) — and value is the positional argument list (the splice args-in-value precedent). Argument order follows the callee's declared parameters.",
+          "description": "Invoke a callable, pure in formula position: target is the callee pointer — a named formula entry (#/state/…) or a blessed pure global via window#/ (Math.*, JSON.*, Object.keys/values/entries, and the Intl helpers Intl/formatNumber, Intl/formatDate, Intl/formatRelativeTime, Intl/formatList, Intl/plural, Intl/compare, Intl/displayName, Intl/segment) — and value is the positional argument list (the splice args-in-value precedent). Argument order follows the callee's declared parameters.",
           "not": {
             "required": [
               "initial"

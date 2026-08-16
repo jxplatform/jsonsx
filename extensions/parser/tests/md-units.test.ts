@@ -88,6 +88,28 @@ describe("processMarkdown", () => {
     expect(result.$readingTime).toBe(3);
   });
 
+  test("a script that does not space its words is not counted as one word", () => {
+    /*
+     * UAX #29. Splitting on whitespace assumed a script that puts spaces between words: an entire
+     * Japanese article counted as ONE word, and therefore as one minute to read whatever its
+     * length. The segmenter finds the boundaries the language actually has.
+     */
+    const japanese = processMarkdown("日本語のテキストです", "/ja.md");
+    expect(japanese.$wordCount).toBeGreaterThan(1);
+
+    const thai = processMarkdown("สวัสดีครับ", "/th.md");
+    expect(thai.$wordCount).toBeGreaterThan(1);
+  });
+
+  test("alphanumeric tokens still count", () => {
+    // Bun's engine reports isWordLike:false for `v3`, so the predicate is spelled out instead.
+    expect(processMarkdown("v3 h1 2026 release", "/mixed.md").$wordCount).toBe(4);
+  });
+
+  test("punctuation alone is not a word", () => {
+    expect(processMarkdown("!!! --- ...", "/punct.md").$wordCount).toBe(0);
+  });
+
   test("empty source produces an empty, well-formed result", () => {
     const result = processMarkdown("", "/empty.md");
     expect(result.$children).toEqual([]);

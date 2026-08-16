@@ -2,7 +2,7 @@
 
 ## File-Based Routing, Content Collections, Layouts, and Static Site Generation
 
-**Version:** 0.5.8-draft
+**Version:** 0.5.9-draft
 **Status:** Partial
 **Updated:** 2026-08-16
 **License:** MIT
@@ -1920,6 +1920,52 @@ request, so a permanent status would let a cache pin one reader's language for a
 
 ---
 
+### 13.7 Formatting Numbers, Dates and Text
+
+> **Status: Implemented.**
+
+A document formats through **blessed `Intl` helpers**, listed once in `packages/schema/src/intl.ts`
+and read by the runtime interpreter, the compiler's emitter and the `call` operator's JSON-Schema
+description. The list lived in those places separately before, and the schema description — a prose
+sentence naming three helpers, checked by nothing — is what made a single source necessary.
+
+| Helper                    | Wraps                     | For                                                  |
+| ------------------------- | ------------------------- | ---------------------------------------------------- |
+| `Intl/formatNumber`       | `Intl.NumberFormat`       | grouping, decimals, currency, percent, units         |
+| `Intl/formatDate`         | `Intl.DateTimeFormat`     | dates and times                                      |
+| `Intl/formatRelativeTime` | `Intl.RelativeTimeFormat` | "3 days ago"                                         |
+| `Intl/formatList`         | `Intl.ListFormat`         | "a, b, and c", rather than a hand-written comma join |
+| `Intl/plural`             | `Intl.PluralRules`        | which plural form a number takes                     |
+| `Intl/compare`            | `Intl.Collator`           | sorting strings                                      |
+| `Intl/displayName`        | `Intl.DisplayNames`       | the name of a language, region, script or currency   |
+| `Intl/segment`            | `Intl.Segmenter`          | graphemes, words and sentences                       |
+
+**They are helpers because ECMA-402's formatters are constructors.** `new` is not in the expression
+grammar and should not be; each helper wraps construct-then-format, which is the shape an author
+wants anyway.
+
+**A helper that is given no locale uses `en-US`, and `Intl/formatDate` with no `timeZone` uses
+`UTC`.** Not the host's, in either case. `new Intl.NumberFormat(undefined)` reads the build
+machine's locale, so the same document emits `1,234.5` on one machine and `1.234,5` on another and a
+site's output stops being a function of its input. The time zone is the worse of the two: a locale
+changes how a date reads, a zone can change **which day it is** — `2026-08-16T02:00Z` is the 16th in
+UTC and the 15th in New York.
+
+**`compare` is the one worth saying out loud.** `<` and `Array.sort()` order by UTF-16 code unit,
+which puts `Zebra` before `apple` and sorts every accented word after `z`. A sorted list built any
+other way is wrong in every language with an accent.
+
+**`DurationFormat` is deliberately absent.** Its baseline support is not universal, and a blessed
+global that throws on a browser Jx claims to support is worse than one that does not exist: the
+author writes a formula that works on their machine and fails on a visitor's.
+
+**What is not built.** A project's `i18n.defaultLocale` is not substituted into a helper call that
+omits one — the fixed default is what runs. Wiring the project's locale through would mean threading
+compile options into every expression call site, and the determinism the fixed default buys is the
+part that mattered; a project-locale default is an improvement on top of a correct baseline rather
+than a fix for a broken one. There is no `i18n.timeZone` key for the same reason: an unread config
+key is the exact defect §13.2 records `i18n` itself having had for months.
+
 ## 14. Deployment
 
 > **Status: Partial.** The adapters, their worker output and the response-header file all ship.
@@ -2252,7 +2298,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 | [JSON-LD 1.1](https://www.w3.org/TR/json-ld11/)                                           | **Subset**    | §8.5              | packages/compiler/src/site/head-merger.ts, packages/compiler/tests/head-merger.test.ts                                                                                               | An object `textContent` is serialized into the tag and templates inside it resolve, so a document can carry structured data that references itself. Jx does not process the JSON-LD — no context expansion, no compaction, no framing; it is emitted for the consumer to interpret.                                                                                                                                                                                                                                                                                                                                 |
 | [BCP 47](https://www.rfc-editor.org/info/bcp47)                                           | **Subset**    | §13.2, §13.4      | packages/schema/src/locale.ts, packages/schema/tests/locale.test.ts, packages/compiler/src/site/i18n.ts                                                                              | Tags are parsed against the RFC 5646 grammar and canonicalized (`EN-us` → `en-US`) through `Intl.Locale`; a malformed tag fails the build. Well-formedness only — the IANA registry is not consulted, so `zz` and `xx-YY` are accepted for languages that do not exist.                                                                                                                                                                                                                                                                                                                                             |
 | [RFC 4647](https://www.rfc-editor.org/rfc/rfc4647)                                        | **Subset**    | §13.6             | packages/compiler/src/site/locale-negotiation.ts, packages/compiler/tests/locale-negotiation.test.ts, packages/compiler/tests/locale-worker.test.ts                                  | §3.4 Lookup, run against `i18n.locales` in the generated worker: progressive truncation, singleton subtags removed with their parent, RFC 9110 §12.5.4 quality order, `q=0` honoured as a refusal. Absent: §3.3 Filtering, which returns a set and cannot answer "which page". Adapter-less static output negotiates nothing and permanently cannot — there is no runtime that sees a request (§13.6).                                                                                                                                                                                                              |
-| [ECMA-402](https://ecma-international.org/publications-and-standards/standards/ecma-402/) | **Subset**    | §13.4             | packages/schema/src/locale.ts, packages/schema/tests/locale.test.ts                                                                                                                  | `gap:locale-formatting` `Intl.Locale` supplies tag parsing, canonical case and likely-subtags maximization. The formatting half is untouched: no project locale reaches `Intl.DateTimeFormat` or `Intl.NumberFormat`, so a date formatted at build time still uses the build machine's locale.                                                                                                                                                                                                                                                                                                                      |
+| [ECMA-402](https://ecma-international.org/publications-and-standards/standards/ecma-402/) | **Subset**    | §13.4, §13.7      | packages/schema/src/intl.ts, packages/schema/src/locale.ts, packages/schema/tests/intl.test.ts, packages/runtime/tests/expression.test.ts                                            | `Intl.Locale` supplies tag parsing, canonical case and likely-subtags maximization. The formatting half is now reachable from a document: eight blessed helpers wrap the ECMA-402 constructors as pure calls, and each defaults to a **fixed** locale and time zone rather than the host's, so a build's output is a function of its input. `DurationFormat` is deliberately not offered — its baseline support is not universal, and a blessed global that throws on a supported browser is worse than its absence.                                                                                                |
 | [RFC 9111](https://www.rfc-editor.org/rfc/rfc9111)                                        | **Adopted**   | §14.3             | packages/compiler/src/site/headers-emitter.ts, packages/compiler/tests/headers-emitter.test.ts                                                                                       | Every output declares its cacheability: `must-revalidate` for anything whose URL does not change with its content, and a year for the one output whose URL does.                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | [RFC 8246](https://www.rfc-editor.org/rfc/rfc8246)                                        | **Adopted**   | §14.3             | packages/compiler/src/site/headers-emitter.ts, packages/compiler/tests/headers-emitter.test.ts                                                                                       | `immutable` is emitted for `/images/_optimized/*` alone. A test asserts no other path can acquire it, because every other filename is reused when its content changes.                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | [RFC 6797](https://www.rfc-editor.org/rfc/rfc6797)                                        | **Subset**    | §14.3             | packages/compiler/src/site/headers-emitter.ts                                                                                                                                        | Off by default and opt-in per project, with `max-age`, `includeSubDomains` and `preload`. `preload` without `includeSubDomains` is refused rather than emitted, since the preload list would reject it.                                                                                                                                                                                                                                                                                                                                                                                                             |
@@ -2391,6 +2437,7 @@ This spec builds on existing Jx primitives wherever possible:
 
 ## Changelog
 
+- **0.5.9-draft** (2026-08-16) — §13.7 blessed Intl helpers — one shared list, five new helpers, and a fixed en-US/UTC default so a build's output is a function of its input. Closes gap:locale-formatting.
 - **0.5.8-draft** (2026-08-16) — §13.3 {locale} sources expand and scope route expansion; §13.6 Accept-Language negotiation in the generated worker; prefix-always is checked; gap:locale-lookup closed.
 - **0.5.7-draft** (2026-08-16) — §8.4.1 a generated route's lastmod comes from the entry it was generated from; gap:sitemap-fields closed.
 - **0.5.6-draft** (2026-08-16) — §8.3 link relations are checked against the IANA registry, warning once per build; gap:link-relation-validation closed.

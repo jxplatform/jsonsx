@@ -1093,7 +1093,9 @@ describe("call operator — named formulas and blessed globals", () => {
       target: ref("window#/Intl/formatNumber"),
       value: [ref("#/state/total"), "en-US"],
     });
-    expect(js).toBe('new Intl.NumberFormat("en-US", undefined).format(state.total)');
+    // The `?? "en-US"` is the deterministic default: a formula that names no locale must not read
+    // The host's, or the same document would render differently on two build machines.
+    expect(js).toBe('new Intl.NumberFormat("en-US" ?? "en-US", undefined).format(state.total)');
     const fn = new Function("state", `return ${js}`) as (s: unknown) => string;
     expect(fn({ total: 1234.5 })).toBe("1,234.5");
 
@@ -1105,6 +1107,85 @@ describe("call operator — named formulas and blessed globals", () => {
     expect(dateJs).toContain("new Intl.DateTimeFormat(");
     const dateFn = new Function("state", `return ${dateJs}`) as (s: unknown) => string;
     expect(dateFn({ when: "2026-01-15T12:00:00Z" })).toBe("Jan 15, 2026");
+  });
+
+  test("a helper that names no locale or time zone still renders the same everywhere", () => {
+    /*
+     * The determinism contract. Without the defaults these compile to `new Intl.NumberFormat()`,
+     * which reads the build machine's locale — and for a date, its time zone, which can move the
+     * rendered day.
+     */
+    const numberJs = compileExpression({
+      operator: "call",
+      target: ref("window#/Intl/formatNumber"),
+      value: [ref("#/state/total")],
+    });
+    expect(numberJs).toContain('"en-US"');
+    const numberFn = new Function("state", `return ${numberJs}`) as (s: unknown) => string;
+    expect(numberFn({ total: 1234.5 })).toBe("1,234.5");
+
+    const dateJs = compileExpression({
+      operator: "call",
+      target: ref("window#/Intl/formatDate"),
+      value: [ref("#/state/when")],
+    });
+    expect(dateJs).toContain('timeZone: "UTC"');
+    const dateFn = new Function("state", `return ${dateJs}`) as (s: unknown) => string;
+    // 02:00 UTC is the 15th in New York; UTC is what keeps the published HTML the same everywhere.
+    expect(dateFn({ when: "2026-01-16T02:00:00Z" })).toBe("1/16/2026");
+  });
+
+  test("the new Intl helpers evaluate and compile to the same answer", () => {
+    const cases: { node: Parameters<typeof compileExpression>[0]; expected: unknown }[] = [
+      {
+        expected: "a, b, and c",
+        node: {
+          operator: "call",
+          target: ref("window#/Intl/formatList"),
+          value: [ref("#/state/items"), "en-US"],
+        },
+      },
+      {
+        expected: "one",
+        node: { operator: "call", target: ref("window#/Intl/plural"), value: [1, "en-US"] },
+      },
+      {
+        expected: "German",
+        node: {
+          operator: "call",
+          target: ref("window#/Intl/displayName"),
+          value: ["de", "language", "en-US"],
+        },
+      },
+      {
+        expected: ["a", "b"],
+        node: {
+          operator: "call",
+          target: ref("window#/Intl/segment"),
+          value: ["ab", "grapheme", "en-US"],
+        },
+      },
+    ];
+    const scope = { items: ["a", "b", "c"] };
+    for (const { node, expected } of cases) {
+      expect(evaluateExpression(node, scope, null)).toEqual(expected);
+      const js = compileExpression(node);
+      const fn = new Function("state", `return ${js}`) as (s: unknown) => unknown;
+      expect(fn(scope)).toEqual(expected);
+    }
+  });
+
+  test("Intl/compare orders accented words the way a person would", () => {
+    // `<` and sort() compare UTF-16 code units, which puts every accented word after "z".
+    const node = {
+      operator: "call" as const,
+      target: ref("window#/Intl/compare"),
+      value: ["école", "zoo", "fr"],
+    };
+    expect(evaluateExpression(node, {}, null)).toBeLessThan(0);
+    const [accented, plain] = ["école", "zoo"];
+    expect(accented! < plain!).toBe(false);
+    expect(new Function(`return ${compileExpression(node)}`)()).toBeLessThan(0);
   });
 
   test("non-blessed globals are rejected at evaluation", () => {

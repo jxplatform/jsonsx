@@ -920,4 +920,58 @@ describe("slugifyHeading", () => {
     expect(slugifyHeading("The `emit` Capability!")).toBe("the-emit-capability");
     expect(slugifyHeading("  spaced   out  ")).toBe("spaced-out");
   });
+
+  test("the two spellings of an accented heading produce ONE anchor", () => {
+    /*
+     * UAX #15. "Café" typed on macOS is `e` + U+0301; typed on Windows it is U+00E9. They render
+     * identically and compare unequal, so a link written against one heading stopped working when
+     * someone re-typed the heading.
+     */
+    const decomposed = "Cafe\u0301 Menu";
+    const precomposed = "Caf\u00E9 Menu";
+    expect(decomposed).not.toBe(precomposed);
+    expect(slugifyHeading(decomposed)).toBe(slugifyHeading(precomposed));
+    expect(slugifyHeading(precomposed)).toBe("café-menu");
+  });
+
+  test("non-Latin headings keep their letters instead of vanishing", () => {
+    // `\w` is ASCII-only, so these used to strip to nothing and fall back to "section".
+    expect(slugifyHeading("日本語の見出し")).toBe("日本語の見出し");
+    expect(slugifyHeading("Привет мир")).toBe("привет-мир");
+    expect(slugifyHeading("مرحبا بالعالم")).toBe("مرحبا-بالعالم");
+  });
+
+  test("every pure-ASCII heading is byte-identical to the old implementation", () => {
+    /*
+     * The mitigation that makes this change safe to ship: `\w` includes `_` and `\p{L}\p{N}` does
+     * not, so `_` is kept in the class explicitly. Nothing on an English site moves, which is what
+     * lets existing anchors and the links pointing at them survive.
+     */
+    const legacy = (text: string) =>
+      text
+        .toLowerCase()
+        .replaceAll(/[^\w\s-]/g, "")
+        .replaceAll(/\s+/g, "-")
+        .replaceAll(/-+/g, "-")
+        .replaceAll(/^-|-$/g, "");
+    const corpus = [
+      "The `emit` Capability!",
+      "  spaced   out  ",
+      "snake_case_heading",
+      "Getting Started — Part 2",
+      "API reference (v3.1)",
+      "What's new?",
+      "100% coverage",
+      "A/B testing & you",
+      "-leading and trailing-",
+      "under_score-and-hyphen",
+      "CAPS LOCK HEADING",
+      "",
+      "!!!",
+      "tabs\tand\nnewlines",
+    ];
+    for (const heading of corpus) {
+      expect(slugifyHeading(heading)).toBe(legacy(heading));
+    }
+  });
 });

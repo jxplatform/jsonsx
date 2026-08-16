@@ -85,6 +85,8 @@ Every field commits as you type, and the previews above redraw with it — which
 
 One row per value that reaches the browser — Title, Description, Social title, Social description, Social image, Social type — each showing the merged value, a character count against the length at which that field gets cut (`47/160`), and a chip saying where the value came from.
 
+The count is of **characters as you see them**: an emoji counts as one, a flag counts as one, and an accented letter counts as one however it was typed. That is not what `length` gives you in most tools — it counts a rocket as two and a flag as four — so a headline with three emoji used to report six characters of budget it had not spent. The count is not a measure of _width_, and deliberately so: a search result truncates on pixels, in a font the engine picks at a size it picks, and any number here claiming to predict that would be a guess wearing a measurement's clothes.
+
 A value this page sets shows the ordinary set dot. A value it inherits is marked **inherited** and names its donor: _from Base_ for a layout, _from Site head_ or _from Site name_ for the project, _from the build_ for a value the build supplies on your behalf. The two chips that lead somewhere are clickable and open the setting in Project Settings; the layout and build chips are plain text, because the card has no verb for them.
 
 That marking is the whole point. A page inheriting its description from the site is not a page missing a description, and until the preview said which was which, the two looked identical.

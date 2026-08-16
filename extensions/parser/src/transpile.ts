@@ -725,18 +725,35 @@ export function transpileJxMarkdown(source: string) {
 // ─── Heading anchors ─────────────────────────────────────────────────────────
 
 /**
- * Slugify a heading's text into an anchor id: lowercase, punctuation stripped, spaces collapsed to
- * single hyphens. The one algorithm behind rendered heading `id`s, `$toc` entries, and search deep
- * links (specs/parser.md).
+ * Slugify a heading's text into an anchor id: normalized, lowercased, punctuation stripped, spaces
+ * collapsed to single hyphens. The one algorithm behind rendered heading `id`s, `$toc` entries, and
+ * search deep links (specs/parser.md).
+ *
+ * **NFC first, and that is the whole point of the change** (UAX #15). "Café" typed on macOS is `e`
+ * + U+0301; the same word typed on Windows, or pasted from a web page, is U+00E9. They look
+ * identical, they compare unequal, and they produced two different anchors — so a link written
+ * against one heading silently stopped working when someone re-typed the heading. Normalizing puts
+ * both spellings in one form before anything else looks at them.
+ *
+ * **`toLowerCase`, never `toLocaleLowerCase`.** Locale-sensitive casing would make the same heading
+ * produce different anchors in different projects — Turkish maps `I` to `ı`, not `i` — and an
+ * anchor is a URL, which belongs to the document rather than to the reader's locale.
+ *
+ * **`_` stays in the character class deliberately.** The old class was `\w`, which is
+ * `[A-Za-z0-9_]`; `\p{L}\p{N}` is the Unicode-aware replacement and does **not** include `_`.
+ * Keeping it means this function is **byte-identical on every pure-ASCII heading**, so no existing
+ * anchor on an English site moves — `tests/transpile.test.ts` asserts exactly that against a
+ * corpus. What changes is only headings that were being mangled anyway.
  *
  * @param {string} text
  * @returns {string}
  */
 export function slugifyHeading(text: string) {
   return text
+    .normalize("NFC")
     .toLowerCase()
-    .replaceAll(/[^\w\s-]/g, "")
-    .replaceAll(/\s+/g, "-")
+    .replaceAll(/[^\p{L}\p{N}_\s-]/gu, "")
+    .replaceAll(/\s+/gu, "-")
     .replaceAll(/-+/g, "-")
     .replaceAll(/^-|-$/g, "");
 }
