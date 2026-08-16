@@ -94,6 +94,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `extensions.md`
 
+- **0.3.8-draft** (2026-08-16) — §8 _meta is reserved in a resolvePaths result — it carries the source entry's facts, never a route parameter.
 - **0.3.7-draft** (2026-08-15) — mediaType is validated against RFC 6838 and carries RFC 7763 variant parameters; mediaTypeEssence for callers that key on a type (§7).
 - **0.3.6-draft** (2026-08-15) — Add §8.6 head: a section owner contributes <head> entries from configuration, before the first page is built.
 - **0.3.5-draft** (2026-08-15) — Add §16 Standards Alignment: JSON Schema composition, media-type registration, and why JSON Patch is declined for lower.
@@ -215,6 +216,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `site-architecture.md`
 
+- **0.5.7-draft** (2026-08-16) — §8.4.1 a generated route's lastmod comes from the entry it was generated from; gap:sitemap-fields closed.
 - **0.5.6-draft** (2026-08-16) — §8.3 link relations are checked against the IANA registry, warning once per build; gap:link-relation-validation closed.
 - **0.5.5-draft** (2026-08-16) — §16: the RFC 9110 row states the five statuses B1 shipped instead of the two that predated it.
 - **0.5.4-draft** (2026-08-16) — Optional service worker with a tombstone contract: off by default, network-first HTML, precache validated against the build's own output (§14.6).

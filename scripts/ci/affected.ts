@@ -122,8 +122,11 @@ const EXTRA_EDGES: ExtraEdge[] = [
   {
     patterns: ["extensions/feed/src/**", "extensions/parser/src/**"],
     seeds: ["packages/compiler"],
-    evidence: ["packages/compiler/tests/feed-integration.test.ts"],
-    why: "The compiler's one end-to-end feed test builds a project that loads @jxsuite/parser and @jxsuite/feed, so a change to either extension's src can break a compiler test.",
+    evidence: [
+      "packages/compiler/tests/feed-integration.test.ts",
+      "packages/compiler/tests/sitemap-lastmod.test.ts",
+    ],
+    why: "Two compiler tests build a real project that loads @jxsuite/parser (and, for feeds, @jxsuite/feed), so a change to either extension's src can break a compiler test. The sitemap one spans three packages by construction: the parser carries an entry's timestamp, the compiler lifts it onto the route, and the sitemap prints it.",
   },
 ];
 

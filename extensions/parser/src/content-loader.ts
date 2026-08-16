@@ -687,6 +687,12 @@ export class Content {
    * Expand a content-type `$paths` source into route-param maps: one `{ [param]: value }` per
    * entry, with `param` defaulting to "slug" and `field` to "id" (the entry id).
    *
+   * Each map also carries the entry's own `_meta`, under that reserved name. `_meta` is not a route
+   * parameter and the host strips it before substitution — it is how a fact about the _entry_
+   * reaches a route that would otherwise know only about the template that generated it. The one
+   * that matters today is `mtime`: without it every post in a collection reports the template's
+   * timestamp in `<lastmod>`, so the whole archive looks edited whenever the template is.
+   *
    * @param {ContentPathsSource} pathsDef - The `$paths` value ({ contentType, param?, field? })
    * @param {ResolvePathsContext} ctx - Host context ({ data, projectConfig, root })
    * @returns {Promise<Record<string, unknown>[]>} Array of route-param objects
@@ -704,10 +710,18 @@ export class Content {
     }
     const param = pathsDef.param ?? "slug";
     const field = pathsDef.field ?? "id";
-    return entries
-      .map((entry) => ({
-        [param]: field === "id" ? entry.id : (entry.data[field] ?? entry.id),
-      }))
-      .filter((p) => p[param]);
+    const paths: Record<string, unknown>[] = [];
+    for (const entry of entries) {
+      const value = field === "id" ? entry.id : (entry.data[field] ?? entry.id);
+      if (!value) {
+        continue;
+      }
+      const pathEntry: Record<string, unknown> = { [param]: value };
+      if (entry._meta !== undefined) {
+        pathEntry._meta = entry._meta;
+      }
+      paths.push(pathEntry);
+    }
+    return paths;
   }
 }

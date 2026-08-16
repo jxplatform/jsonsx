@@ -27,6 +27,13 @@ interface Route {
   params: string[]; // Parameter names (e.g. ["slug"])
   $layout: string | null; // Layout override from page frontmatter, if any
   _pathParams?: Record<string, string>; // Resolved path parameters
+  /**
+   * The timestamp of the thing this concrete route was generated FROM, when that is not the
+   * template file. A collection route's source is an entry; `sourcePath` still points at the
+   * `[slug].json` that rendered it, so without this every post in an archive reports the template's
+   * mtime and the whole collection looks edited whenever the template is.
+   */
+  sourceMtime?: string;
 }
 
 /**
@@ -205,6 +212,35 @@ async function fileToRoute(relativePath: string, absolutePath: string, registry?
 }
 
 /**
+ * The reserved key a `resolvePaths` result may carry alongside its route parameters.
+ *
+ * A route parameter comes from a `[bracket]` segment in a filename, so this name cannot collide
+ * with one by accident, and it matches what the content loader already calls the same data on an
+ * entry (`parser.md` §9.3) — so a fact about an entry keeps one name from the file it was read out
+ * of all the way to the sitemap.
+ */
+const PATH_ENTRY_META = "_meta";
+
+/**
+ * The entry timestamp carried on a `$paths` result, or null when there is none.
+ *
+ * Null is ordinary: the core `$paths` shapes (`values`, `$ref`, a literal array) describe route
+ * parameters and nothing else, and a route with no entry of its own correctly falls back to its
+ * template's own modification time.
+ *
+ * @param {Record<string, unknown>} pathEntry
+ * @returns {string | null}
+ */
+function entryMtime(pathEntry: Record<string, unknown>): string | null {
+  const meta = pathEntry[PATH_ENTRY_META];
+  if (meta === null || typeof meta !== "object") {
+    return null;
+  }
+  const { mtime } = meta as { mtime?: unknown };
+  return typeof mtime === "string" && mtime !== "" ? mtime : null;
+}
+
+/**
  * Expand dynamic routes by resolving $paths from each dynamic page.
  *
  * Supports these $paths shapes (per spec §4.3): 1. Explicit values: { values: ["en", "fr"], param:
@@ -262,17 +298,24 @@ export async function expandDynamicRoutes(
       let concreteUrl = route.urlPattern;
       const params: Record<string, string> = {};
       for (const [param, value] of Object.entries(pathEntry)) {
+        // `_meta` is the reserved carrier for facts about the source ENTRY (extensions.md §8).
+        // It is not a route parameter and must never reach substitution.
+        if (param === PATH_ENTRY_META) {
+          continue;
+        }
         params[param] = String(value);
         concreteUrl = concreteUrl.replace(`:${param}`, params[param]);
         concreteUrl = concreteUrl.replace("*", params[param]);
       }
 
+      const mtime = entryMtime(pathEntry);
       expanded.push({
         ...route,
         _pathParams: params,
         isCatchAll: false,
         isDynamic: false,
         params: [],
+        ...(mtime === null ? {} : { sourceMtime: mtime }),
         urlPattern: concreteUrl,
       });
     }

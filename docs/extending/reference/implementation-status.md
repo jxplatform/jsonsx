@@ -18,14 +18,14 @@ This page is generated from the `> **Status: …**` markers in the specification
 | `collab.md`               | 0.2.3-draft  | Partial     | 2026-08-15 |
 | `compiler.md`             | 0.2.1-draft  | Partial     | 2026-08-15 |
 | `desktop.md`              | 0.3.9-draft  | Pending     | 2026-08-15 |
-| `extensions.md`           | 0.3.7-draft  | Partial     | 2026-08-15 |
+| `extensions.md`           | 0.3.8-draft  | Partial     | 2026-08-16 |
 | `imports.md`              | 0.1.9-draft  | Partial     | 2026-08-15 |
 | `jx-markdown.md`          | 0.1.8-draft  | Partial     | 2026-08-15 |
 | `parser.md`               | 0.2.8-draft  | Partial     | 2026-08-16 |
 | `relationships.md`        | 0.1.4-draft  | Partial     | 2026-08-15 |
 | `schema.md`               | 0.4.8-draft  | Partial     | 2026-08-16 |
 | `server.md`               | 0.2.5        | Implemented | 2026-08-16 |
-| `site-architecture.md`    | 0.5.6-draft  | Partial     | 2026-08-16 |
+| `site-architecture.md`    | 0.5.7-draft  | Partial     | 2026-08-16 |
 | `spec.md`                 | 0.4.31-draft | Partial     | 2026-08-16 |
 | `standards.md`            | 0.1.12-draft | Partial     | 2026-08-16 |
 | `studio-ui-guidelines.md` | 0.3.9        | Implemented | 2026-08-15 |

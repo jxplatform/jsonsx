@@ -565,7 +565,17 @@ export async function buildSite(
       if (sitemapEnabled && !result.excludeFromSitemap && isConcrete) {
         const routeAlternates = alternateMap.get(route.urlPattern) ?? [];
         sitemapEntries.push({
-          lastmod: toRfc3339(statSync(route.sourcePath).mtime),
+          /*
+           * The route's own timestamp when it has one, and only then the template's. A concrete
+           * route expanded from a collection carries the entry it was generated from
+           * (`sourceMtime`), because `sourcePath` still points at the `[slug]` template — so
+           * without this every post in an archive claims to have been edited the moment the
+           * template was, which is precisely the signal `<lastmod>` exists to give.
+           */
+          lastmod:
+            typeof route.sourceMtime === "string" && route.sourceMtime !== ""
+              ? route.sourceMtime
+              : toRfc3339(statSync(route.sourcePath).mtime),
           loc: new URL(route.urlPattern, siteUrl).href,
           ...(routeAlternates.length > 0 && { alternates: routeAlternates }),
         });

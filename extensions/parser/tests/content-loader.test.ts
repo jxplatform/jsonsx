@@ -676,6 +676,28 @@ describe("Content.resolvePaths", () => {
     expect(paths).toEqual([{ slug: "hello" }, { slug: "world" }]);
   });
 
+  /*
+   * The route's own timestamp travelling with its parameters. Without it a collection route is
+   * dated by the `[slug]` template that rendered it, so every post in an archive claims to have
+   * been edited the moment the template was — see site-architecture.md §8.4.1.
+   */
+  it("carries the entry's own _meta alongside the route parameter", async () => {
+    const dated = new Map<string, ContentLoaderEntry[]>([
+      [
+        "posts",
+        [
+          { _meta: { mtime: "2024-03-04T05:06:07Z" }, body: null, data: {}, id: "dated" },
+          { body: null, data: {}, id: "undated" },
+        ],
+      ],
+    ]);
+    const paths = await Content.resolvePaths({ contentType: "posts" }, { data: dated, root: TMP });
+    expect(paths).toEqual([
+      { _meta: { mtime: "2024-03-04T05:06:07Z" }, slug: "dated" },
+      { slug: "undated" },
+    ]);
+  });
+
   it("honors a custom param and field, falling back to the entry id", async () => {
     const paths = await Content.resolvePaths(
       { contentType: "posts", field: "title", param: "name" },

@@ -2,9 +2,9 @@
 
 ## Extension Packages, Schema Composition, and the Capability Contract
 
-**Version:** 0.3.7-draft
+**Version:** 0.3.8-draft
 **Status:** Partial
-**Updated:** 2026-08-15
+**Updated:** 2026-08-16
 **License:** MIT
 
 Supersedes v1 ("Format-Extension Classes and the Capability Contract"). The
@@ -545,6 +545,16 @@ key is present in the `$paths` value. A connector `table` discriminator
 (dynamic-table-driven page paths) is **planned**; no connector descriptor
 declares one today — `contentType` is the only registered discriminator.
 
+**`_meta` is reserved in a `resolvePaths` result.** Every other key in a returned
+object is a route parameter, substituted into the URL pattern; `_meta` is not,
+and the host strips it before substitution. It carries facts about the **source
+entry** the route was generated from, which the route would otherwise have no
+way to learn — its `sourcePath` is the `[slug]` template, not the entry. The one
+the build reads today is `mtime`, which is what lets a sitemap date each post in
+a collection by the post rather than by the template
+(`site-architecture.md` §8.4.1). A capability may omit it; a route with no entry
+behind it falls back to its own file.
+
 ### 8.1 `timing`
 
 Each capability method may declare a `timing` array — the environments allowed
@@ -1065,6 +1075,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.3.8-draft** (2026-08-16) — §8 _meta is reserved in a resolvePaths result — it carries the source entry's facts, never a route parameter.
 - **0.3.7-draft** (2026-08-15) — mediaType is validated against RFC 6838 and carries RFC 7763 variant parameters; mediaTypeEssence for callers that key on a type (§7).
 - **0.3.6-draft** (2026-08-15) — Add §8.6 head: a section owner contributes <head> entries from configuration, before the first page is built.
 - **0.3.5-draft** (2026-08-15) — Add §16 Standards Alignment: JSON Schema composition, media-type registration, and why JSON Patch is declined for lower.
@@ -1087,4 +1098,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx Extensions Specification v0.3.7-draft_
+_Jx Extensions Specification v0.3.8-draft_
