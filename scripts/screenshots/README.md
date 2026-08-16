@@ -19,6 +19,18 @@ Two rules govern everything below, and both are review-enforceable:
 
 ## Usage
 
+**The browser is driven over [WebDriver BiDi](https://www.w3.org/TR/webdriver-bidi/), not CDP.** CDP
+is Chrome's own protocol and no standard describes it; everything this pipeline asks of a browser is
+in BiDi, and the captured bytes are identical under both — the same shot captured over each, with
+everything else held equal, hashes the same. Set `JX_SHOTS_PROTOCOL=cdp` to fall back if a Chromium
+release regresses BiDi.
+
+One consequence worth knowing before you write a step: **BiDi refuses a pointer move outside the
+viewport.** CDP tolerated `(-1, -1)`, which is how the pipeline used to park the cursor where
+nothing could match `:hover`; it now parks at the viewport's bottom-right corner. A step that
+computes a coordinate must keep it inside the viewport, or `input.performActions` fails the shot
+with "move target out of bounds".
+
 ```bash
 bun run screenshots                 # all shots; visually-identical images keep their bytes
 bun run screenshots --only hero     # one shot (comma-separate for several)

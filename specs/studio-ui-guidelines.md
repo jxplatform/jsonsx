@@ -1,6 +1,6 @@
 # Jx Studio UI/UX Interface Guidelines
 
-**Version:** 0.3.11
+**Version:** 0.3.12
 **Status:** Implemented
 **Updated:** 2026-08-16
 **Applies to:** `packages/studio/`
@@ -943,6 +943,33 @@ panel's own column gives everyone else.
 
 ---
 
+## 15. Documentation Screenshots
+
+> **Status: Implemented.**
+
+Every picture in `/docs` is captured by `scripts/screenshots/`, never taken by hand. The contract
+governing what a shot may say lives in `scripts/screenshots/README.md`; this section records the one
+thing that is a **standards** decision rather than a policy one.
+
+**The pipeline drives the browser over [WebDriver BiDi](https://www.w3.org/TR/webdriver-bidi/), not
+CDP.** CDP is Chrome's own protocol and no standard describes it. Everything the pipeline asks of a
+browser — viewport, media features, init scripts, navigation, evaluation, frame enumeration,
+screenshots — is in BiDi, and the captured bytes are identical under both: the same shot captured
+over each protocol, with everything else held equal, hashes the same. That equality was the
+acceptance criterion, and it is what makes the switch a change of protocol rather than a change of
+pictures.
+
+**One thing did have to change, and it is the kind of difference worth writing down.** The pipeline
+parked the pointer at `(-1, -1)` between shots so that nothing matched `:hover`. CDP accepted
+off-canvas coordinates; **BiDi does not** — `input.performActions` refuses a move beyond the
+viewport, and every shot failed the moment the pipeline spoke the standard's protocol. The pointer
+now parks at the viewport's bottom-right corner, which has the property the negative coordinates
+were chosen for and is a position the standard allows. A vendor protocol's tolerance is not a
+contract; this is what depending on one looks like when you stop.
+
+`JX_SHOTS_PROTOCOL=cdp` falls back, so a BiDi regression in a Chromium release costs one environment
+variable rather than a revert.
+
 ## 14. Standards Alignment
 
 External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md). Spectrum Web Components is a component library rather than a standard; §6 records which of its components are in use.
@@ -953,9 +980,11 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 | [Accessible Name and Description Computation](https://www.w3.org/TR/accname-1.2/) | **Adopted** | §10              | packages/studio/src/panels/problems-panel.ts                                                                                                                                                             | §10's rule that a control carries exactly one accessible name — `title` and `aria-label` with the same string announce it twice — is this algorithm's precedence order restated.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | [WCAG 2.2](https://www.w3.org/TR/WCAG22/)                                         | **Subset**  | §1.1, §8.2, §8.7 | packages/studio/src/services/announce.ts, packages/studio/styles/forced-colors.css, packages/studio/scripts/check-styles.ts, packages/studio/tests/announce.test.ts                                      | `gap:wcag-conformance` No level is claimed, and conformance is not tested end to end — that needs a browser. Four criteria are met deliberately and checked: **SC 4.1.3** (Status Messages) — one live region, called from `notify()` itself, so a failure that lands in the Problems panel is still announced; **SC 2.5.7** (Dragging Movements) — cut/paste is the stated alternative to every drag; **SC 1.4.3/1.4.11** (Contrast) — a required-pairs table gated in `check-styles.ts`, with one entry on the debt list; **SC 1.4.1** — a `forced-colors` block redraws the selection and focus affordances Windows High Contrast deletes with `box-shadow`. |
 | [ATAG 2.0](https://www.w3.org/TR/ATAG20/)                                         | **Subset**  | §8, §13.1a       | packages/studio/src/services/announce.ts, packages/studio/src/services/a11y-report.ts                                                                                                                    | Part A — the tool's own accessibility — is answered by §13.1a's live region and §8.2's keyboard alternative to every drag. Part B is `studio.md` §16.6: a check over the author's document, filing a Problem per finding with its WCAG criterion. Neither part claims a conformance level, which needs a browser.                                                                                                                                                                                                                                                                                                                                               |
+| [WebDriver BiDi](https://www.w3.org/TR/webdriver-bidi/)                           | **Adopted** | §15              | scripts/screenshots/lib/browser.ts, scripts/screenshots/lib/browser.test.ts, scripts/screenshots/lib/shot.ts                                                                                             | The documentation screenshot pipeline drives Chromium over the W3C protocol rather than CDP. Verified by capturing the same shot over each with everything else held equal and hashing the results: byte-identical. The one behavioural difference — BiDi refuses a pointer move outside the viewport, where CDP allowed `(-1, -1)` — is fixed in the pipeline rather than worked around, and §15 records it.                                                                                                                                                                                                                                                   |
 
 ## Changelog
 
+- **0.3.12** (2026-08-16) — §15 the documentation screenshot pipeline drives Chromium over WebDriver BiDi rather than CDP — byte-identical captures, and the one behavioural difference (a pointer move outside the viewport) fixed rather than worked around.
 - **0.3.11** (2026-08-16) — §14 ATAG is Subset: Part A is §13.1a and §8.2, Part B is studio.md §16.6.
 - **0.3.10** (2026-08-16) — §1.1 the token table's fallbacks are corrected and gated against tokens.css; §8.2 cut/paste is the stated alternative to every drag (SC 2.5.7); §13.1a one live region, called from notify() itself, so a failure that lands in the Problems panel is announced.
 - **0.3.9** (2026-08-15) — Add §14 Standards Alignment; §8 marked Partial — drag and drop has no non-dragging alternative (WCAG 2.2 SC 2.5.7).

@@ -27,8 +27,8 @@ This page is generated from the `> **Status: …**` markers in the specification
 | `server.md`               | 0.2.7        | Implemented | 2026-08-16 |
 | `site-architecture.md`    | 0.5.9-draft  | Partial     | 2026-08-16 |
 | `spec.md`                 | 0.4.33-draft | Partial     | 2026-08-16 |
-| `standards.md`            | 0.1.13-draft | Partial     | 2026-08-16 |
-| `studio-ui-guidelines.md` | 0.3.11       | Implemented | 2026-08-16 |
+| `standards.md`            | 0.1.14-draft | Partial     | 2026-08-16 |
+| `studio-ui-guidelines.md` | 0.3.12       | Implemented | 2026-08-16 |
 | `studio.md`               | 0.9.27-draft | Partial     | 2026-08-16 |
 
 ## Sections not yet implemented

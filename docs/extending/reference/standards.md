@@ -14,13 +14,13 @@ This page is generated from the `## N. Standards Alignment` tables in the specif
 
 | Class       | Standards | Bindings |
 | ----------- | --------- | -------- |
-| `Adopted`   | 23        | 31       |
+| `Adopted`   | 24        | 32       |
 | `Subset`    | 38        | 67       |
 | `Divergent` | 4         | 6        |
 | `Borrowed`  | 4         | 5        |
 | `Pending`   | 0         | 0        |
 | `Rejected`  | 6         | 6        |
-| _(backlog)_ | 6         | —        |
+| _(backlog)_ | 5         | —        |
 
 ## Standards Jx implements
 
@@ -105,6 +105,7 @@ This page is generated from the `## N. Standards Alignment` tables in the specif
 | [Accessible Rich Internet Applications (WAI-ARIA) 1.2](https://www.w3.org/TR/wai-aria-1.2/) `WAI-ARIA`                                                 | W3C         | `Subset`    | `studio.md` §16                                                                                | `packages/studio/src/ui/layers.ts`                                                                                                                                                                                 |
 | [Web Content Accessibility Guidelines (WCAG) 2.2](https://www.w3.org/TR/WCAG22/) `WCAG 2.2`                                                            | W3C         | `Subset`    | `studio-ui-guidelines.md` §1.1, `studio-ui-guidelines.md` §8.2, `studio-ui-guidelines.md` §8.7 | `packages/studio/src/services/announce.ts`, `packages/studio/styles/forced-colors.css`, `packages/studio/scripts/check-styles.ts`, `packages/studio/tests/announce.test.ts`                                        |
 | [Web Application Manifest](https://www.w3.org/TR/appmanifest/) `Web Application Manifest`                                                              | W3C         | `Subset`    | `site-architecture.md` §14.5                                                                   | `packages/compiler/src/site/well-known.ts`, `packages/compiler/tests/well-known.test.ts`                                                                                                                           |
+| [WebDriver BiDi](https://www.w3.org/TR/webdriver-bidi/) `WebDriver BiDi`                                                                               | W3C         | `Adopted`   | `studio-ui-guidelines.md` §15                                                                  | `scripts/screenshots/lib/browser.ts`, `scripts/screenshots/lib/browser.test.ts`, `scripts/screenshots/lib/shot.ts`                                                                                                 |
 | [DOM Standard](https://dom.spec.whatwg.org/) `WHATWG DOM`                                                                                              | WHATWG      | `Subset`    | `spec.md` §16, `spec.md` §20                                                                   | `packages/compiler/src/targets/compile-element.ts`                                                                                                                                                                 |
 | [Fetch Standard](https://fetch.spec.whatwg.org/) `WHATWG Fetch`                                                                                        | WHATWG      | `Adopted`   | `server.md` §4.2                                                                               | `packages/server/src/net-guard.ts`, `packages/server/tests/net-guard.test.ts`                                                                                                                                      |
 | [HTML Standard](https://html.spec.whatwg.org/) `WHATWG HTML`                                                                                           | WHATWG      | `Subset`    | `ai.md` §2                                                                                     | `packages/server/src/ai-api.ts`                                                                                                                                                                                    |
@@ -151,7 +152,6 @@ Standards whose owning spec section does not exist yet, so no row can bind them.
 | [CSS Shadow Parts](https://www.w3.org/TR/css-shadow-parts-1/)                                      | `spec.md` §16.6 — `::part` from outside | Shadow roots exist now (the `$shadow` opt-in), so `::part` is finally _possible_ — but nothing emits a `part` attribute and no selector addresses one from a page stylesheet, so there is no behaviour to cite yet. |
 | [Media Queries Level 5](https://www.w3.org/TR/mediaqueries-5/) `Media Queries 5`                   | `spec.md` §9.4                          | `$media` borrows `@custom-media`'s shape from this level, but Jx resolves it itself and no browser ships it — so there is nothing to conform to until one does.                                                     |
 | [Web Authentication Level 3](https://www.w3.org/TR/webauthn-3/) `WebAuthn Level 3`                 | `desktop.md` §10                        | Passkeys need a registered relying-party id and a recovery story, neither of which is designed.                                                                                                                     |
-| [WebDriver BiDi](https://www.w3.org/TR/webdriver-bidi/)                                            | `studio.md` — screenshot pipeline       | The pipeline drives Chrome over CDP from `scripts/`, which no spec section describes.                                                                                                                               |
 
 ## Standards catalog
 

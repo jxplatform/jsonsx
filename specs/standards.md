@@ -2,7 +2,7 @@
 
 ## Which External Standards Jx Adopts, and How That Is Recorded
 
-**Version:** 0.1.13-draft
+**Version:** 0.1.14-draft
 **Status:** Partial
 **Updated:** 2026-08-16
 **License:** MIT
@@ -239,7 +239,6 @@ An entry names the spec that will own it. When that section is written, the entr
 | [CSS Containment 3](https://www.w3.org/TR/css-contain-3/)     | `spec.md` §9                            | `$media` is viewport-only. Container queries would need a named-container model in the style object.                                                                                                                |
 | [Media Queries 5](https://www.w3.org/TR/mediaqueries-5/)      | `spec.md` §9.4                          | `$media` borrows `@custom-media`'s shape from this level, but Jx resolves it itself and no browser ships it — so there is nothing to conform to until one does.                                                     |
 | [CSS Shadow Parts](https://www.w3.org/TR/css-shadow-parts-1/) | `spec.md` §16.6 — `::part` from outside | Shadow roots exist now (the `$shadow` opt-in), so `::part` is finally _possible_ — but nothing emits a `part` attribute and no selector addresses one from a page stylesheet, so there is no behaviour to cite yet. |
-| [WebDriver BiDi](https://www.w3.org/TR/webdriver-bidi/)       | `studio.md` — screenshot pipeline       | The pipeline drives Chrome over CDP from `scripts/`, which no spec section describes.                                                                                                                               |
 
 ## 12. Normative Keywords
 
@@ -270,6 +269,7 @@ the failure the gate exists to make loud.
 
 ## Changelog
 
+- **0.1.14-draft** (2026-08-16) — §11 WebDriver BiDi leaves the adoption backlog — the pipeline speaks it, and studio-ui-guidelines.md §15 owns it.
 - **0.1.13-draft** (2026-08-16) — §11 RFC 8414 leaves the adoption backlog — the flow it would configure now exists, and it is recorded Rejected in desktop.md for the reason that remains.
 - **0.1.12-draft** (2026-08-16) — §12 declares the BCP 14 normative keywords for the whole corpus, gated by docs:status; BCP 14 graduates off the backlog.
 - **0.1.11-draft** (2026-08-16) — §4.4 worked examples use a reserved gap:example-only slug so an illustration cannot squat on a real gap id.
@@ -287,4 +287,4 @@ the failure the gate exists to make loud.
 
 ---
 
-_Jx Standards Alignment Specification v0.1.13-draft_
+_Jx Standards Alignment Specification v0.1.14-draft_
