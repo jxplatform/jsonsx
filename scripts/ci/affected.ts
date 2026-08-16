@@ -71,8 +71,8 @@ const EXTRA_EDGES: ExtraEdge[] = [
   {
     patterns: ["packages/runtime/src/runtime.ts"],
     seeds: ["packages/compiler"],
-    evidence: ["packages/compiler/tests/no-shadow-dom.test.ts"],
-    why: "The light-DOM guarantee (spec.md §16.6) is about the compiler AND the runtime, so the compiler's test reads the runtime source directly — a shadow root attached on either side would break the same contract.",
+    evidence: ["packages/compiler/tests/shadow-dom.test.ts"],
+    why: "The shadow-DOM contract (spec.md §16.6) spans the compiler and the runtime, and the compiler's test drives the element emitter that both produce and consume.",
   },
   {
     patterns: [

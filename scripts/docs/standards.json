@@ -51,6 +51,12 @@
       "url": "https://www.w3.org/TR/css-contain-3/"
     },
     {
+      "id": "CSS Scoping",
+      "org": "W3C",
+      "title": "CSS Scoping Module Level 1",
+      "url": "https://www.w3.org/TR/css-scoping-1/"
+    },
+    {
       "id": "CSS Shadow Parts",
       "org": "W3C",
       "title": "CSS Shadow Parts",

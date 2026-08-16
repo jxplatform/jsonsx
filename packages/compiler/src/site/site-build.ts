@@ -66,6 +66,7 @@ import {
 import { resolvePrototypes } from "./prototype-resolver.ts";
 import { transformImageNodes } from "./image-transform.ts";
 import { collectCspSources, emptyCspSources } from "./csp.ts";
+import { resolveShadowMode } from "../shadow.ts";
 import {
   buildManifest,
   buildSecurityTxt,
@@ -388,9 +389,23 @@ export async function buildSite(
         const doc = await readPageDocument(componentPath, formatRegistry);
         if (doc.tagName) {
           componentDefs.set(doc.tagName, doc);
-          const css = buildComponentCSS(doc.tagName, doc.style, doc, projectConfig.$media ?? {});
+          const componentShadow = resolveShadowMode(doc, projectConfig.defaults);
+          const css = buildComponentCSS(
+            doc.tagName,
+            doc.style,
+            doc,
+            projectConfig.$media ?? {},
+            componentShadow,
+          );
           if (css) {
-            componentCSS.set(doc.tagName, css);
+            /*
+             * A shadow component's sheet is linked from inside its own declarative shadow root, so
+             * it is written to disk but kept OUT of the page-level map: a `:host`-rooted rule in
+             * the document head matches nothing, and the duplicate request is pure cost.
+             */
+            if (componentShadow === null) {
+              componentCSS.set(doc.tagName, css);
+            }
             collectAssetRefs(css, assetMounts, assetRefs);
             writeFileSync(resolve(componentOutDir, `${doc.tagName}.css`), css, "utf8");
             fileCount += 1;
@@ -483,6 +498,7 @@ export async function buildSite(
         rewriteNpmAsset,
         i18n,
         alternateMap.get(route.urlPattern) ?? [],
+        runtimeImports,
       );
 
       // Determine which component tags are fully static (for script omission)
@@ -899,6 +915,7 @@ async function compilePage(
   rewriteNpmAsset: (specifier: string) => string,
   i18n: ResolvedI18n | null,
   alternates: readonly LocaleAlternate[],
+  runtimeImports: Record<string, string>,
 ) {
   // Load the raw page document (.json natively, other formats via the registry)
   const pageDoc = await readPageDocument(route.sourcePath as string, formatRegistry);
@@ -969,7 +986,7 @@ async function compilePage(
     media: { ...projectConfig.$media, ...layoutDoc.$media },
     rules: [],
   };
-  expandComponents(layoutDoc, componentDefs, slotCss);
+  expandComponents(layoutDoc, componentDefs, slotCss, projectConfig.defaults);
 
   // Strip resolved timing: "compiler" state entries — they're now baked into the tree
   // And keeping them would cause isDynamic() to misclassify the page as dynamic.
@@ -1072,6 +1089,16 @@ async function compilePage(
   // Compile the document using the existing compiler
   const result = await compile(layoutDoc, {
     lang: language.lang,
+    /*
+     * The page-template tiers emit their own import map, and it defaulted to the CDN — so a page
+     * that reached compile-static/compile-client kept loading its runtime from esm.sh even after
+     * the self-hosting landed, because `injectComponentScripts` sees a map already present and
+     * declines to add its own. Both halves have to name the same URLs.
+     */
+    ...(runtimeImports["@vue/reactivity"] === undefined
+      ? {}
+      : { reactivitySrc: runtimeImports["@vue/reactivity"] }),
+    ...(runtimeImports["lit-html"] === undefined ? {} : { litHtmlSrc: runtimeImports["lit-html"] }),
     prePaintScheme: false, // Injected via the merged <head> above, not the target template
     projectStyle: projectConfig.style ?? null,
     ...(rewriteSidecarSrc === undefined
@@ -1614,18 +1641,20 @@ interface SlotCssCollector {
  * @param {JxElement | string} node
  * @param {Map<string, JxElement>} componentDefs
  * @param {SlotCssCollector} [slotCss]
+ * @param {ProjectConfig["defaults"]} [defaults] - Read for `defaults.shadow` (spec.md §16.6)
  */
 function expandComponents(
   node: JxElement | string,
   componentDefs: Map<string, JxElement>,
   slotCss?: SlotCssCollector,
+  defaults?: ProjectConfig["defaults"],
 ) {
   if (!node || typeof node !== "object") {
     return;
   }
   if (Array.isArray(node)) {
     for (const n of node as (JxElement | string)[]) {
-      expandComponents(n, componentDefs, slotCss);
+      expandComponents(n, componentDefs, slotCss, defaults);
     }
     return;
   }
@@ -1633,7 +1662,7 @@ function expandComponents(
   // Recurse into children first (bottom-up expansion)
   if (Array.isArray(node.children)) {
     for (const child of node.children) {
-      expandComponents(child, componentDefs, slotCss);
+      expandComponents(child, componentDefs, slotCss, defaults);
     }
   }
 
@@ -1672,10 +1701,27 @@ function expandComponents(
             .join("\n")
         : null;
 
-    const innerHTML = preRenderComponentHtml(def, node.$props || null, slotContent);
+    /*
+     * In shadow mode the slotted children are NOT substituted into the prerendered markup: they
+     * stay in the light tree as siblings of the template, where a real `<slot>` distributes them.
+     * Passing them here instead would bake them into the shadow root, and the browser would then
+     * render them twice.
+     */
+    const shadow = resolveShadowMode(def, defaults);
+    const innerHTML = preRenderComponentHtml(def, node.$props || null, shadow ? null : slotContent);
     const isStatic = isComponentFullyStatic(def);
 
-    node.innerHTML = innerHTML;
+    /*
+     * A declarative shadow root: markup the parser materializes before any script runs, which the
+     * element then adopts rather than replaces (spec.md §16.6). The stylesheet link moves inside
+     * it because a shadow root does not inherit the document's stylesheets — and it stays an
+     * external `<link>`, so no Content-Security-Policy hash changes.
+     */
+    node.innerHTML = shadow
+      ? `<template shadowrootmode="${shadow}">` +
+        `<link rel="stylesheet" href="/components/${node.tagName}.css">` +
+        `${innerHTML}</template>${slotContent ?? ""}`
+      : innerHTML;
     delete node.children;
 
     // Resolve template-string host styles with props (per-instance values like background-image)

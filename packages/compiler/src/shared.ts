@@ -34,6 +34,8 @@ import {
   paramNames,
   tagNameCandidates,
 } from "@jxsuite/schema/guards";
+import { styleScopePrefix } from "./shadow.ts";
+import type { ShadowMode } from "./shadow.ts";
 import type { ExpressionNode } from "@jxsuite/runtime/expression";
 import type {
   JsonValue,
@@ -1726,13 +1728,55 @@ function _isStaticNode(node: JxElement | string | (JxElement | string)[]): boole
  * @param {Record<string, string>} [mediaQueries] - Project media query definitions
  * @returns {string} CSS text, or empty string if no styles
  */
+/** `::slotted()` and `::part()` select through a shadow boundary, not the host that owns it. */
+const SHADOW_STANDALONE = /^(?:::slotted\(|::part\()/;
+
+/**
+ * Turn one nested style key into a selector, given the component's scope prefix.
+ *
+ * Three shapes, and the interesting one is `:host`. A style object should mean the same thing in
+ * both modes, so `:host` and `:host(.foo)` are **translated** rather than passed through: inside a
+ * shadow root they stand alone, and in the light DOM they become the tag name and `<tag>.foo` —
+ * which is what "the host, matching this" means when there is no shadow root. Moving a component
+ * between modes therefore does not silently break its styles.
+ *
+ * @param {string} prop - The style-object key, e.g. `":hover"`, `"& .inner"`, `":host(.wide)"`
+ * @param {string} scope - `":host"` in shadow mode, the tag name otherwise
+ * @returns {string}
+ */
+function resolveSelector(prop: string, scope: string): string {
+  if (prop.startsWith("&")) {
+    return prop.replace("&", scope);
+  }
+  if (prop.startsWith(":host")) {
+    const inner = /^:host\((.*)\)$/.exec(prop)?.[1];
+    if (scope === ":host") {
+      return prop;
+    }
+    return inner === undefined ? scope : `${scope}${inner}`;
+  }
+  // `:host::slotted(x)` matches nothing — the pseudo-element attaches to a slot, not the host.
+  if (scope === ":host" && SHADOW_STANDALONE.test(prop)) {
+    return prop;
+  }
+  return `${scope}${prop}`;
+}
+
 export function buildComponentCSS(
   tagName: string,
   styleDef?: JxStyle | null | undefined,
   doc: JxElement | null = null,
   mediaQueries: Record<string, string> = {},
+  shadow: ShadowMode | null = null,
 ) {
   const rules: string[] = [];
+  /*
+   * The scope prefix. In light DOM it is the tag name, which is what keeps `sty-card .inner` from
+   * reaching another component's `.inner`. Inside a shadow root the selector cannot see the host's
+   * tag name at all, and `:host` is the standard's way to address it — so the same style object
+   * produces different, correct CSS in each mode without the author restating it.
+   */
+  const scope = styleScopePrefix(tagName, shadow);
 
   if (styleDef && typeof styleDef === "object") {
     const decls: string[] = [];
@@ -1755,20 +1799,21 @@ export function buildComponentCSS(
       decls.push(`  ${camelToKebab(prop)}: ${value};`);
     }
     if (decls.length > 0) {
-      rules.push(`${tagName} {\n${decls.join("\n")}\n}`);
+      rules.push(`${scope} {\n${decls.join("\n")}\n}`);
     }
 
     for (const [prop, val] of Object.entries(styleDef)) {
       if (prop.startsWith("@")) {
-        pushConditionalRule(rules, prop, mediaQueries, tagName, val as Record<string, unknown>);
+        pushConditionalRule(rules, prop, mediaQueries, scope, val as Record<string, unknown>);
       } else if (
         prop.startsWith(":") ||
         prop.startsWith(".") ||
         prop.startsWith("&") ||
         prop.startsWith("[")
       ) {
-        const resolved = prop.startsWith("&") ? prop.replace("&", tagName) : `${tagName}${prop}`;
-        rules.push(`${resolved} { ${toCSSText(val as Record<string, unknown>)} }`);
+        rules.push(
+          `${resolveSelector(prop, scope)} { ${toCSSText(val as Record<string, unknown>)} }`,
+        );
       }
     }
   }

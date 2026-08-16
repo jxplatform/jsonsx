@@ -295,6 +295,18 @@ export const projectConfigSchema = {
           examples: ["./layouts/base.json"],
           oneOf: [{ type: "string" }, { type: "null" }],
         },
+        shadow: {
+          default: false,
+          description:
+            "Default shadow-DOM mode for every component (spec.md §16.6). Off unless set: a " +
+            "shadow root isolates component styles from the page and replaces the <slot> " +
+            "emulation with real slot distribution. A component's own `$shadow` overrides this " +
+            "in both directions.",
+          oneOf: [
+            { enum: ["open", "closed"], type: "string" },
+            { const: false, type: "boolean" },
+          ],
+        },
       },
       type: "object",
     },

@@ -665,6 +665,11 @@ export interface ProjectConfig {
     lang?: string;
     /** Base direction for `<html dir>`. A page's `$dir` overrides it. */
     dir?: "ltr" | "rtl" | "auto";
+    /**
+     * Default shadow-DOM mode for components. `false` (light DOM) unless set; a component's own
+     * `$shadow` overrides it in both directions.
+     */
+    shadow?: "open" | "closed" | false;
     charset?: string;
     [key: string]: unknown;
   };

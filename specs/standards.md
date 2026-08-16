@@ -2,7 +2,7 @@
 
 ## Which External Standards Jx Adopts, and How That Is Recorded
 
-**Version:** 0.1.7-draft
+**Version:** 0.1.8-draft
 **Status:** Partial
 **Updated:** 2026-08-16
 **License:** MIT
@@ -230,19 +230,20 @@ Standards the audit found relevant whose **owning spec section does not exist ye
 
 An entry names the spec that will own it. When that section is written, the entry moves out of this table and becomes a `Pending` row bound to it; `backlog-already-cited` fails if it is left in both places.
 
-| Standard                                                      | Target                                  | Why not yet                                                                                                                                                                                                          |
-| ------------------------------------------------------------- | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [Service Workers](https://www.w3.org/TR/service-workers/)     | `site-architecture.md` — installability | A generated worker survives redeploys and can serve stale HTML indefinitely, so it needs a tombstone contract specified before any code.                                                                             |
-| [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414)            | `desktop.md` §10                        | Discovery is only reachable once an authorization flow exists (`gap:native-oauth`), and the one provider in use publishes no metadata document.                                                                      |
-| [WebAuthn Level 3](https://www.w3.org/TR/webauthn-3/)         | `desktop.md` §10                        | Passkeys need a registered relying-party id and a recovery story, neither of which is designed.                                                                                                                      |
-| [CSS Cascade Layers](https://www.w3.org/TR/css-cascade-5/)    | `spec.md` §9                            | The style model has no layer concept; adding one is a design change, not a citation.                                                                                                                                 |
-| [CSS Containment 3](https://www.w3.org/TR/css-contain-3/)     | `spec.md` §9                            | `$media` is viewport-only. Container queries would need a named-container model in the style object.                                                                                                                 |
-| [Media Queries 5](https://www.w3.org/TR/mediaqueries-5/)      | `spec.md` §9.4                          | `$media` borrows `@custom-media`'s shape from this level, but Jx resolves it itself and no browser ships it — so there is nothing to conform to until one does.                                                      |
-| [CSS Shadow Parts](https://www.w3.org/TR/css-shadow-parts-1/) | `spec.md` §16.6 — the `$shadow` opt-in  | `::part` is meaningless without shadow roots. `spec.md` §16.6 now states the light-DOM divergence and tracks the opt-in as `gap:declarative-shadow-dom`; this entry graduates when that section gains a shadow mode. |
-| [WebDriver BiDi](https://www.w3.org/TR/webdriver-bidi/)       | `studio.md` — screenshot pipeline       | The pipeline drives Chrome over CDP from `scripts/`, which no spec section describes.                                                                                                                                |
+| Standard                                                      | Target                                  | Why not yet                                                                                                                                                                                                         |
+| ------------------------------------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Service Workers](https://www.w3.org/TR/service-workers/)     | `site-architecture.md` — installability | A generated worker survives redeploys and can serve stale HTML indefinitely, so it needs a tombstone contract specified before any code.                                                                            |
+| [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414)            | `desktop.md` §10                        | Discovery is only reachable once an authorization flow exists (`gap:native-oauth`), and the one provider in use publishes no metadata document.                                                                     |
+| [WebAuthn Level 3](https://www.w3.org/TR/webauthn-3/)         | `desktop.md` §10                        | Passkeys need a registered relying-party id and a recovery story, neither of which is designed.                                                                                                                     |
+| [CSS Cascade Layers](https://www.w3.org/TR/css-cascade-5/)    | `spec.md` §9                            | The style model has no layer concept; adding one is a design change, not a citation.                                                                                                                                |
+| [CSS Containment 3](https://www.w3.org/TR/css-contain-3/)     | `spec.md` §9                            | `$media` is viewport-only. Container queries would need a named-container model in the style object.                                                                                                                |
+| [Media Queries 5](https://www.w3.org/TR/mediaqueries-5/)      | `spec.md` §9.4                          | `$media` borrows `@custom-media`'s shape from this level, but Jx resolves it itself and no browser ships it — so there is nothing to conform to until one does.                                                     |
+| [CSS Shadow Parts](https://www.w3.org/TR/css-shadow-parts-1/) | `spec.md` §16.6 — `::part` from outside | Shadow roots exist now (the `$shadow` opt-in), so `::part` is finally _possible_ — but nothing emits a `part` attribute and no selector addresses one from a page stylesheet, so there is no behaviour to cite yet. |
+| [WebDriver BiDi](https://www.w3.org/TR/webdriver-bidi/)       | `studio.md` — screenshot pipeline       | The pipeline drives Chrome over CDP from `scripts/`, which no spec section describes.                                                                                                                               |
 
 ## Changelog
 
+- **0.1.8-draft** (2026-08-16) — CSS Shadow Parts backlog entry now waits on part attributes, not on shadow roots.
 - **0.1.7-draft** (2026-08-16) — Retarget the CSS Shadow Parts backlog entry at spec.md §16.6, which now owns the shadow-DOM question.
 - **0.1.6-draft** (2026-08-15) — Web App Manifest, RFC 9116 and RFC 8615 graduate to bound rows in site-architecture.md §14.5.
 - **0.1.5-draft** (2026-08-15) — UAX #9 and UTS #35 graduate to bound rows in site-architecture.md §13.4.
@@ -254,4 +255,4 @@ An entry names the spec that will own it. When that section is written, the entr
 
 ---
 
-_Jx Standards Alignment Specification v0.1.7-draft_
+_Jx Standards Alignment Specification v0.1.8-draft_
