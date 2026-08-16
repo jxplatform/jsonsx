@@ -709,7 +709,7 @@ describe("the Assistant command family", () => {
     );
     // `when` is asked of a snapshot; the selection can go away before the run. A silent no-op
     // Would look exactly like a chip that had landed.
-    record("assistant.attachSelection").run(emptyContext(), undefined as never);
+    void record("assistant.attachSelection").run(emptyContext(), undefined as never);
     expect(notices().at(-1)).toBe("Nothing is selected to attach.");
   });
 

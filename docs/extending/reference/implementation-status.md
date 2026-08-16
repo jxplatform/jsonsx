@@ -15,7 +15,7 @@ This page is generated from the `> **Status: …**` markers in the specification
 | Spec                      | Version      | Status      | Updated    |
 | ------------------------- | ------------ | ----------- | ---------- |
 | `ai.md`                   | 0.1.6-draft  | Partial     | 2026-08-16 |
-| `collab.md`               | 0.2.3-draft  | Partial     | 2026-08-15 |
+| `collab.md`               | 0.2.4-draft  | Partial     | 2026-08-16 |
 | `compiler.md`             | 0.2.1-draft  | Partial     | 2026-08-15 |
 | `desktop.md`              | 0.3.10-draft | Pending     | 2026-08-16 |
 | `extensions.md`           | 0.3.8-draft  | Partial     | 2026-08-16 |
@@ -36,6 +36,7 @@ This page is generated from the `> **Status: …**` markers in the specification
 ### Partial
 
 - `ai.md` §2 — Provider Contract
+- `collab.md` §5 — Version Skew
 - `compiler.md` §3 — Output Tiers
 - `parser.md` §3 — `Markdown` — the markdown format class
 - `site-architecture.md` §9.4 — Studio Media Browser
@@ -55,7 +56,6 @@ This page is generated from the `> **Status: …**` markers in the specification
 
 ### Pending
 
-- `collab.md` §5 — Version Skew
 - `desktop.md` §4.3 — Single File Mode
 - `site-architecture.md` §12.3 — Incremental Builds
 

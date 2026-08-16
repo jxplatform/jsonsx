@@ -11,6 +11,8 @@
  * gitClone, resolveClass, component discovery, code services.
  */
 
+import { negotiateCollab } from "@jxsuite/collab/negotiate";
+import type { CollabNegotiation } from "@jxsuite/collab/negotiate";
 import type { WsCollabConnection } from "@jxsuite/collab/client";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 import type {
@@ -171,6 +173,8 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
    * promise so concurrent first opens share the connection instead of racing two sockets.
    */
   let collabConnection: Promise<WsCollabConnection> | null = null;
+  /** Lazy subprotocol negotiation from the gateway's capability probe (null = not asked yet). */
+  let collabNegotiation: Promise<CollabNegotiation> | null = null;
 
   function api(path: string, init?: RequestInit): Promise<Response> {
     if (!project) {
@@ -344,11 +348,29 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
      * path, per the shared ProjectSession working tree). Backends without the endpoint (or with the
      * flag off) refuse the upgrade and Studio degrades to solo editing. The wire client's
      * evaluation defers behind the dynamic import until a doc opens.
+     *
+     * A plain GET on the same URL is the subprotocol negotiation, and this adapter did not make one
+     * before. **A probe that does not answer is not a refusal here.** The gateway is deployed
+     * separately from this bundle, so a 404 or a network error means "older gateway", and treating
+     * that as no-collab would take working co-editing away from every session pointed at one. It
+     * connects as it always has, offering nothing — which is also the only handshake-safe answer to
+     * a server that would echo nothing (RFC 6455 §4.1).
      */
     async collab(docPath: string) {
       if (!project || typeof WebSocket === "undefined" || typeof location === "undefined") {
         return null;
       }
+      collabNegotiation ??= api("/collab")
+        .then(async (res) =>
+          res.ok ? negotiateCollab(await res.json()) : { offer: [], refused: null },
+        )
+        .catch(() => ({ offer: [], refused: null }));
+      const negotiated = await collabNegotiation;
+      if (negotiated.refused !== null) {
+        console.warn(`Collaboration unavailable: ${negotiated.refused}`);
+        return null;
+      }
+      const { offer } = negotiated;
       collabConnection ??= (async () => {
         const { createWsCollabConnection } = await import("@jxsuite/collab/client");
         const scheme = location.protocol === "https:" ? "wss" : "ws";
@@ -357,6 +379,7 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
             // The DO has no GitHub token on a WS message; a plain read hydrates + caches the row.
             await api(`/file?path=${encodeURIComponent(path)}`);
           },
+          protocols: offer,
           url: `${scheme}://${location.host}${base}/collab`,
         });
       })();

@@ -75,6 +75,7 @@ On a shared dev server, unsaved co-edits live only in the server's memory. If ev
 Collaboration degrades, never blocks:
 
 - A backend without the endpoint simply gives you ordinary solo editing — no errors, no pill.
+- A backend running a **different version of the co-editing wire format** also gives you solo editing, rather than a session. Studio and the backend agree on a format before the connection opens, and when they can't, joining anyway would mean two copies of the document merging edits neither side reads the same way. Updating whichever side is older restores it.
 - If a session can't sync within a few seconds of opening, the tab proceeds solo and the pill reads **Not connected** with the reason on hover. This is deliberately not the same as **Solo**: **Solo** means nobody else is here, **Not connected** means something went wrong, and the two never wear the same word.
 - If the connection drops, the pill reads **Offline — changes sync on reconnect**: keep editing, and your changes merge when the connection returns.
 - If the file is replaced underneath the session — a git pull or discard, an outside edit — the session resets and rejoins on the new content automatically.

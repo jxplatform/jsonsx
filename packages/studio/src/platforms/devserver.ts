@@ -10,6 +10,8 @@
 
 import { streamImport } from "../services/import-client";
 import { canPickDirectory, pickDirectoryPath } from "../services/directory-picker";
+import { negotiateCollab } from "@jxsuite/collab/negotiate";
+import type { CollabNegotiation } from "@jxsuite/collab/negotiate";
 import type { WsCollabConnection } from "@jxsuite/collab/client";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 import type {
@@ -64,8 +66,12 @@ interface SiteEntry {
  */
 export function createDevServerPlatform() {
   let _projectRoot = "";
-  /** Lazy /__studio/collab capability probe (null = not asked yet). */
-  let _collabProbe: Promise<boolean> | null = null;
+  /**
+   * Lazy /__studio/collab capability probe (null = not asked yet). Its result is the subprotocol
+   * negotiation, not a boolean: the probe is the only place the client can learn what envelope the
+   * server speaks without risking the handshake (see `@jxsuite/collab/negotiate`).
+   */
+  let _collabProbe: Promise<CollabNegotiation | null> | null = null;
   /**
    * One multiplexed collab socket per page; per-doc handles come from openDoc. Memoized as a
    * promise so concurrent first opens share the connection instead of racing two sockets.
@@ -503,6 +509,12 @@ export function createDevServerPlatform() {
      * server-root-relative path). Probes capability once — older servers without the endpoint
      * degrade to solo editing; the wire client's evaluation defers behind the dynamic import until
      * a doc opens.
+     *
+     * The same probe carries the subprotocol negotiation. A server that advertises no `protocols`
+     * predates it and gets no offer, because an offer it cannot echo would fail the handshake
+     * outright (RFC 6455 §4.1); a server that advertises an envelope this build does not speak is
+     * refused here, where the reason can be said, rather than in a room where the two would merge
+     * divergent histories.
      */
     async collab(docPath: string) {
       if (typeof WebSocket === "undefined" || typeof location === "undefined") {
@@ -510,16 +522,23 @@ export function createDevServerPlatform() {
       }
       if (_collabProbe === null) {
         _collabProbe = fetch("/__studio/collab")
-          .then((res) => res.ok)
-          .catch(() => false);
+          .then(async (res) => (res.ok ? negotiateCollab(await res.json()) : null))
+          .catch(() => null);
       }
-      if (!(await _collabProbe)) {
+      const negotiation = await _collabProbe;
+      if (negotiation === null) {
         return null;
       }
+      if (negotiation.refused !== null) {
+        console.warn(`Collaboration unavailable: ${negotiation.refused}`);
+        return null;
+      }
+      const { offer } = negotiation;
       _collabConnection ??= (async () => {
         const { createWsCollabConnection } = await import("@jxsuite/collab/client");
         const scheme = location.protocol === "https:" ? "wss" : "ws";
         return createWsCollabConnection({
+          protocols: offer,
           url: `${scheme}://${location.host}/__studio/collab`,
         });
       })();

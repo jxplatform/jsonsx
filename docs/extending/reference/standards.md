@@ -14,8 +14,8 @@ This page is generated from the `## N. Standards Alignment` tables in the specif
 
 | Class       | Standards | Bindings |
 | ----------- | --------- | -------- |
-| `Adopted`   | 17        | 24       |
-| `Subset`    | 36        | 60       |
+| `Adopted`   | 18        | 26       |
+| `Subset`    | 35        | 59       |
 | `Divergent` | 4         | 6        |
 | `Borrowed`  | 4         | 5        |
 | `Pending`   | 8         | 9        |
@@ -43,7 +43,7 @@ This page is generated from the `## N. Standards Alignment` tables in the specif
 | [The Atom Syndication Format](https://www.rfc-editor.org/rfc/rfc4287) `RFC 4287`                                                                       | IETF        | `Subset`    | `site-architecture.md` §6.7                                                               | `extensions/feed/src/atom.ts`, `extensions/feed/tests/feed.test.ts`                                                                                                                                           |
 | [Matching of Language Tags](https://www.rfc-editor.org/rfc/rfc4647) `RFC 4647`                                                                         | IETF        | `Subset`    | `site-architecture.md` §13.6                                                              | `packages/compiler/src/site/locale-negotiation.ts`, `packages/compiler/tests/locale-negotiation.test.ts`, `packages/compiler/tests/locale-worker.test.ts`                                                     |
 | [Feed Paging and Archiving](https://www.rfc-editor.org/rfc/rfc5005) `RFC 5005`                                                                         | IETF        | `Subset`    | `site-architecture.md` §6.7                                                               | `extensions/feed/src/feed.ts`, `extensions/feed/tests/feed.test.ts`                                                                                                                                           |
-| [The WebSocket Protocol](https://www.rfc-editor.org/rfc/rfc6455) `RFC 6455`                                                                            | IETF        | `Subset`    | `collab.md` §2                                                                            | `packages/collab/src/envelope.ts`, `packages/server/src/collab.ts`                                                                                                                                            |
+| [The WebSocket Protocol](https://www.rfc-editor.org/rfc/rfc6455) `RFC 6455`                                                                            | IETF        | `Adopted`   | `collab.md` §2, `collab.md` §2.1                                                          | `packages/collab/src/negotiate.ts`, `packages/server/src/collab.ts`, `packages/collab/tests/negotiate.test.ts`, `packages/server/tests/collab-api.test.ts`                                                    |
 | [HTTP Strict Transport Security (HSTS)](https://www.rfc-editor.org/rfc/rfc6797) `RFC 6797`                                                             | IETF        | `Subset`    | `site-architecture.md` §14.3                                                              | `packages/compiler/src/site/headers-emitter.ts`                                                                                                                                                               |
 | [Media Type Specifications and Registration Procedures](https://www.rfc-editor.org/rfc/rfc6838) `RFC 6838`                                             | IETF        | `Adopted`   | `extensions.md` §7                                                                        | `packages/schema/src/media-type.ts`, `packages/schema/tests/media-type.test.ts`                                                                                                                               |
 | [JavaScript Object Notation (JSON) Pointer](https://www.rfc-editor.org/rfc/rfc6901) `RFC 6901`                                                         | IETF        | `Borrowed`  | `relationships.md` §1                                                                     | `packages/schema/schemas/project.core.schema.json`                                                                                                                                                            |
@@ -130,7 +130,6 @@ This page is generated from the `## N. Standards Alignment` tables in the specif
 _These bind a section carrying no status marker, so no tier can be derived._
 
 - <a id="gap-locale-formatting"></a>`gap:locale-formatting` — **ECMAScript Internationalization API Specification** (ECMA-402, `Subset`) in `site-architecture.md` §13.4 — `Intl.Locale` supplies tag parsing, canonical case and likely-subtags maximization. The formatting half is untouched: no project locale reaches `Intl.DateTimeFormat` or `Intl.NumberFormat`, so a date formatted at build time still uses the build machine's locale.
-- <a id="gap-collab-subprotocol"></a>`gap:collab-subprotocol` — **The WebSocket Protocol** (RFC 6455, `Subset`) in `collab.md` §2 — The transport is used as specified. Subprotocol negotiation (§1.9, §4.2.2) is not: no `Sec-WebSocket-Protocol` is offered or echoed, so two peers with incompatible envelopes can share a room — §5 records the consequence.
 
 ## Declined
 

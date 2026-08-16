@@ -17,6 +17,11 @@ import { resolve } from "node:path";
 import { readFile, writeFile } from "node:fs/promises";
 import { colorForKey } from "@jxsuite/collab/awareness-types";
 import { createCollabHost } from "@jxsuite/collab/room";
+import {
+  COLLAB_SUBPROTOCOL,
+  offeredSubprotocols,
+  selectSubprotocol,
+} from "@jxsuite/collab/negotiate";
 import { assertAccessible } from "./studio-api";
 import type { ServerWebSocket, WebSocketHandler } from "bun";
 import type { HostConnection } from "@jxsuite/collab/room";
@@ -65,7 +70,12 @@ export interface CollabRegistry {
    */
   handleRequest: (
     req: Request,
-    server: { upgrade: (req: Request, opts: { data: CollabSocketData }) => boolean },
+    server: {
+      upgrade: (
+        req: Request,
+        opts: { data: CollabSocketData; headers?: Record<string, string> },
+      ) => boolean;
+    },
   ) => Response | undefined;
   /** Bun.serve websocket handlers backing the upgraded connections. */
   websocket: WebSocketHandler<CollabSocketData>;
@@ -193,10 +203,30 @@ export function createCollabRegistry(opts: {
 
     handleRequest(req, server) {
       if (req.headers.get("upgrade")?.toLowerCase() === "websocket") {
-        const upgraded = server.upgrade(req, { data: { connection: null } });
+        /*
+         * RFC 6455 §4.2.2: echo one of the tokens the client offered, or none if it offered none.
+         * An offer we cannot satisfy is refused outright rather than upgraded — two peers whose
+         * envelopes disagree about merge granularity must not share a room, and a 400 here is a
+         * better outcome than the divergent-history merge that would follow.
+         */
+        const answer = selectSubprotocol(
+          offeredSubprotocols(req.headers.get("sec-websocket-protocol")),
+        );
+        if (answer.reject !== null) {
+          return problem("invalidRequest", answer.reject);
+        }
+        const upgraded = server.upgrade(req, {
+          data: { connection: null },
+          ...(answer.echo === null ? {} : { headers: { "Sec-WebSocket-Protocol": answer.echo } }),
+        });
         return upgraded ? undefined : problem("invalidRequest", "Upgrade failed");
       }
-      return Response.json({ collab: true, version: 1 });
+      /*
+       * The capability probe, which is also the negotiation input: a client learns here what this
+       * server speaks, because offering a subprotocol the server cannot echo would fail the
+       * handshake (RFC 6455 §4.1) rather than degrade. `version` stays for older clients.
+       */
+      return Response.json({ collab: true, protocols: [COLLAB_SUBPROTOCOL], version: 1 });
     },
 
     async stop() {

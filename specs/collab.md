@@ -2,9 +2,9 @@
 
 ## Real-Time Co-Editing for Jx Projects
 
-**Version:** 0.2.3-draft
+**Version:** 0.2.4-draft
 **Status:** Partial
-**Updated:** 2026-08-15
+**Updated:** 2026-08-16
 **License:** MIT
 
 ---
@@ -28,6 +28,49 @@ server (`/__studio/collab`), which also answers a capability probe when collab i
   see §3.
 - **Awareness:** cursor/selection presence is carried out-of-band from document state via
   `y-protocols/awareness`, so presence churn never mutates the CRDT.
+- **Subprotocol:** `jx.collab.v1` names the frame layout, negotiated on the handshake — see §2.1.
+- **No compression.** `permessage-deflate` (RFC 7692) is not offered and not accepted, and the
+  reasons are structural rather than a deferral: lib0-encoded Yjs updates are near-incompressible,
+  the dominant frame volume is awareness cursors whose payload is smaller than a deflate block
+  header, both transports are loopback or already compressed at the edge, and Bun allocates a zlib
+  context per socket — a real per-connection cost on a server whose whole purpose is many
+  concurrent sockets. Adopting it would cost memory to make the wire slightly larger.
+
+### 2.1 Subprotocol Negotiation
+
+The socket carries a **WebSocket subprotocol** (RFC 6455 §1.9, §4.2.2), and it names the **wire
+envelope**, not the package version: `jx.collab.v1` means "I speak the frame layout §2 describes".
+
+**One token per envelope major.** The token is bumped when a peer's frame would be _mis-parsed_ — a
+field reordered, a type widened, a length prefix changed. It is **not** bumped for a new frame type,
+because both halves already skip a type they do not know: bumping there would refuse a room that
+would have worked.
+
+**The capability probe is where the two sides agree.** `GET /__studio/collab` answers
+`{collab, protocols, version}`, and `protocols` is the negotiation input:
+
+| The server advertises               | The client offers            | Because                                                                                 |
+| ----------------------------------- | ---------------------------- | --------------------------------------------------------------------------------------- |
+| a token the client speaks           | that token                   | the handshake then echoes it, and both know the envelope matches                        |
+| **no `protocols` at all**           | **nothing**                  | it predates negotiation and would echo nothing — see below                              |
+| only tokens the client cannot parse | nothing; no socket is opened | a divergent-history merge is worse than no session, and here the reason can be reported |
+
+**Why an unconditional offer would be a regression.** RFC 6455 §4.1 requires a client that offered
+subprotocols and received no echo to _fail the connection_, and browsers enforce it. A new Studio
+that always offered `jx.collab.v1` would therefore lose co-editing entirely against a server built
+before this shipped. The probe already existed, already returned a version the client discarded, and
+runs before the socket — it is the one place the client can learn what the server speaks without
+risking the handshake.
+
+**A version in the `hello` control message is not an alternative.** `hello` arrives after the socket
+is up and after frames may already have been exchanged, which is too late to prevent the
+divergent-history merge §3 exists to prevent. Negotiation concludes before a byte of document state
+moves.
+
+**An unanswered probe is not a refusal.** The cloud gateway ships separately from the Studio bundle,
+so a 404 or a network error on its probe means _older gateway_, and treating that as no-collab would
+take working co-editing away from every session pointed at one. It connects offering nothing, which
+is also the only handshake-safe answer to a server that would echo nothing.
 
 ## 3. Invariants (load-bearing)
 
@@ -107,30 +150,32 @@ changes live; they arrive with the file.
 
 ## 5. Version Skew
 
-> **Status: Pending.** Neither kind of skew is handled today.
+> **Status: Partial.** Wire-envelope skew is handled; document-format skew is still out of scope.
 
-Two different things can be out of step, and conflating them has hidden the tractable one.
+Two different things can be out of step, and conflating them hid the tractable one.
 
 **Document-format skew** — a breaking change to the Jx document schema across a room's lifetime — is
 out of scope for this draft and tracked separately (see spec §3.2 on `$schema`).
 
-**Wire-envelope skew** is not. Two clients running different envelope versions disagree about merge
-granularity (§3.1) and can join the same room, because the WebSocket carries no subprotocol: the
-client offers no `Sec-WebSocket-Protocol` and the server echoes none. The capability probe already
-returns a version the client discards. RFC 6455 negotiation is the mechanism designed for exactly
-this, and it fails the handshake rather than admitting a divergent peer.
+**Wire-envelope skew is closed.** Two clients running different envelope versions disagree about
+merge granularity (§3.1), and the subprotocol negotiation in §2.1 is what keeps them out of the same
+room: an incompatible peer is turned away on the handshake, or — when the client can tell from the
+probe — never opens a socket at all, so the author is told why instead of watching a session fail
+silently. The failure mode this replaces was the worst kind: everything appeared to work, and the
+document diverged.
 
 ## 6. Standards Alignment
 
 External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md). Yjs and `y-protocols` are libraries rather than published standards, so the encodings they define are described in §2 rather than cited here.
 
-| Standard                                           | Class        | Binds | Evidence                                                       | Note                                                                                                                                                                                                                                                                                                                                             |
-| -------------------------------------------------- | ------------ | ----- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [RFC 6455](https://www.rfc-editor.org/rfc/rfc6455) | **Subset**   | §2    | packages/collab/src/envelope.ts, packages/server/src/collab.ts | `gap:collab-subprotocol` The transport is used as specified. Subprotocol negotiation (§1.9, §4.2.2) is not: no `Sec-WebSocket-Protocol` is offered or echoed, so two peers with incompatible envelopes can share a room — §5 records the consequence.                                                                                            |
-| [RFC 7692](https://www.rfc-editor.org/rfc/rfc7692) | **Rejected** | §2    | —                                                              | because: lib0-encoded Yjs updates are near-incompressible, the dominant frame volume is awareness cursors whose payload is smaller than a deflate block header, both transports are loopback or already compressed at the edge, and Bun allocates a zlib context per socket — a real cost for a server whose purpose is many concurrent sockets. |
+| Standard                                           | Class        | Binds    | Evidence                                                                                                                                           | Note                                                                                                                                                                                                                                                                                                                                               |
+| -------------------------------------------------- | ------------ | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [RFC 6455](https://www.rfc-editor.org/rfc/rfc6455) | **Adopted**  | §2, §2.1 | packages/collab/src/negotiate.ts, packages/server/src/collab.ts, packages/collab/tests/negotiate.test.ts, packages/server/tests/collab-api.test.ts | The transport is used as specified, and subprotocol negotiation (§1.9, §4.2.2) now runs: the client offers `jx.collab.v1`, the server echoes it, and an offer the server cannot satisfy is refused rather than upgraded unversioned. A server advertising no protocols is offered none, because §4.1 fails a connection whose offer went unechoed. |
+| [RFC 7692](https://www.rfc-editor.org/rfc/rfc7692) | **Rejected** | §2       | —                                                                                                                                                  | because: lib0-encoded Yjs updates are near-incompressible, the dominant frame volume is awareness cursors whose payload is smaller than a deflate block header, both transports are loopback or already compressed at the edge, and Bun allocates a zlib context per socket — a real cost for a server whose purpose is many concurrent sockets.   |
 
 ## Changelog
 
+- **0.2.4-draft** (2026-08-16) — §2.1 subprotocol negotiation: jx.collab.v1 offered from the capability probe and echoed on the handshake; §5 wire-envelope skew closed; RFC 7692 non-adoption stated in §2.
 - **0.2.3-draft** (2026-08-15) — Add §6 Standards Alignment; §5 separates wire-envelope skew from document-format skew and is marked Pending.
 - **0.2.2-draft** (2026-08-05) — §4 project.json is excluded from replication, and why.
 - **0.2.1-draft** (2026-08-04) — §4 the four session states, with failed distinguished from detached; freeze and read-only made visible; undo scoping stated in the UI.
@@ -140,4 +185,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx `@jxsuite/collab` Specification v0.2.3-draft — a stub, subject to expansion._
+_Jx `@jxsuite/collab` Specification v0.2.4-draft — a stub, subject to expansion._
