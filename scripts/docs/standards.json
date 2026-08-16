@@ -93,6 +93,12 @@
       "url": "https://ecma-international.org/publications-and-standards/standards/ecma-404/"
     },
     {
+      "id": "ECMA-426",
+      "org": "Ecma",
+      "title": "Source Map Format Specification",
+      "url": "https://ecma-international.org/publications-and-standards/standards/ecma-426/"
+    },
+    {
       "id": "Fetch Metadata Request Headers",
       "org": "W3C",
       "title": "Fetch Metadata Request Headers",

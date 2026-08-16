@@ -196,6 +196,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `server.md`
 
+- **0.2.5** (2026-08-16) — §5 and §8 record the source-map decision — a constant header offset is not a source map (ECMA-426, Rejected).
 - **0.2.4** (2026-08-16) — §3 static responses correct the two content types where the platform default disagrees with the registration.
 - **0.2.3** (2026-08-16) — §3.1 the SSE stream advertises retry: 500 and answers Last-Event-ID with one reload; gap:sse-reconnect closed.
 - **0.2.2** (2026-08-15) — Add §8 Standards Alignment; §4 and §4.2 marked Partial — the failure contract is unspecified and the project server does not gate uniformly.
@@ -329,6 +330,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `standards.md`
 
+- **0.1.12-draft** (2026-08-16) — §12 declares the BCP 14 normative keywords for the whole corpus, gated by docs:status; BCP 14 graduates off the backlog.
 - **0.1.11-draft** (2026-08-16) — §4.4 worked examples use a reserved gap:example-only slug so an illustration cannot squat on a real gap id.
 - **0.1.10-draft** (2026-08-16) — §1 is Implemented — both ratchets are empty; BCP 14 moves to the backlog, since no section declares the corpus's keyword convention.
 - **0.1.9-draft** (2026-08-16) — Service Workers graduates to a bound row in site-architecture.md §14.6.
