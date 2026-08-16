@@ -5,6 +5,7 @@ spec:
   - site-architecture.md#8
 code:
   - packages/compiler/src/site/head-merger.ts
+  - packages/compiler/src/site/link-relations.ts
   - packages/compiler/src/site/site-build.ts
   - packages/schema/src/asset-paths.ts
 ---
@@ -76,6 +77,24 @@ Duplicates are detected by element identity, so a page-level entry replaces the 
 | `<script src="...">`        | `src`                                              |
 
 Links carry that fourth part because `rel` and `href` alone are not enough to tell two links apart: an RSS and an Atom feed are both `rel="alternate"` at different `type`s, and two favicon sizes share everything but `sizes`.
+
+### A misspelled `rel` gets a warning
+
+A `<link>` with a typo'd relation is a special kind of frustrating: it's still valid HTML, it still renders, and it does nothing.
+
+```
+<link rel="stylshet"> — "stylshet" is not an IANA link relation, and a relation nobody
+recognizes does nothing. Check the spelling, or use an absolute URI if it is an extension
+relation (RFC 8288 §2.1.2).
+```
+
+You get one warning per distinct value, however many pages carry it — the ones worth catching live in the site or layout `$head`, so they're on every page.
+
+It's a warning and never an error, and three things never trigger it: any relation in the [IANA registry](https://www.iana.org/assignments/link-relations/), the legacy `shortcut` in `rel="shortcut icon"`, and any absolute URI — which is how RFC 8288 says to write a relation the registry doesn't carry:
+
+```json
+{ "tagName": "link", "rel": "https://example.com/rel/pricing", "href": "/pricing/" }
+```
 
 Two tags are added automatically: `<link rel="canonical">` (built from `url` in `project.json` plus the page route, when `url` is set) and the `<html lang>` attribute. Both lose to one you write yourself.
 

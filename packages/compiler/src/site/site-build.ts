@@ -44,6 +44,7 @@ import type { FormatEntry, FormatRegistry } from "@jxsuite/schema/format-registr
 import type { ExtensionRegistry } from "@jxsuite/schema/extension-registry";
 import { resolveLayout } from "./layout-resolver.ts";
 import { mergeHead, renderHead } from "./head-merger.ts";
+import { unregisteredHeadRelations } from "./link-relations.ts";
 import { injectContext } from "./context-injection.ts";
 import { compile, compileServer, compileSiteServer } from "../compiler.ts";
 import { compileElement } from "../targets/compile-element.ts";
@@ -476,6 +477,13 @@ export async function buildSite(
   );
 
   const warnedLocalePrefixes = new Set<string>();
+  /*
+   * A mistyped `rel` is silent: the tag is still valid HTML, still renders, and simply does
+   * nothing — the stylesheet never loads, the canonical never consolidates. Warned once per
+   * distinct value across the whole build, because the one that matters lives in the layout and is
+   * therefore on every page.
+   */
+  const warnedRelations = new Set<string>();
   for (const route of routes) {
     const mismatch = undeclaredLocalePrefix(route.urlPattern, i18n);
     if (mismatch && !warnedLocalePrefixes.has(mismatch.segment)) {
@@ -506,6 +514,17 @@ export async function buildSite(
         alternateMap.get(route.urlPattern) ?? [],
         runtimeImports,
       );
+
+      for (const relation of result.unregisteredRelations) {
+        if (!warnedRelations.has(relation)) {
+          warnedRelations.add(relation);
+          console.warn(
+            `<link rel="${relation}"> — "${relation}" is not an IANA link relation, and a ` +
+              `relation nobody recognizes does nothing. Check the spelling, or use an absolute ` +
+              `URI if it is an extension relation (RFC 8288 §2.1.2).`,
+          );
+        }
+      }
 
       // Determine which component tags are fully static (for script omission)
       const staticTags = new Set<string>();
@@ -1199,6 +1218,12 @@ async function compilePage(
     excludeFromSitemap: pageDoc.$sitemap === false,
     files: result.files,
     html: result.html,
+    /*
+     * Reported rather than warned about here: a mistyped `rel` almost always lives in the site or
+     * layout `$head`, which means it is on every page, and the caller is the only scope that can
+     * say it once instead of four hundred times.
+     */
+    unregisteredRelations: unregisteredHeadRelations(mergedHead),
     serverHandler,
   };
 }
