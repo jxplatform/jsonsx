@@ -95,6 +95,8 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { baselineProblemOf, MAX_OUTPUT, verdictOf } from "./mutant-verdict";
+import type { Verdict } from "./mutant-verdict";
 
 /** One source edit: a precise substring and what replaces it. Must match EXACTLY once. */
 interface Edit {
@@ -1696,9 +1698,9 @@ function applyEdits(
  * Apply one mutant's edits, run its test file, and answer whether the test NOTICED.
  *
  * @param {Mutant} mutant
- * @returns {{ killed: boolean; problem: string | null; aborted: boolean }}
+ * @returns {Verdict}
  */
-function runMutant(mutant: Mutant): { killed: boolean; problem: string | null; aborted: boolean } {
+function runMutant(mutant: Mutant): Verdict {
   const path = resolve(ROOT, mutant.file);
   const original = readFileSync(path, "utf8");
   const { mutated, problem } = applyEdits(mutant, original);
@@ -1708,41 +1710,18 @@ function runMutant(mutant: Mutant): { killed: boolean; problem: string | null; a
   _originals.set(path, original);
   try {
     writeFileSync(path, mutated);
-    const run = spawnSync("bun", ["test", "--isolate", mutant.test], {
-      cwd: ROOT,
-      encoding: "utf8",
-      env: { ...process.env, FORCE_COLOR: "0", NO_COLOR: "1" },
-      /* Generous, and not arbitrary. A failing `expect` on a happy-dom element prints the element,
-         and a happy-dom element's inspection reaches its `window` — hundreds of kilobytes of class
-         table per assertion. At Node's 1MB default the child is KILLED for overflowing the pipe,
-         `status` comes back `null`, and a mutant that died loudly is reported as unapplied. */
-      maxBuffer: 64 * 1024 * 1024,
-    });
-    /* CTRL-C, noticed through the CHILD, which is the only place it can be noticed.
-       There were `process.on("SIGINT", …)` handlers here for two rounds and they could not run:
-       `main` is synchronous from the first line to `process.exit`, `spawnSync` blocks the thread,
-       and a signal handler is dispatched on an event-loop turn that never comes. So Ctrl-C was
-       absorbed — the gate reported the interrupted mutant as unapplied and carried on with the
-       next one. The signal reaches the whole foreground process group, so the CHILD dies of it and
-       says so in `run.signal`; that is a real answer, arriving on the synchronous path, and the
-       `finally` below has already restored the file by the time it is returned. */
-    if (run.signal === "SIGINT" || run.signal === "SIGTERM") {
-      return { aborted: true, killed: false, problem: null };
-    }
-    /* A test file that cannot even LOAD is not a kill — it proves the mutant is unloadable, not
-       that anything asserts on the behaviour. Bun reports the failure count either way, so the
-       count decides and the exit code only tells them apart. */
-    const out = `${run.stdout ?? ""}${run.stderr ?? ""}`;
-    const failed = /(\d+) fail/.exec(out);
-    const fails = failed ? Number(failed[1]) : 0;
-    if (run.status !== 0 && fails === 0) {
-      return {
-        aborted: false,
-        killed: false,
-        problem: `${mutant.test} did not RUN under the mutant (exit ${run.status}, 0 reported failures). A mutant that breaks the module's load is not evidence of a test:\n${out.split("\n").slice(-12).join("\n")}`,
-      };
-    }
-    return { aborted: false, killed: fails > 0, problem: null };
+    /* Reading the result is its own module, because getting it wrong is silent: a child killed for
+       outrunning `maxBuffer` comes back as a `SIGTERM`, and this gate read that as Ctrl-C and
+       stopped — red on `main` for weeks with nobody at a keyboard. See `mutant-verdict.ts`. */
+    return verdictOf(
+      spawnSync("bun", ["test", "--isolate", mutant.test], {
+        cwd: ROOT,
+        encoding: "utf8",
+        env: { ...process.env, FORCE_COLOR: "0", NO_COLOR: "1" },
+        maxBuffer: MAX_OUTPUT,
+      }),
+      mutant.test,
+    );
   } finally {
     writeFileSync(path, original);
     _originals.delete(path);
@@ -1762,17 +1741,15 @@ function runMutant(mutant: Mutant): { killed: boolean; problem: string | null; a
  * @returns {string | null} The problem, or null when the file is green.
  */
 function baselineProblem(test: string): string | null {
-  const run = spawnSync("bun", ["test", "--isolate", test], {
-    cwd: ROOT,
-    encoding: "utf8",
-    env: { ...process.env, FORCE_COLOR: "0", NO_COLOR: "1" },
-    maxBuffer: 64 * 1024 * 1024,
-  });
-  if (run.status === 0) {
-    return null;
-  }
-  const out = `${run.stdout ?? ""}${run.stderr ?? ""}`;
-  return `${test} is not green BEFORE any mutant is applied, so every "kill" it reports is that failure and not the mutant:\n${out.split("\n").slice(-8).join("\n")}`;
+  return baselineProblemOf(
+    spawnSync("bun", ["test", "--isolate", test], {
+      cwd: ROOT,
+      encoding: "utf8",
+      env: { ...process.env, FORCE_COLOR: "0", NO_COLOR: "1" },
+      maxBuffer: MAX_OUTPUT,
+    }),
+    test,
+  );
 }
 
 /**
