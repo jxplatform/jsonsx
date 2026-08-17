@@ -202,3 +202,31 @@ export async function settleCollab(rounds = 6): Promise<void> {
     });
   }
 }
+
+/**
+ * Pump turns until `ready()` holds, then stop — for asserting that something DID happen.
+ *
+ * {@link settleCollab} counts turns, which is a guess about how many an async attach takes, and the
+ * guess is machine-dependent: a disable-then-enable flip needs two turns on a developer's machine
+ * and more than six on a CI runner, where exactly that assertion failed. The claim under test is
+ * about the END STATE, so the wait is too — this returns the moment the state arrives.
+ *
+ * It still gives up rather than hanging, and deliberately does NOT throw: the caller's `expect` is
+ * what should fail, because that names the state that never arrived. A wait that threw its own
+ * timeout would replace a readable assertion with a stack trace.
+ *
+ * Use {@link settleCollab} for the opposite claim — you cannot wait for an absence, and a fixed
+ * settle is the right tool for "give it every chance, then prove nothing happened".
+ *
+ * @param {() => boolean} ready The state being waited for.
+ * @param {number} [rounds] How many turns to allow. Generous on purpose: the cost of a high bound
+ *   is nothing when the predicate holds, and the cost of a low one is a test that fails on a loaded
+ *   machine.
+ */
+export async function waitForCollab(ready: () => boolean, rounds = 60): Promise<void> {
+  for (let i = 0; i < rounds && !ready(); i++) {
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+  }
+}
