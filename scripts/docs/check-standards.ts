@@ -39,6 +39,7 @@ const MIN_REJECTION_CHARS = 24;
 export const VIOLATION_CODES = [
   // Structure
   "section-missing",
+  "heading-escaped",
   "section-unnumbered",
   "section-duplicate",
   "section-status-marker-forbidden",
@@ -384,11 +385,29 @@ function checkStructure(spec: SpecStandards, exempt: boolean, uncited: boolean, 
     );
     return;
   }
+  /*
+   * The escape renders invisibly, so nothing looks wrong — and until the heading patterns learned
+   * to tolerate it, one of these silently disabled every check below. Reported even though parsing
+   * now survives it, because a visual editor that escaped a heading has usually also flattened
+   * `[id](url)` cells to bare text and `**Adopted**` to plain, which IS unrecoverable.
+   */
+  for (const line of spec.escapedHeadings) {
+    out.push(
+      v(
+        "heading-escaped",
+        spec.file,
+        "numbered heading carries a `\\.` escape from a visual Markdown editor — run " +
+          "`bun run format:md` to normalize, then check this file's links and bold survived",
+        line,
+      ),
+    );
+  }
   if (!spec.section) {
     if (!exempt && !uncited && spec.hasNumberedHeadings) {
       out.push(
         v(
           "section-missing",
+          "heading-escaped",
           spec.file,
           "no `## N. Standards Alignment` section — every spec with numbered headings declares " +
             "which standards it binds itself to (specs/standards.md §4)",

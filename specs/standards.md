@@ -2,9 +2,9 @@
 
 ## Which External Standards Jx Adopts, and How That Is Recorded
 
-**Version:** 0.1.14-draft
+**Version:** 0.1.15-draft
 **Status:** Partial
-**Updated:** 2026-08-16
+**Updated:** 2026-08-17
 **License:** MIT
 
 ---
@@ -88,6 +88,8 @@ The section is **numbered**, sits before any `## Appendix` heading so the number
 It must never be an appendix. Unnumbered headings are invisible to `scripts/docs/check-doc-refs.ts` and `scripts/docs/lib/spec-status.ts` alike: an unnumbered section is not an anchor, so no docs page can reference it, it never reaches the implementation-status page, and — because the status parser resets its current section only at `## Changelog` — a `> **Status:**` marker placed under it is silently credited to the last numbered section **above** it. The gate reports this case by name.
 
 The section itself carries **no** `> **Status:**` marker. A registry is not a feature; its state is the union of its rows.
+
+The heading is matched **tolerantly**, and that is a deliberate correction rather than laxity. A round trip through a visual Markdown editor rewrites `## 18.` as `## 18\.`, escaping a line that would otherwise re-parse as an ordered-list item; it renders identically and it once made `spec.md`'s entire section unfindable, so its twelve rows stopped being validated with no symptom beyond a single `section-missing`. A parser that cannot find a section silently stops checking it, which is the worst failure mode a gate has — so the pattern accepts the escape and reports it separately as `heading-escaped`. The escape is worth reporting because the same round trip flattens `[<id>](<url>)` cells to bare text and `**Adopted**` to plain, and _those_ losses are unrecoverable. `bun run docs:markdown` fails on the escape anywhere in the repository and `bun run format:md` removes it.
 
 ### 4.2 Column contract
 
@@ -269,6 +271,7 @@ the failure the gate exists to make loud.
 
 ## Changelog
 
+- **0.1.15-draft** (2026-08-17) — §4.1: the Standards Alignment heading is matched tolerantly and a visual-editor escape is reported as heading-escaped.
 - **0.1.14-draft** (2026-08-16) — §11 WebDriver BiDi leaves the adoption backlog — the pipeline speaks it, and studio-ui-guidelines.md §15 owns it.
 - **0.1.13-draft** (2026-08-16) — §11 RFC 8414 leaves the adoption backlog — the flow it would configure now exists, and it is recorded Rejected in desktop.md for the reason that remains.
 - **0.1.12-draft** (2026-08-16) — §12 declares the BCP 14 normative keywords for the whole corpus, gated by docs:status; BCP 14 graduates off the backlog.
@@ -287,4 +290,4 @@ the failure the gate exists to make loud.
 
 ---
 
-_Jx Standards Alignment Specification v0.1.14-draft_
+_Jx Standards Alignment Specification v0.1.15-draft_

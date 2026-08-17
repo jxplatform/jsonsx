@@ -6,7 +6,7 @@ This document is the working plan **and** the status board. It was migrated into
 
 ---
 
-## 0\. What this program is
+## 0. What this program is
 
 An audit of all 16 specs found Jx's standards reference derived almost entirely from WHATWG and, to a lesser extent, Ecma. The IETF surface was **two RFCs** (6901, 4180) and the W3C surface was effectively nothing.
 
@@ -26,7 +26,7 @@ That gap was not cosmetic. It showed up as real defects: a redirect shape the sc
 
 `gap:example-only` is reserved for `standards.md` §4.4's worked examples and names no work.
 
-## 1\. Decisions taken — do not re-litigate
+## 1. Decisions taken — do not re-litigate
 
 | Decision          | Choice                                                                                                                                                                                      |
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -37,7 +37,7 @@ That gap was not cosmetic. It showed up as real defects: a redirect shape the sc
 | Shadow DOM        | Opt-in only. Light DOM stays the default.                                                                                                                                                   |
 | Breaking changes  | Acceptable and expected — the platform has very few adopters.                                                                                                                               |
 
-## 2\. Status board
+## 2. Status board
 
 Legend: **✅ shipped** · **◻ not started** · **◐ partly shipped, remainder named**
 
@@ -120,7 +120,7 @@ Everything §4.11 named, plus two red gates the work uncovered:
 - `bun run schema:verify` failed on the branch: B8b, B13 and B14 each added a project-config key and none re-ran `generate:schema`, so the committed core schema and all 25 per-project entry documents described a config three phases behind the compiler. **A phase that changes `defs/` must run `generate:schema` and `schema:generate-all`, not one or the other.**
 - The container's Bun was one patch behind the CI pin, which produced **29 phantom test failures** in `packages/schema` from an ajv ESM-interop difference. Match `.github/actions/setup-bun` before believing a failure.
 
-## 3\. What the build track actually shipped
+## 3. What the build track actually shipped
 
 Read this before touching any of it — several phases established contracts later phases depend on.
 
@@ -138,7 +138,7 @@ Read this before touching any of it — several phases established contracts lat
 - **B14** `$shadow` opt-in emitting a declarative shadow root the element **adopts**.
 - **B15** RFC 6838 media-type parsing, `text/markdown; variant=GFM`, and I-JSON enforced at the document parse boundary.
 
-## 4\. Remaining work
+## 4. Remaining work
 
 ### 4.1 i18n negotiation — the open half of B11 ✅ **shipped**
 
@@ -307,7 +307,7 @@ rg '^\| \[' specs/*.md | grep -o 'gap:[a-z0-9][a-z0-9-]*' | LC_ALL=C sort -u
 
 Everything that prints is a gap a row still carries. `gap:example-only` is reserved for `standards.md` §4.4's worked examples and names no work.
 
-## 5\. The adoption backlog
+## 5. The adoption backlog
 
 `specs/standards.md` §11 holds standards whose **owning section does not exist yet** — a `Pending` row must bind a section the spec admits is unbuilt, and a feature that has not been designed has no such section. Eight entries remain:
 
@@ -324,7 +324,7 @@ Everything that prints is a gap a row still carries. `gap:example-only` is reser
 
 `backlog-already-cited` fails if an entry is left in both places, which is the intended workflow: a graduating entry is **removed from §11 in the same commit** that adds its row.
 
-## 6\. Working rules for this program
+## 6. Working rules for this program
 
 These are the registry's contracts. Violating one fails `bun run docs:standards`.
 
@@ -336,7 +336,7 @@ These are the registry's contracts. Violating one fails `bun run docs:standards`
 - `scripts/docs/standards.json` is the lexicon of citable identifiers, **sorted by id**. Adding a standard means adding it there first, with issuing body, title and canonical URL.
 - Every substantive spec edit is a release: `bun run spec:bump <spec.md> <major|minor|patch>`, then `bun run docs:generate`.
 
-## 7\. Operational knowledge
+## 7. Operational knowledge
 
 Hard-won during the build track. None of it is derivable from reading the code.
 
@@ -380,7 +380,7 @@ Hard-won during the build track. None of it is derivable from reading the code.
 - A test that reads a file **outside its own workspace** needs an `EXTRA_EDGES` entry in `scripts/ci/affected.ts`, citing the test file that proves it. Those anchors are `existsSync`\-checked before any other job starts.
 - `docs:spec-release` compares against `main`, so a spec created on this branch is skipped there. The pre-commit hook (which compares against `HEAD~`) is the one that notices.
 
-## 8\. Gates that must stay green
+## 8. Gates that must stay green
 
 ```
 bun run lint && bun run typecheck

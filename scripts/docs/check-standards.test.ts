@@ -235,6 +235,30 @@ describe("structure", () => {
     expectViolation(check(src, { catalog: catalogFor("RFC 6901") }), "table-header-mismatch");
   });
 
+  /*
+   * The escape a visual Markdown editor leaves behind: `## 18.` becomes `## 18\.` so the line
+   * cannot re-parse as an ordered-list item. It renders invisibly. Before the heading patterns
+   * tolerated it, one of these made `spec.md`'s entire table unfindable — twelve rows stopped being
+   * validated and the only symptom was a lone `section-missing`.
+   *
+   * So this asserts BOTH halves: the escape is reported, AND the table behind it is still parsed.
+   * A checker that merely rejected the file would keep the rows unvalidated, which is the failure
+   * being fixed.
+   */
+  test("heading-escaped — reported, and the section behind it is still read", () => {
+    const src = fixtureSpec(OK_ROW, String.raw`## 7\. Standards Alignment`);
+    const violations = check(src, { catalog: catalogFor("RFC 6901") });
+
+    expectViolation(violations, "heading-escaped");
+    expect(violations.some((x) => x.code === "section-missing")).toBe(false);
+    expect(violations.some((x) => x.code === "table-missing")).toBe(false);
+  });
+
+  test("a clean numbered heading reports no escape", () => {
+    const violations = check(fixtureSpec(OK_ROW), { catalog: catalogFor("RFC 6901") });
+    expect(violations.some((x) => x.code === "heading-escaped")).toBe(false);
+  });
+
   test("row-arity", () => {
     expectViolation(check(fixtureSpec("| one | two |"), { catalog: [] }), "row-arity");
   });

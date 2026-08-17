@@ -62,15 +62,35 @@ export function tierOf(status: Status | undefined): GapTier | null {
 
 /* ── Grammar ────────────────────────────────────────────────────────────────── */
 
+/**
+ * The `N.` of a numbered heading, tolerating the backslash a visual editor inserts.
+ *
+ * A round trip through a WYSIWYG Markdown editor rewrites `## 18.` as `## 18\.` — it is escaping a
+ * line that would otherwise re-parse as an ordered-list item. The escape renders invisibly, so
+ * nothing looks wrong, and it once cost this repository every one of `spec.md`'s twelve standards
+ * rows: the section became unfindable, the rows stopped being validated, and the single symptom was
+ * one `section-missing` line in a run that also reported six unrelated stale-catalog entries.
+ *
+ * Matching it is deliberate rather than lenient. A parser that cannot find a section silently stops
+ * checking it, which is the worst failure a gate has; `heading-escaped` then reports the escape as
+ * its own violation, so the file still gets normalized. `spec-status.ts` carries the same tolerance
+ * and a note about the previous time a heading pattern went blind.
+ */
+const NUMBER_DOT = String.raw`(\d+(?:\.\d+)*[a-z]?)\\?\.?`;
+
 /** `## 22. Standards Alignment` — the trailing dot is optional, as everywhere else in the specs. */
-export const STANDARDS_HEADING = /^(#{2,6})\s+(\d+(?:\.\d+)*[a-z]?)\.?\s+Standards Alignment\s*$/;
+export const STANDARDS_HEADING = new RegExp(
+  String.raw`^(#{2,6})\s+${NUMBER_DOT}\s+Standards Alignment\s*$`,
+);
 
 /**
  * The backlog lives in `standards.md` alone: standards the audit found relevant whose owning spec
  * section does not exist yet, so no row could bind them. Without it a standard identified before
  * its feature was designed would survive only in someone's notes.
  */
-export const BACKLOG_HEADING = /^(#{2,6})\s+(\d+(?:\.\d+)*[a-z]?)\.?\s+Adoption Backlog\s*$/;
+export const BACKLOG_HEADING = new RegExp(
+  String.raw`^(#{2,6})\s+${NUMBER_DOT}\s+Adoption Backlog\s*$`,
+);
 export const BACKLOG_HEADER_CELLS = ["Standard", "Target", "Why not yet"] as const;
 
 /**
@@ -79,6 +99,9 @@ export const BACKLOG_HEADER_CELLS = ["Standard", "Target", "Why not yet"] as con
  * reaches implementation-status.md, and a `> **Status:**` under it is credited to the last numbered
  * section ABOVE it. Matched so the checker can name the trap by line number.
  */
+/** A numbered heading carrying the WYSIWYG escape, e.g. `## 18\. Standards Alignment`. */
+export const ESCAPED_NUMBERED_HEADING = /^#{2,6}\s+\d+(?:\.\d+)*[a-z]?\\\.\s/;
+
 export const UNNUMBERED_STANDARDS_HEADING = /^#{2,6}\s+(?!\d)[^\n]*Standards Alignment\s*$/;
 
 export const STANDARD_CELL = /^\[([^\]]+)\]\((https:\/\/[^\s)]+)\)$/;
@@ -178,6 +201,8 @@ export interface SpecStandards {
   /** Non-table, non-blank lines beyond one leading prose paragraph. */
   strayLines: number[];
   sectionCount: number;
+  /** 1-based lines of numbered headings carrying the WYSIWYG backslash escape. */
+  escapedHeadings: number[];
   headerCells?: string[];
   rows: StandardsRow[];
   /** Only ever non-empty for standards.md. */
@@ -325,6 +350,7 @@ export function parseStandardsSource(source: string, file: string): SpecStandard
     hasSectionStatusMarker: false,
     strayLines: [],
     sectionCount: 0,
+    escapedHeadings: [],
     rows: [],
     backlog: [],
     badForms: [],
@@ -348,6 +374,9 @@ export function parseStandardsSource(source: string, file: string): SpecStandard
     }
     if (NUMBERED_HEADING.test(line)) {
       out.hasNumberedHeadings = true;
+      if (ESCAPED_NUMBERED_HEADING.test(line)) {
+        out.escapedHeadings.push(i + 1);
+      }
     }
     const h = line.match(STANDARDS_HEADING);
     if (h) {

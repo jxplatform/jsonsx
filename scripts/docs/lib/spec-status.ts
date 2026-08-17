@@ -50,7 +50,12 @@ export interface SpecStatus {
  * §15's "Implemented" was being reported against §14.2, which carries no marker at all.
  * `check-doc-refs.ts:80` has always used `\b` here and resolved the same headings correctly.
  */
-export const NUMBERED_HEADING = /^#{2,6}\s+(\d+(?:\.\d+)*[a-z]?)\.?\s+(.*)$/;
+/*
+ * `\\?` tolerates the backslash a WYSIWYG editor inserts before the dot (`## 18\.`). Same class of
+ * bug as the `\b` note above: a heading pattern that fails to match does not report anything, it
+ * just stops seeing sections. `check-standards.ts` reports the escape as `heading-escaped`.
+ */
+export const NUMBERED_HEADING = /^#{2,6}\s+(\d+(?:\.\d+)*[a-z]?)\\?\.?\s+(.*)$/;
 const BLOCKQUOTE_STATUS = /^>\s*\*\*Status:\s*([A-Za-z]+)/;
 const HEADER_VERSION = /^\*\*Version:\*\*\s*(.+)$/;
 const HEADER_STATUS = /^\*\*Status:\*\*\s*(.+)$/;
