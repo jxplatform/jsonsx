@@ -10,6 +10,7 @@
 import { DEFAULT_FORMAT_LOCALE, DEFAULT_TIME_ZONE, INTL_HELPER_PATHS } from "@jxsuite/schema/intl";
 import type { JxExpressionNode, JxExpressionOperand } from "@jxsuite/schema/types";
 import type { JxScope } from "./types.ts";
+import { readPath, refAccessor, refSegments } from "./pointer.ts";
 
 /** The runtime's expression node — the schema's expression model. */
 export type ExpressionNode = JxExpressionNode;
@@ -366,15 +367,16 @@ function resolveExprRef(ref: string, state: JxScope, event: Event | null, iterCt
     return parts.length > 2 ? getPath(base, parts.slice(2).join("/")) : base;
   }
   if (ref.startsWith("#/state/")) {
-    const sub = ref.slice("#/state/".length);
-    const slash = sub.indexOf("/");
-    if (slash === -1) {
-      return state[sub];
-    }
-    return getPath(state[sub.slice(0, slash)], sub.slice(slash + 1));
+    // One call, not a hand-split leading token: slicing at the first `/` skipped unescaping it, so
+    // `#/state/a~1b/c` looked for a member called `a~1b` rather than `a/b`.
+    return readPath(state, ref.slice("#/state/".length));
   }
   if (ref.startsWith("parent#/")) {
-    return state[ref.slice("parent#/".length)];
+    /*
+     * A prop name may be a path into the prop. This read the whole path as one key and returned
+     * undefined for `parent#/user/name`, while the lowerer above compiled it to a walk.
+     */
+    return readPath(state, ref.slice("parent#/".length));
   }
   if (ref.startsWith("window#/")) {
     return getPath(globalThis.window, ref.slice("window#/".length));
@@ -382,7 +384,7 @@ function resolveExprRef(ref: string, state: JxScope, event: Event | null, iterCt
   if (ref.startsWith("document#/")) {
     return getPath(globalThis.document, ref.slice("document#/".length));
   }
-  return state[ref] ?? null;
+  return readPath(state, ref) ?? null;
 }
 
 /** Resolve a $ref to a writable location — returns { obj, key } for assignment. */
@@ -421,7 +423,12 @@ function resolveWritableRef(
     if (slash === -1) {
       return { key: sub, obj: state };
     }
-    const parts = sub.split("/");
+    /*
+     * The same tokenizer the read path uses. It used to split on `/` alone while the read split on
+     * `/[./]/`, so a write to `#/state/a/b.c` created a key `"b.c"` that the matching read — which
+     * walked `b` then `c` — could never see. The write simply vanished.
+     */
+    const parts = refSegments(sub);
     const lastKey = parts.pop();
     let obj = state;
     // Pointer paths address objects by construction (validated by the schema).
@@ -849,20 +856,18 @@ function compileRef(ref: string, opts: CompileOpts) {
     return "_acc";
   }
   if (ref.startsWith("$args/")) {
-    const parts = ref.slice("$args/".length).split("/");
-    return `_args${parts.map((p) => `[${JSON.stringify(p)}]`).join("")}`;
+    return refAccessor("_args", ref.slice("$args/".length));
   }
 
   if (ref.startsWith("event#/")) {
-    const path = ref.slice("event#/".length);
-    return `${e}.${path.replaceAll("/", ".")}`;
+    return refAccessor(e, ref.slice("event#/".length));
   }
 
   if (ref.startsWith("$map/")) {
     const parts = ref.split("/");
     const [, key] = parts;
     if (key === "item") {
-      return parts.length > 2 ? `_item.${parts.slice(2).join(".")}` : "_item";
+      return parts.length > 2 ? refAccessor("_item", parts.slice(2).join("/")) : "_item";
     }
     if (key === "index") {
       return "_index";
@@ -871,21 +876,24 @@ function compileRef(ref: string, opts: CompileOpts) {
   }
 
   if (ref.startsWith("#/state/")) {
-    const path = ref.slice("#/state/".length);
-    return `${s}.${path.replaceAll("/", ".")}`;
+    return refAccessor(s, ref.slice("#/state/".length));
   }
 
   if (ref.startsWith("parent#/")) {
-    return `${s}.${ref.slice("parent#/".length)}`;
+    return refAccessor(s, ref.slice("parent#/".length));
   }
   if (ref.startsWith("window#/")) {
-    return `window.${ref.slice("window#/".length).replaceAll("/", ".")}`;
+    return refAccessor("window", ref.slice("window#/".length));
   }
   if (ref.startsWith("document#/")) {
-    return `document.${ref.slice("document#/".length).replaceAll("/", ".")}`;
+    return refAccessor("document", ref.slice("document#/".length));
   }
 
-  return `${s}.${ref}`;
+  /*
+   * An unrecognized scheme is still a path under state. Pasting it raw emitted `s.a/b`, which is
+   * not a parse error but a division against an undeclared identifier.
+   */
+  return refAccessor(s, ref);
 }
 
 /** Compile a writable $ref target to its JS equivalent (for LHS of assignment). */
@@ -1092,13 +1100,9 @@ export function compileExpression(node: ExpressionNode, opts: CompileOpts = {}):
 
 // ─── Utilities ───────────────────────────────────────────────────────────────
 
-/** Resolve a dotted/slashed path on an object. */
+/** Resolve a `$ref` path on an object, through the one tokenizer (`pointer.ts`). */
 function getPath(obj: unknown, path: string): unknown {
-  let current: unknown = obj;
-  for (const k of path.split(/[./]/)) {
-    current = (current as Record<string, unknown>)?.[k];
-  }
-  return current;
+  return readPath(obj, path);
 }
 
 // ─── Statement-Engine Surface (spec §20) ─────────────────────────────────────

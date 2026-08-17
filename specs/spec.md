@@ -2,9 +2,9 @@
 
 ## Declarative Document Object Model — JSON Edition
 
-**Version:** 0.4.33-draft
+**Version:** 0.5.0-draft
 **Status:** Partial
-**Updated:** 2026-08-16
+**Updated:** 2026-08-17
 **License:** MIT
 
 ---
@@ -89,7 +89,7 @@ Where a web platform standard exists, Jx follows it. This section is the design 
 
 | Jx Feature                         | Platform Precedent                                           |
 | ---------------------------------- | ------------------------------------------------------------ |
-| `$ref` path syntax                 | JSON Pointer (RFC 6901) shape; Jx binding semantics (see §7) |
+| `$ref` path syntax                 | JSON Pointer (RFC 6901); Jx binding semantics (see §7)       |
 | `$defs` for type definitions       | JSON Schema 2020-12                                          |
 | Signal scope at component boundary | CSS Custom Properties scope                                  |
 | Explicit props at element boundary | HTML attributes on Custom Elements                           |
@@ -602,13 +602,17 @@ Template strings resolve `state.propertyName` against the current component's re
 
 ### 7.1 `$ref` Syntax
 
-Jx uses `$ref` to bind a property to declared state. The path **borrows JSON Pointer syntax** (RFC 6901 shape — a `#`-fragment of `/`-separated tokens):
+Jx uses `$ref` to bind a property to declared state. The path **is JSON Pointer syntax** (RFC 6901 — a `#`-fragment of `/`-separated tokens):
 
 ```json
 { "$ref": "#/state/count" }
 ```
 
-The **semantics are Jx-specific**, not JSON Reference: a Jx `$ref` reads a live value off the reactive scope, it does not substitute a schema. Two consequences follow. RFC 6901 escape sequences (`~0`, `~1`) are **not implemented** — a key containing `/` or `~` is unreachable. And within a **nested** path (the segments after the first) `.` works as a separator alongside `/`, so `#/state/user/name` walks into `state.user.name`; the leading token is read literally, so `#/state/user.name` reads the key `"user.name"`, not `state.user.name`. The schemes below (`window#/`, `parent#/`, `$map/`, `event#/`, …) are Jx extensions, not JSON Reference URIs.
+**`/` is the only separator.** A reference token is every character up to the next `/`, so `.` is an ordinary character in a member name: `#/state/user/name` walks `state` → `user` → `name`, and `#/state/user.name` reads the single member literally called `user.name`. RFC 6901 §4 escapes are implemented — `~1` is a literal `/` and `~0` a literal `~`, applied in that order — so `#/state/a~1b` reaches the key `a/b` and no member name is unreachable.
+
+> **Note:** Before 0.5.0 the dot was a separator inside nested segments, so `#/state/a/b.c` walked three levels. It now addresses the member `b.c` of `a`. This was never one rule: the interpreter dot-split every segment but the first, the assignment path never dot-split at all, and the compiler lowered a ref by replacing `/` with `.` — which emitted `s.items.0` for `#/state/items/0`, a syntax error from a build that reported success. `packages/runtime/src/pointer.ts` is now the only tokenizer, and every read, write and lowering path calls it.
+
+The **semantics are Jx-specific**, not JSON Reference: a Jx `$ref` reads a live value off the reactive scope, it does not substitute a schema, and a token that matches nothing yields `undefined` rather than failing evaluation as RFC 6901 §4 requires. The schemes below (`window#/`, `parent#/`, `$map/`, `event#/`, …) are Jx extensions, not the URI fragment representation of RFC 6901 §6.
 
 ### 7.2 Reference Schemes
 
@@ -621,6 +625,8 @@ The **semantics are Jx-specific**, not JSON Reference: a Jx `$ref` reads a live 
 | Map context      | `"$map/item"`           | Current item in an Array map iteration                                                                                                            |
 | Map index        | `"$map/index"`          | Current index in an Array map iteration                                                                                                           |
 | External file    | `"./other.json"`        | A component document — resolved for `$switch` cases and `$elements` registration (§14, §16), **not** as a node-level component instance (see §13) |
+
+Every scheme takes a path, not just a name: `"parent#/user/name"` reads `name` off the `user` prop and `"window#/location/href"` reads `location.href`, under the §7.1 rule that `/` is the only separator. Before 0.5.0 `parent#/` was the exception — it read the whole path as a single prop name, so a nested one resolved to `undefined` at runtime while the compiler emitted a walk.
 
 ### 7.3 Reactive Bindings
 
@@ -1624,8 +1630,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 | [CSS Scoping](https://www.w3.org/TR/css-scoping-1/)                                       | **Subset**    | §16.6    | packages/compiler/src/shared.ts, packages/compiler/tests/shadow-dom.test.ts                                                   | `:host`, `:host()` and `::slotted()` are emitted for a shadow component, and `:host`/`:host()` are translated to the tag name in light DOM so one style object serves both modes. `:host-context()` is not offered — it never reached a second engine.                                                                                                                                                                                                                                                                                                              |
 | [CSSOM](https://www.w3.org/TR/cssom-1/)                                                   | **Adopted**   | §9.1     | packages/runtime/src/runtime.ts                                                                                               | `style` keys are the CSSOM camelCase IDL attribute names, so a property name needs no translation table.                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | [CSS Color 4](https://www.w3.org/TR/css-color-4/)                                         | **Adopted**   | §9.5     | packages/compiler/src/shared.ts, packages/compiler/tests/shared.test.ts                                                       | `color-scheme: light dark` is emitted with per-attribute overrides, so native controls follow a forced scheme rather than only the author's own rules.                                                                                                                                                                                                                                                                                                                                                                                                              |
-| [RFC 6901](https://www.rfc-editor.org/rfc/rfc6901)                                        | **Borrowed**  | §7       | packages/runtime/src/runtime.ts                                                                                               | Shape only. A `$ref` binds live reactive state rather than substituting a value, `~0`/`~1` escapes are unimplemented, and `.` is treated as a separator.                                                                                                                                                                                                                                                                                                                                                                                                            |
-| [RFC 9535](https://www.rfc-editor.org/rfc/rfc9535)                                        | **Borrowed**  | §7       | packages/runtime/src/runtime.ts                                                                                               | The dotted segment form `#/state/user.name` is JSONPath's shape rather than a deviation from JSON Pointer — but no JSONPath selector, filter or wildcard is supported, so nothing here is a JSONPath query.                                                                                                                                                                                                                                                                                                                                                         |
+| [RFC 6901](https://www.rfc-editor.org/rfc/rfc6901)                                        | **Divergent** | §7       | packages/runtime/src/pointer.ts                                                                                               | Pointer syntax is implemented as written, `~0`/`~1` escapes included, with `/` as the only separator. Four enumerated deviations: a `$ref` binds a live value off the reactive scope rather than resolving a node of a JSON document; a token matching nothing yields `undefined` instead of failing evaluation (§4); the `-` array token (§4) is not special and reads a member named `-`; and the `#`-fragment schemes (`window#/`, `parent#/`, `event#/`) are Jx extensions, not the URI fragment representation of §6 — they are not percent-decoded.           |
 | [CSP Level 3](https://www.w3.org/TR/CSP3/)                                                | **Divergent** | §21      | packages/compiler/tests/no-eval.test.ts                                                                                       | Compiled output contains no `new Function` and no `eval`, proven by a committed test, so it runs under a policy without `'unsafe-eval'`. The **interpreting** runtime compiles templates and function bodies at load time and therefore requires `'unsafe-eval'` permanently — §21.3 states this as a property, not a defect.                                                                                                                                                                                                                                       |
 | [Trusted Types](https://www.w3.org/TR/trusted-types/)                                     | **Subset**    | §21.5    | packages/studio/src/services/trusted-types.ts, packages/studio/tests/trusted-types.test.ts, packages/runtime/src/runtime.ts   | `gap:trusted-types` The policy exists and refuses: `createHTML` asserts its input is sanitized and throws naming what it found, `createScript`/`createScriptURL` throw outright, and the runtime's four `innerHTML = ""` writes became `replaceChildren()`. **Not enforced** — no deployment sends `require-trusted-types-for`, because under this standard `eval` and `new Function` are gated too and the canvas interpreter needs both; §21.5 records why that is two permanent CSP profiles rather than a TODO, and why enforcement waits on a report-only run. |
 
@@ -2443,6 +2448,7 @@ This rewrites the mutating handlers of Appendix A's idiom using `$expression`, l
 
 ## Changelog
 
+- **0.5.0-draft** (2026-08-17) — $ref is JSON Pointer: `/` is the only separator and `~0`/`~1` are implemented; one shared tokenizer replaces five disagreeing ones.
 - **0.4.33-draft** (2026-08-16) — §21.5 two CSP profiles, permanently: compiled output never needs 'unsafe-eval' and the interpreting canvas always will. A Trusted Types policy guards the shell's one injection sink and refuses to build scripts; the runtime's four innerHTML writes became replaceChildren().
 - **0.4.32-draft** (2026-08-16) — §11.2a the Cookie prototype derives Secure/Path/Domain from a name prefix and from SameSite=None; HttpOnly and Expires are absent on purpose; a cookie name is data, never pattern syntax.
 - **0.4.31-draft** (2026-08-16) — Shadow DOM opt-in: $shadow and defaults.shadow emit a declarative shadow root the element adopts; :host translation keeps one style object valid in both modes (§16.6).
@@ -2496,4 +2502,4 @@ This rewrites the mutating handlers of Appendix A's idiom using `$expression`, l
 
 ---
 
-_Jx Specification v0.4.33-draft — subject to revision_
+_Jx Specification v0.5.0-draft — subject to revision_

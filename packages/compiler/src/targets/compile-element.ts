@@ -36,6 +36,7 @@ import type { ExpressionNode } from "../shared.ts";
 import { resolveShadowMode } from "../shadow.ts";
 import type { ShadowMode } from "../shadow.ts";
 import type { FormatRegistry } from "@jxsuite/schema/format-registry";
+import { escapeToken, objectKey, refAccessor, refSegments } from "@jxsuite/runtime/pointer";
 import type {
   JxDocument,
   JxExpressionDef,
@@ -453,7 +454,11 @@ export function emitElementModule(
   // Emit reactive({...}) with initial state values
   lines.push("    this.state = reactive({");
   for (const [key, initVal] of stateEntries) {
-    lines.push(`      ${key}: ${initVal},`);
+    /*
+     * A state key is author data, not an identifier: `{"user.name": 1}` is a legal document, and
+     * pasting it raw emitted `user.name: 1,` — a SyntaxError this build reported as a success.
+     */
+    lines.push(`      ${objectKey(key)}: ${initVal},`);
   }
   lines.push("    });");
 
@@ -465,7 +470,9 @@ export function emitElementModule(
         eventParam: "e",
         statePrefix: "s",
       });
-      lines.push(`    this.state.${key} = (s, e) => { ${compiled}; };`);
+      lines.push(
+        `    ${refAccessor("this.state", escapeToken(key))} = (s, e) => { ${compiled}; };`,
+      );
     } else if (hasStructuredBody(def)) {
       // Structured body (spec §20) — statements compiled against this.state; dispatch target is
       // The component instance itself (WHATWG dispatchEvent on the custom element).
@@ -475,7 +482,11 @@ export function emitElementModule(
         indent: "      ",
         statePrefix: "this.state",
       });
-      lines.push(`    this.state.${key} = (s, e) => {`, compiled, "    };");
+      lines.push(
+        `    ${refAccessor("this.state", escapeToken(key))} = (s, e) => {`,
+        compiled,
+        "    };",
+      );
     } else {
       const args = def.parameters ? paramNames(def.parameters) : (def.arguments ?? ["state"]);
       const paramList = args.join(", ");
@@ -490,17 +501,25 @@ export function emitElementModule(
       if (args[0] === "state") {
         if (def.$src) {
           // $src function — wrap imported function so it receives state
-          lines.push(`    this.state.${key} = (${paramList}) => ${key}(${paramList});`);
+          lines.push(
+            `    ${refAccessor("this.state", escapeToken(key))} = (${paramList}) => ${key}(${paramList});`,
+          );
         } else {
-          lines.push(`    this.state.${key} = (${paramList}) => {`, `      ${body}`, "    };");
+          lines.push(
+            `    ${refAccessor("this.state", escapeToken(key))} = (${paramList}) => {`,
+            `      ${body}`,
+            "    };",
+          );
         }
       } else {
         const callArgs = args.map((a: string) => (a === "state" ? "state" : "e")).join(", ");
         if (def.$src) {
-          lines.push(`    this.state.${key} = (state, e) => ${key}(${callArgs});`);
+          lines.push(
+            `    ${refAccessor("this.state", escapeToken(key))} = (state, e) => ${key}(${callArgs});`,
+          );
         } else {
           lines.push(
-            `    this.state.${key} = (state, e) => {`,
+            `    ${refAccessor("this.state", escapeToken(key))} = (state, e) => {`,
             `      const _fn = (${paramList}) => {`,
             `        ${body}`,
             "      };",
@@ -519,7 +538,9 @@ export function emitElementModule(
       eventParam: "e",
       statePrefix: "this.state",
     });
-    lines.push(`    this.state.${key} = ${emitFormulaFn(def, compiled)};`);
+    lines.push(
+      `    ${refAccessor("this.state", escapeToken(key))} = ${emitFormulaFn(def, compiled)};`,
+    );
   }
 
   /* Emitted with the same `state.` → `this.state.` rewrite the inline-body path below uses, into a
@@ -528,7 +549,7 @@ export function emitElementModule(
   for (const [key, template] of templateEntries) {
     lines.push(
       "",
-      `    this.state.${key} = computed(() => \`${template.replaceAll("state.", "this.state.")}\`);`,
+      `    ${refAccessor("this.state", escapeToken(key))} = computed(() => \`${template.replaceAll("state.", "this.state.")}\`);`,
     );
   }
 
@@ -540,11 +561,15 @@ export function emitElementModule(
         eventParam: "e",
         statePrefix: "this.state",
       });
-      lines.push(`    this.state.${key} = computed(() => ${compiled});`);
+      lines.push(
+        `    ${refAccessor("this.state", escapeToken(key))} = computed(() => ${compiled});`,
+      );
     } else if (def.$src) {
-      lines.push(`    this.state.${key} = computed(() => ${key}(this.state));`);
+      lines.push(
+        `    ${refAccessor("this.state", escapeToken(key))} = computed(() => ${key}(this.state));`,
+      );
     } else {
-      lines.push(`    this.state.${key} = computed(() => {`);
+      lines.push(`    ${refAccessor("this.state", escapeToken(key))} = computed(() => {`);
       const body = (typeof def.body === "string" ? def.body : "").replaceAll(
         "state.",
         "this.state.",
@@ -1250,14 +1275,38 @@ function emitMappedArray(arrayDef: JxMappedArray, indent: string) {
  */
 function refToExpr(ref: string) {
   if (ref.startsWith("#/state/")) {
-    const path = ref.slice("#/state/".length);
-    return `s.${path.replaceAll("/", ".")}`;
+    return refAccessor("s", ref.slice("#/state/".length));
   }
   if (ref.startsWith("$map/")) {
-    const path = ref.slice("$map/".length);
-    return path.replaceAll("/", ".");
+    return mapVarAccessor(ref.slice("$map/".length));
   }
-  return `s.${ref}`;
+  /*
+   * The remaining schemes, mirroring `compileRef` in @jxsuite/runtime. They used to fall through to
+   * the state branch, so `parent#/user` emitted `s.parent#/user` — a syntax error. A prop reaches
+   * this element through `state`, so `parent#/` reads from `s` exactly as `#/state/` does.
+   */
+  if (ref.startsWith("parent#/")) {
+    return refAccessor("s", ref.slice("parent#/".length));
+  }
+  if (ref.startsWith("window#/")) {
+    return refAccessor("window", ref.slice("window#/".length));
+  }
+  if (ref.startsWith("document#/")) {
+    return refAccessor("document", ref.slice("document#/".length));
+  }
+  return refAccessor("s", ref);
+}
+
+/**
+ * `$map/item/title` reads the loop variable `item`, so its first segment is an emitted identifier
+ * rather than a member of some receiver — the one ref form whose base is not fixed.
+ *
+ * @param {string} path
+ * @returns {string}
+ */
+function mapVarAccessor(path: string) {
+  const [head, ...rest] = refSegments(path);
+  return refAccessor(head ?? "", rest.map((seg) => escapeToken(seg)).join("/"));
 }
 
 /**
@@ -1266,7 +1315,7 @@ function refToExpr(ref: string) {
  */
 function mapRefToExpr(ref: string) {
   if (ref.startsWith("$map/")) {
-    return ref.slice("$map/".length).replaceAll("/", ".");
+    return mapVarAccessor(ref.slice("$map/".length));
   }
   return refToExpr(ref);
 }

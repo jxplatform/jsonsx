@@ -949,7 +949,12 @@ describe("compileElement — refToExpr edge cases", () => {
     expect(content).toContain("item.name");
   });
 
-  test("unknown ref without #/state/ prefix uses s. prefix", async () => {
+  /*
+   * A ref with no recognized prefix is still a path. This used to paste the whole ref after `s.`
+   * and emit `s.custom/path` — which is not a parse error but a *division*, `s.custom / path`,
+   * against an undeclared identifier. The build reported success and the value was NaN.
+   */
+  test("unknown ref without #/state/ prefix is lowered as a path under s", async () => {
     const result = await compileElement({
       children: [
         {
@@ -962,7 +967,8 @@ describe("compileElement — refToExpr edge cases", () => {
     });
 
     const { content } = result.files[0]!;
-    expect(content).toContain("s.custom/path");
+    expect(content).toContain("s.custom.path");
+    expect(content).not.toContain("s.custom/path");
   });
 
   test("$map/ prefix ref resolves to dot path without s. prefix", async () => {

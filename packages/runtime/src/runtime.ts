@@ -24,6 +24,7 @@ import {
   toRaw,
 } from "@vue/reactivity";
 import { evaluateExpression, evaluateOperand, isMutating } from "./expression.ts";
+import { readPath } from "./pointer.ts";
 import type { DynamicClass, JxEventHandler, JxPath, JxRenderOptions, JxScope } from "./types.ts";
 import {
   bodyReturnsValue,
@@ -2096,15 +2097,16 @@ export function resolveRef(refPath: string, state: JxScope) {
     return parts.length > 2 ? getPath(base, parts.slice(2).join("/")) : base;
   }
   if (refPath.startsWith("#/state/")) {
-    const sub = refPath.slice("#/state/".length);
-    const slash = sub.indexOf("/");
-    if (slash === -1) {
-      return state[sub];
-    }
-    return getPath(state[sub.slice(0, slash)], sub.slice(slash + 1));
+    // One call, not a hand-split leading token: slicing at the first `/` skipped unescaping it, so
+    // `#/state/a~1b/c` looked for a member called `a~1b` rather than `a/b`.
+    return readPath(state, refPath.slice("#/state/".length));
   }
   if (refPath.startsWith("parent#/")) {
-    return state[refPath.slice("parent#/".length)];
+    /*
+     * A prop name may be a path into the prop. This read the whole path as one key and returned
+     * undefined for `parent#/user/name`, while the compiler lowered it to a walk.
+     */
+    return readPath(state, refPath.slice("parent#/".length));
   }
   if (refPath.startsWith("window#/")) {
     return getPath(globalThis.window, refPath.slice("window#/".length));
@@ -2112,7 +2114,7 @@ export function resolveRef(refPath: string, state: JxScope) {
   if (refPath.startsWith("document#/")) {
     return getPath(globalThis.document, refPath.slice("document#/".length));
   }
-  return state[refPath] ?? null;
+  return readPath(state, refPath) ?? null;
 }
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
@@ -2144,16 +2146,15 @@ function isNestedSelector(k: string) {
 }
 
 /**
+ * Walk a path off a value. Delegates to the one tokenizer (`pointer.ts`) — this used to split on
+ * `/[./]/`, which no other path in the codebase agreed with.
+ *
  * @param {unknown} obj
  * @param {string} path
  * @returns {unknown}
  */
 function getPath(obj: unknown, path: string) {
-  let current: unknown = obj;
-  for (const k of path.split(/[./]/)) {
-    current = (current as Record<string, unknown>)?.[k];
-  }
-  return current;
+  return readPath(obj, path);
 }
 
 /**

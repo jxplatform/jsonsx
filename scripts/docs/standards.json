@@ -333,12 +333,6 @@
       "url": "https://www.rfc-editor.org/rfc/rfc9512"
     },
     {
-      "id": "RFC 9535",
-      "org": "IETF",
-      "title": "JSONPath: Query Expressions for JSON",
-      "url": "https://www.rfc-editor.org/rfc/rfc9535"
-    },
-    {
       "id": "Referrer Policy",
       "org": "W3C",
       "title": "Referrer Policy",

@@ -1281,10 +1281,30 @@ describe("call operator — named formulas and blessed globals", () => {
 
   test("$args refs compile to _args member access", () => {
     expect(compileExpression({ operator: "+", target: ref("$args/price"), value: 1 })).toBe(
-      '(_args["price"] + 1)',
+      "(_args.price + 1)",
     );
     expect(compileExpression({ operator: "+", target: ref("$args/user/name"), value: "" })).toBe(
-      '(_args["user"]["name"] + "")',
+      '(_args.user.name + "")',
+    );
+  });
+
+  /*
+   * `$args/` used to bracket every segment while every other ref form dotted every segment, and
+   * only one of those two rules survives a segment that is not an identifier. Both branches are
+   * pinned here because the dotted branch is the one that silently emitted a SyntaxError.
+   */
+  test("a segment that is not an identifier takes the bracket branch", () => {
+    expect(compileExpression({ operator: "+", target: ref("$args/values/0"), value: 1 })).toBe(
+      '(_args.values["0"] + 1)',
+    );
+    expect(compileExpression({ operator: "+", target: ref("#/state/items/0"), value: 1 })).toBe(
+      '(state.items["0"] + 1)',
+    );
+    expect(compileExpression({ operator: "+", target: ref("#/state/user.name"), value: 1 })).toBe(
+      '(state["user.name"] + 1)',
+    );
+    expect(compileExpression({ operator: "+", target: ref("#/state/a-b"), value: 1 })).toBe(
+      '(state["a-b"] + 1)',
     );
   });
 });

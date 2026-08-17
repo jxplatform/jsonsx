@@ -37,6 +37,7 @@ import {
 import { styleScopePrefix } from "./shadow.ts";
 import type { ShadowMode } from "./shadow.ts";
 import type { ExpressionNode } from "@jxsuite/runtime/expression";
+import { readPath } from "@jxsuite/runtime/pointer";
 import type {
   JsonValue,
   JxElement,
@@ -723,14 +724,15 @@ export function resolveRefValue(refValue: unknown, scope: Record<string, unknown
     return parts.length > 2 ? getPathValue(base, parts.slice(2).join("/")) : base;
   }
   if (refValue.startsWith("#/state/")) {
-    const sub = refValue.slice("#/state/".length);
-    const slash = sub.indexOf("/");
-    if (slash === -1) {
-      return scope[sub];
-    }
-    return getPathValue(scope[sub.slice(0, slash)], sub.slice(slash + 1));
+    // One call, not a hand-split leading token: slicing at the first `/` skipped unescaping it, so
+    // `#/state/a~1b/c` looked for a member called `a~1b` rather than `a/b`.
+    return getPathValue(scope, refValue.slice("#/state/".length));
   }
-  return scope[refValue] ?? null;
+  /*
+   * An unrecognized scheme is still a path, matching the runtime resolvers and the lowerer.
+   * Reading it as one key returned null for `a/b` while the emitted client module walked it.
+   */
+  return getPathValue(scope, refValue) ?? null;
 }
 
 /**
@@ -812,14 +814,7 @@ export function evaluateStaticTemplate(str: string, scope: Record<string, unknow
  * @returns {unknown}
  */
 export function getPathValue(base: unknown, path: string) {
-  if (!path) {
-    return base;
-  }
-  let acc: unknown = base;
-  for (const key of path.split("/")) {
-    acc = acc == null ? undefined : (acc as Record<string, unknown>)[key];
-  }
-  return acc;
+  return readPath(base, path);
 }
 
 /**
