@@ -288,6 +288,24 @@ Status is `neutral` on a visual change — always — and red only on a shot _er
 an unknown command id, an unresolvable region, an `idle()` timeout. Those are regressions. A picture
 merely changing is an aesthetic judgement CI cannot make.
 
+**The lane declines its own commits, and that is load-bearing.** Its push moves the PR head, which
+raises `pull_request: synchronize`, which queues the lane again on the commit it just wrote. Nothing
+in the trigger can prevent that — `paths:` matches the PR's whole diff against its base, and one
+landed re-capture puts `docs/images/**` in that diff permanently — so the refusal is a job-level
+`if:` on `github.actor`. Two facts made it necessary, and both were measured rather than assumed:
+
+- A `GITHUB_TOKEN` push **does** queue this workflow here. Sixteen of the thirty runs on the branch
+  that found this were headed by the lane's own `chore(screenshots)` commit.
+- The `action_required` state those runs sit in is a repository Actions policy, not a termination
+  condition. Approve one and the lane re-captures its own output and pushes again; the button is
+  the crank handle, not the brake.
+
+**CI never passes `--force`.** That flag is for a deliberate re-baseline (§13.4) and it works by
+skipping `writeIfChanged` — the pixel comparison that keeps committed screenshots from churning.
+In the lane it rewrote all 63 PNGs every run, and since Chromium does not re-encode a PNG
+byte-for-byte, ~28 files whose own report read `0.00% of pixels` were pushed as changes. Under
+`DIFF_THRESHOLD` those files are now kept, and `git diff` means what the lane needs it to mean.
+
 ## Authoring notes
 
 - **Deleting a shot is a first-class fix.** A screenshot of content the docs pipeline already

@@ -75,11 +75,34 @@ concurrency:
 jobs:
   capture:
     runs-on: ubuntu-latest
-    # Belt-and-braces with the `paths:` list above. This lane's failure mode is a bot commit on
-    # your branch, and a bot branch is precisely where that is never wanted: an automated
+    # Two refusals, and the second one is the loop-breaker.
+    #
+    # DEPENDABOT — belt-and-braces with the `paths:` list above. This lane's failure mode is a bot
+    # commit on your branch, and a bot branch is precisely where that is never wanted: an automated
     # dependency bump has no picture to review, and the re-capture lands as unreviewable bytes in
     # a PR nobody opened for that purpose.
-    if: github.event.pull_request.user.login != 'dependabot[bot]'
+    #
+    # ITSELF — the lane must not photograph its own output. The push below moves the PR head, which
+    # raises `pull_request: synchronize`, which queues THIS workflow again on the commit it just
+    # made. The note that used to sit on the push step said a `GITHUB_TOKEN` push cannot re-trigger
+    # a workflow. On this repository it demonstrably does: of the 30 runs on the branch that found
+    # this, SIXTEEN were headed by a `chore(screenshots)` commit of the lane's own. Fifteen sat at
+    # `action_required`, which is a repository Actions policy holding runs whose actor is a bot —
+    # an accident that has been standing in for a termination condition. Run 739a6af2 is what it
+    # looks like when the accident lapses: `actor=github-actions[bot], triggering_actor=<a human>`,
+    # somebody pressed *Approve and run*, the lane re-captured its own PNGs and pushed again. The
+    # approval button is not a circuit breaker, it is the crank handle.
+    #
+    # `github.actor` is the exact discriminator, verified against those runs: it is
+    # `github-actions[bot]` on every bot-headed run and the pushing human on every other, and it
+    # survives a re-run (which sets `triggering_actor` and leaves `actor` alone) — so approving one
+    # of the held runs now costs a skipped job instead of another turn of the crank.
+    #
+    # Scoped to `pull_request` on purpose. For `schedule`, `github.actor` is whoever last touched
+    # the cron, and a bot having touched it once must not silently retire the nightly.
+    if: >-
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
+      !(github.event_name == 'pull_request' && github.actor == 'github-actions[bot]')
     # A PINNED container, Chromium AND fontconfig. The fontset is not optional: the Spectrum UI
     # Stack resolves differently on NixOS and on Ubuntu, so a hash lock over bytes rendered with an
     # Unknown font set is a lock nobody can reproduce — which is why every lock entry records the
@@ -212,11 +235,23 @@ jobs:
           # Changes for no visible reason, this line is what says the browser moved.
           "$bin" --version
 
+      # NO `--force`. It is the re-baseline flag — UX-REDESIGN-PLAN §13.4 spends it on "one
+      # reviewable commit" when the FIXTURES change — and it works by skipping `writeIfChanged`,
+      # the pixel comparison that exists so committed screenshots do not churn. Passing it here
+      # overwrote all 63 PNGs unconditionally on every run, and Chromium does not re-encode a PNG
+      # byte-for-byte, so `git diff` then saw ~28 changed files whose own report said
+      # `0.00% of pixels` and pushed them. That is the fuel the loop above was burning: not a
+      # picture that moved, an encoder that does not repeat itself.
+      #
+      # Without it the same run keeps every image whose pixel diff is under `DIFF_THRESHOLD`
+      # (0.0001 — about 920 px of a 3840x2400 frame, sized in shot.ts against the thinnest surface
+      # this pipeline has to keep honest), so `git diff` becomes an honest proxy for "the picture
+      # moved" and a run with nothing to say pushes nothing.
       - name: Capture
         id: capture
         continue-on-error: true
         shell: bash
-        run: bun run screenshots --force
+        run: bun run screenshots
 
       # Integrity: the runner must have written a lock that names every byte it produced. This
       # Failing means the pipeline is broken, not that a picture changed — so it is also red.
@@ -247,8 +282,11 @@ jobs:
           cat /tmp/screenshots-report.md >> "$GITHUB_STEP_SUMMARY"
 
       # ── Push (same-repo PRs only) ──────────────────────────────────────────
-      # A GITHUB_TOKEN push does not re-trigger workflows, which is deliberate here: the lane must
-      # Not chase its own commit round a loop.
+      # This push DOES raise `pull_request: synchronize` and DOES queue this workflow again on the
+      # commit it just made — see the job's `if:` above, which is what stops the lane photographing
+      # its own output. Nothing here can prevent the run being created: for a `pull_request` event
+      # the `paths:` filter matches the PR's whole diff against its base, and once one re-capture
+      # has landed that diff contains `docs/images/**` forever. The run is queued; the job declines.
       - name: Push the re-capture
         id: push
         if: >-
