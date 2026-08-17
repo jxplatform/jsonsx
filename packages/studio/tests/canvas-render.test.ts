@@ -123,6 +123,27 @@ interface FakeEditor {
 const createdModels: FakeModel[] = [];
 const createdEditors: FakeEditor[] = [];
 
+/**
+ * Wait until the source editor's floating mount has actually landed.
+ *
+ * `mountSourceEditor` is `void mountSourceEditor(…)` around a dynamic import, so the number of
+ * turns it takes is a property of the machine, not of the code under test. A bare `await flush()`
+ * is two turns and is usually enough — until it is not, and then the assertion reads
+ * `createdEditors` while it is still short.
+ *
+ * That flake is worth removing rather than tolerating, because `scripts/check-lens-mutants.ts`
+ * treats a red baseline file as a killed mutant: one flake here reports nineteen false kills, and
+ * on a CI runner it did exactly that. Waiting on the condition costs nothing when the mount has
+ * already landed.
+ *
+ * @param {number} count - How many editors must exist before the caller may assert.
+ */
+async function waitForEditors(count: number): Promise<void> {
+  for (let turns = 0; createdEditors.length < count && turns < 20; turns++) {
+    await flush();
+  }
+}
+
 void mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
   MarkerSeverity: { Error: 8, Warning: 4 },
   Uri: { parse: (s: string) => ({ toString: () => s }) },
@@ -598,16 +619,7 @@ describe("tab close/reopen lifecycle", () => {
     openSyncedTab();
     setMode("source");
     renderCanvas();
-    await flush();
-    /* `mountSourceEditor` is a FLOATING async mount — `void mountSourceEditor(…)` around a dynamic
-       import — so "the editor exists" is not established by a fixed number of turns. Two turns is
-       normally plenty and once, on a loaded machine, was not: the test failed at the line below
-       with `createdEditors` empty. That is worth waiting for rather than tolerating, because
-       `scripts/check-lens-mutants.ts` reads a red test file as a killed mutant and would report
-       nineteen false kills off one flake. */
-    for (let turns = 0; createdEditors.length === 0 && turns < 20; turns++) {
-      await flush();
-    }
+    await waitForEditors(1);
     const [editor] = createdEditors;
     const [model] = createdModels;
     expect(surfaceForPane("primary").monacoEditor).toBe(editor as never);
@@ -622,7 +634,7 @@ describe("tab close/reopen lifecycle", () => {
     openSyncedTab();
     setMode("source");
     renderCanvas();
-    await flush();
+    await waitForEditors(2);
     expect(createdEditors.length).toBe(2);
     expect(surfaceForPane("primary").monacoEditor).toBe(createdEditors[1] as never);
   });
@@ -803,7 +815,7 @@ describe("source mode", () => {
     openSyncedTab(undefined, { documentPath: "pages/index.json" });
     setMode("source");
     renderCanvas();
-    await flush();
+    await waitForEditors(1);
     expect(createdModels).toHaveLength(1);
     expect(String(createdModels[0]!.uri)).toBe("file:///pages/index.json");
     const firstEditor = createdEditors[0]!;
@@ -811,7 +823,7 @@ describe("source mode", () => {
     openSyncedTab(undefined, { documentPath: "project.json", id: "tab-project" });
     setMode("source");
     renderCanvas();
-    await flush();
+    await waitForEditors(2);
 
     expect(createdModels).toHaveLength(2);
     expect(String(createdModels[1]!.uri)).toBe("file:///project.json");
