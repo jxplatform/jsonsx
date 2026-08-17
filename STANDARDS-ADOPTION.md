@@ -18,11 +18,11 @@ That gap was not cosmetic. It showed up as real defects: a redirect shape the sc
 
 **Three gap ids remain, and each is a live `Subset` row rather than unstarted work** — they name the part of a standard the repo does not claim, which is what a gap id is for:
 
-| Gap                    | Where                                      | What is left                                                                                                                                                                                                                       |
-| ---------------------- | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `gap:wcag-conformance` | `studio-ui-guidelines.md` §1.1, §8.2, §8.7 | Four criteria are met and checked (4.1.3, 2.5.7, 1.4.3/1.4.11, 1.4.1). **No level is claimed**, because claiming one needs an end-to-end audit in a browser.                                                                       |
-| `gap:apg-coverage`     | `studio-ui-guidelines.md` §6, §8, §12      | Tree, menu, toolbar, radiogroup, combobox and dialog are done. The **tab strips** still carry no tab semantics; the Tabulator grid is deliberately left alone (hand-authoring `role="grid"` over virtualized rows makes it worse). |
-| `gap:trusted-types`    | `spec.md` §21.5                            | The policy exists and refuses. **Enforcement** — a deployment sending `require-trusted-types-for` — waits on a report-only run, for the reason §4.9 gives.                                                                         |
+| Gap                  | Where                                    | What is left                                                                                                                                                                                                                 |
+| -------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| gap:wcag-conformance | studio-ui-guidelines.md §1.1, §8.2, §8.7 | Four criteria are met and checked (4.1.3, 2.5.7, 1.4.3/1.4.11, 1.4.1). No level is claimed, because claiming one needs an end-to-end audit in a browser.                                                                     |
+| gap:apg-coverage     | studio-ui-guidelines.md §6, §8, §12      | Tree, menu, toolbar, radiogroup, combobox and dialog are done. The tab strips still carry no tab semantics; the Tabulator grid is deliberately left alone (hand-authoring role="grid" over virtualized rows makes it worse). |
+| gap:trusted-types    | spec.md §21.5                            | The policy exists and refuses. Enforcement — a deployment sending require-trusted-types-for — waits on a report-only run, for the reason §4.9 gives.                                                                         |
 
 `gap:example-only` is reserved for `standards.md` §4.4's worked examples and names no work.
 
@@ -89,58 +89,31 @@ PR 0 shipped `specs/standards.md` (the contract), `scripts/docs/lib/standards.ts
 
 ### What each phase changed, and what it found
 
-The designs below held. What follows is only what they did **not** anticipate — the part worth
-reading before touching any of this again.
+The designs below held. What follows is only what they did **not** anticipate — the part worth reading before touching any of this again.
 
-- **S3.** The probe had to become the negotiation input, as designed. What the design missed is that
-  `new WebSocket(url, [])` is **not** the same as `new WebSocket(url)` — an empty array still sends
-  the header, and a server that echoes nothing then fails the connection. The client offers no
-  `protocols` argument at all when the list is empty, and a test pins the distinction.
-- **S4.** Two Better Auth defaults were wrong for Cloudflare Workers in the same way: both
-  `useSecureCookies` and `rateLimit.enabled` fall back to `NODE_ENV === "production"`, which is
-  **unset** there. The library's own defaults therefore shipped non-`Secure`, unprefixed session
-  cookies with rate limiting off, in production. Reaching `__Host-` also meant setting
-  `useSecureCookies: false` and restoring `Secure` by hand, because the library prepends
-  `__Secure-` to whatever name it is given — a test asserts the resulting names so a library upgrade
-  is loud.
-- **S5.** `i18n.timeZone` was **not** added. The determinism fix is a fixed `UTC` default in the
-  helpers, which is what the test proves; a config key nothing reads is the exact defect §4.1 of this
-  document records `i18n` itself having had. Also: Bun's `Intl.Segmenter` answers
-  `isWordLike: false` for a mixed alphanumeric segment (`v3`, `h1`), so the word-count predicate is
-  spelled out as "contains a letter or a digit" rather than trusting the flag.
-- **S6.** The live region was the whole point and it landed. The contrast gate found one real
-  failure — white on the brand blue is **3.68:1**, below the 4.5:1 normal text owes — and it is on
-  the debt list rather than fixed, because darkening the brand is a design decision. The
-  guidelines-vs-tokens rule found **seven** wrong hex values, one more than the six this document
-  predicted.
-- **S7.** Shipped as a model plus a Problems reporter and a command, **not** a modal: Problems is
-  already the surface for records that outlive the frame you were not watching, and a second one
-  would have been a window to open. B.3.2 is partial and says so — most repairs have no command yet,
-  and naming one that merely reopens a panel would put a button on a finding that does not do what
-  the button says.
-- **S8.** The scope check was worth doing: under Trusted Types `eval` and `new Function` **are**
-  gated, so the shell ships the policy and does not enforce. The policy refuses rather than passing
-  through, which is the difference between a control and a ceremony.
-- **S9.** BiDi drives everything the pipeline needs, and the captured bytes are **identical** —
-  verified by capturing the same shot over each protocol and hashing. One real difference: BiDi
-  refuses a pointer move outside the viewport, where CDP allowed `(-1, -1)`. Fixed in the pipeline
-  rather than worked around.
+- **S3.** The probe had to become the negotiation input, as designed. What the design missed is that `new WebSocket(url, [])` is **not** the same as `new WebSocket(url)` — an empty array still sends the header, and a server that echoes nothing then fails the connection. The client offers no `protocols` argument at all when the list is empty, and a test pins the distinction.
+- **S4.** Two Better Auth defaults were wrong for Cloudflare Workers in the same way: both `useSecureCookies` and `rateLimit.enabled` fall back to `NODE_ENV === "production"`, which is **unset** there. The library's own defaults therefore shipped non-`Secure`, unprefixed session cookies with rate limiting off, in production. Reaching `__Host-` also meant setting `useSecureCookies: false` and restoring `Secure` by hand, because the library prepends `__Secure-` to whatever name it is given — a test asserts the resulting names so a library upgrade is loud.
+- **S5.** `i18n.timeZone` was **not** added. The determinism fix is a fixed `UTC` default in the helpers, which is what the test proves; a config key nothing reads is the exact defect §4.1 of this document records `i18n` itself having had. Also: Bun's `Intl.Segmenter` answers `isWordLike: false` for a mixed alphanumeric segment (`v3`, `h1`), so the word-count predicate is spelled out as "contains a letter or a digit" rather than trusting the flag.
+- **S6.** The live region was the whole point and it landed. The contrast gate found one real failure — white on the brand blue is **3.68:1**, below the 4.5:1 normal text owes — and it is on the debt list rather than fixed, because darkening the brand is a design decision. The guidelines-vs-tokens rule found **seven** wrong hex values, one more than the six this document predicted.
+- **S7.** Shipped as a model plus a Problems reporter and a command, **not** a modal: Problems is already the surface for records that outlive the frame you were not watching, and a second one would have been a window to open. B.3.2 is partial and says so — most repairs have no command yet, and naming one that merely reopens a panel would put a button on a finding that does not do what the button says.
+- **S8.** The scope check was worth doing: under Trusted Types `eval` and `new Function` **are** gated, so the shell ships the policy and does not enforce. The policy refuses rather than passing through, which is the difference between a control and a ceremony.
+- **S9.** BiDi drives everything the pipeline needs, and the captured bytes are **identical** — verified by capturing the same shot over each protocol and hashing. One real difference: BiDi refuses a pointer move outside the viewport, where CDP allowed `(-1, -1)`. Fixed in the pipeline rather than worked around.
 
 ### Smaller items track — complete
 
 Everything §4.11 named, plus two red gates the work uncovered:
 
-| Item                                                                      | Status |
-| ------------------------------------------------------------------------- | ------ |
-| `gap:bcp47-locale-validation` — a schema `pattern` on the language tags   | ✅     |
-| `gap:sse-reconnect` — `retry:` and one reload on `Last-Event-ID`          | ✅     |
-| `gap:markdown-variant`, `gap:yaml-media-type` — what hosts actually serve | ✅     |
-| `gap:link-relation-validation` — the IANA registry, checked               | ✅     |
-| `gap:identifier-syntax` — UAX #31 §R4 at the parse boundary               | ✅     |
-| `gap:sitemap-fields` — a generated route's own `<lastmod>`                | ✅     |
-| BCP 14 — `standards.md` §12, gated by `docs:status`                       | ✅     |
-| ECMA-426 source maps — recorded `Rejected`                                | ✅     |
-| RFC 7464 — already `Rejected`; the NDJSON drop counter shipped            | ✅     |
+| Item                                                                  | Status |
+| --------------------------------------------------------------------- | ------ |
+| gap:bcp47-locale-validation — a schema pattern on the language tags   | ✅     |
+| gap:sse-reconnect — retry: and one reload on Last-Event-ID            | ✅     |
+| gap:markdown-variant, gap:yaml-media-type — what hosts actually serve | ✅     |
+| gap:link-relation-validation — the IANA registry, checked             | ✅     |
+| gap:identifier-syntax — UAX #31 §R4 at the parse boundary             | ✅     |
+| gap:sitemap-fields — a generated route's own <lastmod>                | ✅     |
+| BCP 14 — standards.md §12, gated by docs:status                       | ✅     |
+| ECMA-426 source maps — recorded Rejected                              | ✅     |
+| RFC 7464 — already Rejected; the NDJSON drop counter shipped          | ✅     |
 
 **Two gates were already red before any of this work**, and both are worth remembering as a pattern:
 
@@ -169,14 +142,7 @@ Read this before touching any of it — several phases established contracts lat
 
 ### 4.1 i18n negotiation — the open half of B11 ✅ **shipped**
 
-> Shipped as `packages/compiler/src/site/locale-negotiation.ts`, with `site-architecture.md` §13.6.
-> The design below was followed; two things are worth carrying forward. The negotiation is
-> **middleware, not a route** — when the negotiated locale is the one `/` already serves the request
-> has to continue down whatever chain the adapter uses, and a route would have to reproduce it. And
-> the algorithm exists twice, in TypeScript and as the JavaScript the worker gets, because the worker
-> bundles from the _project_ root and cannot import the compiler; a test evaluates the emitted source
-> and drives it through the same corpus as the implementation, which is the only thing standing
-> between two copies and a silent divergence.
+> Shipped as `packages/compiler/src/site/locale-negotiation.ts`, with `site-architecture.md` §13.6. The design below was followed; two things are worth carrying forward. The negotiation is **middleware, not a route** — when the negotiated locale is the one `/` already serves the request has to continue down whatever chain the adapter uses, and a route would have to reproduce it. And the algorithm exists twice, in TypeScript and as the JavaScript the worker gets, because the worker bundles from the _project_ root and cannot import the compiler; a test evaluates the emitted source and drives it through the same corpus as the implementation, which is the only thing standing between two copies and a silent divergence.
 
 `gap:locale-lookup` (RFC 4647) and the `Accept-Language` half of RFC 9110 §12.5.4.
 
@@ -191,13 +157,7 @@ Also still open here: **`{locale}` in a collection `source` is not expanded** (�
 
 ### 4.2 S1 — RFC 9457 Problem Details ✅ **shipped**
 
-> Shipped as `packages/protocol/src/{problem,problems}.ts`, `packages/server/src/problem.ts` and
-> `packages/server/scripts/check-error-shapes.ts`, with `server.md` §4.3. The plan held, including
-> the `error`-alias sequencing and all three "would be wrong" exemptions. Two things it did not
-> anticipate: **401 and 403 needed separate types** (the status belongs to the type, and collapsing
-> them made a missing API key indistinguishable from a refused root), and `gitPull`'s documented
-> `409 {conflicts}` was **structurally impossible** to produce — `runGit` threw `stderr` alone and
-> git writes every CONFLICT line to stdout. Both are fixed.
+> Shipped as `packages/protocol/src/{problem,problems}.ts`, `packages/server/src/problem.ts` and `packages/server/scripts/check-error-shapes.ts`, with `server.md` §4.3. The plan held, including the `error`\-alias sequencing and all three "would be wrong" exemptions. Two things it did not anticipate: **401 and 403 needed separate types** (the status belongs to the type, and collapsing them made a missing API key indistinguishable from a refused root), and `gitPull`'s documented `409 {conflicts}` was **structurally impossible** to produce — `runGit` threw `stderr` alone and git writes every CONFLICT line to stdout. Both are fixed.
 
 `@jxsuite/protocol` is the home: the only package both the server and Studio already depend on. Two new files — `problem.ts` (shape and constructors) and `problems.ts` (a `PROBLEM_TYPES` registry in `STUDIO_ROUTES`'s exact idiom, so the same generator and drift machinery applies).
 
@@ -215,13 +175,7 @@ Gaps closed: `gap:backend-failure-contract`, `gap:studio-problem-details`, `gap:
 
 ### 4.3 S2 — Fetch Metadata and loopback hardening ✅ **shipped**
 
-> Shipped in `packages/server/src/net-guard.ts`, with `server.md` §4.2. Everything the design named
-> landed, including the `embeddable` policy and the `fetchMetadataAbsentIsAccepted` test. One thing
-> it did not: tokening `/__studio__/ai/*` meant the desktop had to append the token, and
-> `ai-models.ts` derived the models URL with `chatUrl.replace(/\/chat$/, …)` — a regex anchored on
-> the end of the string, which silently stopped matching the moment a query appeared and would have
-> pointed the models request at the chat endpoint. **A "one-line" gate change reached three
-> packages.**
+> Shipped in `packages/server/src/net-guard.ts`, with `server.md` §4.2. Everything the design named landed, including the `embeddable` policy and the `fetchMetadataAbsentIsAccepted` test. One thing it did not: tokening `/__studio__/ai/*` meant the desktop had to append the token, and `ai-models.ts` derived the models URL with `chatUrl.replace(/\/chat$/, …)` — a regex anchored on the end of the string, which silently stopped matching the moment a query appeared and would have pointed the models request at the chat endpoint. **A "one-line" gate change reached three packages.**
 
 One predicate folded into the existing `originHostGate`, so **zero new call sites**. `Sec-Fetch-Site: same-origin`/`none` allow; `cross-site` allows only a top-level document navigation; `same-site` **denies** — stricter than the standard Resource Isolation Policy and justified: on `127.0.0.1` there is no meaningful "site" broader than the origin, so `same-site` means a different port on the same host, which is precisely the other-local-process threat the loopback bind cannot address.
 
