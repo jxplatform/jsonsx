@@ -2,7 +2,10 @@
 
 ## Declarative Document Object Model — JSON Edition
 
-**Version:** 0.4.33-draft **Status:** Partial **Updated:** 2026-08-16 **License:** MIT
+**Version:** 0.4.33-draft
+**Status:** Partial
+**Updated:** 2026-08-16
+**License:** MIT
 
 ---
 
