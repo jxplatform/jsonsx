@@ -27,6 +27,7 @@
  */
 
 import { serveSiteOutput, siteOutDir } from "./site-output.ts";
+import { problem } from "./problem.ts";
 
 /** A running preview server for one project. */
 export interface SitePreview {
@@ -63,7 +64,7 @@ export function startSitePreview(projectRoot: string): SitePreview | null {
       try {
         decoded = decodeURIComponent(url.pathname);
       } catch {
-        return new Response("Bad request", { status: 400 });
+        return problem("invalidRequest", "Bad request");
       }
       const res = await serveSiteOutput(decoded, projectRoot);
       if (res) {
@@ -75,7 +76,7 @@ export function startSitePreview(projectRoot: string): SitePreview | null {
       const notFound = await serveSiteOutput("/404.html", projectRoot);
       return notFound
         ? new Response(notFound.body, { headers: notFound.headers, status: 404 })
-        : new Response("Not found", { status: 404 });
+        : problem("notFound", "Not found");
     },
     hostname: "127.0.0.1",
     port: 0,

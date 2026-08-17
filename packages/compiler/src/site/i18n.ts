@@ -111,6 +111,46 @@ export function localeOfRoute(urlPattern: string, i18n: ResolvedI18n | null): st
 }
 
 /**
+ * Routes sitting outside the locale tree under `prefix-always`.
+ *
+ * `prefix-always` is a promise that **every** URL names its language. A page at `/about/` under it
+ * breaks that promise silently: it builds, it serves, and `localeOfRoute` calls it the default
+ * locale — so a site that declared "no unprefixed URLs" ships them anyway, and the only reader who
+ * finds out is a visitor who lands on one and sees the wrong language with no way to switch.
+ *
+ * Reported rather than rejected. The author may genuinely mean it — a `/robots-info/` page, a
+ * landing page with no translations — and failing their build over a page that works would be the
+ * compiler overruling a decision it cannot see the reason for. Naming it is enough.
+ *
+ * `/` is excluded: under `prefix-always` the site root is the one URL that exists precisely to send
+ * a visitor somewhere else, and negotiation (`locale-negotiation.ts`) is what it is for.
+ *
+ * @param {readonly { urlPattern: string }[]} routes
+ * @param {ResolvedI18n | null} i18n
+ * @returns {string[]} Offending URL patterns, in route order
+ */
+export function unprefixedRoutes(
+  routes: readonly { urlPattern: string }[],
+  i18n: ResolvedI18n | null,
+): string[] {
+  if (i18n === null || i18n.routing !== "prefix-always") {
+    return [];
+  }
+  const offenders: string[] = [];
+  for (const route of routes) {
+    if (route.urlPattern === "/") {
+      continue;
+    }
+    const first = route.urlPattern.split("/").find(Boolean);
+    const canonical = canonicalizeLocale(first);
+    if (canonical === null || !i18n.locales.includes(canonical)) {
+      offenders.push(route.urlPattern);
+    }
+  }
+  return offenders;
+}
+
+/**
  * A route prefix that looks like one of the declared locales but is not one of them.
  *
  * The precise mistake this catches: `i18n.locales` says `fr-CA` and the pages live in `pages/fr/`.

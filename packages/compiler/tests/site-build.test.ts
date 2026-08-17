@@ -2874,3 +2874,63 @@ describe("redirect conflict warnings", () => {
     expect(warnings.some((w) => w.includes('"/gone"'))).toBe(false);
   });
 });
+
+// ── Unregistered link relation warning ───────────────────────────────────────
+
+describe("link relation warnings", () => {
+  const LR_TMP = resolve(import.meta.dir, "__test-link-relations__");
+
+  afterAll(() => {
+    rmSync(LR_TMP, { force: true, recursive: true });
+  });
+
+  async function buildWithHead(head: unknown[]): Promise<string[]> {
+    rmSync(LR_TMP, { force: true, recursive: true });
+    mkdirSync(resolve(LR_TMP, "pages"), { recursive: true });
+    writeFileSync(
+      resolve(LR_TMP, "project.json"),
+      JSON.stringify({ $head: head, build: { outDir: "./dist" }, name: "LR" }),
+      "utf8",
+    );
+    for (const name of ["index", "about"]) {
+      writeFileSync(
+        resolve(LR_TMP, `pages/${name}.json`),
+        JSON.stringify({ children: [{ children: [name], tagName: "h1" }], title: name }),
+        "utf8",
+      );
+    }
+    const warnings: string[] = [];
+    const origWarn = console.warn;
+    console.warn = (msg: string) => warnings.push(String(msg));
+    try {
+      await buildSite(LR_TMP, { verbose: false });
+    } finally {
+      console.warn = origWarn;
+    }
+    return warnings;
+  }
+
+  /*
+   * The site `$head` is on every page, so the mistake that matters is also the one that would be
+   * loudest — hence "once", asserted with two pages in the build.
+   */
+  it("warns once for an unregistered relation in the site head", async () => {
+    const warnings = await buildWithHead([
+      { attributes: { href: "/theme.css", rel: "stylshet" }, tagName: "link" },
+    ]);
+    const matched = warnings.filter((w) => w.includes('"stylshet" is not an IANA link relation'));
+    expect(matched).toHaveLength(1);
+  });
+
+  it("says nothing about a head that is entirely registered relations", async () => {
+    const warnings = await buildWithHead([
+      { attributes: { href: "/theme.css", rel: "stylesheet" }, tagName: "link" },
+      { attributes: { href: "/favicon.ico", rel: "shortcut icon" }, tagName: "link" },
+      {
+        attributes: { href: "https://example.com/rel/x", rel: "https://example.com/rel/x" },
+        tagName: "link",
+      },
+    ]);
+    expect(warnings.some((w) => w.includes("is not an IANA link relation"))).toBe(false);
+  });
+});

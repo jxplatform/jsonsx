@@ -9,7 +9,7 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { buildProjectExtensionRegistry } from "../src/site/format-host";
 import { loadProjectSections } from "../src/site/project-sections";
@@ -325,6 +325,40 @@ describe("$paths expansion", () => {
 
     const langRoutes = expanded.filter((r) => ["/en", "/fr", "/de"].includes(r.urlPattern));
     expect(langRoutes.length).toBe(3);
+  });
+
+  /*
+   * `_meta` is the reserved carrier for facts about the source ENTRY, and it must never survive as
+   * a route parameter: it is not one, and letting it through would put it in `$page.params` and in
+   * any `:_meta` substitution a URL happened to contain.
+   */
+  it("lifts the entry timestamp onto the route and keeps it out of the parameters", async () => {
+    const stamp = new Date("2024-03-04T05:06:07.000Z");
+    utimesSync(resolve(TMP, "content/blog/hello-world.md"), stamp, stamp);
+    const freshSections = await loadProjectSections(TMP, getProjectConfig(), registry);
+    const pagesDir = resolve(TMP, "pages");
+    const routes = await discoverPages(pagesDir, registry.formats);
+    const expanded = await expandDynamicRoutes(
+      routes,
+      TMP,
+      freshSections,
+      registry,
+      getProjectConfig(),
+    );
+
+    const hello = expanded.find((r) => r.urlPattern === "/blog/hello-world")!;
+    expect(hello.sourceMtime).toBe("2024-03-04T05:06:07Z");
+    expect(hello._pathParams).toEqual({ slug: "hello-world" });
+  });
+
+  // A route with no entry of its own correctly falls back to its own file's modification time.
+  it("leaves sourceMtime unset for the $paths shapes that describe only parameters", async () => {
+    const pagesDir = resolve(TMP, "pages");
+    const routes = await discoverPages(pagesDir, registry.formats);
+    const expanded = await expandDynamicRoutes(routes, TMP, sections, registry, getProjectConfig());
+
+    const lang = expanded.find((r) => r.urlPattern === "/fr")!;
+    expect(lang.sourceMtime).toBeUndefined();
   });
 
   it("preserves _pathParams on expanded routes", async () => {

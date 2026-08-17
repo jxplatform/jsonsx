@@ -9,6 +9,8 @@
 import { html } from "lit-html";
 import { getPlatform } from "../platform";
 import { getBaseUrl, getModel, getOpenAiKey } from "../services/ai-settings";
+import { IMPORT_WARNING_PHASE } from "../services/import-client";
+import { notify } from "../services/notify";
 import { errorMessage } from "@jxsuite/schema/parse";
 import { destinationPath } from "./location-fields";
 import type { TemplateResult } from "lit-html";
@@ -161,6 +163,11 @@ export async function startImport(ctx: ImportTabCtx) {
       },
       (evt) => {
         _log = [..._log, evt];
+        // The log is destroyed the moment a successful import hands off, so the one line the client
+        // Emits about lines it could not read is re-posted where it will outlive that.
+        if (evt.phase === IMPORT_WARNING_PHASE) {
+          notify.warn(evt.message);
+        }
         ctx.rerender();
         requestAnimationFrame(() => {
           const el = document.querySelector(".new-project-import-log");

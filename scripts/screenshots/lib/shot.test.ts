@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { bootUrl, DOCK_COMMAND, matchState, OPEN_COMMANDS } from "./shot";
 import { resolveShot, validateManifest } from "./types";
 import type { ShotContext } from "./shot";
@@ -115,5 +117,23 @@ describe("matchState", () => {
 
   test("expecting an object where the state holds a scalar says so", () => {
     expect(matchState({ git: { ahead: 0 } }, { git: 3 })).toEqual(["git is 3, expected an object"]);
+  });
+});
+
+// ─── Where the pointer parks ─────────────────────────────────────────────────
+
+describe("resetPointerAndFocus", () => {
+  test("parks the cursor INSIDE the viewport", () => {
+    /*
+     * It used to move to `(-1, -1)` — off-canvas, so nothing matched `:hover`. CDP accepted that;
+     * **WebDriver BiDi refuses it**: `input.performActions` rejects a move beyond the viewport with
+     * "move target out of bounds", and every shot failed the moment the pipeline spoke the
+     * standard's protocol. The bottom-right corner has the same property — no panel's interactive
+     * content occupies it — in coordinates the standard allows.
+     */
+    const source = readFileSync(join(import.meta.dir, "shot.ts"), "utf8");
+    expect(source).not.toContain("mouse.move(-1, -1)");
+    expect(source).toContain("viewport.width - 1");
+    expect(source).toContain("viewport.height - 1");
   });
 });

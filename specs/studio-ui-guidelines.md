@@ -1,8 +1,8 @@
 # Jx Studio UI/UX Interface Guidelines
 
-**Version:** 0.3.9
+**Version:** 0.3.12
 **Status:** Implemented
-**Updated:** 2026-08-15
+**Updated:** 2026-08-16
 **Applies to:** `packages/studio/`
 
 ---
@@ -15,15 +15,17 @@ Jx Studio builds on **Adobe Spectrum Web Components** (`@spectrum-web-components
 
 Use CSS custom properties from `:root` — never hardcode color values.
 
+> The **Fallback** column is checked against `styles/tokens.css` by `packages/studio/scripts/check-styles.ts`, and the check is why the values below are right. Seven of them had been wrong for months — this table named `#1e1e1e` for `--bg` where the app had shipped `#111111` since the brand ramp landed — so anyone designing against the documented palette was designing against one that no longer existed. A correction without a gate only resets the clock.
+
 | Token         | Purpose                           | Fallback                 |
 | ------------- | --------------------------------- | ------------------------ |
-| `--bg`        | App background                    | `#1e1e1e`                |
-| `--bg-panel`  | Panel background                  | `#252526`                |
-| `--bg-input`  | Input field background            | `#3c3c3c`                |
-| `--border`    | Borders and separators            | `#3c3c3c`                |
-| `--fg`        | Primary text                      | `#cccccc`                |
-| `--fg-dim`    | Secondary text (labels, hints)    | `#808080`                |
-| `--accent`    | Interactive elements, focus rings | `#007acc`                |
+| `--bg`        | App background                    | `#111111`                |
+| `--bg-panel`  | Panel background                  | `#1a1a1a`                |
+| `--bg-input`  | Input field background            | `#1a1a1a`                |
+| `--border`    | Borders and separators            | `#222222`                |
+| `--fg`        | Primary text                      | `#e4e4e7`                |
+| `--fg-dim`    | Secondary text (labels, hints)    | `#a1a1aa`                |
+| `--accent`    | Interactive elements, focus rings | `#3b82f6`                |
 | `--accent-fg` | Text on accent backgrounds        | `#ffffff`                |
 | `--danger`    | Destructive actions, errors       | `#f44747`                |
 | `--success`   | Positive states                   | `#89d185`                |
@@ -39,7 +41,7 @@ Use CSS custom properties from `:root` — never hardcode color values.
 
 | Token        | Purpose                               |
 | ------------ | ------------------------------------- |
-| `--tag`      | Element tag names (`#569cd6`)         |
+| `--tag`      | Element tag names (`#93c5fd`)         |
 | `--signal`   | State signals (`#dcdcaa`)             |
 | `--handler`  | Functions/handlers (`#c586c0`)        |
 | `--map`      | Repeaters (`#5b4fc7`)                 |
@@ -424,6 +426,25 @@ Uses `@atlaskit/pragmatic-drag-and-drop` for layer reordering and canvas element
 - Drop line: 2px tall accent bar between elements
 - On the CANVAS, a drag may be initiated only from the block action bar's drag handle. Pressing and
   dragging within text selects text — the canvas is a writing surface first
+
+#### Moving without dragging (WCAG 2.2 SC 2.5.7)
+
+> **Status: Implemented.**
+
+**Every move a drag performs is also reachable without one.** SC 2.5.7 asks that any function
+operated by a dragging movement have a single-pointer alternative, and the alternative here is the
+pair the editor already had: **cut** the node, select the destination, **paste**. Both are commands,
+so both have a chord, a context-menu item and a palette entry; both run through the same document
+mutation the drag does, and both report through `notify`, so a screen-reader user is told the move
+happened.
+
+Deliberately **not** an APG keyboard-drag mode. Building a grab/move/drop state machine would add a
+mode with its own keys, its own escape semantics and its own announcements — a second way to do
+something the editor can already do, and one more thing to keep correct. The cheaper answer is to
+say plainly that cut and paste ARE the alternative, and to make sure they announce.
+
+The block action bar's **Move up** / **Move down** cover the common same-parent case in one
+keystroke, without a clipboard round trip.
 
 #### External (OS) file drags
 
@@ -868,6 +889,30 @@ The question is never "how bad is this?" — it is **what does the reader have t
 Severity picks the default tier and the call site overrides it. Severity is not the tier: a warning
 that must be fixed is a Problem, and an error the user cannot act on is a toast with a `detail`.
 
+### 13.1a Every record is announced
+
+> **Status: Implemented.**
+
+**One live region, called from `notify()` itself.** WCAG 2.2 SC 4.1.3 asks that a status message be
+programmatically determinable without receiving focus, and this app had one region — on the _toast_
+host. Since `error` defaults to the **Problem** tier, that meant **a failure reached no live region
+at all**: the app posted "Save failed", rendered it in a panel, and a screen-reader user was told
+nothing.
+
+A region inside the Problems panel would not have fixed it either. The panel lives in the Bottom
+dock, and a region inside a hidden tab announces nothing — so the announcer belongs to no surface.
+It is called where the record is created, which makes "posted" and "announced" the same event and
+gives any future host the behaviour without having to remember.
+
+Two regions, because politeness is not a style choice: an error is `assertive` and interrupts,
+everything else is `polite` and waits. The attribute is read when a region is created rather than
+when its text changes, so one region cannot serve both. The text is cleared and re-set on a later
+turn, because a live region announces a _change_ — without that, a second identical failure would be
+silent, which is the failure a reader would be least able to explain.
+
+The message carries its `source` when it has one: a listener has none of the visual grouping the
+panel's own column gives everyone else.
+
 ### 13.2 Rendering rules
 
 - **Four toasts at most, newest at the bottom.** Beyond that the oldest retires early — a stack that
@@ -898,19 +943,50 @@ that must be fixed is a Problem, and an error the user cannot act on is a toast 
 
 ---
 
+## 15. Documentation Screenshots
+
+> **Status: Implemented.**
+
+Every picture in `/docs` is captured by `scripts/screenshots/`, never taken by hand. The contract
+governing what a shot may say lives in `scripts/screenshots/README.md`; this section records the one
+thing that is a **standards** decision rather than a policy one.
+
+**The pipeline drives the browser over [WebDriver BiDi](https://www.w3.org/TR/webdriver-bidi/), not
+CDP.** CDP is Chrome's own protocol and no standard describes it. Everything the pipeline asks of a
+browser — viewport, media features, init scripts, navigation, evaluation, frame enumeration,
+screenshots — is in BiDi, and the captured bytes are identical under both: the same shot captured
+over each protocol, with everything else held equal, hashes the same. That equality was the
+acceptance criterion, and it is what makes the switch a change of protocol rather than a change of
+pictures.
+
+**One thing did have to change, and it is the kind of difference worth writing down.** The pipeline
+parked the pointer at `(-1, -1)` between shots so that nothing matched `:hover`. CDP accepted
+off-canvas coordinates; **BiDi does not** — `input.performActions` refuses a move beyond the
+viewport, and every shot failed the moment the pipeline spoke the standard's protocol. The pointer
+now parks at the viewport's bottom-right corner, which has the property the negative coordinates
+were chosen for and is a position the standard allows. A vendor protocol's tolerance is not a
+contract; this is what depending on one looks like when you stop.
+
+`JX_SHOTS_PROTOCOL=cdp` falls back, so a BiDi regression in a Chromium release costs one environment
+variable rather than a revert.
+
 ## 14. Standards Alignment
 
 External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md). Spectrum Web Components is a component library rather than a standard; §6 records which of its components are in use.
 
-| Standard                                                                          | Class       | Binds       | Evidence                                                                                                                   | Note                                                                                                                                                                                                                                                                                                 |
-| --------------------------------------------------------------------------------- | ----------- | ----------- | -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [WAI-ARIA](https://www.w3.org/TR/wai-aria-1.2/)                                   | **Subset**  | §6, §8, §12 | packages/studio/src/files/files.ts, packages/studio/src/panels/layers-panel.ts, packages/studio/src/editor/context-menu.ts | `gap:apg-coverage` The tree, menu, toolbar and radiogroup patterns are implemented with their full state and keyboard contracts. The tab strips carry no tab semantics at all, the command palette has combobox roles but no `aria-activedescendant`, and the data grid is whatever Tabulator emits. |
-| [Accessible Name and Description Computation](https://www.w3.org/TR/accname-1.2/) | **Adopted** | §10         | packages/studio/src/panels/problems-panel.ts                                                                               | §10's rule that a control carries exactly one accessible name — `title` and `aria-label` with the same string announce it twice — is this algorithm's precedence order restated.                                                                                                                     |
-| [WCAG 2.2](https://www.w3.org/TR/WCAG22/)                                         | **Pending** | §8          | —                                                                                                                          | `gap:wcag-conformance` No conformance level is claimed or tested. SC 2.5.7 (Dragging Movements) is the concrete failure: §8's drag surface offers no single-pointer alternative, and SC 2.1.1 is failed with it.                                                                                     |
-| [ATAG 2.0](https://www.w3.org/TR/ATAG20/)                                         | **Pending** | §8          | —                                                                                                                          | `gap:atag-authoring-support` Studio is an authoring tool, so Part B applies: nothing checks the accessibility of the content an author produces, and nothing helps repair it. The `Search appearance` modal is the shape such a surface would take.                                                  |
+| Standard                                                                          | Class       | Binds            | Evidence                                                                                                                                                                                                 | Note                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| --------------------------------------------------------------------------------- | ----------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [WAI-ARIA](https://www.w3.org/TR/wai-aria-1.2/)                                   | **Subset**  | §6, §8, §12      | packages/studio/src/files/files.ts, packages/studio/src/panels/layers-panel.ts, packages/studio/src/editor/context-menu.ts, packages/studio/src/panels/quick-search.ts, packages/studio/src/ui/layers.ts | `gap:apg-coverage` The tree, menu, toolbar and radiogroup patterns are implemented with their full state and keyboard contracts, and two more now are: the **combobox** (Quick Access carries `aria-controls`, `aria-activedescendant` and an `aria-expanded` that is false when nothing matched — it was the literal string `true`) and the **dialog** (`role`, `aria-modal` and a name off the wrapper's headline). The tab strips still carry no tab semantics, and the Tabulator data grid is virtualized — hand-authoring `role="grid"` over rows that do not exist in the DOM would make it worse, not better.                                            |
+| [Accessible Name and Description Computation](https://www.w3.org/TR/accname-1.2/) | **Adopted** | §10              | packages/studio/src/panels/problems-panel.ts                                                                                                                                                             | §10's rule that a control carries exactly one accessible name — `title` and `aria-label` with the same string announce it twice — is this algorithm's precedence order restated.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| [WCAG 2.2](https://www.w3.org/TR/WCAG22/)                                         | **Subset**  | §1.1, §8.2, §8.7 | packages/studio/src/services/announce.ts, packages/studio/styles/forced-colors.css, packages/studio/scripts/check-styles.ts, packages/studio/tests/announce.test.ts                                      | `gap:wcag-conformance` No level is claimed, and conformance is not tested end to end — that needs a browser. Four criteria are met deliberately and checked: **SC 4.1.3** (Status Messages) — one live region, called from `notify()` itself, so a failure that lands in the Problems panel is still announced; **SC 2.5.7** (Dragging Movements) — cut/paste is the stated alternative to every drag; **SC 1.4.3/1.4.11** (Contrast) — a required-pairs table gated in `check-styles.ts`, with one entry on the debt list; **SC 1.4.1** — a `forced-colors` block redraws the selection and focus affordances Windows High Contrast deletes with `box-shadow`. |
+| [ATAG 2.0](https://www.w3.org/TR/ATAG20/)                                         | **Subset**  | §8, §13.1a       | packages/studio/src/services/announce.ts, packages/studio/src/services/a11y-report.ts                                                                                                                    | Part A — the tool's own accessibility — is answered by §13.1a's live region and §8.2's keyboard alternative to every drag. Part B is `studio.md` §16.6: a check over the author's document, filing a Problem per finding with its WCAG criterion. Neither part claims a conformance level, which needs a browser.                                                                                                                                                                                                                                                                                                                                               |
+| [WebDriver BiDi](https://www.w3.org/TR/webdriver-bidi/)                           | **Adopted** | §15              | scripts/screenshots/lib/browser.ts, scripts/screenshots/lib/browser.test.ts, scripts/screenshots/lib/shot.ts                                                                                             | The documentation screenshot pipeline drives Chromium over the W3C protocol rather than CDP. Verified by capturing the same shot over each with everything else held equal and hashing the results: byte-identical. The one behavioural difference — BiDi refuses a pointer move outside the viewport, where CDP allowed `(-1, -1)` — is fixed in the pipeline rather than worked around, and §15 records it.                                                                                                                                                                                                                                                   |
 
 ## Changelog
 
+- **0.3.12** (2026-08-16) — §15 the documentation screenshot pipeline drives Chromium over WebDriver BiDi rather than CDP — byte-identical captures, and the one behavioural difference (a pointer move outside the viewport) fixed rather than worked around.
+- **0.3.11** (2026-08-16) — §14 ATAG is Subset: Part A is §13.1a and §8.2, Part B is studio.md §16.6.
+- **0.3.10** (2026-08-16) — §1.1 the token table's fallbacks are corrected and gated against tokens.css; §8.2 cut/paste is the stated alternative to every drag (SC 2.5.7); §13.1a one live region, called from notify() itself, so a failure that lands in the Problems panel is announced.
 - **0.3.9** (2026-08-15) — Add §14 Standards Alignment; §8 marked Partial — drag and drop has no non-dragging alternative (WCAG 2.2 SC 2.5.7).
 - **0.3.8** (2026-08-13) — A row wraps and never overflows (§4.6); the floating bar's visibility rule.
 - **0.3.7** (2026-08-12) — blockbar/format joins the level × placement matrix, with its own chrome budget.

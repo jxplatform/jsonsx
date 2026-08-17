@@ -19,7 +19,7 @@
  * printing a token into a list is how a screenshot leaks one.
  */
 
-import { clearGithubToken, getGithubToken } from "../github/github-auth";
+import { clearGithubToken, githubTokenLocation, githubTokenStored } from "../github/github-auth";
 import { getCfAccountId, getCfToken, setCfAccountId, setCfToken } from "../services/cf-settings";
 import {
   getBaseUrl,
@@ -50,7 +50,7 @@ export interface AccountRecord {
  * list that hides what is absent cannot answer the question the section exists to answer.
  */
 export function listAccounts(): AccountRecord[] {
-  const githubToken = getGithubToken();
+  const githubToken = githubTokenStored();
   const cfToken = getCfToken();
   const cfAccount = getCfAccountId();
   const model = getModel();
@@ -60,7 +60,9 @@ export function listAccounts(): AccountRecord[] {
       id: "github",
       label: "GitHub",
       detail: githubToken
-        ? "Signed in — a device-flow token is stored on this machine."
+        ? githubTokenLocation() === "desktop"
+          ? "Signed in — the token is in this app's config folder, readable only by you."
+          : "Signed in — a device-flow token is stored in this browser."
         : "Not signed in. Cloning and pushing will ask when they need it.",
       connected: Boolean(githubToken),
       revoke: clearGithubToken,

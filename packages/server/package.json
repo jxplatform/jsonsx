@@ -20,6 +20,7 @@
     "./import-api": "./src/import-api.ts",
     "./packages": "./src/packages.ts",
     "./project-server": "./src/project-server.ts",
+    "./oauth-loopback": "./src/oauth-loopback.ts",
     "./site-preview": "./src/site-preview.ts",
     "./refactor": "./src/refactor/index.ts",
     "./resolve": "./src/resolve.ts",
@@ -31,9 +32,10 @@
     "provenance": true
   },
   "scripts": {
-    "upgrade": "bunx npm-check-updates -u && bun install",
-    "test": "bun test --isolate",
-    "test:coverage": "bun test --isolate --coverage"
+    "lint:errors": "bun run scripts/check-error-shapes.ts",
+    "test": "bun run lint:errors && bun test --isolate",
+    "test:coverage": "bun run lint:errors && bun test --isolate --coverage",
+    "upgrade": "bunx npm-check-updates -u && bun install"
   },
   "dependencies": {
     "@jxsuite/collab": "workspace:^",

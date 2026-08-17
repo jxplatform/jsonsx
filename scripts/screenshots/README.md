@@ -19,6 +19,18 @@ Two rules govern everything below, and both are review-enforceable:
 
 ## Usage
 
+**The browser is driven over [WebDriver BiDi](https://www.w3.org/TR/webdriver-bidi/), not CDP.** CDP
+is Chrome's own protocol and no standard describes it; everything this pipeline asks of a browser is
+in BiDi, and the captured bytes are identical under both — the same shot captured over each, with
+everything else held equal, hashes the same. Set `JX_SHOTS_PROTOCOL=cdp` to fall back if a Chromium
+release regresses BiDi.
+
+One consequence worth knowing before you write a step: **BiDi refuses a pointer move outside the
+viewport.** CDP tolerated `(-1, -1)`, which is how the pipeline used to park the cursor where
+nothing could match `:hover`; it now parks at the viewport's bottom-right corner. A step that
+computes a coordinate must keep it inside the viewport, or `input.performActions` fails the shot
+with "move target out of bounds".
+
 ```bash
 bun run screenshots                 # all shots; visually-identical images keep their bytes
 bun run screenshots --only hero     # one shot (comma-separate for several)
@@ -275,6 +287,24 @@ branch, and comments with a before/after table and the docs pages each changed i
 Status is `neutral` on a visual change — always — and red only on a shot _error_: a failed `expect`,
 an unknown command id, an unresolvable region, an `idle()` timeout. Those are regressions. A picture
 merely changing is an aesthetic judgement CI cannot make.
+
+**The lane declines its own commits, and that is load-bearing.** Its push moves the PR head, which
+raises `pull_request: synchronize`, which queues the lane again on the commit it just wrote. Nothing
+in the trigger can prevent that — `paths:` matches the PR's whole diff against its base, and one
+landed re-capture puts `docs/images/**` in that diff permanently — so the refusal is a job-level
+`if:` on `github.actor`. Two facts made it necessary, and both were measured rather than assumed:
+
+- A `GITHUB_TOKEN` push **does** queue this workflow here. Sixteen of the thirty runs on the branch
+  that found this were headed by the lane's own `chore(screenshots)` commit.
+- The `action_required` state those runs sit in is a repository Actions policy, not a termination
+  condition. Approve one and the lane re-captures its own output and pushes again; the button is
+  the crank handle, not the brake.
+
+**CI never passes `--force`.** That flag is for a deliberate re-baseline (§13.4) and it works by
+skipping `writeIfChanged` — the pixel comparison that keeps committed screenshots from churning.
+In the lane it rewrote all 63 PNGs every run, and since Chromium does not re-encode a PNG
+byte-for-byte, ~28 files whose own report read `0.00% of pixels` were pushed as changes. Under
+`DIFF_THRESHOLD` those files are now kept, and `git diff` means what the lane needs it to mean.
 
 ## Authoring notes
 

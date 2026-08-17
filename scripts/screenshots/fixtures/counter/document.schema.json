@@ -1015,9 +1015,6 @@
             "domain": {
               "type": "string"
             },
-            "expires": {
-              "type": "string"
-            },
             "filter": {
               "anyOf": [
                 {
@@ -1616,7 +1613,7 @@
               "title": "Pure method — genuine prototype methods; receiver in target, args in value"
             },
             {
-              "description": "Invoke a callable, pure in formula position: target is the callee pointer — a named formula entry (#/state/…) or a blessed pure global via window#/ (Math.*, JSON.*, Object.keys/values/entries, and the Intl helpers Intl/formatNumber, Intl/formatDate, Intl/formatRelativeTime) — and value is the positional argument list (the splice args-in-value precedent). Argument order follows the callee's declared parameters.",
+              "description": "Invoke a callable, pure in formula position: target is the callee pointer — a named formula entry (#/state/…) or a blessed pure global via window#/ (Math.*, JSON.*, Object.keys/values/entries, and the Intl helpers Intl/formatNumber, Intl/formatDate, Intl/formatRelativeTime, Intl/formatList, Intl/plural, Intl/compare, Intl/displayName, Intl/segment) — and value is the positional argument list (the splice args-in-value precedent). Argument order follows the callee's declared parameters.",
               "not": {
                 "required": [
                   "initial"
@@ -23342,6 +23339,22 @@
           ],
           "oneOf": [
             {
+              "type": "string"
+            },
+            {
+              "const": false,
+              "type": "boolean"
+            }
+          ]
+        },
+        "$shadow": {
+          "description": "Render this component into a shadow root instead of the light DOM (spec.md §16.6). Off unless set: a shadow root isolates the component's styles from the page and replaces the <slot> emulation with real slot distribution, so it changes how the component composes. Overrides `defaults.shadow` in both directions — `false` opts one component out of a project that opted in.",
+          "oneOf": [
+            {
+              "enum": [
+                "open",
+                "closed"
+              ],
               "type": "string"
             },
             {

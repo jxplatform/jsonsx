@@ -44,6 +44,7 @@ import type { FormatEntry, FormatRegistry } from "@jxsuite/schema/format-registr
 import type { ExtensionRegistry } from "@jxsuite/schema/extension-registry";
 import { resolveLayout } from "./layout-resolver.ts";
 import { mergeHead, renderHead } from "./head-merger.ts";
+import { unregisteredHeadRelations } from "./link-relations.ts";
 import { injectContext } from "./context-injection.ts";
 import { compile, compileServer, compileSiteServer } from "../compiler.ts";
 import { compileElement } from "../targets/compile-element.ts";
@@ -85,6 +86,7 @@ import {
   pageLanguage,
   resolveI18n,
   undeclaredLocalePrefix,
+  unprefixedRoutes,
 } from "./i18n.ts";
 import type { LocaleAlternate, ResolvedI18n } from "./i18n.ts";
 import { renderImportMap, resolveClientRuntime, writeClientRuntime } from "./client-runtime.ts";
@@ -327,6 +329,7 @@ export async function buildSite(
     sections,
     registry,
     projectConfig,
+    i18n,
   );
   log(`  ${routes.length} route(s) after expansion`);
 
@@ -475,7 +478,30 @@ export async function buildSite(
     siteUrl ?? "",
   );
 
+  /*
+   * `prefix-always` says every URL names its language, and until now nothing checked it: a page
+   * outside the locale tree built, served, and claimed the default locale, so a site that promised
+   * no unprefixed URLs shipped them silently. Reported once with the whole list, not once per
+   * page — an author who moved a directory wants to see the extent of it.
+   */
+  const unprefixed = unprefixedRoutes(routes, i18n);
+  if (unprefixed.length > 0) {
+    console.warn(
+      `i18n.routing is "prefix-always", but ${unprefixed.length} route(s) sit outside the locale ` +
+        `tree and are served as "${i18n?.defaultLocale}": ${unprefixed.slice(0, 10).join(", ")}` +
+        `${unprefixed.length > 10 ? `, and ${unprefixed.length - 10} more` : ""}. ` +
+        `Move them under a locale directory, or use "prefix-except-default".`,
+    );
+  }
+
   const warnedLocalePrefixes = new Set<string>();
+  /*
+   * A mistyped `rel` is silent: the tag is still valid HTML, still renders, and simply does
+   * nothing — the stylesheet never loads, the canonical never consolidates. Warned once per
+   * distinct value across the whole build, because the one that matters lives in the layout and is
+   * therefore on every page.
+   */
+  const warnedRelations = new Set<string>();
   for (const route of routes) {
     const mismatch = undeclaredLocalePrefix(route.urlPattern, i18n);
     if (mismatch && !warnedLocalePrefixes.has(mismatch.segment)) {
@@ -506,6 +532,17 @@ export async function buildSite(
         alternateMap.get(route.urlPattern) ?? [],
         runtimeImports,
       );
+
+      for (const relation of result.unregisteredRelations) {
+        if (!warnedRelations.has(relation)) {
+          warnedRelations.add(relation);
+          console.warn(
+            `<link rel="${relation}"> — "${relation}" is not an IANA link relation, and a ` +
+              `relation nobody recognizes does nothing. Check the spelling, or use an absolute ` +
+              `URI if it is an extension relation (RFC 8288 §2.1.2).`,
+          );
+        }
+      }
 
       // Determine which component tags are fully static (for script omission)
       const staticTags = new Set<string>();
@@ -546,7 +583,17 @@ export async function buildSite(
       if (sitemapEnabled && !result.excludeFromSitemap && isConcrete) {
         const routeAlternates = alternateMap.get(route.urlPattern) ?? [];
         sitemapEntries.push({
-          lastmod: toRfc3339(statSync(route.sourcePath).mtime),
+          /*
+           * The route's own timestamp when it has one, and only then the template's. A concrete
+           * route expanded from a collection carries the entry it was generated from
+           * (`sourceMtime`), because `sourcePath` still points at the `[slug]` template — so
+           * without this every post in an archive claims to have been edited the moment the
+           * template was, which is precisely the signal `<lastmod>` exists to give.
+           */
+          lastmod:
+            typeof route.sourceMtime === "string" && route.sourceMtime !== ""
+              ? route.sourceMtime
+              : toRfc3339(statSync(route.sourcePath).mtime),
           loc: new URL(route.urlPattern, siteUrl).href,
           ...(routeAlternates.length > 0 && { alternates: routeAlternates }),
         });
@@ -647,7 +694,7 @@ export async function buildSite(
     const skipWorker = adapter === "cloudflare-pages" && deduped.size === 0 && mounts.length === 0;
     const workerSource = skipWorker
       ? null
-      : compileSiteServer([...deduped.values()], { adapter, connectors, mounts });
+      : compileSiteServer([...deduped.values()], { adapter, connectors, i18n, mounts });
 
     if (workerSource) {
       // Bundle the worker self-contained for the adapter's runtime (compiler.md §12): mount
@@ -672,7 +719,17 @@ export async function buildSite(
         // Only invoke the worker for server routes; everything else stays static.
         writeFileSync(
           resolve(outDir, "_routes.json"),
-          `${JSON.stringify({ exclude: [], include: ["/_jx/*"], version: 1 }, null, 2)}\n`,
+          // `/` joins the include list only when there is a locale to negotiate: Pages invokes
+          // The worker for included paths only, so an uninvoked middleware is an inert one.
+          `${JSON.stringify(
+            {
+              exclude: [],
+              include: i18n && i18n.locales.length > 1 ? ["/", "/_jx/*"] : ["/_jx/*"],
+              version: 1,
+            },
+            null,
+            2,
+          )}\n`,
           "utf8",
         );
         fileCount += 1;
@@ -1199,6 +1256,12 @@ async function compilePage(
     excludeFromSitemap: pageDoc.$sitemap === false,
     files: result.files,
     html: result.html,
+    /*
+     * Reported rather than warned about here: a mistyped `rel` almost always lives in the site or
+     * layout `$head`, which means it is on every page, and the caller is the only scope that can
+     * say it once instead of four hundred times.
+     */
+    unregisteredRelations: unregisteredHeadRelations(mergedHead),
     serverHandler,
   };
 }

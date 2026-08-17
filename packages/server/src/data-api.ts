@@ -45,6 +45,7 @@ import type {
   SecretsSetRequest,
   SecretsSetResponse,
 } from "@jxsuite/protocol";
+import { problem, problemTypeForStatus } from "./problem.ts";
 
 // ─── Local section shapes (structural — the connector owns the full types) ───
 
@@ -868,7 +869,13 @@ export async function handleDataApi(
       }
     }
   } catch (error) {
+    /*
+     * The one place a status is computed rather than named, so the TYPE is derived from it here
+     * instead of at each throw. `ApiError` predates the registry and carries only a status; mapping
+     * it once keeps the alternative — a `ProblemTypeName` threaded through every throw site — out
+     * of a file whose failures are all shapes of "the request was wrong".
+     */
     const status = error instanceof ApiError ? error.status : 500;
-    return Response.json({ error: errorMessage(error) }, { status });
+    return problem(problemTypeForStatus(status), errorMessage(error));
   }
 }

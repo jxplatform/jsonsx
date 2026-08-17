@@ -1,5 +1,5 @@
 {
-  "$comment": "The standards LEXICON: what each identifier IS (issuing body, title, canonical URL). It is not the registry \u2014 the specs' `## N. Standards Alignment` tables say what Jx DOES about each standard, and scripts/docs/check-standards.ts joins the two. An id no spec cites fails (catalog-stale); an id no entry vouches for fails (id-unknown). That is the only offline way a typo'd RFC number can fail, since a wrong-but-well-formed rfc-editor.org URL is indistinguishable from a right one. Keep entries sorted by id (codepoint order).",
+  "$comment": "The standards LEXICON: what each identifier IS (issuing body, title, canonical URL). It is not the registry — the specs' `## N. Standards Alignment` tables say what Jx DOES about each standard, and scripts/docs/check-standards.ts joins the two. An id no spec cites fails (catalog-stale); an id no entry vouches for fails (id-unknown). That is the only offline way a typo'd RFC number can fail, since a wrong-but-well-formed rfc-editor.org URL is indistinguishable from a right one. Keep entries sorted by id (codepoint order).",
   "standards": [
     {
       "id": "ATAG 2.0",
@@ -91,6 +91,12 @@
       "org": "Ecma",
       "title": "The JSON Data Interchange Syntax",
       "url": "https://ecma-international.org/publications-and-standards/standards/ecma-404/"
+    },
+    {
+      "id": "ECMA-426",
+      "org": "Ecma",
+      "title": "Source Map Format Specification",
+      "url": "https://ecma-international.org/publications-and-standards/standards/ecma-426/"
     },
     {
       "id": "Fetch Metadata Request Headers",
@@ -231,6 +237,12 @@
       "url": "https://www.rfc-editor.org/rfc/rfc7493"
     },
     {
+      "id": "RFC 7519",
+      "org": "IETF",
+      "title": "JSON Web Token (JWT)",
+      "url": "https://www.rfc-editor.org/rfc/rfc7519"
+    },
+    {
       "id": "RFC 7636",
       "org": "IETF",
       "title": "Proof Key for Code Exchange by OAuth Public Clients",
@@ -367,6 +379,12 @@
       "org": "Unicode",
       "title": "Unicode Text Segmentation",
       "url": "https://www.unicode.org/reports/tr29/"
+    },
+    {
+      "id": "UAX #31",
+      "org": "Unicode",
+      "title": "Unicode Identifiers and Syntax",
+      "url": "https://www.unicode.org/reports/tr31/"
     },
     {
       "id": "UAX #9",

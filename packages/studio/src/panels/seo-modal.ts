@@ -41,8 +41,10 @@ import {
   findLinkEntry,
   renderMetaFieldRow,
   seoField,
+  reportSeoProblems,
   seoPreviewFor,
   upsertLink,
+  visibleLength,
 } from "./head-panel";
 import type { SeoField, SeoPreview } from "./head-panel";
 import type { FieldProvenance } from "./provenance";
@@ -170,7 +172,8 @@ function seoFieldList(preview: SeoPreview): TemplateResult {
   return html`
     <ul class="seo-fields">
       ${preview.fields.map((field) => {
-        const over = field.limit !== null && field.value.length > field.limit;
+        const length = visibleLength(field.value);
+        const over = field.limit !== null && length > field.limit;
         return html`
           <li class="seo-field" data-seo-field=${field.key}>
             <span class="seo-field-label">${field.label}</span>
@@ -180,7 +183,7 @@ function seoFieldList(preview: SeoPreview): TemplateResult {
                 ? nothing
                 : html`<span
                     class=${over ? "seo-field-count seo-field-count--over" : "seo-field-count"}
-                    >${field.value.length}/${field.limit}</span
+                    >${length}/${field.limit}</span
                   >`
             }
             ${renderProvenanceChip(field.key, seoProvenance(field))}
@@ -326,6 +329,15 @@ export function openSeoModal(tab: Tab): void {
     _handle = openModal(html``, { label: "Search appearance", onDismiss: closeSeoModal });
   }
   renderSeoModal();
+  /*
+   * File the same warnings as Problems on the way in.
+   *
+   * A window someone has to open is not where a fact should live alone: a page shipped with no
+   * description is worth knowing whether or not you thought to look, and Problems is where this app
+   * keeps the records that outlive the frame you were not watching. Same list, keyed by warning id,
+   * so the two surfaces are naming one thing rather than two.
+   */
+  reportSeoProblems(seoPreviewFor(tab, tab.doc.document), tab.documentPath ?? undefined);
 }
 
 /** Close it, and forget the document it was about. */

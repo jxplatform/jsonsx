@@ -14,36 +14,34 @@ This page is generated from the `> **Status: …**` markers in the specification
 
 | Spec                      | Version      | Status      | Updated    |
 | ------------------------- | ------------ | ----------- | ---------- |
-| `ai.md`                   | 0.1.5-draft  | Partial     | 2026-08-15 |
-| `collab.md`               | 0.2.3-draft  | Partial     | 2026-08-15 |
+| `ai.md`                   | 0.1.6-draft  | Partial     | 2026-08-16 |
+| `collab.md`               | 0.2.4-draft  | Partial     | 2026-08-16 |
 | `compiler.md`             | 0.2.1-draft  | Partial     | 2026-08-15 |
-| `desktop.md`              | 0.3.9-draft  | Pending     | 2026-08-15 |
-| `extensions.md`           | 0.3.7-draft  | Partial     | 2026-08-15 |
+| `desktop.md`              | 0.3.11-draft | Pending     | 2026-08-16 |
+| `extensions.md`           | 0.3.9-draft  | Partial     | 2026-08-16 |
 | `imports.md`              | 0.1.9-draft  | Partial     | 2026-08-15 |
 | `jx-markdown.md`          | 0.1.8-draft  | Partial     | 2026-08-15 |
-| `parser.md`               | 0.2.7-draft  | Partial     | 2026-08-15 |
+| `parser.md`               | 0.2.9-draft  | Partial     | 2026-08-16 |
 | `relationships.md`        | 0.1.4-draft  | Partial     | 2026-08-15 |
-| `schema.md`               | 0.4.6-draft  | Partial     | 2026-08-16 |
-| `server.md`               | 0.2.2        | Implemented | 2026-08-15 |
-| `site-architecture.md`    | 0.5.5-draft  | Partial     | 2026-08-16 |
-| `spec.md`                 | 0.4.31-draft | Partial     | 2026-08-16 |
-| `standards.md`            | 0.1.10-draft | Partial     | 2026-08-16 |
-| `studio-ui-guidelines.md` | 0.3.9        | Implemented | 2026-08-15 |
-| `studio.md`               | 0.9.25-draft | Partial     | 2026-08-15 |
+| `schema.md`               | 0.4.8-draft  | Partial     | 2026-08-16 |
+| `server.md`               | 0.2.7        | Implemented | 2026-08-16 |
+| `site-architecture.md`    | 0.5.9-draft  | Partial     | 2026-08-16 |
+| `spec.md`                 | 0.4.33-draft | Partial     | 2026-08-16 |
+| `standards.md`            | 0.1.14-draft | Partial     | 2026-08-16 |
+| `studio-ui-guidelines.md` | 0.3.12       | Implemented | 2026-08-16 |
+| `studio.md`               | 0.9.27-draft | Partial     | 2026-08-16 |
 
 ## Sections not yet implemented
 
 ### Partial
 
 - `ai.md` §2 — Provider Contract
+- `collab.md` §5 — Version Skew
 - `compiler.md` §3 — Output Tiers
-- `desktop.md` §5 — Backend API Contract
 - `parser.md` §3 — `Markdown` — the markdown format class
-- `schema.md` §3.2 — Project Schema (`project-schema.json`)
-- `server.md` §4 — Studio API (`/__studio/*`)
-- `server.md` §4.2 — Security
 - `site-architecture.md` §9.4 — Studio Media Browser
 - `site-architecture.md` §13 — Internationalization
+- `site-architecture.md` §13.6 — Locale Negotiation
 - `site-architecture.md` §14 — Deployment
 - `spec.md` §5.6 — Private State (`#` prefix)
 - `spec.md` §11.4 — Server Timing — RPC Function Boundary
@@ -58,10 +56,8 @@ This page is generated from the `> **Status: …**` markers in the specification
 
 ### Pending
 
-- `collab.md` §5 — Version Skew
 - `desktop.md` §4.3 — Single File Mode
 - `site-architecture.md` §12.3 — Incremental Builds
-- `site-architecture.md` §13.3 — Content Localization
 
 ### Future
 

@@ -7,6 +7,7 @@
  * @module expression
  */
 
+import { DEFAULT_FORMAT_LOCALE, DEFAULT_TIME_ZONE, INTL_HELPER_PATHS } from "@jxsuite/schema/intl";
 import type { JxExpressionNode, JxExpressionOperand } from "@jxsuite/schema/types";
 import type { JxScope } from "./types.ts";
 
@@ -177,11 +178,9 @@ export const BLESSED_GLOBALS = new Set([
   // String
   "String/fromCharCode",
   "String/fromCodePoint",
-  // Intl (synthetic helpers — see BLESSED_HELPERS; Intl formatters are constructors,
-  // So the plain-function call shape wraps construct-then-format)
-  "Intl/formatNumber",
-  "Intl/formatDate",
-  "Intl/formatRelativeTime",
+  // Intl helpers come from @jxsuite/schema/intl — see BLESSED_HELPERS. One list, so the runtime,
+  // The compiler and the JSON-Schema description cannot drift apart.
+  ...INTL_HELPER_PATHS,
 ]);
 
 /**
@@ -190,21 +189,49 @@ export const BLESSED_GLOBALS = new Set([
  * these; the compiler emits the equivalent inline construct-then-format expression.
  */
 const BLESSED_HELPERS: Record<string, (...a: unknown[]) => unknown> = {
+  "Intl/compare": (a, b, locale, options) =>
+    new Intl.Collator(
+      (locale as string | undefined) ?? DEFAULT_FORMAT_LOCALE,
+      options as Intl.CollatorOptions | undefined,
+    ).compare(a as string, b as string),
+  "Intl/displayName": (code, type, locale, options) =>
+    new Intl.DisplayNames((locale as string | undefined) ?? DEFAULT_FORMAT_LOCALE, {
+      ...(options as Intl.DisplayNamesOptions | undefined),
+      type: (type as Intl.DisplayNamesType | undefined) ?? "language",
+    }).of(code as string),
   "Intl/formatDate": (value, locale, options) =>
-    new Intl.DateTimeFormat(
-      locale as string | undefined,
-      options as Intl.DateTimeFormatOptions | undefined,
-    ).format(new Date(value as string | number | Date)),
+    new Intl.DateTimeFormat((locale as string | undefined) ?? DEFAULT_FORMAT_LOCALE, {
+      timeZone: DEFAULT_TIME_ZONE,
+      ...(options as Intl.DateTimeFormatOptions | undefined),
+    }).format(new Date(value as string | number | Date)),
+  "Intl/formatList": (values, locale, options) =>
+    new Intl.ListFormat(
+      (locale as string | undefined) ?? DEFAULT_FORMAT_LOCALE,
+      options as Intl.ListFormatOptions | undefined,
+    ).format(values as string[]),
   "Intl/formatNumber": (value, locale, options) =>
     new Intl.NumberFormat(
-      locale as string | undefined,
+      (locale as string | undefined) ?? DEFAULT_FORMAT_LOCALE,
       options as Intl.NumberFormatOptions | undefined,
     ).format(value as number),
   "Intl/formatRelativeTime": (value, unit, locale, options) =>
     new Intl.RelativeTimeFormat(
-      locale as string | undefined,
+      (locale as string | undefined) ?? DEFAULT_FORMAT_LOCALE,
       options as Intl.RelativeTimeFormatOptions | undefined,
     ).format(value as number, unit as Intl.RelativeTimeFormatUnit),
+  "Intl/plural": (value, locale, options) =>
+    new Intl.PluralRules(
+      (locale as string | undefined) ?? DEFAULT_FORMAT_LOCALE,
+      options as Intl.PluralRulesOptions | undefined,
+    ).select(value as number),
+  /* Returns the segments as plain strings, because a formula's value has to be JSON — the
+     Segmenter's own iterator of {segment, index, isWordLike} records is not. */
+  "Intl/segment": (value, granularity, locale) =>
+    [
+      ...new Intl.Segmenter((locale as string | undefined) ?? DEFAULT_FORMAT_LOCALE, {
+        granularity: (granularity as "grapheme" | "sentence" | "word" | undefined) ?? "grapheme",
+      }).segment(value as string),
+    ].map((part) => part.segment),
 };
 
 /** Whether a `window#/…` callee ref is on the blessed pure-globals list. */
@@ -887,15 +914,42 @@ function compileTarget(target: unknown, opts: CompileOpts): string {
  */
 function compileHelperCall(path: string, args: string[]): string | null {
   const a = (i: number) => args[i] ?? "undefined";
+  /* The same deterministic defaults the interpreter applies, inlined — see @jxsuite/schema/intl. */
+  const L = JSON.stringify(DEFAULT_FORMAT_LOCALE);
+  const Z = JSON.stringify(DEFAULT_TIME_ZONE);
   switch (path) {
     case "Intl/formatNumber": {
-      return `new Intl.NumberFormat(${a(1)}, ${a(2)}).format(${a(0)})`;
+      return `new Intl.NumberFormat(${a(1)} ?? ${L}, ${a(2)}).format(${a(0)})`;
     }
     case "Intl/formatDate": {
-      return `new Intl.DateTimeFormat(${a(1)}, ${a(2)}).format(new Date(${a(0)}))`;
+      return (
+        `new Intl.DateTimeFormat(${a(1)} ?? ${L}, ` +
+        `{timeZone: ${Z}, ...${a(2)}}).format(new Date(${a(0)}))`
+      );
     }
     case "Intl/formatRelativeTime": {
-      return `new Intl.RelativeTimeFormat(${a(2)}, ${a(3)}).format(${a(0)}, ${a(1)})`;
+      return `new Intl.RelativeTimeFormat(${a(2)} ?? ${L}, ${a(3)}).format(${a(0)}, ${a(1)})`;
+    }
+    case "Intl/formatList": {
+      return `new Intl.ListFormat(${a(1)} ?? ${L}, ${a(2)}).format(${a(0)})`;
+    }
+    case "Intl/plural": {
+      return `new Intl.PluralRules(${a(1)} ?? ${L}, ${a(2)}).select(${a(0)})`;
+    }
+    case "Intl/compare": {
+      return `new Intl.Collator(${a(2)} ?? ${L}, ${a(3)}).compare(${a(0)}, ${a(1)})`;
+    }
+    case "Intl/displayName": {
+      return (
+        `new Intl.DisplayNames(${a(2)} ?? ${L}, ` +
+        `{...${a(3)}, type: ${a(1)} ?? 'language'}).of(${a(0)})`
+      );
+    }
+    case "Intl/segment": {
+      return (
+        `[...new Intl.Segmenter(${a(2)} ?? ${L}, {granularity: ${a(1)} ?? 'grapheme'})` +
+        `.segment(${a(0)})].map((p) => p.segment)`
+      );
     }
     default: {
       return null;

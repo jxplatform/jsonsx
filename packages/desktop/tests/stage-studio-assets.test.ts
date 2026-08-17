@@ -28,6 +28,7 @@ const STYLESHEETS = [
   "panels.css",
   "inspector.css",
   "overlays.css",
+  "forced-colors.css",
 ];
 for (const sheet of STYLESHEETS) {
   writeFileSync(join(studioDir, "styles", sheet), `/* ${sheet} */`);

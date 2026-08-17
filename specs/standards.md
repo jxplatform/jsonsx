@@ -2,7 +2,7 @@
 
 ## Which External Standards Jx Adopts, and How That Is Recorded
 
-**Version:** 0.1.10-draft
+**Version:** 0.1.14-draft
 **Status:** Partial
 **Updated:** 2026-08-16
 **License:** MIT
@@ -119,17 +119,19 @@ Five columns, in this order and with exactly these headings:
 One row per class:
 
 ```markdown
-| Standard                                                                                  | Class         | Binds | Evidence                           | Note                                                                                                                                                 |
-| ----------------------------------------------------------------------------------------- | ------------- | ----- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [JSON Schema 2020-12](https://json-schema.org/draft/2020-12/schema)                       | **Adopted**   | §3.2  | packages/schema/src/schema.ts      | —                                                                                                                                                    |
-| [RFC 4180](https://www.rfc-editor.org/rfc/rfc4180)                                        | **Subset**    | §4    | extensions/parser/src/csv.ts       | Quoted fields and CRLF records only; no dialect negotiation and no header-less mode.                                                                 |
-| [ECMA-262](https://ecma-international.org/publications-and-standards/standards/ecma-262/) | **Divergent** | §19   | packages/runtime/src/expression.ts | Operator punctuators and arity are ECMAScript's; evaluation is total, with no exceptions.                                                            |
-| [RFC 6901](https://www.rfc-editor.org/rfc/rfc6901)                                        | **Borrowed**  | §7    | packages/runtime/src/runtime.ts    | Shape only. A `$ref` binds live state rather than substituting a schema; `~0`/`~1` escapes are unimplemented and `.` is a separator.                 |
-| [UAX #31](https://www.unicode.org/reports/tr31/)                                          | **Pending**   | §5    | —                                  | `gap:identifier-syntax` State names are ASCII-restricted; UAX #31 identifier profiles are not applied.                                               |
-| [RFC 7386](https://www.rfc-editor.org/rfc/rfc7386)                                        | **Rejected**  | §20   | —                                  | because: JSON Merge Patch cannot express positional array edits, and statement lists need splices; Jx defines an explicit statement grammar instead. |
+| Standard                                                                                  | Class         | Binds | Evidence                           | Note                                                                                                                                                     |
+| ----------------------------------------------------------------------------------------- | ------------- | ----- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [JSON Schema 2020-12](https://json-schema.org/draft/2020-12/schema)                       | **Adopted**   | §3.2  | packages/schema/src/schema.ts      | —                                                                                                                                                        |
+| [RFC 4180](https://www.rfc-editor.org/rfc/rfc4180)                                        | **Subset**    | §4    | extensions/parser/src/csv.ts       | Quoted fields and CRLF records only; no dialect negotiation and no header-less mode.                                                                     |
+| [ECMA-262](https://ecma-international.org/publications-and-standards/standards/ecma-262/) | **Divergent** | §19   | packages/runtime/src/expression.ts | Operator punctuators and arity are ECMAScript's; evaluation is total, with no exceptions.                                                                |
+| [RFC 6901](https://www.rfc-editor.org/rfc/rfc6901)                                        | **Borrowed**  | §7    | packages/runtime/src/runtime.ts    | Shape only. A `$ref` binds live state rather than substituting a schema; `~0`/`~1` escapes are unimplemented and `.` is a separator.                     |
+| [Media Queries 5](https://www.w3.org/TR/mediaqueries-5/)                                  | **Pending**   | §5    | —                                  | `gap:example-only` The worked examples use a reserved slug: a real id here would be a second, unreachable definition of a gap that is tracked elsewhere. |
+| [RFC 7386](https://www.rfc-editor.org/rfc/rfc7386)                                        | **Rejected**  | §20   | —                                  | because: JSON Merge Patch cannot express positional array edits, and statement lists need splices; Jx defines an explicit statement grammar instead.     |
 ```
 
 Tables inside fenced blocks — including the two above — are skipped by the parser, so a specification may show examples without registering them.
+
+That skip is why the example rows above can be freely wrong about the code. It is **not** why their gap slug is `gap:example-only`: a slug is unique across the repository (§3.5), and a plausible-looking one in an example is a second definition of a gap tracked for real somewhere else — indistinguishable from the real thing to a `grep`, and to anyone auditing the gap list against the specs. `gap:example-only` is reserved for these rows and names no work.
 
 ## 5. Citation Rules
 
@@ -219,9 +221,10 @@ Generated by `bun run docs:generate` and diffed by `docs:verify`. It carries the
 
 ## 10. Standards Alignment
 
-| Standard                                           | Class      | Binds | Evidence                      | Note                                                                                                                     |
-| -------------------------------------------------- | ---------- | ----- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| [RFC 3986](https://www.rfc-editor.org/rfc/rfc3986) | **Subset** | §5.2  | scripts/docs/lib/standards.ts | The canonical-URL rules admit only absolute `https` URIs with no query and no fragment — a subset of the generic syntax. |
+| Standard                                           | Class       | Binds | Evidence                      | Note                                                                                                                                                                                                                                                                                                                                        |
+| -------------------------------------------------- | ----------- | ----- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [RFC 3986](https://www.rfc-editor.org/rfc/rfc3986) | **Subset**  | §5.2  | scripts/docs/lib/standards.ts | The canonical-URL rules admit only absolute `https` URIs with no query and no fragment — a subset of the generic syntax.                                                                                                                                                                                                                    |
+| [BCP 14](https://www.rfc-editor.org/info/bcp14)    | **Adopted** | §12   | specs/standards.md#12         | The RFC 8174 boilerplate, declared once for the whole corpus. Its "and only when they appear in all capitals" clause is the operative half: these specifications are explanatory prose using "must" and "should" in their ordinary senses constantly, so the capitalized forms are rare and every one of them is a conformance requirement. |
 
 ## 11. Adoption Backlog
 
@@ -229,19 +232,47 @@ Standards the audit found relevant whose **owning spec section does not exist ye
 
 An entry names the spec that will own it. When that section is written, the entry moves out of this table and becomes a `Pending` row bound to it; `backlog-already-cited` fails if it is left in both places.
 
-| Standard                                                      | Target                                  | Why not yet                                                                                                                                                                                                                             |
-| ------------------------------------------------------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [BCP 14](https://www.rfc-editor.org/info/bcp14)               | `standards.md` — normative keywords     | Jx specifications use MUST and SHOULD informally and none declares the RFC 2119/8174 boilerplate. That is a convention for the whole corpus, not a property of any section that exists — declaring it needs a section to declare it in. |
-| [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414)            | `desktop.md` §10                        | Discovery is only reachable once an authorization flow exists (`gap:native-oauth`), and the one provider in use publishes no metadata document.                                                                                         |
-| [WebAuthn Level 3](https://www.w3.org/TR/webauthn-3/)         | `desktop.md` §10                        | Passkeys need a registered relying-party id and a recovery story, neither of which is designed.                                                                                                                                         |
-| [CSS Cascade Layers](https://www.w3.org/TR/css-cascade-5/)    | `spec.md` §9                            | The style model has no layer concept; adding one is a design change, not a citation.                                                                                                                                                    |
-| [CSS Containment 3](https://www.w3.org/TR/css-contain-3/)     | `spec.md` §9                            | `$media` is viewport-only. Container queries would need a named-container model in the style object.                                                                                                                                    |
-| [Media Queries 5](https://www.w3.org/TR/mediaqueries-5/)      | `spec.md` §9.4                          | `$media` borrows `@custom-media`'s shape from this level, but Jx resolves it itself and no browser ships it — so there is nothing to conform to until one does.                                                                         |
-| [CSS Shadow Parts](https://www.w3.org/TR/css-shadow-parts-1/) | `spec.md` §16.6 — `::part` from outside | Shadow roots exist now (the `$shadow` opt-in), so `::part` is finally _possible_ — but nothing emits a `part` attribute and no selector addresses one from a page stylesheet, so there is no behaviour to cite yet.                     |
-| [WebDriver BiDi](https://www.w3.org/TR/webdriver-bidi/)       | `studio.md` — screenshot pipeline       | The pipeline drives Chrome over CDP from `scripts/`, which no spec section describes.                                                                                                                                                   |
+| Standard                                                      | Target                                  | Why not yet                                                                                                                                                                                                         |
+| ------------------------------------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [WebAuthn Level 3](https://www.w3.org/TR/webauthn-3/)         | `desktop.md` §10                        | Passkeys need a registered relying-party id and a recovery story, neither of which is designed.                                                                                                                     |
+| [CSS Cascade Layers](https://www.w3.org/TR/css-cascade-5/)    | `spec.md` §9                            | The style model has no layer concept; adding one is a design change, not a citation.                                                                                                                                |
+| [CSS Containment 3](https://www.w3.org/TR/css-contain-3/)     | `spec.md` §9                            | `$media` is viewport-only. Container queries would need a named-container model in the style object.                                                                                                                |
+| [Media Queries 5](https://www.w3.org/TR/mediaqueries-5/)      | `spec.md` §9.4                          | `$media` borrows `@custom-media`'s shape from this level, but Jx resolves it itself and no browser ships it — so there is nothing to conform to until one does.                                                     |
+| [CSS Shadow Parts](https://www.w3.org/TR/css-shadow-parts-1/) | `spec.md` §16.6 — `::part` from outside | Shadow roots exist now (the `$shadow` opt-in), so `::part` is finally _possible_ — but nothing emits a `part` attribute and no selector addresses one from a page stylesheet, so there is no behaviour to cite yet. |
+
+## 12. Normative Keywords
+
+> **Status: Implemented.** The convention below governs every specification in `specs/`, and
+> `bun run docs:status` fails if a specification uses one of these keywords while this section is
+> missing or names a different set.
+
+The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHALL**, **SHALL NOT**, **SHOULD**,
+**SHOULD NOT**, **RECOMMENDED**, **NOT RECOMMENDED**, **MAY** and **OPTIONAL** in the Jx
+specifications are to be interpreted as described in BCP 14
+([RFC 2119](https://www.rfc-editor.org/rfc/rfc2119), [RFC 8174](https://www.rfc-editor.org/rfc/rfc8174))
+when, and only when, they appear in all capitals, as shown here.
+
+The "and only when" half is what makes the rest of the corpus readable. These specifications are
+explanatory prose, and they use "must", "should" and "may" in their ordinary English senses on
+almost every page — a sentence saying the build "must" find a layout describes what happens, it does
+not impose a conformance requirement on an implementer. RFC 8174 exists so a document can do both,
+and declaring it here turns a corpus-wide informality into a deliberate distinction rather than an
+ambiguity a reader has to resolve sentence by sentence.
+
+The capitalized forms are therefore **rare and load-bearing**: a reader who meets one should
+understand that an implementation doing otherwise is non-conformant, not merely unusual.
+
+This section is the whole declaration. Individual specifications do not repeat the boilerplate, and
+a specification that uses a keyword needs no BCP 14 row of its own. Deleting this section while any
+specification still uses a capitalized keyword would leave those requirements undefined, which is
+the failure the gate exists to make loud.
 
 ## Changelog
 
+- **0.1.14-draft** (2026-08-16) — §11 WebDriver BiDi leaves the adoption backlog — the pipeline speaks it, and studio-ui-guidelines.md §15 owns it.
+- **0.1.13-draft** (2026-08-16) — §11 RFC 8414 leaves the adoption backlog — the flow it would configure now exists, and it is recorded Rejected in desktop.md for the reason that remains.
+- **0.1.12-draft** (2026-08-16) — §12 declares the BCP 14 normative keywords for the whole corpus, gated by docs:status; BCP 14 graduates off the backlog.
+- **0.1.11-draft** (2026-08-16) — §4.4 worked examples use a reserved gap:example-only slug so an illustration cannot squat on a real gap id.
 - **0.1.10-draft** (2026-08-16) — §1 is Implemented — both ratchets are empty; BCP 14 moves to the backlog, since no section declares the corpus's keyword convention.
 - **0.1.9-draft** (2026-08-16) — Service Workers graduates to a bound row in site-architecture.md §14.6.
 - **0.1.8-draft** (2026-08-16) — CSS Shadow Parts backlog entry now waits on part attributes, not on shadow roots.
@@ -256,4 +287,4 @@ An entry names the spec that will own it. When that section is written, the entr
 
 ---
 
-_Jx Standards Alignment Specification v0.1.10-draft_
+_Jx Standards Alignment Specification v0.1.14-draft_

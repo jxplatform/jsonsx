@@ -28,6 +28,7 @@
     "upgrade": "bunx npm-check-updates -u && bun install"
   },
   "dependencies": {
+    "@jxsuite/protocol": "workspace:^",
     "@vue/reactivity": "3.5.41"
   },
   "devDependencies": {

@@ -85,6 +85,8 @@ Every field commits as you type, and the previews above redraw with it — which
 
 One row per value that reaches the browser — Title, Description, Social title, Social description, Social image, Social type — each showing the merged value, a character count against the length at which that field gets cut (`47/160`), and a chip saying where the value came from.
 
+The count is of **characters as you see them**: an emoji counts as one, a flag counts as one, and an accented letter counts as one however it was typed. That is not what `length` gives you in most tools — it counts a rocket as two and a flag as four — so a headline with three emoji used to report six characters of budget it had not spent. The count is not a measure of _width_, and deliberately so: a search result truncates on pixels, in a font the engine picks at a size it picks, and any number here claiming to predict that would be a guess wearing a measurement's clothes.
+
 A value this page sets shows the ordinary set dot. A value it inherits is marked **inherited** and names its donor: _from Base_ for a layout, _from Site head_ or _from Site name_ for the project, _from the build_ for a value the build supplies on your behalf. The two chips that lead somewhere are clickable and open the setting in Project Settings; the layout and build chips are plain text, because the card has no verb for them.
 
 That marking is the whole point. A page inheriting its description from the site is not a page missing a description, and until the preview said which was which, the two looked identical.
@@ -98,6 +100,13 @@ A named list, in plain language, of things that are wrong or absent — and it i
 - No `og:title`, `og:description`, or `og:image` — a shared link with no headline, no summary, or a text-only card.
 - A field is longer than its budget, with the actual length: _Description is 187 characters; summaries are cut near 160._
 - Project Settings names no site URL, so the build emits no canonical link and no `og:url`.
+
+:::doc-note
+**These warnings also appear in Problems**, in the Bottom dock, filed the moment you open this window. A page shipped with no description is worth knowing about whether or not you thought to look here, and Problems is where Studio keeps the things that are still waiting to be fixed. Each row opens this window again.
+
+There is a companion check for accessibility: **Check Accessibility** in the command palette reads the open document and files a Problem for each thing an author can fix — an image with no alt text, a control with no label, a skipped heading level, a link that reads "click here", a duplicate id. Every row names the WCAG criterion it comes from. It also always files two rows saying what it could **not** check: colour contrast and target size are properties of the built page in a browser, not of the document, so a report that stayed silent about them would read as a clean bill it has no way to give.
+:::
+
 - A `<title>` element inside `$head` is discarded — the build writes the title from the document's own title property.
 
 When there is nothing to say, it says that too: _Nothing to flag — every previewed field resolves to a value._

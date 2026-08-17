@@ -9,6 +9,8 @@
  * @module @jxsuite/ai/streaming-client
  */
 
+import type { ProblemDetails } from "@jxsuite/protocol";
+
 type StreamEvent =
   | StreamDeltaEvent
   | StreamToolCallStartEvent
@@ -44,10 +46,22 @@ interface StreamDoneEvent {
   stopReason: string;
 }
 
+/**
+ * A failure that arrived mid-stream.
+ *
+ * **This is the one place RFC 9457 could not simply replace what was here**, and the reason is
+ * structural: a problem document is a _response body_, and by the time this frame is written the
+ * response has already begun with a 200. Nothing can change the status any more. So the adoption is
+ * that the frame CARRIES a problem rather than being replaced by one — `problem` is the machine
+ * half (a `type` a client can key on), `message` stays the human half every existing reader already
+ * shows, and `code` remains for the providers that send one.
+ */
 interface StreamErrorEvent {
   type: "error";
   message: string;
   code?: string;
+  /** RFC 9457 problem document describing the failure, when the producer knows its type. */
+  problem?: ProblemDetails;
 }
 
 /**

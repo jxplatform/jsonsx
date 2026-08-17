@@ -112,6 +112,61 @@ describe("streamImport", () => {
     expect(result.config).toEqual({ name: "Split" } as never);
   });
 
+  /*
+   * Tolerating a garbled line is right; hiding it is not. Before the counter, an import that
+   * dropped half its progress lines finished looking clean and the user never learned which pages
+   * were skipped.
+   */
+  test("counts unreadable lines and reports them once at the end", async () => {
+    stubFetch(() =>
+      Promise.resolve(
+        ndjsonResponse([
+          '{"type":"progress","phase":"crawl","message":"Fetching..."}\n',
+          "{not json at all\n",
+          "}{\n",
+          '{"type":"done","root":"/p","config":{"name":"Partial"}}\n',
+        ]),
+      ),
+    );
+    const events: ImportProgressEvent[] = [];
+    await streamImport("/e", OPTS, (e) => events.push(e));
+    expect(events).toEqual([
+      { phase: "crawl", message: "Fetching..." },
+      {
+        phase: "warning",
+        message:
+          "2 progress lines could not be read and were skipped — the import may be missing steps.",
+      },
+    ]);
+  });
+
+  test("a clean stream reports no warning", async () => {
+    stubFetch(() =>
+      Promise.resolve(
+        ndjsonResponse([
+          '{"type":"heartbeat"}\n',
+          '{"type":"done","root":"/p","config":{"name":"Clean"}}\n',
+        ]),
+      ),
+    );
+    const events: ImportProgressEvent[] = [];
+    await streamImport("/e", OPTS, (e) => events.push(e));
+    expect(events).toEqual([]);
+  });
+
+  test("one unreadable line is reported in the singular", async () => {
+    stubFetch(() =>
+      Promise.resolve(
+        ndjsonResponse(["oops\n", '{"type":"done","root":"/p","config":{"name":"One"}}\n']),
+      ),
+    );
+    const events: ImportProgressEvent[] = [];
+    await streamImport("/e", OPTS, (e) => events.push(e));
+    expect(events[0]?.message).toBe(
+      "1 progress line could not be read and was skipped — the import may be missing steps.",
+    );
+  });
+
   test("rejects on a terminal error line", async () => {
     stubFetch(() =>
       Promise.resolve(

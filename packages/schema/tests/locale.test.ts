@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   canonicalizeLocale,
   isWellFormedLocale,
+  LANGUAGE_TAG_PATTERN,
   localeDirection,
   primaryLanguage,
 } from "../src/locale.ts";
@@ -79,5 +80,67 @@ describe("primaryLanguage", () => {
     expect(primaryLanguage("zh-Hant-TW")).toBe("zh");
     expect(primaryLanguage("EN-us")).toBe("en");
     expect(primaryLanguage("nope_")).toBeNull();
+  });
+});
+
+describe("LANGUAGE_TAG_PATTERN", () => {
+  const pattern = new RegExp(LANGUAGE_TAG_PATTERN);
+
+  test("rejects the shape errors an author actually makes", () => {
+    for (const tag of ["en_US", "en--US", "en-US-", "-en", "e", "en-verylongsubtag", ""]) {
+      expect(pattern.test(tag)).toBe(false);
+    }
+  });
+
+  test("accepts ordinary tags, including extensions and private use", () => {
+    for (const tag of [
+      "en",
+      "en-US",
+      "zh-Hant-TW",
+      "es-419",
+      "de-DE-u-co-phonebk",
+      "en-GB-oxendict",
+      "qaa-Qaaa-QM-x-southern",
+    ]) {
+      expect(pattern.test(tag)).toBe(true);
+    }
+  });
+
+  /*
+   * The contract that makes the pattern safe to put in the schema, stated as an assertion rather
+   * than as prose: author-time must never reject what build-time accepts. The reverse is allowed —
+   * `zh-min-nan` matches the pattern and throws in `Intl.Locale` — because the build stays the
+   * authority. Deleting this test is how the two would silently drift back apart.
+   */
+  test("accepts every tag canonicalizeLocale accepts", () => {
+    const corpus = [
+      "en",
+      "EN-us",
+      "fr-CA",
+      "zh-hant-tw",
+      "ar",
+      "he-IL",
+      "sr-Latn-RS",
+      "es-419",
+      "und",
+      "tlh",
+      "cmn-Hans-CN",
+      "art-lojban",
+      "hy-arevela",
+      "ja-JP-u-ca-japanese",
+      "de-DE-u-co-phonebk",
+      "en-a-bbb-x-a-ccc",
+      "qaa-Qaaa-QM-x-southern",
+      "en_US",
+      "en--US",
+      "x-private",
+      "i-klingon",
+      "e",
+    ];
+    for (const tag of corpus) {
+      if (canonicalizeLocale(tag) !== null) {
+        expect({ matches: pattern.test(tag.trim()), tag }).toEqual({ matches: true, tag });
+      }
+    }
   });
 });

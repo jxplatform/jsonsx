@@ -170,6 +170,23 @@ void mock.module("../src/settings-store", () => ({
   writeSettings: writeSettingsMock,
 }));
 
+/*
+ * GitHub sign-in. Mocked at the module boundary because the real one opens a browser and talks to
+ * GitHub; what this file tests is that the launcher wires the three requests to it at all.
+ */
+const githubSignInMock = mock(async (params: { force?: boolean }) => ({
+  token: params.force ? "gho_fresh" : "gho_stored",
+}));
+const githubSignOutMock = mock(async () => ({ ok: true }));
+const githubTokenMock = mock(async () => ({ stored: true }));
+const setAuthorizationHostMock = mock((_host: unknown) => {});
+void mock.module("../src/github-signin", () => ({
+  githubSignIn: githubSignInMock,
+  githubSignOut: githubSignOutMock,
+  githubTokenStatus: githubTokenMock,
+  setAuthorizationHost: setAuthorizationHostMock,
+}));
+
 // The import pipeline itself is exercised in @jxsuite/import; here only the route wiring matters.
 const importSiteMock = mock((options: Record<string, unknown>) => {
   const outDir = options.outDir as string;
@@ -537,6 +554,20 @@ describe("chromium launcher RPC dispatch", () => {
     const settings = { aiApiKey: "sk-new", theme: "dark" };
     expect(await rpc("saveSettings", { settings })).toBeNull();
     expect(writeSettingsMock).toHaveBeenCalledWith(settings);
+  });
+
+  test("GitHub sign-in handlers reach the loopback flow", async () => {
+    expect(await rpc("githubToken")).toEqual({ stored: true });
+    expect(await rpc("githubSignIn", { force: true })).toEqual({ token: "gho_fresh" });
+    expect(githubSignInMock).toHaveBeenLastCalledWith({ force: true });
+    expect(await rpc("githubSignOut")).toEqual({ ok: true });
+  });
+
+  test("the loopback server is installed as the OAuth redirect host", () => {
+    // Sign-in cannot be wired before the server exists, so this is what proves it was.
+    expect(setAuthorizationHostMock).toHaveBeenCalled();
+    const host = setAuthorizationHostMock.mock.calls.at(-1)![0] as { port: number };
+    expect(typeof host.port).toBe("number");
   });
 
   test("git query methods return results", async () => {

@@ -95,6 +95,32 @@ describe("validateProjectFile", () => {
     expect(JSON.stringify(result.errors)).toContain("unevaluatedProperties");
   });
 
+  /*
+   * The half of `gap:bcp47-locale-validation` that was author-time. The build has always rejected
+   * `en_US` (`canonicalizeLocale` returns null and `resolveI18n` files a build error); until the
+   * schema carried the pattern, `jx validate` said the same project was fine, so the author learned
+   * about the typo one command later than they should have. Both ends now refuse it.
+   */
+  test("a malformed locale tag is rejected at author time, as it is at build time", async () => {
+    const root = makeProject({
+      project: { ...validProject(), i18n: { defaultLocale: "en_US", locales: ["en_US", "fr"] } },
+    });
+    const result = await validateProjectFile(root);
+    expect(result.valid).toBe(false);
+    expect(JSON.stringify(result.errors)).toContain("pattern");
+  });
+
+  test("a well-formed locale block still validates", async () => {
+    const root = makeProject({
+      project: {
+        ...validProject(),
+        i18n: { defaultLocale: "en", locales: ["en", "fr-CA", "zh-Hant-TW"] },
+      },
+    });
+    const result = await validateProjectFile(root);
+    expect(result.valid).toBe(true);
+  });
+
   test("falls back to host resolution when the project has no node_modules", async () => {
     const root = makeProject({ nodeModules: false });
     const result = await validateProjectFile(root);

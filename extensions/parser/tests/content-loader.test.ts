@@ -8,6 +8,7 @@
  */
 
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
+import type { ProjectConfig } from "@jxsuite/schema/types";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
@@ -21,6 +22,7 @@ import {
   getContentTypeElements,
   loadContentConfig,
   loadContentSection,
+  localesForExpansion,
   resolveContentTypeRefs,
 } from "../src/content-loader.ts";
 import type { ContentLoaderEntry, ContentSection } from "../src/content-loader.ts";
@@ -676,6 +678,28 @@ describe("Content.resolvePaths", () => {
     expect(paths).toEqual([{ slug: "hello" }, { slug: "world" }]);
   });
 
+  /*
+   * The route's own timestamp travelling with its parameters. Without it a collection route is
+   * dated by the `[slug]` template that rendered it, so every post in an archive claims to have
+   * been edited the moment the template was — see site-architecture.md §8.4.1.
+   */
+  it("carries the entry's own _meta alongside the route parameter", async () => {
+    const dated = new Map<string, ContentLoaderEntry[]>([
+      [
+        "posts",
+        [
+          { _meta: { mtime: "2024-03-04T05:06:07Z" }, body: null, data: {}, id: "dated" },
+          { body: null, data: {}, id: "undated" },
+        ],
+      ],
+    ]);
+    const paths = await Content.resolvePaths({ contentType: "posts" }, { data: dated, root: TMP });
+    expect(paths).toEqual([
+      { _meta: { mtime: "2024-03-04T05:06:07Z" }, slug: "dated" },
+      { slug: "undated" },
+    ]);
+  });
+
   it("honors a custom param and field, falling back to the entry id", async () => {
     const paths = await Content.resolvePaths(
       { contentType: "posts", field: "title", param: "name" },
@@ -871,5 +895,85 @@ describe("content asset mounts", () => {
       expect(post.body).toContain("![hero](./images/hero.png)");
       expect(post.body).not.toContain("/content/media/");
     });
+  });
+});
+
+// ─── {locale} sources ────────────────────────────────────────────────────────
+
+describe("localesForExpansion", () => {
+  it("reads the declared locales, deduplicated", () => {
+    expect(
+      localesForExpansion({ i18n: { defaultLocale: "en", locales: ["en", "fr", "en"] } }),
+    ).toEqual(["en", "fr"]);
+  });
+
+  // A project may declare only a default; expanding over it alone is still a real expansion.
+  it("falls back to the default locale when no list is given", () => {
+    expect(localesForExpansion({ i18n: { defaultLocale: "de" } })).toEqual(["de"]);
+  });
+
+  it("a project with no i18n expands over nothing", () => {
+    expect(localesForExpansion(({} as { config?: ProjectConfig }).config)).toEqual([]);
+    expect(localesForExpansion({})).toEqual([]);
+    expect(localesForExpansion({ i18n: {} })).toEqual([]);
+  });
+});
+
+describe("Content.resolvePaths — localized collections", () => {
+  const localized = new Map<string, ContentLoaderEntry[]>([
+    [
+      "blog",
+      [
+        { _meta: { locale: "en" }, body: null, data: {}, id: "hello" },
+        { _meta: { locale: "en" }, body: null, data: {}, id: "solo" },
+        { _meta: { locale: "fr" }, body: null, data: {}, id: "hello" },
+      ],
+    ],
+  ]);
+
+  /*
+   * Two translations of one post share an id. Expanding both under `/fr/[slug]` would emit the
+   * route twice and let the second overwrite the first — so the route's own locale is what scopes
+   * a localized collection.
+   */
+  it("expands only the entries belonging to the route's locale", async () => {
+    const fr = await Content.resolvePaths(
+      { contentType: "blog" },
+      { data: localized, locale: "fr", root: TMP },
+    );
+    expect(fr.map((p) => p.slug)).toEqual(["hello"]);
+
+    const en = await Content.resolvePaths(
+      { contentType: "blog" },
+      { data: localized, locale: "en", root: TMP },
+    );
+    expect(en.map((p) => p.slug)).toEqual(["hello", "solo"]);
+  });
+
+  // An unlocalized collection must be untouched, whatever the route's locale happens to be.
+  it("leaves a collection with no locales alone", async () => {
+    const plain = new Map<string, ContentLoaderEntry[]>([
+      [
+        "posts",
+        [
+          { body: null, data: {}, id: "a" },
+          { body: null, data: {}, id: "b" },
+        ],
+      ],
+    ]);
+    const paths = await Content.resolvePaths(
+      { contentType: "posts" },
+      { data: plain, locale: "fr", root: TMP },
+    );
+    expect(paths.map((p) => p.slug)).toEqual(["a", "b"]);
+  });
+
+  // A project without i18n gives no locale at all; the collection must not vanish.
+  it("a route with no locale expands everything", async () => {
+    const paths = await Content.resolvePaths(
+      { contentType: "blog" },
+      { data: localized, locale: null, root: TMP },
+    );
+    expect(paths).toHaveLength(3);
   });
 });

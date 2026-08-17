@@ -70,6 +70,10 @@ Because the new project is a git repository from its first minute, every later c
 There is no default location. Studio never picks a folder for you and never falls back to whatever directory it happens to be running in — if the **Location** is empty, nothing is created.
 :::
 
+### While an import runs
+
+The Import tab streams a live log — one line per phase, with the current step at the top. A garbled line in that stream doesn't stop the import; the pages already crawled are kept. But it isn't ignored either: when the run finishes, Studio counts the lines it couldn't read and posts a warning saying so, because an import that quietly skipped a step looks exactly like one that didn't.
+
 ## Next
 
 - **[Projects](/docs/studio/projects)** — the other ways to get a project: open a folder or clone a repository

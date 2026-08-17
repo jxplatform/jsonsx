@@ -132,6 +132,8 @@ describe("report", () => {
     silentCatches: [],
     focusRings: [],
     staleFocusRings: [],
+    contrast: [],
+    guidelineTokens: [],
     underScrim: [],
   };
   const logs: string[] = [];

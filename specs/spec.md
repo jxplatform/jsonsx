@@ -2,7 +2,7 @@
 
 ## Declarative Document Object Model — JSON Edition
 
-**Version:** 0.4.31-draft
+**Version:** 0.4.33-draft
 **Status:** Partial
 **Updated:** 2026-08-16
 **License:** MIT
@@ -1021,13 +1021,38 @@ Web APIs are accessed via `$prototype` in a `state` entry:
 | `FormData`        | FormData API | **Implemented** — basic field population                                |
 | `LocalStorage`    | Storage API  | **Implemented** — reactive read/write with persistence                  |
 | `SessionStorage`  | Storage API  | **Implemented** — session-scoped reactive storage                       |
-| `Cookie`          | Cookie API   | **Implemented** — maxAge, path, domain, secure, sameSite                |
+| `Cookie`          | Cookie API   | **Implemented** — maxAge, path, domain, secure, sameSite (see §11.2a)   |
 | `IndexedDB`       | IDB API      | **Implemented** — store creation, indexes, CRUD helper                  |
 | `Array`           | —            | **Implemented** — dynamic mapped list (see §10)                         |
 | `Set`             | —            | **Implemented** — `new Set(default)`                                    |
 | `Map`             | —            | **Implemented** — `new Map(Object.entries(default))`                    |
 | `Blob`            | Blob API     | **Implemented** — parts and type                                        |
 | `ReadableStream`  | Streams API  | **Pending** — stub returns `null`                                       |
+
+#### 11.2a The `Cookie` prototype's attribute rules
+
+> **Status: Implemented.**
+
+Three attributes are **derived rather than taken as declared**, because a browser that disagrees
+with a cookie's attributes drops it silently — the write appears to succeed and the value is simply
+never there again ([RFC 6265bis](https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-rfc6265bis)
+§4.1.3, §5.4.7):
+
+- A **`__Host-`** name forces `Secure`, forces `Path=/`, and drops any declared `Domain`. Honoring a
+  declared path or domain would produce a cookie no browser stores.
+- A **`__Secure-`** name forces `Secure`, and leaves path and domain alone.
+- **`SameSite=None`** forces `Secure`.
+
+Two attributes are absent on purpose, and neither is a missing feature:
+
+- **`HttpOnly`** cannot be set from script and would make the value unreadable to the binding that
+  wrote it. Its absence is the correct behavior for a script-written cookie.
+- **`Expires`** is not supported. `Max-Age` covers the same ground, §5.5 makes `Max-Age` win
+  wherever both appear, and `Expires` takes an HTTP-date whose mis-spelling fails silently in the
+  direction of a cookie that never expires.
+
+The cookie **name is data, never pattern syntax**: the reader splits the cookie header rather than
+building a regular expression from an author-supplied name.
 
 ### 11.3 Timing Values
 
@@ -1589,20 +1614,20 @@ Custom elements may carry annotations compatible with the Custom Elements Manife
 
 External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md). Two things once listed here are **not** standards and are therefore prose rather than rows: reactivity is `@vue/reactivity`, a library; and the `$media` breakpoint syntax borrows the shape of CSS `@custom-media`, a Media Queries Level 5 feature no browser ships, which Jx resolves itself at build and run time. The Custom Elements Manifest (§16.8) is a community format with no standards body.
 
-| Standard                                                                                  | Class         | Binds    | Evidence                                                                                                                      | Note                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| ----------------------------------------------------------------------------------------- | ------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [ECMA-404](https://ecma-international.org/publications-and-standards/standards/ecma-404/) | **Adopted**   | §3       | packages/schema/src/parse.ts                                                                                                  | A Jx document is JSON. Nothing in the format extends the syntax.                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| [JSON Schema 2020-12](https://json-schema.org/draft/2020-12/schema)                       | **Divergent** | §3.2, §5 | packages/schema/src/schema.ts, packages/schema/tests/schema.test.ts                                                           | `$defs` holds genuine 2020-12 type definitions and a document validates as an _instance_ against a conformant meta-schema. Three deviations: Jx declares no `$vocabulary`, so it is not a dialect; `$id` is a display name and establishes no base URI for relative `$ref`; and `$schema` is an editor "schema for this instance" pointer, not a dialect declaration.                                                                                                                        |
-| [ECMA-262](https://ecma-international.org/publications-and-standards/standards/ecma-262/) | **Subset**    | §19, §20 | packages/runtime/src/expression.ts, packages/runtime/tests/expression.test.ts                                                 | Operator punctuators and their arity are ECMAScript's, and aggregate operations follow `Array.prototype` semantics — but only an allow-listed subset is evaluable, and `if`/`then`/`else` statements are imperative control flow over a statement list rather than anything from JSON Schema.                                                                                                                                                                                                |
-| [WHATWG DOM](https://dom.spec.whatwg.org/)                                                | **Subset**    | §16, §20 | packages/compiler/src/targets/compile-element.ts                                                                              | Custom elements are defined and `dispatchEvent` emits a real `CustomEvent`. Shadow trees are not used at all (§16.6).                                                                                                                                                                                                                                                                                                                                                                        |
-| [WHATWG HTML](https://html.spec.whatwg.org/)                                              | **Subset**    | §16.6    | packages/compiler/src/shadow.ts, packages/compiler/src/targets/compile-element.ts, packages/compiler/tests/shadow-dom.test.ts | Custom elements are defined and upgraded as the standard describes and render into the **light DOM by default**. A component may opt into a shadow root with `$shadow` (a project into all of them with `defaults.shadow`), which emits a declarative `<template shadowrootmode>` the element then adopts — `open` through `element.shadowRoot`, `closed` through `ElementInternals`. Not offered: `ElementInternals` for form association, and `::part` addressed from outside a component. |
-| [CSS Scoping](https://www.w3.org/TR/css-scoping-1/)                                       | **Subset**    | §16.6    | packages/compiler/src/shared.ts, packages/compiler/tests/shadow-dom.test.ts                                                   | `:host`, `:host()` and `::slotted()` are emitted for a shadow component, and `:host`/`:host()` are translated to the tag name in light DOM so one style object serves both modes. `:host-context()` is not offered — it never reached a second engine.                                                                                                                                                                                                                                       |
-| [CSSOM](https://www.w3.org/TR/cssom-1/)                                                   | **Adopted**   | §9.1     | packages/runtime/src/runtime.ts                                                                                               | `style` keys are the CSSOM camelCase IDL attribute names, so a property name needs no translation table.                                                                                                                                                                                                                                                                                                                                                                                     |
-| [CSS Color 4](https://www.w3.org/TR/css-color-4/)                                         | **Adopted**   | §9.5     | packages/compiler/src/shared.ts, packages/compiler/tests/shared.test.ts                                                       | `color-scheme: light dark` is emitted with per-attribute overrides, so native controls follow a forced scheme rather than only the author's own rules.                                                                                                                                                                                                                                                                                                                                       |
-| [RFC 6901](https://www.rfc-editor.org/rfc/rfc6901)                                        | **Borrowed**  | §7       | packages/runtime/src/runtime.ts                                                                                               | Shape only. A `$ref` binds live reactive state rather than substituting a value, `~0`/`~1` escapes are unimplemented, and `.` is treated as a separator.                                                                                                                                                                                                                                                                                                                                     |
-| [RFC 9535](https://www.rfc-editor.org/rfc/rfc9535)                                        | **Borrowed**  | §7       | packages/runtime/src/runtime.ts                                                                                               | The dotted segment form `#/state/user.name` is JSONPath's shape rather than a deviation from JSON Pointer — but no JSONPath selector, filter or wildcard is supported, so nothing here is a JSONPath query.                                                                                                                                                                                                                                                                                  |
-| [CSP Level 3](https://www.w3.org/TR/CSP3/)                                                | **Divergent** | §21      | packages/compiler/tests/no-eval.test.ts                                                                                       | Compiled output contains no `new Function` and no `eval`, proven by a committed test, so it runs under a policy without `'unsafe-eval'`. The **interpreting** runtime compiles templates and function bodies at load time and therefore requires `'unsafe-eval'` permanently — §21.3 states this as a property, not a defect.                                                                                                                                                                |
-| [Trusted Types](https://www.w3.org/TR/trusted-types/)                                     | **Pending**   | §21      | —                                                                                                                             | `gap:trusted-types` No policy is installed. The DOM-sink surface is small, but `require-trusted-types-for 'script'` also governs the runtime's template compilation, so enforcing it needs a decision about that path rather than only about the sinks.                                                                                                                                                                                                                                      |
+| Standard                                                                                  | Class         | Binds    | Evidence                                                                                                                      | Note                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ----------------------------------------------------------------------------------------- | ------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [ECMA-404](https://ecma-international.org/publications-and-standards/standards/ecma-404/) | **Adopted**   | §3       | packages/schema/src/parse.ts                                                                                                  | A Jx document is JSON. Nothing in the format extends the syntax.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| [JSON Schema 2020-12](https://json-schema.org/draft/2020-12/schema)                       | **Divergent** | §3.2, §5 | packages/schema/src/schema.ts, packages/schema/tests/schema.test.ts                                                           | `$defs` holds genuine 2020-12 type definitions and a document validates as an _instance_ against a conformant meta-schema. Three deviations: Jx declares no `$vocabulary`, so it is not a dialect; `$id` is a display name and establishes no base URI for relative `$ref`; and `$schema` is an editor "schema for this instance" pointer, not a dialect declaration.                                                                                                                                                                                               |
+| [ECMA-262](https://ecma-international.org/publications-and-standards/standards/ecma-262/) | **Subset**    | §19, §20 | packages/runtime/src/expression.ts, packages/runtime/tests/expression.test.ts                                                 | Operator punctuators and their arity are ECMAScript's, and aggregate operations follow `Array.prototype` semantics — but only an allow-listed subset is evaluable, and `if`/`then`/`else` statements are imperative control flow over a statement list rather than anything from JSON Schema.                                                                                                                                                                                                                                                                       |
+| [WHATWG DOM](https://dom.spec.whatwg.org/)                                                | **Subset**    | §16, §20 | packages/compiler/src/targets/compile-element.ts                                                                              | Custom elements are defined and `dispatchEvent` emits a real `CustomEvent`. Shadow trees are not used at all (§16.6).                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| [WHATWG HTML](https://html.spec.whatwg.org/)                                              | **Subset**    | §16.6    | packages/compiler/src/shadow.ts, packages/compiler/src/targets/compile-element.ts, packages/compiler/tests/shadow-dom.test.ts | Custom elements are defined and upgraded as the standard describes and render into the **light DOM by default**. A component may opt into a shadow root with `$shadow` (a project into all of them with `defaults.shadow`), which emits a declarative `<template shadowrootmode>` the element then adopts — `open` through `element.shadowRoot`, `closed` through `ElementInternals`. Not offered: `ElementInternals` for form association, and `::part` addressed from outside a component.                                                                        |
+| [CSS Scoping](https://www.w3.org/TR/css-scoping-1/)                                       | **Subset**    | §16.6    | packages/compiler/src/shared.ts, packages/compiler/tests/shadow-dom.test.ts                                                   | `:host`, `:host()` and `::slotted()` are emitted for a shadow component, and `:host`/`:host()` are translated to the tag name in light DOM so one style object serves both modes. `:host-context()` is not offered — it never reached a second engine.                                                                                                                                                                                                                                                                                                              |
+| [CSSOM](https://www.w3.org/TR/cssom-1/)                                                   | **Adopted**   | §9.1     | packages/runtime/src/runtime.ts                                                                                               | `style` keys are the CSSOM camelCase IDL attribute names, so a property name needs no translation table.                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| [CSS Color 4](https://www.w3.org/TR/css-color-4/)                                         | **Adopted**   | §9.5     | packages/compiler/src/shared.ts, packages/compiler/tests/shared.test.ts                                                       | `color-scheme: light dark` is emitted with per-attribute overrides, so native controls follow a forced scheme rather than only the author's own rules.                                                                                                                                                                                                                                                                                                                                                                                                              |
+| [RFC 6901](https://www.rfc-editor.org/rfc/rfc6901)                                        | **Borrowed**  | §7       | packages/runtime/src/runtime.ts                                                                                               | Shape only. A `$ref` binds live reactive state rather than substituting a value, `~0`/`~1` escapes are unimplemented, and `.` is treated as a separator.                                                                                                                                                                                                                                                                                                                                                                                                            |
+| [RFC 9535](https://www.rfc-editor.org/rfc/rfc9535)                                        | **Borrowed**  | §7       | packages/runtime/src/runtime.ts                                                                                               | The dotted segment form `#/state/user.name` is JSONPath's shape rather than a deviation from JSON Pointer — but no JSONPath selector, filter or wildcard is supported, so nothing here is a JSONPath query.                                                                                                                                                                                                                                                                                                                                                         |
+| [CSP Level 3](https://www.w3.org/TR/CSP3/)                                                | **Divergent** | §21      | packages/compiler/tests/no-eval.test.ts                                                                                       | Compiled output contains no `new Function` and no `eval`, proven by a committed test, so it runs under a policy without `'unsafe-eval'`. The **interpreting** runtime compiles templates and function bodies at load time and therefore requires `'unsafe-eval'` permanently — §21.3 states this as a property, not a defect.                                                                                                                                                                                                                                       |
+| [Trusted Types](https://www.w3.org/TR/trusted-types/)                                     | **Subset**    | §21.5    | packages/studio/src/services/trusted-types.ts, packages/studio/tests/trusted-types.test.ts, packages/runtime/src/runtime.ts   | `gap:trusted-types` The policy exists and refuses: `createHTML` asserts its input is sanitized and throws naming what it found, `createScript`/`createScriptURL` throw outright, and the runtime's four `innerHTML = ""` writes became `replaceChildren()`. **Not enforced** — no deployment sends `require-trusted-types-for`, because under this standard `eval` and `new Function` are gated too and the canvas interpreter needs both; §21.5 records why that is two permanent CSP profiles rather than a TODO, and why enforcement waits on a report-only run. |
 
 ---
 
@@ -2134,9 +2159,10 @@ Every statement kind reuses a web-platform name — §19.4's law extended to sta
 
 ## 21. Evaluation Surface
 
-> **Status: Partial.** The surface is stated accurately, which is what this section is for. What is
-> absent is a **guard**: no Trusted Types policy is installed, so the DOM sinks the runtime and
-> Studio use are unprotected even where the eval requirement does not apply. See §18.
+> **Status: Partial.** The surface is stated accurately, which is what this section is for, and a
+> Trusted Types policy now guards the one injection sink the Studio shell has (§21.5). What is
+> absent is **enforcement**: no deployment sends `require-trusted-types-for`, and doing so needs a
+> report-only run first for the reason §21.5 gives. See §18.
 
 Jx documents contain executable code — `${}` templates and `body`/`$src` functions. Where and how that code runs differs by mode, and the security posture differs with it. This section states the surface honestly so hosts can make an informed decision.
 
@@ -2161,6 +2187,40 @@ The interpreting runtime — the dev server, the Studio canvas, and `@jxsuite/ru
 A Jx document is **executable input**. Loading and rendering an untrusted document in the interpreting runtime runs its code; compiling an untrusted document runs its code at build time. Jx does not sandbox document code — treat a `.json` document with the same trust you would treat a `.js` file from the same source.
 
 > **Status: Implemented** (as a stated property, not a sandbox). See also `@jxsuite/server` §4.2 for the dev-server network controls and `docs/framework/concepts/security.md` for the user-facing summary.
+
+### 21.5 Two CSP Profiles, Permanently
+
+> **Status: Implemented** as a decision; enforcement is not.
+
+There are **two** profiles here, not one profile with an outstanding TODO, and saying so is the
+point of this section: "remove `eval` from the runtime" has been living as an implied task, and it
+is not one. The interpreter **is** those `new Function` sites — an interpreter that does not compile
+expressions at runtime is a compiler.
+
+| Profile                     | `'unsafe-eval'` | Why                                                                        |
+| --------------------------- | --------------- | -------------------------------------------------------------------------- |
+| **Compiled output**         | never           | §21.1, with a committed test asserting the emitted JS contains neither     |
+| **The interpreting canvas** | permanently     | §21.3 — it evaluates `${}` templates and `body` functions as they are read |
+
+**What Trusted Types actually gates, verified rather than assumed.** The tempting reading is that
+`require-trusted-types-for 'script'` covers DOM injection sinks and leaves `eval` to `script-src`.
+It does not: under Trusted Types, `eval()` and `new Function()` are gated as well, and throw when no
+default policy exists. The escape hatch is a **default policy whose `createScript` passes its input
+through**, which re-permits evaluation and makes the script half of Trusted Types a rubber stamp.
+
+That is why the two halves are staged separately, and why the shell does not enforce yet:
+
+- **The injection sinks are handled now.** The four `innerHTML = ""` writes in `@jxsuite/runtime`
+  became `replaceChildren()` — identical semantics, four fewer sinks, and no policy needed to clear
+  an element. The shell's one remaining sink is the assistant's markdown, which goes through a
+  policy that **asserts** its input is sanitized and throws naming what it found. A `createHTML`
+  that returned its input unchanged would satisfy the API and defend nothing.
+- **`createScript` and `createScriptURL` refuse.** Nothing in the shell builds either from a string.
+  The canvas iframe is a different document with a different profile, so a permissive `createScript`
+  in the shell would buy the shell nothing and cost it the control.
+- **Enforcement needs a report-only deployment first.** This is the one place where getting the
+  standard's scope wrong produces a plan that cannot be executed, so the order is: ship the policy,
+  observe under `Content-Security-Policy-Report-Only`, then enforce.
 
 ---
 
@@ -2383,6 +2443,8 @@ This rewrites the mutating handlers of Appendix A's idiom using `$expression`, l
 
 ## Changelog
 
+- **0.4.33-draft** (2026-08-16) — §21.5 two CSP profiles, permanently: compiled output never needs 'unsafe-eval' and the interpreting canvas always will. A Trusted Types policy guards the shell's one injection sink and refuses to build scripts; the runtime's four innerHTML writes became replaceChildren().
+- **0.4.32-draft** (2026-08-16) — §11.2a the Cookie prototype derives Secure/Path/Domain from a name prefix and from SameSite=None; HttpOnly and Expires are absent on purpose; a cookie name is data, never pattern syntax.
 - **0.4.31-draft** (2026-08-16) — Shadow DOM opt-in: $shadow and defaults.shadow emit a declarative shadow root the element adopts; :host translation keeps one style object valid in both modes (§16.6).
 - **0.4.30-draft** (2026-08-16) — §9.1 and §16.6: style scoping is a tag-name prefix and generated classes, not data-jx attribute selectors; cite the light-DOM divergence.
 - **0.4.29-draft** (2026-08-15) — §18 becomes the machine-checked standards table; §2.5 renamed Platform Precedents to free the reserved title; §21 marked Partial — no Trusted Types policy is installed.
@@ -2434,4 +2496,4 @@ This rewrites the mutating handlers of Appendix A's idiom using `$expression`, l
 
 ---
 
-_Jx Specification v0.4.31-draft — subject to revision_
+_Jx Specification v0.4.33-draft — subject to revision_

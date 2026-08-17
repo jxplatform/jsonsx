@@ -20,26 +20,47 @@ import { isAbsolute, relative, resolve, sep } from "node:path";
 import { realpathSync } from "node:fs";
 import { resolveAssetUrl } from "@jxsuite/schema/asset-paths";
 import type { AssetMount } from "@jxsuite/schema/asset-paths";
+import { problem } from "./problem.ts";
 
 export const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
+
+/**
+ * The whole loopback block, not just `127.0.0.1`.
+ *
+ * IANA reserves `127.0.0.0/8` (RFC 1122 §3.2.1.3), and every address in it is the same machine —
+ * `127.0.0.2` reaches this process exactly as `127.0.0.1` does. A gate that recognized only the
+ * canonical spelling would reject a client that used any other, while granting nothing: an attacker
+ * who can send from `127.0.0.53` is already on the host.
+ */
+const IPV4_LOOPBACK = /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
+
+/**
+ * The unspecified address, accepted as a **Host** and never as an **Origin**.
+ *
+ * As a Host it is ordinary: a server bound to `0.0.0.0` inside a container is reached at that
+ * literal, and the request is as local as any other. As an Origin it is meaningless — no page is
+ * ever served from `http://0.0.0.0` — so a request claiming it is either confused or probing, and
+ * treating the two positions alike would widen the gate for nothing.
+ */
+const UNSPECIFIED_HOST = "0.0.0.0";
+
+/** Strip a trailing `:port`, keeping a bracketed IPv6 literal intact. */
+function bareHost(host: string): string {
+  if (host.startsWith("[")) {
+    const end = host.indexOf("]");
+    return end === -1 ? host : host.slice(0, end + 1);
+  }
+  const colon = host.indexOf(":");
+  return colon === -1 ? host : host.slice(0, colon);
+}
 
 /** True when a hostname (optionally with :port) is a loopback host. */
 export function isLoopbackHost(host: string | null | undefined): boolean {
   if (!host) {
     return false;
   }
-  // Strip a trailing :port (but keep bracketed IPv6 intact for the literal set).
-  let h = host;
-  if (h.startsWith("[")) {
-    const end = h.indexOf("]");
-    h = end === -1 ? h : h.slice(0, end + 1);
-  } else {
-    const colon = h.indexOf(":");
-    if (colon !== -1) {
-      h = h.slice(0, colon);
-    }
-  }
-  return LOOPBACK_HOSTS.has(h.toLowerCase());
+  const h = bareHost(host).toLowerCase();
+  return LOOPBACK_HOSTS.has(h) || IPV4_LOOPBACK.test(h);
 }
 
 /**
@@ -53,6 +74,7 @@ export function originIsLoopbackOrAbsent(req: Request): boolean {
     return true;
   }
   try {
+    // Deliberately NOT accepting the unspecified address here; see UNSPECIFIED_HOST.
     return isLoopbackHost(new URL(origin).hostname);
   } catch {
     return false;
@@ -68,36 +90,169 @@ export function hostIsLoopbackOrAbsent(req: Request): boolean {
   if (!host) {
     return true;
   }
-  return isLoopbackHost(host);
+  return isLoopbackHost(host) || bareHost(host) === UNSPECIFIED_HOST;
 }
 
 /**
- * Origin/Host-only request gate (no token). Returns a 403 Response when the request is not
- * loopback-safe, else null. Suitable for a same-origin dev server: the browser sends a loopback
- * Origin on cross-origin POSTs, so this closes CSRF + DNS-rebinding without a shared token.
+ * How much cross-origin traffic a surface tolerates.
+ *
+ * `strict` is the default and what every privileged route uses. `embeddable` exists for exactly one
+ * reason: the desktop canvas renders the project inside an iframe on a **different origin**, so the
+ * subresources that page requests — its images, its stylesheets, its modules — legitimately arrive
+ * `cross-site`. Refusing those would break the canvas; accepting them for a route that can write a
+ * file or run an `import()` would hand away the containment. So the difference is a property of the
+ * surface, named at the call site.
  */
-export function originHostGate(req: Request): Response | null {
+export type FetchPolicy = "strict" | "embeddable";
+
+/**
+ * Whether `Sec-Fetch-*` says this request is one the surface accepts (Fetch Metadata Request
+ * Headers).
+ *
+ * The header states the requester's intent directly, which is what `Origin` cannot do: a
+ * same-origin GET omits `Origin` entirely, so the gate has to accept an absent one — a hole
+ * `Sec-Fetch-Site` does not have.
+ *
+ * **Absent means accept, and that is a hard requirement rather than a concession.** The header is
+ * browser-supplied. curl omits it, Bun-native clients omit it, the desktop RPC bridge omits it, and
+ * `packages/server/tests/**` builds well over a hundred bare `Request`s. Requiring it would refuse
+ * every non-browser client on the machine while stopping no attacker, because the threat model here
+ * is a _page_ — and a page always sends it. `fetchMetadataAbsentIsAccepted` in
+ * `tests/net-guard.test.ts` is the test that makes deleting this loud.
+ *
+ * Under `strict`:
+ *
+ * - `same-origin` and `none` — the served page and a typed URL. Allowed.
+ * - `cross-site` — allowed **only** for a top-level document navigation, which is a person following
+ *   a link. A cross-site _subresource_ or form POST is the CSRF this gate exists for.
+ * - `same-site` — **denied**, which is stricter than the standard's Resource Isolation Policy and
+ *   deliberate: on `127.0.0.1` there is no meaningful "site" wider than the origin, so `same-site`
+ *   means _a different port on this machine_ — precisely the other-local-process threat a loopback
+ *   bind cannot address.
+ *
+ * @param {Request} req
+ * @param {FetchPolicy} policy
+ * @returns {boolean}
+ */
+export function fetchMetadataAllows(req: Request, policy: FetchPolicy = "strict"): boolean {
+  const site = req.headers.get("sec-fetch-site");
+  if (!site) {
+    return true;
+  }
+  if (site === "same-origin" || site === "none") {
+    return true;
+  }
+  if (site === "cross-site") {
+    if (policy === "embeddable") {
+      return true;
+    }
+    // A person following a link, and nothing else.
+    return (
+      req.headers.get("sec-fetch-mode") === "navigate" &&
+      req.headers.get("sec-fetch-dest") === "document" &&
+      req.method === "GET"
+    );
+  }
+  // `same-site` and anything unrecognized.
+  return policy === "embeddable" && site === "same-site";
+}
+
+/**
+ * Origin/Host + Fetch Metadata request gate (no token). Returns a 403 Response when the request is
+ * not loopback-safe, else null.
+ *
+ * Suitable for a same-origin dev server: the browser sends a loopback Origin on cross-origin POSTs,
+ * so this closes CSRF + DNS-rebinding without a shared token. The Fetch Metadata check is folded in
+ * here rather than added at each call site, which is what makes it reach every gated surface at
+ * once — there are no new call sites to remember.
+ */
+export function originHostGate(req: Request, policy: FetchPolicy = "strict"): Response | null {
   if (!originIsLoopbackOrAbsent(req) || !hostIsLoopbackOrAbsent(req)) {
-    return new Response("Forbidden", { status: 403 });
+    return problem("forbidden", "Forbidden");
+  }
+  if (!fetchMetadataAllows(req, policy)) {
+    return problem("forbidden", "Forbidden");
   }
   return null;
 }
 
 /**
- * Token + Origin/Host gate. Returns a 403 Response when the token mismatches OR the request is not
- * loopback-safe, else null. Used by the cross-origin desktop server whose canvas iframe carries the
- * token in the URL. Pass `token: null` to skip the token check (Origin/Host only).
+ * Compare two secrets without leaking their common prefix through timing.
+ *
+ * The token is in a URL that a local process may be able to guess at but not read, so a
+ * character-by-character early return is a real oracle: an attacker who can time responses recovers
+ * it one character at a time. Length is compared first and separately, because a length mismatch is
+ * not secret — the token's length is fixed and public.
+ *
+ * @param {string} a
+ * @param {string} b
+ * @returns {boolean}
  */
-export function loopbackGate(req: Request, url: URL, token: string | null): Response | null {
-  if (token !== null && url.searchParams.get("token") !== token) {
-    return new Response("Forbidden", { status: 403 });
+export function secretsMatch(a: string, b: string): boolean {
+  if (a.length !== b.length) {
+    return false;
   }
-  return originHostGate(req);
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    // oxlint-disable-next-line no-bitwise -- constant-time accumulation; a branch here is the leak.
+    diff |= (a.codePointAt(i) ?? 0) ^ (b.codePointAt(i) ?? 0);
+  }
+  return diff === 0;
+}
+
+/**
+ * The token a request presents, from either place it may carry one.
+ *
+ * The query parameter is what the canvas iframe uses, because an iframe's `src` is the only place
+ * it can put one. `Authorization: Bearer` is accepted **additively** for everything else — a fetch,
+ * a curl, a desktop bridge — since a secret in a URL is logged, referred and shoulder-surfable, and
+ * offering a header costs nothing.
+ *
+ * @param {Request} req
+ * @param {URL} url
+ * @returns {string | null}
+ */
+export function presentedToken(req: Request, url: URL): string | null {
+  const bearer = req.headers.get("authorization");
+  if (bearer?.toLowerCase().startsWith("bearer ")) {
+    const value = bearer.slice("bearer ".length).trim();
+    if (value !== "") {
+      return value;
+    }
+  }
+  return url.searchParams.get("token");
+}
+
+/**
+ * Token + Origin/Host + Fetch Metadata gate. Returns a 403 Response when the token mismatches OR
+ * the request is not loopback-safe, else null. Used by the cross-origin desktop server whose canvas
+ * iframe carries the token in the URL. Pass `token: null` to skip the token check.
+ */
+export function loopbackGate(
+  req: Request,
+  url: URL,
+  token: string | null,
+  policy: FetchPolicy = "strict",
+): Response | null {
+  if (token !== null) {
+    const presented = presentedToken(req, url);
+    if (presented === null || !secretsMatch(presented, token)) {
+      return problem("forbidden", "Forbidden");
+    }
+  }
+  return originHostGate(req, policy);
 }
 
 /** Normalize a path for cross-platform containment comparison (separators + case on Windows). */
 export function normalizeForCompare(p: string): string {
-  const slashed = p.replaceAll("\\", "/");
+  /*
+   * NFC, and this is not cosmetic. `readdir` on macOS returns a decomposed filename while a path
+   * from a file picker, a config file or a URL arrives precomposed — two different strings for one
+   * file. Containment is a string comparison, so without normalizing, every path holding an accent
+   * silently failed to be contained: the file existed, the check said it was outside the root, and
+   * the request 404'd with nothing to search for.
+   */
+  const slashed = p.replaceAll("\\", "/").normalize("NFC");
   return process.platform === "win32" ? slashed.toLowerCase() : slashed;
 }
 
@@ -224,10 +379,10 @@ export function decodeAndNormalizePath(url: URL): DecodedPath {
   try {
     path = decodeURIComponent(url.pathname);
   } catch {
-    return { reject: new Response("Bad request", { status: 400 }) };
+    return { reject: problem("invalidRequest", "Bad request") };
   }
   if (/%2e|%2f/i.test(path)) {
-    return { reject: new Response("Not found", { status: 404 }) };
+    return { reject: problem("notFound", "Not found") };
   }
   const normPath = path.replace(/^\/{2,}/, "/");
   return { path, normPath };

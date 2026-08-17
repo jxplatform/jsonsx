@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { createDevServerPlatform } from "../src/platforms/devserver";
 import { LOCATION_ID_FILE } from "@jxsuite/protocol/routes";
 import type { FsEvent, StudioPlatform } from "../src/types";
+import { recordCollabSockets } from "./collab-socket-recorder";
 
 /** Minimal EventSource stub: records the latest instance and lets tests emit named events. */
 class FakeEventSource {
@@ -1297,41 +1298,42 @@ describe("collab capability", () => {
 
   test("a capable server opens the multiplexed socket at /__studio/collab", async () => {
     route("/__studio/collab", () => json({ collab: true, version: 1 }));
-    const seen: string[] = [];
-    class RecordingWebSocket {
-      binaryType = "";
-      readyState = 0;
-      onopen: (() => void) | null = null;
-      onclose: (() => void) | null = null;
-      onerror: (() => void) | null = null;
-      onmessage: ((ev: unknown) => void) | null = null;
-      sent = 0;
-      constructor(url: string) {
-        seen.push(url);
-      }
-      send(): void {
-        this.sent += 1;
-      }
-      close(): void {
-        this.sent = -1;
-      }
-    }
-    const realWs = (globalThis as Record<string, unknown>)["WebSocket"];
-    (globalThis as Record<string, unknown>)["WebSocket"] = RecordingWebSocket;
+    const seen = await recordCollabSockets(() => createDevServerPlatform());
+    // A server advertising no `protocols` predates negotiation, so nothing is offered to it.
+    expect(seen).toEqual([{ url: `ws://${location.host}/__studio/collab` }]);
+  });
+
+  test("offers the subprotocol a server advertises", async () => {
+    route("/__studio/collab", () =>
+      json({ collab: true, protocols: ["jx.collab.v1"], version: 1 }),
+    );
+    const seen = await recordCollabSockets(() => createDevServerPlatform());
+    expect(seen).toEqual([
+      { protocols: ["jx.collab.v1"], url: `ws://${location.host}/__studio/collab` },
+    ]);
+  });
+
+  test("refuses to open a socket to a server speaking an envelope this build cannot parse", async () => {
+    /*
+     * The connection is never attempted: a peer whose frames we would mis-parse must not join a
+     * room, and detecting that on the probe means the author gets a reason instead of a browser's
+     * opaque handshake failure.
+     */
+    route("/__studio/collab", () =>
+      json({ collab: true, protocols: ["jx.collab.v9"], version: 9 }),
+    );
+    const warnings: unknown[] = [];
+    const realWarn = console.warn;
+    console.warn = (...args: unknown[]) => {
+      warnings.push(args[0]);
+    };
     try {
       const platform = createDevServerPlatform();
-      // The open never resolves (the socket never answers); only the URL contract is under test.
-      void platform.collab?.("pages/index.md");
-      const deadline = Date.now() + 3000;
-      while (seen.length === 0 && Date.now() < deadline) {
-        await new Promise((resolve) => {
-          setTimeout(resolve, 10);
-        });
-      }
-      expect(seen).toEqual([`ws://${location.host}/__studio/collab`]);
+      expect(await platform.collab?.("pages/index.md")).toBeNull();
     } finally {
-      (globalThis as Record<string, unknown>)["WebSocket"] = realWs;
+      console.warn = realWarn;
     }
+    expect(String(warnings[0])).toContain("jx.collab.v9");
   });
 });
 

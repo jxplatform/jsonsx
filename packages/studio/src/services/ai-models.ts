@@ -97,6 +97,35 @@ export function getProxyDefaultModel(): string {
 }
 
 /**
+ * The sibling of the chat route, replacing the last path segment and keeping everything else.
+ *
+ * Written as a URL rewrite rather than `chatUrl.replace(/\/chat$/, …)`, because the chat URL is not
+ * always a bare path: the desktop platform appends the loopback server's `?token=`, and a regex
+ * anchored on the end of the string silently stopped matching the moment it did — leaving the
+ * models request pointed at the chat endpoint.
+ *
+ * @param {string} chatUrl - Absolute or root-relative, with or without a query
+ * @param {string} segment - The sibling route's last path segment
+ * @returns {string}
+ */
+export function siblingRoute(chatUrl: string, segment: string): string {
+  /*
+   * A fixed sentinel base rather than `location.href`. The document's own URL is not always a
+   * usable base — under the DOM test harness it is `about:blank`, which makes `new URL` throw and
+   * would silently return the chat URL unchanged, pointing the models request at the chat endpoint.
+   * The base is discarded below for a root-relative input, so its value cannot leak.
+   */
+  let url: URL;
+  try {
+    url = new URL(chatUrl, "http://jx.invalid");
+  } catch {
+    return chatUrl; // Not a URL at all — leave a caller's own string alone.
+  }
+  url.pathname = url.pathname.replace(/[^/]*$/, segment);
+  return /^https?:/i.test(chatUrl) ? url.href : `${url.pathname}${url.search}`;
+}
+
+/**
  * Fetch the models available through the AI proxy. Returns the cached list when present unless
  * `force` is set; throws on HTTP/network failure (callers surface the error).
  *
@@ -112,7 +141,7 @@ export async function fetchAvailableModels(
   }
   const plat = getPlatform();
   const chatUrl = await Promise.resolve(plat.aiChatUrl());
-  const modelsUrl = chatUrl.replace(/\/chat$/, "/models");
+  const modelsUrl = siblingRoute(chatUrl, "models");
 
   const headers: Record<string, string> = {};
   const apiKey = opts.apiKey || getOpenAiKey();

@@ -33,6 +33,7 @@
  */
 
 import { reactive } from "../reactivity";
+import { announce } from "./announce";
 import { now } from "./clock";
 
 /** How bad it is. Chooses the icon, the colour, and the default tier. */
@@ -194,6 +195,21 @@ export function notify(
       toasts.shift();
     }
   }
+  /*
+   * Announce from HERE, not from a host.
+   *
+   * The `role="status"` region lived on the toast host, and `error` defaults to the `problem` tier —
+   * so a failure reached no live region at all, and a Problems-panel region would still announce
+   * nothing while another Bottom-dock tab was showing. One call site is what makes "posted" and
+   * "announced" the same event: a new host gets announcements without knowing this module exists.
+   *
+   * `source` is included because a screen-reader user has no visual grouping to tell them where the
+   * message came from, which is exactly what the panel's own column shows everyone else.
+   */
+  announce(
+    record.source === undefined ? record.message : `${record.source}: ${record.message}`,
+    severity === "error" ? "assertive" : "polite",
+  );
   return record;
 }
 

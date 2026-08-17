@@ -1,0 +1,106 @@
+/*
+ * Forced colours (Windows High Contrast, and its equivalents).
+ *
+ * WHAT BREAKS, CONCRETELY. In forced-colors mode the browser replaces every author colour with a
+ * value from the user's chosen system palette, and it drops `background-image` and `box-shadow`
+ * outright. Most of this app's "you are here" affordances are drawn with exactly those two:
+ *
+ *   - the selected pane tab's underline           inset box-shadow
+ *   - the Problems/dirty row marker               inset box-shadow
+ *   - the media-picker selection ring             `0 0 0 1px` box-shadow
+ *   - the drop-target ring                        `0 0 0 3px` box-shadow
+ *
+ * All four vanish, silently, and the result is an editor where nothing shows what is selected. That
+ * is not a contrast problem to tune; it is a category of affordance the mode deletes. Each one is
+ * therefore redrawn here with a BORDER or an OUTLINE, which forced colours keep and recolour.
+ *
+ * The system colour keywords (`Highlight`, `CanvasText`, `LinkText`) are the point: they resolve to
+ * whatever palette the user chose, so the result honours a high-contrast theme instead of imposing
+ * this app's idea of one. `-1px` outline offsets keep a redrawn ring inside the element's own box,
+ * where the shadow it replaces was.
+ *
+ * This file loads LAST, so it wins on specificity ties without `!important` on anything but the
+ * declarations forced colours would otherwise re-force.
+ */
+
+@media (forced-colors: active) {
+  /* ── Selection and state markers ────────────────────────────────────────── */
+
+  /*
+   * The pane tab's underline and the row markers. `box-shadow: inset …` is gone in this mode, so
+   * the same 2px is drawn as a border on the same edge — which forced colours keep.
+   */
+  .pane-tab[aria-selected="true"],
+  .tab--active {
+    border-bottom: 2px solid Highlight;
+  }
+
+  .notification-row--problem,
+  .problem-row {
+    border-left: 2px solid Highlight;
+  }
+
+  /* A media-picker or grid selection ring, redrawn as an outline. */
+  .media-item--selected,
+  .media-tile--selected,
+  [aria-selected="true"] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+
+  /* The drop target. A 3px translucent ring is invisible here twice over — shadow and alpha. */
+  .drop-target,
+  .is-drop-target {
+    outline: 3px solid Highlight;
+    outline-offset: -3px;
+  }
+
+  /* ── Focus ──────────────────────────────────────────────────────────────── */
+
+  /*
+   * Keyboard focus must survive whatever a component drew it with. `Highlight` is the palette's
+   * own focus colour, and the offset puts the ring outside the control rather than over its label.
+   */
+  :focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+
+  /* ── The canvas ─────────────────────────────────────────────────────────── */
+
+  /*
+   * The canvas renders the USER'S OWN DOCUMENT, and forcing colours over it would misrepresent
+   * what they are building: an author in high-contrast mode would see their site's palette replaced
+   * by the system's and have no way to tell what visitors see. `forced-color-adjust: none` opts the
+   * artboard — and only the artboard — back out. Every affordance the editor draws ON TOP of it
+   * (selection outlines, hover rules, the grid) lives outside this element and keeps the mode.
+   */
+  .artboard,
+  .canvas-frame,
+  iframe.canvas-iframe {
+    forced-color-adjust: none;
+  }
+
+  /* ── Affordances drawn only with colour ─────────────────────────────────── */
+
+  /*
+   * A dot or a bar whose whole meaning is its fill loses that meaning when every fill becomes the
+   * same system colour. A border restores the shape distinction the fill was carrying.
+   */
+  .status-dot,
+  .severity-dot,
+  .provenance-chip {
+    border: 1px solid CanvasText;
+  }
+
+  /*
+   * Disabled controls: forced colours map them to `GrayText`, which the browser will apply — but
+   * only if the app has not painted over it with an opacity trick. Opacity is not a colour, so it
+   * survives the mode and stacks with GrayText into something unreadable.
+   */
+  [disabled],
+  [aria-disabled="true"] {
+    opacity: 1;
+    color: GrayText;
+  }
+}

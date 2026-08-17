@@ -55,6 +55,10 @@ Everything else on the interface is optional, and each optional member maps to a
 
 Studio always checks for presence before calling an optional member, so an omitted member is never an error. The [protocol route reference](/docs/extending/reference/studio-routes) is the complete degradation catalogue.
 
+:::doc-note
+**`collab` probes before it connects, and the probe decides more than availability.** Both bundled adapters GET the collab URL once and pass the `protocols` it lists to the wire client, which offers one as `Sec-WebSocket-Protocol`. An adapter that skips the probe and opens the socket directly must offer no subprotocol at all — a client whose offer goes unechoed fails the connection outright ([RFC 6455 §4.1](https://www.rfc-editor.org/rfc/rfc6455#section-4.1)), so an unconditional offer breaks co-editing against every backend that predates negotiation. See [the backend protocol](/docs/extending/embedding/backend-protocol).
+:::
+
 ### Capabilities beyond the interface
 
 Your host may be able to do things no other host can. Keep those **off** `StudioPlatform` and let Studio feature-detect them on `globalThis.__jxPlatform` — that is how the desktop's `updater` and window controls work, and it is what lets the same Studio code run where they do not exist.

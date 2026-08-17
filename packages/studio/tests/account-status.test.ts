@@ -121,8 +121,10 @@ describe("platform-errors", () => {
       code: "needs_installation_access",
       installUrl: INSTALL_URL,
     });
+    // The underscored legacy code and the hyphenated problem-type slug are one code; normalizing
+    // Is what lets a migrated and an unmigrated backend reach the same branch below.
     expect(platformErrorInfo(error)).toEqual({
-      code: "needs_installation_access",
+      code: "needs-installation-access",
       installUrl: INSTALL_URL,
     });
     expect(installUrlOf(error)).toBe(INSTALL_URL);

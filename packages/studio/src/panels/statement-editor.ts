@@ -145,7 +145,13 @@ export function laneListAt(list: JxStatement[], path: LanePath): JxStatement[] |
     return list;
   }
   const [idx, key] = path;
-  const stmt = typeof idx === "number" ? (list[idx] as Record<string, unknown> | undefined) : null;
+  /*
+   * `unknown`, not a cast to `Record<string, unknown>`. A `JxStatement` is a union of interfaces
+   * with no index signature, so asserting one into an open bag is a lie TypeScript rightly refuses
+   * — and it was buying nothing, because `isJsonObject` takes `unknown` and narrows to exactly the
+   * open bag this wants. The guard on the next line is the real check either way.
+   */
+  const stmt: unknown = typeof idx === "number" ? list[idx] : null;
   if (!isJsonObject(stmt) || typeof key !== "string") {
     return null;
   }

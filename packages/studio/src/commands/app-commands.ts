@@ -40,6 +40,7 @@ import { selectionCommands } from "../canvas/canvas-render";
 import { inspectorCommands } from "../panels/properties-panel";
 import { dataExplorerCommands } from "../panels/data-explorer";
 import { seoCommands } from "../panels/seo-modal";
+import { a11yCommands } from "../services/a11y-report";
 import { liveElementCommands } from "../editor/context-menu";
 import { signalsCommands } from "../panels/signals-panel";
 import { formulaEditorCommands } from "../panels/formula-workspace";
@@ -121,6 +122,7 @@ export function appCommandSet(): AnyCommand[] {
     ...selectionCommands(),
     ...inspectorCommands(),
     ...seoCommands(),
+    ...a11yCommands(),
     // The element menu's eight verbs. Every one declares `menus: ["context/element", "palette"]`
     // And none reached the palette, because they were registered ONLY into the private registry
     // `editor/context-menu.ts` builds for its popover — a registry whose own docstring said it

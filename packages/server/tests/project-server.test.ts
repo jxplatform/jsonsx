@@ -401,7 +401,7 @@ describe("misc surfaces", () => {
   test("an unmatched AI route falls through to a project-file 404", async () => {
     // HandleAiApi returns null for a non-AI/unknown path; the request then falls through to the
     // Project-file lookup (no such file) and 404s. This exercises the AI prefix-rewrite branch.
-    expect(await statusOf(`${base}/__studio__/ai/does-not-exist`)).toBe(404);
+    expect(await statusOf(`${base}/__studio__/ai/does-not-exist?token=${token}`)).toBe(404);
   });
 
   test("a bare npm specifier is resolved and bundled", async () => {
@@ -510,5 +510,69 @@ describe("ws dispatch", () => {
       session1Alive = true;
       ws.close();
     }
+  });
+});
+
+// ─── The OAuth loopback callback (RFC 8252) ──────────────────────────────────
+
+describe("the OAuth loopback callback", () => {
+  test("is reachable without the token, because the provider cannot carry one", async () => {
+    /*
+     * The whole point of the exemption: the IdP redirects the user's own browser to the
+     * `redirect_uri` it was given, and a page cannot append a secret to a URL it does not compose.
+     * A token gate here would make the flow impossible rather than safe — the `state` parameter is
+     * what does that job.
+     */
+    const pending = await handle.authorizer.begin(handle.server.port!, {
+      authorizationEndpoint: "https://github.com/login/oauth/authorize",
+      clientId: "Ov23liEXAMPLE",
+    });
+    const response = await fetch(
+      `${base}/__jx_oauth__/callback?code=abc123&state=${encodeURIComponent(pending.state)}`,
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/html");
+    expect(await pending.code).toBe("abc123");
+  });
+
+  test("the redirect_uri it hands the provider names this server's own port", async () => {
+    const pending = await handle.authorizer.begin(handle.server.port!, {
+      authorizationEndpoint: "https://github.com/login/oauth/authorize",
+      clientId: "Ov23liEXAMPLE",
+    });
+    expect(pending.redirectUri).toBe(
+      `http://127.0.0.1:${handle.server.port}/__jx_oauth__/callback`,
+    );
+    pending.cancel();
+  });
+
+  test("still refuses a cross-site subresource and a rebinding Host", async () => {
+    // Exempt from the token, and only from the token: Host and Fetch Metadata still apply.
+    const crossSite = await fetch(`${base}/__jx_oauth__/callback?code=x&state=y`, {
+      headers: {
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "cross-site",
+      },
+    });
+    expect(crossSite.status).toBe(403);
+
+    const rebound = await fetch(`${base}/__jx_oauth__/callback?code=x&state=y`, {
+      headers: { Host: "evil.example.com" },
+    });
+    expect(rebound.status).toBe(403);
+  });
+
+  test("accepts the shape an IdP redirect actually has", async () => {
+    // A top-level GET document navigation is the one cross-site shape the strict policy admits.
+    const response = await fetch(`${base}/__jx_oauth__/callback?code=x&state=unknown`, {
+      headers: {
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "cross-site",
+      },
+    });
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain("did not match a sign-in started by this app");
   });
 });

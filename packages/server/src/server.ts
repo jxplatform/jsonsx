@@ -34,7 +34,9 @@ import {
 import { handleCodeApi } from "./code-api.ts";
 import { handleAiApi } from "./ai-api.ts";
 import { handleImportApi } from "./import-api.ts";
+import { mediaTypeForPath } from "@jxsuite/schema/media-type";
 import { existsSync, readFileSync } from "node:fs";
+import { problem } from "./problem.ts";
 
 /**
  * Resolve an npm-style bare specifier from a URL path via node_modules. Handles scoped packages
@@ -255,8 +257,19 @@ export async function createDevServer(options: {
   // Studio.js/canvas bundle — which shows up as half-updated UI after a rebuild (the iframe assets
   // Are query-cache-busted per mount, the parent bundle is not).
   const NO_CACHE = { "Cache-Control": "no-cache" };
-  const fileResponse = (file: ReturnType<typeof Bun.file>) =>
-    new Response(file, { headers: NO_CACHE });
+  /*
+   * `Bun.file` already infers a type from the extension, and for almost everything it is right. The
+   * exceptions are the two RFCs Jx has an opinion about: `.md` comes back as bare `text/markdown`
+   * with no `variant`, and `.yaml` comes back as `text/yaml`, the spelling RFC 9512 §5 asks
+   * implementations to stop using. `mediaTypeForPath` answers null everywhere else, so the
+   * inference stays in charge of the ordinary cases.
+   */
+  const fileResponse = (file: ReturnType<typeof Bun.file>) => {
+    const corrected = file.name === undefined ? null : mediaTypeForPath(file.name);
+    return new Response(file, {
+      headers: corrected === null ? NO_CACHE : { ...NO_CACHE, "Content-Type": corrected },
+    });
+  };
 
   // Active studio project root (set via /__studio/activate, used for static file fallback)
   let activeProjectRoot: string | null = null;
@@ -296,7 +309,7 @@ export async function createDevServer(options: {
 
       // SSE live reload
       if (handleSSE && path === "/__reload") {
-        return handleSSE();
+        return handleSSE(req);
       }
 
       /*
@@ -362,7 +375,9 @@ export async function createDevServer(options: {
             createdRoots.some((created) => containedPath(requested, created) !== null) ||
             isOwnedProjectDir(requested);
           if (!permitted) {
-            return Response.json({ ok: false, error: "root not permitted" }, { status: 403 });
+            // `ok: false` rides along as an extension member: the Studio client branches on it,
+            // And RFC 9457 §3.2 exists precisely so a problem can carry what a type documents.
+            return problem("forbidden", "root not permitted", { ok: false });
           }
           activeProjectRoot = requested;
           return Response.json({ ok: true, root: activeProjectRoot });
@@ -526,7 +541,7 @@ export async function createDevServer(options: {
            404s from the output looked like it worked and handed the reader whichever of the two
            happened to be missing. `site-preview.ts` gives the built site its own origin instead,
            where every path has exactly one meaning. */
-        return new Response("Not found", { status: 404 });
+        return problem("notFound", "Not found");
       }
 
       // Inject the live-reload script into served HTML — but NOT into the Studio editor.

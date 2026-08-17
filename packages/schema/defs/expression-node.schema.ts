@@ -1,3 +1,5 @@
+import { intlHelpersClause } from "../src/intl.ts";
+
 export const expressionPointerSchema = {
   additionalProperties: false,
   description:
@@ -199,7 +201,8 @@ export const expressionNodeSchema = {
     },
     {
       description:
-        "Invoke a callable, pure in formula position: target is the callee pointer — a named formula entry (#/state/…) or a blessed pure global via window#/ (Math.*, JSON.*, Object.keys/values/entries, and the Intl helpers Intl/formatNumber, Intl/formatDate, Intl/formatRelativeTime) — and value is the positional argument list (the splice args-in-value precedent). Argument order follows the callee's declared parameters.",
+        "Invoke a callable, pure in formula position: target is the callee pointer — a named formula entry (#/state/…) or a blessed pure global via window#/ (Math.*, JSON.*, Object.keys/values/entries, and " +
+        `${intlHelpersClause()}) — and value is the positional argument list (the splice args-in-value precedent). Argument order follows the callee's declared parameters.`,
       not: { required: ["initial"] },
       properties: {
         operator: { $ref: "#/$defs/CallOperator" },

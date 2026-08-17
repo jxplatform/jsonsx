@@ -137,6 +137,10 @@ Frontmatter and data fields live under `data` (`${state.post.data.title}`); for 
 
 Markdown headings in `$children` carry automatic anchor `id`s — the heading text lowercased, punctuation stripped, spaces hyphenated, with `-2`, `-3` suffixes deduplicating repeats in document order. The entry's table of contents (`_meta.toc`: `depth`, `text`, `id` per heading) uses the same ids, so TOC links, search results, and hand-written `#fragment` URLs all land on the rendered section.
 
+Two details of that are worth knowing if you write in anything but English. **Letters outside ASCII are kept**, so a Japanese or Russian heading gets an anchor made of its own words rather than an empty one falling back to `section`. And an accented heading gets **one** anchor whichever way it was typed: `é` can be a single character or an `e` with a combining accent, they look identical and used to produce two different links, so the text is normalized before the id is built. Anchors for plain-ASCII headings are unchanged, so existing links still work.
+
+`_meta.wordCount` and `_meta.readingTime` count **words as the language defines them**, not runs of text between spaces — a Japanese or Thai article has no spaces between its words and used to count as one word, and therefore as one minute to read however long it was. Reading time is word count at 200 words per minute; that rate is a single honest constant rather than a per-language table, so treat it as an estimate for prose in any script.
+
 Fenced code blocks in `$children` arrive syntax-highlighted: recognized languages become token spans carrying `--shiki-light`/`--shiki-dark` color variables that follow the site's [color scheme](/docs/framework/concepts/color-schemes). See [Jx Markdown](/docs/framework/site/jx-markdown) for the language set.
 
 ## Schema validation

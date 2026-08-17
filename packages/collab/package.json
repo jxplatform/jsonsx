@@ -19,6 +19,7 @@
     "./op-bridge": "./src/op-bridge.ts",
     "./diff": "./src/diff.ts",
     "./envelope": "./src/envelope.ts",
+    "./negotiate": "./src/negotiate.ts",
     "./awareness-types": "./src/awareness-types.ts",
     "./provider": "./src/provider.ts",
     "./client": "./src/ws-client.ts",

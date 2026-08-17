@@ -14,10 +14,16 @@
  * are dropped and answered with a `doc-reset` control message, upon which the client destroys its
  * Y.Doc and re-opens. The invariant "Y history is never deleted or replaced without an epoch bump"
  * is what prevents divergent-history duplicate-content merges.
+ *
+ * The layout above is what the `jx.collab.v1` WebSocket subprotocol names. A change that would make
+ * a peer mis-parse a frame is a new token, not a silent edit here — see `negotiate.ts` for the bump
+ * rule and for why the capability probe, not the socket, is where the two sides agree.
  */
 
 import * as decoding from "lib0/decoding";
 import * as encoding from "lib0/encoding";
+
+export { COLLAB_SUBPROTOCOL } from "./negotiate.ts";
 
 export const FRAME_DOC_SYNC = 0;
 export const FRAME_AWARENESS = 1;

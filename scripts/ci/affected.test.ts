@@ -24,12 +24,18 @@ function flagsFor(...changed: string[]): string[] {
 describe("the whole matrix", () => {
   test("a schema change reaches every workspace that depends on it", () => {
     const flags = flagsFor("packages/schema/src/schema.ts");
-    // Everything except `ai`, which depends on nothing and is depended on only by studio.
-    expect(flags).not.toContain("ai");
+    /*
+     * Every workspace, `ai` included. It used to be the one exception — it depended on nothing and
+     * only studio depended on it — and it stopped being one the moment `streaming-client.ts` began
+     * reading RFC 9457 problem bodies through `@jxsuite/protocol`, which depends on schema. That is
+     * exactly the drift this file exists to make visible: a dependency added for a two-line read
+     * widened the CI matrix, and the graph is pinned here so it says so out loud.
+     */
+    expect(flags).toContain("ai");
     expect(flags).toContain("studio");
     expect(flags).toContain("server");
     expect(flags).toContain("parser");
-    expect(flags.length).toBe(workspaces.length - 1);
+    expect(flags.length).toBe(workspaces.length);
   });
 
   test("a root manifest change runs everything", () => {

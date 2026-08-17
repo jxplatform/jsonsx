@@ -2,9 +2,9 @@
 
 ## Development Server with Live Reload, Proxy Resolution, and Studio API
 
-**Version:** 0.2.2
+**Version:** 0.2.7
 **Status:** Implemented
-**Updated:** 2026-08-15
+**Updated:** 2026-08-16
 **License:** MIT
 
 ---
@@ -68,7 +68,7 @@ The request path is matched in this order (`src/server.ts`):
 4. `/_jx/*` — extension server mounts
 5. `/__studio/*` — Studio API (collab WebSocket/probe, activate, AI proxy, site import, code services, then the main studio handler)
 6. Custom `middleware`
-7. Static files — the active project's extension asset mounts ([extensions.md §8.5](./extensions.md)), then the server root, then the active project root, then its `public/` (mirroring production), then npm bare specifiers resolved through `node_modules` and bundled on demand with `Bun.build`. Served HTML gets the live-reload client injected (except the Studio shell, which manages its own state); all responses carry `Cache-Control: no-cache`.
+7. Static files — the active project's extension asset mounts ([extensions.md §8.5](./extensions.md)), then the server root, then the active project root, then its `public/` (mirroring production), then npm bare specifiers resolved through `node_modules` and bundled on demand with `Bun.build`. Served HTML gets the live-reload client injected (except the Studio shell, which manages its own state); all responses carry `Cache-Control: no-cache`. Content types come from `Bun.file`'s own inference, corrected only where a registration disagrees with it — `.md` carries the `variant` that names its dialect and `.yaml` is `application/yaml` rather than the retired `text/yaml` (`MEDIA_TYPE_BY_EXTENSION` in `@jxsuite/schema/media-type`, shared with `jx preview`); every other extension keeps the inferred type.
 
 **Asset mounts.** A mount publishes a directory that may sit outside the project root — a content collection's co-located images — at the same site URL the built site will use, so a dev preview and a production page render identically. Each candidate is contained against the mount's own directory (lexical + realpath), and the URL→path mapping refuses `.`/`..`, empty segments, and still-encoded dots or slashes. Mounts come from the section owner's `assets` capability via the per-project context cache, so they refresh when `project.json` changes on disk. The desktop loopback server (`project-server.ts`) resolves them through the same `serveProjectFile` path.
 
@@ -83,6 +83,10 @@ SSE (Server-Sent Events) endpoint backed by `src/watch.ts`. A chokidar watcher o
 3. Otherwise broadcasts a reload only when `reloadOnAnyChange` is set
 
 Two event streams share the connection: the default (unnamed) `reload` message that the injected client (`injectSSE`) turns into `location.reload()`, and named `fs` events — coalesced structured filesystem events that the Studio shell subscribes to for its sidebar while the preview iframe ignores them. Heartbeats every 15 s keep connections alive.
+
+**Reconnection.** The stream opens with `retry: 500`, and every reload frame carries an `id:`. Both exist for one reason: a dev-server restart drops the connection, and the browser's default reconnection time is measured in seconds — long enough that a save during the window looks like it did nothing. Half a second is right because both ends are on loopback.
+
+The `id:` is **not** a replay cursor. It exists so the browser sends `Last-Event-ID` on reconnect, which is the only way the server can tell a reconnection from a first connection; a reconnecting client is then pushed exactly **one** reload and no history. Nothing is buffered against the id. That is not an unfinished implementation, it is the correct one: the page the client is holding was built before the disconnect, a reload is idempotent and total, so one subsumes every event missed and finishes sooner than a replay would. A first connection is pushed nothing at all — reloading a page that just loaded is a reload loop.
 
 ### 3.2 `$prototype`/`$src` Proxy (`POST /__jx_resolve__`)
 
@@ -118,11 +122,10 @@ The server imports the module and calls the exported function as `fn(args, env)`
 
 ## 4. Studio API (`/__studio/*`)
 
-> **Status: Partial.** The routes ship. The **failure** half of the contract does not: errors are
-> returned in four incompatible shapes across roughly 97 sites (a `{error}` body, a bare-text
-> response, a 200 carrying an embedded error, and in-stream error frames), `desktop.md` §5 documents
-> none of them, and the one failure the route table does publish — `gitPull`'s `409 {conflicts}` —
-> is never produced by this backend. See §8.
+> **Status: Implemented.** The routes ship, and so does the failure half: every failure is an
+> RFC 9457 problem document (§4.3), from one registry the docs are generated from, guarded by
+> `scripts/check-error-shapes.ts`. `gitPull`'s `409 {conflicts}` — the one failure the route table
+> has always published and never produced — is produced now.
 
 The reference implementation of the Studio Backend Protocol, serving Studio's Platform Abstraction Layer (specs/desktop.md §3, §5).
 
@@ -146,10 +149,10 @@ Handlers are dispatched inside the `/__studio/*` branch in this order: collab �
 
 ### 4.2 Security
 
-> **Status: Partial.** The dev server applies the gate as described below. The **loopback project
-> server does not apply it uniformly**: `/_jx/*` extension mounts and `/__studio__/ai/*` are
-> dispatched ahead of any gate there, so this section's claim that the mounts are gated holds for
-> one entry point and not the other. `/__reload` is likewise served before the gate. See §8.
+> **Status: Implemented.** Both entry points apply the gate, and the gate now reads
+> `Sec-Fetch-*` as well as `Origin`/`Host`. The three surfaces the loopback project server used to
+> dispatch ahead of it — the AI proxy, the `/_jx/*` extension mounts, and project files at their
+> natural URLs — are gated at the strength each one warrants.
 
 Both server entry points share one set of primitives (`src/net-guard.ts`), applied at different strengths:
 
@@ -161,7 +164,94 @@ Both server entry points share one set of primitives (`src/net-guard.ts`), appli
 - **Two-root activation**: filesystem operations go through `assertAccessible(filePath, root, activeProjectRoot)` — the path must sit under the server root **or** the active project root Studio bound via `POST /__studio/activate`, which itself only accepts a root contained under the server root, an explicit `allowedRoots` entry, a project this server just created (below), or **a project the account already owns** — an absolute directory holding a `project.json` somewhere under the user's home directory (`isOwnedProjectDir`). That last clause is what makes an _existing_ project openable at all: projects live outside the server root as a matter of course, so `?project=/abs/path`, the Open Project picker and the recent-projects list would otherwise be able to bind nothing but a project inside the served checkout. Requiring both the `project.json` and home containment keeps a hostile page on the loopback origin from binding the server to `/etc` or to another account's files. A refused activation is an **error the client must surface**, never a silent fallback: the endpoints that take no `dir` (the git surface especially) resolve against `activeProjectRoot || root`, so a swallowed refusal would silently run against whatever tree the server is serving
 - **Project creation is the one deliberate exception to root containment.** A new project belongs wherever the user pointed the New Project modal's Location field (specs/desktop.md §4.5), which is normally _outside_ the server root — containing it there would mean scaffolding into whatever tree the dev server happens to serve. `POST /__studio/create-project` and `POST /__studio/import-site` therefore take an explicit absolute parent and check it with `assertCreatableParent(parent, root, allowedRoots)` instead of `assertAccessible`. That guard **requires** an absolute path (a request without a destination is a 400 — the server never falls back to its own root) and admits only the server root, a configured `allowedRoots` entry, or the account's home directory, so a hostile page on the loopback origin cannot scaffold into system paths. Roots created this way are remembered for the duration of the process so the very next `/__studio/activate` can open them; the create response reports a root-relative path when the project landed under the server root and an absolute one otherwise
 
-**Loopback project server (`src/project-server.ts`, used by the desktop launchers).** Adds, on top of the above, a **per-server token** as the hard gate on the WebSocket RPC upgrade and the resolve/import routes — the desktop canvas iframe is cross-origin, so it carries the token in its URL where the same-origin dev server does not need one.
+**Fetch Metadata.** `Sec-Fetch-Site` states the requester's intent directly, which `Origin` cannot: a same-origin GET omits `Origin` entirely, so the gate has to accept an absent one — a hole `Sec-Fetch-Site` does not have. The predicate is folded into `originHostGate`, so it reaches every gated surface without a single new call site.
+
+Under the **strict** policy, which every privileged route uses:
+
+| `Sec-Fetch-Site` | Decision                                                                   |
+| ---------------- | -------------------------------------------------------------------------- |
+| absent           | **accept** — see below                                                     |
+| `same-origin`    | accept — the served page                                                   |
+| `none`           | accept — a typed URL or a bookmark                                         |
+| `cross-site`     | accept **only** a top-level document navigation: a person following a link |
+| `same-site`      | **deny**                                                                   |
+
+**Denying `same-site` is stricter than the standard's Resource Isolation Policy, and deliberate.** On `127.0.0.1` there is no meaningful "site" wider than the origin, so `same-site` means _a different port on this machine_ — precisely the other-local-process threat a loopback bind cannot address.
+
+**An absent header is accepted, and that is a hard requirement rather than a concession.** The header is browser-supplied: curl omits it, Bun-native clients omit it, the desktop RPC bridge omits it, and `packages/server/tests/**` builds well over a hundred bare `Request`s. Requiring it would refuse every non-browser client on the machine while stopping no attacker, because the threat model here is a _page_ — and a page always sends it. The test pinning this is named `fetchMetadataAbsentIsAccepted`, so deleting it is loud.
+
+A second, looser **`embeddable`** policy exists for one reason: the desktop canvas renders the project inside an iframe on a **different origin**, so that page's own subresources — its images, its stylesheets, its modules — legitimately arrive `cross-site`. Refusing them would break the canvas; accepting them on a route that can write a file or run an `import()` would hand away the containment. The difference is a property of the surface, named at the call site.
+
+**Never CORS.** No response from either entry point carries an `Access-Control-Allow-*` header, and `scripts/check-error-shapes.ts` bans one outright. The whole loopback model rests on the browser refusing cross-origin reads, so a single such header would hand that containment away. There is none in the repository today, and that fact is load-bearing rather than incidental — which is exactly what needs a check, since nothing in the code makes it visible.
+
+**The loopback block, not one address.** IANA reserves `127.0.0.0/8` and every address in it is this machine, so `127.0.0.2` is loopback exactly as `127.0.0.1` is; recognizing only the canonical spelling would reject a client for nothing. `0.0.0.0` is accepted as a **Host** — a server bound to it in a container is reached at that literal — and **never as an Origin**, since no page is ever served from `http://0.0.0.0`.
+
+**Loopback project server (`src/project-server.ts`, used by the desktop launchers).** Adds, on top of the above, a **per-server token** as the hard gate on the WebSocket RPC upgrade, the resolve/import routes, and the AI proxy — the desktop canvas iframe is cross-origin, so it carries the token in its URL where the same-origin dev server does not need one.
+
+Which instrument gates which surface is a judgement about who calls it, not a uniform strength:
+
+- **Token** on the RPC upgrade, `/__jx_resolve__`, `/__jx_server__`, `/__studio__/import-site`, and `/__studio__/ai/*`. Each either runs code, writes files, or spends the user's own API credit; an ungated AI proxy is an open relay for any process on the machine, and it was dispatched ahead of every gate until this closed.
+- **Origin/Host + Fetch Metadata, no token**, on `/_jx/*` and on project files at their natural URLs. These are fetched by the canvas iframe's own page, whose requests carry no `?token=` — a page cannot rewrite the URLs its own content asks for — so the token is the wrong instrument and the origin check is the right one. Both use the `embeddable` policy, because that iframe is cross-origin by construction.
+
+**The token is compared in constant time**, and may be presented as `Authorization: Bearer` as well as `?token=`. The query form stays because an iframe's `src` is the only place it can carry one; the header is accepted additively for everything else, since a secret in a URL is logged, referred and shoulder-surfable.
+
+### 4.3 Failure Shape
+
+> **Status: Implemented.** `src/problem.ts` and the `PROBLEM_TYPES` registry in
+> `@jxsuite/protocol`; `scripts/check-error-shapes.ts` keeps the old shapes from regrowing.
+
+**Every failure is an RFC 9457 problem document** at `application/problem+json`.
+
+There were four shapes before — `Response.json({error}, {status})`, a bare-text body, a 200
+carrying an `upstreamError` field, and a thrown string that became an empty 500 — and the Studio
+client carried a separate reader for each. The cost was not the inconsistency. It was that a failure
+could reach the user with **no detail at all**, because the reader that ran was not the one for the
+shape that arrived.
+
+**The type is the contract.** Problem types live in one table (`PROBLEM_TYPES`), in the same idiom
+as `STUDIO_ROUTES`: declared once, exported as data, rendered into the docs by the same generator.
+A type is a _class_ of failure a client might handle differently, never a message — "the project
+root was refused" is a type, "root /x/y was refused" is a `detail`. Two consequences:
+
+- **`type` URIs are absolute**, under `https://jxsuite.com/problems/`. RFC 9457 permits a relative
+  reference resolved against the request URL, which on a dev server is
+  `http://127.0.0.1:3000/problems/…` and serves nothing.
+- **The status belongs to the type, not to the call site.** A type answerable with two statuses is
+  two types. `401` and `403` are therefore separate: one asks the client to authenticate, the other
+  says no, and collapsing them would make a missing API key indistinguishable from a refused root.
+
+**`instance` is never emitted.** It identifies one occurrence, and Jx has no per-occurrence
+resource to point at; a field whose only possible value is a fabricated URI is noise that looks like
+information.
+
+**`error` is emitted as a deprecated alias of `detail`, for one release.** That is the whole
+sequencing device: every existing client reads `body.error`, so emitting both lets the server change
+shape without a synchronized release across every client call site. The clients follow, then a
+one-line change deletes the alias. Nothing new is written against it.
+
+**Three places where a problem document would be wrong**, and each stays as it is:
+
+- **The code services** (§5) answer **200**. A syntax error in the author's snippet is the _result_
+  of a lint or a format, not a failure of the request that asked for one.
+- **The AI model catalogue** answers **200** with an `upstreamError` field. It is degraded success:
+  the catalogue is still delivered, from defaults.
+- **In-stream frames are not response bodies.** By the time an SSE `error` frame is written the
+  response has begun with a 200 and no status can change. The adoption there is that the frame
+  **carries** a problem (`problem` beside the existing `message`), rather than being replaced by
+  one. The same reasoning covers the RPC bridge's `{error, id}` envelope in `project-server.ts`.
+
+**The client keeps one reader.** `problemDetail` reads a problem's `detail`, the legacy `error`, and
+finally the type's `title` — most-specific first, since a `title` describes the type rather than the
+occurrence. It answers `null` when a body says nothing, so a caller can supply better words than any
+generic fallback. A problem's `type` also **is** the structured error code the Studio UI already
+branched on: `problemSlug` derives it, and `installUrl` is the extension member (§3.2) that the
+`needs-installation-access` type documents.
+
+**No CORS, ever.** The guard script bans `Access-Control-Allow-*` outright. It is not a shape rule:
+the whole loopback model rests on the browser refusing cross-origin reads (§4.2), so one such header
+would hand that containment away. There is none in the repository today, and that fact is
+load-bearing rather than incidental — which is exactly what needs a check, since nothing in the code
+makes it visible.
 
 ---
 
@@ -176,6 +266,8 @@ OXC-powered code quality services for Studio's function-body editors.
 | `POST /__studio/code/lint`   | `oxlint`         | Lint JavaScript snippet (JSON diagnostics) | **Implemented** |
 
 Snippets are function _bodies_: the handler wraps them in a synthetic function before formatting/linting, unwraps the result, and remaps diagnostic line/column positions back to the snippet.
+
+The remapping is a constant: the wrapper is one synthetic header line, so a diagnostic loses one line and a fixed byte count (`adjustDiagnostics`). It is named here because it is the kind of thing that invites a source map, and a source map for a constant offset is more machinery than the thing it maps — see §8.
 
 > **Status: Implemented.** `src/code-api.ts` (oxfmt via its Node API, oxlint via its CLI binary, minification via `Bun.Transpiler`).
 
@@ -216,17 +308,24 @@ Incremental rebuild triggered by the file watcher: only entries whose `match` (R
 
 External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md).
 
-| Standard                                                                | Class        | Binds | Evidence                                                                  | Note                                                                                                                                                                                                                                                                                                                                                  |
-| ----------------------------------------------------------------------- | ------------ | ----- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [WHATWG Fetch](https://fetch.spec.whatwg.org/)                          | **Adopted**  | §4.2  | packages/server/src/net-guard.ts, packages/server/tests/net-guard.test.ts | The same-origin policy is the containment, so **no** response from either entry point carries an `Access-Control-Allow-*` header. Emitting one would hand the containment away.                                                                                                                                                                       |
-| [WHATWG HTML](https://html.spec.whatwg.org/)                            | **Subset**   | §3.1  | packages/server/src/watch.ts                                              | `gap:sse-reconnect` Server-Sent Events only, and without the reconnection half: no `retry:` field and no event ids are sent, so a client that misses a reload while the server restarts stays stale until the next save.                                                                                                                              |
-| [RFC 9111](https://www.rfc-editor.org/rfc/rfc9111)                      | **Adopted**  | §3    | packages/server/src/server.ts                                             | Every dev-server response carries `Cache-Control: no-cache`, so a browser revalidates rather than applying its heuristic freshness to an edited file.                                                                                                                                                                                                 |
-| [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457)                      | **Pending**  | §4    | —                                                                         | `gap:studio-problem-details` No route answers `application/problem+json`; there is no shared error helper on either side, and the Studio client carries five different readers for the shapes that result.                                                                                                                                            |
-| [Fetch Metadata Request Headers](https://www.w3.org/TR/fetch-metadata/) | **Pending**  | §4.2  | —                                                                         | `gap:fetch-metadata` The gate infers cross-origin intent from `Origin` and `Host`, and must accept an absent `Origin` because same-origin GETs omit it. `Sec-Fetch-Site` states the intent directly and does not have that hole.                                                                                                                      |
-| [RFC 7464](https://www.rfc-editor.org/rfc/rfc7464)                      | **Rejected** | §4.1  | —                                                                         | because: the only advantage over the `application/x-ndjson` already in use is that a record containing a raw newline cannot break framing, and the producer is always `JSON.stringify`, which escapes newlines — so the framing is unambiguous already. Adopting it would break every client and test and make a dev-server debug stream ungreppable. |
+| Standard                                                                                                  | Class         | Binds | Evidence                                                                                                             | Note                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| --------------------------------------------------------------------------------------------------------- | ------------- | ----- | -------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [WHATWG Fetch](https://fetch.spec.whatwg.org/)                                                            | **Adopted**   | §4.2  | packages/server/src/net-guard.ts, packages/server/tests/net-guard.test.ts                                            | The same-origin policy is the containment, so **no** response from either entry point carries an `Access-Control-Allow-*` header. Emitting one would hand the containment away. That absence is now enforced rather than merely true: `scripts/check-error-shapes.ts` bans the header outright, because nothing in the code makes a load-bearing absence visible.                                                                                                                                                                                                                                                                        |
+| [IANA IPv4 Special-Purpose Address Registry](https://www.iana.org/assignments/iana-ipv4-special-registry) | **Adopted**   | §4.2  | packages/server/src/net-guard.ts, packages/server/tests/net-guard.test.ts                                            | The whole `127.0.0.0/8` loopback block is recognized, not the canonical spelling alone — every address in it reaches this machine, so rejecting `127.0.0.2` would refuse a client while granting nothing. `0.0.0.0` (the unspecified address) is accepted as a `Host` and never as an `Origin`.                                                                                                                                                                                                                                                                                                                                          |
+| [WHATWG HTML](https://html.spec.whatwg.org/)                                                              | **Subset**    | §3.1  | packages/server/src/watch.ts, packages/server/tests/watch-gaps.test.ts                                               | The Server-Sent Events section, including the reconnection half: `retry: 500` opens the stream, reload frames carry an `id:`, and a reconnect carrying `Last-Event-ID` is pushed one reload. Absent, deliberately: the event buffer that would make `Last-Event-ID` a replay cursor. A reload is idempotent and total, so one subsumes every missed event — §3.1 states why, and a test asserts that three missed reloads produce one.                                                                                                                                                                                                   |
+| [RFC 9111](https://www.rfc-editor.org/rfc/rfc9111)                                                        | **Adopted**   | §3    | packages/server/src/server.ts                                                                                        | Every dev-server response carries `Cache-Control: no-cache`, so a browser revalidates rather than applying its heuristic freshness to an edited file.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457)                                                        | **Subset**    | §4.3  | packages/server/src/problem.ts, packages/server/scripts/check-error-shapes.ts, packages/server/tests/problem.test.ts | Every failure is `application/problem+json` with an absolute `type`, a type-stable `title` and a per-occurrence `detail`, from one registry the docs are generated from. Absent, deliberately: `instance`, which would have to be fabricated since Jx has no per-occurrence resource. Three surfaces stay 200 and §4.3 says why — a lint result, a degraded catalogue, and an in-stream frame that carries a problem rather than being one.                                                                                                                                                                                              |
+| [Fetch Metadata Request Headers](https://www.w3.org/TR/fetch-metadata/)                                   | **Divergent** | §4.2  | packages/server/src/net-guard.ts, packages/server/tests/net-guard.test.ts                                            | `Sec-Fetch-Site` is read on every gated surface, folded into `originHostGate` so there are no new call sites. Two deviations, both toward strictness or usability: `same-site` is **denied**, where the Resource Isolation Policy allows it — on loopback a "site" wider than the origin is just another port on this machine — and an **absent** header is accepted, because it is browser-supplied and requiring it would refuse curl, Bun-native clients and the desktop bridge while stopping no page. A second `embeddable` policy admits the cross-origin canvas iframe's own subresources.                                        |
+| [ECMA-426](https://ecma-international.org/publications-and-standards/standards/ecma-426/)                 | **Rejected**  | §5    | —                                                                                                                    | because: the only mapping the code services perform is subtracting one synthetic header line and a fixed byte offset from each diagnostic, which is exact, total, and four lines of arithmetic. A source map would encode that constant as a generated artefact the snippet does not otherwise need, and every consumer would have to learn to read it. The snippets are function bodies edited in place, never shipped, so nothing downstream has a debugger to point at them.                                                                                                                                                          |
+| [RFC 7464](https://www.rfc-editor.org/rfc/rfc7464)                                                        | **Rejected**  | §4.1  | —                                                                                                                    | because: the only advantage over the `application/x-ndjson` already in use is that a record containing a raw newline cannot break framing, and the producer is always `JSON.stringify`, which escapes newlines — so the framing is unambiguous already. Adopting it would break every client and test and make a dev-server debug stream ungreppable. The defect that looked like a framing problem was not one: the reader dropped unparseable lines in silence, so an import finished looking clean while the user never learned what it skipped. They are counted and reported now (`packages/studio/src/services/import-client.ts`). |
 
 ## Changelog
 
+- **0.2.7** (2026-08-16) — §4.2 Fetch Metadata on every gated surface, the loopback block, a constant-time token, and the three ungated project-server routes closed; gap:fetch-metadata closed.
+- **0.2.6** (2026-08-16) — §4.3 every failure is an RFC 9457 problem document, guarded; gitPull produces the 409 the route table publishes; gap:studio-problem-details closed.
+- **0.2.5** (2026-08-16) — §5 and §8 record the source-map decision — a constant header offset is not a source map (ECMA-426, Rejected).
+- **0.2.4** (2026-08-16) — §3 static responses correct the two content types where the platform default disagrees with the registration.
+- **0.2.3** (2026-08-16) — §3.1 the SSE stream advertises retry: 500 and answers Last-Event-ID with one reload; gap:sse-reconnect closed.
 - **0.2.2** (2026-08-15) — Add §8 Standards Alignment; §4 and §4.2 marked Partial — the failure contract is unspecified and the project server does not gate uniformly.
 - **0.2.1** (2026-07-25) — Activation admits an existing project of the account's own (project.json under the home directory); a refused activation must surface as an error rather than fall back to the server root.
 - **0.2.0** (2026-07-25) — POST /__studio/create-project requires an explicit absolute destination parent — the server no longer falls back to its own root. Adds assertCreatableParent (root, allowedRoots, or home; absolute only), remembers created roots for a following activate, and returns an absolute root for projects outside the server root.
@@ -243,4 +342,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/server` Specification v0.2.2_
+_`@jxsuite/server` Specification v0.2.7_

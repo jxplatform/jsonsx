@@ -14,6 +14,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `ai.md`
 
+- **0.1.6-draft** (2026-08-16) — §2 failures are problem documents and the mid-stream frame carries one; gap:ai-problem-details closed.
 - **0.1.5-draft** (2026-08-15) — Add §5 Standards Alignment: SSE, the IANA special-purpose address registries the SSRF guard uses, and the problem+json gap.
 - **0.1.4-draft** (2026-08-12) — The assistant's six capabilities are command records, gated on ai.configured and ai.streaming.
 - **0.1.3-draft** (2026-08-04) — §3.2 the turn is accountable (per-write disk marking, Restore to here, chip outcomes, partial success) and §3.3 the batch follows the document, not the tab.
@@ -23,6 +24,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `collab.md`
 
+- **0.2.4-draft** (2026-08-16) — §2.1 subprotocol negotiation: jx.collab.v1 offered from the capability probe and echoed on the handshake; §5 wire-envelope skew closed; RFC 7692 non-adoption stated in §2.
 - **0.2.3-draft** (2026-08-15) — Add §6 Standards Alignment; §5 separates wire-envelope skew from document-format skew and is marked Pending.
 - **0.2.2-draft** (2026-08-05) — §4 project.json is excluded from replication, and why.
 - **0.2.1-draft** (2026-08-04) — §4 the four session states, with failed distinguished from detached; freeze and read-only made visible; undo scoping stated in the UI.
@@ -66,6 +68,8 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `desktop.md`
 
+- **0.3.11-draft** (2026-08-16) — §3.6 the desktop signs in with an RFC 8252 loopback redirect and PKCE; the token rests in a 0600 credential store, not localStorage. RFC 8414 and RFC 7519 recorded Rejected as vacuous. Closes gap:native-oauth and gap:oauth-pkce.
+- **0.3.10-draft** (2026-08-16) — §5 the contract's failure half is specified — one RFC 9457 registry; gap:backend-failure-contract closed.
 - **0.3.9-draft** (2026-08-15) — Add §12 Standards Alignment; §5 marked Partial — the Backend API Contract specifies no failure shape.
 - **0.3.8-draft** (2026-08-13) — Open Project asks where a project should open (§4.2a): New Window is routed through pickProject + openProjectInNewWindow, and the outcome is reported rather than the target.
 - **0.3.7-draft** (2026-08-11) — Name the pane context bar's resolving-with popover rather than the tab bar, which P8 deleted.
@@ -94,6 +98,8 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `extensions.md`
 
+- **0.3.9-draft** (2026-08-16) — §13.1 auth session cookies: __Host- prefix derived from the origin's scheme, rate limiting on everywhere, session lifetime stated, Partitioned never set. Closes gap:cookie-prefixes.
+- **0.3.8-draft** (2026-08-16) — §8 _meta is reserved in a resolvePaths result — it carries the source entry's facts, never a route parameter.
 - **0.3.7-draft** (2026-08-15) — mediaType is validated against RFC 6838 and carries RFC 7763 variant parameters; mediaTypeEssence for callers that key on a type (§7).
 - **0.3.6-draft** (2026-08-15) — Add §8.6 head: a section owner contributes <head> entries from configuration, before the first page is built.
 - **0.3.5-draft** (2026-08-15) — Add §16 Standards Alignment: JSON Schema composition, media-type registration, and why JSON Patch is declined for lower.
@@ -141,6 +147,8 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `parser.md`
 
+- **0.2.9-draft** (2026-08-16) — §3 heading slugs normalize to NFC before casing (UAX #15) and word counts segment rather than split on whitespace (UAX #29). Closes gap:heading-slug-normalization and gap:word-segmentation.
+- **0.2.8-draft** (2026-08-16) — §3 the markdown variant and YAML media type are what hosts serve, not only what the class declares; gap:markdown-variant and gap:yaml-media-type closed.
 - **0.2.7-draft** (2026-08-15) — §9.3 records _meta.mtime as the date fallback a feed uses.
 - **0.2.6-draft** (2026-08-15) — Add §9.3 date coercion: schema-declared date fields normalize to RFC 3339, ambiguous values are refused rather than guessed.
 - **0.2.5-draft** (2026-08-15) — Add §10 Standards Alignment; §3 marked Partial — heading slugs and word counts are correct only for Latin script.
@@ -167,6 +175,8 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `schema.md`
 
+- **0.4.8-draft** (2026-08-16) — §3.5 documents, configs and class definitions cross the parse boundary in NFC (UAX #31 §R4).
+- **0.4.7-draft** (2026-08-16) — §3.2 language-tag keys carry a BCP 47 pattern, so author-time and build-time agree; gap:bcp47-locale-validation closed.
 - **0.4.6-draft** (2026-08-16) — §3.2 and §7: BCP 47 validation exists in the build; the schema is the half that still lacks it.
 - **0.4.5-draft** (2026-08-15) — I-JSON enforced at the parse boundary: duplicate names and unrepresentable integers are parse failures (§3.4).
 - **0.4.4-draft** (2026-08-15) — The class method role enum gains head (extensions.md §8.6).
@@ -193,6 +203,11 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `server.md`
 
+- **0.2.7** (2026-08-16) — §4.2 Fetch Metadata on every gated surface, the loopback block, a constant-time token, and the three ungated project-server routes closed; gap:fetch-metadata closed.
+- **0.2.6** (2026-08-16) — §4.3 every failure is an RFC 9457 problem document, guarded; gitPull produces the 409 the route table publishes; gap:studio-problem-details closed.
+- **0.2.5** (2026-08-16) — §5 and §8 record the source-map decision — a constant header offset is not a source map (ECMA-426, Rejected).
+- **0.2.4** (2026-08-16) — §3 static responses correct the two content types where the platform default disagrees with the registration.
+- **0.2.3** (2026-08-16) — §3.1 the SSE stream advertises retry: 500 and answers Last-Event-ID with one reload; gap:sse-reconnect closed.
 - **0.2.2** (2026-08-15) — Add §8 Standards Alignment; §4 and §4.2 marked Partial — the failure contract is unspecified and the project server does not gate uniformly.
 - **0.2.1** (2026-07-25) — Activation admits an existing project of the account's own (project.json under the home directory); a refused activation must surface as an error rather than fall back to the server root.
 - **0.2.0** (2026-07-25) — POST /__studio/create-project requires an explicit absolute destination parent — the server no longer falls back to its own root. Adds assertCreatableParent (root, allowedRoots, or home; absolute only), remembers created roots for a following activate, and returns an absolute root for projects outside the server root.
@@ -209,6 +224,10 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `site-architecture.md`
 
+- **0.5.9-draft** (2026-08-16) — §13.7 blessed Intl helpers — one shared list, five new helpers, and a fixed en-US/UTC default so a build's output is a function of its input. Closes gap:locale-formatting.
+- **0.5.8-draft** (2026-08-16) — §13.3 {locale} sources expand and scope route expansion; §13.6 Accept-Language negotiation in the generated worker; prefix-always is checked; gap:locale-lookup closed.
+- **0.5.7-draft** (2026-08-16) — §8.4.1 a generated route's lastmod comes from the entry it was generated from; gap:sitemap-fields closed.
+- **0.5.6-draft** (2026-08-16) — §8.3 link relations are checked against the IANA registry, warning once per build; gap:link-relation-validation closed.
 - **0.5.5-draft** (2026-08-16) — §16: the RFC 9110 row states the five statuses B1 shipped instead of the two that predated it.
 - **0.5.4-draft** (2026-08-16) — Optional service worker with a tombstone contract: off by default, network-first HTML, precache validated against the build's own output (§14.6).
 - **0.5.3-draft** (2026-08-16) — Cascade layer 6 describes the scoping that exists — there is no shadow DOM.
@@ -272,6 +291,8 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `spec.md`
 
+- **0.4.33-draft** (2026-08-16) — §21.5 two CSP profiles, permanently: compiled output never needs 'unsafe-eval' and the interpreting canvas always will. A Trusted Types policy guards the shell's one injection sink and refuses to build scripts; the runtime's four innerHTML writes became replaceChildren().
+- **0.4.32-draft** (2026-08-16) — §11.2a the Cookie prototype derives Secure/Path/Domain from a name prefix and from SameSite=None; HttpOnly and Expires are absent on purpose; a cookie name is data, never pattern syntax.
 - **0.4.31-draft** (2026-08-16) — Shadow DOM opt-in: $shadow and defaults.shadow emit a declarative shadow root the element adopts; :host translation keeps one style object valid in both modes (§16.6).
 - **0.4.30-draft** (2026-08-16) — §9.1 and §16.6: style scoping is a tag-name prefix and generated classes, not data-jx attribute selectors; cite the light-DOM divergence.
 - **0.4.29-draft** (2026-08-15) — §18 becomes the machine-checked standards table; §2.5 renamed Platform Precedents to free the reserved title; §21 marked Partial — no Trusted Types policy is installed.
@@ -323,6 +344,10 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `standards.md`
 
+- **0.1.14-draft** (2026-08-16) — §11 WebDriver BiDi leaves the adoption backlog — the pipeline speaks it, and studio-ui-guidelines.md §15 owns it.
+- **0.1.13-draft** (2026-08-16) — §11 RFC 8414 leaves the adoption backlog — the flow it would configure now exists, and it is recorded Rejected in desktop.md for the reason that remains.
+- **0.1.12-draft** (2026-08-16) — §12 declares the BCP 14 normative keywords for the whole corpus, gated by docs:status; BCP 14 graduates off the backlog.
+- **0.1.11-draft** (2026-08-16) — §4.4 worked examples use a reserved gap:example-only slug so an illustration cannot squat on a real gap id.
 - **0.1.10-draft** (2026-08-16) — §1 is Implemented — both ratchets are empty; BCP 14 moves to the backlog, since no section declares the corpus's keyword convention.
 - **0.1.9-draft** (2026-08-16) — Service Workers graduates to a bound row in site-architecture.md §14.6.
 - **0.1.8-draft** (2026-08-16) — CSS Shadow Parts backlog entry now waits on part attributes, not on shadow roots.
@@ -337,6 +362,9 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio-ui-guidelines.md`
 
+- **0.3.12** (2026-08-16) — §15 the documentation screenshot pipeline drives Chromium over WebDriver BiDi rather than CDP — byte-identical captures, and the one behavioural difference (a pointer move outside the viewport) fixed rather than worked around.
+- **0.3.11** (2026-08-16) — §14 ATAG is Subset: Part A is §13.1a and §8.2, Part B is studio.md §16.6.
+- **0.3.10** (2026-08-16) — §1.1 the token table's fallbacks are corrected and gated against tokens.css; §8.2 cut/paste is the stated alternative to every drag (SC 2.5.7); §13.1a one live region, called from notify() itself, so a failure that lands in the Problems panel is announced.
 - **0.3.9** (2026-08-15) — Add §14 Standards Alignment; §8 marked Partial — drag and drop has no non-dragging alternative (WCAG 2.2 SC 2.5.7).
 - **0.3.8** (2026-08-13) — A row wraps and never overflows (§4.6); the floating bar's visibility rule.
 - **0.3.7** (2026-08-12) — blockbar/format joins the level × placement matrix, with its own chrome budget.
@@ -363,6 +391,8 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.9.27-draft** (2026-08-16) — §16.6 reports about the author's own content — an ATAG Part B accessibility check and the SEO warnings both file Problems, each finding naming its WCAG criterion, and each run naming what it could not check. Closes gap:atag-authoring-support.
+- **0.9.26-draft** (2026-08-16) — §16 one Problem reader over every backend failure shape; gap:studio-error-reader closed.
 - **0.9.25-draft** (2026-08-15) — Add §19 Standards Alignment; six bare **Status:** lines converted to the blockquote form no tool could read, and §16 marked Partial — the one status channel has no live region for the error tier.
 - **0.9.24-draft** (2026-08-13) — Open in Browser serves the built site on its own origin; the build reports the URL.
 - **0.9.23-draft** (2026-08-13) — Open in Browser opens the page's route on a server that serves the built site there, and builds it first.

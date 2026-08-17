@@ -2,9 +2,9 @@
 
 ## Platform Abstraction, Project Loading, and Component Scoping
 
-**Version:** 0.3.9-draft
+**Version:** 0.3.11-draft
 **Status:** Pending
-**Updated:** 2026-08-15
+**Updated:** 2026-08-16
 **License:** MIT
 
 ---
@@ -159,6 +159,49 @@ so a link clicked in Preview mode goes to the **user's default browser** via an 
 like the deployed thing — routing, history, devtools — and a webview with no address bar is not that;
 navigating it would also replace the editor. When the shell is unavailable or the OS refuses, the
 studio's own `window.open` default still applies.
+
+### 3.6 Signing In
+
+> **Status: Implemented.**
+
+The desktop signs in to a provider with the **loopback redirect** of
+[RFC 8252](https://www.rfc-editor.org/rfc/rfc8252) §7.3, protected by
+[PKCE](https://www.rfc-editor.org/rfc/rfc7636). The browser Studio keeps GitHub's device flow, and
+must: it has no loopback server to redirect to, and GitHub's device endpoints send no CORS headers,
+so the page cannot reach them either.
+
+**The device flow is the wrong tool for a desktop app.** RFC 8628 designed it for clients that
+cannot show a browser or take typed input. A desktop app has both, and paying that price anyway
+means the user copies a code between two windows while the app polls a token endpoint on a timer.
+
+Four properties are load-bearing, and each is a real attack or a real failure if dropped:
+
+| Property                                                          | Why                                                                                                                         |
+| ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| The redirect host is the literal `127.0.0.1`, never `localhost`   | §8.3 — a name resolves, and a `hosts` entry or a resolver answering `::1` sends the code somewhere the app is not listening |
+| `S256`, never `plain`                                             | The code is the whole credential for a client with no secret; `plain` puts the verifier in the authorization request        |
+| `state` is unguessable, single-use, and compared in constant time | Any local page can navigate a browser to the callback; without this the app adopts an attacker's account                    |
+| The provider's page opens in the **user's own browser**           | §8.12 — an embedded webview can read what the user types into the provider's login form, and carries no existing session    |
+
+**No client secret is sent.** A desktop app cannot keep one (§8.5): shipping it puts it in every
+copy of the binary, where it is a secret in name only. The PKCE verifier is what authenticates the
+exchange.
+
+**The callback route is exempt from the project server's token gate, and only from that.** The
+provider redirects the user's browser to the `redirect_uri` it was given, and a page cannot append a
+secret to a URL it does not compose — a token gate there would make the flow impossible rather than
+safe. The Host check and Fetch Metadata still apply (§4.2 of `server.md`), and an IdP redirect is
+exactly the one cross-site shape the strict policy admits: a top-level GET document navigation. The
+callback page carries `Referrer-Policy: no-referrer`, because the authorization code is in that
+request's query string until it is exchanged.
+
+**Where the token rests.** In the app's own config directory, in a file written owner-only
+(`0600`), **not** in `localStorage` and **not** in the settings store — the settings store is handed
+to the webview wholesale by `getSettings`. The RPC surface answers _whether_ a token exists and
+performs a sign-in; it never returns the store. The limitation is stated rather than hidden: the
+file is plaintext, and another process running as the same user can read it. The OS keychain is the
+right answer and a native dependency per platform; this is strictly better than a browser storage
+entry and no better than that.
 
 ---
 
@@ -340,10 +383,11 @@ A live preview under the fields shows the resolved destination (`/home/you/Sites
 
 ## 5. Backend API Contract
 
-> **Status: Partial.** The success half is specified — the route table is canonical and complete.
-> The **failure** half is not specified at all: this section names no status codes, no error body
-> and no media type, and the four incompatible shapes the reference backend actually returns are
-> therefore not a deviation from anything. See §12.
+> **Status: Implemented.** Both halves are specified. The route table is canonical and complete,
+> and the failure shape is RFC 9457 `application/problem+json` from the `PROBLEM_TYPES` registry in
+> `@jxsuite/protocol` — one table, generated into the docs beside the routes, so a backend
+> implementer reads the failure vocabulary in the same breath as the success one. `server.md` §4.3
+> holds the reasoning, including the three surfaces that deliberately stay 200.
 
 The Backend API Contract defines the operations that any Studio backend must support. The current `@jxsuite/server` endpoints map directly to these operations. Other backends (ElectroBun Bun process, cloud API) implement the same operations through their own transport.
 
@@ -869,15 +913,18 @@ Ensure desktop app matches dev-mode capabilities:
 
 External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md). ElectroBun and Chromium are implementations rather than standards, so §7–§9 cite nothing.
 
-| Standard                                           | Class       | Binds | Evidence | Note                                                                                                                                                                                                                                                                                                                |
-| -------------------------------------------------- | ----------- | ----- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) | **Pending** | §5    | —        | `gap:backend-failure-contract` The contract defines no failure shape, so each backend invents one and the Studio client carries a separate reader for each.                                                                                                                                                         |
-| [RFC 8252](https://www.rfc-editor.org/rfc/rfc8252) | **Pending** | §10   | —        | `gap:native-oauth` No native authorization flow exists. The one sign-in the desktop shell performs uses GitHub's device flow, which is designed for input-constrained devices; a desktop app with a browser and a keyboard should use a loopback redirect, which the loopback server is already positioned to host. |
-| [RFC 7636](https://www.rfc-editor.org/rfc/rfc7636) | **Pending** | §10   | —        | `gap:oauth-pkce` No authorization-code exchange binds a code verifier, so an intercepted code is replayable.                                                                                                                                                                                                        |
-| [RFC 6265](https://www.rfc-editor.org/rfc/rfc6265) | **Pending** | §10   | —        | `gap:cookie-prefixes` Session cookies carry no `__Host-` or `__Secure-` prefix, so nothing stops a same-site attacker on a sibling origin from overwriting one.                                                                                                                                                     |
+| Standard                                           | Class        | Binds | Evidence                                                                                                                                                                                            | Note                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| -------------------------------------------------- | ------------ | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) | **Subset**   | §5    | packages/protocol/src/problem.ts, packages/protocol/src/problems.ts, packages/protocol/tests/problem.test.ts, packages/studio/src/platform-errors.ts, packages/studio/tests/platform-errors.test.ts | The contract now defines one failure shape, so the platform layer carries one reader instead of five: `problemDetail` reads a problem's `detail`, the legacy `error`, then the type's `title`. A problem's `type` **is** the structured error code the UI already branched on — `problemSlug` derives it and `installUrl` is the extension member its type documents. Absent: `instance`, and the WebSocket RPC envelope, which is a frame rather than a response body. |
+| [RFC 8252](https://www.rfc-editor.org/rfc/rfc8252) | **Adopted**  | §3.6  | packages/server/src/oauth-loopback.ts, packages/desktop/src/github-signin.ts, packages/server/tests/oauth-loopback.test.ts, packages/desktop/tests/github-signin.test.ts                            | The desktop signs in through a loopback redirect hosted on the project server: the literal `127.0.0.1` (§8.3), the provider's page in the user's own browser (§8.12), no client secret (§8.5), and a callback exempt from the token gate but not from the Host or Fetch Metadata checks. The browser Studio keeps the device flow, because a page has no loopback server to redirect to.                                                                                |
+| [RFC 7636](https://www.rfc-editor.org/rfc/rfc7636) | **Adopted**  | §3.6  | packages/server/src/oauth-loopback.ts, packages/desktop/src/github-signin.ts, packages/server/tests/oauth-loopback.test.ts, packages/desktop/tests/github-signin.test.ts                            | Every authorization-code exchange binds a verifier. `S256` only — `plain` is not implemented, and the test asserts the challenge is not the verifier rather than merely asserting the method string.                                                                                                                                                                                                                                                                    |
+| [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414) | **Rejected** | §3.6  | —                                                                                                                                                                                                   | because: the flow this would configure now exists, and the provider it talks to publishes no metadata document at either well-known URI. Discovery would be a request that always 404s, followed by the hard-coded endpoints below it. A second provider that does publish one is what would make this worth having.                                                                                                                                                    |
+| [RFC 7519](https://www.rfc-editor.org/rfc/rfc7519) | **Rejected** | §3.6  | —                                                                                                                                                                                                   | because: Jx issues and validates no JWTs. The desktop holds an opaque provider access token, and the loopback server's own gate is a random per-server token compared in constant time. The strongest posture against the JWT BCP's failure modes — `alg: none`, unverified `kid`, confused audiences — is not having a JWT, and adopting one to be conformant would create every risk it then manages.                                                                 |
 
 ## Changelog
 
+- **0.3.11-draft** (2026-08-16) — §3.6 the desktop signs in with an RFC 8252 loopback redirect and PKCE; the token rests in a 0600 credential store, not localStorage. RFC 8414 and RFC 7519 recorded Rejected as vacuous. Closes gap:native-oauth and gap:oauth-pkce.
+- **0.3.10-draft** (2026-08-16) — §5 the contract's failure half is specified — one RFC 9457 registry; gap:backend-failure-contract closed.
 - **0.3.9-draft** (2026-08-15) — Add §12 Standards Alignment; §5 marked Partial — the Backend API Contract specifies no failure shape.
 - **0.3.8-draft** (2026-08-13) — Open Project asks where a project should open (§4.2a): New Window is routed through pickProject + openProjectInNewWindow, and the outcome is reported rather than the target.
 - **0.3.7-draft** (2026-08-11) — Name the pane context bar's resolving-with popover rather than the tab bar, which P8 deleted.
@@ -906,4 +953,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx Studio Desktop Architecture Specification v0.3.9-draft_
+_Jx Studio Desktop Architecture Specification v0.3.11-draft_

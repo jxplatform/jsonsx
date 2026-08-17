@@ -5,6 +5,7 @@ spec:
   - site-architecture.md#8
 code:
   - packages/compiler/src/site/head-merger.ts
+  - packages/compiler/src/site/link-relations.ts
   - packages/compiler/src/site/site-build.ts
   - packages/schema/src/asset-paths.ts
 ---
@@ -76,6 +77,24 @@ Duplicates are detected by element identity, so a page-level entry replaces the 
 | `<script src="...">`        | `src`                                              |
 
 Links carry that fourth part because `rel` and `href` alone are not enough to tell two links apart: an RSS and an Atom feed are both `rel="alternate"` at different `type`s, and two favicon sizes share everything but `sizes`.
+
+### A misspelled `rel` gets a warning
+
+A `<link>` with a typo'd relation is a special kind of frustrating: it's still valid HTML, it still renders, and it does nothing.
+
+```
+<link rel="stylshet"> — "stylshet" is not an IANA link relation, and a relation nobody
+recognizes does nothing. Check the spelling, or use an absolute URI if it is an extension
+relation (RFC 8288 §2.1.2).
+```
+
+You get one warning per distinct value, however many pages carry it — the ones worth catching live in the site or layout `$head`, so they're on every page.
+
+It's a warning and never an error, and three things never trigger it: any relation in the [IANA registry](https://www.iana.org/assignments/link-relations/), the legacy `shortcut` in `rel="shortcut icon"`, and any absolute URI — which is how RFC 8288 says to write a relation the registry doesn't carry:
+
+```json
+{ "tagName": "link", "rel": "https://example.com/rel/pricing", "href": "/pricing/" }
+```
 
 Two tags are added automatically: `<link rel="canonical">` (built from `url` in `project.json` plus the page route, when `url` is set) and the `<html lang>` attribute. Both lose to one you write yourself.
 
@@ -154,9 +173,11 @@ Template strings resolve inside the object, at any depth — so the block can re
 When `url` is set in `project.json`, the build emits `dist/sitemap.xml` from the route table — one `<url>` per compiled page, with:
 
 - `<loc>` — absolute, built from `url` + the route, identical to the page's canonical URL
-- `<lastmod>` — the page source file's modification time, as a full timestamp (`2025-03-04T16:00:00Z`)
+- `<lastmod>` — a full timestamp (`2025-03-04T16:00:00Z`), taken from the page source file, or from the content entry when the page was generated from one
 
-Dynamic routes appear as their expanded concrete URLs; pages generated from one template share that template file's `<lastmod>`. Redirect sources are not pages and never appear.
+Dynamic routes appear as their expanded concrete URLs, each dated by **its own content entry** rather than by the `[slug]` template. That matters more than it sounds: you edit a template far more often than the posts under it, and dating by the template made every post in an archive announce itself as changed each time — the opposite of what `<lastmod>` is for. A route with no entry behind it (an authored page, or a `$paths` listing plain values) is still dated by its own file.
+
+Redirect sources are not pages and never appear.
 
 To opt a single page out (a thank-you page, a draft), set `"$sitemap": false` at the page root. To disable the sitemap entirely, set `"build": { "sitemap": false }`. Without `url` the sitemap is skipped with a build warning — absolute `<loc>` values can't be built.
 

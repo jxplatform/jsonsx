@@ -41,6 +41,7 @@ import {
   paramNames,
 } from "@jxsuite/schema/guards";
 import { runStatements } from "./statements.ts";
+import { readCookie, serializeCookie } from "./cookie.ts";
 import type {
   JxAttributeValue,
   JxClassDef,
@@ -1310,7 +1311,11 @@ function renderSwitch(def: JxElement, state: JxScope, options?: JxRenderOptions)
   let generation = 0;
 
   effect(() => {
-    container.innerHTML = "";
+    /* `replaceChildren()` rather than `innerHTML = ""`: identical semantics, and it is not a
+       Trusted Types injection sink — under `require-trusted-types-for 'script'` an innerHTML write
+       needs a policy even when the string is empty. Four sinks that were never injecting anything
+       is four fewer things a policy has to be permissive about. */
+    container.replaceChildren();
     if (!isRefObj(def.$switch)) {
       return;
     }
@@ -1333,7 +1338,7 @@ function renderSwitch(def: JxElement, state: JxScope, options?: JxRenderOptions)
           if (gen !== generation) {
             return;
           }
-          container.innerHTML = "";
+          container.replaceChildren();
           const childOpts = options ? { ...options, _path: [...path, "cases", key] } : undefined;
           container.append(renderNode(doc, childScope, childOpts));
         })
@@ -1480,38 +1485,21 @@ export async function resolvePrototype(
     case "Cookie": {
       const name = def.name ?? key;
       const read = () => {
-        const m = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
-        if (!m) {
+        const raw = readCookie(document.cookie, name);
+        if (raw === null) {
           return null;
         }
         try {
-          return JSON.parse(decodeURIComponent(m[1]!));
+          return JSON.parse(decodeURIComponent(raw));
         } catch {
-          return m[1];
+          return raw;
         }
       };
       const cookieState: Ref<unknown> = ref(read() ?? def.default ?? null);
       // Persist on change
       effect(() => {
-        const v = cookieState.value;
-        let s = `${name}=${encodeURIComponent(JSON.stringify(v))}`;
-        if (def.maxAge !== undefined) {
-          s += `; Max-Age=${def.maxAge}`;
-        }
-        if (def.path) {
-          s += `; Path=${def.path}`;
-        }
-        if (def.domain) {
-          s += `; Domain=${def.domain}`;
-        }
-        if (def.secure) {
-          s += `; Secure`;
-        }
-        if (def.sameSite) {
-          s += `; SameSite=${def.sameSite}`;
-        }
         // oxlint-disable-next-line unicorn/no-document-cookie -- the Cookie $prototype IS the cookie store binding
-        document.cookie = s;
+        document.cookie = serializeCookie(name, cookieState.value, def);
       });
       return cookieState;
     }
@@ -2492,7 +2480,7 @@ export async function defineElement(source: string | JxDocument, baseUrl?: strin
 
       // Capture light DOM children (for slot distribution) before rendering
       const slottedChildren = [...this.childNodes];
-      this.innerHTML = "";
+      this.replaceChildren();
 
       // Custom elements default to display:inline — use block so they behave as
       // Containers (matching <div> semantics).  The component's own style can
@@ -2640,7 +2628,7 @@ function distributeSlots(host: HTMLElement, slottedChildren: ChildNode[]) {
     const name = slot.getAttribute("name");
     const matches = name ? (named.get(name) ?? []) : unnamed;
     if (matches.length > 0) {
-      slot.innerHTML = "";
+      slot.replaceChildren();
       for (const child of matches) {
         slot.append(child);
       }

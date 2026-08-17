@@ -778,3 +778,36 @@ describe("projects mode", () => {
     expect(overlay()).toBeNull();
   });
 });
+
+// ─── The combobox relationship ───────────────────────────────────────────────
+
+describe("quick search announces its results", () => {
+  test("the input points at the listbox and at the highlighted row", async () => {
+    /*
+     * `role="combobox"` alone described nothing: there was no `aria-controls`, so a screen reader
+     * could not find the popup, and no `aria-activedescendant`, so arrowing through the results
+     * moved a visual highlight and said nothing at all.
+     */
+    await open("commands");
+    await type("a");
+    expect(items().length).toBeGreaterThan(0);
+    const el = input();
+    const list = document.querySelector(".quick-search-results")!;
+
+    expect(el.getAttribute("aria-controls")).toBe(list.id);
+    expect(list.id).not.toBe("");
+    expect(el.getAttribute("aria-autocomplete")).toBe("list");
+
+    const active = el.getAttribute("aria-activedescendant");
+    expect(active).not.toBeNull();
+    expect(document.querySelector(`#${active}`)?.getAttribute("aria-selected")).toBe("true");
+  });
+
+  test("aria-expanded is honest about whether a popup is showing", async () => {
+    // It was the literal string "true", which claims a popup even when nothing matched.
+    await open("commands");
+    await type("zzzzz-no-such-command-zzzzz");
+    expect(input().getAttribute("aria-expanded")).toBe("false");
+    expect(input().hasAttribute("aria-activedescendant")).toBe(false);
+  });
+});
