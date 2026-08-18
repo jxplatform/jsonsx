@@ -270,7 +270,10 @@ export async function writeRuntimeSubpaths(
           await bundleSource(
             `export * from ${JSON.stringify(specifier)};\n`,
             { outfile, resolveDir },
-            { resolver: shareRuntimeCore(outfile, await coreOf(mod), mirrors), target: "browser" },
+            {
+              resolver: shareRuntimeCore(mod, outfile, await coreOf(mod), mirrors),
+              target: "browser",
+            },
           );
           written += 1;
           discovered += 1;
@@ -294,12 +297,14 @@ export async function writeRuntimeSubpaths(
  * Keep a runtime package's core out of the subpath bundle, and note where the shared copy has to
  * appear for the specifier the bundler will leave behind to reach it.
  *
+ * @param {RuntimeModule} owner - The runtime package this subpath belongs to
  * @param {string} outfile - Where this subpath's bundle is being written
  * @param {string | undefined} core - The package's core file, or undefined if it did not resolve
  * @param {Map<string, string>} mirrors - Collects the core re-export stubs the build must write
  * @returns {BundleResolver}
  */
 function shareRuntimeCore(
+  owner: RuntimeModule,
   outfile: string,
   core: string | undefined,
   mirrors: Map<string, string>,
@@ -329,8 +334,7 @@ function shareRuntimeCore(
        * the runtime packages are ESM and write their extensions, and the hook has to give the same
        * answer under Bun and under esbuild.
        */
-      const owner = CLIENT_RUNTIME_MODULES.find((mod) => outfile.includes(mod.assetDir.slice(1)));
-      if (owner === undefined || resolve(dirname(importer), path) !== core) {
+      if (resolve(dirname(importer), path) !== core) {
         return;
       }
       mirrors.set(resolve(dirname(outfile), path), owner.specifier);
