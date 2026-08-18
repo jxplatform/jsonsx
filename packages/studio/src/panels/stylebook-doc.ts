@@ -100,7 +100,8 @@ export function transposeStylebookStyle(effectiveStyle: JxStyle): JxStyle {
         if (k === "@--") {
           continue; // Base canvas width marker, not a real query.
         }
-        const bucket = (mediaOut[k] ??= {});
+        mediaOut[k] ??= {};
+        const bucket = mediaOut[k];
         const sel = `${SPECIMEN_SCOPE} ${tagPath}`;
         bucket[sel] = mergeRules(
           bucket[sel] as Record<string, unknown> | undefined,
@@ -127,7 +128,8 @@ export function transposeStylebookStyle(effectiveStyle: JxStyle): JxStyle {
         continue;
       }
       // Media block: re-key tag rules inside; non-tag keys (scalars/pseudo) apply to the root.
-      const bucket = (mediaOut[k] ??= {});
+      mediaOut[k] ??= {};
+      const bucket = mediaOut[k];
       for (const [mk, mv] of Object.entries(v)) {
         if (isPlainObject(mv) && isTagPath(mk)) {
           const sel = `${SPECIMEN_SCOPE} ${mk}`;

@@ -1329,7 +1329,8 @@ function renderSwitch(def: JxElement, state: JxScope, options?: JxRenderOptions)
 
     if (isRefObj(caseDef)) {
       // External $ref — fetch and render asynchronously
-      const gen = (generation += 1);
+      generation += 1;
+      const gen = generation;
       const { href } = new URL(caseDef.$ref, location.href);
       resolve(href)
         .then(async (doc) => {

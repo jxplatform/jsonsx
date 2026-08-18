@@ -553,7 +553,8 @@ export function renderSignalsTemplate(S: SignalsPanelState, ctx: SignalsPanelCtx
     { items: groups.function!, key: "function", label: "Functions" },
   ];
 
-  const collapsedCats = (S._collapsedSignalCats ||= new Set());
+  S._collapsedSignalCats ||= new Set();
+  const collapsedCats = S._collapsedSignalCats;
 
   const catTemplates = categories
     .filter((c) => c.items.length > 0)

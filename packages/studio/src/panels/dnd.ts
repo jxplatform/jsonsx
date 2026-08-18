@@ -182,7 +182,8 @@ export function registerLayersDnD() {
           const tab = activeTab.value;
           const newPath = primarySelection(tab?.session.selection);
           if (newPath) {
-            const collapsed = (view._layersCollapsed ||= new Set());
+            view._layersCollapsed ||= new Set();
+            const collapsed = view._layersCollapsed;
             collapsed.add(newPath.join("/"));
           }
         }

@@ -82,7 +82,8 @@ export function createDesktopPlatform() {
     return ready.then(
       () =>
         new Promise((resolve, reject) => {
-          const id = (nextId += 1);
+          nextId += 1;
+          const id = nextId;
           pending.set(id, { reject, resolve });
           ws.send(JSON.stringify({ id, method, params }));
         }),

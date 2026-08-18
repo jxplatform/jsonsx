@@ -157,9 +157,9 @@ export function coerceEntryDates(
         continue;
       }
       if (coerced !== raw) {
-        const meta = (entry._meta ??= {});
-        const rawDates = ((meta as { rawDates?: Record<string, unknown> }).rawDates ??= {});
-        rawDates[field] = raw;
+        entry._meta ??= {};
+        entry._meta.rawDates ??= {};
+        entry._meta.rawDates[field] = raw;
       }
       entry.data[field] = coerced;
     }

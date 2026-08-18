@@ -249,7 +249,8 @@ function pushValue(out: ParamValues, param: string, value: unknown) {
     return;
   }
   const str = String(value);
-  const list = (out[param] ??= []);
+  out[param] ??= [];
+  const list = out[param];
   if (!list.includes(str)) {
     list.push(str);
   }

@@ -398,10 +398,7 @@ export function createOpenAIStreamingClient({
  * @param {string} _opts.apiKey
  * @returns {StreamingClient}
  */
-export function createAnthropicStreamingClient({
-  baseUrl: _,
-  apiKey: __,
-}: {
+export function createAnthropicStreamingClient(_opts: {
   baseUrl: string;
   apiKey: string;
 }): StreamingClient {
