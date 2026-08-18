@@ -47,7 +47,7 @@
     "lint:fix": "oxlint --fix .",
     "lint:typecheck": "oxlint --type-aware -c .oxlintrc.typecheck.json .",
     "pack": "bun run --workspaces bun pm pack",
-    "postinstall": "node -e \"if(!process.env.CI)require('child_process').execSync('bun2nix -o bun.nix',{stdio:'ignore'})\" || true",
+    "postinstall": "bun scripts/check-workspace-links.ts --fix; node -e \"if(!process.env.CI)require('child_process').execSync('bun2nix -o bun.nix',{stdio:'ignore'})\" || true",
     "prepare": "husky",
     "screenshots": "bun scripts/screenshots/run.ts",
     "screenshots:thumbnails": "bun scripts/screenshots/thumbnails.ts",
@@ -59,6 +59,8 @@
     "typecheck": "tsc",
     "upgrade": "bunx npm-check-updates -u && bun install && bun run --workspaces --if-present upgrade",
     "schema:clean-roots": "bun scripts/check-shadowed-core.ts --fix",
+    "links:check": "bun scripts/check-workspace-links.ts",
+    "links:clean": "bun scripts/check-workspace-links.ts --fix",
     "schema:generate-all": "bun run schema:clean-roots && bun scripts/generate-schemas.ts",
     "schema:validate-all": "bun scripts/validate-schemas.ts"
   },

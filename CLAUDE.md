@@ -46,6 +46,32 @@ schema narrower than the starter's own content for six weeks.
   their generators. `schema:validate-all` answers a different question (documents against schemas)
   and cannot see a stale schema.
 
+### The other half: a workspace shadowing the root install
+
+Same shape, different cause, different guard — `scripts/check-workspace-links.ts`, run as
+`bun run links:check` (report) or `bun run links:clean` (remove).
+
+Bun's `isolated` linker points every workspace's `node_modules` at a store under
+`node_modules/.bun/`. This repo links **hoisted** (`bunfig.toml`, oven-sh/bun#23615), which writes
+real directories into the ROOT `node_modules/` and touches a workspace's own only for a conflict it
+cannot hoist. A leftover from the isolated era is therefore in no later install's plan, so nothing
+rewrites or removes it — and resolution walks UP from the importing file, so the leftover answers
+first. `packages/schema` was resolving `@webref/css` 8.5.8 against a declared `^8.7.1`, which made
+`schema:verify` fail locally with a diff nobody authored; `packages/studio` was two majors behind on
+`@atlaskit/pragmatic-drag-and-drop`, under the drag-and-drop tests.
+
+- **The manifest decides what may be deleted, not the file type.** A nested copy that satisfies the
+  workspace's declared range is the answer that workspace asked for — `packages/import` pins
+  `puppeteer-core: ^24.9.0` while the root holds 25.7.0, and its own copy must survive. Only a copy
+  the declared range _rules out_ is stale. A leftover nothing declares is judged by where it points:
+  a symlink into the isolated store, under a hoisted linker, belongs to an abandoned layout.
+- **Removing one is a single `rm` of the entry, never the tree**, and needs no reinstall —
+  resolution falls through to the root copy immediately.
+- It runs itself: `postinstall` (where the staleness appears) and a non-blocking `pre-commit` step.
+  Both use `--fix`; the check takes ~20ms.
+- **CI never sees this** — it installs clean — so there is no CI lane, and a green PR is no evidence
+  your tree is right. That is what makes it worth automating locally.
+
 ## Specs & User-Documentation Policy
 
 Specs (`/specs`, §-numbered) are the source of truth; user docs (`/docs`, published at jxsuite.com/docs) must track shipped behavior. Every plan for a behavior-changing task MUST include a "Specs & docs" step, and the change set must land code, spec edits, and docs-page updates together.

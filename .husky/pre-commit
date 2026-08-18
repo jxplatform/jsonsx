@@ -1,4 +1,9 @@
 bunx nano-staged
+# Self-healing (never blocks): a workspace resolving a dependency its own manifest rules out.
+# Left behind by installs from before the hoisted-linker switch, and by any install that
+# rebuilds the isolated layout — Studio runs `bun install` in starter roots. Removing the
+# entry is instant and needs no reinstall; resolution falls through to the root copy.
+bun scripts/check-workspace-links.ts --fix || true
 # Advisory (never blocks): staged source files whose docs/specs aren't in the commit
 bun scripts/docs/check-doc-sync.ts --staged || true
 # Advisory (never blocks): a staged spec whose body changed but wasn't released.
