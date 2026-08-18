@@ -2,7 +2,7 @@
 
 ## File-Based Routing, Content Collections, Layouts, and Static Site Generation
 
-**Version:** 0.5.10-draft
+**Version:** 0.5.12-draft
 **Status:** Partial
 **Updated:** 2026-08-18
 **License:** MIT
@@ -1114,7 +1114,9 @@ column gave `Description` two meanings. Every field commits live, and the previe
 ### 8.7 Bare Specifiers in `$head` and `$elements`
 
 > **Status: Implemented.** `rewriteNpmAsset` in `site-build.ts`; the copy step runs beside sidecar
-> bundling.
+> bundling. Resolution runs on all three `$head` levels and both `$elements` levels — see "Every
+> level" below, which is a correction rather than an addition — package subpaths resolve through an
+> import-map prefix key, and an npm `$elements` set is bundled as one self-contained module.
 
 A `$head` entry may name a file inside an installed package by bare specifier rather than by URL —
 `"@shoelace-style/shoelace/dist/themes/light.css"`. The build **resolves it against the project
@@ -1127,8 +1129,40 @@ Function-def `$src` takes (`spec.md` §12) and land at the same kind of URL. Bun
 copying is what makes the package's own bare imports resolvable: the emitted import map carries two
 entries, and a component package imports far more than that.
 
+**Every level, not just the project's.** Both keys are legal on the project, on a layout and on a
+page, and resolution applies wherever they are written. This is stated because it did not hold: the
+`$head` pass ran over `projectConfig.$head` alone and the `$elements` pass read the layout alone, so
+the identical declaration written on a **page** was silently skipped — its stylesheet shipped as a
+bare specifier the browser resolved against the page URL, and its component modules were never
+imported at all. The page rendered unknown elements with nothing in the build log, because a
+dropped entry produced no output to be wrong.
+
+**A page whose only components come from npm still gets an import map.** The map is what makes the
+two external runtime modules resolvable, and it was emitted only alongside Jx component scripts —
+so a page with npm elements and no Jx components got modules that immediately failed on
+`Failed to resolve module specifier "lit-html"`.
+
 Copies and bundles share one output directory, so they share one namespace. Two different files
 that flatten to the same name is a **build error** naming both, never a last-writer-wins overwrite.
+
+**A package subpath resolves through a prefix key.** A `$src` sidecar may import a _subpath_ of a
+runtime module — `lit-html/directives/class-map.js` — and a package-name external covers the
+package's subpaths as well, so the specifier survives into the bundle. The import map therefore
+carries a `/`-suffixed prefix entry beside each exact one (`"lit-html/": "/assets/lit-html/"`), and
+the build writes the subpaths it finds referenced in the emitted assets. The set is **discovered
+from the output**, never enumerated: which subpaths exist is a property of the third-party code a
+page happens to use. Each is bundled with the core still external, so it imports the one shared copy
+rather than inlining a second — two copies of lit on a page is a documented breakage, not a size
+regression.
+
+**An npm `$elements` set is bundled as ONE self-contained module**, with nothing external. Two
+measurements decided this. Bundling each specifier separately against an external framework
+produced output that threw before defining anything: Bun's codegen for `export *` from an external
+emits a re-export against a namespace it never imports, and a component package re-exporting its
+framework is exactly that shape. Inlining per specifier fixes the codegen and gives each component
+its own framework copy — seven of them on the demo that motivated this. Bundling the set as one
+entry gives one copy, no external and no import map: 190kb against 462kb, and correct instead of
+broken.
 
 An unresolvable specifier is a build error too. It was previously rewritten to
 `/node_modules/<specifier>`, which the dev server happens to serve and which nothing copies into
@@ -2443,6 +2477,8 @@ This spec builds on existing Jx primitives wherever possible:
 
 ## Changelog
 
+- **0.5.12-draft** (2026-08-18) — §8.7: subpaths resolve through a prefix key and an npm $elements set bundles as one self-contained module.
+- **0.5.11-draft** (2026-08-18) — §8.7: bare specifiers resolve on page and layout too, npm-only pages get an import map, and the package-subpath gap is recorded.
 - **0.5.10-draft** (2026-08-18) — §13: correct a status marker that contradicted §13.3 and §13.6 — {locale} expansion and Accept-Language negotiation both ship.
 - **0.5.9-draft** (2026-08-16) — §13.7 blessed Intl helpers — one shared list, five new helpers, and a fixed en-US/UTC default so a build's output is a function of its input. Closes gap:locale-formatting.
 - **0.5.8-draft** (2026-08-16) — §13.3 {locale} sources expand and scope route expansion; §13.6 Accept-Language negotiation in the generated worker; prefix-always is checked; gap:locale-lookup closed.

@@ -18,7 +18,7 @@
 import { mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
-import { bundleSource } from "./bundler.ts";
+import { bundleSource, CLIENT_EXTERNALS } from "./bundler.ts";
 import { DEFAULT_LIT_HTML_SRC, DEFAULT_REACTIVITY_SRC } from "../shared.ts";
 
 /** One import-map entry the build can satisfy itself. */
@@ -27,16 +27,37 @@ interface RuntimeModule {
   assetPath: string;
   /** Where the entry points when this package cannot be resolved at all. */
   fallback: string;
+  /**
+   * Directory this package's SUBPATHS are served from, and the value of its import-map prefix key.
+   *
+   * A third-party component does not import only `lit-html`; it imports
+   * `lit-html/directives/class-map.js` too. Those stay external in its bundle — a package-name
+   * external covers the package's subpaths as well — so without a prefix key the page dies on
+   * `Failed to resolve module specifier`. Trailing slashes on both sides are required: that is what
+   * makes it a prefix mapping rather than an exact one.
+   */
+  assetDir: string;
 }
 
 export const CLIENT_RUNTIME_MODULES: readonly RuntimeModule[] = [
   {
+    assetDir: "/assets/@vue/reactivity/",
     assetPath: "/assets/vue-reactivity.js",
     fallback: DEFAULT_REACTIVITY_SRC,
     specifier: "@vue/reactivity",
   },
-  { assetPath: "/assets/lit-html.js", fallback: DEFAULT_LIT_HTML_SRC, specifier: "lit-html" },
+  {
+    assetDir: "/assets/lit-html/",
+    assetPath: "/assets/lit-html.js",
+    fallback: DEFAULT_LIT_HTML_SRC,
+    specifier: "lit-html",
+  },
 ];
+
+/** An import-map prefix key — `"lit-html/"` — as opposed to an exact specifier. */
+export function isPrefixSpecifier(specifier: string): boolean {
+  return specifier.endsWith("/");
+}
 
 export interface ClientRuntime {
   /** The import map's `imports` object. */
@@ -65,6 +86,12 @@ export function resolveClientRuntime(resolveDir: string = import.meta.dir): Clie
   for (const mod of CLIENT_RUNTIME_MODULES) {
     if (canResolve(mod.specifier, resolveDir)) {
       imports[mod.specifier] = mod.assetPath;
+      /*
+       * The prefix key is emitted whether or not any subpath turns out to be used. It costs two
+       * lines of JSON, and the alternative is knowing the subpath set before the first page is
+       * compiled — which is impossible, since the set is discovered from the bundles themselves.
+       */
+      imports[`${mod.specifier}/`] = mod.assetDir;
       assetPaths.push(mod.assetPath);
     } else {
       imports[mod.specifier] = mod.fallback;
@@ -137,4 +164,92 @@ function canResolve(specifier: string, resolveDir: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Emit the package subpaths the built bundles actually import, so the prefix keys resolve.
+ *
+ * The subpath set cannot be known before the build: it is a property of whichever third-party
+ * components a page happens to register. So it is discovered _from the output_ — every emitted
+ * `.js` asset is scanned for an import of `<runtime package>/<subpath>`, each is bundled to the
+ * directory its prefix key names, and the scan repeats over what that produced. Bundling can
+ * introduce new subpaths (a directive importing another directive), so the pass runs to closure
+ * rather than once.
+ *
+ * Each subpath keeps the same externals as everything else, so it still imports the ONE shared copy
+ * of the package core rather than inlining a second one. That matters beyond size: two copies of
+ * lit-html in a page is a documented breakage, not a waste.
+ *
+ * @param {string} outDir - Build output root
+ * @param {string} [resolveDir] - Directory bare specifiers resolve from
+ * @returns {Promise<{ written: number; errors: string[] }>}
+ */
+export async function writeRuntimeSubpaths(
+  outDir: string,
+  resolveDir: string = import.meta.dir,
+): Promise<{ written: number; errors: string[] }> {
+  const errors: string[] = [];
+  const done = new Set<string>();
+  const assetsDir = resolve(outDir, "assets");
+  let written = 0;
+
+  /** `from "lit-html/directives/class-map.js"` — the import forms a bundler emits. */
+  const importedSpecifiers = async (file: string): Promise<string[]> => {
+    const text = await Bun.file(file).text();
+    return [...text.matchAll(/(?:from|import)\s*["']([^"']+)["']/g)].map((m) => m[1] as string);
+  };
+
+  for (let pass = 0; pass < 10; pass++) {
+    let discovered = 0;
+    let files: string[] = [];
+    try {
+      files = await Array.fromAsync(
+        new Bun.Glob("**/*.js").scan({ absolute: true, cwd: assetsDir }),
+      );
+    } catch {
+      return { errors, written };
+    }
+
+    for (const file of files) {
+      let specifiers: string[] = [];
+      try {
+        specifiers = await importedSpecifiers(file);
+      } catch {
+        continue;
+      }
+      for (const specifier of specifiers) {
+        const mod = CLIENT_RUNTIME_MODULES.find((m) => specifier.startsWith(`${m.specifier}/`));
+        if (!mod || done.has(specifier)) {
+          continue;
+        }
+        done.add(specifier);
+        const subpath = specifier.slice(mod.specifier.length + 1);
+        const outfile = resolve(outDir, `${mod.assetDir.replace(/^\//, "")}${subpath}`);
+        mkdirSync(dirname(outfile), { recursive: true });
+        try {
+          /*
+           * Re-exported rather than copied, for the reason `writeClientRuntime` gives: the file on
+           * disk may be a condition of the package this page must not get.
+           */
+          await bundleSource(
+            `export * from ${JSON.stringify(specifier)};\n`,
+            { outfile, resolveDir },
+            { external: CLIENT_EXTERNALS, target: "browser" },
+          );
+          written += 1;
+          discovered += 1;
+        } catch (error) {
+          errors.push(`Bundling runtime subpath "${specifier}": ${(error as Error).message}`);
+        }
+      }
+    }
+    if (discovered === 0) {
+      return { errors, written };
+    }
+  }
+  errors.push(
+    "Runtime subpath resolution did not settle in 10 passes — a package subpath graph this deep " +
+      "is more likely a cycle in the scan than a real dependency chain.",
+  );
+  return { errors, written };
 }

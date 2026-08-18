@@ -1516,10 +1516,18 @@ describe("buildSite — the import map points at the site, not a CDN", () => {
     const html = readFileSync(resolve(RT_TMP, "dist/index.html"), "utf8");
     expect(html).not.toContain("esm.sh");
     const map = /<script type="importmap">([\s\S]*?)<\/script>/.exec(html)?.[1] ?? "";
+    /*
+     * Four entries: an exact key per module and a `/`-suffixed prefix key beside it. The prefix is
+     * what resolves a SUBPATH — `lit-html/directives/class-map.js`, which a `$src` sidecar imports
+     * and which a package-name external leaves in the bundle. Without it the page loads a module
+     * that cannot resolve its own import (site-architecture.md §8.7).
+     */
     expect(JSON.parse(map)).toEqual({
       imports: {
         "@vue/reactivity": "/assets/vue-reactivity.js",
+        "@vue/reactivity/": "/assets/@vue/reactivity/",
         "lit-html": "/assets/lit-html.js",
+        "lit-html/": "/assets/lit-html/",
       },
     });
 

@@ -26,6 +26,7 @@ import {
   bundleEntry,
   bundleWorkerSource,
   isBundleableSrc,
+  bundleSource,
   resolveSidecarEntry,
 } from "./bundler.ts";
 import { loadProjectConfig } from "./site-loader.ts";
@@ -89,7 +90,12 @@ import {
   unprefixedRoutes,
 } from "./i18n.ts";
 import type { LocaleAlternate, ResolvedI18n } from "./i18n.ts";
-import { renderImportMap, resolveClientRuntime, writeClientRuntime } from "./client-runtime.ts";
+import {
+  renderImportMap,
+  resolveClientRuntime,
+  writeClientRuntime,
+  writeRuntimeSubpaths,
+} from "./client-runtime.ts";
 import { getImageCacheDir, loadCache, saveCache } from "./image-cache.ts";
 import type { ImageConfig } from "./image-optimizer.ts";
 import type { ImageMetaCache } from "./image-transform.ts";
@@ -158,6 +164,20 @@ export async function buildSite(
    * server serves that path, and 404s in production, where nothing copies node_modules into dist.
    */
   const npmAssets = new Map<string, string>();
+  /*
+   * One entry per distinct SET of npm `$elements`, bundled self-contained. Keyed by the set rather
+   * than by specifier so two pages registering the same components share one file, and so a package
+   * that ships its own framework copy inlines it exactly once per page instead of once per
+   * component. See `injectNpmElementScripts` for why sharing Jx's copy is not an option.
+   */
+  const elementBundles = new Map<string, string[]>();
+  const registerElementBundle = (specifiers: string[]): string => {
+    const sorted = specifiers.toSorted();
+    const key = Bun.hash(sorted.join("\u0000")).toString(36);
+    const assetPath = `/assets/elements-${key}.js`;
+    elementBundles.set(assetPath, sorted);
+    return assetPath;
+  };
   /*
    * Bundles and copies land in one URL directory, so one map arbitrates it. Two different files
    * that slug to the same name is a build error, not a silent last-writer-wins overwrite.
@@ -531,6 +551,7 @@ export async function buildSite(
         i18n,
         alternateMap.get(route.urlPattern) ?? [],
         runtimeImports,
+        registerElementBundle,
       );
 
       for (const relation of result.unregisteredRelations) {
@@ -782,6 +803,49 @@ export async function buildSite(
     }
   }
 
+  if (elementBundles.size > 0) {
+    log(`Bundling ${elementBundles.size} npm element set(s)...`);
+    for (const [assetPath, specifiers] of elementBundles) {
+      const outfile = resolve(outDir, assetPath.replace(/^\//, ""));
+      mkdirSync(dirname(outfile), { recursive: true });
+      try {
+        /*
+         * `external: []` — the whole point. A component package re-exporting its framework is
+         * exactly the shape Bun mis-compiles when that framework is external.
+         */
+        await bundleSource(
+          `${specifiers.map((sp) => `import ${JSON.stringify(sp)};`).join("\n")}\n`,
+          { outfile, resolveDir: projectRoot },
+          { target: "browser" },
+        );
+        fileCount += 1;
+        log(`  ${specifiers.length} element(s) → ${assetPath}`);
+      } catch (error) {
+        const msg = `Error bundling npm $elements [${specifiers.join(", ")}]: ${
+          (error as Error).message
+        }`;
+        errors.push(msg);
+        console.error(msg);
+      }
+    }
+  }
+
+  /*
+   * Package subpaths the emitted bundles import — run AFTER every bundle exists, because the set is
+   * discovered from their contents rather than declared anywhere (site-architecture.md §8.7).
+   */
+  if (runtimeAssetsUsed.size > 0) {
+    const subpaths = await writeRuntimeSubpaths(outDir);
+    if (subpaths.written > 0) {
+      log(`Bundling ${subpaths.written} runtime subpath module(s)...`);
+    }
+    fileCount += subpaths.written;
+    for (const error of subpaths.errors) {
+      errors.push(error);
+      console.error(error);
+    }
+  }
+
   // ── 6e. Extension-emitted assets (extensions.md §8.4) ───────────────────
   // Section-owner classes with an `emit` capability contribute derived build artifacts
   // (search indexes, feeds, …). The host writes the returned files so extensions stay pure;
@@ -982,7 +1046,7 @@ export async function buildSite(
  *   serverHandler: string | null;
  *   doc: JxDocument;
  * }>}
- *   Every parameter is required. There is exactly one caller and it passes all fifteen, so the
+ *   Every parameter is required. There is exactly one caller and it passes all sixteen, so the
  *   defaults this list used to carry described no reachable call — and one of them, an identity
  *   `rewriteNpmAsset`, was a function that could never run pretending to be a safety net.
  */
@@ -1003,6 +1067,8 @@ async function compilePage(
   i18n: ResolvedI18n | null,
   alternates: readonly LocaleAlternate[],
   runtimeImports: Record<string, string>,
+  /** Registers a page's npm `$elements` set as one bundle and returns its URL. */
+  registerElementBundle: (specifiers: string[]) => string,
 ) {
   // Load the raw page document (.json natively, other formats via the registry)
   const pageDoc = await readPageDocument(route.sourcePath as string, formatRegistry);
@@ -1058,8 +1124,25 @@ async function compilePage(
   }
 
   // Resolve template strings in $head entries
-  const resolvedPageHead = resolveHeadTemplates(pageHead, scope);
-  const resolvedLayoutHead = resolveHeadTemplates(layoutHead, scope);
+  /*
+   * Bare specifiers resolve on ALL THREE heads, not just the project's.
+   *
+   * A `$head` entry may name a package file — a component library's stylesheet, most often — and
+   * `rewriteNpmAsset` copies it into `/assets/` so it survives deploy. That ran only over
+   * `projectConfig.$head`, so the same link written on a PAGE shipped its bare specifier verbatim
+   * into the HTML: the browser resolved `@scope/pkg/x.css` against the page URL and 404'd, and the
+   * page rendered unstyled with nothing in the build log. `resolveHeadBareSpecifiers` leaves an
+   * entry with no bare specifier untouched, so widening the scope costs nothing where it does not
+   * apply.
+   */
+  const resolvedPageHead = resolveHeadBareSpecifiers(
+    resolveHeadTemplates(pageHead, scope),
+    rewriteNpmAsset,
+  );
+  const resolvedLayoutHead = resolveHeadBareSpecifiers(
+    resolveHeadTemplates(layoutHead, scope),
+    rewriteNpmAsset,
+  );
 
   // Resolve template strings in the document tree (innerHTML, textContent, style, attributes)
   // So that timing: "compiler" data is baked into the static HTML
@@ -1220,20 +1303,33 @@ async function compilePage(
   // Post-process: inject merged <head> content into the compiled HTML
   result.html = injectHead(result.html, mergedHead, language);
 
-  // Inject <script type="module"> for npm $elements (cherry-picked component imports)
-  const npmElements = (layoutDoc.$elements ?? []).filter(
-    (e: JxElement | string) => typeof e === "string" && !e.startsWith("./") && !e.startsWith("../"),
-  );
+  /*
+   * Inject <script type="module"> for npm $elements (cherry-picked component imports).
+   *
+   * BOTH documents, because `$elements` is legal on either and `resolveLayout` does not merge the
+   * page's into the layout's. Reading only the layout dropped every bare specifier a PAGE declared:
+   * the page still rendered `<sl-card>` and friends into the markup, nothing imported the modules
+   * that define them, and the result was a page of inert unknown elements with no error anywhere.
+   * A local `./x.json` element never hit this, because those are registered through `componentDefs`
+   * on a different path — which is why the failure looked component-specific rather than general.
+   */
+  /*
+   * Deliberately the original predicate, not the stricter module-level `isBareSpecifier`: this fix
+   * is about WHERE entries are read from, and narrowing WHICH ones count would silently drop an
+   * absolute-URL `$element` that reaches this path today.
+   */
+  const isNpmElementEntry = (e: JxElement | string): e is string =>
+    typeof e === "string" && !e.startsWith("./") && !e.startsWith("../");
+  const npmElements = [
+    ...new Set(
+      [
+        ...((layoutDoc.$elements ?? []) as (JxElement | string)[]),
+        ...((pageDoc.$elements ?? []) as (JxElement | string)[]),
+      ].filter((e) => isNpmElementEntry(e)),
+    ),
+  ];
   if (npmElements.length > 0) {
-    /*
-     * Bundled through the same sidecar path as a Function-def `$src`, with the `npm:` prefix the
-     * resolver expects. A component package imports its own dependencies by bare specifier, and
-     * the emitted import map only ever carried `@vue/reactivity` and `lit-html` — so linking the
-     * package file directly left those imports unresolvable even before the URL was wrong.
-     */
-    const bundleNpmElement = (specifier: string) =>
-      rewriteSidecarSrc === undefined ? specifier : rewriteSidecarSrc(`npm:${specifier}`, null);
-    result.html = injectNpmElementScripts(result.html, npmElements as string[], bundleNpmElement);
+    result.html = injectNpmElementScripts(result.html, registerElementBundle(npmElements));
   }
 
   // Compile server handler if applicable (skip when provider bundles site-wide)
@@ -1944,16 +2040,21 @@ function injectComponentScripts(
  *   "@shoelace-style/shoelace/components/button/button.js"
  * @returns {string}
  */
-function injectNpmElementScripts(
-  html: string,
-  npmElements: string[],
-  rewrite: (specifier: string) => string,
-) {
-  const scripts = npmElements
-    .map((spec: string) => `<script type="module" src="${rewrite(spec)}"></script>`)
-    .join("\n  ");
-
-  return html.replace("</body>", `  ${scripts}\n</body>`);
+function injectNpmElementScripts(html: string, bundleUrl: string) {
+  /*
+   * ONE self-contained module for the whole set, and no import map.
+   *
+   * Each specifier used to be bundled separately with `lit-html` external, shared through the page
+   * import map. Two things were wrong with that. Bun's codegen for `export *` from an external
+   * emits a `__reExport(…, lit_html)` against a namespace it never imports, so the bundle threw
+   * `lit_html is not defined` before defining anything — measured, not inferred. And a package
+   * brings its own framework copy anyway, so sharing Jx's was a version-skew bet with no upside.
+   *
+   * Inlining per specifier would fix the codegen and cost seven copies of Lit on this page — a
+   * documented breakage, not merely 462kb. Bundling the SET as one entry gives one copy, no
+   * external, and 190kb for the seven-component demo that motivated this.
+   */
+  return html.replace("</body>", `  <script type="module" src="${bundleUrl}"></script>\n</body>`);
 }
 
 /**
