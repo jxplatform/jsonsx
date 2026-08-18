@@ -379,7 +379,14 @@ export async function loadContentSection(
   const contentTypes = new Map<string, ContentLoaderEntry[]>();
   const mounts = new Map(
     contentAssetMounts(section, root, projectConfig).map((mount) => [
-      mount.urlPrefix.split("/").pop()!,
+      /*
+       * The path below `/content/` — `<type>` for a plain source, `<type>/<locale>` for a
+       * localized one — which is exactly the key each lookup below builds. Keying by the LAST
+       * segment made every localized mount unreachable (`posts/fr` never matching `fr`), so a
+       * translated entry's `./hero.png` was left unrewritten; and it collided any two types that
+       * shared a locale.
+       */
+      mount.urlPrefix.slice(`/${SECTION_KEY}/`.length),
       mount,
     ]),
   );

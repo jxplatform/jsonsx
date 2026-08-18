@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from "bun:test";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -222,6 +222,25 @@ describe("writing", () => {
       headers: { "Content-Type": "application/atom+xml; charset=utf-8" },
       pattern: "/feed.xml",
     });
+    rmSync(dir, { force: true, recursive: true });
+  });
+
+  /*
+   * RFC 5005 archive pages are Atom documents served from a directory, so the rule has to be a
+   * prefix pattern rather than a filename — a subscriber's reader fetches them by URL and needs the
+   * same type the feed itself carries.
+   */
+  it("covers the RFC 5005 archive directory with the feed's own type", () => {
+    const dir = tmp();
+    mkdirSync(join(dir, "feed", "archive"), { recursive: true });
+    writeFileSync(join(dir, "feed", "archive", "1.xml"), "", "utf8");
+
+    expect(contentTypeRules(dir)).toEqual([
+      {
+        headers: { "Content-Type": "application/atom+xml; charset=utf-8" },
+        pattern: "/feed/archive/*",
+      },
+    ]);
     rmSync(dir, { force: true, recursive: true });
   });
 

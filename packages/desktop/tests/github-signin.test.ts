@@ -75,6 +75,21 @@ describe("the credential store", () => {
     expect(await readCredential("x")).toBe("y");
   });
 
+  /*
+   * Valid JSON that is not an object of entries — an array, a bare string, `null`. The parse
+   * succeeds, so the corrupt-file guard never fires, and `Object.entries` on a non-object would
+   * silently yield a store with the wrong shape.
+   */
+  test("a store that parses but is not an object reads as empty", async () => {
+    for (const contents of ["[1,2,3]", '"a string"', "null", "42"]) {
+      await Bun.write(storePath(), contents);
+      expect({ contents, value: await readCredential("x") }).toEqual({ contents, value: null });
+    }
+    // Still writable afterwards, so a bad file is never a permanent state.
+    await writeCredential("x", "y");
+    expect(await readCredential("x")).toBe("y");
+  });
+
   test("non-string entries are dropped", async () => {
     await Bun.write(storePath(), JSON.stringify({ n: 5, s: "ok" }));
     expect(await readCredential("n")).toBeNull();

@@ -1753,3 +1753,35 @@ describe("compileElement — $props delivery", () => {
     expect(content).toContain("this.removeAttribute(_n);");
   });
 });
+
+// ─── $ref schemes other than state ──────────────────────────────────────────
+
+describe("compileElement — the non-state $ref schemes", () => {
+  /*
+   * These used to fall through to the state branch, so `parent#/user` emitted `s.parent#/user` —
+   * a syntax error that took the whole element module down with it. They mirror `compileRef` in
+   * @jxsuite/runtime, and a prop reaches an element through `state`, so `parent#/` reads from `s`
+   * exactly as `#/state/` does.
+   */
+  test("parent, window and document refs each compile to their own accessor", async () => {
+    const result = await compileElement({
+      $props: { user: { type: "string" } },
+      children: [
+        { tagName: "span", textContent: { $ref: "parent#/user" } },
+        { tagName: "em", textContent: { $ref: "window#/location/href" } },
+        { tagName: "b", textContent: { $ref: "document#/title" } },
+      ],
+      state: {},
+      tagName: "test-ref-schemes",
+    });
+
+    const { content } = result.files[0]!;
+    expect(content).toContain("s.user");
+    expect(content).toContain("window.location");
+    expect(content).toContain("document.title");
+    // The defect itself: no scheme prefix survives into the emitted expression.
+    expect(content).not.toContain("parent#/");
+    expect(content).not.toContain("window#/");
+    expect(content).not.toContain("document#/");
+  });
+});

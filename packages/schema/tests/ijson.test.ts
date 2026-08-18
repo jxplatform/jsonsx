@@ -141,3 +141,19 @@ describe("describeIJsonProblem", () => {
     );
   });
 });
+
+describe("isSafeJsonNumber — integers JavaScript cannot hold", () => {
+  /*
+   * An integer literal is safe only when `String(Number(x))` reproduces it: that is the round trip
+   * a parse-then-serialize performs, and anything it changes is a value the document no longer
+   * says. A literal too large to be finite loses everything, not just precision.
+   */
+  test("a literal that overflows to Infinity is not safe", () => {
+    expect(isSafeJsonNumber("9".repeat(400))).toBe(false);
+    expect(isSafeJsonNumber(`-${"9".repeat(400)}`)).toBe(false);
+  });
+
+  test("a float literal is left alone — only integers are round-tripped", () => {
+    expect(isSafeJsonNumber("1e999")).toBe(true);
+  });
+});

@@ -77,3 +77,17 @@ describe("problemTypeForStatus", () => {
     expect(problemTypeForStatus(503)).toBe("upstreamFailure");
   });
 });
+
+describe("problemTypeForStatus — a status the table does not name", () => {
+  /*
+   * The switch lists the statuses this server deliberately distinguishes. Anything else still has
+   * to become SOME problem type, and which side of 500 it falls on is the only thing that decides
+   * whether the client is being told it made a mistake or that we did.
+   */
+  test("an unlisted 5xx is ours, an unlisted 4xx is the caller's", () => {
+    expect(problemTypeForStatus(507)).toBe("internalError");
+    expect(problemTypeForStatus(500)).toBe("internalError");
+    expect(problemTypeForStatus(418)).toBe("invalidRequest");
+    expect(problemTypeForStatus(429)).toBe("invalidRequest");
+  });
+});

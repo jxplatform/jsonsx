@@ -19,6 +19,7 @@ import { FormatEntry, FormatRegistry } from "@jxsuite/schema/format-registry";
 import type { FormatHostIO } from "@jxsuite/schema/format-registry";
 import {
   Content,
+  contentAssetMounts,
   getContentTypeElements,
   loadContentConfig,
   loadContentSection,
@@ -975,5 +976,112 @@ describe("Content.resolvePaths — localized collections", () => {
       { data: localized, locale: null, root: TMP },
     );
     expect(paths).toHaveLength(3);
+  });
+});
+
+// ─── {locale} sources — expansion, mounts, and per-locale assets ──────────────
+
+describe("localized content types", () => {
+  const I18N = resolve(TMP, "content/i18n-posts");
+  const section: ContentSection = {
+    "i18n-posts": { format: "Markdown", source: "./content/i18n-posts/{locale}/" },
+  };
+  const config: ProjectConfig = { i18n: { defaultLocale: "en", locales: ["en", "fr"] } };
+
+  beforeAll(() => {
+    for (const locale of ["en", "fr"]) {
+      mkdirSync(resolve(I18N, locale), { recursive: true });
+      writeFileSync(resolve(I18N, locale, "hero.png"), "png-bytes");
+      writeFileSync(
+        resolve(I18N, locale, "hello.md"),
+        `---\ntitle: Hello ${locale}\n---\n\n![hero](./hero.png)\n`,
+      );
+    }
+  });
+
+  /*
+   * One source, N directories, N mounts. They are published per locale because a French post's
+   * `./hero.png` and its English translation's are different files that would otherwise land on
+   * one URL — the second overwriting the first.
+   */
+  it("publishes one mount per locale the source expands over", () => {
+    expect(contentAssetMounts(section, TMP, config)).toEqual([
+      {
+        dir: resolve(I18N, "en").split("\\").join("/"),
+        urlPrefix: "/content/i18n-posts/en",
+      },
+      {
+        dir: resolve(I18N, "fr").split("\\").join("/"),
+        urlPrefix: "/content/i18n-posts/fr",
+      },
+    ]);
+  });
+
+  it("skips a locale with no directory, and a locale name that is not URL-safe", () => {
+    const mounts = contentAssetMounts(section, TMP, {
+      i18n: { defaultLocale: "en", locales: ["en", "de", "../evil"] },
+    });
+    expect(mounts.map((mount) => mount.urlPrefix)).toEqual(["/content/i18n-posts/en"]);
+  });
+
+  it("loads every locale's directory and stamps where each entry came from", async () => {
+    const registry = await buildFixtureRegistry();
+    const data = await Content.projectData(section, { projectConfig: config, registry, root: TMP });
+    const entries = data.get("i18n-posts") as ContentLoaderEntry[];
+
+    expect(entries.map((entry) => [entry.id, entry._meta?.locale])).toEqual([
+      ["hello", "en"],
+      ["hello", "fr"],
+    ]);
+    // The locale is the ONLY thing telling two translations of one id apart.
+    expect(entries.map((entry) => entry.data.title)).toEqual(["Hello en", "Hello fr"]);
+  });
+
+  /*
+   * The regression that made the per-locale mounts pointless: the lookup asks for `<type>/<locale>`
+   * and the map was keyed by the last URL segment, so it always missed and a translated entry kept
+   * its authored `./hero.png`.
+   */
+  /** The `src` of every img in an entry's rendered children. */
+  const srcsOf = (entry: ContentLoaderEntry): string[] => {
+    const srcs: string[] = [];
+    const walk = (node: unknown): void => {
+      if (!node || typeof node !== "object") {
+        return;
+      }
+      const record = node as Record<string, unknown>;
+      const attributes = record.attributes as Record<string, unknown> | undefined;
+      if (record.tagName === "img" && typeof attributes?.src === "string") {
+        srcs.push(attributes.src);
+      }
+      for (const child of (record.children as unknown[]) ?? []) {
+        walk(child);
+      }
+    };
+    for (const child of entry.$children ?? []) {
+      walk(child);
+    }
+    return srcs;
+  };
+
+  it("rewrites a translated entry's assets onto its own locale's mount", async () => {
+    const registry = await buildFixtureRegistry();
+    const data = await Content.projectData(section, { projectConfig: config, registry, root: TMP });
+    const entries = data.get("i18n-posts") as ContentLoaderEntry[];
+
+    expect(entries.map((entry) => srcsOf(entry))).toEqual([
+      ["/content/i18n-posts/en/hero.png"],
+      ["/content/i18n-posts/fr/hero.png"],
+    ]);
+  });
+
+  // Nothing to expand over is a warning and an empty collection, not a crash or a literal path.
+  it("warns and loads nothing when the project declares no locales", async () => {
+    const warnings = captureWarnings();
+    const registry = await buildFixtureRegistry();
+    const data = await Content.projectData(section, { projectConfig: {}, registry, root: TMP });
+
+    expect(data.get("i18n-posts")).toEqual([]);
+    expect(warnings.some((warning) => warning.includes("declares no i18n locales"))).toBe(true);
   });
 });

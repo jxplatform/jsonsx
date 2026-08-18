@@ -172,6 +172,38 @@ describe("image-transform", () => {
       expect(doc.attributes.sizes).toBe("(max-width: 768px) 100vw, 50vw");
     });
 
+    /*
+     * `<picture>` is a wrapper element with no presentation of its own: a style authored on the
+     * image describes the IMAGE, and leaving it on the wrapper would size the box rather than the
+     * picture inside it.
+     */
+    test("a style authored on the image moves onto the img, not the picture", async () => {
+      const doc: any = {
+        attributes: { src: "/images/hero.png" },
+        style: { borderRadius: "8px", width: "100%" },
+        tagName: "img",
+      };
+
+      await transformImageNodes(doc, defaultConfig, TMP, { entries: {}, version: 1 });
+
+      expect(doc.tagName).toBe("picture");
+      expect(doc.style).toBeUndefined();
+      expect(imgOf(doc).style).toEqual({ borderRadius: "8px", width: "100%" });
+    });
+
+    // A node with no attributes at all is still a node the transform has to be able to fill in.
+    test("an img with no attributes object is given one rather than throwing", async () => {
+      const doc: any = { src: "/images/hero.png", tagName: "img" };
+
+      const result = await transformImageNodes(doc, defaultConfig, TMP, {
+        entries: {},
+        version: 1,
+      });
+
+      expect(doc.attributes).toBeDefined();
+      expect(result).toBeDefined();
+    });
+
     test("images.picture false keeps the bare img even with two formats", async () => {
       const doc: any = { attributes: { src: "/images/hero.png" }, tagName: "img" };
 

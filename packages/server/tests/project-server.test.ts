@@ -315,6 +315,20 @@ describe("token / Origin / Host auth", () => {
     expect(res.status).toBe(403);
   });
 
+  /*
+   * The `embeddable` class: routes the canvas iframe loads, so they are reachable cross-origin from
+   * the studio document but from nowhere else. The gate runs before the route does — a foreign
+   * Origin must never reach the handler, whether it asks for an API path or a static file.
+   */
+  test("a foreign Origin is refused on the embeddable API and on static files alike", async () => {
+    const foreign = { Origin: "http://evil.example.com" };
+
+    const api = await fetch(`${base}/_jx/state?token=${token}`, { headers: foreign });
+    const asset = await fetch(`${base}/index.html`, { headers: foreign });
+
+    expect({ api: api.status, asset: asset.status }).toEqual({ api: 403, asset: 403 });
+  });
+
   test("WS upgrade without token is 403 (closes)", async () => {
     expect(openWs("?win=one")).rejects.toThrow();
   });

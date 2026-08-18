@@ -261,6 +261,14 @@ describe("RFC 5005", () => {
     // Archive 1 is the oldest and stays put as entries are added; only the newest one grows.
     expect(archives.map((p) => p.map((i) => i.id))).toEqual([["i3", "i4"], ["i2"]]);
   });
+
+  // A feed that fits on one page has no archive: paging it would publish empty pages to subscribe to.
+  test("a feed no longer than one page is all current and has no archives", () => {
+    const items = Array.from({ length: 2 }, (_, i) => ({ id: `i${i}` }) as FeedItem);
+    expect(paginate(items, 5)).toEqual({ archives: [], current: [items[0]!, items[1]!] });
+    expect(paginate(items, 2).archives).toEqual([]);
+    expect(paginate([], 2)).toEqual({ archives: [], current: [] });
+  });
 });
 
 describe("JSON Feed 1.1", () => {

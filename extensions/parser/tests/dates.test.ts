@@ -170,3 +170,15 @@ describe("predicates", () => {
     expect(isCoercedDate("March 4")).toBe(false);
   });
 });
+
+describe("parseDateValue — a well-shaped date that is not a date", () => {
+  /*
+   * RFC_3339 matches the SHAPE; it cannot know that month 13 or day 32 does not exist. A value that
+   * looks right and is not must be rejected rather than coerced, or the field sorts as an Invalid
+   * Date and every comparison against it silently answers false.
+   */
+  test("a syntactically valid but impossible date-time is null", () => {
+    expect(parseDateValue("2024-13-45T00:00:00Z", "date-time")).toBeNull();
+    expect(parseDateValue("2024-02-30T25:61:61Z", "date-time")).toBeNull();
+  });
+});

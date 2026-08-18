@@ -596,6 +596,27 @@ describe("report", () => {
     expect(logs.join("\n")).toContain("src/a.ts:1");
   });
 
+  test("fails on a contrast pair below its ratio, and says how to record it as debt", () => {
+    expect(report({ ...empty, contrast: [finding("--fg on --bg is 3.10:1")] })).toBe(1);
+    expect(logs.join("\n")).toContain("below the contrast WCAG 2.2 asks of them");
+    expect(logs.join("\n")).toContain("--fg on --bg is 3.10:1");
+    expect(logs.join("\n")).toContain("CONTRAST_DEBT");
+  });
+
+  /*
+   * The rule that matters more than the contrast one: a documented palette the app does not ship
+   * is one nobody can design against, and the message has to say that rather than name a colour.
+   */
+  test("fails when the documented palette disagrees with tokens.css", () => {
+    const guidelineTokens = [
+      finding("--bg is documented as `#1e1e1e` but tokens.css ships #111111"),
+    ];
+    expect(report({ ...empty, guidelineTokens })).toBe(1);
+    expect(logs.join("\n")).toContain("studio-ui-guidelines.md §1.1");
+    expect(logs.join("\n")).toContain("designing against");
+    expect(logs.join("\n")).toContain("#1e1e1e");
+  });
+
   test("fails on a stale focus-ring allowance", () => {
     expect(report({ ...empty, staleFocusRings: ["styles/a.css → .gone"] })).toBe(1);
     expect(logs.join("\n")).toContain("stale FOCUS_RING_ALLOWANCES");
@@ -755,6 +776,18 @@ describe("guidelineTokenFindings", () => {
     expect(guidelineTokenFindings(spec, css)).toEqual([]);
   });
 
+  /*
+   * A token with no hex fallback is still checked, against the declaration OR the fallback inside
+   * it — `--radius` ships `var(--r, 3px)`, so a row claiming `4px` is wrong about what a reader
+   * gets even though neither side is a colour.
+   */
+  test("catches a non-colour row whose fallback is not what the spec documents", () => {
+    const findings = guidelineTokenFindings("| `--radius` | Radius | `4px` |", css);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]!.text).toContain("documented as `4px`");
+    expect(findings[0]!.file).toBe("specs/studio-ui-guidelines.md");
+  });
+
   test("a table that stopped parsing is itself the finding", () => {
     // Otherwise moving the table would silently turn the rule into a no-op that always passes.
     const findings = guidelineTokenFindings("no table here", css);
@@ -775,5 +808,20 @@ describe("contrastFindings", () => {
     // A pair that cannot be checked must not look like a pair that passed.
     const findings = contrastFindings("sp-theme { --bg: var(--x, #111111); }");
     expect(findings.some((f) => f.text.includes("no hex fallback"))).toBe(true);
+  });
+
+  /*
+   * The ratchet, in the direction that keeps the debt list honest: once a pair clears its ratio,
+   * the entry recording that it did not is stale, and a stale entry silently exempts the pair from
+   * the rule for as long as it survives.
+   */
+  test("a debt entry whose pair now passes is itself the finding", () => {
+    const css = "sp-theme {\n  --accent-fg: var(--x, #ffffff);\n  --accent: var(--y, #000000);\n}";
+
+    const findings = contrastFindings(css);
+
+    const outgrown = findings.find((f) => f.text.includes("--accent-fg on --accent"));
+    expect(outgrown?.text).toContain("now meets 4.5:1 (21.00)");
+    expect(outgrown?.text).toContain("delete its CONTRAST_DEBT entry");
   });
 });

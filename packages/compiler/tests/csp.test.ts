@@ -182,3 +182,11 @@ describe("buildCspHeaders", () => {
     expect(value).toContain("style-src 'self' 'unsafe-inline' https://fonts.googleapis.com");
   });
 });
+
+describe("originOf — a URL the parser rejects", () => {
+  // The scheme test is a cheap filter, not a parse: a string can pass it and still not be a URL.
+  test("a well-schemed string that will not parse is null, not a throw", () => {
+    expect(originOf("http://")).toBeNull();
+    expect(originOf("https://")).toBeNull();
+  });
+});

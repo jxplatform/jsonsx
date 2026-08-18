@@ -1107,6 +1107,16 @@ describe("call operator — named formulas and blessed globals", () => {
     expect(dateJs).toContain("new Intl.DateTimeFormat(");
     const dateFn = new Function("state", `return ${dateJs}`) as (s: unknown) => string;
     expect(dateFn({ when: "2026-01-15T12:00:00Z" })).toBe("Jan 15, 2026");
+
+    // The relative helper takes its locale in the THIRD slot, after the value and the unit.
+    const relativeJs = compileExpression({
+      operator: "call",
+      target: ref("window#/Intl/formatRelativeTime"),
+      value: [ref("#/state/delta"), "day", "en-US"],
+    });
+    expect(relativeJs).toContain("new Intl.RelativeTimeFormat(");
+    const relativeFn = new Function("state", `return ${relativeJs}`) as (s: unknown) => string;
+    expect(relativeFn({ delta: -3 })).toBe("3 days ago");
   });
 
   test("a helper that names no locale or time zone still renders the same everywhere", () => {

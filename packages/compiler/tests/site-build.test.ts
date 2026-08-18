@@ -1299,6 +1299,68 @@ describe("buildSite — template string resolution", () => {
   });
 });
 
+describe("buildSite — templates inside a structured data block", () => {
+  const LD_TMP = resolve(import.meta.dir, "__test-site-ld-templates__");
+
+  beforeAll(() => {
+    rmSync(LD_TMP, { force: true, recursive: true });
+    mkdirSync(resolve(LD_TMP, "pages"), { recursive: true });
+    writeFileSync(
+      resolve(LD_TMP, "project.json"),
+      JSON.stringify({ build: { outDir: "./dist" }, name: "LD Test" }),
+      "utf8",
+    );
+    writeFileSync(
+      resolve(LD_TMP, "pages/index.json"),
+      JSON.stringify({
+        $head: [
+          {
+            attributes: { type: "application/ld+json" },
+            tagName: "script",
+            // A JSON-LD graph is an object of arrays of objects, and a template can sit at any depth.
+            textContent: {
+              "@context": "https://schema.org",
+              "@type": "Article",
+              author: { "@type": "Person", name: "${state.author}" },
+              headline: "${state.headline}",
+              // A non-string leaf passes through untouched — there is nothing in it to resolve.
+              isAccessibleForFree: true,
+              keywords: ["${state.headline}", "static"],
+              wordCount: 42,
+            },
+          },
+        ],
+        children: [{ tagName: "h1", textContent: "Structured" }],
+        state: {
+          author: { default: "Ada Lovelace", timing: "compiler" },
+          headline: { default: "A Real Headline", timing: "compiler" },
+        },
+      }),
+      "utf8",
+    );
+  });
+
+  afterAll(() => {
+    rmSync(LD_TMP, { force: true, recursive: true });
+  });
+
+  /*
+   * A JSON-LD block describes the page it sits on, so a template that stayed a template would
+   * publish `${state.headline}` to every consumer reading the page's structured data.
+   */
+  it("resolves templates nested in arrays and objects, not just at the top level", async () => {
+    const result = await buildSite(LD_TMP);
+    expect(result.errors).toHaveLength(0);
+
+    const html = readFileSync(resolve(LD_TMP, "dist/index.html"), "utf8");
+    expect(html).toContain("A Real Headline");
+    expect(html).toContain("Ada Lovelace");
+    expect(html).toContain('"wordCount": 42');
+    expect(html).toContain('"isAccessibleForFree": true');
+    expect(html).not.toContain("${state.");
+  });
+});
+
 // ── $elements (npm element scripts) ──────────────────────────────────────────
 
 describe("buildSite — npm $elements injection", () => {
