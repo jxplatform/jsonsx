@@ -213,6 +213,27 @@ describe("studio assets (/__studio__/)", () => {
     expect(await statusOf(`${base}/__studio__/dist/iframe-entry.js`)).toBe(200);
   });
 
+  /*
+   * The §21.5 observation stage, and the line that keeps its two CSP profiles apart. Both
+   * documents come out of this one branch, so the assertion that matters is the negative one: the
+   * canvas evaluates `${}` templates and `body` functions as it reads them and needs
+   * `'unsafe-eval'` permanently, and `require-trusted-types-for 'script'` gates `new Function`
+   * too. A header set one line higher in the handler would put the shell's profile on the
+   * interpreter and turn a permanent property into a bug report.
+   */
+  test("sends the report-only Trusted Types header to the shell and to nothing else", async () => {
+    const header = "Content-Security-Policy-Report-Only";
+    const shell = await fetch(`${base}/__studio__/index.html`);
+    expect(shell.headers.get(header)).toBe("require-trusted-types-for 'script'");
+    // Report-only, never enforcing: enforcement is a later stage and a separate decision.
+    expect(shell.headers.get("Content-Security-Policy")).toBeNull();
+
+    for (const rel of ["canvas.html", "dist/iframe-entry.js"]) {
+      const res = await fetch(`${base}/__studio__/${rel}`);
+      expect({ header: res.headers.get(header), rel }).toEqual({ header: null, rel });
+    }
+  });
+
   test("traversal out of studioDir is 404", async () => {
     const res = await fetch(`${base}/__studio__/../project/hello.txt`);
     expect(res.status).toBe(404);

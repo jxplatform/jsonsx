@@ -205,6 +205,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `server.md`
 
+- **0.2.8** (2026-08-18) — §4.2: both entry points send the Studio shell a report-only Trusted Types policy, and nothing else.
 - **0.2.7** (2026-08-16) — §4.2 Fetch Metadata on every gated surface, the loopback block, a constant-time token, and the three ungated project-server routes closed; gap:fetch-metadata closed.
 - **0.2.6** (2026-08-16) — §4.3 every failure is an RFC 9457 problem document, guarded; gitPull produces the 409 the route table publishes; gap:studio-problem-details closed.
 - **0.2.5** (2026-08-16) — §5 and §8 record the source-map decision — a constant header offset is not a source map (ECMA-426, Rejected).
@@ -294,6 +295,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `spec.md`
 
+- **0.5.2-draft** (2026-08-18) — §21.5: ship the Trusted Types observation stage, and correct two claims its first boot disproved.
 - **0.5.1-draft** (2026-08-18) — §7.1: state the one-separator rule without showcasing a dotted key; note that forbidding one would itself depart from RFC 6901.
 - **0.5.0-draft** (2026-08-17) — $ref is JSON Pointer: `/` is the only separator and `~0`/`~1` are implemented; one shared tokenizer replaces five disagreeing ones.
 - **0.4.33-draft** (2026-08-16) — §21.5 two CSP profiles, permanently: compiled output never needs 'unsafe-eval' and the interpreting canvas always will. A Trusted Types policy guards the shell's one injection sink and refuses to build scripts; the runtime's four innerHTML writes became replaceChildren().

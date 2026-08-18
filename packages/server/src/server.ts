@@ -37,6 +37,7 @@ import { handleImportApi } from "./import-api.ts";
 import { mediaTypeForPath } from "@jxsuite/schema/media-type";
 import { existsSync, readFileSync } from "node:fs";
 import { problem } from "./problem.ts";
+import { withStudioReportOnlyCsp } from "./studio-csp.ts";
 
 /**
  * Resolve an npm-style bare specifier from a URL path via node_modules. Handles scoped packages
@@ -553,6 +554,19 @@ export async function createDevServer(options: {
         return new Response(injectSSE(html), {
           headers: { ...NO_CACHE, "Content-Type": "text/html; charset=utf-8" },
         });
+      }
+
+      /*
+       * The Trusted Types observation run (`spec.md` §21.5), on the Studio shell document only.
+       *
+       * Matched here rather than inside `fileResponse`, which takes a `Bun.file` and cannot see the
+       * request path. The match is exact on purpose: this same branch serves `canvas.html`, which
+       * evaluates `${}` templates and `body` functions and needs `'unsafe-eval'` permanently, and
+       * the Monaco workers, which are separate global scopes taking their policy from their own
+       * responses.
+       */
+      if (path === "/packages/studio/index.html" || path === "/packages/studio/") {
+        return withStudioReportOnlyCsp(fileResponse(file), "index.html");
       }
 
       return fileResponse(file);
