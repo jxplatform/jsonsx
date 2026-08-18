@@ -15,10 +15,16 @@
  * @docs framework/build
  */
 
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { dirname, join, resolve } from "node:path";
-import { bundleSource, CLIENT_EXTERNALS } from "./bundler.ts";
+import { dirname, join, relative, resolve } from "node:path";
+import type { BundleResolver } from "./bundler.ts";
+import {
+  bundleSource,
+  isTransientEntry,
+  resolveThroughBundler,
+  useNodeFallback,
+} from "./bundler.ts";
 import { DEFAULT_LIT_HTML_SRC, DEFAULT_REACTIVITY_SRC } from "../shared.ts";
 
 /** One import-map entry the build can satisfy itself. */
@@ -154,10 +160,16 @@ export function renderImportMap(imports: Record<string, string>): string {
   return `<script type="importmap">\n  {\n    "imports": {\n${entries}\n    }\n  }\n  </script>`;
 }
 
-/** True when a bare specifier resolves from `resolveDir` under either backend. */
+/**
+ * True when a bare specifier resolves from `resolveDir` under either backend.
+ *
+ * The backend choice is `bundler.ts`'s to make, not a second inline `typeof Bun` check: resolution
+ * and bundling must agree about which one they are on, or the import map promises a module the
+ * bundle then fails to produce.
+ */
 function canResolve(specifier: string, resolveDir: string): boolean {
   try {
-    if (typeof Bun === "undefined") {
+    if (useNodeFallback()) {
       return typeof createRequire(join(resolveDir, "x.js")).resolve(specifier) === "string";
     }
     return typeof Bun.resolveSync(specifier, resolveDir) === "string";
@@ -165,6 +177,9 @@ function canResolve(specifier: string, resolveDir: string): boolean {
     return false;
   }
 }
+
+/** How many discovery passes may run before the scan is declared cyclic rather than deep. */
+const MAX_SUBPATH_PASSES = 10;
 
 /**
  * Emit the package subpaths the built bundles actually import, so the prefix keys resolve.
@@ -176,9 +191,20 @@ function canResolve(specifier: string, resolveDir: string): boolean {
  * introduce new subpaths (a directive importing another directive), so the pass runs to closure
  * rather than once.
  *
- * Each subpath keeps the same externals as everything else, so it still imports the ONE shared copy
- * of the package core rather than inlining a second one. That matters beyond size: two copies of
- * lit-html in a page is a documented breakage, not a waste.
+ * **The subpath itself must be bundled, and only the core kept external.** A package-name external
+ * covers the package's subpaths too, so listing `lit-html` in `external` externalises the entry —
+ * and the emitted asset is then a re-export of the very specifier the import map points back at it.
+ * That file imports itself: `export * from "lit-html/directives/class-map.js"` served AS
+ * `/assets/lit-html/directives/class-map.js`. A self-referential module has an empty namespace, so
+ * every page using a directive died on an undefined import while the build reported success. The
+ * externals are therefore decided by a resolver hook that can see the importer, not by a name
+ * list.
+ *
+ * The core stays shared, which is the part that must not regress: two copies of lit on a page is a
+ * documented breakage, not a waste. A package imports its own core by RELATIVE path from inside
+ * itself (`../lit-html.js`), and a bundler keeps an external's specifier exactly as the source
+ * wrote it — so the shared copy is reached by emitting a stub at the place that relative path lands
+ * in the OUTPUT tree, re-exporting the bare specifier the import map already resolves.
  *
  * @param {string} outDir - Build output root
  * @param {string} [resolveDir] - Directory bare specifiers resolve from
@@ -190,8 +216,22 @@ export async function writeRuntimeSubpaths(
 ): Promise<{ written: number; errors: string[] }> {
   const errors: string[] = [];
   const done = new Set<string>();
+  /** Output path of a core re-export stub → the bare specifier it must re-export. */
+  const mirrors = new Map<string, string>();
+  /** Runtime package specifier → the core file the bundler resolves it to. */
+  const cores = new Map<string, string | undefined>();
   const assetsDir = resolve(outDir, "assets");
   let written = 0;
+
+  const coreOf = async (mod: RuntimeModule): Promise<string | undefined> => {
+    if (!cores.has(mod.specifier)) {
+      cores.set(
+        mod.specifier,
+        await resolveThroughBundler(mod.specifier, resolveDir, { target: "browser" }),
+      );
+    }
+    return cores.get(mod.specifier);
+  };
 
   /** `from "lit-html/directives/class-map.js"` — the import forms a bundler emits. */
   const importedSpecifiers = async (file: string): Promise<string[]> => {
@@ -199,7 +239,7 @@ export async function writeRuntimeSubpaths(
     return [...text.matchAll(/(?:from|import)\s*["']([^"']+)["']/g)].map((m) => m[1] as string);
   };
 
-  for (let pass = 0; pass < 10; pass++) {
+  for (let pass = 0; pass < MAX_SUBPATH_PASSES; pass++) {
     let discovered = 0;
     let files: string[] = [];
     try {
@@ -207,7 +247,7 @@ export async function writeRuntimeSubpaths(
         new Bun.Glob("**/*.js").scan({ absolute: true, cwd: assetsDir }),
       );
     } catch {
-      return { errors, written };
+      return finish(outDir, mirrors, errors, written);
     }
 
     for (const file of files) {
@@ -227,14 +267,10 @@ export async function writeRuntimeSubpaths(
         const outfile = resolve(outDir, `${mod.assetDir.replace(/^\//, "")}${subpath}`);
         mkdirSync(dirname(outfile), { recursive: true });
         try {
-          /*
-           * Re-exported rather than copied, for the reason `writeClientRuntime` gives: the file on
-           * disk may be a condition of the package this page must not get.
-           */
           await bundleSource(
             `export * from ${JSON.stringify(specifier)};\n`,
             { outfile, resolveDir },
-            { external: CLIENT_EXTERNALS, target: "browser" },
+            { resolver: shareRuntimeCore(outfile, await coreOf(mod), mirrors), target: "browser" },
           );
           written += 1;
           discovered += 1;
@@ -244,12 +280,91 @@ export async function writeRuntimeSubpaths(
       }
     }
     if (discovered === 0) {
-      return { errors, written };
+      return finish(outDir, mirrors, errors, written);
     }
   }
   errors.push(
-    "Runtime subpath resolution did not settle in 10 passes — a package subpath graph this deep " +
-      "is more likely a cycle in the scan than a real dependency chain.",
+    `Runtime subpath resolution did not settle in ${MAX_SUBPATH_PASSES} passes — a package subpath ` +
+      "graph this deep is more likely a cycle in the scan than a real dependency chain.",
   );
-  return { errors, written };
+  return finish(outDir, mirrors, errors, written);
+}
+
+/**
+ * Keep a runtime package's core out of the subpath bundle, and note where the shared copy has to
+ * appear for the specifier the bundler will leave behind to reach it.
+ *
+ * @param {string} outfile - Where this subpath's bundle is being written
+ * @param {string | undefined} core - The package's core file, or undefined if it did not resolve
+ * @param {Map<string, string>} mirrors - Collects the core re-export stubs the build must write
+ * @returns {BundleResolver}
+ */
+function shareRuntimeCore(
+  outfile: string,
+  core: string | undefined,
+  mirrors: Map<string, string>,
+): BundleResolver {
+  return {
+    filter: /.*/,
+    resolve: ({ importer, path }) => {
+      /*
+       * The entry's own import is the subpath being bundled. It must resolve — externalising it
+       * is what made the emitted asset import itself.
+       */
+      if (isTransientEntry(importer)) {
+        return;
+      }
+      const runtime = CLIENT_RUNTIME_MODULES.find(
+        (mod) => path === mod.specifier || path.startsWith(`${mod.specifier}/`),
+      );
+      if (runtime !== undefined) {
+        // Another runtime package, or another of this one's subpaths: the next pass emits it.
+        return { external: true, path };
+      }
+      if (core === undefined || !path.startsWith(".")) {
+        return;
+      }
+      /*
+       * Package-internal relative imports are resolved by path rather than by asking a backend:
+       * the runtime packages are ESM and write their extensions, and the hook has to give the same
+       * answer under Bun and under esbuild.
+       */
+      const owner = CLIENT_RUNTIME_MODULES.find((mod) => outfile.includes(mod.assetDir.slice(1)));
+      if (owner === undefined || resolve(dirname(importer), path) !== core) {
+        return;
+      }
+      mirrors.set(resolve(dirname(outfile), path), owner.specifier);
+      return { external: true, path };
+    },
+  };
+}
+
+/**
+ * Write the core re-export stubs the emitted subpaths point at, and report the totals.
+ *
+ * A stub is skipped when a real bundle already occupies its path — that file is a subpath the build
+ * was asked for, and the request outranks the shim.
+ */
+function finish(
+  outDir: string,
+  mirrors: Map<string, string>,
+  errors: string[],
+  written: number,
+): { written: number; errors: string[] } {
+  let total = written;
+  for (const [path, specifier] of mirrors) {
+    if (existsSync(path)) {
+      continue;
+    }
+    try {
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, `export * from ${JSON.stringify(specifier)};\n`, "utf8");
+      total += 1;
+    } catch (error) {
+      errors.push(
+        `Writing shared core stub ${relative(outDir, path)}: ${(error as Error).message}`,
+      );
+    }
+  }
+  return { errors, written: total };
 }

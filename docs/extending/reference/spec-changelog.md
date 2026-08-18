@@ -227,6 +227,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `site-architecture.md`
 
+- **0.5.13-draft** (2026-08-18) — §8.7: the subpath entry is bundled rather than externalised, and the shared core is reached through an emitted stub — a self-referential asset broke every page using a directive.
 - **0.5.12-draft** (2026-08-18) — §8.7: subpaths resolve through a prefix key and an npm $elements set bundles as one self-contained module.
 - **0.5.11-draft** (2026-08-18) — §8.7: bare specifiers resolve on page and layout too, npm-only pages get an import map, and the package-subpath gap is recorded.
 - **0.5.10-draft** (2026-08-18) — §13: correct a status marker that contradicted §13.3 and §13.6 — {locale} expansion and Accept-Language negotiation both ship.

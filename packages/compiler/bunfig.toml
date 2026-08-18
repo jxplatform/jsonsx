@@ -11,6 +11,9 @@ coveragePathIgnorePatterns = [
   "**/jx-worker-portability-*/**",
   "**/jx-import-impl-*/**",
   "**/jx-locale-worker-*/**",
+  # The emitted runtime subpath a client-runtime test LOADS, to prove it exports the module's real
+  # API rather than a re-export of itself. The file is lit-html's code bundled into a temp site.
+  "**/jx-subpath-*/**",
   "../../extensions/**",
   "../create/**",
   "../desktop/**",

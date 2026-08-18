@@ -2,7 +2,7 @@
 
 ## File-Based Routing, Content Collections, Layouts, and Static Site Generation
 
-**Version:** 0.5.12-draft
+**Version:** 0.5.13-draft
 **Status:** Partial
 **Updated:** 2026-08-18
 **License:** MIT
@@ -1151,9 +1151,31 @@ package's subpaths as well, so the specifier survives into the bundle. The impor
 carries a `/`-suffixed prefix entry beside each exact one (`"lit-html/": "/assets/lit-html/"`), and
 the build writes the subpaths it finds referenced in the emitted assets. The set is **discovered
 from the output**, never enumerated: which subpaths exist is a property of the third-party code a
-page happens to use. Each is bundled with the core still external, so it imports the one shared copy
-rather than inlining a second — two copies of lit on a page is a documented breakage, not a size
-regression.
+page happens to use.
+
+**The subpath is bundled; only the core is external.** That the package-name external covers
+subpaths is what makes the specifier survive into a page's bundle, and it is also the trap when the
+build comes to satisfy it: listing the package in `external` externalises the subpath ENTRY too, so
+the emitted asset is a re-export of the very specifier the prefix key points back at it —
+`export * from "lit-html/directives/class-map.js"` served AS
+`/assets/lit-html/directives/class-map.js`. A self-referential module has an empty namespace, so
+every page using a directive failed on an undefined import while the build reported success. The
+externals are therefore decided per import by a hook that can see the **importer**: the entry's own
+import resolves and is bundled, and everything reached through it that belongs to a runtime package
+stays external.
+
+**The core is reached through a stub, so a page gets one copy.** A package imports its own core by
+RELATIVE path from inside itself (`../lit-html.js`), and a bundler keeps an external's specifier
+exactly as the source wrote it — a rewritten one is not honoured. The shared copy is therefore
+reached by emitting a stub at the place that relative path lands in the OUTPUT tree, re-exporting
+the bare specifier the import map already resolves. Two copies of lit on a page is a documented
+breakage, not a size regression, and a text assertion about the emitted file cannot tell the two
+apart: the guarantee is proved by loading the asset and reading its exports.
+
+Discovery runs to closure rather than once, because bundling one subpath can reveal the next — a
+directive importing another directive stays external and is found on the following pass. A graph
+deeper than the pass budget is a build error rather than a silent truncation: at that depth the
+likelier explanation is a cycle in the scan than a real dependency chain.
 
 **An npm `$elements` set is bundled as ONE self-contained module**, with nothing external. Two
 measurements decided this. Bundling each specifier separately against an external framework
@@ -2477,6 +2499,7 @@ This spec builds on existing Jx primitives wherever possible:
 
 ## Changelog
 
+- **0.5.13-draft** (2026-08-18) — §8.7: the subpath entry is bundled rather than externalised, and the shared core is reached through an emitted stub — a self-referential asset broke every page using a directive.
 - **0.5.12-draft** (2026-08-18) — §8.7: subpaths resolve through a prefix key and an npm $elements set bundles as one self-contained module.
 - **0.5.11-draft** (2026-08-18) — §8.7: bare specifiers resolve on page and layout too, npm-only pages get an import map, and the package-subpath gap is recorded.
 - **0.5.10-draft** (2026-08-18) — §13: correct a status marker that contradicted §13.3 and §13.6 — {locale} expansion and Accept-Language negotiation both ship.

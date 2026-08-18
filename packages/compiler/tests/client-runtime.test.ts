@@ -1,9 +1,18 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   CLIENT_RUNTIME_MODULES,
+  isPrefixSpecifier,
   renderImportMap,
   resolveClientRuntime,
   writeClientRuntime,
@@ -44,6 +53,62 @@ describe("resolveClientRuntime", () => {
       expect(runtime.warnings[0]).toContain("default-src 'self'");
     } finally {
       rmSync(empty, { force: true, recursive: true });
+    }
+  });
+});
+
+describe("isPrefixSpecifier", () => {
+  /*
+   * The two kinds of import-map key are told apart by their trailing slash and nothing else, and
+   * only a caller that can tell them apart can treat a prefix value as the directory it is.
+   */
+  test("a trailing slash is what separates a prefix key from an exact one", () => {
+    const { imports } = resolveClientRuntime();
+    const keys = Object.keys(imports);
+    const exact = CLIENT_RUNTIME_MODULES.map((mod) => mod.specifier);
+    expect(keys.filter((key) => isPrefixSpecifier(key)).toSorted()).toEqual(
+      exact.map((specifier) => `${specifier}/`).toSorted(),
+    );
+    expect(keys.filter((key) => !isPrefixSpecifier(key)).toSorted()).toEqual(exact.toSorted());
+  });
+});
+
+/*
+ * Resolution and bundling must agree about which backend they are on, so `canResolve` asks
+ * `bundler.ts` rather than checking `typeof Bun` a second time. `JX_BUNDLER=esbuild` is the switch
+ * that forces the Node path under Bun — the same parity check `sidecar-bundler.test.ts` runs on
+ * `resolveSidecarEntry`.
+ */
+describe("the Node resolution backend", () => {
+  test("JX_BUNDLER=esbuild resolves through createRequire with the same result", () => {
+    const bunResolved = resolveClientRuntime();
+    const { JX_BUNDLER: prev } = process.env;
+    process.env.JX_BUNDLER = "esbuild";
+    try {
+      expect(resolveClientRuntime()).toEqual(bunResolved);
+    } finally {
+      if (prev === undefined) {
+        delete process.env.JX_BUNDLER;
+      } else {
+        process.env.JX_BUNDLER = prev;
+      }
+    }
+  });
+
+  test("an unresolvable module falls back under the Node backend too", () => {
+    const { JX_BUNDLER: prev } = process.env;
+    process.env.JX_BUNDLER = "esbuild";
+    try {
+      const empty = mkdtempSync(join(tmpdir(), "jx-noresolve-"));
+      const runtime = resolveClientRuntime(empty);
+      expect(runtime.assetPaths).toEqual([]);
+      expect(runtime.warnings).toHaveLength(CLIENT_RUNTIME_MODULES.length);
+    } finally {
+      if (prev === undefined) {
+        delete process.env.JX_BUNDLER;
+      } else {
+        process.env.JX_BUNDLER = prev;
+      }
     }
   });
 });
@@ -172,22 +237,150 @@ describe("package subpaths (site-architecture.md §8.7)", () => {
   });
 
   /*
-   * The emitted subpath keeps the package core external, so it imports the ONE shared copy rather
-   * than inlining a second. Two copies of lit on a page is a documented breakage, not a size
-   * regression.
+   * The regression this mechanism exists to prevent, asserted the only way that cannot pass by
+   * accident: LOAD the emitted asset and look at what it exports.
+   *
+   * A package-name external covers the package's subpaths, so bundling the subpath by bare
+   * specifier emitted `export * from "lit-html/directives/class-map.js"` INTO
+   * `/assets/lit-html/directives/class-map.js` — which the prefix key points straight back at. The
+   * file imported itself, a self-referential module has an empty namespace, and every page using a
+   * directive died on an undefined import while the build reported success. Every text assertion
+   * about that file passed the whole time.
    */
-  test("an emitted subpath still imports the shared core", async () => {
+  test("the emitted subpath exports the module's real API", async () => {
     const dir = mkdtempSync(join(tmpdir(), "jx-subpath-"));
     try {
       await Bun.write(join(dir, "assets", "b.js"), 'import "lit-html/directives/class-map.js";\n');
       await writeRuntimeSubpaths(dir);
-      const text = readFileSync(
+
+      // Stand in for the import map, which is what resolves the core in a browser.
+      await Bun.write(
+        join(dir, "assets", "lit-html", "lit-html.js"),
+        'export const noChange = Symbol("noChange");\n',
+      );
+      const emitted = (await import(
+        join(dir, "assets", "lit-html", "directives", "class-map.js")
+      )) as { classMap?: unknown };
+
+      expect(typeof emitted.classMap).toBe("function");
+    } finally {
+      rmSync(dir, { force: true, recursive: true });
+    }
+  });
+
+  /*
+   * The core stays shared. A package imports its own core by RELATIVE path from inside itself, and
+   * a bundler keeps an external's specifier exactly as the source wrote it — so the shared copy is
+   * reached by a stub written where that relative path lands in the OUTPUT tree. Two copies of lit
+   * on a page is a documented breakage, not a size regression.
+   */
+  test("an emitted subpath reaches the shared core through a stub, not a second copy", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "jx-subpath-"));
+    try {
+      await Bun.write(join(dir, "assets", "b.js"), 'import "lit-html/directives/class-map.js";\n');
+      await writeRuntimeSubpaths(dir);
+
+      const subpath = readFileSync(
         join(dir, "assets", "lit-html", "directives", "class-map.js"),
         "utf8",
       );
-      expect(text).toContain("lit-html");
-      expect(text).not.toContain("class ReactiveElement");
+      // Left external exactly as lit-html's own source wrote it…
+      expect(subpath).toContain('from "../lit-html.js"');
+      // …and that is where the stub lands, re-exporting the bare specifier the import map resolves.
+      expect(readFileSync(join(dir, "assets", "lit-html", "lit-html.js"), "utf8")).toBe(
+        'export * from "lit-html";\n',
+      );
     } finally {
+      rmSync(dir, { force: true, recursive: true });
+    }
+  });
+
+  // A subpath the package does not have is the author's typo, and it is named as one.
+  test("a subpath that cannot be bundled is reported, not thrown", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "jx-subpath-"));
+    try {
+      await Bun.write(
+        join(dir, "assets", "c.js"),
+        'import "lit-html/directives/no-such-directive.js";\n',
+      );
+
+      const result = await writeRuntimeSubpaths(dir);
+
+      expect(result.written).toBe(0);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0]).toContain(
+        'Bundling runtime subpath "lit-html/directives/no-such-directive.js"',
+      );
+    } finally {
+      rmSync(dir, { force: true, recursive: true });
+    }
+  });
+
+  /*
+   * Discovery runs to closure because bundling one subpath can reveal the next — a directive
+   * importing another directive stays external and is found on the following pass. A graph deeper
+   * than the pass budget is reported rather than silently truncated: at that depth the likelier
+   * explanation is a cycle in the scan than a real dependency chain.
+   */
+  test("a subpath graph deeper than the pass budget is reported", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "jx-subpath-"));
+    const fixture = mkdtempSync(join(tmpdir(), "jx-deep-pkg-"));
+    try {
+      const pkg = join(fixture, "node_modules", "lit-html");
+      mkdirSync(pkg, { recursive: true });
+      writeFileSync(
+        join(pkg, "package.json"),
+        JSON.stringify({ main: "./core.js", name: "lit-html", type: "module", version: "1.0.0" }),
+      );
+      writeFileSync(join(pkg, "core.js"), "export const noChange = 1;\n");
+      // Each link imports the next by BARE subpath, so each pass discovers exactly one more.
+      const depth = 12;
+      for (let i = 1; i <= depth; i++) {
+        writeFileSync(
+          join(pkg, `a${i}.js`),
+          i < depth ? `export * from "lit-html/a${i + 1}.js";\n` : "export const end = 1;\n",
+        );
+      }
+      await Bun.write(join(dir, "assets", "seed.js"), 'import "lit-html/a1.js";\n');
+
+      const result = await writeRuntimeSubpaths(dir, fixture);
+
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0]).toContain("did not settle in 10 passes");
+      // Everything it did manage is still on disk — the budget truncates, it does not roll back.
+      expect(existsSync(join(dir, "assets", "lit-html", "a10.js"))).toBe(true);
+    } finally {
+      rmSync(dir, { force: true, recursive: true });
+      rmSync(fixture, { force: true, recursive: true });
+    }
+  });
+
+  /*
+   * An emitted asset the scan cannot read is skipped, not fatal. The build has already written
+   * every page by this point, and a runtime subpath that goes missing is a broken import on one
+   * page — throwing here would instead discard a build that otherwise succeeded.
+   */
+  test("an unreadable asset is skipped rather than failing the build", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "jx-subpath-"));
+    try {
+      await Bun.write(
+        join(dir, "assets", "locked.js"),
+        'import "lit-html/directives/repeat.js";\n',
+      );
+      chmodSync(join(dir, "assets", "locked.js"), 0o000);
+      await Bun.write(
+        join(dir, "assets", "readable.js"),
+        'import "lit-html/directives/class-map.js";\n',
+      );
+
+      const result = await writeRuntimeSubpaths(dir);
+
+      expect(result.errors).toEqual([]);
+      // The readable asset's subpath still lands; the unreadable one's is simply never discovered.
+      expect(existsSync(join(dir, "assets", "lit-html", "directives", "class-map.js"))).toBe(true);
+      expect(existsSync(join(dir, "assets", "lit-html", "directives", "repeat.js"))).toBe(false);
+    } finally {
+      chmodSync(join(dir, "assets", "locked.js"), 0o600);
       rmSync(dir, { force: true, recursive: true });
     }
   });

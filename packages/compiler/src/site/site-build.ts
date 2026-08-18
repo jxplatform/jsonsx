@@ -91,6 +91,7 @@ import {
 } from "./i18n.ts";
 import type { LocaleAlternate, ResolvedI18n } from "./i18n.ts";
 import {
+  isPrefixSpecifier,
   renderImportMap,
   resolveClientRuntime,
   writeClientRuntime,
@@ -2011,10 +2012,16 @@ function injectComponentScripts(
 
   // Build import map (needed for @vue/reactivity and lit-html)
   const importMap = renderImportMap(runtimeImports);
-  for (const url of Object.values(runtimeImports)) {
-    if (url.startsWith("/")) {
-      runtimeAssetsUsed.add(url);
+  for (const [specifier, url] of Object.entries(runtimeImports)) {
+    /*
+     * A prefix key's value is the DIRECTORY its subpaths are served from — `/assets/lit-html/` —
+     * not a file any build writes. `writeClientRuntime` matches this set against exact asset
+     * paths, so a directory in it bundled nothing and only inflated the count this build logged.
+     */
+    if (isPrefixSpecifier(specifier) || !url.startsWith("/")) {
+      continue;
     }
+    runtimeAssetsUsed.add(url);
   }
 
   const moduleScripts = jsTags
