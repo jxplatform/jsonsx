@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { localeLabel } from "@jxsuite/schema/locale";
 import { injectContext } from "../src/site/context-injection";
 import { resolvePrototypes } from "../src/site/prototype-resolver";
 import type { SiteRoute } from "../src/types";
@@ -185,6 +186,65 @@ describe("injectContext", () => {
     injectContext(doc, project, baseRoute);
     expect(doc.$elements).toHaveLength(1);
     expect(doc.$elements[0].$ref).toBe("./components/card.json");
+  });
+
+  /*
+   * A language switcher is the one part of a multilingual site the framework cannot write for the
+   * author, and the data behind it is the same translation set `<head>` advertises. Without it the
+   * only way to build one is a hardcoded list of URLs, which goes stale silently.
+   */
+  test("exposes the page's translation set to the template", () => {
+    const doc: Record<string, any> = {};
+    const i18n = {
+      defaultLocale: "en",
+      locales: ["en", "fr-CA", "ar"],
+      routing: "prefix-always" as const,
+    };
+    injectContext(doc, baseProject, { urlPattern: "/fr-ca/about/" } as SiteRoute, null, i18n, [
+      { locale: "ar", urlPattern: "/ar/about/" },
+      { locale: "en", urlPattern: "/about/" },
+      { locale: "fr-CA", urlPattern: "/fr-ca/about/" },
+    ]);
+    expect(doc.state.$page.alternates).toEqual([
+      { code: "ar", current: false, dir: "rtl", label: localeLabel("ar"), url: "/ar/about/" },
+      { code: "en", current: false, dir: "ltr", label: localeLabel("en"), url: "/about/" },
+      {
+        code: "fr-CA",
+        current: true,
+        dir: "ltr",
+        label: localeLabel("fr-CA"),
+        url: "/fr-ca/about/",
+      },
+    ]);
+    // The autonym, not the name in the site's language: a menu reading "French" is unreadable to
+    // Exactly the person looking for it.
+    expect(doc.state.$page.alternates[1].label).toBe("English");
+  });
+
+  test("no translation set, no key — a monolingual page carries nothing extra", () => {
+    const doc: Record<string, any> = {};
+    injectContext(doc, baseProject, baseRoute);
+    expect("alternates" in doc.state.$page).toBe(false);
+  });
+
+  /*
+   * `$lang` overrides the locale the route implies (§13.4), but not which directory the page is
+   * served from — so `current` follows the route. A switcher that marked the wrong entry would
+   * offer the reader a link to the page they are already on.
+   */
+  test("current follows the route, not an overriding $lang", () => {
+    const doc: Record<string, any> = { $lang: "de" };
+    const i18n = {
+      defaultLocale: "en",
+      locales: ["en", "fr-CA"],
+      routing: "prefix-except-default" as const,
+    };
+    injectContext(doc, baseProject, { urlPattern: "/about/" } as SiteRoute, null, i18n, [
+      { locale: "en", urlPattern: "/about/" },
+      { locale: "fr-CA", urlPattern: "/fr-ca/about/" },
+    ]);
+    expect(doc.state.$page.locale).toBe("de");
+    expect(doc.state.$page.alternates.find((a: { current: boolean }) => a.current).code).toBe("en");
   });
 
   test("resolves ContentEntry with missing content type gracefully", async () => {

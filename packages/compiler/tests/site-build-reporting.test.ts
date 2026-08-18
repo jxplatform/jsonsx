@@ -67,6 +67,54 @@ describe("buildSite — a route prefix i18n does not declare", () => {
   });
 });
 
+describe("buildSite — prefix-always with no runtime to answer the root", () => {
+  const DIR = resolve(import.meta.dir, "__test-site-static-root__");
+
+  beforeAll(() => {
+    scaffold(DIR, {
+      i18n: { defaultLocale: "en", locales: ["en", "fr"], routing: "prefix-always" },
+      name: "Rootless",
+    });
+    // `prefix-always` means every page lives under a locale, so the site has no page at `/`.
+    rmSync(resolve(DIR, "pages/index.json"), { force: true });
+    mkdirSync(resolve(DIR, "pages/en"), { recursive: true });
+    writeFileSync(
+      resolve(DIR, "pages/en/index.json"),
+      JSON.stringify({ $children: ["Hello"], tagName: "main" }),
+      "utf8",
+    );
+  });
+  afterAll(() => rmSync(DIR, { force: true, recursive: true }));
+
+  /*
+   * The one deployment shape where the root is genuinely broken and nothing said so: negotiation
+   * answers `/` only inside a generated worker, and an adapter-less build has no runtime that sees
+   * a request. `unprefixedRoutes` deliberately never reports `/` because under an adapter it is
+   * handled — so without this the site's front door is a 404 the author finds out about in
+   * production.
+   */
+  it("names the root, the locale it would send a visitor to, and why negotiation is absent", async () => {
+    const { warnings } = await captured(() => buildSite(DIR));
+
+    const warning = warnings.find((w) => w.includes('no page claims "/"'));
+    expect(warning).toBeDefined();
+    expect(warning).toContain("/en/");
+    expect(warning).toContain("build.adapter");
+  });
+
+  it("says nothing once a page claims the root", async () => {
+    writeFileSync(
+      resolve(DIR, "pages/index.json"),
+      JSON.stringify({ $children: ["Choose"], tagName: "main" }),
+      "utf8",
+    );
+    const { warnings } = await captured(() => buildSite(DIR));
+    rmSync(resolve(DIR, "pages/index.json"), { force: true });
+
+    expect(warnings.some((w) => w.includes('no page claims "/"'))).toBe(false);
+  });
+});
+
 describe("buildSite — well-known emitters", () => {
   const DIR = resolve(import.meta.dir, "__test-site-well-known-report__");
 

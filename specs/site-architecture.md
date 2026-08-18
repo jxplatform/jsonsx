@@ -2,7 +2,7 @@
 
 ## File-Based Routing, Content Collections, Layouts, and Static Site Generation
 
-**Version:** 0.5.13-draft
+**Version:** 0.5.14-draft
 **Status:** Partial
 **Updated:** 2026-08-18
 **License:** MIT
@@ -509,23 +509,27 @@ This allows `blog-post.json` layout to wrap within `base.json`, providing blog-s
 
 Layouts receive page metadata via the `$page` context object:
 
-| Property            | Source                                         | Description                |
-| ------------------- | ---------------------------------------------- | -------------------------- |
-| `$page.title`       | Page's `$head` title or explicit `title` field | Page title                 |
-| `$page.description` | Page's `$head` meta description                | Meta description           |
-| `$page.url`         | Computed from file path                        | Page URL path              |
-| `$page.lang`        | Page-level or site default                     | Language code              |
-| `$page.$head`       | Page's `$head` array                           | Page-specific head entries |
-| `$page.frontmatter` | Content entry frontmatter (for content pages)  | All frontmatter fields     |
+| Property            | Source                                                          | Description                   |
+| ------------------- | --------------------------------------------------------------- | ----------------------------- |
+| `$page.title`       | Page's `$head` title or explicit `title` field                  | Page title                    |
+| `$page.description` | Page's `$head` meta description                                 | Meta description              |
+| `$page.url`         | Computed from file path                                         | Page URL path                 |
+| `$page.locale`      | `$lang`, else the route's locale, else the site default (§13.4) | BCP 47 language tag           |
+| `$page.dir`         | Derived from `$page.locale`'s script (§13.4)                    | `ltr` or `rtl`                |
+| `$page.alternates`  | The page's translation set (§13.5)                              | `{code, url, dir, current}[]` |
+| `$page.$head`       | Page's `$head` array                                            | Page-specific head entries    |
+| `$page.frontmatter` | Content entry frontmatter (for content pages)                   | All frontmatter fields        |
 
 The `$site` context provides site-level data:
 
-| Property      | Source                 | Description         |
-| ------------- | ---------------------- | ------------------- |
-| `$site.name`  | `project.json` `name`  | Site name           |
-| `$site.url`   | `project.json` `url`   | Production URL      |
-| `$site.state` | `project.json` `state` | Site-wide state     |
-| `$site.$head` | `project.json` `$head` | Global head entries |
+| Property              | Source                        | Description                     |
+| --------------------- | ----------------------------- | ------------------------------- |
+| `$site.name`          | `project.json` `name`         | Site name                       |
+| `$site.url`           | `project.json` `url`          | Production URL                  |
+| `$site.state`         | `project.json` `state`        | Site-wide state                 |
+| `$site.$head`         | `project.json` `$head`        | Global head entries             |
+| `$site.locales`       | `i18n.locales`, canonicalized | Declared locales, default first |
+| `$site.defaultLocale` | `i18n.defaultLocale`          | The locale `/` serves           |
 
 ---
 
@@ -1941,6 +1945,39 @@ An author-supplied alternate for the same `hreflang` wins, like every other auto
 differ only in `hreflang`, and `x-default` conventionally shares its `href` with the default
 locale's entry, so a key of `rel` + `href` alone collapsed the set into one link.
 
+**The same set is readable from the page**, as `$page.alternates`: an array of
+`{ code, label, url, dir, current }`, ordered by tag, which maps straight into a language switcher
+through the ordinary `{"$prototype": "Array"}` form. A switcher is the one part of a multilingual site the
+framework cannot write for the author, and without this the only way to build one is a hardcoded
+list of URLs — which goes stale the moment a page gains or loses a translation, silently, in the
+one place a reader would have used it.
+
+Three differences from the `<head>` annotation above, each following from who reads it:
+
+- **URLs are site-absolute, not absolute.** A switcher is an internal link, and it has to work in a
+  project that has not configured `url` yet — which is every project in development. The `<head>`
+  form must be absolute because a crawler may have arrived at the page by any URL.
+- **A page with no translations gets itself**, where `<head>` gets nothing. A lone `hreflang`
+  pointing at itself is noise to a crawler; a template asking "which languages is this page in"
+  wants the honest answer, and dropping the page itself would leave a switcher unable to mark where
+  the reader is.
+- **`x-default` is absent.** It names no language a reader could choose.
+
+`current` marks the member this route **is**, taken from the route rather than from `$page.locale`,
+because a document whose `$lang` disagrees with its directory (§13.4) is still served from that
+directory.
+
+`label` is the locale's **autonym** — its name in its own language, from CLDR — because that is what
+a reader scans a switcher for: a menu reading "French" is unreadable to exactly the person it exists
+for. It is resolved into the array rather than left to `Intl/displayName` (§13.7) because a switcher
+is a mapped array, and a map template interpolates scope values rather than evaluating expressions;
+without the field the only label available is one the author typed, which is the hand-kept table
+CLDR exists to replace.
+
+Both readings are derived from one grouping, so they cannot come to disagree about which pages are
+translations of one another — a disagreement that would otherwise be invisible, because only a
+machine ever reads one of them.
+
 **Negotiation is not this.** Discovery tells a crawler the set exists; §13.6 is what sends a
 visitor to their own language.
 
@@ -1955,6 +1992,17 @@ static output has no runtime that sees one: `dist/` is files, and the preview se
 mapper. That is a property of the output shape, not missing work, and it is stated here rather than
 tracked as a gap so nobody sets out to close it. A site with `build.adapter` set gets a generated
 worker, the worker sees the request, and negotiation runs there.
+
+**A static `prefix-always` site is told about its root.** The two facts above compose into one
+deployment that is simply broken: `prefix-always` puts every page under a locale, negotiation is
+what answers `/`, and an adapter-less build has no runtime to negotiate with — so the site's front
+door is a 404 and nothing else in the build says so. The `prefix-always` check in §13.2 deliberately
+never reports `/`, because under an adapter it is handled; this is the one shape where it is not, so
+the build names it, once, with the locale a visitor would have been sent to.
+
+A warning and not a generated redirect. Which URL the root should serve is a deployment decision —
+a redirect, a language-choice page, a rewrite at the CDN — and emitting one would be the compiler
+overruling a choice it cannot see the reason for.
 
 **The bare `/` only.** A visitor who asked for `/fr/about/` has expressed a preference far stronger
 than a header, and overriding it would make a shared link mean different things to different people.
@@ -2006,12 +2054,20 @@ sentence naming three helpers, checked by nothing — is what made a single sour
 grammar and should not be; each helper wraps construct-then-format, which is the shape an author
 wants anyway.
 
-**A helper that is given no locale uses `en-US`, and `Intl/formatDate` with no `timeZone` uses
-`UTC`.** Not the host's, in either case. `new Intl.NumberFormat(undefined)` reads the build
+**A helper that is given no locale uses the page's own**, and `Intl/formatDate` with no `timeZone`
+uses `UTC`. Never the host's, in either case. `new Intl.NumberFormat(undefined)` reads the build
 machine's locale, so the same document emits `1,234.5` on one machine and `1.234,5` on another and a
 site's output stops being a function of its input. The time zone is the worse of the two: a locale
 changes how a date reads, a zone can change **which day it is** — `2026-08-16T02:00Z` is the 16th in
 UTC and the 15th in New York.
+
+`$page.locale` (§13.4) is the default because it has the same property the fixed one was chosen for
+— it is a function of the route and the document, not of the machine — and because the alternative
+is worse than it looks: a page under `/fr/` that formats a number without naming a locale used to
+render it in English, on a page whose `<html lang>` and every `hreflang` on it said French. That
+defect is invisible to whoever built the site in their own language and obvious to every reader of
+the other one. An explicit locale still wins; a scope with **no page** — a component's own state, or
+the runtime evaluated standalone — keeps `en-US`, which is what the fixed default now exists for.
 
 **`compare` is the one worth saying out loud.** `<` and `Array.sort()` order by UTF-16 code unit,
 which puts `Zebra` before `apple` and sorts every accented word after `z`. A sorted list built any
@@ -2021,12 +2077,12 @@ other way is wrong in every language with an accent.
 global that throws on a browser Jx claims to support is worse than one that does not exist: the
 author writes a formula that works on their machine and fails on a visitor's.
 
-**What is not built.** A project's `i18n.defaultLocale` is not substituted into a helper call that
-omits one — the fixed default is what runs. Wiring the project's locale through would mean threading
-compile options into every expression call site, and the determinism the fixed default buys is the
-part that mattered; a project-locale default is an improvement on top of a correct baseline rather
-than a fix for a broken one. There is no `i18n.timeZone` key for the same reason: an unread config
-key is the exact defect §13.2 records `i18n` itself having had for months.
+**What is not built.** There is no `i18n.timeZone` key: an unread config key is the exact defect
+§13.2 records `i18n` itself having had for months, and unlike a locale a time zone is not derivable
+from anything the route already says. A **component's** own scope has no `$page`, so a formula
+inside a custom element formats in `en-US` unless the locale is passed to it — the component
+boundary is the state boundary (§10.4), and reaching across it for one value would make `$page`
+ambient in a way nothing else is.
 
 ## 14. Deployment
 
@@ -2360,7 +2416,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 | [JSON-LD 1.1](https://www.w3.org/TR/json-ld11/)                                           | **Subset**    | §8.5              | packages/compiler/src/site/head-merger.ts, packages/compiler/tests/head-merger.test.ts                                                                                               | An object `textContent` is serialized into the tag and templates inside it resolve, so a document can carry structured data that references itself. Jx does not process the JSON-LD — no context expansion, no compaction, no framing; it is emitted for the consumer to interpret.                                                                                                                                                                                                                                                                                                                                 |
 | [BCP 47](https://www.rfc-editor.org/info/bcp47)                                           | **Subset**    | §13.2, §13.4      | packages/schema/src/locale.ts, packages/schema/tests/locale.test.ts, packages/compiler/src/site/i18n.ts                                                                              | Tags are parsed against the RFC 5646 grammar and canonicalized (`EN-us` → `en-US`) through `Intl.Locale`; a malformed tag fails the build. Well-formedness only — the IANA registry is not consulted, so `zz` and `xx-YY` are accepted for languages that do not exist.                                                                                                                                                                                                                                                                                                                                             |
 | [RFC 4647](https://www.rfc-editor.org/rfc/rfc4647)                                        | **Subset**    | §13.6             | packages/compiler/src/site/locale-negotiation.ts, packages/compiler/tests/locale-negotiation.test.ts, packages/compiler/tests/locale-worker.test.ts                                  | §3.4 Lookup, run against `i18n.locales` in the generated worker: progressive truncation, singleton subtags removed with their parent, RFC 9110 §12.5.4 quality order, `q=0` honoured as a refusal. Absent: §3.3 Filtering, which returns a set and cannot answer "which page". Adapter-less static output negotiates nothing and permanently cannot — there is no runtime that sees a request (§13.6).                                                                                                                                                                                                              |
-| [ECMA-402](https://ecma-international.org/publications-and-standards/standards/ecma-402/) | **Subset**    | §13.4, §13.7      | packages/schema/src/intl.ts, packages/schema/src/locale.ts, packages/schema/tests/intl.test.ts, packages/runtime/tests/expression.test.ts                                            | `Intl.Locale` supplies tag parsing, canonical case and likely-subtags maximization. The formatting half is now reachable from a document: eight blessed helpers wrap the ECMA-402 constructors as pure calls, and each defaults to a **fixed** locale and time zone rather than the host's, so a build's output is a function of its input. `DurationFormat` is deliberately not offered — its baseline support is not universal, and a blessed global that throws on a supported browser is worse than its absence.                                                                                                |
+| [ECMA-402](https://ecma-international.org/publications-and-standards/standards/ecma-402/) | **Subset**    | §13.4, §13.7      | packages/schema/src/intl.ts, packages/schema/src/locale.ts, packages/schema/tests/intl.test.ts, packages/runtime/tests/expression.test.ts                                            | `Intl.Locale` supplies tag parsing, canonical case and likely-subtags maximization. The formatting half is now reachable from a document: eight blessed helpers wrap the ECMA-402 constructors as pure calls, and each defaults to the **page's** locale and a **fixed** time zone rather than the host's, so a build's output is a function of its input. `DurationFormat` is deliberately not offered — its baseline support is not universal, and a blessed global that throws on a supported browser is worse than its absence.                                                                                 |
 | [RFC 9111](https://www.rfc-editor.org/rfc/rfc9111)                                        | **Adopted**   | §14.3             | packages/compiler/src/site/headers-emitter.ts, packages/compiler/tests/headers-emitter.test.ts                                                                                       | Every output declares its cacheability: `must-revalidate` for anything whose URL does not change with its content, and a year for the one output whose URL does.                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | [RFC 8246](https://www.rfc-editor.org/rfc/rfc8246)                                        | **Adopted**   | §14.3             | packages/compiler/src/site/headers-emitter.ts, packages/compiler/tests/headers-emitter.test.ts                                                                                       | `immutable` is emitted for `/images/_optimized/*` alone. A test asserts no other path can acquire it, because every other filename is reused when its content changes.                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | [RFC 6797](https://www.rfc-editor.org/rfc/rfc6797)                                        | **Subset**    | §14.3             | packages/compiler/src/site/headers-emitter.ts                                                                                                                                        | Off by default and opt-in per project, with `max-age`, `includeSubDomains` and `preload`. `preload` without `includeSubDomains` is refused rather than emitted, since the preload list would reject it.                                                                                                                                                                                                                                                                                                                                                                                                             |
@@ -2499,6 +2555,7 @@ This spec builds on existing Jx primitives wherever possible:
 
 ## Changelog
 
+- **0.5.14-draft** (2026-08-18) — §13.5 exposes the translation set to the page as $page.alternates, with each locale's autonym; §13.7 defaults a helper's locale to the page's own; §13.6 reports a prefix-always root no static deployment can answer.
 - **0.5.13-draft** (2026-08-18) — §8.7: the subpath entry is bundled rather than externalised, and the shared core is reached through an emitted stub — a self-referential asset broke every page using a directive.
 - **0.5.12-draft** (2026-08-18) — §8.7: subpaths resolve through a prefix key and an npm $elements set bundles as one self-contained module.
 - **0.5.11-draft** (2026-08-18) — §8.7: bare specifiers resolve on page and layout too, npm-only pages get an import map, and the package-subpath gap is recorded.

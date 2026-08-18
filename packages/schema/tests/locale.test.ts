@@ -4,6 +4,7 @@ import {
   isWellFormedLocale,
   LANGUAGE_TAG_PATTERN,
   localeDirection,
+  localeLabel,
   primaryLanguage,
 } from "../src/locale.ts";
 
@@ -72,6 +73,35 @@ describe("localeDirection", () => {
   test("a malformed tag is left to right rather than an error", () => {
     expect(localeDirection("not_a_tag")).toBe("ltr");
     expect(localeDirection(({} as { lang?: string }).lang)).toBe("ltr");
+  });
+});
+
+describe("localeLabel", () => {
+  /*
+   * The autonym is the point. A language switcher exists for the reader who does not read the
+   * site's current language, and a menu that says "French" is unreadable to precisely that person.
+   */
+  test("names a language in its own language", () => {
+    expect(localeLabel("en")).toBe("English");
+    expect(localeLabel("fr")).toBe("français");
+    expect(localeLabel("ar")).toBe("العربية");
+    expect(localeLabel("ja")).toBe("日本語");
+  });
+
+  test("canonicalizes first, so the spelling of the tag does not change the answer", () => {
+    expect(localeLabel("EN-us")).toBe(localeLabel("en-US"));
+  });
+
+  /*
+   * A tag CLDR has no name for answers with itself, which is a usable menu entry. A malformed one
+   * answers with what it was given — this is called while rendering, where validation has already
+   * happened, and an empty entry would be worse than an odd one.
+   */
+  test("falls back to the tag rather than to nothing", () => {
+    expect(localeLabel("zz")).toBe("zz");
+    expect(localeLabel("en_US")).toBe("en_US");
+    expect(localeLabel(null)).toBe("");
+    expect(localeLabel(42)).toBe("");
   });
 });
 

@@ -5,6 +5,7 @@ import {
   pageLanguage,
   resolveI18n,
   translationKey,
+  translationSets,
   undeclaredLocalePrefix,
   unprefixedRoutes,
 } from "../src/site/i18n.ts";
@@ -166,6 +167,76 @@ describe("translationKey", () => {
 
   test("a localized slug is a different page, and says so", () => {
     expect(translationKey("/fr-ca/a-propos/", i18n)).not.toBe(translationKey("/about/", i18n));
+  });
+});
+
+describe("translationSets", () => {
+  const { i18n } = resolveI18n(project({ defaultLocale: "en", locales: ["en", "fr-ca", "ar"] }));
+  const routes = [
+    { urlPattern: "/about/" },
+    { urlPattern: "/fr-ca/about/" },
+    { urlPattern: "/ar/about/" },
+    { urlPattern: "/only-english/" },
+  ];
+  const sets = translationSets(routes, i18n);
+
+  test("every member sees the whole set, itself included, ordered by tag", () => {
+    for (const pattern of ["/about/", "/fr-ca/about/", "/ar/about/"]) {
+      expect(sets.get(pattern)?.map((m) => m.locale)).toEqual(["ar", "en", "fr-CA"]);
+    }
+  });
+
+  /*
+   * The one place this deliberately disagrees with `localeAlternates`. A lone `hreflang` pointing
+   * at itself is noise in `<head>`; a switcher asking "which languages is this page in" wants the
+   * honest answer, and dropping the page itself would leave it unable to mark where the reader is.
+   */
+  test("a page with no translations keeps itself, where the head annotation drops it", () => {
+    expect(sets.get("/only-english/")?.map((m) => m.locale)).toEqual(["en"]);
+    expect(localeAlternates(routes, i18n, "https://x.example").has("/only-english/")).toBe(false);
+  });
+
+  // Site-absolute, so a switcher works in a project that has not configured `url` yet.
+  test("URLs stay site-absolute and need no site URL to compute", () => {
+    expect(sets.get("/ar/about/")?.find((m) => m.locale === "fr-CA")?.urlPattern).toBe(
+      "/fr-ca/about/",
+    );
+  });
+
+  test("nothing without i18n", () => {
+    expect(translationSets(routes, null).size).toBe(0);
+  });
+
+  /*
+   * Two routes claiming one language is a contradiction, and the layout can produce one: under
+   * `prefix-except-default` an author with both `pages/about.json` and `pages/en/about.json` has
+   * written the English page twice. The first wins, and the loser is keyed nowhere — no
+   * alternates, no switcher — rather than the set advertising two Englishes.
+   */
+  test("a duplicate locale in a set is dropped, and carries no set of its own", () => {
+    const dup = translationSets(
+      [{ urlPattern: "/about/" }, { urlPattern: "/en/about/" }, { urlPattern: "/ar/about/" }],
+      i18n,
+    );
+    expect(dup.get("/about/")?.map((m) => m.locale)).toEqual(["ar", "en"]);
+    expect(dup.get("/about/")?.find((m) => m.locale === "en")?.urlPattern).toBe("/about/");
+    expect(dup.has("/en/about/")).toBe(false);
+  });
+
+  // The alternates are built from these sets, so a disagreement between them is impossible by
+  // Construction rather than by a test — this asserts the construction.
+  test("the head annotation is this set, minus the singletons, made absolute", () => {
+    const alternates = localeAlternates(routes, i18n, "https://x.example");
+    for (const [pattern, members] of sets) {
+      const heads = alternates.get(pattern);
+      if (members.length < 2) {
+        expect(heads).toBeUndefined();
+        continue;
+      }
+      expect(heads?.filter((a) => a.hreflang !== "x-default").map((a) => a.hreflang)).toEqual(
+        members.map((m) => m.locale),
+      );
+    }
   });
 });
 

@@ -12,8 +12,9 @@
  * construct-then-format, which is the shape a document author wants anyway.
  *
  * **Every helper takes an explicit locale.** `new Intl.NumberFormat(undefined)` reads the _host's_
- * locale, so the same document compiled on two machines emits different text. Passing the project's
- * locale is what makes a build reproducible; see `site-architecture.md` §13.7.
+ * locale, so the same document compiled on two machines emits different text. A call that names no
+ * locale gets the **page's** — which is a function of the route, not of the build machine — and
+ * failing that the fixed default below; see `site-architecture.md` §13.7.
  *
  * Pure data and no imports, so a browser bundle, the compiler and the schema generator can all read
  * it without pulling anything else in.
@@ -22,12 +23,18 @@
  */
 
 /**
- * The locale a helper uses when a formula names none.
+ * The locale a helper uses when a formula names none **and there is no page to ask**.
  *
  * **Not the host's.** `new Intl.NumberFormat(undefined)` reads the machine's locale, so the same
  * document renders `1,234.5` on one build machine and `1.234,5` on another, and a site's output
- * stops being a function of its input. A fixed default is the only value that makes a build
- * reproducible; an author who wants a different one passes it, which is what the parameter is for.
+ * stops being a function of its input.
+ *
+ * A page's own locale is the better answer where there is one — a page under `/fr/` that formats a
+ * date means French, and it already said so in `<html lang>` — so `$page.locale` is consulted first
+ * (see `INTL_LOCALE_PARAM`). That preserves the property this constant exists for, because
+ * `$page.locale` is a function of the route and the document rather than of the machine. This value
+ * is what remains for a scope with no page: a component's own state, or the runtime evaluated
+ * standalone.
  */
 export const DEFAULT_FORMAT_LOCALE = "en-US";
 
@@ -121,6 +128,19 @@ export const INTL_HELPERS: readonly IntlHelper[] = [
 
 /** Just the callee paths, for the runtime's allow-set. */
 export const INTL_HELPER_PATHS: readonly string[] = INTL_HELPERS.map((helper) => helper.path);
+
+/**
+ * Where each helper's `locale` argument sits, so a call that omits it can be given the page's.
+ *
+ * Derived from `params` rather than written out, for the reason this module exists at all: a
+ * hand-kept second list is what let the schema description drift from the implementation. The
+ * position differs per helper — `formatNumber` takes it second, `formatRelativeTime` third — and a
+ * table that disagreed with the signature would pass the wrong argument silently, which reads as a
+ * formatting bug rather than a wiring one.
+ */
+export const INTL_LOCALE_PARAM: Readonly<Record<string, number>> = Object.fromEntries(
+  INTL_HELPERS.map((helper) => [helper.path, helper.params.indexOf("locale")]),
+);
 
 /**
  * The helper names as one clause, for the `call` operator's JSON-Schema description.

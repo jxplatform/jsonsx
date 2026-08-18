@@ -138,6 +138,36 @@ export function localeDirection(tag: unknown): TextDirection {
   return script !== undefined && RTL_SCRIPTS.has(script) ? "rtl" : "ltr";
 }
 
+/**
+ * A locale's name **in its own language**: `français` for `fr`, `العربية` for `ar`.
+ *
+ * The autonym, not the name in the site's language, because that is what a reader looking for their
+ * own language scans a switcher for — a menu that says "French" is unreadable to precisely the
+ * person it exists for.
+ *
+ * Resolved here rather than left to `Intl/displayName` in the document, because a switcher is a
+ * mapped array and a map template interpolates scope values rather than evaluating expressions:
+ * without this the only label available to an author is one they typed themselves, which is the
+ * hand-kept table CLDR exists to replace.
+ *
+ * Falls back to the tag. `Intl.DisplayNames` answers with the code itself for a language it has no
+ * name for, which is the same answer and a better one than an empty menu entry.
+ *
+ * No try/catch, for the reason {@link localeDirection} gives: the tag has already been through
+ * `Intl.Locale` here, so neither the constructor nor `of` can reject it, and a guard would be an
+ * untestable branch pretending otherwise.
+ *
+ * @param {unknown} tag
+ * @returns {string}
+ */
+export function localeLabel(tag: unknown): string {
+  const canonical = canonicalizeLocale(tag);
+  if (canonical === null) {
+    return typeof tag === "string" ? tag : "";
+  }
+  return new Intl.DisplayNames([canonical], { type: "language" }).of(canonical) ?? canonical;
+}
+
 /** The primary language subtag of a tag: `en` for `en-GB`, `zh` for `zh-Hant-TW`. */
 export function primaryLanguage(tag: unknown): string | null {
   const canonical = canonicalizeLocale(tag);

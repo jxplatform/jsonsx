@@ -7,7 +7,10 @@
  * Per site-architecture spec §10: $site.name — from project.json name $site.url — from project.json
  * url $site.state.* — site-wide reactive state $page.url — current page URL path $page.title — page
  * title $page.params — dynamic route parameters (if any) $page.locale/$page.dir — the route's
- * language and writing direction (§13.4)
+ * language and writing direction (§13.4) $page.alternates — this page in every language it exists
+ * in (§13.5)
+ *
+ * @docs framework/site/i18n
  */
 
 import { dirname, relative, resolve } from "node:path";
@@ -17,9 +20,9 @@ import type {
   JxStateDefinition,
   ProjectConfig,
 } from "@jxsuite/schema/types";
-import { localeDirection } from "@jxsuite/schema/locale";
+import { localeDirection, localeLabel } from "@jxsuite/schema/locale";
 import { localeOfRoute } from "./i18n.ts";
-import type { ResolvedI18n } from "./i18n.ts";
+import type { ResolvedI18n, TranslationMember } from "./i18n.ts";
 import type { SiteRoute } from "../types.ts";
 
 /**
@@ -30,6 +33,8 @@ import type { SiteRoute } from "../types.ts";
  * @param {SiteRoute} route - The resolved route for this page
  * @param {string | null} [projectRoot] - Absolute path to the project root (for import rebasing)
  * @param {ResolvedI18n | null} [i18n] - Validated locale config, when the project declares one
+ * @param {readonly TranslationMember[]} [translations] - This route's translation set, itself
+ *   included
  * @returns {JxDocument} The mutated document
  */
 export function injectContext(
@@ -38,6 +43,7 @@ export function injectContext(
   route: SiteRoute,
   projectRoot: string | null = null,
   i18n: ResolvedI18n | null = null,
+  translations: readonly TranslationMember[] = [],
 ) {
   if (!doc.state) {
     doc.state = {};
@@ -62,10 +68,29 @@ export function injectContext(
     (typeof doc.$lang === "string" ? doc.$lang : undefined) ??
     localeOfRoute(route.urlPattern, i18n) ??
     projectConfig.defaults?.lang;
+  /*
+   * The same translation set `<head>` advertises, in the shape a template can render: a language
+   * switcher is the one part of a multilingual site the framework cannot write for the author, and
+   * without this it could only be hand-maintained — a hardcoded list of URLs that goes stale the
+   * moment a page gains or loses a translation, silently, in the one place a reader would use it.
+   *
+   * Site-absolute URLs, not the absolute hrefs `<head>` needs: a switcher is an internal link, and
+   * it has to work before `url` is configured. `current` marks the member this route *is*, taken
+   * from the route rather than from `$page.locale`, because a document whose `$lang` disagrees with
+   * its directory is still served from that directory.
+   */
+  const alternates = translations.map((member) => ({
+    code: member.locale,
+    current: member.urlPattern === route.urlPattern,
+    dir: localeDirection(member.locale),
+    label: localeLabel(member.locale),
+    url: member.urlPattern,
+  }));
   doc.state.$page = {
     params: route._pathParams ?? {},
     title: doc.title ?? doc._pageTitle ?? projectConfig.name ?? "",
     url: route.urlPattern,
+    ...(alternates.length > 0 && { alternates }),
     ...(pageLang === undefined ? {} : { dir: localeDirection(pageLang), locale: pageLang }),
   };
 

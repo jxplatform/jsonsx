@@ -212,6 +212,85 @@ export interface LocaleAlternate {
   href: string;
 }
 
+/** One route in a translation set: the locale it serves, and where it lives. */
+export interface TranslationMember {
+  /** Canonical BCP 47 tag. */
+  locale: string;
+  /** Site-absolute route pattern, e.g. `/fr-ca/about/`. */
+  urlPattern: string;
+}
+
+/** Everything a page needs to know about its own locale, gathered once per build. */
+export interface PageLocaleContext {
+  /** Absolute alternates for `<head>` and the sitemap; empty without a site `url`. */
+  alternates: readonly LocaleAlternate[];
+  i18n: ResolvedI18n | null;
+  /** The page's translation set, site-absolute and including itself. */
+  translations: readonly TranslationMember[];
+}
+
+/**
+ * Group routes into translation sets: for each route, every route that is the same page in another
+ * language, itself included, ordered by tag.
+ *
+ * One derivation, two readers. {@link localeAlternates} turns a set into absolute `<link
+ * rel="alternate">` hrefs for crawlers; `injectContext` turns it into `$page.alternates` for a
+ * language switcher a reader can click. Deriving it twice is how the two would come to disagree
+ * about which pages are translations of one another — and the disagreement would be invisible,
+ * because one of them is only ever read by a machine.
+ *
+ * **A set of one is kept here and dropped there.** A lone `hreflang` pointing at itself is noise in
+ * `<head>` (§13.5), but a template asking "which languages is this page in" wants the honest
+ * answer, and dropping the page itself would leave a switcher unable to mark where the reader is.
+ *
+ * URLs stay **site-absolute** rather than becoming absolute hrefs, because a switcher is a link
+ * within the site and works before `url` is configured — which is every project during
+ * development.
+ *
+ * @param {readonly { urlPattern: string }[]} routes - Concrete routes only
+ * @param {ResolvedI18n | null} i18n
+ * @returns {Map<string, TranslationMember[]>} Keyed by `urlPattern`; members of one set share one
+ *   array
+ */
+export function translationSets(
+  routes: readonly { urlPattern: string }[],
+  i18n: ResolvedI18n | null,
+): Map<string, TranslationMember[]> {
+  const out = new Map<string, TranslationMember[]>();
+  if (i18n === null) {
+    return out;
+  }
+
+  const sets = new Map<string, TranslationMember[]>();
+  for (const route of routes) {
+    const key = translationKey(route.urlPattern, i18n);
+    const locale = localeOfRoute(route.urlPattern, i18n);
+    if (locale === null) {
+      continue;
+    }
+    const members = sets.get(key) ?? [];
+    /*
+     * A duplicate locale in one set means two routes claim to be the same page in one language.
+     * The first wins, which keeps the set single-valued rather than advertising a contradiction;
+     * the loser is keyed nowhere, so it carries no alternates and no switcher.
+     */
+    if (!members.some((m) => m.locale === locale)) {
+      members.push({ locale, urlPattern: route.urlPattern });
+    }
+    sets.set(key, members);
+  }
+
+  for (const members of sets.values()) {
+    const ordered = members.toSorted((a, b) =>
+      a.locale === b.locale ? 0 : a.locale < b.locale ? -1 : 1,
+    );
+    for (const member of members) {
+      out.set(member.urlPattern, ordered);
+    }
+  }
+  return out;
+}
+
 /**
  * Group routes into translation sets and give each one its alternates.
  *
@@ -239,43 +318,28 @@ export function localeAlternates(
     return out;
   }
 
-  const sets = new Map<string, { locale: string; urlPattern: string }[]>();
-  for (const route of routes) {
-    const key = translationKey(route.urlPattern, i18n);
-    const locale = localeOfRoute(route.urlPattern, i18n);
-    if (locale === null) {
-      continue;
-    }
-    const members = sets.get(key) ?? [];
-    // A duplicate locale in one set means two routes claim the same translation; the first wins,
-    // Which keeps the annotation single-valued rather than emitting a contradiction.
-    if (!members.some((m) => m.locale === locale)) {
-      members.push({ locale, urlPattern: route.urlPattern });
-    }
-    sets.set(key, members);
-  }
-
-  for (const members of sets.values()) {
+  /* Built once per set rather than once per member: every member advertises the same list. */
+  const built = new Map<readonly TranslationMember[], LocaleAlternate[]>();
+  for (const [urlPattern, members] of translationSets(routes, i18n)) {
     if (members.length < 2) {
       continue;
     }
-    const ordered = members.toSorted((a, b) =>
-      a.locale === b.locale ? 0 : a.locale < b.locale ? -1 : 1,
-    );
-    const alternates: LocaleAlternate[] = ordered.map((m) => ({
-      href: new URL(m.urlPattern, siteUrl).href,
-      hreflang: m.locale,
-    }));
-    const fallback = ordered.find((m) => m.locale === i18n.defaultLocale);
-    if (fallback !== undefined) {
-      alternates.push({
-        href: new URL(fallback.urlPattern, siteUrl).href,
-        hreflang: "x-default",
-      });
+    let alternates = built.get(members);
+    if (alternates === undefined) {
+      alternates = members.map((m) => ({
+        href: new URL(m.urlPattern, siteUrl).href,
+        hreflang: m.locale,
+      }));
+      const fallback = members.find((m) => m.locale === i18n.defaultLocale);
+      if (fallback !== undefined) {
+        alternates.push({
+          href: new URL(fallback.urlPattern, siteUrl).href,
+          hreflang: "x-default",
+        });
+      }
+      built.set(members, alternates);
     }
-    for (const member of members) {
-      out.set(member.urlPattern, alternates);
-    }
+    out.set(urlPattern, alternates);
   }
   return out;
 }
