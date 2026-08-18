@@ -14,37 +14,49 @@ This page is generated from the `> **Status: …**` markers in the specification
 
 | Spec                      | Version      | Status      | Updated    |
 | ------------------------- | ------------ | ----------- | ---------- |
-| `ai.md`                   | 0.1.4-draft  | Partial     | 2026-08-12 |
-| `collab.md`               | 0.2.2-draft  | Partial     | 2026-08-05 |
-| `compiler.md`             | 0.1.26-draft | Partial     | 2026-08-14 |
-| `desktop.md`              | 0.3.8-draft  | Pending     | 2026-08-13 |
-| `extensions.md`           | 0.3.4-draft  | Partial     | 2026-08-08 |
-| `imports.md`              | 0.1.7-draft  | Partial     | 2026-08-02 |
-| `jx-markdown.md`          | 0.1.7-draft  | Partial     | 2026-07-22 |
-| `parser.md`               | 0.2.4-draft  | Partial     | 2026-07-23 |
-| `relationships.md`        | 0.1.3-draft  | Partial     | 2026-07-22 |
-| `schema.md`               | 0.3.1-draft  | Partial     | 2026-08-10 |
-| `server.md`               | 0.2.1        | Implemented | 2026-07-25 |
-| `site-architecture.md`    | 0.1.44-draft | Partial     | 2026-08-12 |
-| `spec.md`                 | 0.4.28-draft | Partial     | 2026-08-10 |
-| `studio-ui-guidelines.md` | 0.3.8        | Implemented | 2026-08-13 |
-| `studio.md`               | 0.9.24-draft | Partial     | 2026-08-13 |
+| `ai.md`                   | 0.1.6-draft  | Partial     | 2026-08-16 |
+| `collab.md`               | 0.2.4-draft  | Partial     | 2026-08-16 |
+| `compiler.md`             | 0.3.1-draft  | Partial     | 2026-08-18 |
+| `desktop.md`              | 0.3.11-draft | Pending     | 2026-08-16 |
+| `extensions.md`           | 0.3.9-draft  | Partial     | 2026-08-16 |
+| `imports.md`              | 0.1.9-draft  | Partial     | 2026-08-15 |
+| `jx-markdown.md`          | 0.1.8-draft  | Partial     | 2026-08-15 |
+| `parser.md`               | 0.2.9-draft  | Partial     | 2026-08-16 |
+| `relationships.md`        | 0.1.4-draft  | Partial     | 2026-08-15 |
+| `schema.md`               | 0.4.8-draft  | Partial     | 2026-08-16 |
+| `server.md`               | 0.2.9        | Implemented | 2026-08-18 |
+| `site-architecture.md`    | 0.5.13-draft | Partial     | 2026-08-18 |
+| `spec.md`                 | 0.5.4-draft  | Partial     | 2026-08-18 |
+| `standards.md`            | 0.1.15-draft | Partial     | 2026-08-17 |
+| `studio-ui-guidelines.md` | 0.3.12       | Implemented | 2026-08-16 |
+| `studio.md`               | 0.9.30-draft | Partial     | 2026-08-18 |
 
 ## Sections not yet implemented
 
 ### Partial
 
 - `ai.md` §2 — Provider Contract
+- `collab.md` §5 — Version Skew
+- `compiler.md` §3 — Output Tiers
+- `parser.md` §3 — `Markdown` — the markdown format class
 - `site-architecture.md` §9.4 — Studio Media Browser
-- `spec.md` §5.6 — Private State (`#` prefix)
+- `site-architecture.md` §13 — Internationalization
+- `site-architecture.md` §13.6 — Locale Negotiation
+- `site-architecture.md` §14 — Deployment
 - `spec.md` §11.4 — Server Timing — RPC Function Boundary
 - `spec.md` §16.8 — CEM-Compatible Annotations
+- `spec.md` §21 — Evaluation Surface
+- `studio-ui-guidelines.md` §8 — Interactive Patterns
+- `studio.md` §6.8 — The `From data…` picker addresses only what it can list
+- `studio.md` §13 — Command Registry and Context Keys
+- `studio.md` §14 — Tabs and Document Identity
+- `studio.md` §15 — Application Preferences
+- `studio.md` §17 — Project Documents (Settings and Styles)
 
 ### Pending
 
 - `desktop.md` §4.3 — Single File Mode
 - `site-architecture.md` §12.3 — Incremental Builds
-- `site-architecture.md` §13 — Internationalization
 
 ### Future
 

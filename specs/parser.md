@@ -2,9 +2,9 @@
 
 ## Content Formats and the Reference Format-Extension Classes
 
-**Version:** 0.2.4-draft
+**Version:** 0.2.9-draft
 **Status:** Partial
-**Updated:** 2026-07-23
+**Updated:** 2026-08-16
 **License:** MIT
 
 ---
@@ -40,16 +40,26 @@ Built on the `unified` / `remark` pipeline (markdown) and a minimal RFC 4180 par
 
 ## 3. `Markdown` — the markdown format class
 
+> **Status: Partial.** The class and every capability ship. Two derived values are **correct only
+> for Latin script**: `slugifyHeading` strips on an ASCII-only character class, so a heading in any
+> other script slugifies to the empty string and falls back to `section`, `section-2`, … — which
+> means the deep-linkable anchors this section promises are not delivered for those documents; and
+> `$wordCount`/`$readingTime` split on whitespace, which reports a CJK article as one word. See §10.
+
 A single class carrying every capability (`Markdown.class.json`):
 
 ```json
 "format": {
   "extensions": [".md"],
-  "mediaType": "text/markdown",
+  "mediaType": "text/markdown; variant=GFM",
   "documentKinds": ["page", "component", "content"],
   "exportTarget": true
 }
 ```
+
+**The `variant` is load-bearing.** `text/markdown` names a family, not a syntax (RFC 7763 §2); the `variant` parameter RFC 7764 registers is the only thing on the wire that says which dialect a `.md` file is written in, and Jx's is GFM. Two places must agree about that and cannot import each other — this class, which the format registry dispatches through, and the static file servers, which have no registry to consult and answer from an extension table (`MEDIA_TYPE_BY_EXTENSION` in `@jxsuite/schema/media-type`). A drift test joins them.
+
+The same table is where YAML's media type lives. Frontmatter is YAML, and so is any `.yaml` an author drops in `public/` — served as `application/yaml` (RFC 9512 §4), never as the `text/yaml` spelling §5 asks implementations to retire and that most platform lookup tables, Bun's included, still answer with. Anything absent from that table keeps the host's own answer: it exists to correct a lookup, not to become a second MIME table.
 
 | Capability  | Scope    | Timing                   | Behavior                                                                                                                                                                     |
 | ----------- | -------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -111,7 +121,7 @@ Rendered pages are therefore deep-linkable to sections
 | `load`     | static   | compiler, server         | Read file **or fetch http(s) URL** → coerced `ContentLoaderEntry[]` |
 | `resolve`  | instance | runtime                  | Load the configured `src` (file or remote)                          |
 
-Coercion per the content-type schema: `number` strips currency symbols/commas (`null` for empty/invalid), `boolean` is `"true"` only, `array` is comma-split/trimmed. Entry ids resolve `idField` → `id` → `sku` → `slug` → `Slug` → row index.
+Coercion per the content-type schema: `number` strips currency symbols/commas (`null` for empty/invalid), `boolean` is `"true"` only, `array` is comma-split/trimmed. **Dates are not coerced here** — a `format: "date"` field is handled once for every format by the content loader (§9.3), which is the only place that holds both the entries and the schema. Entry ids resolve `idField` → `id` → `sku` → `slug` → `Slug` → row index.
 
 ---
 
@@ -193,8 +203,71 @@ Entries address media relative to themselves, so a collection reads correctly in
 
 Because the rewrite happens in the loader, every consumer of `projectData` — site build, dev server, studio preview, search indexing — sees the same mounted URLs with no extra work.
 
+### 9.3 Date coercion
+
+> **Status: Implemented.** `coerceEntryDates` runs in the content loader between a format class's
+> `load` and `validateEntries` — the one point that holds both the entries and the schema, since
+> `Csv.load` receives a schema and `Markdown.load` does not.
+
+A field the content-type schema declares as `format: "date"` or `format: "date-time"` is normalized
+to RFC 3339:
+
+| Declared    | Stored                                                  |
+| ----------- | ------------------------------------------------------- |
+| `date`      | `YYYY-MM-DD`                                            |
+| `date-time` | `YYYY-MM-DDTHH:MM:SSZ` — **UTC**, no fractional seconds |
+
+**Why a string and not a `Date`.** `JSON.stringify(new Date("2025-03-04"))` yields an instant, so a
+Studio save would rewrite `2025-03-04` as `2025-03-04T00:00:00.000Z` — which is _March 3_ west of
+UTC. A `Temporal.PlainDate` is semantically right and fails differently: `<` and `>` on one yield
+`NaN`, and §6's sort compares with exactly those.
+
+**Why UTC.** Mixed offsets do not sort lexicographically: `2025-03-04T01:00:00+02:00` sorts _after_
+`2025-03-04T00:00:00Z` as text and is _earlier_ in fact. Normalizing makes the sort correct by
+construction rather than correct by accident for ISO 8601.
+
+**Accepted**, in order: a `Date` instance, an RFC 3339 string, a bare `YYYY-MM-DD`. **Everything
+else is refused**, left exactly as authored, and reported naming the collection, entry, field and
+value. `03/04/2025` is March 4th or April 3rd depending on the reader and `new Date()` resolves it
+by implementation-defined rules, so guessing is the failure this pass exists to prevent — refusing
+is the feature.
+
+When coercion rewrote a value the authored text is kept at `_meta.rawDates[field]`, because a
+collection that genuinely means "7pm local" has had that thrown away by the normalized instant.
+
+**`_meta.mtime`.** Every loaded entry carries its source file's modification time as RFC 3339. It is
+the only date a file always has, so it is the fallback a feed uses when the frontmatter carries none
+(`site-architecture.md` §6.7) — and it is what would let the sitemap stop giving every page
+generated from one template that template's `<lastmod>`.
+
+**A schemaless collection is not covered.** `MarkdownCollection` (§6) globs and sorts without a
+content-type schema, so nothing can know which of its frontmatter fields is a date. Its default
+`sortBy: "frontmatter.date"` compares text, which is correct for `YYYY-MM-DD` and wrong for an
+offset date-time. Declaring the field in a content type is what fixes it; inferring would mean
+guessing, which §9.3 refuses everywhere else.
+
+## 10. Standards Alignment
+
+External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md). `remark`, `unified` and the MDAST node model are libraries rather than published standards, so they are described in §2 rather than cited here.
+
+| Standard                                           | Class       | Binds | Evidence                                                                                                                       | Note                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| -------------------------------------------------- | ----------- | ----- | ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [CommonMark](https://spec.commonmark.org/current/) | **Subset**  | §3    | extensions/parser/src/md.ts, extensions/parser/tests/transpile.test.ts                                                         | Parsing is CommonMark via `remark`, but only the constructs §8 maps reach a Jx node — an unmapped construct is dropped rather than mis-rendered.                                                                                                                                                                                                                                                                                                                                    |
+| [GFM](https://github.github.com/gfm/)              | **Subset**  | §3    | extensions/parser/src/md.ts                                                                                                    | Tables, strikethrough, task lists and autolinks are parsed; the mapping restriction above applies to them too.                                                                                                                                                                                                                                                                                                                                                                      |
+| [RFC 7763](https://www.rfc-editor.org/rfc/rfc7763) | **Adopted** | §3    | extensions/parser/src/Markdown.class.json, packages/schema/src/media-type.ts, packages/schema/tests/class-schema-drift.test.ts | The class declares `text/markdown; variant=GFM`, and every host that serves a `.md` file off disk sends the same thing — the `variant` RFC 7764 registers is the only thing on the wire that says which markdown a file is. A drift test joins the two statements, which live in files that cannot import each other.                                                                                                                                                               |
+| [RFC 4180](https://www.rfc-editor.org/rfc/rfc4180) | **Subset**  | §4    | extensions/parser/src/csv.ts, extensions/parser/tests/csv.test.ts                                                              | Quoted fields, embedded separators and CRLF records are handled. There is no dialect negotiation and no header-less mode: the first record is always the header.                                                                                                                                                                                                                                                                                                                    |
+| [RFC 9512](https://www.rfc-editor.org/rfc/rfc9512) | **Adopted** | §3    | packages/schema/src/media-type.ts, packages/schema/tests/media-type.test.ts, packages/compiler/tests/preview-server.test.ts    | `application/yaml`, which is the registration — deliberately not `text/yaml`, `text/x-yaml` or `application/x-yaml`, the pre-registration spellings §5 asks implementations to retire and the ones most platform tables still answer with. A `.yaml` file in `public/` is served under the registered type by both the dev server and `jx preview`.                                                                                                                                 |
+| [UAX #15](https://www.unicode.org/reports/tr15/)   | **Adopted** | §3    | extensions/parser/src/transpile.ts, extensions/parser/tests/transpile.test.ts                                                  | `slugifyHeading` normalizes to NFC before casing, so the two spellings of an accented heading — `e` + U+0301 on macOS, U+00E9 on Windows — produce one anchor instead of two that look identical and compare unequal. Casing is `toLowerCase`, never `toLocaleLowerCase`: an anchor is a URL and belongs to the document, not to the reader's locale.                                                                                                                               |
+| [UAX #29](https://www.unicode.org/reports/tr29/)   | **Adopted** | §3    | extensions/parser/src/md.ts, extensions/parser/tests/md-units.test.ts                                                          | `$wordCount` and `$readingTime` segment words with `Intl.Segmenter` rather than splitting on whitespace, so a Japanese or Thai article is no longer counted as one word. The word-like test is spelled out as "contains a letter or a digit" because Bun's engine answers `isWordLike: false` for a mixed alphanumeric segment. Studio's SEO counters segment graphemes for the same reason: `String.length` counts code units, so an emoji spent two characters of a title budget. |
+| [RFC 3339](https://www.rfc-editor.org/rfc/rfc3339) | **Subset**  | §9.3  | extensions/parser/src/dates.ts, extensions/parser/tests/dates.test.ts                                                          | Schema-declared date fields are normalized to `full-date` or a UTC `date-time`, so sorting and comparison are correct by construction. Local offsets are not preserved in the stored value — the authored text is kept at `_meta.rawDates` instead — and a value outside the accepted forms is refused rather than parsed heuristically.                                                                                                                                            |
+
 ## Changelog
 
+- **0.2.9-draft** (2026-08-16) — §3 heading slugs normalize to NFC before casing (UAX #15) and word counts segment rather than split on whitespace (UAX #29). Closes gap:heading-slug-normalization and gap:word-segmentation.
+- **0.2.8-draft** (2026-08-16) — §3 the markdown variant and YAML media type are what hosts serve, not only what the class declares; gap:markdown-variant and gap:yaml-media-type closed.
+- **0.2.7-draft** (2026-08-15) — §9.3 records _meta.mtime as the date fallback a feed uses.
+- **0.2.6-draft** (2026-08-15) — Add §9.3 date coercion: schema-declared date fields normalize to RFC 3339, ambiguous values are refused rather than guessed.
+- **0.2.5-draft** (2026-08-15) — Add §10 Standards Alignment; §3 marked Partial — heading slugs and word counts are correct only for Latin script.
 - **0.2.4-draft** (2026-07-23) — Document the Content project-section class: asset mounts and content-relative reference rewriting (§9).
 - **0.2.3-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.2.2-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
@@ -210,4 +283,4 @@ Because the rewrite happens in the loader, every consumer of `projectData` — s
 
 ---
 
-_`@jxsuite/parser` Specification v0.2.4-draft_
+_`@jxsuite/parser` Specification v0.2.9-draft_

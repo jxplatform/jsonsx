@@ -20,6 +20,7 @@ import {
   resolveTitleField,
   seoField,
   seoPreviewFor,
+  visibleLength,
 } from "../src/panels/head-panel";
 import { invalidateLayoutCache } from "../src/site-context";
 import { closeAllTabs } from "../src/workspace/workspace";
@@ -1095,5 +1096,33 @@ describe("layoutHeadEntries — the one layer that lives in a file", () => {
       source: "site",
       value: "/site-card.png",
     });
+  });
+});
+
+// ─── Counting what a reader sees ─────────────────────────────────────────────
+
+describe("visibleLength", () => {
+  test("counts graphemes, not UTF-16 code units", () => {
+    /*
+     * `String.length` is not a count of anything a person can see: an emoji is 2 code units, a flag
+     * is 4, and a multi-person emoji with a zero-width joiner is more. A budget counter reporting
+     * those numbers is wrong by exactly that margin.
+     */
+    expect(visibleLength("hello")).toBe(5);
+    expect(visibleLength("🚀")).toBe(1);
+    expect("🚀".length).toBe(2);
+    expect(visibleLength("🇬🇧")).toBe(1);
+    expect(visibleLength("👩‍🚀")).toBe(1);
+    expect(visibleLength("café")).toBe(4);
+    // A decomposed é is two code points and one grapheme.
+    expect(visibleLength("café")).toBe(4);
+    expect(visibleLength("")).toBe(0);
+  });
+
+  test("the over-limit warning counts the same way the badge does", () => {
+    const long = "🚀".repeat(40);
+    // 80 code units, 40 graphemes: the old counter called this over a 60-character title budget.
+    expect(long.length).toBe(80);
+    expect(visibleLength(long)).toBe(40);
   });
 });

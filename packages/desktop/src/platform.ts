@@ -672,6 +672,16 @@ export function createDesktopPlatform() {
       return streamImport(endpoint, opts, onProgress, signal);
     },
 
+    /*
+     * GitHub sign-in, launcher-only like `updater` and `windowControls`: the browser Studio has no
+     * loopback server to redirect to and keeps the device flow, so this is not a PAL member.
+     */
+    githubAuth: {
+      signIn: (force = false) => rpc.request.githubSignIn({ force }),
+      signOut: () => rpc.request.githubSignOut(),
+      status: () => rpc.request.githubToken(),
+    },
+
     updater: {
       applyUpdate: () => rpc.request.updaterApplyUpdate(),
       checkForUpdate: () => rpc.request.updaterCheckForUpdate(),

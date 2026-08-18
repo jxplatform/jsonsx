@@ -282,3 +282,23 @@ export function tagNameCandidates(tagName: unknown): string[] {
 export function displayTagName(tagName: unknown): string {
   return typeof tagName === "string" ? tagName : tagNameCandidates(tagName).join("|");
 }
+
+/**
+ * Whether a `state` key is private (`spec.md` §5.6).
+ *
+ * A `#`-prefixed entry is ordinary state in every respect but one: it is not part of the
+ * component's interface. It never reaches the studio property panel, never appears in an exported
+ * CEM manifest, and is never settable through `$props` — which is the clause that needs a predicate
+ * rather than a convention, because the props paths are spread across two tiers.
+ *
+ * The rule lived inline at three call sites before it lived here, spelled `key.startsWith("#")`
+ * each time. That is survivable for two and a drift risk at four, and the interesting direction of
+ * drift is silent: a path that forgets the check does not fail, it just quietly makes a private
+ * entry writable from outside.
+ *
+ * @param {string} key - A `state` key
+ * @returns {boolean}
+ */
+export function isPrivateStateKey(key: string): boolean {
+  return key.startsWith("#");
+}

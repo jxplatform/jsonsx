@@ -50,6 +50,15 @@ function shouldIgnore(pathname: string, ignore: string[]) {
 
 export { shouldIgnore };
 
+/**
+ * Reconnection time advertised on the stream, in milliseconds (HTML Standard, `retry:`).
+ *
+ * The default is user-agent defined and measured in seconds, which on a dev server restart is long
+ * enough for a save to look like it did nothing. Both endpoints are on loopback, so a reconnect
+ * costs nothing and half a second lands inside a typical restart.
+ */
+export const RECONNECT_MS = 500;
+
 export const SSE_SCRIPT = `\n<script>new EventSource('/__reload').onmessage=()=>location.reload()</script>`;
 
 /** @param {string} html */
@@ -72,7 +81,7 @@ export function injectSSE(html: string) {
  * }} [opts]
  * @returns {{
  *   broadcast: () => void;
- *   handleSSE: () => Response;
+ *   handleSSE: (request?: Request) => Response;
  *   watcher: import("chokidar").FSWatcher;
  * }}
  */
@@ -95,9 +104,23 @@ export function createWatcher(
   const clients = new Set<(msg: string) => void>();
   const encoder = new TextEncoder();
 
+  /*
+   * Monotonic reload counter, sent as the SSE `id:` of every reload frame.
+   *
+   * Its only job is to arm the browser: a stream that has never sent an `id:` makes the client omit
+   * `Last-Event-ID` on reconnect, and then the server cannot tell a first connection from a
+   * reconnection. **Nothing is buffered against it and nothing is replayed.** A reconnecting client
+   * gets exactly one reload, because the page it is holding was built before the disconnect and a
+   * full reload subsumes every event it missed — one is as correct as a hundred and finishes
+   * sooner. Do not "complete" this into a replay buffer; there is no per-event state to replay.
+   */
+  let lastEventId = 0;
+
   function broadcast() {
+    lastEventId += 1;
+    const frame = `id: ${lastEventId}\ndata: reload\n\n`;
     for (const send of clients) {
-      send("data: reload\n\n");
+      send(frame);
     }
   }
 
@@ -112,7 +135,24 @@ export function createWatcher(
     }
   }
 
-  function handleSSE() {
+  /**
+   * Open the live-reload stream.
+   *
+   * Two halves of the HTML Standard's EventSource contract that were missing, and are the whole of
+   * `gap:sse-reconnect`:
+   *
+   * - **`retry:`** sets the reconnection time. The default is user-agent defined and is measured in
+   *   seconds; during a dev-server restart that is long enough to watch a save do nothing. 500ms is
+   *   loopback, so the reconnect costs nothing and lands inside the restart.
+   * - **`Last-Event-ID`** is how the browser says "I was here before". It gets **one** reload and no
+   *   replay — see the note on `lastEventId`. A dev server has no event log and needs none: the
+   *   reload is idempotent and total.
+   *
+   * @param {Request} [request] - The stream request; read only for its `Last-Event-ID`
+   * @returns {Response}
+   */
+  function handleSSE(request?: Request) {
+    const resuming = (request?.headers.get("Last-Event-ID") ?? "") !== "";
     /** @type {((msg: string) => void) | undefined} */
     let send: ((msg: string) => void) | undefined;
     const stream = new ReadableStream({
@@ -128,6 +168,12 @@ export function createWatcher(
           } catch {}
         };
         clients.add(send);
+        // The retry interval is a stream-level field, so it is set once, before any event.
+        send(`retry: ${RECONNECT_MS}\n\n`);
+        if (resuming) {
+          lastEventId += 1;
+          send(`id: ${lastEventId}\ndata: reload\n\n`);
+        }
         const hb = setInterval(() => {
           try {
             c.enqueue(encoder.encode(": heartbeat\n\n"));

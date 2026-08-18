@@ -69,6 +69,12 @@ export interface ExtraEdge {
 
 const EXTRA_EDGES: ExtraEdge[] = [
   {
+    patterns: ["packages/runtime/src/runtime.ts"],
+    seeds: ["packages/compiler"],
+    evidence: ["packages/compiler/tests/shadow-dom.test.ts"],
+    why: "The shadow-DOM contract (spec.md §16.6) spans the compiler and the runtime, and the compiler's test drives the element emitter that both produce and consume.",
+  },
+  {
     patterns: [
       "scripts/check-image-lock.ts",
       "scripts/check-shot-contract.ts",
@@ -112,6 +118,15 @@ const EXTRA_EDGES: ExtraEdge[] = [
       "packages/schema/tests/class-schema-drift.test.ts",
     ],
     why: "An INVERTED edge: extensions depend on schema, yet schema's tests read parser's committed fragment and walk every extension's src for class definitions.",
+  },
+  {
+    patterns: ["extensions/feed/src/**", "extensions/parser/src/**"],
+    seeds: ["packages/compiler"],
+    evidence: [
+      "packages/compiler/tests/feed-integration.test.ts",
+      "packages/compiler/tests/sitemap-lastmod.test.ts",
+    ],
+    why: "Two compiler tests build a real project that loads @jxsuite/parser (and, for feeds, @jxsuite/feed), so a change to either extension's src can break a compiler test. The sitemap one spans three packages by construction: the parser carries an entry's timestamp, the compiler lifts it onto the route, and the sitemap prints it.",
   },
 ];
 

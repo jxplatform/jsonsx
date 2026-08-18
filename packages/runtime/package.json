@@ -16,6 +16,7 @@
   "exports": {
     ".": "./src/runtime.ts",
     "./expression": "./src/expression.ts",
+    "./pointer": "./src/pointer.ts",
     "./statements": "./src/statements.ts",
     "./types": "./src/types.ts"
   },

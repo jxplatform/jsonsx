@@ -18,6 +18,7 @@ import { resolveLayout } from "../src/site/layout-resolver";
 import { mergeHead, renderHead } from "../src/site/head-merger";
 import { injectContext } from "../src/site/context-injection";
 import { buildSite } from "../src/site/site-build";
+import { hashOf } from "../src/site/csp.ts";
 import { _testResetNpmCacheBase, _testSetNpmCacheBase } from "../src/site/image-cache.ts";
 
 const TMP = resolve(import.meta.dir, "__test-site__");
@@ -44,7 +45,13 @@ beforeAll(() => {
     build: { outDir: "./dist" },
     defaults: { lang: "en", layout: "./layouts/base.json" },
     name: "Test Site",
-    redirects: { "/old": "/new" },
+    redirects: {
+      "/api/*": { destination: "https://api.example.com/*", rewrite: true },
+      "/moved": { destination: "/here", status: 308 },
+      "/old": "/new",
+      "/seeother": { destination: "/other", status: 303 },
+      "/temp": { destination: "/now", status: 302 },
+    },
     url: "https://test.com",
   });
 
@@ -63,12 +70,23 @@ beforeAll(() => {
   });
 
   writeJSON("pages/about.json", {
+    $dir: "rtl",
     $head: [
       {
         attributes: { content: "About page", name: "description" },
         tagName: "meta",
       },
+      {
+        attributes: { type: "application/ld+json" },
+        tagName: "script",
+        textContent: {
+          "@context": "https://schema.org",
+          "@type": "AboutPage",
+          name: "${$site.name}",
+        },
+      },
     ],
+    $lang: "ar-EG",
     children: [{ children: ["About Us"], tagName: "h1" }],
     title: "About",
   });
@@ -278,6 +296,109 @@ describe("buildSite", () => {
     expect(redirectHtml).toContain("/new");
   });
 
+  /*
+   * An HTML meta-refresh is a CLIENT-side redirect, so it is a stand-in for some statuses and a
+   * misrepresentation of the others. Every rule reaches `_redirects`; only some get a file.
+   */
+  describe("the HTML fallback follows the status (RFC 9110 §15.4)", () => {
+    it("301 gets a canonical link — the permanent case is the one it fits", async () => {
+      await buildSite(TMP, { verbose: false });
+      const html = readFileSync(resolve(TMP, "dist/old/index.html"), "utf8");
+      expect(html).toContain('rel="canonical"');
+      expect(html).not.toContain('name="robots"');
+    });
+
+    it("302 and 303 get a file, but noindex instead of a canonical link", async () => {
+      await buildSite(TMP, { verbose: false });
+      for (const path of ["dist/temp/index.html", "dist/seeother/index.html"]) {
+        const html = readFileSync(resolve(TMP, path), "utf8");
+        expect(html).toContain('http-equiv="refresh"');
+        // A canonical link on a temporary redirect asserts the permanence the status denies.
+        expect(html).not.toContain('rel="canonical"');
+        expect(html).toContain('name="robots"');
+      }
+    });
+
+    it("308 gets no file — a meta-refresh would convert POST to GET", async () => {
+      await buildSite(TMP, { verbose: false });
+      expect(existsSync(resolve(TMP, "dist/moved/index.html"))).toBe(false);
+      expect(readFileSync(resolve(TMP, "dist/_redirects"), "utf8")).toContain("/moved /here 308");
+    });
+
+    it("a rewrite gets no file, and reaches _redirects as 200", async () => {
+      await buildSite(TMP, { verbose: false });
+      const redirects = readFileSync(resolve(TMP, "dist/_redirects"), "utf8");
+      expect(redirects).toContain("/api/* https://api.example.com/* 200");
+      // A file at the source URL would shadow the rewrite on hosts that honour _redirects, and
+      // Turn it into a redirect on the hosts that do not. This was the bug.
+      expect(existsSync(resolve(TMP, "dist/api"))).toBe(false);
+    });
+
+    it("an off-enum status is a build error naming the rule", async () => {
+      const root = mkdtempSync(join(tmpdir(), "jx-redirect-"));
+      mkdirSync(join(root, "pages"), { recursive: true });
+      writeFileSync(
+        join(root, "project.json"),
+        JSON.stringify({
+          build: { outDir: "./dist" },
+          name: "Bad Redirect",
+          redirects: { "/bad": { destination: "/x", status: 418 } },
+        }),
+        "utf8",
+      );
+      writeFileSync(
+        join(root, "pages/index.json"),
+        JSON.stringify({ children: ["hi"], tagName: "div" }),
+        "utf8",
+      );
+      const result = await buildSite(root, { verbose: false });
+      expect(result.errors.some((e) => e.includes("/bad") && e.includes("418"))).toBe(true);
+      // The rule is refused outright rather than written through to the host.
+      const emitted = join(root, "dist/_redirects");
+      expect(existsSync(emitted) && readFileSync(emitted, "utf8").includes("418")).toBe(false);
+      rmSync(root, { force: true, recursive: true });
+    });
+  });
+
+  it("takes lang and dir from the page, not only the site", async () => {
+    await buildSite(TMP, { verbose: false });
+
+    const about = readFileSync(resolve(TMP, "dist/about/index.html"), "utf8");
+    expect(about).toContain('lang="ar-EG"');
+    expect(about).toContain('dir="rtl"');
+
+    // A page that declares neither still gets the site default, and no stray dir.
+    const index = readFileSync(resolve(TMP, "dist/index.html"), "utf8");
+    expect(index).toContain('lang="en"');
+    expect(index).not.toContain("dir=");
+  });
+
+  it("serializes a JSON-LD object and resolves templates inside it (§8.5)", async () => {
+    await buildSite(TMP, { verbose: false });
+
+    const about = readFileSync(resolve(TMP, "dist/about/index.html"), "utf8");
+    expect(about).not.toContain("[object Object]");
+    expect(about).toContain('"@type": "AboutPage"');
+    // A structured-data block that cannot reference the page it describes is not much use.
+    expect(about).toContain('"name": "Test Site"');
+  });
+
+  it("emits _headers and .nojekyll", async () => {
+    await buildSite(TMP, { verbose: false });
+
+    const headers = readFileSync(resolve(TMP, "dist/_headers"), "utf8");
+    expect(headers).toContain("/*\n");
+    expect(headers).toContain("Cache-Control: public, max-age=0, must-revalidate");
+    expect(headers).toContain("/images/_optimized/*");
+    expect(headers).toContain("immutable");
+    expect(headers).toContain("X-Content-Type-Options: nosniff");
+    // The build knows which filenames carry a content hash and which do not.
+    expect(headers).not.toContain("/components/*");
+
+    // Jekyll excludes every `_`-prefixed path, which is most of what the build just wrote.
+    expect(existsSync(resolve(TMP, "dist/.nojekyll"))).toBe(true);
+  });
+
   it("generates sitemap.xml from the route table", async () => {
     await buildSite(TMP, { verbose: false });
 
@@ -291,7 +412,9 @@ describe("buildSite", () => {
     expect(sitemap).toContain("<loc>https://test.com/blog</loc>");
 
     // <lastmod> is a W3C date
-    expect(sitemap).toMatch(/<lastmod>\d{4}-\d{2}-\d{2}<\/lastmod>/);
+    // Full RFC 3339, not date-only: the W3C Datetime profile admits both, and the date-only form
+    // Threw away any way to tell two edits on one day apart.
+    expect(sitemap).toMatch(/<lastmod>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z<\/lastmod>/);
 
     // Redirect sources are not pages and must not appear
     expect(sitemap).not.toContain("/old");
@@ -1176,6 +1299,68 @@ describe("buildSite — template string resolution", () => {
   });
 });
 
+describe("buildSite — templates inside a structured data block", () => {
+  const LD_TMP = resolve(import.meta.dir, "__test-site-ld-templates__");
+
+  beforeAll(() => {
+    rmSync(LD_TMP, { force: true, recursive: true });
+    mkdirSync(resolve(LD_TMP, "pages"), { recursive: true });
+    writeFileSync(
+      resolve(LD_TMP, "project.json"),
+      JSON.stringify({ build: { outDir: "./dist" }, name: "LD Test" }),
+      "utf8",
+    );
+    writeFileSync(
+      resolve(LD_TMP, "pages/index.json"),
+      JSON.stringify({
+        $head: [
+          {
+            attributes: { type: "application/ld+json" },
+            tagName: "script",
+            // A JSON-LD graph is an object of arrays of objects, and a template can sit at any depth.
+            textContent: {
+              "@context": "https://schema.org",
+              "@type": "Article",
+              author: { "@type": "Person", name: "${state.author}" },
+              headline: "${state.headline}",
+              // A non-string leaf passes through untouched — there is nothing in it to resolve.
+              isAccessibleForFree: true,
+              keywords: ["${state.headline}", "static"],
+              wordCount: 42,
+            },
+          },
+        ],
+        children: [{ tagName: "h1", textContent: "Structured" }],
+        state: {
+          author: { default: "Ada Lovelace", timing: "compiler" },
+          headline: { default: "A Real Headline", timing: "compiler" },
+        },
+      }),
+      "utf8",
+    );
+  });
+
+  afterAll(() => {
+    rmSync(LD_TMP, { force: true, recursive: true });
+  });
+
+  /*
+   * A JSON-LD block describes the page it sits on, so a template that stayed a template would
+   * publish `${state.headline}` to every consumer reading the page's structured data.
+   */
+  it("resolves templates nested in arrays and objects, not just at the top level", async () => {
+    const result = await buildSite(LD_TMP);
+    expect(result.errors).toHaveLength(0);
+
+    const html = readFileSync(resolve(LD_TMP, "dist/index.html"), "utf8");
+    expect(html).toContain("A Real Headline");
+    expect(html).toContain("Ada Lovelace");
+    expect(html).toContain('"wordCount": 42');
+    expect(html).toContain('"isAccessibleForFree": true');
+    expect(html).not.toContain("${state.");
+  });
+});
+
 // ── $elements (npm element scripts) ──────────────────────────────────────────
 
 describe("buildSite — npm $elements injection", () => {
@@ -1193,7 +1378,7 @@ describe("buildSite — npm $elements injection", () => {
     writeFileSync(
       resolve(EL_TMP, "pages/index.json"),
       JSON.stringify({
-        $elements: ["@shoelace-style/shoelace/components/button/button.js"],
+        $elements: ["@shoelace-style/shoelace/dist/components/button/button.js"],
         children: [{ children: ["Click Me"], tagName: "sl-button" }],
         title: "Home",
       }),
@@ -1205,13 +1390,20 @@ describe("buildSite — npm $elements injection", () => {
     rmSync(EL_TMP, { force: true, recursive: true });
   });
 
-  it("injects npm element scripts as module scripts", async () => {
+  /*
+   * The script is BUNDLED, not linked. A component package imports its own dependencies by bare
+   * specifier, and the emitted import map only ever carried `@vue/reactivity` and `lit-html`, so
+   * the old `/node_modules/<specifier>` URL was doubly broken: the path 404s in production, and
+   * even where it resolved the module's own imports did not.
+   */
+  it("bundles npm element scripts into /assets/", async () => {
     const result = await buildSite(EL_TMP);
     expect(result.errors).toHaveLength(0);
     const html = readFileSync(resolve(EL_TMP, "dist/index.html"), "utf8");
-    expect(html).toContain(
-      'src="/node_modules/@shoelace-style/shoelace/components/button/button.js"',
-    );
+    expect(html).toContain('src="/assets/');
+    expect(html).not.toContain("/node_modules/");
+    const src = /src="(\/assets\/[^"]+)"/.exec(html)?.[1] ?? "";
+    expect(existsSync(resolve(EL_TMP, `dist${src}`))).toBe(true);
   });
 });
 
@@ -1235,7 +1427,7 @@ describe("buildSite — bare specifier resolution in $head", () => {
             tagName: "link",
           },
           {
-            attributes: { src: "@pkg/lib/index.js", type: "module" },
+            attributes: { src: "@vue/reactivity", type: "module" },
             tagName: "script",
           },
         ],
@@ -1259,12 +1451,557 @@ describe("buildSite — bare specifier resolution in $head", () => {
     rmSync(BS_TMP, { force: true, recursive: true });
   });
 
-  it("resolves bare specifiers to /node_modules/ paths", async () => {
+  /*
+   * `/node_modules/<specifier>` resolved in `jx dev`, where the server serves that path, and 404d
+   * on every deployed site, because nothing copies node_modules into dist. The file is copied to
+   * `/assets/` under a flattened name instead.
+   */
+  it("copies bare-specifier $head files into /assets/", async () => {
     const result = await buildSite(BS_TMP);
     expect(result.errors).toHaveLength(0);
     const html = readFileSync(resolve(BS_TMP, "dist/index.html"), "utf8");
-    expect(html).toContain("/node_modules/@shoelace-style/shoelace/dist/themes/light.css");
-    expect(html).toContain("/node_modules/@pkg/lib/index.js");
+    expect(html).not.toContain("/node_modules/");
+    expect(html).toContain("/assets/shoelace-style-shoelace-dist-themes-light.css");
+    expect(html).toContain("/assets/vue-reactivity");
+    expect(
+      existsSync(resolve(BS_TMP, "dist/assets/shoelace-style-shoelace-dist-themes-light.css")),
+    ).toBe(true);
+  });
+});
+
+// ── /assets/ name collisions across copies and bundles ──────────────────────
+
+describe("buildSite — a $head copy and a sidecar bundle claiming one asset name", () => {
+  const CLASH_TMP = resolve(import.meta.dir, "__test-site-asset-clash__");
+  const pkg = (dir: string, files: Record<string, string>) => {
+    for (const [rel, body] of Object.entries(files)) {
+      const abs = resolve(CLASH_TMP, "node_modules", dir, rel);
+      mkdirSync(resolve(abs, ".."), { recursive: true });
+      writeFileSync(abs, body, "utf8");
+    }
+  };
+
+  beforeAll(() => {
+    rmSync(CLASH_TMP, { force: true, recursive: true });
+    mkdirSync(CLASH_TMP, { recursive: true });
+    // `@x/a-b` bundles to /assets/x-a-b.js; `@x/a/b.js` copies to the same name.
+    pkg("@x/a-b", {
+      "index.js": "export function aOne() {\n  return 1;\n}\n",
+      "package.json": '{ "name": "@x/a-b", "main": "index.js" }',
+    });
+    pkg("@x/a", { "b.js": "export const b = 1;\n", "package.json": '{ "name": "@x/a" }' });
+    writeFileSync(
+      resolve(CLASH_TMP, "project.json"),
+      JSON.stringify({
+        $head: [{ attributes: { src: "@x/a/b.js", type: "module" }, tagName: "script" }],
+        build: { outDir: "./dist" },
+        name: "Asset Clash",
+      }),
+      "utf8",
+    );
+    mkdirSync(resolve(CLASH_TMP, "components"), { recursive: true });
+    writeFileSync(
+      resolve(CLASH_TMP, "components/clash-widget.json"),
+      JSON.stringify({
+        children: [{ tagName: "span", textContent: "${state.n}" }],
+        state: {
+          aOne: { $prototype: "Function", $src: "npm:@x/a-b", parameters: ["state"] },
+          n: 0,
+        },
+        tagName: "clash-widget",
+      }),
+      "utf8",
+    );
+    mkdirSync(resolve(CLASH_TMP, "pages"), { recursive: true });
+    writeFileSync(
+      resolve(CLASH_TMP, "pages/index.json"),
+      JSON.stringify({ children: [{ tagName: "clash-widget" }], tagName: "main", title: "Home" }),
+      "utf8",
+    );
+  });
+
+  afterAll(() => {
+    rmSync(CLASH_TMP, { force: true, recursive: true });
+  });
+
+  // Copies and bundles share one URL directory, so the second claim is an error rather than an
+  // Overwrite that quietly serves one file under the other's name.
+  it("reports the clash instead of letting one overwrite the other", async () => {
+    const result = await buildSite(CLASH_TMP, { verbose: false });
+    expect(result.errors.some((e) => e.includes("both map to /assets/x-a-b.js"))).toBe(true);
+  });
+});
+
+// ── The self-hosted client runtime ───────────────────────────────────────────
+
+describe("buildSite — the import map points at the site, not a CDN", () => {
+  const RT_TMP = resolve(import.meta.dir, "__test-site-runtime__");
+
+  beforeAll(() => {
+    rmSync(RT_TMP, { force: true, recursive: true });
+    mkdirSync(resolve(RT_TMP, "components"), { recursive: true });
+    mkdirSync(resolve(RT_TMP, "pages"), { recursive: true });
+    writeFileSync(
+      resolve(RT_TMP, "project.json"),
+      JSON.stringify({ build: { outDir: "./dist" }, name: "Runtime Test" }),
+      "utf8",
+    );
+    writeFileSync(
+      resolve(RT_TMP, "components/rt-counter.json"),
+      JSON.stringify({
+        children: [{ onClick: "state.n++", tagName: "button", textContent: "${state.n}" }],
+        state: { n: 0 },
+        tagName: "rt-counter",
+      }),
+      "utf8",
+    );
+    writeFileSync(
+      resolve(RT_TMP, "pages/index.json"),
+      JSON.stringify({ children: [{ tagName: "rt-counter" }], tagName: "main", title: "Home" }),
+      "utf8",
+    );
+  });
+
+  afterAll(() => {
+    rmSync(RT_TMP, { force: true, recursive: true });
+  });
+
+  /*
+   * Every interactive page used to import its runtime from esm.sh. That is a third party in the
+   * load path of every visit, with no integrity metadata, and it made `default-src 'self'`
+   * unusable — the policy would have broken every interactive page on the site.
+   */
+  it("serves @vue/reactivity and lit-html from /assets/", async () => {
+    const result = await buildSite(RT_TMP, { verbose: false });
+    expect(result.errors).toHaveLength(0);
+
+    const html = readFileSync(resolve(RT_TMP, "dist/index.html"), "utf8");
+    expect(html).not.toContain("esm.sh");
+    const map = /<script type="importmap">([\s\S]*?)<\/script>/.exec(html)?.[1] ?? "";
+    /*
+     * Four entries: an exact key per module and a `/`-suffixed prefix key beside it. The prefix is
+     * what resolves a SUBPATH — `lit-html/directives/class-map.js`, which a `$src` sidecar imports
+     * and which a package-name external leaves in the bundle. Without it the page loads a module
+     * that cannot resolve its own import (site-architecture.md §8.7).
+     */
+    expect(JSON.parse(map)).toEqual({
+      imports: {
+        "@vue/reactivity": "/assets/vue-reactivity.js",
+        "@vue/reactivity/": "/assets/@vue/reactivity/",
+        "lit-html": "/assets/lit-html.js",
+        "lit-html/": "/assets/lit-html/",
+      },
+    });
+
+    // And the URLs it names are real files, which is the half a bare rewrite would have missed.
+    expect(existsSync(resolve(RT_TMP, "dist/assets/vue-reactivity.js"))).toBe(true);
+    expect(existsSync(resolve(RT_TMP, "dist/assets/lit-html.js"))).toBe(true);
+  }, 30_000);
+});
+
+// ── Content-Security-Policy over a real build ────────────────────────────────
+
+describe("buildSite — the emitted policy authorizes the page it was built from", () => {
+  const CSP_TMP = resolve(import.meta.dir, "__test-site-csp__");
+
+  beforeAll(() => {
+    rmSync(CSP_TMP, { force: true, recursive: true });
+    mkdirSync(resolve(CSP_TMP, "components"), { recursive: true });
+    mkdirSync(resolve(CSP_TMP, "pages"), { recursive: true });
+    writeFileSync(
+      resolve(CSP_TMP, "project.json"),
+      JSON.stringify({
+        $head: [
+          {
+            attributes: { type: "application/ld+json" },
+            tagName: "script",
+            textContent: { "@context": "https://schema.org", "@type": "WebSite" },
+          },
+        ],
+        $media: { dark: "(prefers-color-scheme: dark)" },
+        build: { headers: { security: { csp: true } }, outDir: "./dist" },
+        name: "CSP Site",
+        url: "https://csp.example",
+      }),
+      "utf8",
+    );
+    writeFileSync(
+      resolve(CSP_TMP, "components/csp-counter.json"),
+      JSON.stringify({
+        children: [
+          { onclick: { $ref: "#/state/bump" }, tagName: "button", textContent: "${state.n}" },
+        ],
+        state: {
+          bump: { $expression: { operator: "+=", target: { $ref: "#/state/n" }, value: 1 } },
+          n: 0,
+        },
+        tagName: "csp-counter",
+      }),
+      "utf8",
+    );
+    writeFileSync(
+      resolve(CSP_TMP, "pages/index.json"),
+      JSON.stringify({ children: [{ tagName: "csp-counter" }], tagName: "main", title: "Home" }),
+      "utf8",
+    );
+  });
+
+  afterAll(() => {
+    rmSync(CSP_TMP, { force: true, recursive: true });
+  });
+
+  /*
+   * The load-bearing assertion of the whole feature: every inline script in the shipped HTML is
+   * named by a hash in the shipped header. A hash that does not match the bytes is worse than no
+   * policy, so this compares the two artifacts rather than either one against an expectation.
+   *
+   * Verified in Chrome as well, on this exact shape: the pre-paint script and import map run, the
+   * JSON-LD survives without a hash, the counter increments on click, and an injected inline
+   * script is blocked.
+   */
+  it("hashes every executable inline script, and nothing else", async () => {
+    const result = await buildSite(CSP_TMP, { verbose: false });
+    expect(result.errors).toHaveLength(0);
+
+    const html = readFileSync(resolve(CSP_TMP, "dist/index.html"), "utf8");
+    const csp = /\n {2}Content-Security-Policy: (.*)/.exec(
+      readFileSync(resolve(CSP_TMP, "dist/_headers"), "utf8"),
+    )?.[1];
+    expect(csp).toBeDefined();
+
+    const inline = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)].filter(
+      (m) => !/\bsrc\s*=/.test(m[1] ?? ""),
+    );
+    const executable = inline.filter((m) => !/ld\+json/.test(m[1] ?? ""));
+    // The pre-paint script and the import map, both present and both hashed.
+    expect(executable.length).toBeGreaterThanOrEqual(2);
+    for (const match of executable) {
+      expect(csp).toContain(hashOf(match[2] ?? ""));
+    }
+
+    // The data block is present and deliberately unhashed — CSP never checks it.
+    const dataBlock = inline.find((m) => /ld\+json/.test(m[1] ?? ""));
+    expect(dataBlock).toBeDefined();
+    expect(csp).not.toContain(hashOf(dataBlock?.[2] ?? ""));
+
+    // Nothing cross-origin is left to allow.
+    expect(csp).toContain("default-src 'self'");
+    expect(csp).not.toContain("https://");
+  }, 30_000);
+});
+
+// ── Locale routing ───────────────────────────────────────────────────────────
+
+describe("buildSite — locale routing", () => {
+  const I18N_TMP = resolve(import.meta.dir, "__test-site-i18n__");
+  const page = (rel: string, doc: object) => {
+    const abs = resolve(I18N_TMP, "pages", rel);
+    mkdirSync(resolve(abs, ".."), { recursive: true });
+    writeFileSync(abs, JSON.stringify(doc), "utf8");
+  };
+
+  beforeAll(() => {
+    rmSync(I18N_TMP, { force: true, recursive: true });
+    mkdirSync(I18N_TMP, { recursive: true });
+    writeFileSync(
+      resolve(I18N_TMP, "project.json"),
+      JSON.stringify({
+        build: { outDir: "./dist" },
+        // Declared in the spellings an author would actually type, to prove canonicalization.
+        i18n: { defaultLocale: "EN", locales: ["en", "fr-ca", "ar"] },
+        name: "Multi",
+        url: "https://multi.example",
+      }),
+      "utf8",
+    );
+    page("index.json", { children: ["${$page.locale}"], tagName: "main", title: "Home" });
+    page("fr-ca/index.json", { children: ["fr"], tagName: "main", title: "Accueil" });
+    page("ar/index.json", { children: ["ar"], tagName: "main", title: "AR" });
+    page("about.json", { children: ["about"], tagName: "main", title: "About" });
+    page("fr-ca/about.json", { children: ["a propos"], tagName: "main", title: "A propos" });
+    page("en/quebec.json", { $lang: "fr-CA", children: ["mixed"], tagName: "main", title: "Q" });
+  });
+
+  afterAll(() => {
+    rmSync(I18N_TMP, { force: true, recursive: true });
+  });
+
+  it("gives each route the lang its prefix declares, and dir only when it earns it", async () => {
+    const result = await buildSite(I18N_TMP, { verbose: false });
+    expect(result.errors).toHaveLength(0);
+    const html = (rel: string) => readFileSync(resolve(I18N_TMP, "dist", rel), "utf8");
+
+    expect(/<html[^>]*lang="en"/.test(html("index.html"))).toBe(true);
+    // Canonical case, from a directory named in lower case.
+    expect(/<html[^>]*lang="fr-CA"/.test(html("fr-ca/index.html"))).toBe(true);
+    // Arabic is right-to-left by script, so `dir` appears without anyone writing it.
+    expect(/<html[^>]*dir="rtl"/.test(html("ar/index.html"))).toBe(true);
+    // `ltr` is HTML's default; writing it on every page would say nothing.
+    expect(html("index.html")).not.toContain('dir="ltr"');
+    // An explicit $lang beats the route it sits under.
+    expect(/<html[^>]*lang="fr-CA"/.test(html("en/quebec/index.html"))).toBe(true);
+    // And the resolved locale is readable from a template.
+    expect(html("index.html")).toContain("en");
+  }, 30_000);
+
+  /*
+   * Discovery, which is the half that makes a translated site legible to anything but a reader.
+   * The set is reciprocal and includes each page itself — that is what the annotation means and
+   * what a validator checks for — and it only exists because `headEntryKey` keys a link on its
+   * qualifying attribute. Before that these four collapsed into one.
+   */
+  it("advertises its translations in <head> and in the sitemap", async () => {
+    await buildSite(I18N_TMP, { verbose: false });
+    const html = readFileSync(resolve(I18N_TMP, "dist/index.html"), "utf8");
+    const alternates = [...html.matchAll(/hreflang="([^"]+)"/g)].map((m) => m[1]);
+    expect(alternates.toSorted()).toEqual(["ar", "en", "fr-CA", "x-default"]);
+    // The `x-default` entry names the default locale's URL: where an unmatched visitor goes.
+    expect(html).toContain('href="https://multi.example/" hreflang="x-default"');
+
+    const sitemap = readFileSync(resolve(I18N_TMP, "dist/sitemap.xml"), "utf8");
+    expect(sitemap).toContain('xmlns:xhtml="http://www.w3.org/1999/xhtml"');
+    expect(sitemap).toContain(
+      '<xhtml:link rel="alternate" hreflang="ar" href="https://multi.example/ar"/>',
+    );
+  }, 30_000);
+
+  // A page with no translations gets none: a lone hreflang pointing at itself is noise.
+  it("says nothing about a page that has no siblings", async () => {
+    writeFileSync(
+      resolve(I18N_TMP, "pages/solo.json"),
+      JSON.stringify({ children: ["solo"], tagName: "main", title: "Solo" }),
+      "utf8",
+    );
+    await buildSite(I18N_TMP, { verbose: false });
+    expect(readFileSync(resolve(I18N_TMP, "dist/solo/index.html"), "utf8")).not.toContain(
+      "hreflang",
+    );
+  }, 30_000);
+});
+
+// ── An invalid locale tag ────────────────────────────────────────────────────
+
+describe("buildSite — a malformed BCP 47 tag", () => {
+  const BAD_TMP = resolve(import.meta.dir, "__test-site-bad-locale__");
+
+  beforeAll(() => {
+    rmSync(BAD_TMP, { force: true, recursive: true });
+    mkdirSync(resolve(BAD_TMP, "pages"), { recursive: true });
+    writeFileSync(
+      resolve(BAD_TMP, "project.json"),
+      JSON.stringify({
+        build: { outDir: "./dist" },
+        i18n: { defaultLocale: "en", locales: ["en", "en_US"] },
+        name: "Bad Locale",
+      }),
+      "utf8",
+    );
+    writeFileSync(
+      resolve(BAD_TMP, "pages/index.json"),
+      JSON.stringify({ children: ["hi"], tagName: "main", title: "Home" }),
+      "utf8",
+    );
+  });
+
+  afterAll(() => {
+    rmSync(BAD_TMP, { force: true, recursive: true });
+  });
+
+  // A typo'd locale does not degrade — it ships pages claiming a language that does not exist.
+  it("fails the build and names the tag", async () => {
+    const result = await buildSite(BAD_TMP, { verbose: false });
+    expect(result.errors.some((e) => e.includes("en_US"))).toBe(true);
+  }, 30_000);
+});
+
+// ── manifest.webmanifest and .well-known/security.txt ────────────────────────
+
+describe("buildSite — installability and disclosure files", () => {
+  const WK_TMP = resolve(import.meta.dir, "__test-site-wellknown__");
+
+  beforeAll(() => {
+    rmSync(WK_TMP, { force: true, recursive: true });
+    mkdirSync(resolve(WK_TMP, "pages"), { recursive: true });
+    writeFileSync(
+      resolve(WK_TMP, "project.json"),
+      JSON.stringify({
+        build: { outDir: "./dist" },
+        manifest: {
+          icons: [
+            { sizes: "192x192", src: "/i192.png" },
+            { sizes: "512x512", src: "/i512.png" },
+          ],
+          themeColor: "#0b3d91",
+        },
+        name: "PWA Site",
+        securityTxt: {
+          contact: ["mailto:security@pwa.example"],
+          expires: "2099-01-01T00:00:00Z",
+          preferredLanguages: ["EN"],
+        },
+        url: "https://pwa.example",
+      }),
+      "utf8",
+    );
+    writeFileSync(
+      resolve(WK_TMP, "pages/index.json"),
+      JSON.stringify({ children: ["hi"], tagName: "main", title: "Home" }),
+      "utf8",
+    );
+  });
+
+  afterAll(() => {
+    rmSync(WK_TMP, { force: true, recursive: true });
+  });
+
+  /*
+   * The three halves have to agree, which is why this is one test: the file exists, the page
+   * points at it, and `_headers` names a content type no host would infer for either extension.
+   */
+  it("writes both files, links them, and names their content types", async () => {
+    const result = await buildSite(WK_TMP, { verbose: false });
+    expect(result.errors).toHaveLength(0);
+    const read = (rel: string) => readFileSync(resolve(WK_TMP, "dist", rel), "utf8");
+
+    expect(JSON.parse(read("manifest.webmanifest")).short_name).toBe("PWA Site");
+    expect(read(".well-known/security.txt")).toContain("Expires: 2099-01-01T00:00:00Z");
+    // Canonicalized through the same BCP 47 implementation as i18n.locales.
+    expect(read(".well-known/security.txt")).toContain("Preferred-Languages: en");
+
+    const html = read("index.html");
+    expect(html).toContain('<link href="/manifest.webmanifest" rel="manifest">');
+    expect(html).toContain('<meta content="#0b3d91" name="theme-color">');
+
+    const headers = read("_headers");
+    expect(headers).toContain("Content-Type: application/manifest+json; charset=utf-8");
+    expect(headers).toContain("Content-Type: text/plain; charset=utf-8");
+  }, 30_000);
+});
+
+// ── The service worker and its tombstone ─────────────────────────────────────
+
+describe("buildSite — service worker", () => {
+  const SW_TMP = resolve(import.meta.dir, "__test-site-sw__");
+  /** `undefined` means the key is absent, which is a different instruction from `false`. */
+  const project = (serviceWorker?: unknown) =>
+    writeFileSync(
+      resolve(SW_TMP, "project.json"),
+      JSON.stringify({
+        build: { outDir: "./dist" },
+        name: "SW Site",
+        url: "https://sw.example",
+        ...(serviceWorker === undefined ? {} : { serviceWorker }),
+      }),
+      "utf8",
+    );
+
+  beforeAll(() => {
+    rmSync(SW_TMP, { force: true, recursive: true });
+    mkdirSync(resolve(SW_TMP, "pages"), { recursive: true });
+    writeFileSync(
+      resolve(SW_TMP, "pages/index.json"),
+      JSON.stringify({ children: ["hi"], tagName: "main", title: "Home" }),
+      "utf8",
+    );
+    writeFileSync(
+      resolve(SW_TMP, "pages/offline.json"),
+      JSON.stringify({ children: ["offline"], tagName: "main", title: "Offline" }),
+      "utf8",
+    );
+  });
+
+  afterAll(() => {
+    rmSync(SW_TMP, { force: true, recursive: true });
+  });
+
+  // A worker nobody asked for is a caching layer nobody debugged.
+  it("emits nothing at all when the project never mentions one", async () => {
+    project();
+    const result = await buildSite(SW_TMP, { verbose: false });
+    expect(result.errors).toHaveLength(0);
+    expect(existsSync(resolve(SW_TMP, "dist/sw.js"))).toBe(false);
+    expect(readFileSync(resolve(SW_TMP, "dist/index.html"), "utf8")).not.toContain("serviceWorker");
+  }, 30_000);
+
+  it("emits the worker and registers it from every page", async () => {
+    project({ offlineFallback: "/offline/", precache: ["/"] });
+    const result = await buildSite(SW_TMP, { verbose: false });
+    expect(result.errors).toHaveLength(0);
+
+    const worker = readFileSync(resolve(SW_TMP, "dist/sw.js"), "utf8");
+    // The fallback joined precache, since a page never cached cannot be served offline.
+    expect(worker).toContain('const PRECACHE = ["/","/offline/"]');
+    expect(readFileSync(resolve(SW_TMP, "dist/index.html"), "utf8")).toContain(
+      "navigator.serviceWorker.register('/sw.js'",
+    );
+  }, 30_000);
+
+  /*
+   * The distinction the whole feature turns on. `false` is not the same as deleting the key: a
+   * worker is sticky, and a 404 at its URL is not an instruction to stop. Verified in a browser —
+   * flipping a live deploy from the worker to the tombstone left zero registrations, zero caches
+   * and an uncontrolled page.
+   */
+  it("false emits a tombstone at the same URL, and stops registering it", async () => {
+    project(false);
+    const result = await buildSite(SW_TMP, { verbose: false });
+    expect(result.errors).toHaveLength(0);
+
+    const worker = readFileSync(resolve(SW_TMP, "dist/sw.js"), "utf8");
+    expect(worker).toContain("self.registration.unregister()");
+    expect(worker).not.toContain("PRECACHE");
+    // Registering a tombstone from the page trying to shed it would be self-defeating.
+    expect(readFileSync(resolve(SW_TMP, "dist/index.html"), "utf8")).not.toContain(
+      "serviceWorker.register",
+    );
+  }, 30_000);
+
+  // `cache.addAll()` is all-or-nothing, so one bad URL stops the worker installing — silently.
+  it("fails the build on a precache URL it did not produce", async () => {
+    project({ precache: ["/", "/never-built/"] });
+    const result = await buildSite(SW_TMP, { verbose: false });
+    expect(result.errors.some((e) => e.includes("/never-built/"))).toBe(true);
+  }, 30_000);
+});
+
+// ── Unresolvable bare specifiers ─────────────────────────────────────────────
+
+describe("buildSite — unresolvable bare specifier in $head", () => {
+  const MISS_TMP = resolve(import.meta.dir, "__test-site-bare-missing__");
+
+  beforeAll(() => {
+    rmSync(MISS_TMP, { force: true, recursive: true });
+    mkdirSync(MISS_TMP, { recursive: true });
+    writeFileSync(
+      resolve(MISS_TMP, "project.json"),
+      JSON.stringify({
+        $head: [
+          {
+            attributes: { href: "@nope/not-installed/theme.css", rel: "stylesheet" },
+            tagName: "link",
+          },
+        ],
+        build: { outDir: "./dist" },
+        name: "Missing Spec Test",
+      }),
+      "utf8",
+    );
+    mkdirSync(resolve(MISS_TMP, "pages"), { recursive: true });
+    writeFileSync(
+      resolve(MISS_TMP, "pages/index.json"),
+      JSON.stringify({ children: [{ children: ["Hi"], tagName: "p" }], title: "Home" }),
+      "utf8",
+    );
+  });
+
+  afterAll(() => {
+    rmSync(MISS_TMP, { force: true, recursive: true });
+  });
+
+  // A missing dependency is a build error. It used to be a URL that looked fine until deploy.
+  it("reports the specifier rather than emitting a dead URL", async () => {
+    const result = await buildSite(MISS_TMP);
+    expect(result.errors.some((e) => e.includes("@nope/not-installed/theme.css"))).toBe(true);
   });
 });
 
@@ -2201,9 +2938,69 @@ describe("redirect conflict warnings", () => {
       console.warn = origWarn;
     }
 
-    expect(warnings.some((w) => w.includes('Redirect "/about" overwrites a compiled page'))).toBe(
-      true,
-    );
+    expect(
+      warnings.some((w) => w.includes('The redirect "/about" collides with a compiled page')),
+    ).toBe(true);
     expect(warnings.some((w) => w.includes('"/gone"'))).toBe(false);
+  });
+});
+
+// ── Unregistered link relation warning ───────────────────────────────────────
+
+describe("link relation warnings", () => {
+  const LR_TMP = resolve(import.meta.dir, "__test-link-relations__");
+
+  afterAll(() => {
+    rmSync(LR_TMP, { force: true, recursive: true });
+  });
+
+  async function buildWithHead(head: unknown[]): Promise<string[]> {
+    rmSync(LR_TMP, { force: true, recursive: true });
+    mkdirSync(resolve(LR_TMP, "pages"), { recursive: true });
+    writeFileSync(
+      resolve(LR_TMP, "project.json"),
+      JSON.stringify({ $head: head, build: { outDir: "./dist" }, name: "LR" }),
+      "utf8",
+    );
+    for (const name of ["index", "about"]) {
+      writeFileSync(
+        resolve(LR_TMP, `pages/${name}.json`),
+        JSON.stringify({ children: [{ children: [name], tagName: "h1" }], title: name }),
+        "utf8",
+      );
+    }
+    const warnings: string[] = [];
+    const origWarn = console.warn;
+    console.warn = (msg: string) => warnings.push(String(msg));
+    try {
+      await buildSite(LR_TMP, { verbose: false });
+    } finally {
+      console.warn = origWarn;
+    }
+    return warnings;
+  }
+
+  /*
+   * The site `$head` is on every page, so the mistake that matters is also the one that would be
+   * loudest — hence "once", asserted with two pages in the build.
+   */
+  it("warns once for an unregistered relation in the site head", async () => {
+    const warnings = await buildWithHead([
+      { attributes: { href: "/theme.css", rel: "stylshet" }, tagName: "link" },
+    ]);
+    const matched = warnings.filter((w) => w.includes('"stylshet" is not an IANA link relation'));
+    expect(matched).toHaveLength(1);
+  });
+
+  it("says nothing about a head that is entirely registered relations", async () => {
+    const warnings = await buildWithHead([
+      { attributes: { href: "/theme.css", rel: "stylesheet" }, tagName: "link" },
+      { attributes: { href: "/favicon.ico", rel: "shortcut icon" }, tagName: "link" },
+      {
+        attributes: { href: "https://example.com/rel/x", rel: "https://example.com/rel/x" },
+        tagName: "link",
+      },
+    ]);
+    expect(warnings.some((w) => w.includes("is not an IANA link relation"))).toBe(false);
   });
 });

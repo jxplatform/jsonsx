@@ -2,9 +2,9 @@
 
 ## File-Based Routing, Content Collections, Layouts, and Static Site Generation
 
-**Version:** 0.1.44-draft
+**Version:** 0.5.13-draft
 **Status:** Partial
-**Updated:** 2026-08-12
+**Updated:** 2026-08-18
 **License:** MIT
 
 ---
@@ -26,6 +26,7 @@
 13. [Internationalization](#13-internationalization)
 14. [Deployment](#14-deployment)
 15. [Application Tier](#15-application-tier)
+16. [Standards Alignment](#16-standards-alignment)
 
 ---
 
@@ -755,6 +756,49 @@ content/                         # Schemas live in project.json `content`
 
 ---
 
+### 6.7 Syndication feeds
+
+> **Status: Implemented.** Provided by `@jxsuite/feed`, a first-party extension rather than a
+> compiler built-in: a feed is derived from a content collection, and hard-coding the compiler to
+> one extension's section is the coupling `extensions.md` §1 exists to prevent.
+
+A `feed` section names a collection and the URL prefix its entries are served under:
+
+```json
+{
+  "feed": {
+    "blog": {
+      "collection": "posts",
+      "basePath": "/blog/",
+      "title": "Example Blog",
+      "archive": true
+    }
+  }
+}
+```
+
+**Atom (RFC 4287) and JSON Feed 1.1. RSS 2.0 is deliberately not offered** — it has no standards
+body, its `<guid>` semantics were never settled, and every reader handles Atom. The omission is a
+decision rather than an oversight, which is why it is written down.
+
+**Dates come from the entry, never the build.** The `date` and `updated` frontmatter fields are
+already normalized to RFC 3339 by the parser (`parser.md` §9.3); an entry with no authored date
+falls back to `_meta.mtime`. The feed-level `<updated>` is the newest **item** — a feed stamped with
+the build time re-notifies every subscriber on every deploy.
+
+**RFC 5005.** With `archive: true`, entries beyond `pageSize` are written to
+`/feed/archive/<n>.xml`, linked by `prev-archive` and `next-archive`, each pointing back at the
+subscription document with `rel="current"`. Archives are chunked **from the oldest end**, so
+archive 1 keeps its contents as entries are added and only the newest archive changes — RFC 5005 §2
+asks that a published archive not change. When a feed holds its entire history it says so with
+`<fh:complete/>`, and only then: a document trimmed by `pageSize` is not complete even with no
+archives, and claiming otherwise would be believed.
+
+**Discovery.** The `<link rel="alternate">` tags come from the `head` capability
+(`extensions.md` §8.6), not from `emit` — emitters run after every page is written and cannot reach
+a `<head>`. Both formats' links survive the merge because §8.3 keys a link on its `type` as well as
+its `rel` and `href`.
+
 ## 7. Data Management in Studio
 
 Studio extends from a component editor to a full content management interface.
@@ -950,37 +994,62 @@ The compiler assembles `<head>` content from three sources, in order:
 2. **Layout-level** (layout's `<head>` children) — charset, viewport, structural tags
 3. **Page-level** (page's `$head`) — page-specific title, description, OG tags
 
-Later entries can override earlier entries. If both site and page define a `<title>`, the page's wins. Deduplication is by `tagName` + identifying attribute (`name`, `property`, `rel`).
+Later entries can override earlier entries. If both site and page define a `<title>`, the page's wins.
+
+Deduplication is by `tagName` plus the attribute that identifies the element: `name` for a `<meta name>`, `property` for a `<meta property>`, and for a `<link>`, `rel` **plus `href` plus whichever of `hreflang`, `type`, `media` or `sizes` is present**. That last part is not pedantry — `rel` and `href` alone are not identity, and the cases where they collide are ones a real site needs: `hreflang="x-default"` conventionally points at the same href as the default locale's alternate, and an RSS and an Atom feed are both `rel="alternate"` differing only in `type`.
+
+An auto-injected entry loses to an author-supplied one under the same key, including the canonical link.
+
+**`rel` values are checked against the IANA Link Relation Types registry.** A misspelled relation —
+`stylshet`, `canonicial`, `alternative` — is well-formed HTML that renders, passes every other check
+in this build, and does nothing at all: the stylesheet never loads, the canonical never
+consolidates. There is no runtime symptom, so the build says so instead.
+
+It is a **warning, never an error**, and reported once per distinct value across the whole build
+rather than once per page — the mistake that matters lives in the site or layout `$head` and is
+therefore on every page. Three things are deliberately not reported: registered relations
+(`link-relations.ts` snapshots the registry CSV and names the date it was taken), `shortcut` (the
+legacy spelling in `rel="shortcut icon"`, which the HTML Standard handles explicitly), and any
+absolute URI, which is RFC 8288 §2.1.2's extension mechanism and the one way to express a relation
+the registry does not carry. The snapshot going stale therefore costs one line of noise, not a
+broken build.
 
 ### 8.4 Automatic SEO
 
 The compiler automatically generates certain tags if not explicitly declared:
 
-| Auto-generated                   | Condition                                            |
-| -------------------------------- | ---------------------------------------------------- |
-| `<meta charset>`                 | Always (from `defaults.charset`)                     |
-| `<meta name="viewport">`         | Always, unless the author supplies one               |
-| `<title>`                        | Always — page title, falling back to the site `name` |
-| `<link rel="canonical">`         | When `url` is set, from `$site.url` + page path      |
-| `<meta property="og:url">`       | With the canonical; an author-supplied value wins    |
-| `<meta property="og:site_name">` | From `$site.name`; an author-supplied value wins     |
-| `<html lang>`                    | From page or site `lang`                             |
-| `sitemap.xml` entry              | Every page, when `url` is set (§8.4.1)               |
+| Auto-generated                   | Condition                                                                |
+| -------------------------------- | ------------------------------------------------------------------------ |
+| `<meta charset>`                 | Always (from `defaults.charset`)                                         |
+| `<meta name="viewport">`         | Always, unless the author supplies one                                   |
+| `<title>`                        | Always — page title, falling back to the site `name`                     |
+| `<link rel="canonical">`         | When `url` is set, from `$site.url` + page path                          |
+| `<meta property="og:url">`       | With the canonical; an author-supplied value wins                        |
+| `<meta property="og:site_name">` | From `$site.name`; an author-supplied value wins                         |
+| `<html lang>`                    | From the page's `$lang`, else `defaults.lang`                            |
+| `<html dir>`                     | From the page's `$dir`, else `defaults.dir`; omitted when neither is set |
+| `sitemap.xml` entry              | Every page, when `url` is set (§8.4.1)                                   |
 
 #### 8.4.1 Sitemap & `robots.txt`
 
-When `url` is set in `project.json`, the build emits `dist/sitemap.xml` from the route table — one `<url>` entry per compiled page, each with a `<loc>` (absolute, built from `url` + the route via `new URL(route, url)`, so it is identical to the page's `<link rel="canonical">`) and a `<lastmod>` (the page source file's modification date, `YYYY-MM-DD`).
+When `url` is set in `project.json`, the build emits `dist/sitemap.xml` from the route table — one `<url>` entry per compiled page, each with a `<loc>` (absolute, built from `url` + the route via `new URL(route, url)`, so it is identical to the page's `<link rel="canonical">`) and a `<lastmod>` — the page source file's modification time as a **full RFC 3339 timestamp**. The W3C Datetime profile sitemaps.org cites admits both that and a bare `YYYY-MM-DD`; the date-only form threw away any way to tell two edits on one day apart.
 
 - **Requires `url`.** Absolute `<loc>` values cannot be built without it; if `url` is absent the sitemap is skipped with a build warning.
 - **Per-page opt-out.** A page sets `$sitemap: false` at its root to be excluded (e.g. thank-you pages, or drafts while build-time draft filtering is still pending). Every other page is included.
 - **Disable entirely.** Set `build.sitemap: false` (§14.1.1).
-- **Dynamic routes** are listed by their expanded concrete URLs. Pages generated from a single template share that template file's `<lastmod>`.
+- **Dynamic routes** are listed by their expanded concrete URLs, each dated by **the entry it was generated from** rather than by the template. A route's `sourcePath` is the `[slug]` file that rendered it, and a template is edited far more often than the posts beneath it — so dating by the template made an entire archive announce itself as changed whenever the template moved, which is the opposite of what `<lastmod>` is for. A `resolvePaths` result therefore carries the entry's `_meta` (`parser.md` §9.3) beside its route parameters; `_meta` is reserved, is never a route parameter, and is stripped before URL substitution. A route with no entry behind it — an authored page, or a `$paths` shape describing only parameter values — still uses its own file's modification time, which for those is the right answer.
 - **`<loc>` form** follows the canonical URL exactly and is not re-normalized for `build.trailingSlash`, keeping sitemap and canonical URLs in agreement.
 - **`robots.txt`.** After the `public/` copy, a `Sitemap: <url>/sitemap.xml` line is appended to `dist/robots.txt` (creating a minimal `robots.txt` if none was provided). An existing `Sitemap:` line is left untouched.
 
 Redirect sources are not pages and never appear in the sitemap.
 
 ### 8.5 Structured Data (JSON-LD)
+
+> **Status: Implemented.** A head entry's `textContent` may be an object; the compiler serializes
+> it to JSON inside the tag, and template strings **inside** the object resolve against the same
+> scope as everywhere else — a structured-data block that cannot reference the page it describes
+> would not be much use. The interpreting runtime serializes it identically, so a dev preview and a
+> built page agree.
 
 Pages may include JSON-LD for rich search results:
 
@@ -1042,6 +1111,86 @@ feeds — `Search result` (description, viewport, icon) and `Social card` (the O
 Ungrouped they collide: Open Graph carries its own `Title`, `Description` and `Image`, so one flat
 column gave `Description` two meanings. Every field commits live, and the previews redraw with it.
 
+### 8.7 Bare Specifiers in `$head` and `$elements`
+
+> **Status: Implemented.** `rewriteNpmAsset` in `site-build.ts`; the copy step runs beside sidecar
+> bundling. Resolution runs on all three `$head` levels and both `$elements` levels — see "Every
+> level" below, which is a correction rather than an addition — package subpaths resolve through an
+> import-map prefix key, and an npm `$elements` set is bundled as one self-contained module.
+
+A `$head` entry may name a file inside an installed package by bare specifier rather than by URL —
+`"@shoelace-style/shoelace/dist/themes/light.css"`. The build **resolves it against the project
+root and copies the file into `/assets/`** under a flattened, hash-free name derived from the
+specifier: `/assets/shoelace-style-shoelace-dist-themes-light.css`. The extension is preserved,
+because both the browser and the host dispatch on it.
+
+`$elements` entries name modules rather than files, so they are **bundled** through the same path a
+Function-def `$src` takes (`spec.md` §12) and land at the same kind of URL. Bundling rather than
+copying is what makes the package's own bare imports resolvable: the emitted import map carries two
+entries, and a component package imports far more than that.
+
+**Every level, not just the project's.** Both keys are legal on the project, on a layout and on a
+page, and resolution applies wherever they are written. This is stated because it did not hold: the
+`$head` pass ran over `projectConfig.$head` alone and the `$elements` pass read the layout alone, so
+the identical declaration written on a **page** was silently skipped — its stylesheet shipped as a
+bare specifier the browser resolved against the page URL, and its component modules were never
+imported at all. The page rendered unknown elements with nothing in the build log, because a
+dropped entry produced no output to be wrong.
+
+**A page whose only components come from npm still gets an import map.** The map is what makes the
+two external runtime modules resolvable, and it was emitted only alongside Jx component scripts —
+so a page with npm elements and no Jx components got modules that immediately failed on
+`Failed to resolve module specifier "lit-html"`.
+
+Copies and bundles share one output directory, so they share one namespace. Two different files
+that flatten to the same name is a **build error** naming both, never a last-writer-wins overwrite.
+
+**A package subpath resolves through a prefix key.** A `$src` sidecar may import a _subpath_ of a
+runtime module — `lit-html/directives/class-map.js` — and a package-name external covers the
+package's subpaths as well, so the specifier survives into the bundle. The import map therefore
+carries a `/`-suffixed prefix entry beside each exact one (`"lit-html/": "/assets/lit-html/"`), and
+the build writes the subpaths it finds referenced in the emitted assets. The set is **discovered
+from the output**, never enumerated: which subpaths exist is a property of the third-party code a
+page happens to use.
+
+**The subpath is bundled; only the core is external.** That the package-name external covers
+subpaths is what makes the specifier survive into a page's bundle, and it is also the trap when the
+build comes to satisfy it: listing the package in `external` externalises the subpath ENTRY too, so
+the emitted asset is a re-export of the very specifier the prefix key points back at it —
+`export * from "lit-html/directives/class-map.js"` served AS
+`/assets/lit-html/directives/class-map.js`. A self-referential module has an empty namespace, so
+every page using a directive failed on an undefined import while the build reported success. The
+externals are therefore decided per import by a hook that can see the **importer**: the entry's own
+import resolves and is bundled, and everything reached through it that belongs to a runtime package
+stays external.
+
+**The core is reached through a stub, so a page gets one copy.** A package imports its own core by
+RELATIVE path from inside itself (`../lit-html.js`), and a bundler keeps an external's specifier
+exactly as the source wrote it — a rewritten one is not honoured. The shared copy is therefore
+reached by emitting a stub at the place that relative path lands in the OUTPUT tree, re-exporting
+the bare specifier the import map already resolves. Two copies of lit on a page is a documented
+breakage, not a size regression, and a text assertion about the emitted file cannot tell the two
+apart: the guarantee is proved by loading the asset and reading its exports.
+
+Discovery runs to closure rather than once, because bundling one subpath can reveal the next — a
+directive importing another directive stays external and is found on the following pass. A graph
+deeper than the pass budget is a build error rather than a silent truncation: at that depth the
+likelier explanation is a cycle in the scan than a real dependency chain.
+
+**An npm `$elements` set is bundled as ONE self-contained module**, with nothing external. Two
+measurements decided this. Bundling each specifier separately against an external framework
+produced output that threw before defining anything: Bun's codegen for `export *` from an external
+emits a re-export against a namespace it never imports, and a component package re-exporting its
+framework is exactly that shape. Inlining per specifier fixes the codegen and gives each component
+its own framework copy — seven of them on the demo that motivated this. Bundling the set as one
+entry gives one copy, no external and no import map: 190kb against 462kb, and correct instead of
+broken.
+
+An unresolvable specifier is a build error too. It was previously rewritten to
+`/node_modules/<specifier>`, which the dev server happens to serve and which nothing copies into
+`dist/` — so the page worked while it was being written and lost the file on deploy. A missing
+dependency now fails the build that would have shipped it.
+
 ---
 
 ## 9. Media Management
@@ -1072,6 +1221,7 @@ Image optimization is configured in `project.json` under the `images` key. All p
     "quality": { "webp": 80, "avif": 65, "jpeg": 80, "png": 80 },
     "sizes": "(max-width: 768px) 100vw, 50vw",
     "lazyLoad": true,
+    "picture": true,
     "service": "build"
   }
 }
@@ -1084,7 +1234,8 @@ Image optimization is configured in `project.json` under the `images` key. All p
 | `formats`       | `string[]` | `["webp", "avif"]`                          | Output formats (also supports `"jpeg"`, `"png"`) — `"build"` service only                                           |
 | `quality`       | `object`   | `{ webp: 80, avif: 65, jpeg: 80, png: 80 }` | Per-format compression quality (0–100); the `"cloudflare"` service uses the `webp` value as its single quality      |
 | `sizes`         | `string`   | `"(max-width: 768px) 100vw, 50vw"`          | Default CSS `sizes` attribute for responsive hints                                                                  |
-| `lazyLoad`      | `boolean`  | `true`                                      | Adds `loading="lazy"` and `decoding="async"` to `<img>` tags                                                        |
+| `lazyLoad`      | `boolean`  | `true`                                      | Adds `loading="lazy"` and `decoding="async"` to `<img>` tags (§9.2.7) — independent of `optimize`                   |
+| `picture`       | `boolean`  | `true`                                      | Wrap a multi-format image in a `<picture>`, one `<source>` per format (§9.2.2)                                      |
 | `service`       | `string`   | `"build"`                                   | `"build"` = Sharp at build time; `"cloudflare"` = `/cdn-cgi/image` transform URLs served by Cloudflare (see §9.2.6) |
 | `remoteDomains` | `string[]` | `[]`                                        | Hostnames whose remote (https) images get transform srcsets — `"cloudflare"` service only (see §9.2.6)              |
 
@@ -1095,13 +1246,12 @@ When `optimize: true`, the compiler processes every `<img>` node during page com
 1. **Width filtering** — Only generates variants at widths ≤ the source image's natural width. The original width is always included as a breakpoint.
 2. **Format conversion** — Each width × format combination produces an optimized variant via Sharp.
 3. **Output path** — Variants are written to `dist/images/_optimized/{stem}-{width}-{hash}.{format}` (e.g., `hero-640-a1b2c3d4.webp`).
-4. **Attribute injection** — The compiler mutates the `<img>` node to add:
-   - `srcset` — responsive variant list (e.g., `hero-320-a1b2.avif 320w, hero-640-a1b2.avif 640w, ...`)
-   - `sizes` — from config (unless the node already specifies one)
-   - `width` and `height` — the original image's intrinsic dimensions (prevents layout shift). Skipped when the author already sets either attribute, and for remote sources or images whose dimensions cannot be read
-   - `loading="lazy"` and `decoding="async"` — when `lazyLoad: true` (unless `loading="eager"` is already set)
+4. **Markup** — one of two shapes, decided by how many formats produced variants:
+   - **One format** — the `<img>` gains `srcset` (e.g. `hero-320-a1b2.webp 320w, hero-640-a1b2.webp 640w, …`) and `sizes` from config, unless the node already specifies one.
+   - **Two or more** — the `<img>` is wrapped in a `<picture>` carrying one `<source type="image/…">` per format, best compression first, and the `<img>` keeps the original `src` with **no** `srcset`. This is not cosmetic: `srcset` alone carries no format information, so a browser that cannot decode AVIF still selects an AVIF candidate from a mixed list and fails to render it. `<source type>` is the only markup that lets it decline. Set `picture: false` to keep the bare `<img>` and accept that.
+5. **Dimensions** — `width` and `height` are the original image's intrinsic dimensions (prevents layout shift). Skipped when the author already sets either attribute, and for remote sources or images whose dimensions cannot be read. They are injected even when no variant applies, since layout shift is not conditional on optimization.
 
-Up to 4 variants are processed concurrently per image.
+Loading attributes are decided separately — see §9.2.7. Up to 4 variants are processed concurrently per image.
 
 #### 9.2.3 Which Images Are Processed
 
@@ -1129,7 +1279,7 @@ Individual `<img>` nodes can override global defaults:
     "src": "/images/hero.jpg",
     "alt": "Hero image",
     "sizes": "(max-width: 640px) 80vw, 40vw",
-    "loading": "eager",
+    "fetchpriority": "high",
     "data-no-optimize": true
   }
 }
@@ -1137,6 +1287,7 @@ Individual `<img>` nodes can override global defaults:
 
 - `sizes` — overrides the global `sizes` value for this image
 - `loading="eager"` — prevents `loading="lazy"` from being added (for above-the-fold images)
+- `fetchpriority="high"` — marks this image as the largest contentful paint: it is fetched at high priority and never lazy-loaded (§9.2.7)
 - `data-no-optimize` — skips optimization entirely for this image
 
 #### 9.2.5 Caching
@@ -1161,6 +1312,32 @@ Setting `"service": "cloudflare"` replaces the build-time Sharp pipeline with Cl
   `format=auto` makes Cloudflare negotiate AVIF/WebP per browser; the single `quality` comes from `quality.webp`. The `v` param is an 8-char content hash for cache busting. The original `src` is left untouched as a fallback.
 - **Remote sources** — https URLs whose hostname is in `images.remoteDomains` get the same treatment with the full URL as the transform source (every configured width is emitted since original dimensions are unknown; `fit=scale-down` prevents upscaling). The zone must allow resizing from the remote origin (Images → Transformations → Sources).
 - **Zone requirement** — Image Transformations must be enabled for the zone (Cloudflare dashboard → Images → Transformations). The build prints a reminder. These URLs do **not** resolve on `*.pages.dev` / `*.workers.dev` preview hosts — only on the production custom domain; previews fall back to the untouched `src` originals.
+
+#### 9.2.7 Loading Attributes
+
+> **Status: Implemented.** `img-loading.ts`, applied by both halves of `image-transform.ts`.
+
+`loading` and `decoding` are decided **once**, by `images.lazyLoad`, for every `<img>` in the
+project — including images the optimizer skipped and images in projects with `optimize: false`.
+Declining to generate variants for an image says nothing about when the browser should fetch it.
+
+The compiler adds `loading="lazy"` and `decoding="async"` unless one of three things is true:
+
+| Condition                | Result                                                                                                         |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| `lazyLoad: false`        | Nothing is added anywhere                                                                                      |
+| The author set `loading` | Left exactly as written, `eager` or `lazy`                                                                     |
+| `fetchpriority="high"`   | Nothing is added — a high-priority lazy image is a contradiction the browser resolves by ignoring the priority |
+
+A document compiled on its own — outside a project, with no `images` config to read — gets no
+loading attributes at all. The setting is the project's, and inventing a default for a document
+that never declared one is how the previous behaviour reached the LCP image in the first place.
+
+**The compiler does not guess which image is the LCP.** That depends on the viewport, not the
+document, so there is no correct static answer; `fetchpriority="high"` is how the author gives one.
+Before this contract the static emitter added `loading="lazy"` to every `<img>` that lacked one —
+outside `images.optimize`, outside the pipeline, and therefore to the LCP image as well, which is
+the one image on a page that must never be lazy.
 
 ### 9.3 Referencing Media
 
@@ -1342,7 +1519,7 @@ The global stylesheet is emitted in this order:
 3. The `color-scheme` declaration triplet, when a scheme query is declared
 4. Layout-level styles
 5. Page-level styles
-6. Component-level styles (scoped to custom element shadow DOM or via class namespacing)
+6. Component-level styles (scoped by tag-name prefix and generated `.<tagName>-<n>` classes — there is no shadow DOM; `spec.md` §16.6)
 
 This follows the natural CSS cascade — more specific sources override less specific ones, and
 base rules always precede their conditional overrides so equal-specificity variants win by
@@ -1372,7 +1549,7 @@ Defined in `project.json`:
 
 The compiler emits two outputs:
 
-- **HTML meta-refresh pages** — every literal (pattern-free) source compiles to an HTML file with a `<meta http-equiv="refresh">` tag and a `<link rel="canonical">` to the destination. A literal source that collides with a compiled page logs a build **warning** (the redirect file overwrites the page — remove one or the other).
+- **HTML meta-refresh pages** — a literal (pattern-free) source compiles to an HTML file with a `<meta http-equiv="refresh">` tag, **for the statuses that have an HTML equivalent** (§11.3). A literal source that collides with a compiled page logs a build **warning** (the redirect file overwrites the page — remove one or the other).
 - **`_redirects` file** — every rule (literal and pattern) is written to `dist/_redirects` in the Netlify/Cloudflare format. Sources containing `:param` or `*` cannot be expressed as static HTML, so they appear **only** here, for platforms that process it.
 
 No `vercel.json` or other platform-specific redirect map is generated.
@@ -1388,17 +1565,43 @@ Redirect rules support `:param` and `*` wildcard syntax:
 }
 ```
 
-### 11.3 Status Codes
+### 11.3 Status Codes and Rewrites
+
+A rule is either a **redirect**, carrying an RFC 9110 §15.4 redirection status, or a **rewrite**,
+which is a different thing wearing a status code's clothes.
 
 ```json
 {
   "/moved-permanently": { "destination": "/new-location", "status": 301 },
   "/temporary-redirect": { "destination": "/other-page", "status": 302 },
-  "/api/*": { "destination": "https://api.example.com/*", "status": 200 }
+  "/method-preserving": { "destination": "/new-endpoint", "status": 308 },
+  "/api/*": { "destination": "https://api.example.com/*", "rewrite": true }
 }
 ```
 
-Status 200 redirects function as rewrites (proxy-style).
+A bare string is a 301. An unrecognised status is a **build error naming the rule**, not a value
+written through to the host.
+
+| Status | Means                           | HTML fallback                                      |
+| ------ | ------------------------------- | -------------------------------------------------- |
+| `301`  | Permanent                       | yes, with `<link rel="canonical">`                 |
+| `302`  | Temporary                       | yes, with `<meta name="robots" content="noindex">` |
+| `303`  | See other, with GET             | yes, with `noindex`                                |
+| `307`  | Temporary, **method preserved** | **no**                                             |
+| `308`  | Permanent, **method preserved** | **no**                                             |
+
+**Why the fallback is not universal.** An HTML meta-refresh is a _client-side_ redirect: the browser
+fetches the source, then navigates. That is a fair stand-in for a 301 on a host that ignores
+`_redirects`, and a misrepresentation of a 307 or 308, which exist precisely to preserve the request
+method and body — a meta-refresh silently converts a POST into a GET. A canonical link is likewise
+correct only for 301: on a temporary redirect it asserts the permanence the status denies, so 302
+and 303 get `noindex` instead.
+
+**A rewrite is not status 200.** It serves the destination's content _at_ the source URL, with no
+redirect at all; the `200` that reaches `_redirects` is the host's convention for saying so. It is
+written `{ "destination": …, "rewrite": true }`, and it gets **no** HTML file — a file at the source
+URL shadows the rewrite on hosts that honour `_redirects` and turns it into a redirect on the hosts
+that do not, which is wrong in both directions.
 
 ### 11.4 Studio Redirect Editor
 
@@ -1531,11 +1734,21 @@ Static assets are emitted per component, with page styles inlined:
 
 ## 13. Internationalization
 
-> **Status: Pending.** `project-schema.json` declares the `i18n` object, so a `project.json` may
-> carry `defaultLocale`, `locales` and `routing` and will validate — and **nothing reads any of
-> them.** No router, no build step and no Studio surface consults the key. A locale-prefixed
-> directory works today only because `pages/en/about.json` is an ordinary route that happens to
-> begin with `en`; none of the behaviour this section specifies follows from the config.
+> **Status: Partial.** §13.1–§13.5 and §13.7 ship: tags are validated and canonicalized, a route's
+> prefix decides its locale, a `{locale}` collection source expands over the declared locales, each
+> page carries the `lang` and `dir` that follow, and translations advertise one another in `<head>`
+> and in the sitemap. §13.6 is the only part that is not whole, and it is bounded rather than
+> unbuilt: a site with `build.adapter` set negotiates `Accept-Language`, and adapter-less static
+> output has no request to negotiate against.
+>
+> This marker previously said negotiation was absent and `{locale}` collections unread. Both had
+> shipped — §13.6 and §13.3 each said so — so the parent contradicted two of its own subsections.
+> A summary marker that restates what its children already record is a second source of truth, and
+> this one drifted; it now names the boundary and defers the rest to the sections that own it.
+>
+> **Jx is not a translation system**, and this section will not become one. There is no message
+> catalogue, no `t()` and no fallback chain. A locale is a property of a _route_; what the route
+> serves is whatever the author put in that directory.
 
 ### 13.1 Locale-Based Routing
 
@@ -1574,6 +1787,36 @@ pages/
 - `/fr/about` → French
 - `/de/about` → German
 
+**Tags are BCP 47 and a malformed one is a build error.** `en_US`, `en--US` and `e` are rejected by
+the RFC 5646 grammar; `EN-us` is accepted and canonicalized to `en-US`. That case matters, because
+the same tag is compared as a string in a route table, written into `<html lang>` and later into an
+`hreflang` attribute — so there is one spelling of it, applied everywhere.
+
+The check is **well-formedness, not registry membership**: `zz` and `xx-YY` are well-formed tags for
+languages that do not exist, and Jx does not ship a copy of the IANA registry to say otherwise.
+
+**Matching is on the first path segment, compared canonically.** A project declaring `fr-ca` is
+served from `pages/fr-ca/`; `pages/fr/` does **not** match it. Silently that would be invisible —
+every page under it would become the default locale and claim the wrong language — so a directory
+naming the _primary language_ of a declared locale is a build warning that names both spellings.
+The warning is scoped that narrowly on purpose: any two-to-eight-letter segment is a well-formed
+language tag, so warning on "looks like a tag" would fire on `/docs/` and `/api/`.
+
+A `defaultLocale` absent from `locales` joins the list rather than being rejected — the pages under
+it exist either way, and no reading of that config is the one the author meant.
+
+**`prefix-always` is checked.** The mode is a promise that every URL names its language, and a page
+outside the locale tree breaks it silently: it builds, it serves, and `localeOfRoute` calls it the
+default locale — so a site that declared "no unprefixed URLs" ships them anyway, and the only reader
+who finds out is a visitor who lands on one and sees the wrong language with no way to switch. The
+build now names every such route, once, with the whole list.
+
+It is a warning rather than an error, because the author may mean it — a landing page with no
+translations, a machine-readable endpoint — and failing a build over a page that works would be the
+compiler overruling a decision it cannot see the reason for. `/` is never reported: under
+`prefix-always` the site root is the one URL that exists to send a visitor somewhere else, and
+§13.6 is what it is for.
+
 ### 13.3 Content Localization
 
 Content collections can be organized by locale:
@@ -1600,9 +1843,196 @@ The collection config can specify locale awareness:
 }
 ```
 
+> **Status: Implemented.** `extensions/parser/src/content-loader.ts` expands `{locale}` over the
+> declared locales, stamps each entry with the locale its directory named, and scopes route
+> expansion to it.
+
+**One content type, N directories — not N content types.** That distinction is what keeps a
+translated post the same post: it keeps one schema, one set of relationship targets, and one name in
+`$paths`, and differs only in which directory it was read from.
+
+Each entry carries the locale it was loaded for in `_meta.locale`, and that is load-bearing rather
+than informational. **Two translations of one post share an id** — `blog/en/hello.md` and
+`blog/fr/hello.md` are both `hello` — so a `[slug]` route expanding the whole collection would emit
+each URL twice and let the second overwrite the first. The route's own locale prefix scopes the
+expansion, so `/fr/blog/:slug` expands the French entries and no others. A collection whose entries
+carry no locale is untouched by this, whatever the route's locale happens to be.
+
+Asset mounts expand with the source: each locale directory publishes at `/content/<type>/<locale>`,
+so a French post's `./hero.png` and its English translation's cannot collide at one URL.
+
+A `{locale}` source in a project that declares no `i18n` locales loads nothing, with a warning
+naming the reason — there is no list to expand over, and reading the path literally is what made the
+old behavior invisible.
+
+### 13.4 Language and Direction on the Page
+
+> **Status: Implemented.** `i18n.ts` and `locale.ts`, applied through `injectHead` and
+> `injectContext`.
+
+Every page carries the language its route implies:
+
+| The page has             | `<html lang>` is           |
+| ------------------------ | -------------------------- |
+| its own `$lang`          | that tag                   |
+| a declared locale prefix | that locale, canonicalized |
+| neither                  | `defaults.lang`, else `en` |
+
+An explicit `$lang` wins over the route because a page really can be a French translation living at
+`/en/a-propos/`, and an author who writes that down means it. Note what §13.4 does **not** claim:
+`prefix-always` is accepted and canonicalized by §13.2, but nothing enforces it — a page outside the
+locale tree still builds and is served as the default locale. Enforcement belongs with the routing
+work in §13.2, not here.
+
+**`dir` is derived, and only appears when it is not the default.** The direction comes from the
+_script_, obtained by maximizing the tag through CLDR likely-subtags (UTS #35) and testing it
+against the ISO 15924 right-to-left set (UAX #9). It is deliberately not `Intl.Locale`'s own
+`getTextInfo()`, which answers from the language's CLDR entry and gets two ordinary cases wrong:
+`dv` (Dhivehi, written in Thaana) where an ICU build lacks its data, and `az-Arab` — Azerbaijani
+deliberately written in the Arabic script — because that language's default script is Latin. Both
+are right-to-left.
+
+`dir="ltr"` is never written. It is HTML's default for every element, so emitting it on every page
+of a left-to-right site is noise that carries no information. An explicit `$dir` or `defaults.dir`
+is emitted verbatim, including `auto`.
+
+**The locale is readable from a template** as `$page.locale`, with `$page.dir` beside it, and the
+project's list as `$site.locales` / `$site.defaultLocale`. It lives on `$page` rather than as a
+top-level `$locale` because that is what it is — a property of the route, not a third ambient
+namespace beside `$site` and `$page` — and because `$page.locale` is the _resolved_ answer, after a
+document's own `$lang` has had its say, rather than the prefix.
+
+### 13.5 Alternate Discovery
+
+> **Status: Implemented.** `localeAlternates()` in `i18n.ts`, emitted through `mergeHead` and
+> `generateSitemap`.
+
+A translated site that does not say so is three unrelated sites to anything but a reader. Each page
+in a translation set therefore advertises the whole set, in `<head>`:
+
+```html
+<link href="https://example.com/about/" hreflang="en" rel="alternate" />
+<link href="https://example.com/fr-ca/about/" hreflang="fr-CA" rel="alternate" />
+<link href="https://example.com/about/" hreflang="x-default" rel="alternate" />
+```
+
+and again as `xhtml:link` inside the page's `<url>` entry in `sitemap.xml`, under a
+`xmlns:xhtml` declaration the document carries only when some entry uses it.
+
+**A translation set is a directory layout.** Two routes are translations when they share a path
+with the locale prefix removed: `/fr-ca/about/` and `/about/` share `about`. Nothing else could
+establish it — Jx has no translation metadata and no per-page id to join on — and this is the
+limitation to state plainly: **a localized slug is not recognized.** `/fr-ca/a-propos/` is a
+different page from `/about/`, and no annotation connects them.
+
+Four rules follow from what the annotation means rather than from convenience:
+
+- **Every member lists every member, itself included.** That reciprocity is the specified
+  behaviour and the thing validators check for.
+- **A page with no translations gets nothing.** A lone `hreflang` pointing at itself is noise; the
+  annotation describes a set.
+- **`x-default` names the default locale's URL**, and is omitted when the set has no default-locale
+  member — inventing one would advertise a URL that does not exist.
+- **A duplicate locale within a set is dropped rather than emitted twice.** Two routes claiming one
+  translation is a contradiction, and a single-valued annotation is the better failure.
+
+An author-supplied alternate for the same `hreflang` wins, like every other auto-injected entry
+(§8.4). This whole section depends on the §8.3 dedup key: these links share `rel="alternate"` and
+differ only in `hreflang`, and `x-default` conventionally shares its `href` with the default
+locale's entry, so a key of `rel` + `href` alone collapsed the set into one link.
+
+**Negotiation is not this.** Discovery tells a crawler the set exists; §13.6 is what sends a
+visitor to their own language.
+
+### 13.6 Locale Negotiation
+
+> **Status: Partial.** `locale-negotiation.ts` implements RFC 4647 Lookup and emits it into the
+> generated worker, so a site with `build.adapter` set negotiates. Adapter-less static output
+> cannot, permanently — see below.
+
+**Which deployments can negotiate, and which cannot.** Negotiation needs a request, and adapter-less
+static output has no runtime that sees one: `dist/` is files, and the preview server is a pure file
+mapper. That is a property of the output shape, not missing work, and it is stated here rather than
+tracked as a gap so nobody sets out to close it. A site with `build.adapter` set gets a generated
+worker, the worker sees the request, and negotiation runs there.
+
+**The bare `/` only.** A visitor who asked for `/fr/about/` has expressed a preference far stronger
+than a header, and overriding it would make a shared link mean different things to different people.
+Under `prefix-except-default` the default locale owns `/`, so a negotiation landing there continues
+down the ordinary chain rather than redirecting to itself; under `prefix-always` nothing lives at
+`/` and the redirect is what makes the root work at all. The implementation is middleware for
+exactly that reason: one of its two outcomes is "carry on".
+
+**The algorithm is RFC 4647 Lookup, not Filtering.** Filtering returns every matching tag, which is
+right for a content-negotiation menu and wrong for "which page do I send this person to". Lookup
+truncates progressively — `de-CH-1901`, then `de-CH`, then `de` — dropping a single-character
+subtag together with the one before it, since a lone `u` or `x` is an extension singleton and never
+a tag. Ranges are ordered by RFC 9110 §12.5.4 quality; `q=0` is a **refusal** and the range is
+dropped rather than ranked last. `*` selects the site's own default. The answer is always one of
+the declared locales.
+
+**`Vary: Accept-Language` is emitted on every `/` response**, redirect or not, and it is not
+optional. Without it any cache in front of the site stores the first visitor's answer and serves it
+to everyone — a site stuck in one language for every later reader, and invisible to the author,
+whose own browser was that first visitor. The redirect is **302**: its target depends on the
+request, so a permanent status would let a cache pin one reader's language for all of them. A
+`Content-Language` names the choice that was made.
+
+**Never from an IP address.** Where someone is has never been what they read.
+
 ---
 
+### 13.7 Formatting Numbers, Dates and Text
+
+> **Status: Implemented.**
+
+A document formats through **blessed `Intl` helpers**, listed once in `packages/schema/src/intl.ts`
+and read by the runtime interpreter, the compiler's emitter and the `call` operator's JSON-Schema
+description. The list lived in those places separately before, and the schema description — a prose
+sentence naming three helpers, checked by nothing — is what made a single source necessary.
+
+| Helper                    | Wraps                     | For                                                  |
+| ------------------------- | ------------------------- | ---------------------------------------------------- |
+| `Intl/formatNumber`       | `Intl.NumberFormat`       | grouping, decimals, currency, percent, units         |
+| `Intl/formatDate`         | `Intl.DateTimeFormat`     | dates and times                                      |
+| `Intl/formatRelativeTime` | `Intl.RelativeTimeFormat` | "3 days ago"                                         |
+| `Intl/formatList`         | `Intl.ListFormat`         | "a, b, and c", rather than a hand-written comma join |
+| `Intl/plural`             | `Intl.PluralRules`        | which plural form a number takes                     |
+| `Intl/compare`            | `Intl.Collator`           | sorting strings                                      |
+| `Intl/displayName`        | `Intl.DisplayNames`       | the name of a language, region, script or currency   |
+| `Intl/segment`            | `Intl.Segmenter`          | graphemes, words and sentences                       |
+
+**They are helpers because ECMA-402's formatters are constructors.** `new` is not in the expression
+grammar and should not be; each helper wraps construct-then-format, which is the shape an author
+wants anyway.
+
+**A helper that is given no locale uses `en-US`, and `Intl/formatDate` with no `timeZone` uses
+`UTC`.** Not the host's, in either case. `new Intl.NumberFormat(undefined)` reads the build
+machine's locale, so the same document emits `1,234.5` on one machine and `1.234,5` on another and a
+site's output stops being a function of its input. The time zone is the worse of the two: a locale
+changes how a date reads, a zone can change **which day it is** — `2026-08-16T02:00Z` is the 16th in
+UTC and the 15th in New York.
+
+**`compare` is the one worth saying out loud.** `<` and `Array.sort()` order by UTF-16 code unit,
+which puts `Zebra` before `apple` and sorts every accented word after `z`. A sorted list built any
+other way is wrong in every language with an accent.
+
+**`DurationFormat` is deliberately absent.** Its baseline support is not universal, and a blessed
+global that throws on a browser Jx claims to support is worse than one that does not exist: the
+author writes a formula that works on their machine and fails on a visitor's.
+
+**What is not built.** A project's `i18n.defaultLocale` is not substituted into a helper call that
+omits one — the fixed default is what runs. Wiring the project's locale through would mean threading
+compile options into every expression call site, and the determinism the fixed default buys is the
+part that mattered; a project-locale default is an improvement on top of a correct baseline rather
+than a fix for a broken one. There is no `i18n.timeZone` key for the same reason: an unread config
+key is the exact defect §13.2 records `i18n` itself having had for months.
+
 ## 14. Deployment
+
+> **Status: Partial.** The adapters, their worker output and the response-header file all ship.
+> What does not is `vercel.json`, which is deliberate — there is no Vercel adapter, and the file
+> belongs at the repository root rather than inside `build.outDir` (Appendix C).
 
 ### 14.1 Output Targets
 
@@ -1677,13 +2107,195 @@ dist/
 ├── sitemap.xml                  # Auto-generated from the route table (when url is set)
 ├── robots.txt                   # From public/, with a Sitemap: line appended
 ├── favicon.svg                  # Copied from public/
+├── _headers                     # Response headers (§14.3)
 ├── _redirects                   # Platform-specific
+├── .nojekyll                    # Stops GitHub Pages' Jekyll eating every _-prefixed path
 └── worker.js                    # Server worker (whenever adapter is set; on cloudflare-pages it is
                                  # named _worker.js, paired with _routes.json, and skipped entirely
                                  # when there are no server entries and no active mounts)
 ```
 
 Page and layout styles are inlined into each page's `<style>` block — there is no site-wide bundled stylesheet and no hashed `_assets/` directory. Pages reference the components they use via `<link rel="stylesheet" href="/components/<tag>.css">` and `<script type="module" src="/components/<tag>.js">` (the script is omitted for fully static components).
+
+---
+
+### 14.3 Response Headers (`_headers`)
+
+Cacheability is something only the build can decide: it chose the filenames, so it is the only party
+that knows which of them embed a content hash. Left unsaid, every host applies its own default to
+output whose lifetime it cannot see. The build therefore writes `dist/_headers`.
+
+```
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  X-Frame-Options: SAMEORIGIN
+  Cache-Control: public, max-age=0, must-revalidate
+
+/images/_optimized/*
+  Cache-Control: public, max-age=31536000, immutable
+```
+
+Two cache rules, and the reasoning is the whole design.
+
+- **`/*` revalidates.** HTML at `/about/`, `/components/*.js`, `/assets/*.js`, `sitemap.xml` — none
+  of their URLs change when their content does, so the only correct default is to check. The ETag
+  makes checking cheap.
+- **`/images/_optimized/*` is immutable** (RFC 8246). It is the one content-addressed output: the
+  filename embeds a digest of the source bytes, so a changed image is a changed URL.
+- **`/components/*` and `/assets/*` are deliberately excluded**, and a test asserts it. They are
+  named after the tag or specifier they contain, so editing a component reuses the URL. Marking
+  either immutable is a year-long cache-poisoning bug visible only to visitors who came before the
+  edit. Content-hashing those filenames is the prerequisite, not a config flag.
+
+**Ordering.** The file is written _after_ the `public/` copy, like the `robots.txt` edit — but it
+**prepends** rather than appends. On both Cloudflare Pages and Netlify a later matching rule wins
+for a duplicate header name, so a hand-authored `public/_headers` has to come last to override, and
+it is concatenated verbatim below a banner. It is not merged structurally: both platforms carry
+removal (`! Header-Name`) and conditional (`Language=`, `Country=`) extensions that a parser would
+silently drop.
+
+**Configuration** lives under `build.headers` — `enabled`, `cache` (`"auto"` or `"off"`),
+`security.{contentTypeOptions, frameOptions, referrerPolicy, permissionsPolicy, hsts, csp}`, and
+`rules` for verbatim stanzas. **HSTS is off by default**: a wrong `max-age` locks an apex domain to
+HTTPS for that long and the mistake is invisible until a certificate lapses. `preload` without
+`includeSubDomains` is a build error, because the preload list will not accept the header without it
+and emitting one anyway produces something that looks submitted and is not.
+
+#### 14.3.1 Content-Security-Policy
+
+> **Status: Implemented.** `csp.ts`, emitted through `buildHeaderRules`. Off by default.
+
+A static site cannot use nonces — a nonce must be fresh per response, and these responses are files
+— so hashes are the only route to a strict `script-src`. That works here because the inline scripts
+Jx emits are **constants**: the colour-scheme pre-paint script is one fixed IIFE, and the import map
+is the same object on every page of a build. A handful of hashes covers a whole site, which is what
+makes the policy fit in the `/*` stanza; a per-page policy would exhaust Cloudflare Pages' ~100-rule
+budget on any real site.
+
+Sources are collected by **scanning finished HTML** — the exact bytes about to be written — rather
+than by asking each emission site what it emitted. Seven places can put a `<script>` on a page, and
+a hash that does not match the shipped bytes is worse than no policy at all.
+
+The emitted policy for a site with no third-party content:
+
+```
+Content-Security-Policy: base-uri 'self'; default-src 'self'; font-src 'self'; form-action 'self';
+  frame-ancestors 'self'; frame-src 'self'; img-src 'self' data:; object-src 'none';
+  script-src 'self' 'sha256-…' 'sha256-…'; style-src 'self' 'unsafe-inline'
+```
+
+Four decisions in that line:
+
+- **`script-src` is strict.** Compiled output contains no `eval` and no `new Function` (a committed
+  test asserts it), and event handlers are bound as listeners rather than emitted as `onclick=`
+  attributes — so there is nothing for `'unsafe-inline'` or `'unsafe-eval'` to be needed for. Since
+  §12 the runtime is same-origin too, so `'self'` plus the constant hashes is the whole directive.
+- **`style-src` keeps `'unsafe-inline'`, and this is a divergence, not an oversight.** Every page
+  carries a generated `<style>` block whose content is per-page, so hashing them would put one hash
+  per page into a site-wide header; per-element `style=` attributes have no hash form at all. The
+  two cannot be half-done: a hash and `'unsafe-inline'` in the same directive cancel, so a partial
+  set of hashes would turn working pages blank. Hoisting inline attributes into the generated
+  stylesheet is the reachable end state and is not this section's work.
+- **A data block is never hashed.** `<script type="application/ld+json">` is not executed, CSP does
+  not check it, and a hash for it would authorize nothing.
+- **`frame-ancestors` is `'self'`**, matching the `X-Frame-Options: SAMEORIGIN` emitted beside it.
+  Two headers disagreeing about framing is a worse outcome than either answer alone.
+
+**Off by default**, unlike every other header in this section. Those describe the response; this one
+governs code the build cannot see — a third-party script that loads a second script, a widget that
+opens a frame. `csp: true` enforces, `"report-only"` observes, and an object form takes `mode`,
+`reportUri` (which emits `report-to`, `report-uri` **and** the `Reporting-Endpoints` header the
+first of those requires) and `directives` for wholesale replacement or removal of any computed
+directive.
+
+**Per adapter.** Cloudflare Pages, Cloudflare Workers assets and Netlify read the file. The `node`
+and `bun` adapters serve no static assets at all, so for them it is documentation of what a reverse
+proxy must send — the build says so with a warning rather than skipping the file.
+
+### 14.4 `.nojekyll`
+
+Written unconditionally. GitHub Pages runs Jekyll, which excludes every `_`-prefixed path — which is
+`_headers`, `_redirects`, `_worker.js`, `_routes.json` and `_islands/`. One empty file closes the
+whole class of "works locally, half-broken on Pages", which is why it is not an adapter option.
+
+### 14.5 Installability and Disclosure Output
+
+> **Status: Implemented.** `well-known.ts`, written after the `public/` copy in step 7d.1.
+
+Two files a site is expected to publish and nothing generated. Both are pure functions of
+`project.json` plus what the build already knows, which is the argument for generating them rather
+than leaving them in `public/`: an author copying either between projects also copies the values
+that were right for the other one.
+
+**`manifest.webmanifest`** (W3C Web App Manifest) is emitted when the `manifest` section is present
+— absence means no manifest, because a manifest is a claim that a site is meant to be installed and
+most are not. `name` falls back to the project's own and `start_url` to `/`; camelCase config maps
+onto the standard's `snake_case` keys, and a key the project did not set is absent rather than
+null. `<link rel="manifest">` and, when a theme colour is set, `<meta name="theme-color">` join the
+site-level `$head` below the author's own entries.
+
+Icons at 192px and 512px are the installability criterion, and their absence is a **warning**, not
+an error: the manifest is still valid and still supplies the name and colour a browser shows, so
+refusing to emit it would be a worse trade than saying so.
+
+**`.well-known/security.txt`** (RFC 9116) is emitted when `securityTxt` is present. `.well-known`
+only — §3 makes it canonical, and a second copy at the root is a second thing to forget to update.
+`preferredLanguages` runs through the same BCP 47 canonicalization as `i18n.locales` (§13.2): one
+implementation for the repo.
+
+**`Expires` is required and a past value is a build error.** §2.5.5 requires it, it is the field
+everyone forgets, and an expired file is worse than a missing one — it advertises a reporting
+channel while telling the reporter not to trust what it says. A missing `Contact` (§2.5.3) fails for
+the same reason.
+
+**Clearsigning is not implemented** and does not need to be. It requires a private key at build
+time, which a build cannot have; a hand-placed `public/.well-known/security.txt` is copied before
+this step and is kept rather than overwritten, so shipping a signed file costs zero code. The same
+shadowing applies to the manifest.
+
+### 14.6 Service Worker
+
+> **Status: Implemented.** `service-worker.ts`, written in step 7d.2. **Off by default.**
+
+A service worker is unlike every other output in this section: it is **sticky**. It survives
+redeploys, it keeps running against a site that has moved on, and the visitors it breaks are
+precisely the ones who came back. Nothing else the build emits can do that, which is why it is off
+by default and why most of the contract below is about getting rid of one.
+
+**`serviceWorker: false` is not the same as omitting the key**, and this is the load-bearing
+distinction. Absence means "never had one" and emits nothing. `false` means "had one, remove it"
+and emits a **tombstone** at the same URL: a worker whose only job is to unregister itself, delete
+every cache it made, and reload its clients onto the live site. Deleting the file instead would
+leave every previous visitor running the old worker forever — a 404 at that URL is not an
+instruction to stop, and there is no other channel to reach them through.
+
+**HTML is always network-first.** The cache is a fallback for a failed request, never a substitute
+for one. A cache-first worker serves a stale page indefinitely and the author's next deploy cannot
+reach the visitor to fix it. The single exception is `/images/_optimized/*`, which is the build's
+only content-addressed output (§14.3) — its filename embeds a digest, so a cached hit can never be
+wrong. `/components/*` and `/assets/*` are deliberately **not** cache-first for the same reason
+they are not `immutable`: they are named after what they contain, not after their content.
+
+**A precache URL that this build did not produce is a build error.** `cache.addAll()` is
+all-or-nothing, so one unreachable entry rejects the install and the worker never activates — with
+no error anywhere the author would look. The symptom is "the service worker does nothing", which is
+how it presented the first time this was run against a browser. The emitted worker also fetches
+precache entries individually rather than through `addAll()`, covering what the build cannot see.
+
+An `offlineFallback` is added to `precache` if it is not already there, with a warning: a page that
+was never cached cannot be served when the network is gone, which is the only moment it exists for.
+
+**The cache name rotates on a configuration change, not on every build.** HTML is network-first and
+images are content-addressed, so a content-only deploy needs no rotation, and rotating anyway would
+discard a warm cache on every deploy for nothing.
+
+The registration script is inline, byte-identical on every page, and therefore one hash in a strict
+`script-src` (§14.3.1). It registers on `load` rather than immediately — a worker competing with
+the page's own resources makes the first visit slower, and that is the visit that matters. It is
+emitted only when a worker exists: registering a tombstone from the page trying to shed it would be
+self-defeating.
 
 ---
 
@@ -1730,6 +2342,38 @@ The tier does not change the shape of publishing. There is no `jx deploy` comman
 Locally, `jx dev` (server.md) stands in for the worker: it dispatches to the same mount handlers directly, merges `.dev.vars` over `process.env` when constructing mount environments, and substitutes a local SQLite file for any connector declaring `local: "sqlite"`. That stand-in is narrow: of the shipped connectors only Cloudflare D1 declares it, so a D1-backed project's auth and data run entirely on the machine, while a connection to a hosted service (Supabase, say) needs the real endpoint reachable and its `urlEnv` set in `.dev.vars`.
 
 ---
+
+## 16. Standards Alignment
+
+External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md). Feed generation is not cited: no numbered section owes it yet, and it is tracked as a roadmap item in Appendix C.
+
+| Standard                                                                                  | Class         | Binds             | Evidence                                                                                                                                                                             | Note                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ----------------------------------------------------------------------------------------- | ------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [RFC 4287](https://www.rfc-editor.org/rfc/rfc4287)                                        | **Subset**    | §6.7              | extensions/feed/src/atom.ts, extensions/feed/tests/feed.test.ts                                                                                                                      | Feed and entry documents carry the required `id`, `title` and `updated`, plus `self` and `alternate` links. Not implemented: `<category>`, `<contributor>`, `<rights>`, and Atom's own paging — RFC 5005 covers the last of those.                                                                                                                                                                                                                                                                                                                                                                                  |
+| [JSON Feed 1.1](https://www.jsonfeed.org/version/1.1/)                                    | **Subset**    | §6.7              | extensions/feed/src/json-feed.ts, extensions/feed/tests/feed.test.ts                                                                                                                 | Feed identity, `language`, and per-item content, dates and authors. Attachments, tags, `banner_image` and hubs are not emitted; `next_url` is available but archives are offered in Atom alone rather than mixing two pagination conventions in one feed.                                                                                                                                                                                                                                                                                                                                                           |
+| [RFC 5005](https://www.rfc-editor.org/rfc/rfc5005)                                        | **Subset**    | §6.7              | extensions/feed/src/feed.ts, extensions/feed/tests/feed.test.ts                                                                                                                      | The archived-feeds flavour (§2) plus `<fh:complete/>` (§4), which is the one designed for static hosting. Paged feeds (§3) are not offered: they are explicitly unstable for subscription, which is the only thing a static site publishes.                                                                                                                                                                                                                                                                                                                                                                         |
+| [RFC 9309](https://www.rfc-editor.org/rfc/rfc9309)                                        | **Adopted**   | §8.4.1            | packages/compiler/src/site/site-build.ts                                                                                                                                             | A minimal `robots.txt` is created when none was provided, and an existing one is appended to rather than replaced. The `Sitemap:` line the build adds is a sitemaps.org extension, not part of this standard.                                                                                                                                                                                                                                                                                                                                                                                                       |
+| [Sitemaps 0.9](https://www.sitemaps.org/protocol.html)                                    | **Subset**    | §8.4.1, §13.5     | packages/compiler/src/site/site-build.ts, packages/compiler/src/site/pages-discovery.ts, packages/compiler/tests/sitemap-lastmod.test.ts                                             | `<loc>`, a full RFC 3339 `<lastmod>` — taken from the content entry a generated route came from, not from the template that rendered it — and `xhtml:link` alternates for translated pages. Absent: `<changefreq>` and `<priority>`, both advisory and widely ignored, and the sitemap index, which is for sites past the 50,000-URL limit.                                                                                                                                                                                                                                                                         |
+| [WHATWG URLPattern](https://urlpattern.spec.whatwg.org/)                                  | **Subset**    | §11.1             | packages/compiler/src/site/site-build.ts                                                                                                                                             | Pattern strings are passed through to `_redirects` verbatim; the compiler neither parses nor validates them, so a malformed pattern is a deploy-time failure rather than a build-time one.                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110)                                        | **Subset**    | §11.3, §13.6      | packages/compiler/src/site/site-build.ts, packages/compiler/src/site/locale-negotiation.ts                                                                                           | All five §15.4 redirection statuses are accepted and validated — 301, 302, 303, 307 and 308 — so a redirect can preserve a request method. A rewrite is modelled as `{destination, rewrite: true}` rather than as status `200`, which was never a redirection status but the host's own convention for serving another URL's content in place. Not implemented: content negotiation, `Retry-After` on 503, or any conditional-request handling — a static host owns those. Also §12.5.4 `Accept-Language`, parsed for locale negotiation: quality order, and `q=0` read as a refusal rather than a weak preference. |
+| [RFC 8288](https://www.rfc-editor.org/rfc/rfc8288)                                        | **Subset**    | §8.1, §8.3, §13.5 | packages/compiler/src/site/head-merger.ts, packages/compiler/src/site/link-relations.ts, packages/compiler/tests/head-merger.test.ts, packages/compiler/tests/link-relations.test.ts | Link identity accounts for the target attributes — `rel`, `href`, and whichever of `hreflang`, `type`, `media` or `sizes` distinguishes two links sharing the first two. That is what lets a set of `alternate` links coexist. Relation types are checked against a snapshot of the IANA registry, with RFC 8288 §2.1.2 extension URIs accepted; unregistered values warn once per build. Absent: the header form of `Link:` — Jx expresses every relation in HTML.                                                                                                                                                 |
+| [JSON-LD 1.1](https://www.w3.org/TR/json-ld11/)                                           | **Subset**    | §8.5              | packages/compiler/src/site/head-merger.ts, packages/compiler/tests/head-merger.test.ts                                                                                               | An object `textContent` is serialized into the tag and templates inside it resolve, so a document can carry structured data that references itself. Jx does not process the JSON-LD — no context expansion, no compaction, no framing; it is emitted for the consumer to interpret.                                                                                                                                                                                                                                                                                                                                 |
+| [BCP 47](https://www.rfc-editor.org/info/bcp47)                                           | **Subset**    | §13.2, §13.4      | packages/schema/src/locale.ts, packages/schema/tests/locale.test.ts, packages/compiler/src/site/i18n.ts                                                                              | Tags are parsed against the RFC 5646 grammar and canonicalized (`EN-us` → `en-US`) through `Intl.Locale`; a malformed tag fails the build. Well-formedness only — the IANA registry is not consulted, so `zz` and `xx-YY` are accepted for languages that do not exist.                                                                                                                                                                                                                                                                                                                                             |
+| [RFC 4647](https://www.rfc-editor.org/rfc/rfc4647)                                        | **Subset**    | §13.6             | packages/compiler/src/site/locale-negotiation.ts, packages/compiler/tests/locale-negotiation.test.ts, packages/compiler/tests/locale-worker.test.ts                                  | §3.4 Lookup, run against `i18n.locales` in the generated worker: progressive truncation, singleton subtags removed with their parent, RFC 9110 §12.5.4 quality order, `q=0` honoured as a refusal. Absent: §3.3 Filtering, which returns a set and cannot answer "which page". Adapter-less static output negotiates nothing and permanently cannot — there is no runtime that sees a request (§13.6).                                                                                                                                                                                                              |
+| [ECMA-402](https://ecma-international.org/publications-and-standards/standards/ecma-402/) | **Subset**    | §13.4, §13.7      | packages/schema/src/intl.ts, packages/schema/src/locale.ts, packages/schema/tests/intl.test.ts, packages/runtime/tests/expression.test.ts                                            | `Intl.Locale` supplies tag parsing, canonical case and likely-subtags maximization. The formatting half is now reachable from a document: eight blessed helpers wrap the ECMA-402 constructors as pure calls, and each defaults to a **fixed** locale and time zone rather than the host's, so a build's output is a function of its input. `DurationFormat` is deliberately not offered — its baseline support is not universal, and a blessed global that throws on a supported browser is worse than its absence.                                                                                                |
+| [RFC 9111](https://www.rfc-editor.org/rfc/rfc9111)                                        | **Adopted**   | §14.3             | packages/compiler/src/site/headers-emitter.ts, packages/compiler/tests/headers-emitter.test.ts                                                                                       | Every output declares its cacheability: `must-revalidate` for anything whose URL does not change with its content, and a year for the one output whose URL does.                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| [RFC 8246](https://www.rfc-editor.org/rfc/rfc8246)                                        | **Adopted**   | §14.3             | packages/compiler/src/site/headers-emitter.ts, packages/compiler/tests/headers-emitter.test.ts                                                                                       | `immutable` is emitted for `/images/_optimized/*` alone. A test asserts no other path can acquire it, because every other filename is reused when its content changes.                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| [RFC 6797](https://www.rfc-editor.org/rfc/rfc6797)                                        | **Subset**    | §14.3             | packages/compiler/src/site/headers-emitter.ts                                                                                                                                        | Off by default and opt-in per project, with `max-age`, `includeSubDomains` and `preload`. `preload` without `includeSubDomains` is refused rather than emitted, since the preload list would reject it.                                                                                                                                                                                                                                                                                                                                                                                                             |
+| [Referrer Policy](https://www.w3.org/TR/referrer-policy/)                                 | **Adopted**   | §14.3             | packages/compiler/src/site/headers-emitter.ts                                                                                                                                        | `strict-origin-when-cross-origin` by default; any policy token from the standard, or `false` to omit the header.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| [Service Workers](https://www.w3.org/TR/service-workers/)                                 | **Subset**    | §14.6             | packages/compiler/src/site/service-worker.ts, packages/compiler/tests/service-worker.test.ts                                                                                         | Install/activate/fetch with a network-first strategy, precaching, an offline fallback, and a tombstone that unregisters a previously deployed worker. Not offered: push, background sync, periodic sync, or navigation preload — every one of them is a capability rather than a caching decision, and none is derivable from a static build's own output.                                                                                                                                                                                                                                                          |
+| [Web Application Manifest](https://www.w3.org/TR/appmanifest/)                            | **Subset**    | §14.5             | packages/compiler/src/site/well-known.ts, packages/compiler/tests/well-known.test.ts                                                                                                 | Identity, presentation and icons: `name`, `short_name`, `start_url`, `scope`, `display`, `orientation`, colours, `lang`/`dir`, `categories`. Not offered: `shortcuts`, `share_target`, `file_handlers`, `protocol_handlers`, `screenshots` and the other members that describe an app's integration with an OS rather than a site's identity.                                                                                                                                                                                                                                                                       |
+| [RFC 9116](https://www.rfc-editor.org/rfc/rfc9116)                                        | **Subset**    | §14.5             | packages/compiler/src/site/well-known.ts, packages/compiler/tests/well-known.test.ts                                                                                                 | Every field the standard defines, at the canonical `.well-known` location, with `Expires` (§2.5.5) and `Contact` (§2.5.3) enforced as build errors. Clearsigning (§2.3) is not implemented — it needs a private key at build time — but a hand-placed `public/.well-known/security.txt` shadows the generated file, which is how a signed one ships.                                                                                                                                                                                                                                                                |
+| [RFC 8615](https://www.rfc-editor.org/rfc/rfc8615)                                        | **Adopted**   | §14.5             | packages/compiler/src/site/well-known.ts                                                                                                                                             | The `/.well-known/` prefix is used as the registry defines it and nothing else is placed there.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| [WHATWG HTML](https://html.spec.whatwg.org/)                                              | **Subset**    | §9.2              | packages/compiler/src/site/image-transform.ts, packages/compiler/src/site/img-loading.ts, packages/compiler/tests/img-loading.test.ts                                                | Responsive images: `srcset` with `w` descriptors, `sizes`, `<picture>` with one `<source type>` per format, and the `loading`/`decoding`/`fetchpriority` interaction. Art direction is not offered — no `media` on a source, and no `x` descriptors — because both are per-image authoring decisions a build-time pass cannot infer.                                                                                                                                                                                                                                                                                |
+| [CSP Level 3](https://www.w3.org/TR/CSP3/)                                                | **Divergent** | §14.3.1           | packages/compiler/src/site/csp.ts, packages/compiler/tests/csp.test.ts, packages/compiler/tests/site-build.test.ts                                                                   | `script-src` is strict — `'self'` plus a hash per constant inline script, no `'unsafe-inline'` and no `'unsafe-eval'`, verified in a browser against a real build. `style-src` keeps `'unsafe-inline'`: per-page `<style>` blocks and per-element `style=` attributes have no site-wide hash, and a partial set would cancel the keyword and blank the page. Off by default, because a policy governs code the build cannot see.                                                                                                                                                                                    |
+| [UAX #9](https://www.unicode.org/reports/tr9/)                                            | **Subset**    | §13.4             | packages/schema/src/locale.ts, packages/schema/tests/locale.test.ts                                                                                                                  | The `<html dir>` half: a tag's script decides direction, tested against the ISO 15924 right-to-left set, and `dir` is emitted only when it is not the default. The algorithm itself — bidi resolution within a run of text — belongs to the browser; Jx neither implements nor overrides it, and emits no `bdi`, `bdo` or isolate controls of its own.                                                                                                                                                                                                                                                              |
+| [UTS #35](https://www.unicode.org/reports/tr35/)                                          | **Borrowed**  | §13.4             | packages/schema/src/locale.ts                                                                                                                                                        | CLDR likely-subtags, reached through `Intl.Locale.maximize()`, is what turns `dv` into `dv-Thaa-MV` and therefore what makes the direction answer right. No other CLDR data is consumed and none is bundled.                                                                                                                                                                                                                                                                                                                                                                                                        |
+| [Permissions Policy](https://www.w3.org/TR/permissions-policy/)                           | **Subset**    | §14.3             | packages/compiler/src/site/headers-emitter.ts                                                                                                                                        | A default deny-list for camera, microphone and geolocation is emitted, and the whole header is author-replaceable. The structured-field grammar is passed through rather than parsed.                                                                                                                                                                                                                                                                                                                                                                                                                               |
 
 ## Appendix: Element Annotations
 
@@ -1843,18 +2487,41 @@ This spec builds on existing Jx primitives wherever possible:
 - [x] Sitemap generation (`sitemap.xml` from route table; `<lastmod>`, `robots.txt` reference, `$sitemap: false` opt-out, `build.sitemap` toggle)
 - [ ] Incremental builds (dependency tracking, selective recompilation)
 - [x] Platform adapters — `build.adapter` for site-wide server bundling (Cloudflare implemented)
-- [ ] Platform-specific file generation (Netlify `_headers`, Vercel `vercel.json`, GitHub Pages `.nojekyll`)
+- [x] Platform-specific file generation — `_headers` (§14.3) and `.nojekyll` (§14.4). `vercel.json` is **declined**: there is no Vercel adapter, and the file belongs at the repository root rather than inside `build.outDir`.
 
 ### Phase 5: Advanced
 
 - [ ] Internationalization routing (locale prefix, default locale handling)
 - [ ] Content localization (per-locale content directories)
 - [ ] Pagination helpers
-- [ ] RSS/Atom feed generation (unblocked by the `emit` capability, extensions.md §8.4)
+- [x] Atom and JSON Feed generation — `@jxsuite/feed` (§6.7), via the `emit` and `head` capabilities (extensions.md §8.4, §8.6). RSS 2.0 is **declined**: no standards body, and every reader handles Atom.
 - [x] Search index generation — via the extension `emit` capability (extensions.md §8.4)
 
 ## Changelog
 
+- **0.5.13-draft** (2026-08-18) — §8.7: the subpath entry is bundled rather than externalised, and the shared core is reached through an emitted stub — a self-referential asset broke every page using a directive.
+- **0.5.12-draft** (2026-08-18) — §8.7: subpaths resolve through a prefix key and an npm $elements set bundles as one self-contained module.
+- **0.5.11-draft** (2026-08-18) — §8.7: bare specifiers resolve on page and layout too, npm-only pages get an import map, and the package-subpath gap is recorded.
+- **0.5.10-draft** (2026-08-18) — §13: correct a status marker that contradicted §13.3 and §13.6 — {locale} expansion and Accept-Language negotiation both ship.
+- **0.5.9-draft** (2026-08-16) — §13.7 blessed Intl helpers — one shared list, five new helpers, and a fixed en-US/UTC default so a build's output is a function of its input. Closes gap:locale-formatting.
+- **0.5.8-draft** (2026-08-16) — §13.3 {locale} sources expand and scope route expansion; §13.6 Accept-Language negotiation in the generated worker; prefix-always is checked; gap:locale-lookup closed.
+- **0.5.7-draft** (2026-08-16) — §8.4.1 a generated route's lastmod comes from the entry it was generated from; gap:sitemap-fields closed.
+- **0.5.6-draft** (2026-08-16) — §8.3 link relations are checked against the IANA registry, warning once per build; gap:link-relation-validation closed.
+- **0.5.5-draft** (2026-08-16) — §16: the RFC 9110 row states the five statuses B1 shipped instead of the two that predated it.
+- **0.5.4-draft** (2026-08-16) — Optional service worker with a tombstone contract: off by default, network-first HTML, precache validated against the build's own output (§14.6).
+- **0.5.3-draft** (2026-08-16) — Cascade layer 6 describes the scoping that exists — there is no shadow DOM.
+- **0.5.2-draft** (2026-08-15) — Generate manifest.webmanifest and .well-known/security.txt (§14.5).
+- **0.5.1-draft** (2026-08-15) — hreflang alternates in <head> and sitemap xhtml:link for translated pages (§13, §13.5).
+- **0.5.0-draft** (2026-08-15) — i18n: BCP 47 validation and canonicalization, route prefixes resolve to locales, per-page lang and script-derived dir, $page.locale (§13, §13.2, §13.4).
+- **0.4.1-draft** (2026-08-15) — Emit a Content-Security-Policy derived from the built pages: strict script-src from constant inline-script hashes, style-src divergence recorded (§14.3.1).
+- **0.4.0-draft** (2026-08-15) — Responsive images: <picture> per format, one owner for loading attributes, fetchpriority honoured, lazyLoad independent of optimize (§9.2, §9.2.7).
+- **0.3.3-draft** (2026-08-15) — $head bare specifiers copy into /assets/ and $elements bundle there; an unresolvable one is a build error (§8.7).
+- **0.3.2-draft** (2026-08-15) — §8.4.1 <lastmod> is a full RFC 3339 timestamp; the per-template lastmod wart is named rather than implied.
+- **0.3.1-draft** (2026-08-15) — Add §6.7 syndication feeds: Atom and JSON Feed via @jxsuite/feed, RFC 5005 archives, RSS declined.
+- **0.3.0-draft** (2026-08-15) — §8.3 link identity includes hreflang/type/media/sizes; §8.5 JSON-LD objects serialize; §8.4 lang and dir come from the page.
+- **0.2.1-draft** (2026-08-15) — Add §14.3 response headers and §14.4 .nojekyll; §14's header gap is closed and vercel.json is declined.
+- **0.2.0-draft** (2026-08-15) — §11.3 separates redirects from rewrites: an RFC 9110 status enum, a per-status HTML-fallback policy, and no file for a rewrite.
+- **0.1.45-draft** (2026-08-15) — Add §16 Standards Alignment; §8.5 marked Pending — the JSON-LD object form is unimplemented — and §14 Partial: no _headers or .nojekyll is emitted.
 - **0.1.44-draft** (2026-08-12) — Header status corrected from Pending to Partial — all seven marked sections were Implemented while the header claimed nothing was; §9.4's marker and its own Still-planned list contradicted each other (metadata and the delete warning ship; browsable usage does not); §12.3 and §13 marked Pending, having no dependency graph and no reader of the i18n config respectively.
 - **0.1.43-draft** (2026-08-11) — Studio SEO previews move from a Document Header disclosure into the Search appearance modal (document.openSeo), reachable from the card, the Page panel and the palette; fields grouped by the preview each feeds.
 - **0.1.42-draft** (2026-08-06) — §7.2 the Library and its window contract, §7.5 the CRUD table corrected — rename, delete and CSV editing already shipped and were listed Pending, §7.6 the draft pill, §8.6 merged-$head previews with no score, §9.4 usage keyed on the authored ref, §11.4 redirects as a GridSource with chain, loop and shadow validation.

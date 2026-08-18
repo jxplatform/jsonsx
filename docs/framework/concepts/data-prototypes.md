@@ -34,7 +34,7 @@ These resolve automatically, with no imports or `$src`, and each maps to a genui
 - `Request` — HTTP fetch with reactive URL parameters, debouncing, and manual mode.
 - `LocalStorage` — a persistent key-value entry that survives closing the browser.
 - `SessionStorage` — the same, scoped to the visit.
-- `Cookie` — a cookie with `maxAge`, `path`, `domain`, `secure`, and `sameSite`.
+- `Cookie` — a cookie with `maxAge`, `path`, `domain`, `secure`, and `sameSite`. Name it with the `__Host-` prefix and the rest is filled in for you: `Secure`, `Path=/`, and no `Domain`, which is what the browser requires of that name and refuses the cookie without. `SameSite: "none"` likewise implies `Secure`. There is no `expires` — `maxAge` is the one that wins wherever both appear — and no `HttpOnly`, which a cookie written by the page could never read back.
 - `IndexedDB` — a browser database store with indexes and CRUD helpers.
 - `FormData` — form fields assembled for submission.
 - `URLSearchParams` — a computed query string.

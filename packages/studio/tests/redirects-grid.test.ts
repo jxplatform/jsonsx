@@ -13,6 +13,7 @@ import { FakeTabulator, tabulatorMockModule } from "./tabulator-mock";
 import type { TemplateResult } from "lit-html";
 import type { StudioPlatform } from "../src/types";
 import type { GridEditBatch } from "../src/grid/grid-source";
+import type { RedirectRule } from "../src/grid/redirects";
 
 void mock.module("tabulator-tables", () => tabulatorMockModule);
 void mock.module("tabulator-tables/dist/css/tabulator.min.css", () => ({}));
@@ -120,7 +121,8 @@ describe("the source", () => {
     expect(columns.map((c) => c.field)).toEqual(["source", "destination", "status"]);
     expect(columns.every((c) => c.editable)).toBeTrue();
     expect(columns.some((c) => c.pk)).toBeFalse();
-    expect(columns[2]!.schema!.enum).toEqual(["301", "302", "307", "308", "200"]);
+    // A rewrite is its own target, not status 200 — see site-architecture.md §11.3.
+    expect(columns[2]!.schema!.enum).toEqual(["301", "302", "303", "307", "308", "rewrite"]);
     expect(await createRedirectsSource().columns()).toEqual(columns);
   });
 
@@ -373,7 +375,7 @@ describe("Problems", () => {
   const routes = { complete: true, routes: ["/about"] };
 
   test("each finding is a Problem naming its rule, keyed so a re-run replaces it", () => {
-    const rules = [
+    const rules: RedirectRule[] = [
       { destination: "/b", source: "/a", status: 301 },
       { destination: "/c", source: "/b", status: 301 },
       { destination: "/contact", source: "/about", status: 301 },

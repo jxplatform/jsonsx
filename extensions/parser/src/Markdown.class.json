@@ -9,7 +9,7 @@
 
   "format": {
     "extensions": [".md"],
-    "mediaType": "text/markdown",
+    "mediaType": "text/markdown; variant=GFM",
     "documentKinds": ["page", "component", "content"],
     "exportTarget": true,
     "remote": false

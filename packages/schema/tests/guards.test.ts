@@ -6,6 +6,7 @@ import {
   childrenContainArray,
   displayTagName,
   ensureNestedStyle,
+  isPrivateStateKey,
   getEventBinding,
   getNestedStyle,
   hasSchemaKeywords,
@@ -448,5 +449,30 @@ describe("the tag-name helpers", () => {
     expect(displayTagName(conditional)).toBe("a|div");
     expect(displayTagName("section")).toBe("section");
     expect(displayTagName(null)).toBe("");
+  });
+});
+
+describe("isPrivateStateKey", () => {
+  /*
+   * The §5.6 rule. Trivial as a predicate; it exists because it was spelled inline at three
+   * call sites and the props paths that must honour it live in two different tiers. A path that
+   * forgets it does not fail — it silently makes a private entry writable from outside.
+   */
+  test("a leading # marks a state entry private", () => {
+    expect(isPrivateStateKey("#cache")).toBe(true);
+    expect(isPrivateStateKey("#lastFetchTime")).toBe(true);
+  });
+
+  test("everything else is public", () => {
+    for (const key of ["count", "label", "_internal", "$map", "a#b", ""]) {
+      expect({ key, private: isPrivateStateKey(key) }).toEqual({ key, private: false });
+    }
+  });
+
+  /*
+   * Only the leading position: a hash inside a name is an ordinary character, as it is in a $ref.
+   */
+  test("a hash elsewhere in the name does not count", () => {
+    expect(isPrivateStateKey("colour#hex")).toBe(false);
   });
 });

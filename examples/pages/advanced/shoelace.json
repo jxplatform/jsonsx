@@ -11,13 +11,13 @@
     }
   ],
   "$elements": [
-    "@shoelace-style/shoelace/components/alert/alert.js",
-    "@shoelace-style/shoelace/components/button/button.js",
-    "@shoelace-style/shoelace/components/card/card.js",
-    "@shoelace-style/shoelace/components/icon/icon.js",
-    "@shoelace-style/shoelace/components/input/input.js",
-    "@shoelace-style/shoelace/components/textarea/textarea.js",
-    "@shoelace-style/shoelace/components/switch/switch.js"
+    "@shoelace-style/shoelace/dist/components/alert/alert.js",
+    "@shoelace-style/shoelace/dist/components/button/button.js",
+    "@shoelace-style/shoelace/dist/components/card/card.js",
+    "@shoelace-style/shoelace/dist/components/icon/icon.js",
+    "@shoelace-style/shoelace/dist/components/input/input.js",
+    "@shoelace-style/shoelace/dist/components/textarea/textarea.js",
+    "@shoelace-style/shoelace/dist/components/switch/switch.js"
   ],
   "children": [
     {

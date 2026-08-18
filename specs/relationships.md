@@ -2,9 +2,9 @@
 
 ## References Between Named Entries Across Extension Sections
 
-**Version:** 0.1.3-draft
+**Version:** 0.1.4-draft
 **Status:** Partial
-**Updated:** 2026-07-22
+**Updated:** 2026-08-15
 **License:** MIT
 
 Companion to [extensions.md](./extensions.md) §5/§9. Defines the standard
@@ -107,8 +107,18 @@ type:
 - Value editors for reference fields present entry pickers populated from
   the resolved section data (`#/$context/<sectionKey>` enumeration).
 
+## 6. Standards Alignment
+
+External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md).
+
+| Standard                                                            | Class        | Binds | Evidence                                                                                   | Note                                                                                                                                                                                                                 |
+| ------------------------------------------------------------------- | ------------ | ----- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [JSON Schema 2020-12](https://json-schema.org/draft/2020-12/schema) | **Adopted**  | §1    | packages/schema/defs/field-schema.schema.ts, packages/schema/tests/project-schemas.test.ts | Cardinality is expressed with the standard's own vocabulary — a bare `$ref` is to-one, `{"type":"array","items":{"$ref":…}}` is to-many — so a relationship needs no keyword the standard does not already have.     |
+| [RFC 6901](https://www.rfc-editor.org/rfc/rfc6901)                  | **Borrowed** | §1    | packages/schema/schemas/project.core.schema.json                                           | `#/<sectionKey>/<entryName>` takes JSON Pointer's shape and points into the resolved project sections rather than into the containing document, so it is not a pointer any conformant implementation could evaluate. |
+
 ## Changelog
 
+- **0.1.4-draft** (2026-08-15) — Add §6 Standards Alignment: JSON Schema 2020-12 for cardinality, and the JSON Pointer shape the reference form borrows.
 - **0.1.3-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.1.2-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
 - **0.1.1-draft** (2026-07-08) — Shipped schema fragments + per-project schema emitters (`9e4a8936`).
@@ -116,4 +126,4 @@ type:
 
 ---
 
-_Jx Relationships Specification v0.1.3-draft_
+_Jx Relationships Specification v0.1.4-draft_

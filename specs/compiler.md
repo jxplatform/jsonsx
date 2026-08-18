@@ -2,9 +2,9 @@
 
 ## Static HTML Compiler, Custom Element Emitter, and Island Detector
 
-**Version:** 0.1.26-draft
+**Version:** 0.3.1-draft
 **Status:** Partial
-**Updated:** 2026-08-14
+**Updated:** 2026-08-18
 **License:** MIT
 
 ---
@@ -53,6 +53,13 @@ Bare strings and numbers in `children` arrays compile to text nodes in all three
 ---
 
 ## 3. Output Tiers
+
+> **Status: Partial.** The tiers themselves are complete. One property of the emitted page is not:
+> every tier emits an **inline** import map, and a project declaring a colour-scheme query also gets
+> an inline pre-paint script, so no tier emits a Content-Security-Policy yet — though both inline
+> blocks are now constants a hash can name. See §13. The page no longer loads anything from a third
+> party: the import map resolves to `/assets/` (§12), and bare `$elements` and `$head` specifiers
+> are bundled and copied there too (`site-architecture.md` §8.7).
 
 | Component surface                        | Compiler output                                 |
 | ---------------------------------------- | ----------------------------------------------- |
@@ -195,6 +202,12 @@ customElements.define("user-card", UserCard);
 | `"style": { "color": "${state.c}" }`       | `style="color: ${s.c}"`     | Inline style               |
 
 The `.property` syntax is the key enabler for the property-first interface.
+
+**Every row above lowers a `$ref` through the one tokenizer** (`@jxsuite/runtime/pointer`, spec.md §7.1), which decides each segment independently: a segment that is an ECMAScript identifier becomes `.name`, and any other segment becomes `["…"]`. So `#/state/user/name` is `s.user.name` while `#/state/items/0` is `s.items["0"]`. The same rule governs an emitted object-literal key, which is bare where it is an identifier and quoted where it is not.
+
+The bracket branch is what makes the lowering total rather than a bet: a reference token may hold any character but `/` and `~` (RFC 6901 §3) and a state key is author data, so neither is guaranteed to be an identifier. This is a property of the emitted JavaScript only — `.` in generated member access says nothing about the pointer, where `/` is the sole separator.
+
+Until 0.3.0 the compiler lowered a ref by replacing `/` with `.` and pasting the result, which emitted `s.items.0` — a syntax error — and `s.custom/path`, which parses as a division against an undeclared identifier. Neither failed the build: nothing between the string concatenation and the browser ever parsed the output. A target that emits JavaScript **must** produce source that parses for every ref the schema admits.
 
 ### 4.4 Property Bridge
 
@@ -771,28 +784,67 @@ The site build bundles Function-def `$src` modules for the browser
   inlined, so `dist/` deploys and runs without `node_modules` — verified by
   importing the bundled worker from an empty directory in tests. The former
   copy of server sources into `dist/components/` is gone.
+- **The client runtime**: `@vue/reactivity` and `lit-html` are bundled from
+  **this package's** dependencies into `/assets/vue-reactivity.js` and
+  `/assets/lit-html.js`, and the emitted import map points there. They resolve
+  from the compiler rather than the project because the compiler is what
+  depends on those versions — a project that never installed them still gets
+  the runtime its output was compiled against. If neither resolves, the map
+  falls back to the CDN URLs with a warning, since a page with no runtime is
+  worse than a page with a third-party one. Emitted once per build, and only
+  when some page actually carries an import map.
 - **Backends**: `Bun.build` when the build runs under Bun; esbuild
   (dynamically imported, a `@jxsuite/compiler` dependency) under plain Node.
   Options are minimal and identical (`format: esm`, browser target, no
-  minify). `JX_BUNDLER=esbuild` forces the fallback. Byte-level output may
-  differ between backends — a repo tracking `dist/` should build with one
-  backend consistently.
+  minify). Browser bundles define `process.env.NODE_ENV` as `"production"`:
+  the substitution matters (a browser has no `process`) but the resolution
+  matters more, because that value decides which `exports` condition a package
+  offers. Bun reads it from the build's own `define` and assumes development
+  without it, so the two backends were resolving different files —
+  `lit-html`'s 31 kB development build under Bun against its 10 kB production
+  build under esbuild. `JX_BUNDLER=esbuild` forces the fallback. Byte-level
+  output may still differ between backends — a repo tracking `dist/` should
+  build with one backend consistently.
 
 > **Status: Implemented** via `site-build` steps 6d (bundling) and 6e
 > (extension `emit`, extensions.md §8.4).
 
 ---
 
+## 13. Standards Alignment
+
+External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md). `lit-html` and `@vue/reactivity` are libraries rather than standards; Appendix A records them as dependencies.
+
+| Standard                                                                                  | Class         | Binds  | Evidence                                                                                     | Note                                                                                                                                                                                                                                                                                                                                               |
+| ----------------------------------------------------------------------------------------- | ------------- | ------ | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [ECMA-262](https://ecma-international.org/publications-and-standards/standards/ecma-262/) | **Adopted**   | §4, §5 | packages/compiler/src/targets/compile-element.ts, packages/compiler/tests/no-eval.test.ts    | Emitted modules are plain ECMAScript modules containing no `new Function` and no `eval`, which is what lets compiled output run under a policy without `'unsafe-eval'` — asserted by a committed test.                                                                                                                                             |
+| [WHATWG HTML](https://html.spec.whatwg.org/)                                              | **Subset**    | §3, §4 | packages/compiler/src/targets/compile-element.ts                                             | Custom elements are defined and rendered into the **light** DOM; `<slot>` is emulated by splicing saved children, and no shadow root is ever attached. Declarative Shadow DOM, `::part` and `ElementInternals` are therefore unavailable to a Jx component.                                                                                        |
+| [CSP Level 3](https://www.w3.org/TR/CSP3/)                                                | **Subset**    | §3     | packages/compiler/tests/no-eval.test.ts, packages/compiler/src/site/csp.ts                   | What the tiers owe the policy: no `eval`, no `new Function`, and no `onclick=` attribute — handlers are bound as listeners — plus two inline blocks that are byte-identical across a build, so one hash each names them site-wide. The policy itself is assembled and emitted by the site build (`site-architecture.md` §14.3.1).                  |
+| [Subresource Integrity](https://www.w3.org/TR/SRI/)                                       | **Divergent** | §12    | packages/compiler/src/site/client-runtime.ts, packages/compiler/tests/client-runtime.test.ts | The gap this standard existed to close is closed by **removal** rather than by attestation: the runtime is served from the site, so there is no cross-origin subresource left to hash. SRI would apply again only if a project overrode the import map back to a URL, and the build cannot compute an integrity value for a file it never fetched. |
+
 ## Appendix A — Production Dependency Stack
 
-| Package           | Size (gzip) | Purpose                                |
-| ----------------- | ----------- | -------------------------------------- |
-| `@vue/reactivity` | ~7 kB       | `reactive()`, `computed()`, `effect()` |
-| `lit-html`        | ~3 kB       | `html`, `render()`                     |
-| **Total**         | **~10 kB**  |                                        |
+Served from the site under `/assets/` (§12), not from a CDN. Sizes are the bundles this build
+actually emits — un-minified ESM, since `minify: false` — measured with `gzip -9`:
+
+| Package           | Raw       | gzip        | Purpose                                |
+| ----------------- | --------- | ----------- | -------------------------------------- |
+| `@vue/reactivity` | 48.7 kB   | 11.1 kB     | `reactive()`, `computed()`, `effect()` |
+| `lit-html`        | 10.6 kB   | 3.7 kB      | `html`, `render()`                     |
+| **Total**         | **59 kB** | **14.8 kB** |                                        |
+
+The previous figures here (~7 kB and ~3 kB, ~10 kB total) described neither of these files. They
+are also the _un-minified_ sizes: the bundler does not minify, so a host that compresses on the fly
+is doing the only size work in the pipeline.
 
 ## Changelog
 
+- **0.3.1-draft** (2026-08-18) — §4.3: separate the emitted-JavaScript accessor form from the pointer grammar it lowers.
+- **0.3.0-draft** (2026-08-17) — §4.3: ref lowering goes through the shared tokenizer — identifier segments dot, all others bracket, so every emitted ref parses.
+- **0.2.1-draft** (2026-08-15) — §3 Implemented — the tiers' inline blocks are hash-nameable and the site build emits the policy.
+- **0.2.0-draft** (2026-08-15) — Client runtime is served from /assets/ instead of esm.sh; browser bundles resolve production export conditions under both backends (§3, §12).
+- **0.1.28-draft** (2026-08-15) — §3: node_modules URLs resolved — bare $head/$elements specifiers land in /assets/.
+- **0.1.27-draft** (2026-08-15) — Add §13 Standards Alignment; §3 marked Partial — inline scripts block a strict CSP and node_modules URLs 404 in production.
 - **0.1.26-draft** (2026-08-14) — $switch compiles on dynamic pages (§9.2); branch subtrees hoisted out of $switch and chosen-tagName constructs (§4.8); prerender treats handler-written entries and computeds reading them as runtime-only, and keeps an array any surviving reader still references (§8.1).
 - **0.1.25-draft** (2026-07-30) — Element modules: props.* attribute intake and $props template bindings, one effect registry stopped on disconnect, state.$map published for map handlers; prerender keeps a repeater whose build-time expansion is empty (§4.1, §4.2, §4.4, §4.7, §8.1).
 - **0.1.24-draft** (2026-07-30) — Element modules: $export aliasing, Request auto-fetch on connect with effect teardown, $map bound in map callbacks, tagName-based output naming; prerender leaves runtime-only reads unresolved (§4.1, §4.7, §8.1).
@@ -823,4 +875,4 @@ The site build bundles Function-def `$src` modules for the browser
 
 ---
 
-_`@jxsuite/compiler` Specification v0.1.26-draft_
+_`@jxsuite/compiler` Specification v0.3.1-draft_

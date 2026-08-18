@@ -35,6 +35,7 @@ import type { FormatRegistry } from "@jxsuite/schema/format-registry";
 import type { ClassJsonDef } from "./types.ts";
 import type { DesignOptions } from "@jxsuite/create/generate";
 import type { ProjectConfig } from "@jxsuite/schema/types";
+import { problem } from "./problem.ts";
 
 /** Normalise a path to forward slashes (Windows `path` module returns backslashes). */
 const fwd = (p: string) => p.replaceAll("\\", "/");
@@ -330,6 +331,29 @@ export interface StudioApiOptions {
  * @param {StudioApiOptions} [opts]
  * @returns {Promise<Response | null>}
  */
+/**
+ * The paths git reported as conflicting, from a failed merge or pull's output.
+ *
+ * Parsed from the porcelain text because there is no machine-readable form of it: `git pull` writes
+ * `CONFLICT (content): Merge conflict in <path>` to stdout and exits non-zero, and the alternative
+ * — a second `git diff --name-only --diff-filter=U` — would be a separate command whose answer
+ * could already have changed. An empty result means the failure was not a conflict, and the caller
+ * rethrows rather than mislabelling it.
+ *
+ * @param {string} output - Combined git output from the failed command
+ * @returns {string[]} Conflicting paths, deduplicated, in the order git reported them
+ */
+function conflictingPaths(output: string): string[] {
+  const paths = new Set<string>();
+  for (const line of output.split("\n")) {
+    const match = /^CONFLICT \([^)]*\): Merge conflict in (.+)$/.exec(line.trim());
+    if (match?.[1]) {
+      paths.add(match[1].trim());
+    }
+  }
+  return [...paths];
+}
+
 export async function handleStudioApi(
   req: Request,
   url: URL,
@@ -366,7 +390,7 @@ export async function handleStudioApi(
     try {
       assertAccessible(absDir, root, activeProjectRoot);
     } catch (error) {
-      return Response.json({ error: errorMessage(error) }, { status: 400 });
+      return problem("invalidRequest", errorMessage(error));
     }
     try {
       const projectRoot = fwd(absDir);
@@ -406,7 +430,7 @@ export async function handleStudioApi(
         projectRoot,
       });
     } catch (error) {
-      return Response.json({ error: errorMessage(error) }, { status: 500 });
+      return problem("internalError", errorMessage(error));
     }
   }
 
@@ -414,7 +438,7 @@ export async function handleStudioApi(
   if (path === "/__studio/resolve-site" && req.method === "GET") {
     const filePath = url.searchParams.get("path");
     if (!filePath) {
-      return Response.json({ error: "Missing path param" }, { status: 400 });
+      return problem("invalidRequest", "Missing path param");
     }
     try {
       // Walk up looking for project.json. Accept a directory (e.g. the project root itself, as
@@ -453,7 +477,7 @@ export async function handleStudioApi(
       }
       return Response.json({ sitePath: null });
     } catch (error) {
-      return Response.json({ error: errorMessage(error) }, { status: 500 });
+      return problem("internalError", errorMessage(error));
     }
   }
 
@@ -462,7 +486,7 @@ export async function handleStudioApi(
   if (path === "/__studio/find-project" && req.method === "GET") {
     const name = url.searchParams.get("name");
     if (!name) {
-      return Response.json({ error: "Missing name" }, { status: 400 });
+      return problem("invalidRequest", "Missing name");
     }
     try {
       const home = process.env.HOME || process.env.USERPROFILE || "";
@@ -481,7 +505,7 @@ export async function handleStudioApi(
       } catch {}
       return Response.json({ path: null });
     } catch (error) {
-      return Response.json({ error: errorMessage(error) }, { status: 500 });
+      return problem("internalError", errorMessage(error));
     }
   }
 
@@ -504,7 +528,7 @@ export async function handleStudioApi(
     const id = url.searchParams.get("id");
     // `name` is interpolated into a glob; the id is only ever compared, never used as a pattern.
     if (!name || !id || !/^[a-f0-9]{32}$/.test(id) || !/^[^/\\]+$/.test(name)) {
-      return Response.json({ error: "Missing or invalid name/id" }, { status: 400 });
+      return problem("invalidRequest", "Missing or invalid name/id");
     }
     try {
       const home = process.env.HOME || process.env.USERPROFILE || "";
@@ -549,7 +573,7 @@ export async function handleStudioApi(
       } catch {}
       return Response.json({ path: null });
     } catch (error) {
-      return Response.json({ error: errorMessage(error) }, { status: 500 });
+      return problem("internalError", errorMessage(error));
     }
   }
 
@@ -577,7 +601,7 @@ export async function handleStudioApi(
       }
       return Response.json(sites);
     } catch (error) {
-      return Response.json({ error: errorMessage(error) }, { status: 500 });
+      return problem("internalError", errorMessage(error));
     }
   }
 
@@ -607,32 +631,29 @@ export async function handleStudioApi(
         design,
       } = body;
       if (!name || !directory) {
-        return Response.json({ error: "name and directory are required" }, { status: 400 });
+        return problem("invalidRequest", "name and directory are required");
       }
       // The destination is the user's to choose (specs/server.md §4.2). Without one the project
       // Would silently land under the server root — which, when the dev server is the jx checkout,
       // Means scaffolding into the monorepo. Refuse instead of guessing.
       if (destination?.kind !== "path" || !destination.parent) {
-        return Response.json({ error: "A destination folder is required." }, { status: 400 });
+        return problem("invalidRequest", "A destination folder is required.");
       }
       // `directory` names the project FOLDER, not a path: a separator or dot-segment would walk out
       // Of the parent that was just vetted below, which is exactly what the vetting is for.
       if (/[/\\]/.test(directory) || directory === "." || directory === "..") {
-        return Response.json(
-          { error: "Directory must be a folder name, not a path" },
-          { status: 400 },
-        );
+        return problem("invalidRequest", "Directory must be a folder name, not a path");
       }
       const { isTemplateId } = await import("@jxsuite/create/templates");
       if (template !== undefined && !isTemplateId(template)) {
-        return Response.json({ error: `Unknown template: "${template}"` }, { status: 400 });
+        return problem("invalidRequest", `Unknown template: "${template}"`);
       }
       // A bad destination is client input, so answer 400 rather than letting the guard's throw fall
       // Through to the catch-all 500 below.
       try {
         assertCreatableParent(destination.parent, root, opts.allowedRoots);
       } catch (error) {
-        return Response.json({ error: errorMessage(error) }, { status: 400 });
+        return problem("invalidRequest", errorMessage(error));
       }
       const destPath = resolve(destination.parent, directory);
 
@@ -657,7 +678,7 @@ export async function handleStudioApi(
       opts.onProjectCreated?.(destPath);
       return Response.json({ config, root: inRoot ? fwd(relative(root, destPath)) : destPath });
     } catch (error) {
-      return Response.json({ error: errorMessage(error) }, { status: 500 });
+      return problem("internalError", errorMessage(error));
     }
   }
 
@@ -667,7 +688,7 @@ export async function handleStudioApi(
       const { listStarters } = await import("@jxsuite/starters");
       return Response.json(listStarters());
     } catch (error) {
-      return Response.json({ error: errorMessage(error) }, { status: 500 });
+      return problem("internalError", errorMessage(error));
     }
   }
 
@@ -679,7 +700,7 @@ export async function handleStudioApi(
     try {
       assertAccessible(absDir, root, activeProjectRoot);
     } catch (error) {
-      return Response.json({ error: errorMessage(error) }, { status: 400 });
+      return problem("invalidRequest", errorMessage(error));
     }
 
     /** Report a path relative to the active project root (or server root as fallback). */
@@ -732,7 +753,7 @@ export async function handleStudioApi(
       }
       return Response.json(files);
     } catch (error) {
-      return Response.json({ error: errorMessage(error) }, { status: 500 });
+      return problem("internalError", errorMessage(error));
     }
   }
 
@@ -743,7 +764,7 @@ export async function handleStudioApi(
     try {
       assertAccessible(scanRoot, root, activeProjectRoot);
     } catch (error) {
-      return Response.json({ error: errorMessage(error) }, { status: 400 });
+      return problem("invalidRequest", errorMessage(error));
     }
     try {
       const registry = await getFormatRegistry(scanRoot);
@@ -884,7 +905,7 @@ export async function handleStudioApi(
 
       return Response.json(components);
     } catch (error) {
-      return Response.json({ error: errorMessage(error) }, { status: 500 });
+      return problem("internalError", errorMessage(error));
     }
   }
 
@@ -908,7 +929,7 @@ export async function handleStudioApi(
   if (path === "/__studio/build" && req.method === "POST") {
     const dir = activeProjectRoot ?? root;
     if (!existsSync(resolve(dir, "project.json"))) {
-      return Response.json({ error: "Not a site project" }, { status: 400 });
+      return problem("invalidRequest", "Not a site project");
     }
     try {
       const { buildSite } = await import("@jxsuite/compiler/site");
@@ -923,7 +944,7 @@ export async function handleStudioApi(
         ...(preview ? { url: preview.origin } : {}),
       });
     } catch (error) {
-      return Response.json({ error: errorMessage(error) }, { status: 500 });
+      return problem("internalError", errorMessage(error));
     }
   }
 
@@ -971,7 +992,7 @@ export async function handleStudioApi(
       }
       return Response.json(packages);
     } catch (error) {
-      return Response.json({ error: errorMessage(error) }, { status: 500 });
+      return problem("internalError", errorMessage(error));
     }
   }
 
@@ -979,7 +1000,7 @@ export async function handleStudioApi(
   if (path === "/__studio/cem" && req.method === "GET") {
     const pkg = url.searchParams.get("pkg");
     if (!pkg) {
-      return new Response("Missing pkg", { status: 400 });
+      return problem("invalidRequest", "Missing pkg");
     }
     const dir = url.searchParams.get("dir") || activeProjectRoot || root;
     const scanRoot = isAbsolute(dir) ? dir : resolve(root, dir);
@@ -1005,7 +1026,7 @@ export async function handleStudioApi(
       const cem = JSON.parse(await readFile(cemPath, "utf8")) as Cem;
       return Response.json({ cem });
     } catch (error) {
-      return Response.json({ error: errorMessage(error) }, { status: 500 });
+      return problem("internalError", errorMessage(error));
     }
   }
 
@@ -1015,7 +1036,7 @@ export async function handleStudioApi(
       const body = (await req.json()) as { name?: string; dir?: string; dev?: boolean };
       const { name } = body;
       if (!name || typeof name !== "string") {
-        return Response.json({ error: "Missing name" }, { status: 400 });
+        return problem("invalidRequest", "Missing name");
       }
       const dir = body.dir || activeProjectRoot;
       const cwd = dir ? (isAbsolute(dir) ? dir : resolve(root, dir)) : root;
@@ -1031,14 +1052,11 @@ export async function handleStudioApi(
       const exitCode = await proc.exited;
       if (exitCode !== 0) {
         const stderr = await new Response(proc.stderr).text();
-        return Response.json(
-          { error: stderr || `bun add exited with ${exitCode}` },
-          { status: 500 },
-        );
+        return problem("internalError", stderr || `bun add exited with ${exitCode}`);
       }
       return Response.json({ ok: true });
     } catch (error) {
-      return Response.json({ error: errorMessage(error) }, { status: 500 });
+      return problem("internalError", errorMessage(error));
     }
   }
 
@@ -1048,7 +1066,7 @@ export async function handleStudioApi(
       const body = (await req.json()) as { name?: string; dir?: string };
       const { name } = body;
       if (!name || typeof name !== "string") {
-        return Response.json({ error: "Missing name" }, { status: 400 });
+        return problem("invalidRequest", "Missing name");
       }
       const dir = body.dir || activeProjectRoot;
       const cwd = dir ? (isAbsolute(dir) ? dir : resolve(root, dir)) : root;
@@ -1060,14 +1078,11 @@ export async function handleStudioApi(
       const exitCode = await proc.exited;
       if (exitCode !== 0) {
         const stderr = await new Response(proc.stderr).text();
-        return Response.json(
-          { error: stderr || `bun remove exited with ${exitCode}` },
-          { status: 500 },
-        );
+        return problem("internalError", stderr || `bun remove exited with ${exitCode}`);
       }
       return Response.json({ ok: true });
     } catch (error) {
-      return Response.json({ error: errorMessage(error) }, { status: 500 });
+      return problem("internalError", errorMessage(error));
     }
   }
 
@@ -1079,7 +1094,7 @@ export async function handleStudioApi(
       const scanRoot = isAbsolute(dir) ? dir : resolve(root, dir);
       return Response.json(await installDependencies(scanRoot));
     } catch (error) {
-      return Response.json({ error: errorMessage(error) }, { status: 500 });
+      return problem("internalError", errorMessage(error));
     }
   }
 
@@ -1097,7 +1112,7 @@ export async function handleStudioApi(
       const scanRoot = isAbsolute(dir) ? dir : resolve(root, dir);
       return Response.json(await outdatedPackages(scanRoot));
     } catch (error) {
-      return Response.json({ error: errorMessage(error) }, { status: 500 });
+      return problem("internalError", errorMessage(error));
     }
   }
 
@@ -1109,13 +1124,13 @@ export async function handleStudioApi(
         updates?: { name: string; version: string; dev?: boolean }[];
       };
       if (!Array.isArray(body.updates)) {
-        return Response.json({ error: "Missing updates" }, { status: 400 });
+        return problem("invalidRequest", "Missing updates");
       }
       const dir = body.dir || activeProjectRoot || root;
       const scanRoot = isAbsolute(dir) ? dir : resolve(root, dir);
       return Response.json(await setPackageVersions(scanRoot, body.updates));
     } catch (error) {
-      return Response.json({ error: errorMessage(error) }, { status: 500 });
+      return problem("internalError", errorMessage(error));
     }
   }
 
@@ -1123,7 +1138,7 @@ export async function handleStudioApi(
   if (path === "/__studio/file" && req.method === "GET") {
     const fp = url.searchParams.get("path");
     if (!fp) {
-      return new Response("Missing path", { status: 400 });
+      return problem("invalidRequest", "Missing path");
     }
     const abs = expandTilde(fp);
     try {
@@ -1141,8 +1156,8 @@ export async function handleStudioApi(
       );
     } catch (error) {
       return (error as NodeJS.ErrnoException).code === "ENOENT"
-        ? new Response("Not found", { status: 404 })
-        : Response.json({ error: errorMessage(error) }, { status: 500 });
+        ? problem("notFound", "Not found")
+        : problem("internalError", errorMessage(error));
     }
   }
 
@@ -1150,7 +1165,7 @@ export async function handleStudioApi(
   if (path === "/__studio/file" && req.method === "PUT") {
     const fp = url.searchParams.get("path");
     if (!fp) {
-      return new Response("Missing path", { status: 400 });
+      return problem("invalidRequest", "Missing path");
     }
     const abs = resolve(root, fp);
     try {
@@ -1163,7 +1178,7 @@ export async function handleStudioApi(
       await writeFile(abs, await req.text(), "utf8");
       return Response.json({ ok: true, path: fwd(relative(root, abs)) });
     } catch (error) {
-      return Response.json({ error: errorMessage(error) }, { status: 500 });
+      return problem("internalError", errorMessage(error));
     }
   }
 
@@ -1171,7 +1186,7 @@ export async function handleStudioApi(
   if (path === "/__studio/file/upload" && req.method === "POST") {
     const fp = url.searchParams.get("path");
     if (!fp) {
-      return new Response("Missing path", { status: 400 });
+      return problem("invalidRequest", "Missing path");
     }
     const abs = resolve(root, fp);
     try {
@@ -1185,7 +1200,7 @@ export async function handleStudioApi(
       await Bun.write(abs, new Uint8Array(buffer));
       return Response.json({ ok: true, path: fwd(relative(root, abs)) });
     } catch (error) {
-      return Response.json({ error: errorMessage(error) }, { status: 500 });
+      return problem("internalError", errorMessage(error));
     }
   }
 
@@ -1193,7 +1208,7 @@ export async function handleStudioApi(
   if (path === "/__studio/file" && req.method === "DELETE") {
     const fp = url.searchParams.get("path");
     if (!fp) {
-      return new Response("Missing path", { status: 400 });
+      return problem("invalidRequest", "Missing path");
     }
     const abs = resolve(root, fp);
     try {
@@ -1206,8 +1221,8 @@ export async function handleStudioApi(
       return Response.json({ ok: true, path: fwd(relative(root, abs)) });
     } catch (error) {
       return (error as NodeJS.ErrnoException).code === "ENOENT"
-        ? new Response("Not found", { status: 404 })
-        : Response.json({ error: errorMessage(error) }, { status: 500 });
+        ? problem("notFound", "Not found")
+        : problem("internalError", errorMessage(error));
     }
   }
 
@@ -1217,11 +1232,11 @@ export async function handleStudioApi(
     try {
       body = (await req.json()) as { from?: string; to?: string };
     } catch {
-      return new Response("Invalid JSON", { status: 400 });
+      return problem("invalidRequest", "Invalid JSON");
     }
     const { from, to } = body;
     if (!from || !to) {
-      return new Response("Missing from or to", { status: 400 });
+      return problem("invalidRequest", "Missing from or to");
     }
     const absFrom = resolve(root, from);
     const absTo = resolve(root, to);
@@ -1235,7 +1250,7 @@ export async function handleStudioApi(
       await mkdir(dirname(absTo), { recursive: true });
       await rename(absFrom, absTo);
     } catch (error) {
-      return Response.json({ error: errorMessage(error) }, { status: 500 });
+      return problem("internalError", errorMessage(error));
     }
     // Refactor pass: rewrite path references project-wide and, for a component, auto-rename its tag.
     // The move already succeeded, so a refactor failure is reported but never fails the rename.
@@ -1259,7 +1274,7 @@ export async function handleStudioApi(
     const target = url.searchParams.get("path");
     const tag = url.searchParams.get("tag");
     if (!target && !tag) {
-      return new Response("Missing path or tag", { status: 400 });
+      return problem("invalidRequest", "Missing path or tag");
     }
     const scanRoot = activeProjectRoot ?? root;
     if (target) {
@@ -1275,7 +1290,7 @@ export async function handleStudioApi(
         await findReferences({ path: target, registry, root: scanRoot, tagName: tag }),
       );
     } catch (error) {
-      return Response.json({ error: errorMessage(error) }, { status: 500 });
+      return problem("internalError", errorMessage(error));
     }
   }
 
@@ -1285,11 +1300,11 @@ export async function handleStudioApi(
     try {
       body = (await req.json()) as { name?: string };
     } catch {
-      return new Response("Invalid JSON", { status: 400 });
+      return problem("invalidRequest", "Invalid JSON");
     }
     const { name } = body;
     if (!name) {
-      return new Response("Missing name", { status: 400 });
+      return problem("invalidRequest", "Missing name");
     }
 
     try {
@@ -1310,7 +1325,7 @@ export async function handleStudioApi(
         ...(matches.length > 1 ? { alternatives: matches } : {}),
       });
     } catch (error) {
-      return Response.json({ error: errorMessage(error) }, { status: 500 });
+      return problem("internalError", errorMessage(error));
     }
   }
 
@@ -1328,17 +1343,17 @@ export async function handleStudioApi(
     ];
     const cfToken = req.headers.get("X-CF-Token");
     if (!cfToken) {
-      return Response.json({ error: "Missing X-CF-Token header" }, { status: 401 });
+      return problem("unauthorized", "Missing X-CF-Token header");
     }
     let payload: { path?: string; method?: string; body?: unknown };
     try {
       payload = (await req.json()) as typeof payload;
     } catch {
-      return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+      return problem("invalidRequest", "Invalid JSON body");
     }
     const apiPath = payload.path ?? "";
     if (!CF_PROXY_ALLOWLIST.some((re) => re.test(apiPath))) {
-      return Response.json({ error: `Path not allowed: ${apiPath}` }, { status: 403 });
+      return problem("forbidden", `Path not allowed: ${apiPath}`);
     }
     const method = payload.method ?? "GET";
     const upstream = await fetch(`https://api.cloudflare.com/client/v4${apiPath}`, {
@@ -1373,18 +1388,15 @@ export async function handleStudioApi(
       assertAccessible(projectRoot, root, activeProjectRoot);
 
       if (!format || !action) {
-        return Response.json({ error: "Missing format or action" }, { status: 400 });
+        return problem("invalidRequest", "Missing format or action");
       }
       if (action !== "parse" && action !== "serialize") {
-        return Response.json({ error: `Unsupported action "${action}"` }, { status: 400 });
+        return problem("invalidRequest", `Unsupported action "${action}"`);
       }
       const registry = await getFormatRegistry(projectRoot);
       const entry = registry.byName(format);
       if (!entry) {
-        return Response.json(
-          { error: `Format "${format}" is not an imported format class` },
-          { status: 404 },
-        );
+        return problem("notFound", `Format "${format}" is not an imported format class`);
       }
       const result =
         action === "parse"
@@ -1392,7 +1404,7 @@ export async function handleStudioApi(
           : await entry.call("serialize", doc ?? {}, options);
       return Response.json({ result });
     } catch (error) {
-      return Response.json({ error: errorMessage(error) }, { status: 500 });
+      return problem("internalError", errorMessage(error));
     }
   }
 
@@ -1420,7 +1432,7 @@ export async function handleStudioApi(
         })),
       });
     } catch (error) {
-      return Response.json({ error: errorMessage(error) }, { status: 400 });
+      return problem("invalidRequest", errorMessage(error));
     }
   }
 
@@ -1433,13 +1445,13 @@ export async function handleStudioApi(
     try {
       assertAccessible(projectRoot, root, activeProjectRoot);
     } catch (error) {
-      return Response.json({ error: errorMessage(error) }, { status: 400 });
+      return problem("invalidRequest", errorMessage(error));
     }
     try {
       const { document, project } = await readBundledProjectSchemas(projectRoot);
       return Response.json({ document, project });
     } catch (error) {
-      return Response.json({ error: errorMessage(error) }, { status: 500 });
+      return problem("internalError", errorMessage(error));
     }
   }
 
@@ -1448,7 +1460,7 @@ export async function handleStudioApi(
     const prototype = url.searchParams.get("prototype");
     const base = url.searchParams.get("base");
     if (!src) {
-      return new Response("Missing src param", { status: 400 });
+      return problem("invalidRequest", "Missing src param");
     }
 
     let moduleAbsPath;
@@ -1553,7 +1565,17 @@ export async function handleStudioApi(
       const stdout = await new Response(proc.stdout).text();
       const stderr = await new Response(proc.stderr).text();
       if (exitCode !== 0) {
-        throw new Error(stderr || `git exited with ${exitCode}`);
+        /*
+         * Both streams, because git splits its failures across them and stderr alone loses the
+         * ones that matter most. A conflicting `git pull` writes every `CONFLICT (…)` line to
+         * STDOUT and leaves stderr empty — so the old `stderr || "git exited with 1"` turned the
+         * one failure this API publishes a shape for into a contentless message, and the 409 the
+         * route table promises could never be produced.
+         */
+        throw Object.assign(new Error(stderr || stdout || `git exited with ${exitCode}`), {
+          stderr,
+          stdout,
+        });
       }
       return stdout;
     };
@@ -1602,7 +1624,7 @@ export async function handleStudioApi(
           url?: string;
         };
         if (!name || !remoteUrl) {
-          return new Response("name and url required", { status: 400 });
+          return problem("invalidRequest", "name and url required");
         }
         await runGit(["remote", "add", name, remoteUrl]);
         return Response.json({ ok: true });
@@ -1642,11 +1664,11 @@ export async function handleStudioApi(
       if (gitCmd === "stage" && req.method === "POST") {
         const { files } = (await req.json()) as { files?: string[] };
         if (!Array.isArray(files) || files.length === 0) {
-          return Response.json({ error: "Missing files" }, { status: 400 });
+          return problem("invalidRequest", "Missing files");
         }
         for (const f of files) {
           if (f.includes("..")) {
-            return Response.json({ error: "Invalid path" }, { status: 400 });
+            return problem("invalidRequest", "Invalid path");
           }
         }
         await runGit(["add", "--", ...files]);
@@ -1656,7 +1678,7 @@ export async function handleStudioApi(
       if (gitCmd === "unstage" && req.method === "POST") {
         const { files } = (await req.json()) as { files?: string[] };
         if (!Array.isArray(files) || files.length === 0) {
-          return Response.json({ error: "Missing files" }, { status: 400 });
+          return problem("invalidRequest", "Missing files");
         }
         await runGit(["restore", "--staged", "--", ...files]);
         return Response.json({ ok: true });
@@ -1665,7 +1687,7 @@ export async function handleStudioApi(
       if (gitCmd === "commit" && req.method === "POST") {
         const { message } = (await req.json()) as { message?: string };
         if (!message || typeof message !== "string") {
-          return Response.json({ error: "Missing message" }, { status: 400 });
+          return problem("invalidRequest", "Missing message");
         }
         const statusOut = await runGit(["status", "--porcelain"]);
         const hasStaged = statusOut
@@ -1694,7 +1716,28 @@ export async function handleStudioApi(
       }
 
       if (gitCmd === "pull" && req.method === "POST") {
-        await runGit(["pull"]);
+        /*
+         * The one failure the route table has always published — `409 {conflicts}` — and never
+         * produced: a conflicting pull threw like any other git failure and reached the catch-all
+         * as a 500, so Studio told the user the backend broke rather than that their branch and
+         * the remote both touched the same files. The conflicting paths are the only thing that
+         * makes the message actionable, so they ride along as the extension member the type
+         * documents.
+         */
+        try {
+          await runGit(["pull"]);
+        } catch (error) {
+          const output = error as { stdout?: string; stderr?: string };
+          const conflicts = conflictingPaths(`${output.stdout ?? ""}\n${output.stderr ?? ""}`);
+          if (conflicts.length === 0) {
+            throw error;
+          }
+          return problem(
+            "conflict",
+            `Pull stopped: ${conflicts.length} file(s) changed on both sides.`,
+            { conflicts },
+          );
+        }
         return Response.json({ ok: true });
       }
 
@@ -1706,7 +1749,7 @@ export async function handleStudioApi(
       if (gitCmd === "checkout" && req.method === "POST") {
         const { branch } = (await req.json()) as { branch?: string };
         if (!branch || typeof branch !== "string") {
-          return Response.json({ error: "Missing branch" }, { status: 400 });
+          return problem("invalidRequest", "Missing branch");
         }
         await runGit(["checkout", branch]);
         return Response.json({ ok: true });
@@ -1715,7 +1758,7 @@ export async function handleStudioApi(
       if (gitCmd === "create-branch" && req.method === "POST") {
         const { name } = (await req.json()) as { name?: string };
         if (!name || typeof name !== "string") {
-          return Response.json({ error: "Missing name" }, { status: 400 });
+          return problem("invalidRequest", "Missing name");
         }
         await runGit(["checkout", "-b", name]);
         return Response.json({ ok: true });
@@ -1724,10 +1767,10 @@ export async function handleStudioApi(
       if (gitCmd === "diff" && req.method === "GET") {
         const fp = url.searchParams.get("path");
         if (!fp) {
-          return Response.json({ error: "Missing path" }, { status: 400 });
+          return problem("invalidRequest", "Missing path");
         }
         if (fp.includes("..")) {
-          return Response.json({ error: "Invalid path" }, { status: 400 });
+          return problem("invalidRequest", "Invalid path");
         }
         const diff = await runGit(["diff", "--", fp]);
         return Response.json({ diff });
@@ -1737,10 +1780,10 @@ export async function handleStudioApi(
         const fp = url.searchParams.get("path");
         const ref = url.searchParams.get("ref") || "HEAD";
         if (!fp) {
-          return Response.json({ error: "Missing path" }, { status: 400 });
+          return problem("invalidRequest", "Missing path");
         }
         if (fp.includes("..")) {
-          return Response.json({ error: "Invalid path" }, { status: 400 });
+          return problem("invalidRequest", "Invalid path");
         }
         const content = await runGit(["show", `${ref}:${fp}`]);
         return Response.json({ content });
@@ -1749,11 +1792,11 @@ export async function handleStudioApi(
       if (gitCmd === "discard" && req.method === "POST") {
         const { files } = (await req.json()) as { files?: string[] };
         if (!Array.isArray(files) || files.length === 0) {
-          return Response.json({ error: "Missing files" }, { status: 400 });
+          return problem("invalidRequest", "Missing files");
         }
         for (const f of files) {
           if (f.includes("..")) {
-            return Response.json({ error: "Invalid path" }, { status: 400 });
+            return problem("invalidRequest", "Invalid path");
           }
         }
         await runGit(["checkout", "--", ...files]);
@@ -1763,7 +1806,7 @@ export async function handleStudioApi(
       if (gitCmd === "clone" && req.method === "POST") {
         const { url: repoUrl } = (await req.json()) as { url?: string };
         if (!repoUrl || typeof repoUrl !== "string") {
-          return Response.json({ error: "Missing url" }, { status: 400 });
+          return problem("invalidRequest", "Missing url");
         }
         const repoName = basename(repoUrl.replace(/\.git$/, ""));
         const dest = resolve(cwd, repoName);
@@ -1780,7 +1823,7 @@ export async function handleStudioApi(
         return Response.json({ ok: true, root: dest });
       }
     } catch (error) {
-      return Response.json({ error: errorMessage(error) }, { status: 500 });
+      return problem("internalError", errorMessage(error));
     }
   }
 

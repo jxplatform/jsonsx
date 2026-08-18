@@ -34,8 +34,17 @@ export interface WsLike {
 export interface WsCollabConnectionOptions {
   /** The ws(s):// endpoint for this project's collab socket. */
   url: string;
+  /**
+   * Subprotocols to offer (`Sec-WebSocket-Protocol`), normally `negotiateCollab`'s `offer`.
+   *
+   * Left empty or undefined deliberately when the server advertised none: RFC 6455 §4.1 makes a
+   * client that offers a subprotocol and receives no echo fail the connection, so an unconditional
+   * offer would break collab against every server built before negotiation shipped. The caller
+   * decides, from the capability probe, and `negotiate.ts` holds the reasoning.
+   */
+  protocols?: string[];
   /** WebSocket constructor override (tests, non-browser runtimes). */
-  webSocketImpl?: new (url: string) => WsLike;
+  webSocketImpl?: new (url: string, protocols?: string[]) => WsLike;
   /**
    * Called when the server refuses a doc with content-not-loaded: hydrate the file over HTTP (which
    * caches it server-side) so the retry can seed. One retry per open.
@@ -74,7 +83,8 @@ interface DocEntry {
 
 export function createWsCollabConnection(options: WsCollabConnectionOptions): WsCollabConnection {
   const WebSocketCtor =
-    options.webSocketImpl ?? (globalThis.WebSocket as unknown as new (url: string) => WsLike);
+    options.webSocketImpl ??
+    (globalThis.WebSocket as unknown as new (url: string, protocols?: string[]) => WsLike);
   const openTimeoutMs = options.openTimeoutMs ?? 10_000;
   const docs = new Map<string, DocEntry>();
   const statusCbs = new Set<(status: CollabStatus) => void>();
@@ -257,7 +267,13 @@ export function createWsCollabConnection(options: WsCollabConnectionOptions): Ws
       return;
     }
     setStatus("connecting");
-    const ws = new WebSocketCtor(options.url);
+    /* Re-offered on every reconnect: a socket that comes back after the server was restarted must
+       negotiate again, and the offer is a property of this client's envelope, not of one socket. */
+    const offer = options.protocols;
+    const ws =
+      offer === undefined || offer.length === 0
+        ? new WebSocketCtor(options.url)
+        : new WebSocketCtor(options.url, offer);
     socket = ws;
     ws.binaryType = "arraybuffer";
     /* Each connect() builds a FRESH socket; single-assignment handlers are the point (and keep

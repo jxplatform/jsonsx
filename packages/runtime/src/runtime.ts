@@ -24,6 +24,7 @@ import {
   toRaw,
 } from "@vue/reactivity";
 import { evaluateExpression, evaluateOperand, isMutating } from "./expression.ts";
+import { readPath } from "./pointer.ts";
 import type { DynamicClass, JxEventHandler, JxPath, JxRenderOptions, JxScope } from "./types.ts";
 import {
   bodyReturnsValue,
@@ -33,6 +34,7 @@ import {
   isJsonObject,
   isMappedArray,
   isNamedFormulaDef,
+  isPrivateStateKey,
   isPrototypeDef,
   isRef as isRefValue,
   isServerFnDef,
@@ -41,6 +43,7 @@ import {
   paramNames,
 } from "@jxsuite/schema/guards";
 import { runStatements } from "./statements.ts";
+import { readCookie, serializeCookie } from "./cookie.ts";
 import type {
   JxAttributeValue,
   JxClassDef,
@@ -1310,7 +1313,11 @@ function renderSwitch(def: JxElement, state: JxScope, options?: JxRenderOptions)
   let generation = 0;
 
   effect(() => {
-    container.innerHTML = "";
+    /* `replaceChildren()` rather than `innerHTML = ""`: identical semantics, and it is not a
+       Trusted Types injection sink — under `require-trusted-types-for 'script'` an innerHTML write
+       needs a policy even when the string is empty. Four sinks that were never injecting anything
+       is four fewer things a policy has to be permissive about. */
+    container.replaceChildren();
     if (!isRefObj(def.$switch)) {
       return;
     }
@@ -1333,7 +1340,7 @@ function renderSwitch(def: JxElement, state: JxScope, options?: JxRenderOptions)
           if (gen !== generation) {
             return;
           }
-          container.innerHTML = "";
+          container.replaceChildren();
           const childOpts = options ? { ...options, _path: [...path, "cases", key] } : undefined;
           container.append(renderNode(doc, childScope, childOpts));
         })
@@ -1480,38 +1487,21 @@ export async function resolvePrototype(
     case "Cookie": {
       const name = def.name ?? key;
       const read = () => {
-        const m = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
-        if (!m) {
+        const raw = readCookie(document.cookie, name);
+        if (raw === null) {
           return null;
         }
         try {
-          return JSON.parse(decodeURIComponent(m[1]!));
+          return JSON.parse(decodeURIComponent(raw));
         } catch {
-          return m[1];
+          return raw;
         }
       };
       const cookieState: Ref<unknown> = ref(read() ?? def.default ?? null);
       // Persist on change
       effect(() => {
-        const v = cookieState.value;
-        let s = `${name}=${encodeURIComponent(JSON.stringify(v))}`;
-        if (def.maxAge !== undefined) {
-          s += `; Max-Age=${def.maxAge}`;
-        }
-        if (def.path) {
-          s += `; Path=${def.path}`;
-        }
-        if (def.domain) {
-          s += `; Domain=${def.domain}`;
-        }
-        if (def.secure) {
-          s += `; Secure`;
-        }
-        if (def.sameSite) {
-          s += `; SameSite=${def.sameSite}`;
-        }
         // oxlint-disable-next-line unicorn/no-document-cookie -- the Cookie $prototype IS the cookie store binding
-        document.cookie = s;
+        document.cookie = serializeCookie(name, cookieState.value, def);
       });
       return cookieState;
     }
@@ -2108,15 +2098,16 @@ export function resolveRef(refPath: string, state: JxScope) {
     return parts.length > 2 ? getPath(base, parts.slice(2).join("/")) : base;
   }
   if (refPath.startsWith("#/state/")) {
-    const sub = refPath.slice("#/state/".length);
-    const slash = sub.indexOf("/");
-    if (slash === -1) {
-      return state[sub];
-    }
-    return getPath(state[sub.slice(0, slash)], sub.slice(slash + 1));
+    // One call, not a hand-split leading token: slicing at the first `/` skipped unescaping it, so
+    // `#/state/a~1b/c` looked for a member called `a~1b` rather than `a/b`.
+    return readPath(state, refPath.slice("#/state/".length));
   }
   if (refPath.startsWith("parent#/")) {
-    return state[refPath.slice("parent#/".length)];
+    /*
+     * A prop name may be a path into the prop. This read the whole path as one key and returned
+     * undefined for `parent#/user/name`, while the compiler lowered it to a walk.
+     */
+    return readPath(state, refPath.slice("parent#/".length));
   }
   if (refPath.startsWith("window#/")) {
     return getPath(globalThis.window, refPath.slice("window#/".length));
@@ -2124,7 +2115,7 @@ export function resolveRef(refPath: string, state: JxScope) {
   if (refPath.startsWith("document#/")) {
     return getPath(globalThis.document, refPath.slice("document#/".length));
   }
-  return state[refPath] ?? null;
+  return readPath(state, refPath) ?? null;
 }
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
@@ -2156,16 +2147,51 @@ function isNestedSelector(k: string) {
 }
 
 /**
+ * Walk a path off a value. Delegates to the one tokenizer (`pointer.ts`) — this used to split on
+ * `/[./]/`, which no other path in the codebase agreed with.
+ *
  * @param {unknown} obj
  * @param {string} path
  * @returns {unknown}
  */
 function getPath(obj: unknown, path: string) {
-  let current: unknown = obj;
-  for (const k of path.split(/[./]/)) {
-    current = (current as Record<string, unknown>)?.[k];
+  return readPath(obj, path);
+}
+
+/** Keys already reported, so a component rendered in a loop warns once rather than per instance. */
+const _privatePropWarned = new Set<string>();
+
+/**
+ * Refuse a `$props` write against a private (`#`) state key — `spec.md` §5.6.
+ *
+ * Ignored rather than thrown. A `$props` block naming a private entry is an authoring mistake, not
+ * a broken document: the rest of the instance is well-formed and refusing to render it would turn a
+ * typo into a blank page. But silence was the previous behavior and it is the wrong kind — the
+ * author sees a prop that looks accepted and does nothing — so the write is dropped and named.
+ *
+ * @param {string} key
+ * @param {string} [where] - The site refusing it, for a message that points somewhere
+ * @returns {boolean} True when the key is private and the caller must skip it
+ */
+function refusePrivateProp(key: string, where?: string): boolean {
+  if (!isPrivateStateKey(key)) {
+    return false;
   }
-  return current;
+  const seen = where === undefined ? key : `${where}:${key}`;
+  if (!_privatePropWarned.has(seen)) {
+    _privatePropWarned.add(seen);
+    console.warn(
+      `Jx: "${key}" is private state (spec.md §5.6) and cannot be set through $props` +
+        `${where === undefined ? "" : ` (${where})`}. The write was ignored; rename the entry ` +
+        "without the leading # to make it part of the component's interface.",
+    );
+  }
+  return true;
+}
+
+/** Tests only — the warn-once set outlives a single render by design. */
+export function _resetPrivatePropWarnings(): void {
+  _privatePropWarned.clear();
 }
 
 /**
@@ -2176,6 +2202,9 @@ function getPath(obj: unknown, path: string) {
 function mergeProps(def: JxElement, parentState: JxScope): JxScope {
   const child = Object.create(parentState) as JxScope;
   for (const [k, v] of Object.entries(def.$props ?? {})) {
+    if (refusePrivateProp(k, "$props")) {
+      continue;
+    }
     child[k] = isRefObj(v) ? resolveRef(v.$ref, parentState) : v;
   }
   return child;
@@ -2364,7 +2393,12 @@ function injectHead(entries: JxHeadEntry[], _base: string) {
       el.setAttribute(k, String(v));
     }
     if (entry.textContent) {
-      el.textContent = entry.textContent;
+      // An object is a structured data block (JSON-LD, site-architecture.md §8.5). The compiler
+      // Serializes it the same way, so the interpreted page and the built page agree.
+      el.textContent =
+        typeof entry.textContent === "object"
+          ? JSON.stringify(entry.textContent, null, 2)
+          : entry.textContent;
     }
     document.head.append(el);
   }
@@ -2441,6 +2475,9 @@ export async function defineElement(source: string | JxDocument, baseUrl?: strin
         try {
           const props = JSON.parse(propsAttr) as Record<string, unknown>;
           for (const [key, val] of Object.entries(props)) {
+            if (refusePrivateProp(key, "data-jx-props")) {
+              continue;
+            }
             if (key in (def.state ?? {})) {
               state[key] = val;
             }
@@ -2458,6 +2495,10 @@ export async function defineElement(source: string | JxDocument, baseUrl?: strin
       );
       for (const name of propAttrNames) {
         const key = name.slice("props.".length);
+        if (refusePrivateProp(key, "props.* attribute")) {
+          this.removeAttribute(name);
+          continue;
+        }
         if (key in (def.state ?? {})) {
           state[key] = this.getAttribute(name);
           this.removeAttribute(name);
@@ -2466,12 +2507,22 @@ export async function defineElement(source: string | JxDocument, baseUrl?: strin
 
       // Merge $props set as JS properties by parent before connection
       for (const key of Object.keys(def.state ?? {})) {
+        if (isPrivateStateKey(key)) {
+          continue;
+        }
         if (key in this && (this as Record<string, unknown>)[key] !== undefined) {
           state[key] = (this as Record<string, unknown>)[key];
         }
       }
-      // Set up property getters/setters that forward into reactive state
+      /*
+       * Set up property getters/setters that forward into reactive state. Private entries get NO
+       * accessor: the property-first interface IS the props mechanism, so defining one would leave
+       * `el["#cache"] = x` writing straight through everything above.
+       */
       for (const key of Object.keys(def.state ?? {})) {
+        if (isPrivateStateKey(key)) {
+          continue;
+        }
         if (!(key in HTMLElement.prototype)) {
           Object.defineProperty(this, key, {
             configurable: true,
@@ -2487,7 +2538,7 @@ export async function defineElement(source: string | JxDocument, baseUrl?: strin
 
       // Capture light DOM children (for slot distribution) before rendering
       const slottedChildren = [...this.childNodes];
-      this.innerHTML = "";
+      this.replaceChildren();
 
       // Custom elements default to display:inline — use block so they behave as
       // Containers (matching <div> semantics).  The component's own style can
@@ -2569,6 +2620,9 @@ function renderCustomElementWithProps(
 
   // Set JS properties from $props (before connection)
   for (const [key, val] of Object.entries(def.$props ?? {})) {
+    if (refusePrivateProp(key, "$props")) {
+      continue;
+    }
     if (isRefObj(val)) {
       const refVal = val;
       const resolved = resolveRef(refVal.$ref, state);
@@ -2635,7 +2689,7 @@ function distributeSlots(host: HTMLElement, slottedChildren: ChildNode[]) {
     const name = slot.getAttribute("name");
     const matches = name ? (named.get(name) ?? []) : unnamed;
     if (matches.length > 0) {
-      slot.innerHTML = "";
+      slot.replaceChildren();
       for (const child of matches) {
         slot.append(child);
       }

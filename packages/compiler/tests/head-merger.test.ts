@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { mergeHead, renderHead } from "../src/site/head-merger";
+import type { JxHeadEntry } from "@jxsuite/schema/types";
 
 // ─── mergeHead ──────────────────────────────────────────────────────────────
 
@@ -188,6 +189,89 @@ describe("mergeHead", () => {
   });
 });
 
+// ─── Link identity ──────────────────────────────────────────────────────────
+
+/*
+ * `rel` + `href` is not identity. These are the four cases where it is not, and the first two are
+ * the reason feeds and locale alternates could not be emitted at all.
+ */
+describe("link deduplication", () => {
+  const links = (entries: JxHeadEntry[]) =>
+    (mergeHead([], [], entries) as JxHeadEntry[]).filter((e) => e.tagName === "link");
+
+  test("two alternates sharing an href but differing in hreflang both survive", () => {
+    // `x-default` conventionally points at the SAME href as the default locale's alternate.
+    const out = links([
+      { attributes: { href: "https://x/", hreflang: "en", rel: "alternate" }, tagName: "link" },
+      {
+        attributes: { href: "https://x/", hreflang: "x-default", rel: "alternate" },
+        tagName: "link",
+      },
+    ]);
+    expect(out).toHaveLength(2);
+  });
+
+  test("an RSS and an Atom feed both survive — they differ only in type", () => {
+    const out = links([
+      {
+        attributes: { href: "/feed", rel: "alternate", type: "application/rss+xml" },
+        tagName: "link",
+      },
+      {
+        attributes: { href: "/feed", rel: "alternate", type: "application/atom+xml" },
+        tagName: "link",
+      },
+    ]);
+    expect(out).toHaveLength(2);
+  });
+
+  test("icons differing only in sizes both survive", () => {
+    const out = links([
+      { attributes: { href: "/i.png", rel: "icon", sizes: "16x16" }, tagName: "link" },
+      { attributes: { href: "/i.png", rel: "icon", sizes: "32x32" }, tagName: "link" },
+    ]);
+    expect(out).toHaveLength(2);
+  });
+
+  test("a genuine duplicate still collapses", () => {
+    const out = links([
+      { attributes: { href: "/a.css", rel: "stylesheet" }, tagName: "link" },
+      { attributes: { href: "/a.css", rel: "stylesheet" }, tagName: "link" },
+    ]);
+    expect(out).toHaveLength(1);
+  });
+
+  /*
+   * The auto-canonical used a hand-written key `headEntryKey` never produces, so it landed under a
+   * different key than an author's own canonical and the page got BOTH — the one thing a canonical
+   * link must not be.
+   */
+  test("an author-supplied canonical replaces the auto one rather than joining it", () => {
+    const out = links([
+      { attributes: { href: "https://mine.example/x", rel: "canonical" }, tagName: "link" },
+    ]).filter((e) => e.attributes?.rel === "canonical");
+    const merged = (
+      mergeHead(
+        [],
+        [],
+        [{ attributes: { href: "https://mine.example/x", rel: "canonical" }, tagName: "link" }],
+        { pageUrl: "/x", siteUrl: "https://auto.example" },
+      ) as JxHeadEntry[]
+    ).filter((e) => e.tagName === "link" && e.attributes?.rel === "canonical");
+    expect(out).toHaveLength(1);
+    expect(merged).toHaveLength(1);
+    expect(merged[0]!.attributes!.href).toBe("https://mine.example/x");
+  });
+
+  test("the canonical is still auto-injected when the page declares none", () => {
+    const merged = (
+      mergeHead([], [], [], { pageUrl: "/x", siteUrl: "https://auto.example" }) as JxHeadEntry[]
+    ).filter((e) => e.tagName === "link" && e.attributes?.rel === "canonical");
+    expect(merged).toHaveLength(1);
+    expect(merged[0]!.attributes!.href).toBe("https://auto.example/x");
+  });
+});
+
 // ─── renderHead ─────────────────────────────────────────────────────────────
 
 describe("renderHead", () => {
@@ -235,5 +319,30 @@ describe("renderHead", () => {
   test("handles boolean attributes", () => {
     const html = renderHead([{ attributes: { async: true, src: "/app.js" }, tagName: "script" }]);
     expect(html).toContain("async");
+  });
+});
+
+describe("structured data (§8.5)", () => {
+  test("an object textContent is serialized to JSON, not stringified to [object Object]", () => {
+    const html = renderHead([
+      {
+        attributes: { type: "application/ld+json" },
+        tagName: "script",
+        textContent: { "@context": "https://schema.org", "@type": "BlogPosting", headline: "Hi" },
+      },
+    ]);
+    expect(html).not.toContain("[object Object]");
+    expect(html).toContain('"@type": "BlogPosting"');
+    const body = html.slice(html.indexOf(">") + 1, html.lastIndexOf("</script>"));
+    expect(JSON.parse(body)).toEqual({
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      headline: "Hi",
+    });
+  });
+
+  test("a string textContent is still emitted verbatim", () => {
+    const html = renderHead([{ tagName: "script", textContent: '{"a":1}' }]);
+    expect(html).toContain('<script>{"a":1}</script>');
   });
 });

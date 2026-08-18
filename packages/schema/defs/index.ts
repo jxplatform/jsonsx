@@ -84,7 +84,7 @@ export {
 } from "./class-def.schema";
 
 // Project
-export { projectConfigSchema } from "./project-config.schema";
+export { projectConfigSchema, REDIRECT_STATUSES } from "./project-config.schema";
 
 // Extensions (specs/extensions.md)
 export { extensionManifestSchema } from "./extension-manifest.schema";

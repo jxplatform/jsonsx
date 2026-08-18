@@ -18,7 +18,15 @@ export type JsonValue = SchemaJsonValue | undefined;
 
 // ─── Errors ──────────────────────────────────────────────────────────────────
 
-/** Message-level failure body every protocol route may return. */
+/**
+ * The pre-RFC-9457 failure body.
+ *
+ * Superseded by {@link ProblemDetails} in `./problem.ts`, and kept because it is still the shape a
+ * client may receive from a backend that has not migrated. A conforming backend answers
+ * `application/problem+json`; a reader written with `problemDetail` handles both.
+ *
+ * @deprecated Emit a problem document. Read this only through `problemDetail`.
+ */
 export interface ErrorBody {
   error: string;
   /** Machine-readable discriminator (e.g. "remote_moved", "cf_not_connected"). */

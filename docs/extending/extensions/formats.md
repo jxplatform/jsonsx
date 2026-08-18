@@ -8,6 +8,7 @@ spec:
 code:
   - extensions/parser/src/Markdown.class.json
   - packages/schema/src/format-registry.ts
+  - packages/schema/src/media-type.ts
 ---
 
 # Custom formats
@@ -21,7 +22,7 @@ The parser's `Markdown.class.json` declares, verbatim:
 ```json
 "format": {
   "extensions": [".md"],
-  "mediaType": "text/markdown",
+  "mediaType": "text/markdown; variant=GFM",
   "documentKinds": ["page", "component", "content"],
   "exportTarget": true,
   "remote": false
@@ -31,12 +32,51 @@ The parser's `Markdown.class.json` declares, verbatim:
 | Key             | Type                                 | Default | Meaning                                                                                                                                      |
 | --------------- | ------------------------------------ | ------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | `extensions`    | `string[]` (required)                | —       | File extensions claimed, with leading dot.                                                                                                   |
-| `mediaType`     | `string`                             | —       | MIME type; used for icons, labels, HTTP responses.                                                                                           |
+| `mediaType`     | `string`                             | —       | Media type; **validated** — a malformed value fails the registry build. Used for icons, labels and HTTP responses.                           |
 | `documentKinds` | `("page"\|"component"\|"content")[]` | `[]`    | `page`/`component` admit the extension into pages/components discovery globs; `content` admits it as a content source.                       |
 | `exportTarget`  | `boolean`                            | `false` | When true, site builds emit a serialized sidecar per page in this format (requires a `serialize` capability).                                |
 | `remote`        | `boolean`                            | `false` | When true, the `load` capability accepts `http(s)` URLs as sources. Remote content sources **must** name a remote-capable format explicitly. |
 
 Two classes may claim the same extension **only with disjoint capabilities** — the registry build fails on an ambiguous `(extension, capability)` pair. A registry never claims `.json`.
+
+### mediaType is checked
+
+Your `mediaType` reaches an HTTP header, a file-picker filter and a Studio label, so it's parsed rather than passed through. Get the grammar wrong and the build tells you:
+
+```
+Format "Toml" declares an invalid mediaType: "applicationtoml" has no "/" — a media type is type/subtype (RFC 6838 §4.2)
+```
+
+The check is on the **syntax**, not the IANA registry — `application/x.my-format` is fine, and so is any subtype nobody has registered.
+
+Parameters are welcome and carry meaning. `@jxsuite/parser` declares `text/markdown; variant=GFM`, which is how [RFC 7763](https://www.rfc-editor.org/rfc/rfc7763) says _which_ markdown a format speaks:
+
+```json
+"format": {
+  "extensions": [".md"],
+  "mediaType": "text/markdown; variant=GFM"
+}
+```
+
+:::doc-note
+If you write code that **keys** on a media type — a file-picker `accept` map, an editor language id — use the _essence_ (`text/markdown`), not the declared string. `mediaTypeEssence` on the registry entry gives you that. Two Studio call sites broke the moment the `variant` parameter was declared, which is why the distinction exists.
+:::
+
+### What a static file server sends
+
+Your `format` block only reaches code that went through the registry. A `.md` file served straight off disk — by the dev server, or by `jx preview` — never touches it, and the platform's own table answers instead.
+
+For most extensions that's fine. For two it isn't, so Jx overrides them:
+
+| Extension       | Platform says           | Jx sends                     | Why                                                                  |
+| --------------- | ----------------------- | ---------------------------- | -------------------------------------------------------------------- |
+| `.md`           | `text/markdown`         | `text/markdown; variant=GFM` | Bare `text/markdown` doesn't say _which_ markdown ([RFC 7763][7763]) |
+| `.yaml`, `.yml` | `text/yaml`, or nothing | `application/yaml`           | `text/yaml` is the pre-registration spelling ([RFC 9512][9512] §5)   |
+
+[7763]: https://www.rfc-editor.org/rfc/rfc7763
+[9512]: https://www.rfc-editor.org/rfc/rfc9512
+
+Everything else keeps whatever the host already decided — this list corrects a lookup, it isn't a second MIME table. A test asserts that the `.md` entry and the parser's declared `mediaType` agree, because they live in files that can't import each other.
 
 ## Format capabilities
 

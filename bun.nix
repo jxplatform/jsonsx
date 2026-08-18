@@ -909,6 +909,7 @@
   "@jxsuite/create" = copyPathToStore ./packages/create;
   "@jxsuite/desktop" = copyPathToStore ./packages/desktop;
   "@jxsuite/examples" = copyPathToStore ./examples;
+  "@jxsuite/feed" = copyPathToStore ./extensions/feed;
   "@jxsuite/formulas" = copyPathToStore ./packages/formulas;
   "@jxsuite/import" = copyPathToStore ./packages/import;
   "@jxsuite/markup" = copyPathToStore ./packages/markup;

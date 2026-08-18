@@ -11,6 +11,7 @@ import { dirname, join } from "node:path";
 import { existsSync } from "node:fs";
 import { unlink } from "node:fs/promises";
 import { format } from "oxfmt";
+import { problem } from "./problem.ts";
 
 interface OxcLabel {
   span: { offset: number; line: number; [key: string]: unknown };
@@ -121,7 +122,7 @@ export async function handleCodeApi(req: Request, url: URL) {
   try {
     body = (await req.json()) as CodeApiBody;
   } catch {
-    return new Response("Invalid JSON", { status: 400 });
+    return problem("invalidRequest", "Invalid JSON");
   }
 
   const action = path.slice("/__studio/code/".length);

@@ -109,7 +109,8 @@ export function declaredRpcRequests(): string[] {
  * exempt request turns up in the map and when it disappears from the schema.
  */
 export const CHROMIUM_RPC_EXEMPT: Record<string, string> = {
-  aiChatUrl: "chromium/platform.ts aiChatUrl() returns the local /__studio__/ai/chat path directly",
+  aiChatUrl:
+    "chromium/platform.ts aiChatUrl() returns the local /__studio__/ai/chat path directly, with the project server's token",
   getCanvasUrl: "chromium/platform.ts builds `canvasUrl` from location.search; no round trip",
   importSiteUrl: "chromium/platform.ts importSite() posts to /__studio__/import-site directly",
   listOpenWindows: "single-window launcher; chromium/platform.ts implements no multi-window PAL",

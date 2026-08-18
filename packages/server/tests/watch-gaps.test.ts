@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { createWatcher } from "../src/watch";
+import { createWatcher, RECONNECT_MS } from "../src/watch";
 import { join, resolve } from "node:path";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 
@@ -235,6 +235,10 @@ describe("createWatcher — rebuild integration", () => {
       const reader = (handleSSE().body as ReadableStream).getReader();
       expect(heartbeat).toBeDefined();
 
+      // The stream opens with its `retry:` field; the heartbeat is the frame after it.
+      const opening = await reader.read();
+      expect(new TextDecoder().decode(opening.value)).toBe(`retry: ${RECONNECT_MS}\n\n`);
+
       // While connected, the heartbeat comment frame reaches the client.
       heartbeat!();
       const { value } = await reader.read();
@@ -276,6 +280,102 @@ describe("createWatcher — rebuild integration", () => {
       } finally {
         console.error = origError;
       }
+      await watcher.close();
+      await sleep(50);
+    } finally {
+      rmSync(dir, { force: true, recursive: true });
+    }
+  });
+});
+
+/*
+ * The reconnection half of EventSource — `gap:sse-reconnect`. Everything asserted here is about
+ * what the stream SAYS, not about what it buffers: there is no replay, and the third test is the
+ * one that would fail if somebody added one.
+ */
+describe("createWatcher — SSE reconnection", () => {
+  const decoder = new TextDecoder();
+
+  async function readFrame(reader: ReadableStreamDefaultReader<Uint8Array>) {
+    const { value } = (await Promise.race([
+      reader.read(),
+      new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("timeout waiting for a frame")), 3000);
+      }),
+    ])) as ReadableStreamReadResult<Uint8Array>;
+    return value === undefined ? "" : decoder.decode(value);
+  }
+
+  test("the stream opens by advertising its reconnection time", async () => {
+    const dir = setup("sse-retry");
+    try {
+      const { handleSSE, watcher } = createWatcher(dir, [], { debounce: 10 });
+      const reader = (handleSSE().body as ReadableStream).getReader();
+      expect(await readFrame(reader)).toBe(`retry: ${RECONNECT_MS}\n\n`);
+      void reader.cancel();
+      await watcher.close();
+      await sleep(50);
+    } finally {
+      rmSync(dir, { force: true, recursive: true });
+    }
+  });
+
+  test("a reload frame carries an id, which is what arms Last-Event-ID", async () => {
+    const dir = setup("sse-id");
+    try {
+      const { broadcast, handleSSE, watcher } = createWatcher(dir, [], { debounce: 10 });
+      const reader = (handleSSE().body as ReadableStream).getReader();
+      await readFrame(reader); // The opening retry: field.
+      broadcast();
+      expect(await readFrame(reader)).toMatch(/^id: \d+\ndata: reload\n\n$/);
+      void reader.cancel();
+      await watcher.close();
+      await sleep(50);
+    } finally {
+      rmSync(dir, { force: true, recursive: true });
+    }
+  });
+
+  test("a reconnecting client is pushed exactly one reload, and nothing is replayed", async () => {
+    const dir = setup("sse-resume");
+    try {
+      const { broadcast, handleSSE, watcher } = createWatcher(dir, [], { debounce: 10 });
+      // Three reloads the disconnected client never saw. A replay buffer would send three.
+      broadcast();
+      broadcast();
+      broadcast();
+      const reader = (
+        handleSSE(new Request("http://127.0.0.1/__reload", { headers: { "Last-Event-ID": "1" } }))
+          .body as ReadableStream
+      ).getReader();
+      expect(await readFrame(reader)).toBe(`retry: ${RECONNECT_MS}\n\n`);
+      expect(await readFrame(reader)).toMatch(/^id: \d+\ndata: reload\n\n$/);
+      // The next frame is the heartbeat, not a second reload — one reload subsumes all three.
+      void reader.cancel();
+      await watcher.close();
+      await sleep(50);
+    } finally {
+      rmSync(dir, { force: true, recursive: true });
+    }
+  });
+
+  test("a first connection gets no reload — only a reconnection does", async () => {
+    const dir = setup("sse-fresh");
+    try {
+      const { handleSSE, watcher } = createWatcher(dir, [], { debounce: 10 });
+      const reader = (
+        handleSSE(new Request("http://127.0.0.1/__reload")).body as ReadableStream
+      ).getReader();
+      expect(await readFrame(reader)).toBe(`retry: ${RECONNECT_MS}\n\n`);
+      // Reloading a page that just loaded is a reload loop; an absent Last-Event-ID must be inert.
+      const raced = await Promise.race([
+        readFrame(reader),
+        new Promise((r) => {
+          setTimeout(() => r("__none__"), 300);
+        }),
+      ]);
+      expect(raced).toBe("__none__");
+      void reader.cancel();
       await watcher.close();
       await sleep(50);
     } finally {

@@ -1165,7 +1165,8 @@ describe("data-api delegation", () => {
   test("data routes are answered by the data-api delegate", async () => {
     const { req, url } = getReq("/__studio/data/connections");
     const res = await callApi(req, url);
-    expect(res.headers.get("Content-Type")).toContain("application/json");
+    // The delegate answered: an unconfigured data surface is a problem document, not a result.
+    expect(res.headers.get("Content-Type")).toContain("json");
   });
 });
 

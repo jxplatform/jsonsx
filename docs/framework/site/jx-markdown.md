@@ -138,6 +138,10 @@ An [array repeater](/docs/studio/design/repeaters) has no `tagName`, so it seria
 :::
 ```
 
+## Heading anchors
+
+Every heading gets an `id` built from its own text, so `## Getting started` becomes `#getting-started` and repeats get `-2`, `-3` in document order. Two things about that are worth knowing outside English: letters in any script are kept, so a Japanese or Cyrillic heading gets a real anchor rather than an empty one, and an accented heading produces one anchor whichever way the accent was typed — `é` can be a single character or an `e` plus a combining mark, which look identical and used to produce two different links. Plain-ASCII headings are unaffected, so existing links keep working.
+
 ## Standard Markdown
 
 Plain Markdown maps to the elements you'd expect: headings to `h1`–`h6`, paragraphs to `p`, emphasis to `em`/`strong`, links to `a`, images to `img`, lists to `ul`/`ol` + `li`, fenced code to `pre` > `code`, tables to `table` structures. Mixing prose and directives in one file is the normal case, not a special one.

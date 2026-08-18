@@ -6,5 +6,7 @@
  * @license MIT
  */
 
+export * from "./problem";
+export * from "./problems";
 export * from "./routes";
 export type * from "./types";

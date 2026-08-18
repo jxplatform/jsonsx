@@ -70,6 +70,16 @@
         "hono": "^4.13.2",
       },
     },
+    "extensions/feed": {
+      "name": "@jxsuite/feed",
+      "version": "0.1.0",
+      "dependencies": {
+        "@jxsuite/schema": "workspace:^",
+      },
+      "devDependencies": {
+        "ajv": "^8.20.0",
+      },
+    },
     "extensions/parser": {
       "name": "@jxsuite/parser",
       "version": "1.4.1",
@@ -113,6 +123,7 @@
       "name": "@jxsuite/ai",
       "version": "0.34.0",
       "dependencies": {
+        "@jxsuite/protocol": "workspace:^",
         "@vue/reactivity": "3.5.41",
       },
       "devDependencies": {
@@ -140,7 +151,9 @@
         "@jxsuite/create": "workspace:^",
         "@jxsuite/runtime": "workspace:^",
         "@jxsuite/schema": "workspace:^",
+        "@vue/reactivity": "3.5.41",
         "esbuild": "^0.28.2",
+        "lit-html": "^3.3.3",
         "sharp": "^0.35.3",
       },
       "devDependencies": {
@@ -827,6 +840,8 @@
     "@jxsuite/desktop": ["@jxsuite/desktop@workspace:packages/desktop"],
 
     "@jxsuite/examples": ["@jxsuite/examples@workspace:examples"],
+
+    "@jxsuite/feed": ["@jxsuite/feed@workspace:extensions/feed"],
 
     "@jxsuite/formulas": ["@jxsuite/formulas@workspace:packages/formulas"],
 

@@ -29,6 +29,7 @@ import type {
   JxMutableNode,
   ProjectConfig,
 } from "@jxsuite/schema/types";
+import { coerceEntryDates, isCoercedDate, isDateFormat } from "./dates.ts";
 import type { ContentLoaderEntry, ContentTypeDef } from "./types.ts";
 
 export type { ContentEntry, ContentLoaderEntry, TocEntry } from "./types.ts";
@@ -56,6 +57,11 @@ export interface ResolvePathsContext {
   projectConfig?: ProjectConfig;
   /** Absolute project root directory. */
   root: string;
+  /**
+   * The locale of the route being expanded, when the project has any. Only a localized collection
+   * reads it — it is the discriminator between two translations sharing an id.
+   */
+  locale?: string | null;
 }
 
 /** The `$paths` value shape routed to this extension by its `contentType` discriminator. */
@@ -110,6 +116,40 @@ function discoverJSONFiles(resolvedSource: string): string[] {
 
 // ─── Asset mounts and content-relative references ────────────────────────────
 
+/**
+ * The placeholder a content type's `source` may carry to say "one directory per locale".
+ *
+ * `./blog/{locale}/` is one content type spread over N directories, not N content types. That
+ * distinction is what keeps a translated post the same post: it keeps one schema, one set of
+ * relationship targets, and one name in `$paths`, and differs only in which directory it was read
+ * from — which is exactly the model `site-architecture.md` §13 uses for routes.
+ */
+export const LOCALE_PLACEHOLDER = "{locale}";
+
+/**
+ * The locales a `{locale}` source expands over, or `[]` when the project declares none.
+ *
+ * Reading `i18n` directly rather than through `resolveI18n` is deliberate: that lives in the
+ * compiler, this is an extension, and the contract between them is the config — not a function.
+ * Canonicalization is the compiler's job and its errors are its to report; a tag that is malformed
+ * fails the build there, so a source expanded over the raw list can never outlive it.
+ *
+ * @param {ProjectConfig | undefined} projectConfig
+ * @returns {string[]}
+ */
+export function localesForExpansion(projectConfig: ProjectConfig | undefined): string[] {
+  const raw = projectConfig?.i18n;
+  if (!raw || typeof raw !== "object") {
+    return [];
+  }
+  const declared = Array.isArray(raw.locales)
+    ? raw.locales.filter((t) => typeof t === "string")
+    : [];
+  const fallback = typeof raw.defaultLocale === "string" ? [raw.defaultLocale] : [];
+  const all = declared.length > 0 ? declared : fallback;
+  return [...new Set(all)];
+}
+
 /** The project.json section key this class owns; also the URL namespace for its asset mounts. */
 const SECTION_KEY = "content";
 
@@ -140,11 +180,35 @@ function isNonRelativeRef(value: string): boolean {
  * @param {string} root - Absolute project root directory
  * @returns {AssetMount[]} One mount per eligible content type, in declaration order
  */
-export function contentAssetMounts(section: ContentSection, root: string): AssetMount[] {
+export function contentAssetMounts(
+  section: ContentSection,
+  root: string,
+  projectConfig?: ProjectConfig,
+): AssetMount[] {
   const mounts: AssetMount[] = [];
+  const locales = localesForExpansion(projectConfig);
   for (const [name, contentTypeDef] of Object.entries(section ?? {})) {
     const source = contentTypeDef?.source;
     if (!source || source.startsWith("http://") || source.startsWith("https://")) {
+      continue;
+    }
+    /*
+     * A localized source is N directories, so it is N mounts — published under
+     * `/content/<type>/<locale>` so a French post's `./hero.png` and its English translation's
+     * cannot collide at one URL.
+     */
+    if (source.includes(LOCALE_PLACEHOLDER)) {
+      for (const locale of locales) {
+        if (!SAFE_TYPE_NAME.test(locale)) {
+          continue;
+        }
+        const dir = resolve(root, source.split(LOCALE_PLACEHOLDER).join(locale))
+          .split("\\")
+          .join("/");
+        if (SAFE_TYPE_NAME.test(name) && existsSync(dir) && statSync(dir).isDirectory()) {
+          mounts.push({ dir, urlPrefix: `/${SECTION_KEY}/${name}/${locale}` });
+        }
+      }
       continue;
     }
     if (!SAFE_TYPE_NAME.test(name)) {
@@ -310,14 +374,62 @@ export async function loadContentSection(
   section: ContentSection,
   root: string,
   formats: FormatRegistry,
+  projectConfig?: ProjectConfig,
 ): Promise<Map<string, ContentLoaderEntry[]>> {
   const contentTypes = new Map<string, ContentLoaderEntry[]>();
   const mounts = new Map(
-    contentAssetMounts(section, root).map((mount) => [mount.urlPrefix.split("/").pop()!, mount]),
+    contentAssetMounts(section, root, projectConfig).map((mount) => [
+      /*
+       * The path below `/content/` — `<type>` for a plain source, `<type>/<locale>` for a
+       * localized one — which is exactly the key each lookup below builds. Keying by the LAST
+       * segment made every localized mount unreachable (`posts/fr` never matching `fr`), so a
+       * translated entry's `./hero.png` was left unrewritten; and it collided any two types that
+       * shared a locale.
+       */
+      mount.urlPrefix.slice(`/${SECTION_KEY}/`.length),
+      mount,
+    ]),
   );
+  const locales = localesForExpansion(projectConfig);
   for (const [name, contentTypeDef] of Object.entries(section)) {
-    const entries = await loadContentType(name, contentTypeDef, root, formats, mounts.get(name));
-    contentTypes.set(name, entries);
+    const source = contentTypeDef?.source;
+    if (typeof source !== "string" || !source.includes(LOCALE_PLACEHOLDER)) {
+      const entries = await loadContentType(name, contentTypeDef, root, formats, mounts.get(name));
+      contentTypes.set(name, entries);
+      continue;
+    }
+    /*
+     * One content type, N directories. Each pass loads a real path and stamps the locale it came
+     * from onto every entry, which is the only thing distinguishing two translations that share an
+     * id — `resolvePaths` reads it back to expand the right ones under a locale-prefixed route.
+     */
+    if (locales.length === 0) {
+      console.warn(
+        `Content type "${name}": source "${source}" uses ${LOCALE_PLACEHOLDER}, but the project ` +
+          `declares no i18n locales — nothing to expand it over, so no entries were loaded.`,
+      );
+      contentTypes.set(name, []);
+      continue;
+    }
+    const all: ContentLoaderEntry[] = [];
+    for (const locale of locales) {
+      const localized = {
+        ...contentTypeDef,
+        source: source.split(LOCALE_PLACEHOLDER).join(locale),
+      };
+      const entries = await loadContentType(
+        name,
+        localized,
+        root,
+        formats,
+        mounts.get(`${name}/${locale}`),
+      );
+      for (const entry of entries) {
+        entry._meta = { ...entry._meta, locale };
+      }
+      all.push(...entries);
+    }
+    contentTypes.set(name, all);
   }
   return contentTypes;
 }
@@ -470,8 +582,15 @@ async function loadContentType(
     entries.push(...fileEntries);
   }
 
-  // Validate entries against schema if present
+  /*
+   * Coerce declared date fields before validating. This is the one point in the pipeline that holds
+   * both the entries and the schema: `Csv.load` receives a schema and `Markdown.load` does not, so
+   * doing it per-format would mean doing it twice and missing every third-party format class.
+   */
   if (schema) {
+    for (const warning of coerceEntryDates(entries, schema, name)) {
+      console.warn(warning.message);
+    }
     validateEntries(entries, schema, name);
   }
 
@@ -526,7 +645,12 @@ function validateEntries(
         continue;
       }
 
-      if (def.type === "string" && typeof value !== "string") {
+      if (isDateFormat(def.format) && typeof value === "string" && !isCoercedDate(value)) {
+        console.warn(
+          `Content validation: "${contentTypeName}/${entry.id}" field "${field}" is declared ` +
+            `${def.format} but "${value}" was not coerced — it will sort and filter as plain text.`,
+        );
+      } else if (def.type === "string" && typeof value !== "string") {
         console.warn(
           `Content validation: "${contentTypeName}/${entry.id}" field "${field}" expected string, got ${typeof value}`,
         );
@@ -652,7 +776,12 @@ export class Content {
     ctx: ProjectDataContext,
   ): Promise<Map<string, ContentLoaderEntry[]>> {
     const section = (sectionValue ?? {}) as ContentSection;
-    const data = await loadContentSection(section, ctx.root, ctx.registry.formats);
+    const data = await loadContentSection(
+      section,
+      ctx.root,
+      ctx.registry.formats,
+      ctx.projectConfig,
+    );
     resolveContentTypeRefs(data, section);
     return data;
   }
@@ -666,13 +795,22 @@ export class Content {
    * @param {{ projectConfig?: ProjectConfig; root: string }} ctx - Host context
    * @returns {AssetMount[]} One mount per content type with a local directory source
    */
-  static assets(sectionValue: unknown, ctx: { root: string }): AssetMount[] {
-    return contentAssetMounts((sectionValue ?? {}) as ContentSection, ctx.root);
+  static assets(
+    sectionValue: unknown,
+    ctx: { root: string; projectConfig?: ProjectConfig },
+  ): AssetMount[] {
+    return contentAssetMounts((sectionValue ?? {}) as ContentSection, ctx.root, ctx.projectConfig);
   }
 
   /**
    * Expand a content-type `$paths` source into route-param maps: one `{ [param]: value }` per
    * entry, with `param` defaulting to "slug" and `field` to "id" (the entry id).
+   *
+   * Each map also carries the entry's own `_meta`, under that reserved name. `_meta` is not a route
+   * parameter and the host strips it before substitution — it is how a fact about the _entry_
+   * reaches a route that would otherwise know only about the template that generated it. The one
+   * that matters today is `mtime`: without it every post in a collection reports the template's
+   * timestamp in `<lastmod>`, so the whole archive looks edited whenever the template is.
    *
    * @param {ContentPathsSource} pathsDef - The `$paths` value ({ contentType, param?, field? })
    * @param {ResolvePathsContext} ctx - Host context ({ data, projectConfig, root })
@@ -691,10 +829,30 @@ export class Content {
     }
     const param = pathsDef.param ?? "slug";
     const field = pathsDef.field ?? "id";
-    return entries
-      .map((entry) => ({
-        [param]: field === "id" ? entry.id : (entry.data[field] ?? entry.id),
-      }))
-      .filter((p) => p[param]);
+    /*
+     * A localized collection holds every language at once, and two translations of one post share
+     * an id — so expanding all of them under `/fr/[slug]` would emit each route twice and let the
+     * second overwrite the first. The route's own locale is the discriminator, and it is applied
+     * only when the entries actually carry one: an unlocalized collection is untouched.
+     */
+    const localized = entries.some((entry) => entry._meta?.locale !== undefined);
+    const wanted = ctx.locale;
+    const scoped =
+      localized && typeof wanted === "string"
+        ? entries.filter((entry) => entry._meta?.locale === wanted)
+        : entries;
+    const paths: Record<string, unknown>[] = [];
+    for (const entry of scoped) {
+      const value = field === "id" ? entry.id : (entry.data[field] ?? entry.id);
+      if (!value) {
+        continue;
+      }
+      const pathEntry: Record<string, unknown> = { [param]: value };
+      if (entry._meta !== undefined) {
+        pathEntry._meta = entry._meta;
+      }
+      paths.push(pathEntry);
+    }
+    return paths;
   }
 }

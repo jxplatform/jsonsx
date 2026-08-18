@@ -35,12 +35,15 @@
     "docs:claims": "bun scripts/docs/check-site-claims.ts",
     "docs:status": "bun scripts/docs/check-spec-status.ts",
     "docs:spec-release": "bun scripts/docs/check-spec-release.ts",
+    "docs:standards": "bun scripts/docs/check-standards.ts",
     "docs:generate": "bun scripts/docs/generate-reference.ts",
     "docs:sync": "bun scripts/docs/check-doc-sync.ts",
     "docs:verify": "bun run docs:generate && git diff --exit-code -- docs && bun run docs:check && bun run docs:images:check",
     "eval": "bun run --cwd packages/studio eval",
     "eval:headless": "bun run --cwd packages/studio eval:headless",
-    "format": "oxfmt .",
+    "format": "bun scripts/normalize-markdown.ts && oxfmt .",
+    "format:md": "bun scripts/normalize-markdown.ts",
+    "docs:markdown": "bun scripts/normalize-markdown.ts --check",
     "generate:schema": "bun run --cwd packages/schema schema",
     "schema:verify": "bun run generate:schema && git diff --exit-code -- packages/schema/schema.json && bun run schema:generate-all && git diff --exit-code -- '**/project.schema.json' '**/document.schema.json'",
     "lint": "oxlint .",
@@ -86,6 +89,9 @@
     "typescript": "^7.0.2"
   },
   "nano-staged": {
+    "*.md": [
+      "bun scripts/normalize-markdown.ts"
+    ],
     "*.{ts,json,css,md}": [
       "oxfmt --no-error-on-unmatched-pattern"
     ],

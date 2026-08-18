@@ -391,7 +391,7 @@ describe("buildSite sidecar/worker failure reporting", () => {
     const result = await buildSite(ERRS, { verbose: false });
     // Collision between ./alpha-beta.js and ./alpha/beta.js on one asset slug.
     expect(
-      result.errors.some((e) => e.includes("both bundle to /assets/components-alpha-beta.js")),
+      result.errors.some((e) => e.includes("both map to /assets/components-alpha-beta.js")),
     ).toBe(true);
     // The colliding specifier and the broken sidecar keep their verbatim imports.
     const module = readFileSync(resolve(ERRS, "dist/components/collide-widget.js"), "utf8");

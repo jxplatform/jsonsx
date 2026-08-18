@@ -21,6 +21,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { initShellRefs, registerRenderer } from "../src/store";
 import { initLayers } from "../src/ui/layers";
 import { activeTab, closeAllTabs } from "../src/workspace/workspace";
+import { problems, resetNotifications } from "../src/services/notify";
 import { invalidateLayoutHeadCache } from "../src/panels/head-panel";
 import { invalidateLayoutCache } from "../src/site-context";
 import { createCommandRegistry } from "../src/commands/registry";
@@ -526,5 +527,28 @@ describe("counters and warnings, and the absence of a score", () => {
     await flush(4);
     expect(seoRow("description").querySelector(".provenance-chip--set")).toBeTruthy();
     expect(seoRow("description").textContent).toContain("Written here");
+  });
+});
+
+// ─── The warnings also reach Problems ────────────────────────────────────────
+
+describe("SEO warnings are Problems too", () => {
+  test("opening the modal files one Problem per warning, and a re-open replaces them", async () => {
+    /*
+     * A window someone has to open is not where a fact should live alone. Problems is where this
+     * app keeps the records that outlive the frame you were not watching.
+     */
+    setupContentTab({ title: "Hello" }, { documentPath: "posts/hello.json" });
+    resetNotifications();
+    await mountAndFlush();
+    const filed = problems.filter((p) => p.source === "Search appearance");
+    expect(filed.length).toBeGreaterThan(0);
+    expect(filed.every((p) => p.tier === "problem")).toBe(true);
+    // Every row leads back to the window that fixes it.
+    expect(filed.every((p) => p.action === "document.openSeo")).toBe(true);
+
+    const before = filed.length;
+    openSeoModal(activeTab.value!);
+    expect(problems.filter((p) => p.source === "Search appearance")).toHaveLength(before);
   });
 });

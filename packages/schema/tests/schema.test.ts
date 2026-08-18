@@ -143,6 +143,7 @@ describe("generateClassSchema", () => {
       "resolvePaths",
       "lower",
       "emit",
+      "head",
       "assets",
       "mount",
       "dialect",

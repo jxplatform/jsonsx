@@ -2,9 +2,9 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.24-draft
+**Version:** 0.9.30-draft
 **Status:** Partial
-**Updated:** 2026-08-13
+**Updated:** 2026-08-18
 **License:** MIT
 
 ---
@@ -846,6 +846,41 @@ Three consequences are normative:
 3.  **A selection is replaced, never mutated in place.** Effects track the set, not the array
     identity; an in-place push would move the selection without repainting the panel drawing it.
 
+### 6.8 The `From data…` picker addresses only what it can list
+
+> **Status: Partial.** The picker lists the document's state signals and writes a `$ref` to the one
+> chosen. A pointer the picker cannot construct is not rejected anywhere — it is simply unreachable
+> from the UI, and an author who hand-writes one gets a field that renders correctly and cannot be
+> edited back.
+
+The rung writes a JSON Pointer (`spec.md` §7.1), and JSON Pointer addresses strictly more than a
+flat list of signals. RFC 6901 §3 excludes exactly two characters from a reference token, `/` and
+`~`; every other character is ordinary. Three consequences the picker does not yet cover:
+
+| Pointer                     | Addresses                              | Picker |
+| --------------------------- | -------------------------------------- | ------ |
+| `#/state/count`             | one state signal                       | ✅     |
+| `#/state/nav/data/sections` | a path into a signal's value           | ❌     |
+| `#/state/user.name`         | one signal whose name contains a dot   | ❌     |
+| `#/state/a~1b`              | one signal whose name contains a slash | ❌     |
+
+The first gap is the common one: 3 of the repository's 227 `#/state/` refs walk into a signal's
+value, and the docs site's own layout is one of them. The other two are legal and unused — no
+document here has such a key — but "unused" is not "invalid", and the picker currently makes them
+authorable only by editing JSON by hand.
+
+Two rules for whatever closes this:
+
+1.  **The picker must never write a pointer it cannot read back.** A control that can produce a ref
+    it then renders as blank or as `[object Object]` is the failure §6.6 rule 2 already names.
+2.  **Escaping is the writer's job, not the author's.** An author who names a signal `a/b` types
+    `a/b`; `~1` is an encoding detail of the pointer and must not surface in the UI. The encoder
+    exists — `escapeToken` in `@jxsuite/runtime/pointer` — and is what any path-aware picker builds
+    its segments with.
+
+Until then the gap is stated rather than hidden, because the alternative is a picker that silently
+implies the pointer grammar is flatter than it is.
+
 ## 7. Project Styles
 
 ### 7.1 Overview
@@ -1336,7 +1371,8 @@ See the [Site Architecture Specification](site-architecture.md) for full design 
 
 ## 13. Command Registry and Context Keys
 
-**Status:** Partial — the registry, the keymap and the CI checks ship; the surfaces are being ported onto them.
+> **Status: Partial.** The registry, the keymap and the CI checks ship; the surfaces are being
+> ported onto them.
 
 Every capability Studio has is one **command record**. The Command Bar, the palette, the Navigator
 rail, the context menus, the block action bar, the keymap, `__jxAutomation` and the assistant's tool
@@ -1572,7 +1608,8 @@ are its own arithmetic and a caller outside the app can only guess at them.
 
 ## 14. Tabs and Document Identity
 
-**Status:** Partial — the identity model and the strip ship; per-pane tab strips and preview tabs are pending.
+> **Status: Partial.** The identity model and the strip ship; per-pane tab strips and preview tabs
+> are pending.
 
 ### 14.1 A tab's id IS its document
 
@@ -1708,8 +1745,10 @@ instruction and wins. A bare `?project=<dir>` means "open this project", and tha
 
 ## 15. Application Preferences
 
-**Status:** Partial — Appearance, Assistant, Accounts and a read-only Keyboard sheet ship; Editor
-behaviour, rebinding and Updates/About are pending.
+> **Status: Partial.** Appearance, Assistant, Accounts and Keyboard ship, the last of them with
+> rebinding: `preferences-keymap.ts` captures a chord, `rebindCommand` refuses a conflicting one,
+> and the result is an override map laid over the registry and remembered across windows. Editor
+> behaviour and Updates/About are pending — neither exists as a pane.
 
 `project.json` configures a **project** and is edited as a project document (`⌘⇧,`, command id
 `settings.open`). **Preferences** (`⌘,`, command id `app.preferences`) configures the
@@ -1746,8 +1785,16 @@ setup notice) repaint without Preferences having to know they exist.
 
 ## 16. Feedback, Problems and Progress
 
-**Status:** Implemented — the notification substrate, the Bottom dock and all three of its tabs
-(Problems, Logic, Activity), and the inline field slot.
+> **Status: Implemented.** The notification substrate, the Bottom dock and all three of its tabs
+> (Problems, Logic, Activity), the inline field slot and the **announcement** all ship.
+>
+> The announcement was the last piece and it is worth recording where it lives, because the obvious
+> place is wrong. It is not a region on the Problems panel: that panel sits in the Bottom dock, and
+> a live region inside a hidden tab announces nothing. `services/announce.ts` owns two body-level
+> regions — `assertive` and `polite`, because politeness is read when the region is created and not
+> when its text changes (WAI-ARIA §5.2.9) — and `notify()` calls it at one unconditional call site,
+> so a record cannot be posted without being announced and a future host inherits announcements
+> without knowing the module exists. See §19.
 
 Studio's predecessor had one feedback surface: a 24px status bar carrying 78 outcomes — successes
 and failures alike — in identical 11px grey text, destroyed after 3000ms. Nothing persisted, nothing
@@ -1863,12 +1910,43 @@ beats being current — and that deferral is now visible rather than silent. A p
 from before the last edit is correct; a panel showing it with no indication is indistinguishable
 from a panel that has stopped working.
 
+### 16.6 Reports about the author's own content
+
+> **Status: Implemented.**
+
+Two checks run over the document rather than over the app, and both file their findings as
+**Problems**: the accessibility report (`services/a11y-report.ts`) and the SEO warnings the Search
+appearance window already computed.
+
+**Why Problems and not a panel of their own.** Problems is where this app keeps the records that
+outlive the frame the reader was not watching, and both of these are exactly that: a page shipped
+with no description, or with an unlabelled image, is a fact worth knowing whether or not the author
+thought to open a window. The Search appearance window keeps rendering its own list — the previews
+are what that window is for — and files the same warnings, keyed by warning id, so the two surfaces
+are naming one thing rather than two.
+
+**No score, in either report.** A single figure out of a hundred aggregates unrelated facts into a
+verdict, and the verdict is what gets optimised. The list is the report.
+
+**Every accessibility finding names its WCAG criterion**, which is what ATAG 2.0 B.3.1 asks a report
+to carry. B.3.2 — a repair the author can invoke from the finding — is only partly answered: a
+finding whose repair is a command carries it, and most repairs ("give this image alt text") have no
+command yet, so those findings carry none. Naming a command that merely reopens a panel would put a
+button on a finding that does not do what the button says.
+
+**A run says what it could NOT check.** Colour contrast between computed colours, target size in
+rendered pixels, focus order and reading order are all properties of built output in a browser, not
+of a document tree; answering them means running the page with an engine like axe-core. Two
+Problems name that absence on every run, because a report that lists nothing otherwise reads as
+"this page is accessible" — a claim the run cannot make. This is the `redirects-grid.ts` idiom, for
+the same reason it exists there.
+
 ---
 
 ## 17. Project Documents (Settings and Styles)
 
-**Status:** Partial — `project.json` is a document under the transaction log and both surfaces
-render from it; the formatting-preserving writer described in §17.2 is not built.
+> **Status: Partial.** `project.json` is a document under the transaction log and both surfaces
+> render from it; the formatting-preserving writer described in §17.2 is not built.
 
 Project configuration used to be edited through a modal by **29 fire-and-forget call sites across
 eight files**, twenty-one of which dropped a rejected write on the floor — `void
@@ -1924,8 +2002,8 @@ inline (§16), rather than writing and hoping.
 
 ## 18. Panes
 
-**Status:** Implemented — the pane grid, two live Canvas panes, per-pane canvas state, the jump bar,
-the dock takeovers and derived panes.
+> **Status: Implemented.** The pane grid, two live Canvas panes, per-pane canvas state, the jump
+> bar, the dock takeovers and derived panes.
 
 ### 18.1 A pane is where a document is shown
 
@@ -2057,8 +2135,24 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ---
 
+## 19. Standards Alignment
+
+External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md). Detailed accessibility conventions live in [`studio-ui-guidelines.md`](./studio-ui-guidelines.md) §14; this section cites what the Studio _shell_ binds.
+
+| Standard                                           | Class      | Binds | Evidence                                                                                                                          | Note                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| -------------------------------------------------- | ---------- | ----- | --------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [WAI-ARIA](https://www.w3.org/TR/wai-aria-1.2/)    | **Subset** | §16   | packages/studio/src/services/announce.ts, packages/studio/tests/announce.test.ts, packages/studio/src/ui/layers.ts                | Every `notify` record reaches a live region, whatever tier it lands in: `announce.ts` keeps one `role="alert"` and one `role="status"` region on `<body>` and `notify()` posts to the one the severity picks (§5.2.9). Body-level rather than panel-level because the Problems panel lives in a dock tab, and a region in a hidden tab announces nothing. Modals carry `role="dialog"` with `aria-modal`. Absent: the wider authoring surfaces, whose conventions are `studio-ui-guidelines.md` §14.                                                  |
+| [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) | **Subset** | §16   | packages/studio/src/platform-errors.ts, packages/studio/src/platforms/devserver.ts, packages/studio/tests/platform-errors.test.ts | A Problem's message comes from one reader over every shape a backend has sent, so a failure can no longer surface blank because the reader that ran was not the one for the shape that arrived. `problemDetail` answers `null` rather than a generic string, which is what lets each call site keep its own better words. Absent: `instance`.                                                                                                                                                                                                         |
+| [ATAG 2.0](https://www.w3.org/TR/ATAG20/)          | **Subset** | §16.6 | packages/studio/src/services/a11y-report.ts, packages/studio/tests/a11y-report.test.ts, packages/studio/src/panels/head-panel.ts  | Part B.3.1 is met: a check over the author's document files a Problem per finding, each naming its WCAG criterion, and names what it could not check rather than reporting a clean bill. B.3.2 is partial — a repair command is carried where one exists, and most repairs have none yet. Part A is `studio-ui-guidelines.md` §13.1a and §8.2. Everything needing layout or the cascade is a property of built output and is out of scope for a document-tree check; the two Problems that say so are how the boundary is stated rather than implied. |
+
 ## Changelog
 
+- **0.9.30-draft** (2026-08-18) — §15: the Keyboard sheet is no longer read-only — rebinding ships, Editor and Updates/About remain pending.
+- **0.9.29-draft** (2026-08-18) — §16 and §19: the notify announcement ships — correct a marker and a WAI-ARIA note that both described the gap it closed.
+- **0.9.28-draft** (2026-08-18) — §6.8: the From data… picker addresses only what it can list — nested paths and tokens holding a dot or slash are legal pointers it cannot author.
+- **0.9.27-draft** (2026-08-16) — §16.6 reports about the author's own content — an ATAG Part B accessibility check and the SEO warnings both file Problems, each finding naming its WCAG criterion, and each run naming what it could not check. Closes gap:atag-authoring-support.
+- **0.9.26-draft** (2026-08-16) — §16 one Problem reader over every backend failure shape; gap:studio-error-reader closed.
+- **0.9.25-draft** (2026-08-15) — Add §19 Standards Alignment; six bare **Status:** lines converted to the blockquote form no tool could read, and §16 marked Partial — the one status channel has no live region for the error tier.
 - **0.9.24-draft** (2026-08-13) — Open in Browser serves the built site on its own origin; the build reports the URL.
 - **0.9.23-draft** (2026-08-13) — Open in Browser opens the page's route on a server that serves the built site there, and builds it first.
 - **0.9.22-draft** (2026-08-13) — The slash menu is recognised at the editing host and gains a named door (insert.openSlashMenu).
@@ -2138,4 +2232,4 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.24-draft_
+_`@jxsuite/studio` Specification v0.9.30-draft_

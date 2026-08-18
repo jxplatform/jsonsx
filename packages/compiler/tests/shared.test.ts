@@ -1059,9 +1059,9 @@ describe("renderStaticNode", () => {
 
   test("renders self-closing tags", () => {
     expect(renderStaticNode({ tagName: "br" }, null)).toBe("<br>");
-    expect(renderStaticNode({ tagName: "img" }, null)).toBe(
-      '<img loading="lazy" decoding="async">',
-    );
+    // The emitter no longer decides how an image loads — the image pipeline does, from
+    // `images.lazyLoad` and whatever the author already said (site/img-loading.ts).
+    expect(renderStaticNode({ tagName: "img" }, null)).toBe("<img>");
     expect(renderStaticNode({ tagName: "input" }, null)).toBe("<input>");
     expect(renderStaticNode({ tagName: "hr" }, null)).toBe("<hr>");
   });

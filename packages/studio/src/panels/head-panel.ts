@@ -14,6 +14,7 @@ import { projectState, renderOnly } from "../store";
 import type { DirEntry, JsonValue } from "../types";
 import { activeTab } from "../workspace/workspace";
 import { activeRegistry } from "../commands/active-registry";
+import { clearProblems, notify } from "../services/notify";
 import { renderEmptyState } from "./empty-state";
 import { registerPanel } from "./panel-registry";
 import { mutateUpdateFrontmatter, transact } from "../tabs/transact";
@@ -437,6 +438,34 @@ export const SEO_LIMITS: Readonly<Record<string, number>> = {
   title: 60,
 };
 
+/** Counts what a reader sees as one character. See {@link visibleLength}. */
+const GRAPHEME_SEGMENTER = new Intl.Segmenter("en-US", { granularity: "grapheme" });
+
+/**
+ * How long a value looks, in the units the person reading the counter has in mind.
+ *
+ * `String.length` counts UTF-16 code units, which is not a count of anything a person can see: an
+ * emoji is 2, a flag is 4, and "👩‍🚀" is 5 — so a title with three emoji reported eleven
+ * characters of budget spent on three glyphs, and the warning beside it was wrong by the same
+ * margin. Counting **grapheme clusters** (UAX #29) counts what renders.
+ *
+ * **What this deliberately does not do is model pixel width.** "iiiii" and "WWWWW" are both five,
+ * and a search result truncates on width — but width depends on the font the search engine chooses,
+ * at a size it chooses, and any table of per-character widths here would be a fabricated number
+ * presented as a measurement. A character count next to a documented limit is an honest
+ * approximation; a pixel count would not be.
+ *
+ * @param {string} value
+ * @returns {number}
+ */
+export function visibleLength(value: string): number {
+  let count = 0;
+  for (const _ of GRAPHEME_SEGMENTER.segment(value)) {
+    count += 1;
+  }
+  return count;
+}
+
 /** A named thing that is wrong, or absent. Never summed — the list IS the report. */
 export interface SeoWarning {
   /** Stable id, so a test and a shot name the same warning. */
@@ -444,6 +473,38 @@ export interface SeoWarning {
   /** The head key the warning is about, so the field row can carry it. */
   field: string;
   message: string;
+}
+
+/** The Problems `source` the SEO warnings carry, so a re-run replaces rather than stacks. */
+export const SEO_PROBLEM_SOURCE = "Search appearance";
+
+/**
+ * File the SEO warnings as Problems as well as rendering them in the modal.
+ *
+ * The modal is a window someone has to open. A page shipped with no description is a fact worth
+ * knowing whether or not you thought to look, and Problems is where this app already keeps facts
+ * that outlive the frame you were not watching — which is the same argument the accessibility
+ * report makes, and the redirects checks before it.
+ *
+ * Cleared first, so a fixed page stops being listed; keyed by warning id, so the two surfaces name
+ * the same thing.
+ *
+ * @param {SeoPreview} preview
+ * @param {string} [path] The document's path, so a row can open the file it is about.
+ * @returns {number} How many Problems were filed.
+ */
+export function reportSeoProblems(preview: SeoPreview, path?: string): number {
+  clearProblems((record) => record.source === SEO_PROBLEM_SOURCE);
+  for (const warning of preview.warnings) {
+    notify.warn(warning.message, {
+      action: "document.openSeo",
+      key: `seo.${warning.id}`,
+      source: SEO_PROBLEM_SOURCE,
+      tier: "problem",
+      ...(path === undefined ? {} : { path }),
+    });
+  }
+  return preview.warnings.length;
 }
 
 /** Everything the two preview cards, the field list and the warning list render. */
@@ -528,12 +589,13 @@ export function seoWarnings(
     });
   }
   for (const field of preview.fields) {
-    if (field.limit !== null && field.value.length > field.limit) {
+    const length = visibleLength(field.value);
+    if (field.limit !== null && length > field.limit) {
       const kind = field.key.endsWith("description") ? "summaries" : "headlines";
       warnings.push({
         field: field.key,
         id: `${field.key}-long`,
-        message: `${field.label} is ${field.value.length} characters; ${kind} are cut near ${field.limit}.`,
+        message: `${field.label} is ${length} characters; ${kind} are cut near ${field.limit}.`,
       });
     }
   }

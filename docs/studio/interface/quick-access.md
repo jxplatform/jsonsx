@@ -13,6 +13,8 @@ Quick Access is the fastest way to open a file: a search palette that drops over
 
 ## Open it
 
+Arrowing through the results announces the highlighted row, so the list is usable without looking at it — the input and the list beneath it are now connected in the way a screen reader expects, which they were not before.
+
 - Press :kbd[⌘P] (macOS) or :kbd[Ctrl+P] (Windows/Linux) — it works from anywhere in Studio.
 - Or click any segment of the **Command Center** pill in the middle of the Command Bar — the segment you click scopes the search to that level.
 

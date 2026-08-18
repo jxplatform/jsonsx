@@ -24,23 +24,40 @@
  * reported about it either way — see {@link validateRedirects}.
  */
 
+import { REDIRECT_STATUSES } from "@jxsuite/schema/defs";
 import { parseCsv } from "./csv-codec";
 
 /** One redirect rule, flattened out of `project.json`'s two accepted spellings. */
+/**
+ * A rule's target: an RFC 9110 §15.4 redirection status, or a rewrite.
+ *
+ * A rewrite is NOT status 200. It serves the destination's content at the source URL, and the 200
+ * that reaches `_redirects` is the host's convention for saying so. Modelling it as a status is
+ * what let the compiler emit a meta-refresh page for one — see site-architecture.md §11.3.
+ */
+export const REWRITE = "rewrite";
+export type RedirectTarget = (typeof REDIRECT_STATUSES)[number] | typeof REWRITE;
+
 export interface RedirectRule {
   source: string;
   destination: string;
-  status: number;
+  status: RedirectTarget;
 }
 
-/** The statuses the status column offers. 200 is a rewrite (proxy), per §11.3. */
-export const REDIRECT_STATUSES = [301, 302, 307, 308, 200] as const;
+/** What the status column offers, in the order it offers them. */
+export const REDIRECT_TARGETS: readonly RedirectTarget[] = [...REDIRECT_STATUSES, REWRITE];
 
 /** The status `project.json` means when a rule is written as a bare string. */
 export const DEFAULT_REDIRECT_STATUS = 301;
 
+/** The status a rewrite is written as in `_redirects`, and read back from an import. */
+export const REWRITE_WIRE_STATUS = 200;
+
 /** `project.json`'s redirects map, as the schema types it. */
-export type RedirectConfig = Record<string, string | { destination: string; status?: number }>;
+export type RedirectConfig = Record<
+  string,
+  string | { destination: string; status?: number } | { destination: string; rewrite: true }
+>;
 
 // ─── Paths and patterns ───────────────────────────────────────────────────────
 
@@ -105,14 +122,19 @@ export function routePattern(route: string): string {
 
 /** Flatten `project.json`'s redirects map into rules, in declaration order. */
 export function rulesFromConfig(config: RedirectConfig | undefined): RedirectRule[] {
-  return Object.entries(config ?? {}).map(([source, target]) => ({
-    destination: typeof target === "string" ? target : target.destination,
-    source,
-    status:
-      typeof target === "string"
-        ? DEFAULT_REDIRECT_STATUS
-        : (target.status ?? DEFAULT_REDIRECT_STATUS),
-  }));
+  return Object.entries(config ?? {}).map(([source, target]) => {
+    if (typeof target === "string") {
+      return { destination: target, source, status: DEFAULT_REDIRECT_STATUS };
+    }
+    if ("rewrite" in target) {
+      return { destination: target.destination, source, status: REWRITE };
+    }
+    return {
+      destination: target.destination,
+      source,
+      status: (target.status ?? DEFAULT_REDIRECT_STATUS) as RedirectTarget,
+    };
+  });
 }
 
 /**
@@ -127,10 +149,13 @@ export function rulesFromConfig(config: RedirectConfig | undefined): RedirectRul
 export function configFromRules(rules: readonly RedirectRule[]): RedirectConfig {
   const config: RedirectConfig = {};
   for (const rule of rules) {
-    config[rule.source] =
-      rule.status === DEFAULT_REDIRECT_STATUS
-        ? rule.destination
-        : { destination: rule.destination, status: rule.status };
+    if (rule.status === REWRITE) {
+      config[rule.source] = { destination: rule.destination, rewrite: true };
+    } else if (rule.status === DEFAULT_REDIRECT_STATUS) {
+      config[rule.source] = rule.destination;
+    } else {
+      config[rule.source] = { destination: rule.destination, status: rule.status };
+    }
   }
   return config;
 }
@@ -269,12 +294,19 @@ export interface RedirectImport {
 }
 
 /** A status token, tolerating Netlify's forcing `!` suffix. Null when it is not a status at all. */
-function parseStatus(token: string | undefined): number | null {
+function parseStatus(token: string | undefined): RedirectTarget | null {
   if (token === undefined || token === "") {
     return DEFAULT_REDIRECT_STATUS;
   }
-  const value = Number(token.replace(/!$/, ""));
-  return Number.isInteger(value) && value >= 100 && value <= 599 ? value : null;
+  const raw = token.trim().replace(/!$/, "");
+  // An imported `_redirects` writes a rewrite as 200, and a pasted CSV may say so in words.
+  if (raw.toLowerCase() === REWRITE || Number(raw) === REWRITE_WIRE_STATUS) {
+    return REWRITE;
+  }
+  const value = Number(raw);
+  return (REDIRECT_STATUSES as readonly number[]).includes(value)
+    ? (value as RedirectTarget)
+    : null;
 }
 
 /** Netlify/Cloudflare `_redirects`: `source destination [status]`, `#` comments, blank lines. */
@@ -340,7 +372,9 @@ export function parseRedirectsCsv(text: string): RedirectImport {
       columns.status === -1 ? undefined : (record[columns.status] ?? "").trim(),
     );
     if (code === null) {
-      errors.push(`Row ${line}: "${record[columns.status]}" is not an HTTP status.`);
+      errors.push(
+        `Row ${line}: "${record[columns.status]}" is not one of ${REDIRECT_TARGETS.join(", ")}.`,
+      );
       continue;
     }
     rules.push({ destination, source, status: code });

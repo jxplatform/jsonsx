@@ -8,6 +8,7 @@ import {
   projectRootKey,
   sessionBase,
 } from "../src/platforms/cloud";
+import { recordCollabSockets } from "./collab-socket-recorder";
 
 const PROJECT = { owner: "octocat", repo: "my-site", branch: "main" };
 const BASE = "/api/v1/p/octocat/my-site/main/studio";
@@ -999,42 +1000,40 @@ describe("collab capability", () => {
   });
 
   test("opens ONE multiplexed socket at the gateway's /collab path", async () => {
-    const seen: string[] = [];
-    class RecordingWebSocket {
-      binaryType = "";
-      readyState = 0;
-      onopen: (() => void) | null = null;
-      onclose: (() => void) | null = null;
-      onerror: (() => void) | null = null;
-      onmessage: ((ev: unknown) => void) | null = null;
-      sent = 0;
-      constructor(url: string) {
-        seen.push(url);
-      }
-      send(): void {
-        this.sent += 1;
-      }
-      close(): void {
-        this.sent = -1;
-      }
-    }
-    const realWs = (globalThis as Record<string, unknown>)["WebSocket"];
-    (globalThis as Record<string, unknown>)["WebSocket"] = RecordingWebSocket;
+    mockFetch();
+    // Two opens share the connection.
+    const seen = await recordCollabSockets(() => createCloudPlatform(PROJECT), 2);
+    expect(seen).toEqual([{ url: `ws://${location.host}${BASE}/collab` }]);
+  });
+
+  test("a gateway that does not answer the probe still gets a socket, offering nothing", async () => {
+    /*
+     * The gateway ships separately from this bundle, so an unanswered probe means "older gateway",
+     * not "no collaboration". Treating it as a refusal would take working co-editing away from
+     * every session pointed at one — and offering nothing is also the only handshake-safe answer
+     * to a server that would echo nothing (RFC 6455 §4.1).
+     */
+    mockFetch({ "/collab": { body: { error: "Not Found" }, status: 404 } });
+    const seen = await recordCollabSockets(() => createCloudPlatform(PROJECT));
+    expect(seen).toEqual([{ url: `ws://${location.host}${BASE}/collab` }]);
+  });
+
+  test("offers the subprotocol the gateway advertises", async () => {
+    mockFetch({ "/collab": { body: { collab: true, protocols: ["jx.collab.v1"], version: 1 } } });
+    const seen = await recordCollabSockets(() => createCloudPlatform(PROJECT));
+    expect(seen).toEqual([
+      { protocols: ["jx.collab.v1"], url: `ws://${location.host}${BASE}/collab` },
+    ]);
+  });
+
+  test("refuses a gateway speaking an envelope this build cannot parse", async () => {
+    mockFetch({ "/collab": { body: { collab: true, protocols: ["jx.collab.v9"], version: 9 } } });
+    const realWarn = console.warn;
+    console.warn = () => {};
     try {
-      const p = createCloudPlatform(PROJECT);
-      // Two opens share the connection; neither resolves (the socket never answers) — the
-      // Session-level timeout owns fallback. Only the URL/multiplexing contract is under test.
-      void p.collab!("pages/a.md");
-      void p.collab!("pages/b.md");
-      const deadline = Date.now() + 3000;
-      while (seen.length === 0 && Date.now() < deadline) {
-        await new Promise((resolve) => {
-          setTimeout(resolve, 10);
-        });
-      }
-      expect(seen).toEqual([`ws://${location.host}${BASE}/collab`]);
+      expect(await createCloudPlatform(PROJECT).collab!("pages/a.md")).toBeNull();
     } finally {
-      (globalThis as Record<string, unknown>)["WebSocket"] = realWs;
+      console.warn = realWarn;
     }
   });
 });

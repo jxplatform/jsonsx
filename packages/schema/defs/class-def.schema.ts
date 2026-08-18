@@ -15,6 +15,7 @@ export const CLASS_METHOD_ROLES = [
   "resolvePaths",
   "lower",
   "emit",
+  "head",
   "assets",
   "mount",
   "dialect",

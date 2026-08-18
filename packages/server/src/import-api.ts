@@ -22,6 +22,7 @@
 
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { problem } from "./problem.ts";
 
 export interface ImportApiOptions {
   /**
@@ -81,15 +82,15 @@ async function handleImportSite(req: Request, opts: ImportApiOptions): Promise<R
   try {
     body = (await req.json()) as ImportRequestBody;
   } catch {
-    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+    return problem("invalidRequest", "Invalid JSON body");
   }
 
   const { url, directory } = body;
   if (!url || !directory) {
-    return Response.json({ error: "url and directory are required" }, { status: 400 });
+    return problem("invalidRequest", "url and directory are required");
   }
   if (!url.startsWith("http://") && !url.startsWith("https://")) {
-    return Response.json({ error: "url must start with http:// or https://" }, { status: 400 });
+    return problem("invalidRequest", "url must start with http:// or https://");
   }
 
   let destPath: string;
@@ -97,7 +98,7 @@ async function handleImportSite(req: Request, opts: ImportApiOptions): Promise<R
     destPath = opts.resolveDest(directory);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return Response.json({ error: message }, { status: 400 });
+    return problem("invalidRequest", message);
   }
 
   const depth = clamp(body.depth ?? 1, 0, MAX_DEPTH);

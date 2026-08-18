@@ -117,8 +117,10 @@
         { "path": "framework/site/jx-markdown", "label": "Jx Markdown" },
         { "path": "framework/site/relationships", "label": "Relationships" },
         { "path": "framework/site/seo", "label": "SEO and metadata" },
+        { "path": "framework/site/i18n", "label": "Locales and languages" },
         { "path": "framework/site/images", "label": "Images" },
         { "path": "framework/site/redirects", "label": "Redirects" },
+        { "path": "framework/site/feeds", "label": "Feeds" },
         { "path": "framework/site/search", "label": "Site search" },
         { "path": "framework/site/deployment", "label": "Build output and adapters" },
         { "path": "framework/build", "label": "How compilation works" },
@@ -156,6 +158,7 @@
         { "path": "extending/reference/studio-routes", "label": "Protocol routes" },
         { "path": "extending/reference/implementation-status", "label": "Implementation status" },
         { "path": "extending/reference/spec-changelog", "label": "Spec changelog" },
+        { "path": "extending/reference/standards", "label": "Standards alignment" },
         { "path": "extending/contributing/monorepo", "label": "Working in the monorepo" },
         { "path": "extending/contributing/docs", "label": "Contributing to these docs" },
         { "path": "extending/contributing/ai-evals", "label": "AI assistant evals" }

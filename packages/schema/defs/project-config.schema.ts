@@ -1,3 +1,14 @@
+import { LANGUAGE_TAG_PATTERN } from "../src/locale.ts";
+
+/**
+ * The RFC 9110 §15.4 redirection statuses a static host can express. 303 preserves the "see other,
+ * with GET" semantics; 307 and 308 preserve the request method, which 301 and 302 historically do
+ * not. **200 is not here**: a host's rewrite/proxy convention is not a redirection status, and
+ * modelling it as one is what let the compiler emit a meta-refresh page for a rewrite. Rewrites are
+ * `{ destination, rewrite: true }`.
+ */
+export const REDIRECT_STATUSES = [301, 302, 303, 307, 308] as const;
+
 export const projectConfigSchema = {
   description:
     "Schema for Jx project.json files. " +
@@ -126,6 +137,116 @@ export const projectConfigSchema = {
           description: "Output directory for compiled site.",
           type: "string",
         },
+        headers: {
+          additionalProperties: false,
+          description:
+            "Emit dist/_headers — the response headers only the build can know. Honored by " +
+            "Cloudflare Pages/Workers assets and Netlify; on the node/bun adapters the file " +
+            "documents what a reverse proxy in front of them must send.",
+          properties: {
+            cache: {
+              default: "auto",
+              description:
+                '"auto" marks the content-addressed image variants immutable (RFC 8246) and ' +
+                'revalidates everything else (RFC 9111). "off" emits no Cache-Control at all.',
+              enum: ["auto", "off"],
+              type: "string",
+            },
+            enabled: { default: true, type: "boolean" },
+            rules: {
+              additionalProperties: { additionalProperties: { type: "string" }, type: "object" },
+              description: "Verbatim rules, merged after the generated block.",
+              propertyNames: { pattern: "^/" },
+              type: "object",
+            },
+            security: {
+              additionalProperties: false,
+              properties: {
+                contentTypeOptions: { default: true, type: "boolean" },
+                csp: {
+                  default: false,
+                  description:
+                    "CSP Level 3. Off by default: unlike the other security headers this one " +
+                    "governs code the build cannot see — a third-party script that loads a " +
+                    "second script, a widget that opens a frame — so turning it on is a change " +
+                    "to verify in the browser console, not a safe default. `script-src` is " +
+                    "derived from the inline scripts and external origins the build emitted; " +
+                    "`style-src` keeps 'unsafe-inline', because per-page <style> blocks and " +
+                    "per-element style attributes have no site-wide hash.",
+                  oneOf: [
+                    { type: "boolean" },
+                    { const: "report-only" },
+                    {
+                      additionalProperties: false,
+                      properties: {
+                        directives: {
+                          additionalProperties: {
+                            oneOf: [{ type: "string" }, { const: false }],
+                          },
+                          description:
+                            "Replace (string) or remove (false) a computed directive. A " +
+                            "replacement is wholesale, so an addition restates the defaults.",
+                          type: "object",
+                        },
+                        mode: { default: "enforce", enum: ["enforce", "report-only"] },
+                        reportUri: { format: "uri-reference", type: "string" },
+                      },
+                      type: "object",
+                    },
+                  ],
+                },
+                frameOptions: {
+                  default: "SAMEORIGIN",
+                  oneOf: [{ enum: ["DENY", "SAMEORIGIN"], type: "string" }, { const: false }],
+                },
+                hsts: {
+                  default: false,
+                  description:
+                    "RFC 6797. Off by default: a wrong max-age locks the apex domain to HTTPS " +
+                    "for that long, and the mistake is invisible until a certificate lapses. " +
+                    "`preload` requires `includeSubDomains` and is a build error without it.",
+                  oneOf: [
+                    { type: "boolean" },
+                    {
+                      additionalProperties: false,
+                      properties: {
+                        includeSubDomains: { default: true, type: "boolean" },
+                        maxAge: { default: 31_536_000, minimum: 0, type: "integer" },
+                        preload: { default: false, type: "boolean" },
+                      },
+                      type: "object",
+                    },
+                  ],
+                },
+                permissionsPolicy: {
+                  default: "camera=(), microphone=(), geolocation=()",
+                  oneOf: [{ type: "string" }, { const: false }],
+                },
+                referrerPolicy: {
+                  default: "strict-origin-when-cross-origin",
+                  oneOf: [
+                    {
+                      enum: [
+                        "no-referrer",
+                        "no-referrer-when-downgrade",
+                        "origin",
+                        "origin-when-cross-origin",
+                        "same-origin",
+                        "strict-origin",
+                        "strict-origin-when-cross-origin",
+                        "unsafe-url",
+                      ],
+                      type: "string",
+                    },
+                    { const: false },
+                  ],
+                },
+              },
+              type: "object",
+            },
+          },
+          type: "object",
+        },
         sitemap: {
           default: true,
           description:
@@ -155,9 +276,17 @@ export const projectConfigSchema = {
           description: "Default charset for the page.",
           type: "string",
         },
+        dir: {
+          description:
+            "Base direction for the <html> element. Omitted when unset — a page's `$dir` " +
+            "overrides it. Right-to-left content renders left-to-right without this.",
+          enum: ["ltr", "rtl", "auto"],
+          type: "string",
+        },
         lang: {
           default: "en",
-          description: "Default lang attribute for the <html> element.",
+          description:
+            "Default lang attribute for the <html> element. A page's `$lang` overrides it.",
           type: "string",
         },
         layout: {
@@ -167,6 +296,18 @@ export const projectConfigSchema = {
             "Set to null to render pages without a layout.",
           examples: ["./layouts/base.json"],
           oneOf: [{ type: "string" }, { type: "null" }],
+        },
+        shadow: {
+          default: false,
+          description:
+            "Default shadow-DOM mode for every component (spec.md §16.6). Off unless set: a " +
+            "shadow root isolates component styles from the page and replaces the <slot> " +
+            "emulation with real slot distribution. A component's own `$shadow` overrides this " +
+            "in both directions.",
+          oneOf: [
+            { enum: ["open", "closed"], type: "string" },
+            { const: false, type: "boolean" },
+          ],
         },
       },
       type: "object",
@@ -179,18 +320,127 @@ export const projectConfigSchema = {
       items: { type: "string" },
       type: "array",
     },
+    manifest: {
+      additionalProperties: false,
+      description:
+        'W3C Web App Manifest, emitted as manifest.webmanifest with a <link rel="manifest"> ' +
+        "on every page. Absent means no manifest: it is a claim that a site is meant to be " +
+        "installed, and most are not.",
+      properties: {
+        backgroundColor: { type: "string" },
+        categories: { items: { type: "string" }, type: "array" },
+        description: { type: "string" },
+        dir: { enum: ["ltr", "rtl", "auto"], type: "string" },
+        display: {
+          default: "standalone",
+          enum: ["fullscreen", "standalone", "minimal-ui", "browser"],
+          type: "string",
+        },
+        enabled: { default: true, type: "boolean" },
+        icons: {
+          description:
+            "Icons at 192px and 512px are what browsers require before offering to install " +
+            "the site; the build warns when either is missing.",
+          items: {
+            additionalProperties: false,
+            properties: {
+              purpose: { type: "string" },
+              sizes: { examples: ["192x192"], type: "string" },
+              src: { type: "string" },
+              type: { type: "string" },
+            },
+            required: ["src"],
+            type: "object",
+          },
+          type: "array",
+        },
+        lang: { type: "string" },
+        name: { description: "Defaults to the project name.", type: "string" },
+        orientation: { type: "string" },
+        scope: { type: "string" },
+        shortName: { type: "string" },
+        startUrl: { default: "/", type: "string" },
+        themeColor: { type: "string" },
+      },
+      type: "object",
+    },
+    serviceWorker: {
+      default: false,
+      description:
+        "W3C Service Worker, emitted as sw.js. Off unless declared — a worker is sticky, so it " +
+        "is the one output that can keep breaking visitors after a deploy tries to fix them. " +
+        "**Turning it off means `false`, not deleting the key**: `false` emits a tombstone at " +
+        "the same URL that unregisters the old worker and clears its caches, and a 404 there is " +
+        "not an instruction to stop. HTML is always network-first; only the content-addressed " +
+        "/images/_optimized/* is served cache-first.",
+      oneOf: [
+        { type: "boolean" },
+        {
+          additionalProperties: false,
+          properties: {
+            enabled: { default: true, type: "boolean" },
+            offlineFallback: {
+              description:
+                "Page served for a failed navigation. Added to `precache` if not already there.",
+              type: "string",
+            },
+            precache: {
+              description:
+                "Site-absolute URLs fetched at install time. Each must be a file this build " +
+                "produces; one that is not fails the build, because a single unreachable entry " +
+                "stops the worker installing at all.",
+              items: { pattern: "^/", type: "string" },
+              type: "array",
+            },
+            scope: { default: "/", type: "string" },
+          },
+          type: "object",
+        },
+      ],
+    },
+    securityTxt: {
+      additionalProperties: false,
+      description:
+        "RFC 9116 security.txt, emitted at .well-known/security.txt. `expires` is required by " +
+        "§2.5.5 and an absent or past value is a build error — an expired file advertises a " +
+        "reporting channel while telling the reporter not to trust it. A hand-placed " +
+        "public/.well-known/security.txt shadows this, which is how a clearsigned file ships.",
+      properties: {
+        acknowledgments: { items: { type: "string" }, type: "array" },
+        canonical: { type: "string" },
+        contact: {
+          description: "At least one mailto:, https: or tel: URI (§2.5.3).",
+          items: { type: "string" },
+          type: "array",
+        },
+        enabled: { default: true, type: "boolean" },
+        encryption: { items: { type: "string" }, type: "array" },
+        expires: { format: "date-time", type: "string" },
+        hiring: { items: { type: "string" }, type: "array" },
+        policy: { items: { type: "string" }, type: "array" },
+        preferredLanguages: {
+          description: "BCP 47 tags, validated and canonicalized like i18n.locales.",
+          items: { pattern: LANGUAGE_TAG_PATTERN, type: "string" },
+          type: "array",
+        },
+      },
+      type: "object",
+    },
     i18n: {
       description: "Internationalization configuration.",
       properties: {
         defaultLocale: {
-          description: "Default locale code.",
+          description:
+            "Default locale, as a BCP 47 language tag. The pattern catches shape errors " +
+            "(`en_US`, `en--US`); the build is the authority on well-formedness.",
           examples: ["en"],
+          pattern: LANGUAGE_TAG_PATTERN,
           type: "string",
         },
         locales: {
-          description: "Available locale codes.",
+          description: "Available locales, as BCP 47 language tags.",
           examples: [["en", "fr", "de"]],
-          items: { type: "string" },
+          items: { pattern: LANGUAGE_TAG_PATTERN, type: "string" },
           type: "array",
         },
         routing: {
@@ -222,9 +472,51 @@ export const projectConfigSchema = {
       type: "string",
     },
     redirects: {
-      additionalProperties: { type: "string" },
-      description: "Static redirect rules. Maps source paths to destination paths.",
-      examples: [{ "/old-about": "/about" }],
+      additionalProperties: {
+        oneOf: [
+          { description: "Destination path or URL; implies a 301.", type: "string" },
+          {
+            additionalProperties: false,
+            description: "A redirect with an explicit RFC 9110 §15.4 status.",
+            properties: {
+              destination: { type: "string" },
+              status: {
+                default: 301,
+                description:
+                  "RFC 9110 §15.4 redirection status. 307 and 308 preserve the request method; " +
+                  "301 and 302 historically do not.",
+                enum: [...REDIRECT_STATUSES],
+                type: "integer",
+              },
+            },
+            required: ["destination"],
+            type: "object",
+          },
+          {
+            additionalProperties: false,
+            description:
+              "A rewrite (proxy): the destination's content is served AT the source URL, with no " +
+              "redirect. Emitted as status 200 in `_redirects`, which is the host convention — " +
+              "not an HTTP redirection status.",
+            properties: {
+              destination: { type: "string" },
+              rewrite: { const: true, type: "boolean" },
+            },
+            required: ["destination", "rewrite"],
+            type: "object",
+          },
+        ],
+      },
+      description:
+        "Static redirect and rewrite rules. Keys are source paths in URLPattern pathname syntax.",
+      examples: [
+        {
+          "/api/*": { destination: "https://api.example.com/*", rewrite: true },
+          "/legacy/*": { destination: "/archive/*", status: 308 },
+          "/old-about": "/about",
+        },
+      ],
+      propertyNames: { pattern: "^/" },
       type: "object",
     },
     state: {

@@ -67,10 +67,30 @@ function mountBoth(): {
   };
 }
 
+/**
+ * A distinct client IP per request.
+ *
+ * Auth routes are rate-limited per IP and path, and every request in this file otherwise arrives
+ * from the same one — so a suite that signs up two dozen users in a few milliseconds looks exactly
+ * like credential stuffing and starts collecting 429s. Real callers are separate people on separate
+ * addresses; the header says so. (`x-forwarded-for` is Better Auth's default IP source, and it
+ * trusts a single-value header.)
+ */
+let clientIp = 0;
+function nextClientIp(): string {
+  clientIp += 1;
+  // TEST-NET-3, reserved for documentation and examples (RFC 5737).
+  return `203.0.113.${clientIp % 254}`;
+}
+
 function jsonRequest(method: string, url: string, body: unknown, cookie = ""): Request {
   return new Request(url, {
     body: JSON.stringify(body),
-    headers: { "Content-Type": "application/json", ...(cookie ? { cookie } : {}) },
+    headers: {
+      "Content-Type": "application/json",
+      "x-forwarded-for": nextClientIp(),
+      ...(cookie ? { cookie } : {}),
+    },
     method,
   });
 }

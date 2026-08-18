@@ -35,9 +35,13 @@ import type { ImportApiOptions } from "./import-api.ts";
 import {
   decodeAndNormalizePath,
   loopbackGate,
+  originHostGate,
   serveContained,
   serveProjectFile,
 } from "./net-guard.ts";
+import { problem } from "./problem.ts";
+import { createLoopbackAuthorizer, OAUTH_CALLBACK_PATH } from "./oauth-loopback.ts";
+import type { LoopbackAuthorizer } from "./oauth-loopback.ts";
 
 /** A resolved per-window session: its project root plus its RPC handler map. */
 export interface ProjectServerSession {
@@ -73,6 +77,11 @@ export interface ProjectServerHandle {
   wsUrl: string;
   rpcToken: string;
   canvasUrl: string;
+  /**
+   * The RFC 8252 loopback authorization host. The desktop launcher drives it: `begin()` for the URL
+   * to open in the user's browser, then `await pending.code` and {@link exchangeCode}.
+   */
+  authorizer: LoopbackAuthorizer;
   stop: () => void;
 }
 
@@ -94,6 +103,9 @@ export function createProjectServer(options: CreateProjectServerOptions): Projec
   // Bundle cache for npm bare specifiers (mirrors server.ts).
   const bundleCache = new Map<string, string>();
 
+  /* Outstanding OAuth authorizations (RFC 8252). Per server, so a stopped server abandons them. */
+  const authorizer: LoopbackAuthorizer = createLoopbackAuthorizer();
+
   const server = Bun.serve<{ winId: string | null }>({
     hostname,
     port,
@@ -111,6 +123,30 @@ export function createProjectServer(options: CreateProjectServerOptions): Projec
 
       const winId = url.searchParams.get("win");
 
+      /*
+       * 0. The OAuth loopback redirect (RFC 8252 §7.3).
+       *
+       *    **Exempt from the token, and only from the token.** The provider redirects the user's
+       *    own browser here; that navigation carries whatever the provider's `redirect_uri` said,
+       *    and a page cannot append a secret to a URL it does not compose. Gating it on the token
+       *    would make the flow impossible rather than safe.
+       *
+       *    What replaces the token is the `state` parameter, which is unguessable, single-use and
+       *    compared in constant time — plus the Host and Fetch Metadata checks, which still apply.
+       *    An IdP redirect is exactly the one cross-site shape the strict policy admits: a
+       *    top-level GET document navigation, a person following a link.
+       */
+      if (normPath === OAUTH_CALLBACK_PATH) {
+        const gate = originHostGate(req, "strict");
+        if (gate) {
+          return gate;
+        }
+        const callback = authorizer.handleCallback(url);
+        if (callback) {
+          return callback;
+        }
+      }
+
       // 1. WebSocket upgrade — token + loopback Origin/Host are the hard gate.
       const upgrade = req.headers.get("upgrade");
       if (upgrade && upgrade.toLowerCase() === "websocket") {
@@ -121,11 +157,20 @@ export function createProjectServer(options: CreateProjectServerOptions): Projec
         if (srv.upgrade(req, { data: { winId } })) {
           return;
         }
-        return new Response("Upgrade failed", { status: 400 });
+        return problem("invalidRequest", "Upgrade failed");
       }
 
-      // 2. AI SSE — keep the existing handleAiApi behavior (rewrite the studio-ai prefix).
+      /*
+       * 2. AI proxy. Gated with the token, like every other surface that spends something: this
+       *    route forwards to a provider on the user's key, so an ungated one is an open relay for
+       *    any local process — and it was dispatched ahead of every gate. The token is what the
+       *    desktop shell appends to this URL; a request without one is refused.
+       */
       if (normPath.startsWith("/__studio__/ai/")) {
+        const gate = loopbackGate(req, url, rpcToken);
+        if (gate) {
+          return gate;
+        }
         const aiUrl = new URL(req.url);
         aiUrl.pathname = normPath.replace("/__studio__/ai/", "/__studio/ai/");
         const aiResponse = await handleAiApi(req, aiUrl);
@@ -139,7 +184,7 @@ export function createProjectServer(options: CreateProjectServerOptions): Projec
       if (normPath === "/__studio__/import-site" && req.method === "POST") {
         const { importApi } = options;
         if (!importApi) {
-          return new Response("Not found", { status: 404 });
+          return problem("notFound", "Not found");
         }
         const gate = loopbackGate(req, url, rpcToken);
         if (gate) {
@@ -168,22 +213,34 @@ export function createProjectServer(options: CreateProjectServerOptions): Projec
           headers.set("Referrer-Policy", "same-origin");
           return new Response(res.body, { headers, status: res.status });
         }
-        return new Response("Not found", { status: 404 });
+        return problem("notFound", "Not found");
       }
 
       // 4. Resolve the session (fail-closed).
       const session = resolveSession(winId);
       if (!session) {
-        return new Response("Unknown window", { status: 404 });
+        return problem("notFound", "Unknown window");
       }
       const root = session.projectRoot;
       if (!root) {
-        return new Response("No project", { status: 404 });
+        return problem("notFound", "No project");
       }
 
-      // 4b. Extension server mounts (/_jx/data etc.) — registry-driven, same wire contract as
-      //     The generated site worker and the dev server (specs/extensions.md §11).
+      /*
+       * 4b. Extension server mounts (/_jx/data etc.) — registry-driven, same wire contract as the
+       *     generated site worker and the dev server (specs/extensions.md §11).
+       *
+       *     Gated on **Origin/Host and Fetch Metadata, not the token**, and the distinction is the
+       *     point: these are fetched by the canvas iframe's own page, whose requests carry no
+       *     `?token=` — a page cannot rewrite the URLs its own content asks for. So the token is
+       *     the wrong instrument here and the origin check is the right one. The policy is
+       *     `embeddable` because that iframe is cross-origin by construction.
+       */
       if (normPath.startsWith("/_jx/")) {
+        const gate = originHostGate(req, "embeddable");
+        if (gate) {
+          return gate;
+        }
         const mountRes = await handleJxMounts(req, url, root);
         if (mountRes) {
           return mountRes;
@@ -206,8 +263,17 @@ export function createProjectServer(options: CreateProjectServerOptions): Projec
         return handleServerFunction(req, root);
       }
 
-      // 6. Project files at natural URLs, including extension asset mounts (§8.5) — that is what
-      // Lets a canvas preview show an image a content entry references relative to itself.
+      /*
+       * 6. Project files at natural URLs, including extension asset mounts (§8.5) — that is what
+       *    lets a canvas preview show an image a content entry references relative to itself.
+       *
+       *    `embeddable`, for the same reason as the mounts: these ARE the canvas iframe's
+       *    subresources, and a cross-origin iframe's images arrive `cross-site`.
+       */
+      const staticGate = originHostGate(req, "embeddable");
+      if (staticGate) {
+        return staticGate;
+      }
       const fileRes = await serveProjectFile(normPath, root, await projectAssetMounts(root));
       if (fileRes) {
         return fileRes;
@@ -242,7 +308,7 @@ export function createProjectServer(options: CreateProjectServerOptions): Projec
          server's paths mean the project's SOURCES, and a built page means its own output by the
          very same paths; `site-preview.ts` gives that output its own origin, which is what
          `View: Open in Browser` opens. */
-      return new Response("Not found", { status: 404 });
+      return problem("notFound", "Not found");
     },
 
     websocket: {
@@ -295,7 +361,10 @@ export function createProjectServer(options: CreateProjectServerOptions): Projec
     wsUrl,
     rpcToken,
     canvasUrl,
+    authorizer,
     stop: () => {
+      // Abandon outstanding sign-ins first: their callbacks can no longer arrive.
+      authorizer.stop();
       void server.stop(true);
     },
   };

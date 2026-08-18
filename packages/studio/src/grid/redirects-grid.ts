@@ -34,14 +34,15 @@ import { PROJECT_CONFIG_PATH, commitProjectConfig } from "../tabs/project-config
 import { pageRoute } from "../panels/tab-strip";
 import { createGridController, getGridController } from "./grid-controller";
 import {
-  REDIRECT_STATUSES,
+  REDIRECT_TARGETS,
+  REWRITE,
   configFromRules,
   parseRedirectImport,
   rulesFromConfig,
   validateRedirects,
 } from "./redirects";
 import { optionalStringArg, stringProperty } from "../commands/command-args";
-import type { RedirectConfig, RedirectRule } from "./redirects";
+import type { RedirectConfig, RedirectRule, RedirectTarget } from "./redirects";
 import type {
   CommitResult,
   GridCellValue,
@@ -103,7 +104,7 @@ export function redirectColumns(): GridColumn[] {
       editable: true,
       field: "status",
       kind: "enum",
-      schema: { enum: REDIRECT_STATUSES.map(String) },
+      schema: { enum: REDIRECT_TARGETS.map(String) },
       title: "Status",
       widthHint: 110,
     },
@@ -123,14 +124,27 @@ function currentConfig(): RedirectConfig | undefined {
   return projectState?.projectConfig?.redirects as RedirectConfig | undefined;
 }
 
-/** A cell bag back to a rule. Unparseable statuses become 0 and are refused by {@link ruleErrors}. */
+/**
+ * A cell's text back to a target. An unrecognised value becomes the string itself, so
+ * {@link ruleErrors} can name what the author actually typed rather than reporting a silent 0.
+ */
+function parseTarget(raw: string): RedirectTarget {
+  const trimmed = raw.trim();
+  if (trimmed.toLowerCase() === REWRITE) {
+    return REWRITE;
+  }
+  const value = Number(trimmed);
+  return Number.isInteger(value) ? (value as RedirectTarget) : (trimmed as RedirectTarget);
+}
+
+/** A cell bag back to a rule. An unrecognised target is refused by {@link ruleErrors}. */
 function ruleFromCells(cells: Record<string, GridCellValue>): RedirectRule {
   const text = (value: GridCellValue | undefined) =>
     value === null || value === undefined ? "" : String(value);
   return {
     destination: text(cells.destination).trim(),
     source: text(cells.source).trim(),
-    status: Number(text(cells.status)) || 0,
+    status: parseTarget(text(cells.status)),
   };
 }
 
@@ -142,8 +156,8 @@ function ruleErrors(rule: RedirectRule): string | null {
   if (rule.destination === "") {
     return "A destination is required.";
   }
-  if (!REDIRECT_STATUSES.includes(rule.status as (typeof REDIRECT_STATUSES)[number])) {
-    return `Status must be one of ${REDIRECT_STATUSES.join(", ")}.`;
+  if (!REDIRECT_TARGETS.includes(rule.status)) {
+    return `Status must be one of ${REDIRECT_TARGETS.join(", ")}.`;
   }
   return null;
 }
@@ -277,7 +291,7 @@ export function createRedirectsSource(): GridSource {
         }
         const text = cell.value === null ? "" : String(cell.value);
         if (cell.field === "status") {
-          rule.status = Number(text) || 0;
+          rule.status = parseTarget(text);
         } else if (cell.field === "source") {
           rule.source = text.trim();
         } else {

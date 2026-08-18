@@ -32,7 +32,7 @@ Everything you enter is stored locally, on this machine, and sent only to the en
 
 Every credential Studio is holding, in one list — **GitHub**, the **AI provider**, and **Cloudflare**. All three are always listed: a connected one says what is stored (the model and endpoint your key is used with, the Cloudflare account it is tied to), a disconnected one says what connecting would buy you and when Studio will ask for it.
 
-A connected account offers **Disconnect**, which forgets it on this machine immediately and takes its row back to the disconnected wording. Nothing else is touched — disconnecting the AI provider leaves GitHub signed in — and anything that was waiting on that credential notices at once, so the assistant's setup notice appears or disappears without you reopening anything.
+A connected GitHub account also says **where** the credential is kept, because that differs by build: the desktop app holds it in a file in its own configuration folder that only your user account can read; a browser keeps it in that browser's storage. A connected account offers **Disconnect**, which forgets it on this machine immediately and takes its row back to the disconnected wording. Nothing else is touched — disconnecting the AI provider leaves GitHub signed in — and anything that was waiting on that credential notices at once, so the assistant's setup notice appears or disappears without you reopening anything.
 
 The list never shows the credential itself, only that one is stored.
 

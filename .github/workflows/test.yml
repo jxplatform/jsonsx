@@ -268,6 +268,15 @@ jobs:
       # footer versions match, and each spec's changelog agrees with its header.
       # See scripts/docs/check-spec-status.ts.
       - run: bun run docs:status
+      # Markdown: no visual-editor escapes (`## 18\.`, `RESERVED\_KEYS`). One of these once made
+      # spec.md's whole Standards Alignment section unfindable, so twelve rows silently stopped
+      # being validated. See scripts/normalize-markdown.ts; `bun run format:md` fixes it.
+      - run: bun run docs:markdown
+      # Standards: every spec's `## N. Standards Alignment` table cites a known standard at its
+      # canonical URL, binds a real numbered section, backs a present-tense claim with committed
+      # evidence, and joins its Pending rows to sections the status markers agree are unbuilt.
+      # See scripts/docs/check-standards.ts and specs/standards.md.
+      - run: bun run docs:standards
       # Specs: a spec whose body changed must also be released — version advanced,
       # **Updated:** restamped, and a new changelog entry (`bun run spec:bump`).
       # See scripts/docs/check-spec-release.ts.

@@ -12,10 +12,18 @@ Studio can take a project that exists only on your machine and put it on GitHub 
 
 ## Authorize Studio
 
-The first time you use a GitHub feature, Studio asks you to sign in with a one-time code:
+The first time you use a GitHub feature, Studio asks you to sign in. **How it asks depends on where Studio is running**, because the two places have genuinely different options.
+
+**In the desktop app**, your browser opens GitHub's own authorization page:
+
+1. Your default browser opens with GitHub's **Authorize** page. If you're already signed in to GitHub there, this is one click.
+2. Approve the request.
+3. GitHub sends you to a small page that says you're signed in. Close that tab and go back to Studio — it already has what it needs.
+
+**In a browser**, Studio asks for a one-time code instead:
 
 1. A **Sign in to GitHub** dialog appears showing a short code.
-2. Click the link in the dialog — it opens GitHub's device-authorization page in your browser.
+2. Click the link in the dialog — it opens GitHub's device-authorization page.
 3. Enter the code there and approve the request.
 4. Back in Studio, the dialog closes on its own once GitHub confirms.
 
@@ -23,6 +31,8 @@ Studio remembers the authorization on this device, so you won't be asked again o
 
 :::doc-note
 The authorization belongs to the machine, not to a project. **Preferences › Accounts** lists it alongside every other credential Studio holds and is where you forget it — no page in Studio ever prints the token back to you.
+
+Where it's kept differs too, and the Accounts row says which: the desktop app stores it in a file in its own configuration folder that only your user account can read, while the browser keeps it in that browser's storage. Signing out from Accounts forgets it either way. Revoking Studio's access entirely is done on [GitHub's own applications page](https://github.com/settings/applications) — no app can revoke its own token for you.
 :::
 
 ## Put the project on GitHub

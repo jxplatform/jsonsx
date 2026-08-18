@@ -362,12 +362,44 @@ export async function generateSchema() {
         examples: ["Counter", "TodoApp", "UserCard"],
         type: "string",
       },
+      $dir: {
+        description:
+          "Base direction for this page's <html> element, overriding `defaults.dir`. " +
+          "Right-to-left content renders left-to-right without it.",
+        enum: ["ltr", "rtl", "auto"],
+        type: "string",
+      },
+      $lang: {
+        description:
+          "Language tag for this page's <html> element, overriding `defaults.lang` " +
+          "(site-architecture.md §8.4).",
+        examples: ["en", "fr", "ar-EG"],
+        type: "string",
+      },
       $layout: {
         description:
           "Layout reference for pages. String path to a layout JSON file, " +
           "or false to opt out of the default layout.",
         examples: ["./layouts/base.json"],
         oneOf: [{ type: "string" }, { const: false, type: "boolean" }],
+      },
+      $shadow: {
+        description:
+          "Render this component into a shadow root instead of the light DOM (spec.md §16.6). " +
+          "Off unless set: a shadow root isolates the component's styles from the page and " +
+          "replaces the <slot> emulation with real slot distribution, so it changes how the " +
+          "component composes. Overrides `defaults.shadow` in both directions — `false` opts " +
+          "one component out of a project that opted in.",
+        oneOf: [
+          { enum: ["open", "closed"], type: "string" },
+          { const: false, type: "boolean" },
+        ],
+      },
+      $sitemap: {
+        description:
+          "Set false to exclude this page from sitemap.xml (site-architecture.md §8.4.1). " +
+          "Every other page with a URL is included.",
+        type: "boolean",
       },
       $media: {
         additionalProperties: { type: "string" },

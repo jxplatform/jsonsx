@@ -362,8 +362,21 @@ async function settle(page: Page, net: RequestTracker, at: string): Promise<void
  * a panel re-rendering under a stationary cursor picked up a hover ring the shot never asked for.
  */
 async function resetPointerAndFocus(page: Page): Promise<void> {
-  // Off-canvas: no element is under the cursor, so nothing matches :hover.
-  await page.mouse.move(-1, -1);
+  /*
+   * The bottom-right corner, not `(-1, -1)`.
+   *
+   * Off-canvas coordinates were the obvious way to have nothing under the cursor, and CDP accepted
+   * them. **WebDriver BiDi does not**: `input.performActions` refuses a move beyond the viewport,
+   * with "move target out of bounds", so every shot failed the moment the pipeline spoke the
+   * standard's protocol instead of Chrome's. The corner is inside the viewport and reachable, and
+   * it is the one pixel of a full-window screenshot that no panel's interactive content occupies —
+   * the same property `(-1, -1)` was chosen for, expressed in coordinates the standard allows.
+   */
+  const viewport = page.viewport();
+  await page.mouse.move(
+    viewport ? Math.max(0, viewport.width - 1) : 0,
+    viewport ? Math.max(0, viewport.height - 1) : 0,
+  );
   await page.evaluate(() => {
     const active = document.activeElement;
     if (active instanceof HTMLElement && active !== document.body) {

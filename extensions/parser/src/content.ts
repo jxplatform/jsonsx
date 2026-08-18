@@ -6,6 +6,7 @@
  * queryContentType, findEntry) used by both the classes and the server endpoint.
  */
 
+import { parseComparable } from "./dates.ts";
 import type { ContentLoaderEntry } from "./types.ts";
 
 interface CollectionConfig {
@@ -76,17 +77,26 @@ export function evaluateFilterRule(
       }
       return typeof actual === "string" && !actual.includes(String(rule.value ?? ""));
     }
+    /*
+     * `Number()` on both sides made every date comparison false, since NaN compares false against
+     * everything. `parseComparable` keeps two normalized dates in string space, where RFC 3339
+     * compares chronologically.
+     */
     case ">": {
-      return Number(actual) > Number(rule.value);
+      const [a, b] = parseComparable(actual, rule.value);
+      return a > b;
     }
     case "<": {
-      return Number(actual) < Number(rule.value);
+      const [a, b] = parseComparable(actual, rule.value);
+      return a < b;
     }
     case ">=": {
-      return Number(actual) >= Number(rule.value);
+      const [a, b] = parseComparable(actual, rule.value);
+      return a >= b;
     }
     case "<=": {
-      return Number(actual) <= Number(rule.value);
+      const [a, b] = parseComparable(actual, rule.value);
+      return a <= b;
     }
     default: {
       return true;
