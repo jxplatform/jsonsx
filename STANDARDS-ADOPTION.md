@@ -22,7 +22,6 @@ That gap was not cosmetic. It showed up as real defects: a redirect shape the sc
 | -------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | gap:wcag-conformance | studio-ui-guidelines.md §1.1, §8.2, §8.7 | Four criteria are met and checked (4.1.3, 2.5.7, 1.4.3/1.4.11, 1.4.1). No level is claimed, because claiming one needs an end-to-end audit in a browser.                                                                     |
 | gap:apg-coverage     | studio-ui-guidelines.md §6, §8, §12      | Tree, menu, toolbar, radiogroup, combobox and dialog are done. The tab strips still carry no tab semantics; the Tabulator grid is deliberately left alone (hand-authoring role="grid" over virtualized rows makes it worse). |
-| gap:trusted-types    | spec.md §21.5                            | The policy exists and refuses. Enforcement — a deployment sending require-trusted-types-for — waits on a report-only run, for the reason §4.9 gives.                                                                         |
 
 `gap:example-only` is reserved for `standards.md` §4.4's worked examples and names no work.
 
@@ -96,7 +95,7 @@ The designs below held. What follows is only what they did **not** anticipate �
 - **S5.** `i18n.timeZone` was **not** added. The determinism fix is a fixed `UTC` default in the helpers, which is what the test proves; a config key nothing reads is the exact defect §4.1 of this document records `i18n` itself having had. Also: Bun's `Intl.Segmenter` answers `isWordLike: false` for a mixed alphanumeric segment (`v3`, `h1`), so the word-count predicate is spelled out as "contains a letter or a digit" rather than trusting the flag.
 - **S6.** The live region was the whole point and it landed. The contrast gate found one real failure — white on the brand blue is **3.68:1**, below the 4.5:1 normal text owes — and it is on the debt list rather than fixed, because darkening the brand is a design decision. The guidelines-vs-tokens rule found **seven** wrong hex values, one more than the six this document predicted.
 - **S7.** Shipped as a model plus a Problems reporter and a command, **not** a modal: Problems is already the surface for records that outlive the frame you were not watching, and a second one would have been a window to open. B.3.2 is partial and says so — most repairs have no command yet, and naming one that merely reopens a panel would put a button on a finding that does not do what the button says.
-- **S8.** The scope check was worth doing: under Trusted Types `eval` and `new Function` **are** gated, so the shell ships the policy and does not enforce. The policy refuses rather than passing through, which is the difference between a control and a ceremony.
+- **S8.** The scope check was worth doing: under Trusted Types `eval` and `new Function` **are** gated, so the shell ships the policy and does not enforce. The policy refuses rather than passing through, which is the difference between a control and a ceremony. **The report-only run has since been removed, and `gap:trusted-types` retired.** It answered its question — every violation belonged to a dependency's sink or to the interpreter, and no Jx-owned sink remained — and once answered, the emitter could only file warnings about a decision already taken. A Problems panel that reports what its reader cannot act on teaches its reader to stop reading it. The one finding worth acting on was in the other profile: the compiler emitted `this.innerHTML = ''` into every light-DOM element module, so the runtime's `replaceChildren()` change now reaches shipped sites too.
 - **S9.** BiDi drives everything the pipeline needs, and the captured bytes are **identical** — verified by capturing the same shot over each protocol and hashing. One real difference: BiDi refuses a pointer move outside the viewport, where CDP allowed `(-1, -1)`. Fixed in the pipeline rather than worked around.
 
 ### Smaller items track — complete
@@ -273,7 +272,7 @@ Honest staging: the four `innerHTML = ""` become `replaceChildren()` regardless 
 
 The two-profile CSP conclusion survives and is the real win: compiled output already has a committed test proving no `new Function`/`eval` (and B8b now ships that strict policy), while the interpreting canvas keeps `'unsafe-eval'` permanently. Say so in a new `spec.md` §21.5 so "remove eval from the runtime" stops living as an implied TODO — the interpreter _is_ those twenty sites.
 
-Gap: `gap:trusted-types`.
+Gap: none — `gap:trusted-types` was opened by this phase and retired when the observation run answered it. Trusted Types is a permanent, deliberate `Subset`: the injection-sink half, without enforcement.
 
 ### 4.10 S9 — WebDriver BiDi for the screenshot pipeline ✅ **shipped**
 

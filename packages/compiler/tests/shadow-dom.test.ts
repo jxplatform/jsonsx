@@ -67,7 +67,7 @@ describe("the emitted module — light DOM (the default)", () => {
     for (const api of ["attachShadow", "shadowRoot", "attachInternals", "#renderRoot"]) {
       expect(source).not.toContain(api);
     }
-    expect(source).toContain("this.innerHTML = ''");
+    expect(source).toContain("this.replaceChildren()");
     expect(source).toContain("render(this.template(), this)");
   });
 
@@ -86,7 +86,7 @@ describe("the emitted module — shadow DOM", () => {
     expect(source).toContain("render(this.template(), _root)");
     expect(source).not.toContain("render(this.template(), this)");
     // The light children are the slotted content — clearing them would delete the composition.
-    expect(source).not.toContain("this.innerHTML = ''");
+    expect(source).not.toContain("this.replaceChildren()");
   });
 
   /*

@@ -115,7 +115,6 @@ import {
 } from "./files/files";
 import { startFsSync } from "./files/fs-events";
 import { invalidateParamValues } from "./page-params";
-import { observeCspViolations } from "./services/csp-report";
 import {
   configureCollabNotifier,
   configureCollabParser,
@@ -566,12 +565,6 @@ initCanvasPatcher({
 setIframePatchEscalation(scheduleCanvasRender);
 // One global coordinator monitor drives cross-frame palette→canvas drops (Phase 4c).
 registerCanvasDndBridge();
-/*
- * Observe the report-only Trusted Types policy the servers send this document (spec.md §21.5).
- * Registered unconditionally: where no policy is delivered — the Electrobun shell, on views://,
- * which has no HTTP response — the event simply never fires.
- */
-observeCspViolations();
 initCanvasRender({
   get gitDiffState() {
     return shell.git.diffState;

@@ -2,7 +2,7 @@
 
 ## Development Server with Live Reload, Proxy Resolution, and Studio API
 
-**Version:** 0.2.8
+**Version:** 0.2.9
 **Status:** Implemented
 **Updated:** 2026-08-18
 **License:** MIT
@@ -182,16 +182,6 @@ Under the **strict** policy, which every privileged route uses:
 
 A second, looser **`embeddable`** policy exists for one reason: the desktop canvas renders the project inside an iframe on a **different origin**, so that page's own subresources — its images, its stylesheets, its modules — legitimately arrive `cross-site`. Refusing them would break the canvas; accepting them on a route that can write a file or run an `import()` would hand away the containment. The difference is a property of the surface, named at the call site.
 
-**The Studio shell carries a report-only Trusted Types policy.** Both entry points send
-`Content-Security-Policy-Report-Only: require-trusted-types-for 'script'` on the shell document, and
-on nothing else (`src/studio-csp.ts`). This is the observation stage `spec.md` §21.5 requires before
-enforcement, and the discrimination is the substance: the same branch serves `canvas.html`, whose
-interpreter compiles `${}` templates and `body` functions with `new Function` — a directive that
-gates script evaluation as well as DOM sinks would describe the wrong document. The Monaco workers
-are excluded for a different reason: a worker is its own global scope and takes its policy from its
-own response, so the shell's header would neither reach nor describe it. Report-only blocks nothing;
-the shell files each `SecurityPolicyViolationEvent` as a Problem.
-
 **Never CORS.** No response from either entry point carries an `Access-Control-Allow-*` header, and `scripts/check-error-shapes.ts` bans one outright. The whole loopback model rests on the browser refusing cross-origin reads, so a single such header would hand that containment away. There is none in the repository today, and that fact is load-bearing rather than incidental — which is exactly what needs a check, since nothing in the code makes it visible.
 
 **The loopback block, not one address.** IANA reserves `127.0.0.0/8` and every address in it is this machine, so `127.0.0.2` is loopback exactly as `127.0.0.1` is; recognizing only the canonical spelling would reject a client for nothing. `0.0.0.0` is accepted as a **Host** — a server bound to it in a container is reached at that literal — and **never as an Origin**, since no page is ever served from `http://0.0.0.0`.
@@ -331,6 +321,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.2.9** (2026-08-18) — §4.2: the Studio shell's report-only Trusted Types header is removed — see spec.md §21.5.
 - **0.2.8** (2026-08-18) — §4.2: both entry points send the Studio shell a report-only Trusted Types policy, and nothing else.
 - **0.2.7** (2026-08-16) — §4.2 Fetch Metadata on every gated surface, the loopback block, a constant-time token, and the three ungated project-server routes closed; gap:fetch-metadata closed.
 - **0.2.6** (2026-08-16) — §4.3 every failure is an RFC 9457 problem document, guarded; gitPull produces the 409 the route table publishes; gap:studio-problem-details closed.
@@ -353,4 +344,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/server` Specification v0.2.8_
+_`@jxsuite/server` Specification v0.2.9_

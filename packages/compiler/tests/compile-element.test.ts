@@ -448,9 +448,9 @@ describe("compileElement — templates", () => {
     });
 
     const { content } = result.files[0]!;
-    expect(content).toContain("this.innerHTML = '';");
+    expect(content).toContain("this.replaceChildren();");
     expect(content).not.toContain("} else {");
-    expect(content).not.toContain("} else {\n      this.innerHTML = '';");
+    expect(content).not.toContain("} else {\n      this.replaceChildren();");
   });
 
   test("attributes", async () => {

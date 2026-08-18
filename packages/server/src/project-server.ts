@@ -42,11 +42,6 @@ import {
 import { problem } from "./problem.ts";
 import { createLoopbackAuthorizer, OAUTH_CALLBACK_PATH } from "./oauth-loopback.ts";
 import type { LoopbackAuthorizer } from "./oauth-loopback.ts";
-import {
-  CSP_REPORT_ONLY_HEADER,
-  isStudioShellDocument,
-  STUDIO_REPORT_ONLY_CSP,
-} from "./studio-csp.ts";
 
 /** A resolved per-window session: its project root plus its RPC handler map. */
 export interface ProjectServerSession {
@@ -216,15 +211,6 @@ export function createProjectServer(options: CreateProjectServerOptions): Projec
           // Self-403s /__jx_resolve__ + /__jx_server__ from the very document this server serves.
           const headers = new Headers(res.headers);
           headers.set("Referrer-Policy", "same-origin");
-          /*
-           * The Trusted Types observation run (`spec.md` §21.5), on the shell document ONLY. This
-           * branch also serves `canvas.html`, which needs `'unsafe-eval'` permanently, and the
-           * Monaco workers, which are separate global scopes with their own policies — a blanket
-           * header here would put the shell's profile on both.
-           */
-          if (isStudioShellDocument(assetRel)) {
-            headers.set(CSP_REPORT_ONLY_HEADER, STUDIO_REPORT_ONLY_CSP);
-          }
           return new Response(res.body, { headers, status: res.status });
         }
         return problem("notFound", "Not found");

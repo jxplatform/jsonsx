@@ -8,8 +8,7 @@ spec:
 code:
   - extensions/connector/src/worker.ts
   - extensions/auth/src/worker.ts
-  - packages/server/src/studio-csp.ts
-  - packages/studio/src/services/csp-report.ts
+  - packages/studio/src/services/trusted-types.ts
 ---
 
 # Security
@@ -32,23 +31,31 @@ The interpreting runtime — the dev server, the Studio canvas, and `@jxsuite/ru
 
 **This is two settings, permanently — not one with a fix pending.** A compiled site never needs `'unsafe-eval'`; a page hosting the interpreter always will. The interpreter _is_ the code that compiles expressions as it reads them, so "remove eval from the runtime" would mean removing the interpreter. Ship compiled output to production and the requirement is simply not there.
 
-## Trusted Types in the Studio shell
+## Trusted Types
 
-Studio's own window — the chrome around the canvas, not the page you are editing — is served a
-**report-only** Trusted Types policy: `require-trusted-types-for 'script'`. Report-only means the
-browser blocks nothing and reports everything, so this changes no behavior; violations arrive in the
-**Problems** panel under the source **Trusted Types**.
+Jx takes the half of [Trusted Types](https://www.w3.org/TR/trusted-types/) that applies to it and
+declines the half that cannot.
+
+**Nothing Jx ships writes `innerHTML`.** The runtime and the compiled element modules clear elements
+with `replaceChildren()` instead — identical behavior, and not a DOM injection sink. That is a
+smaller surface in every site you build, whether or not any policy is enforcing.
+
+**Studio's markdown goes through a policy that refuses.** The assistant's rendered markdown is the
+one place a string becomes markup in Studio's own window, and it passes a policy whose `createHTML`
+throws — naming what it found — if anything script-shaped survived sanitization. Its `createScript`
+and `createScriptURL` refuse outright.
 
 :::doc-note
-A row here is not a bug in your project. It says "under enforcement, this would have been blocked",
-and it is almost always about Studio's own code or a library it bundles.
+**Enforcement is declined, not pending.** `require-trusted-types-for 'script'` gates `eval` and
+`new Function` as well as DOM injection — and the interpreter _is_ those calls, in the canvas and in
+Studio's window alike. Enforcing would mean a policy that passes scripts through, which satisfies
+the API and defends nothing. Studio's remaining injection sinks belong to the libraries it bundles,
+which no policy of Jx's can route.
 :::
 
-The canvas iframe is deliberately excluded. `require-trusted-types-for 'script'` gates `eval` and
-`new Function` as well as DOM injection, and the canvas is where the interpreter runs — so the
-policy that suits the shell would stop the canvas rendering at all. The two documents keep separate
-policies permanently, which works only because the canvas is a real page with its own response: a
-frame loaded over `http` gets its own policy, while a `srcdoc` frame inherits its parent's.
+This is why the canvas and the shell keep separate policies permanently — and it works only because
+the canvas is a real page with its own response: a frame loaded over `http` gets its own policy,
+while a `srcdoc` frame inherits its parent's.
 
 ## Treat documents as code
 

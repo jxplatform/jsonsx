@@ -214,23 +214,19 @@ describe("studio assets (/__studio__/)", () => {
   });
 
   /*
-   * The §21.5 observation stage, and the line that keeps its two CSP profiles apart. Both
-   * documents come out of this one branch, so the assertion that matters is the negative one: the
-   * canvas evaluates `${}` templates and `body` functions as it reads them and needs
-   * `'unsafe-eval'` permanently, and `require-trusted-types-for 'script'` gates `new Function`
-   * too. A header set one line higher in the handler would put the shell's profile on the
-   * interpreter and turn a permanent property into a bug report.
+   * §21.5 declines Trusted Types enforcement on both profiles, so the shell is served no policy at
+   * all — the report-only observation run answered its question and went. This asserts the absence
+   * because the absence is the decision: a policy added here would gate `new Function`, and the
+   * shell runs the interpreter for Library preview, render-check and component preview.
    */
-  test("sends the report-only Trusted Types header to the shell and to nothing else", async () => {
-    const header = "Content-Security-Policy-Report-Only";
-    const shell = await fetch(`${base}/__studio__/index.html`);
-    expect(shell.headers.get(header)).toBe("require-trusted-types-for 'script'");
-    // Report-only, never enforcing: enforcement is a later stage and a separate decision.
-    expect(shell.headers.get("Content-Security-Policy")).toBeNull();
-
-    for (const rel of ["canvas.html", "dist/iframe-entry.js"]) {
+  test("sends the Studio shell no Content-Security-Policy of either disposition", async () => {
+    for (const rel of ["index.html", "canvas.html", "dist/iframe-entry.js"]) {
       const res = await fetch(`${base}/__studio__/${rel}`);
-      expect({ header: res.headers.get(header), rel }).toEqual({ header: null, rel });
+      expect({
+        enforced: res.headers.get("Content-Security-Policy"),
+        rel,
+        reportOnly: res.headers.get("Content-Security-Policy-Report-Only"),
+      }).toEqual({ enforced: null, rel, reportOnly: null });
     }
   });
 

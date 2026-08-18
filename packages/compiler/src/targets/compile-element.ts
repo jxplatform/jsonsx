@@ -737,7 +737,14 @@ export function emitElementModule(
   );
   if (shadow === null) {
     lines.push(
-      "    this.innerHTML = '';",
+      /*
+       * `replaceChildren()`, not `innerHTML = ''`: identical semantics for clearing an element, and
+       * it is not a DOM injection sink. The runtime made the same change for the same reason — a
+       * write that was never injecting anything still costs a page a Trusted Types policy under
+       * `require-trusted-types-for 'script'`, and this one is emitted into every light-DOM element
+       * module a site ships.
+       */
+      "    this.replaceChildren();",
       "    this.#effects.push(effect(() => render(this.template(), this)));",
     );
   } else {
