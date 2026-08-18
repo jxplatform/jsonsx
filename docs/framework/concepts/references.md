@@ -15,9 +15,9 @@ code:
 A reference is an object with a single `$ref` key whose string value points at something declared elsewhere — a state entry, a global, an iteration item, or another file. The path **is JSON Pointer syntax** (RFC 6901 — a `#`-fragment of `/`-separated tokens), but the semantics are Jx-specific: a `$ref` reads a live value off the reactive scope, it does not substitute a schema.
 
 :::doc-warning
-**`/` is the only separator.** A dot is an ordinary character in a member name, so `"#/state/user/name"` walks `state` → `user` → `name` while `"#/state/user.name"` reads a single member literally called `user.name`. Escapes work as RFC 6901 specifies — `~1` is a literal `/`, `~0` a literal `~` — so `"#/state/a~1b"` reaches the key `a/b`.
+**`/` is the only separator.** A token runs to the next `/`, so `"#/state/user/name"` walks `state` → `user` → `name`. Escapes work as RFC 6901 specifies — `~1` is a literal `/`, `~0` a literal `~` — so `"#/state/a~1b"` reaches the key `a/b`.
 
-Before 0.5.0 the dot also separated segments inside a nested path, so `"#/state/a/b.c"` walked three levels. If you have a ref relying on that, write it with `/`.
+Before 0.5.0 a dot separated segments too, so `"#/state/a/b.c"` walked three levels. That rule was not part of JSON Pointer. If you have a ref relying on it, write it with `/`.
 :::
 
 ```json
@@ -42,7 +42,11 @@ The prefix of the `$ref` string selects where the lookup happens:
 | Event context    | `"event#/target/value"` | Property path on the handler event (expressions)                                                              |
 | External file    | `"./other.json"`        | A component document — for `$switch` cases and `$elements` registration, not a bare `children` node (see §13) |
 
-Paths navigate nested data with further `/` segments: `"#/state/user/name"`, `"$map/item/title"`. Any member name is reachable — a numeric index (`"#/state/items/0"`), a key holding a dot (`"#/state/user.name"`), or one holding a slash via `~1`.
+Paths navigate nested data with further `/` segments: `"#/state/user/name"`, `"$map/item/title"`. A numeric index is just a segment: `"#/state/items/0"`.
+
+:::doc-note
+RFC 6901 excludes only `/` and `~` from a token, so a state key containing any other character — a dot, a space, a hyphen — is addressable as one segment. Jx does not restrict this, because doing so would depart from the standard, but Studio's **From data…** picker lists your state signals and cannot author such a key today. Refs like these are written by hand.
+:::
 
 ## Reactive bindings
 

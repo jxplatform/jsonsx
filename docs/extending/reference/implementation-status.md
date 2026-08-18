@@ -16,7 +16,7 @@ This page is generated from the `> **Status: …**` markers in the specification
 | ------------------------- | ------------ | ----------- | ---------- |
 | `ai.md`                   | 0.1.6-draft  | Partial     | 2026-08-16 |
 | `collab.md`               | 0.2.4-draft  | Partial     | 2026-08-16 |
-| `compiler.md`             | 0.3.0-draft  | Partial     | 2026-08-17 |
+| `compiler.md`             | 0.3.1-draft  | Partial     | 2026-08-18 |
 | `desktop.md`              | 0.3.11-draft | Pending     | 2026-08-16 |
 | `extensions.md`           | 0.3.9-draft  | Partial     | 2026-08-16 |
 | `imports.md`              | 0.1.9-draft  | Partial     | 2026-08-15 |
@@ -26,10 +26,10 @@ This page is generated from the `> **Status: …**` markers in the specification
 | `schema.md`               | 0.4.8-draft  | Partial     | 2026-08-16 |
 | `server.md`               | 0.2.7        | Implemented | 2026-08-16 |
 | `site-architecture.md`    | 0.5.9-draft  | Partial     | 2026-08-16 |
-| `spec.md`                 | 0.5.0-draft  | Partial     | 2026-08-17 |
+| `spec.md`                 | 0.5.1-draft  | Partial     | 2026-08-18 |
 | `standards.md`            | 0.1.15-draft | Partial     | 2026-08-17 |
 | `studio-ui-guidelines.md` | 0.3.12       | Implemented | 2026-08-16 |
-| `studio.md`               | 0.9.27-draft | Partial     | 2026-08-16 |
+| `studio.md`               | 0.9.28-draft | Partial     | 2026-08-18 |
 
 ## Sections not yet implemented
 
@@ -48,6 +48,7 @@ This page is generated from the `> **Status: …**` markers in the specification
 - `spec.md` §16.8 — CEM-Compatible Annotations
 - `spec.md` §21 — Evaluation Surface
 - `studio-ui-guidelines.md` §8 — Interactive Patterns
+- `studio.md` §6.8 — The `From data…` picker addresses only what it can list
 - `studio.md` §13 — Command Registry and Context Keys
 - `studio.md` §14 — Tabs and Document Identity
 - `studio.md` §15 — Application Preferences

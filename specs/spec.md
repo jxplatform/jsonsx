@@ -2,9 +2,9 @@
 
 ## Declarative Document Object Model — JSON Edition
 
-**Version:** 0.5.0-draft
+**Version:** 0.5.1-draft
 **Status:** Partial
-**Updated:** 2026-08-17
+**Updated:** 2026-08-18
 **License:** MIT
 
 ---
@@ -608,9 +608,11 @@ Jx uses `$ref` to bind a property to declared state. The path **is JSON Pointer 
 { "$ref": "#/state/count" }
 ```
 
-**`/` is the only separator.** A reference token is every character up to the next `/`, so `.` is an ordinary character in a member name: `#/state/user/name` walks `state` → `user` → `name`, and `#/state/user.name` reads the single member literally called `user.name`. RFC 6901 §4 escapes are implemented — `~1` is a literal `/` and `~0` a literal `~`, applied in that order — so `#/state/a~1b` reaches the key `a/b` and no member name is unreachable.
+**`/` is the only separator.** A reference token runs to the next `/`, so `#/state/user/name` walks `state` → `user` → `name`. RFC 6901 §4 escapes are implemented — `~1` is a literal `/` and `~0` a literal `~`, applied in that order — so `#/state/a~1b` reaches the key `a/b` and no member name is unreachable.
 
-> **Note:** Before 0.5.0 the dot was a separator inside nested segments, so `#/state/a/b.c` walked three levels. It now addresses the member `b.c` of `a`. This was never one rule: the interpreter dot-split every segment but the first, the assignment path never dot-split at all, and the compiler lowered a ref by replacing `/` with `.` — which emitted `s.items.0` for `#/state/items/0`, a syntax error from a build that reported success. `packages/runtime/src/pointer.ts` is now the only tokenizer, and every read, write and lowering path calls it.
+RFC 6901 §3 excludes exactly two characters from a reference token, `/` and `~`. Every other character is ordinary, which is why `#/state/user.name` denotes one member named `user.name` rather than a path. Jx neither encourages nor forbids such a key: forbidding it would mean adding a restriction the standard does not have. No document in this repository uses one.
+
+> **Note:** Before 0.5.0 the dot was a second separator inside nested segments, so `#/state/a/b.c` walked three levels. That rule was not in RFC 6901 and was never applied consistently: the interpreter dot-split every segment but the first, the assignment path never dot-split at all, and the compiler lowered a ref by replacing `/` with `.` — which emitted `s.items.0` for `#/state/items/0`, a syntax error from a build that reported success. `packages/runtime/src/pointer.ts` is now the only tokenizer, and every read, write and lowering path calls it.
 
 The **semantics are Jx-specific**, not JSON Reference: a Jx `$ref` reads a live value off the reactive scope, it does not substitute a schema, and a token that matches nothing yields `undefined` rather than failing evaluation as RFC 6901 §4 requires. The schemes below (`window#/`, `parent#/`, `$map/`, `event#/`, …) are Jx extensions, not the URI fragment representation of RFC 6901 §6.
 
@@ -2448,6 +2450,7 @@ This rewrites the mutating handlers of Appendix A's idiom using `$expression`, l
 
 ## Changelog
 
+- **0.5.1-draft** (2026-08-18) — §7.1: state the one-separator rule without showcasing a dotted key; note that forbidding one would itself depart from RFC 6901.
 - **0.5.0-draft** (2026-08-17) — $ref is JSON Pointer: `/` is the only separator and `~0`/`~1` are implemented; one shared tokenizer replaces five disagreeing ones.
 - **0.4.33-draft** (2026-08-16) — §21.5 two CSP profiles, permanently: compiled output never needs 'unsafe-eval' and the interpreting canvas always will. A Trusted Types policy guards the shell's one injection sink and refuses to build scripts; the runtime's four innerHTML writes became replaceChildren().
 - **0.4.32-draft** (2026-08-16) — §11.2a the Cookie prototype derives Secure/Path/Domain from a name prefix and from SameSite=None; HttpOnly and Expires are absent on purpose; a cookie name is data, never pattern syntax.
@@ -2502,4 +2505,4 @@ This rewrites the mutating handlers of Appendix A's idiom using `$expression`, l
 
 ---
 
-_Jx Specification v0.5.0-draft — subject to revision_
+_Jx Specification v0.5.1-draft — subject to revision_

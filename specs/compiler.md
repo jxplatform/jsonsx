@@ -2,9 +2,9 @@
 
 ## Static HTML Compiler, Custom Element Emitter, and Island Detector
 
-**Version:** 0.3.0-draft
+**Version:** 0.3.1-draft
 **Status:** Partial
-**Updated:** 2026-08-17
+**Updated:** 2026-08-18
 **License:** MIT
 
 ---
@@ -203,9 +203,11 @@ customElements.define("user-card", UserCard);
 
 The `.property` syntax is the key enabler for the property-first interface.
 
-**Every row above lowers a `$ref` through the one tokenizer** (`@jxsuite/runtime/pointer`, spec.md §7.1), which decides each segment independently: a segment that is an ECMAScript identifier becomes `.name`, and any other segment becomes `["…"]`. So `#/state/user/name` is `s.user.name` while `#/state/items/0` is `s.items["0"]` and `#/state/user.name` is `s["user.name"]`. The same rule governs an emitted object-literal key, which is bare where it is an identifier and quoted where it is not.
+**Every row above lowers a `$ref` through the one tokenizer** (`@jxsuite/runtime/pointer`, spec.md §7.1), which decides each segment independently: a segment that is an ECMAScript identifier becomes `.name`, and any other segment becomes `["…"]`. So `#/state/user/name` is `s.user.name` while `#/state/items/0` is `s.items["0"]`. The same rule governs an emitted object-literal key, which is bare where it is an identifier and quoted where it is not.
 
-The bracket branch is not cosmetic. Until 0.3.0 the compiler lowered a ref by replacing `/` with `.` and pasting the result, which emitted `s.items.0` — a syntax error — and `s.custom/path`, which parses as a division against an undeclared identifier. Neither failed the build: nothing between the string concatenation and the browser ever parsed the output. A target that emits JavaScript **must** produce source that parses for every ref the schema admits.
+The bracket branch is what makes the lowering total rather than a bet: a reference token may hold any character but `/` and `~` (RFC 6901 §3) and a state key is author data, so neither is guaranteed to be an identifier. This is a property of the emitted JavaScript only — `.` in generated member access says nothing about the pointer, where `/` is the sole separator.
+
+Until 0.3.0 the compiler lowered a ref by replacing `/` with `.` and pasting the result, which emitted `s.items.0` — a syntax error — and `s.custom/path`, which parses as a division against an undeclared identifier. Neither failed the build: nothing between the string concatenation and the browser ever parsed the output. A target that emits JavaScript **must** produce source that parses for every ref the schema admits.
 
 ### 4.4 Property Bridge
 
@@ -837,6 +839,7 @@ is doing the only size work in the pipeline.
 
 ## Changelog
 
+- **0.3.1-draft** (2026-08-18) — §4.3: separate the emitted-JavaScript accessor form from the pointer grammar it lowers.
 - **0.3.0-draft** (2026-08-17) — §4.3: ref lowering goes through the shared tokenizer — identifier segments dot, all others bracket, so every emitted ref parses.
 - **0.2.1-draft** (2026-08-15) — §3 Implemented — the tiers' inline blocks are hash-nameable and the site build emits the policy.
 - **0.2.0-draft** (2026-08-15) — Client runtime is served from /assets/ instead of esm.sh; browser bundles resolve production export conditions under both backends (§3, §12).
@@ -872,4 +875,4 @@ is doing the only size work in the pipeline.
 
 ---
 
-_`@jxsuite/compiler` Specification v0.3.0-draft_
+_`@jxsuite/compiler` Specification v0.3.1-draft_

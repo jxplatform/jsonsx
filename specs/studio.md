@@ -2,9 +2,9 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.27-draft
+**Version:** 0.9.28-draft
 **Status:** Partial
-**Updated:** 2026-08-16
+**Updated:** 2026-08-18
 **License:** MIT
 
 ---
@@ -845,6 +845,41 @@ Three consequences are normative:
     rather than showing the primary's value as though it were everyone's.
 3.  **A selection is replaced, never mutated in place.** Effects track the set, not the array
     identity; an in-place push would move the selection without repainting the panel drawing it.
+
+### 6.8 The `From data…` picker addresses only what it can list
+
+> **Status: Partial.** The picker lists the document's state signals and writes a `$ref` to the one
+> chosen. A pointer the picker cannot construct is not rejected anywhere — it is simply unreachable
+> from the UI, and an author who hand-writes one gets a field that renders correctly and cannot be
+> edited back.
+
+The rung writes a JSON Pointer (`spec.md` §7.1), and JSON Pointer addresses strictly more than a
+flat list of signals. RFC 6901 §3 excludes exactly two characters from a reference token, `/` and
+`~`; every other character is ordinary. Three consequences the picker does not yet cover:
+
+| Pointer                     | Addresses                              | Picker |
+| --------------------------- | -------------------------------------- | ------ |
+| `#/state/count`             | one state signal                       | ✅     |
+| `#/state/nav/data/sections` | a path into a signal's value           | ❌     |
+| `#/state/user.name`         | one signal whose name contains a dot   | ❌     |
+| `#/state/a~1b`              | one signal whose name contains a slash | ❌     |
+
+The first gap is the common one: 3 of the repository's 227 `#/state/` refs walk into a signal's
+value, and the docs site's own layout is one of them. The other two are legal and unused — no
+document here has such a key — but "unused" is not "invalid", and the picker currently makes them
+authorable only by editing JSON by hand.
+
+Two rules for whatever closes this:
+
+1.  **The picker must never write a pointer it cannot read back.** A control that can produce a ref
+    it then renders as blank or as `[object Object]` is the failure §6.6 rule 2 already names.
+2.  **Escaping is the writer's job, not the author's.** An author who names a signal `a/b` types
+    `a/b`; `~1` is an encoding detail of the pointer and must not surface in the UI. The encoder
+    exists — `escapeToken` in `@jxsuite/runtime/pointer` — and is what any path-aware picker builds
+    its segments with.
+
+Until then the gap is stated rather than hidden, because the alternative is a picker that silently
+implies the pointer grammar is flatter than it is.
 
 ## 7. Project Styles
 
@@ -2105,6 +2140,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.9.28-draft** (2026-08-18) — §6.8: the From data… picker addresses only what it can list — nested paths and tokens holding a dot or slash are legal pointers it cannot author.
 - **0.9.27-draft** (2026-08-16) — §16.6 reports about the author's own content — an ATAG Part B accessibility check and the SEO warnings both file Problems, each finding naming its WCAG criterion, and each run naming what it could not check. Closes gap:atag-authoring-support.
 - **0.9.26-draft** (2026-08-16) — §16 one Problem reader over every backend failure shape; gap:studio-error-reader closed.
 - **0.9.25-draft** (2026-08-15) — Add §19 Standards Alignment; six bare **Status:** lines converted to the blockquote form no tool could read, and §16 marked Partial — the one status channel has no live region for the error tier.
@@ -2187,4 +2223,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.27-draft_
+_`@jxsuite/studio` Specification v0.9.28-draft_
