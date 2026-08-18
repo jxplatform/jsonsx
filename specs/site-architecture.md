@@ -2,9 +2,9 @@
 
 ## File-Based Routing, Content Collections, Layouts, and Static Site Generation
 
-**Version:** 0.5.9-draft
+**Version:** 0.5.10-draft
 **Status:** Partial
-**Updated:** 2026-08-16
+**Updated:** 2026-08-18
 **License:** MIT
 
 ---
@@ -1678,11 +1678,17 @@ Static assets are emitted per component, with page styles inlined:
 
 ## 13. Internationalization
 
-> **Status: Partial.** §13.1, §13.2, §13.4 and §13.5 ship: tags are validated and canonicalized, a
-> route's prefix decides its locale, each page carries the `lang` and `dir` that follow, and
-> translations advertise one another in `<head>` and in the sitemap. What does not is
-> **negotiation** — nothing reads `Accept-Language`, so the bare `/` always serves the default
-> locale — and §13.3's `{locale}` collections are still unread.
+> **Status: Partial.** §13.1–§13.5 and §13.7 ship: tags are validated and canonicalized, a route's
+> prefix decides its locale, a `{locale}` collection source expands over the declared locales, each
+> page carries the `lang` and `dir` that follow, and translations advertise one another in `<head>`
+> and in the sitemap. §13.6 is the only part that is not whole, and it is bounded rather than
+> unbuilt: a site with `build.adapter` set negotiates `Accept-Language`, and adapter-less static
+> output has no request to negotiate against.
+>
+> This marker previously said negotiation was absent and `{locale}` collections unread. Both had
+> shipped — §13.6 and §13.3 each said so — so the parent contradicted two of its own subsections.
+> A summary marker that restates what its children already record is a second source of truth, and
+> this one drifted; it now names the boundary and defers the rest to the sections that own it.
 >
 > **Jx is not a translation system**, and this section will not become one. There is no message
 > catalogue, no `t()` and no fallback chain. A locale is a property of a _route_; what the route
@@ -2437,6 +2443,7 @@ This spec builds on existing Jx primitives wherever possible:
 
 ## Changelog
 
+- **0.5.10-draft** (2026-08-18) — §13: correct a status marker that contradicted §13.3 and §13.6 — {locale} expansion and Accept-Language negotiation both ship.
 - **0.5.9-draft** (2026-08-16) — §13.7 blessed Intl helpers — one shared list, five new helpers, and a fixed en-US/UTC default so a build's output is a function of its input. Closes gap:locale-formatting.
 - **0.5.8-draft** (2026-08-16) — §13.3 {locale} sources expand and scope route expansion; §13.6 Accept-Language negotiation in the generated worker; prefix-always is checked; gap:locale-lookup closed.
 - **0.5.7-draft** (2026-08-16) — §8.4.1 a generated route's lastmod comes from the entry it was generated from; gap:sitemap-fields closed.

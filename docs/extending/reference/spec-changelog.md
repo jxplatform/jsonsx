@@ -226,6 +226,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `site-architecture.md`
 
+- **0.5.10-draft** (2026-08-18) — §13: correct a status marker that contradicted §13.3 and §13.6 — {locale} expansion and Accept-Language negotiation both ship.
 - **0.5.9-draft** (2026-08-16) — §13.7 blessed Intl helpers — one shared list, five new helpers, and a fixed en-US/UTC default so a build's output is a function of its input. Closes gap:locale-formatting.
 - **0.5.8-draft** (2026-08-16) — §13.3 {locale} sources expand and scope route expansion; §13.6 Accept-Language negotiation in the generated worker; prefix-always is checked; gap:locale-lookup closed.
 - **0.5.7-draft** (2026-08-16) — §8.4.1 a generated route's lastmod comes from the entry it was generated from; gap:sitemap-fields closed.
@@ -396,6 +397,8 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.9.30-draft** (2026-08-18) — §15: the Keyboard sheet is no longer read-only — rebinding ships, Editor and Updates/About remain pending.
+- **0.9.29-draft** (2026-08-18) — §16 and §19: the notify announcement ships — correct a marker and a WAI-ARIA note that both described the gap it closed.
 - **0.9.28-draft** (2026-08-18) — §6.8: the From data… picker addresses only what it can list — nested paths and tokens holding a dot or slash are legal pointers it cannot author.
 - **0.9.27-draft** (2026-08-16) — §16.6 reports about the author's own content — an ATAG Part B accessibility check and the SEO warnings both file Problems, each finding naming its WCAG criterion, and each run naming what it could not check. Closes gap:atag-authoring-support.
 - **0.9.26-draft** (2026-08-16) — §16 one Problem reader over every backend failure shape; gap:studio-error-reader closed.

@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.28-draft
+**Version:** 0.9.30-draft
 **Status:** Partial
 **Updated:** 2026-08-18
 **License:** MIT
@@ -1745,8 +1745,10 @@ instruction and wins. A bare `?project=<dir>` means "open this project", and tha
 
 ## 15. Application Preferences
 
-> **Status: Partial.** Appearance, Assistant, Accounts and a read-only Keyboard sheet ship; Editor
-> behaviour, rebinding and Updates/About are pending.
+> **Status: Partial.** Appearance, Assistant, Accounts and Keyboard ship, the last of them with
+> rebinding: `preferences-keymap.ts` captures a chord, `rebindCommand` refuses a conflicting one,
+> and the result is an override map laid over the registry and remembered across windows. Editor
+> behaviour and Updates/About are pending — neither exists as a pane.
 
 `project.json` configures a **project** and is edited as a project document (`⌘⇧,`, command id
 `settings.open`). **Preferences** (`⌘,`, command id `app.preferences`) configures the
@@ -1783,11 +1785,16 @@ setup notice) repaint without Preferences having to know they exist.
 
 ## 16. Feedback, Problems and Progress
 
-> **Status: Partial.** The notification substrate, the Bottom dock and all three of its tabs
-> (Problems, Logic, Activity), and the inline field slot all ship. What does not is the
-> **announcement**: the toast host is the only live region, and the default tier routes an error
-> to the Problems panel, which has none — so the app's one status channel is silent to assistive
-> technology for exactly the tier that matters most. See §19.
+> **Status: Implemented.** The notification substrate, the Bottom dock and all three of its tabs
+> (Problems, Logic, Activity), the inline field slot and the **announcement** all ship.
+>
+> The announcement was the last piece and it is worth recording where it lives, because the obvious
+> place is wrong. It is not a region on the Problems panel: that panel sits in the Bottom dock, and
+> a live region inside a hidden tab announces nothing. `services/announce.ts` owns two body-level
+> regions — `assertive` and `polite`, because politeness is read when the region is created and not
+> when its text changes (WAI-ARIA §5.2.9) — and `notify()` calls it at one unconditional call site,
+> so a record cannot be posted without being announced and a future host inherits announcements
+> without knowing the module exists. See §19.
 
 Studio's predecessor had one feedback surface: a 24px status bar carrying 78 outcomes — successes
 and failures alike — in identical 11px grey text, destroyed after 3000ms. Nothing persisted, nothing
@@ -2134,12 +2141,14 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 | Standard                                           | Class      | Binds | Evidence                                                                                                                          | Note                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | -------------------------------------------------- | ---------- | ----- | --------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [WAI-ARIA](https://www.w3.org/TR/wai-aria-1.2/)    | **Subset** | §16   | packages/studio/src/ui/layers.ts                                                                                                  | The toast host is a live region and modals carry `role="dialog"` with `aria-modal`. The Problems panel, which is where the default tier sends an error, is not a live region at all.                                                                                                                                                                                                                                                                                                                                                                  |
+| [WAI-ARIA](https://www.w3.org/TR/wai-aria-1.2/)    | **Subset** | §16   | packages/studio/src/services/announce.ts, packages/studio/tests/announce.test.ts, packages/studio/src/ui/layers.ts                | Every `notify` record reaches a live region, whatever tier it lands in: `announce.ts` keeps one `role="alert"` and one `role="status"` region on `<body>` and `notify()` posts to the one the severity picks (§5.2.9). Body-level rather than panel-level because the Problems panel lives in a dock tab, and a region in a hidden tab announces nothing. Modals carry `role="dialog"` with `aria-modal`. Absent: the wider authoring surfaces, whose conventions are `studio-ui-guidelines.md` §14.                                                  |
 | [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) | **Subset** | §16   | packages/studio/src/platform-errors.ts, packages/studio/src/platforms/devserver.ts, packages/studio/tests/platform-errors.test.ts | A Problem's message comes from one reader over every shape a backend has sent, so a failure can no longer surface blank because the reader that ran was not the one for the shape that arrived. `problemDetail` answers `null` rather than a generic string, which is what lets each call site keep its own better words. Absent: `instance`.                                                                                                                                                                                                         |
 | [ATAG 2.0](https://www.w3.org/TR/ATAG20/)          | **Subset** | §16.6 | packages/studio/src/services/a11y-report.ts, packages/studio/tests/a11y-report.test.ts, packages/studio/src/panels/head-panel.ts  | Part B.3.1 is met: a check over the author's document files a Problem per finding, each naming its WCAG criterion, and names what it could not check rather than reporting a clean bill. B.3.2 is partial — a repair command is carried where one exists, and most repairs have none yet. Part A is `studio-ui-guidelines.md` §13.1a and §8.2. Everything needing layout or the cascade is a property of built output and is out of scope for a document-tree check; the two Problems that say so are how the boundary is stated rather than implied. |
 
 ## Changelog
 
+- **0.9.30-draft** (2026-08-18) — §15: the Keyboard sheet is no longer read-only — rebinding ships, Editor and Updates/About remain pending.
+- **0.9.29-draft** (2026-08-18) — §16 and §19: the notify announcement ships — correct a marker and a WAI-ARIA note that both described the gap it closed.
 - **0.9.28-draft** (2026-08-18) — §6.8: the From data… picker addresses only what it can list — nested paths and tokens holding a dot or slash are legal pointers it cannot author.
 - **0.9.27-draft** (2026-08-16) — §16.6 reports about the author's own content — an ATAG Part B accessibility check and the SEO warnings both file Problems, each finding naming its WCAG criterion, and each run naming what it could not check. Closes gap:atag-authoring-support.
 - **0.9.26-draft** (2026-08-16) — §16 one Problem reader over every backend failure shape; gap:studio-error-reader closed.
@@ -2223,4 +2232,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.28-draft_
+_`@jxsuite/studio` Specification v0.9.30-draft_

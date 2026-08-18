@@ -153,7 +153,7 @@ Discovery is done. What is missing is sending a visitor to their own language, w
 
 `translationKey()` and `localeAlternates()` in `packages/compiler/src/site/i18n.ts` already model translation sets; the lookup needs the same canonicalization (`canonicalizeLocale`) so a tag matches the same way it does everywhere else.
 
-Also still open here: **`{locale}` in a collection `source` is not expanded** (§13.3 is `Pending`), and **`prefix-always` is accepted but not enforced** — a page outside the locale tree still builds and serves as the default locale.
+~~Also still open here: `{locale}` in a collection `source` is not expanded (§13.3 is `Pending`), and `prefix-always` is accepted but not enforced.~~ **Both shipped.** `{locale}` expands in `extensions/parser/src/content-loader.ts` (§13.3 is `Implemented`), and `unprefixedRoutes` in `packages/compiler/src/site/i18n.ts` is called from `site-build.ts` and warns, naming every route outside the locale tree. The warning is deliberately not an error: the author may genuinely mean it, and failing a build over a page that works would be the compiler overruling a decision it cannot see the reason for.
 
 ### 4.2 S1 — RFC 9457 Problem Details ✅ **shipped**
 
