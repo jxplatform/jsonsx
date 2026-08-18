@@ -26,7 +26,7 @@ This page is generated from the `> **Status: …**` markers in the specification
 | `schema.md`               | 0.4.8-draft  | Partial     | 2026-08-16 |
 | `server.md`               | 0.2.8        | Implemented | 2026-08-18 |
 | `site-architecture.md`    | 0.5.10-draft | Partial     | 2026-08-18 |
-| `spec.md`                 | 0.5.2-draft  | Partial     | 2026-08-18 |
+| `spec.md`                 | 0.5.3-draft  | Partial     | 2026-08-18 |
 | `standards.md`            | 0.1.15-draft | Partial     | 2026-08-17 |
 | `studio-ui-guidelines.md` | 0.3.12       | Implemented | 2026-08-16 |
 | `studio.md`               | 0.9.30-draft | Partial     | 2026-08-18 |
@@ -43,7 +43,6 @@ This page is generated from the `> **Status: …**` markers in the specification
 - `site-architecture.md` §13 — Internationalization
 - `site-architecture.md` §13.6 — Locale Negotiation
 - `site-architecture.md` §14 — Deployment
-- `spec.md` §5.6 — Private State (`#` prefix)
 - `spec.md` §11.4 — Server Timing — RPC Function Boundary
 - `spec.md` §16.8 — CEM-Compatible Annotations
 - `spec.md` §21 — Evaluation Surface

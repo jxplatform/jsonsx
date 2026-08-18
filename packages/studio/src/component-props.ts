@@ -12,6 +12,7 @@
 
 import type { JsonValue } from "./types";
 import type { JxMutableNode } from "@jxsuite/schema/types";
+import { isPrivateStateKey } from "@jxsuite/schema/guards";
 
 /** One editable prop row: the state key and its current default value (undefined = none). */
 export interface ComponentPropEntry {
@@ -60,8 +61,8 @@ export function componentPropEntries(doc: JxMutableNode | null | undefined): Com
   const state = (doc?.state ?? {}) as Record<string, unknown>;
   const out: ComponentPropEntry[] = [];
   for (const [name, def] of Object.entries(state)) {
-    if (name.startsWith("#")) {
-      continue; // Private entries are not props (the CEM-export rule).
+    if (isPrivateStateKey(name)) {
+      continue; // Private entries are not props (spec.md §5.6).
     }
     const shape = propShape(def);
     if (!shape) {

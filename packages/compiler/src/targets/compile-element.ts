@@ -629,12 +629,21 @@ export function emitElementModule(
         ]),
     // ConnectedCallback
     "  connectedCallback() {",
+    /*
+     * Each of the three absorption paths below skips a `#`-prefixed key: private state is not part
+     * of the component's interface and is never settable through $props (spec.md §5.6). Emitted as
+     * a runtime check rather than resolved at build time because all three read keys that arrive
+     * with the instance — an attribute payload, an attribute name, a property a parent set — none
+     * of which the compiler can see. The interpreter enforces the same rule in `runtime.ts`; the
+     * two tiers agreeing is the point, since a document is authored against whichever runs.
+     */
     // Read $props from data-jx-props attribute (set by compiler for pre-rendered instances)
     "    const _pa = this.getAttribute('data-jx-props');",
     "    if (_pa) {",
     "      try {",
     "        const _p = JSON.parse(_pa);",
     "        for (const [k, v] of Object.entries(_p)) {",
+    "          if (k.startsWith('#')) continue;",
     "          if (k in this.state) this.state[k] = v;",
     "        }",
     "      } catch {}",
@@ -646,6 +655,7 @@ export function emitElementModule(
     "    const _pn = this.getAttributeNames().filter(n => n.startsWith('props.') && n.length > 6);",
     "    for (const _n of _pn) {",
     "      const _k = _n.slice(6);",
+    "      if (_k.startsWith('#')) { this.removeAttribute(_n); continue; }",
     "      if (_k in this.state) {",
     "        this.state[_k] = this.getAttribute(_n);",
     "        this.removeAttribute(_n);",
@@ -654,6 +664,7 @@ export function emitElementModule(
     // Merge JS properties set before connection (by parent runtime).
     // Only check own properties to avoid inherited DOM properties like `title`.
     "    for (const key of Object.keys(this.state)) {",
+    "      if (key.startsWith('#')) continue;",
     "      if (this.hasOwnProperty(key) && this[key] !== undefined) {",
     "        this.state[key] = this[key];",
     "      }",

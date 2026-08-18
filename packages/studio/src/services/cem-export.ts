@@ -1,6 +1,11 @@
 /// <reference lib="dom" />
 import type { CemParameter, JxMutableNode, JxStateObject } from "@jxsuite/schema/types";
-import { displayTagName, isFunctionDef, isJsonObject } from "@jxsuite/schema/guards";
+import {
+  displayTagName,
+  isFunctionDef,
+  isJsonObject,
+  isPrivateStateKey,
+} from "@jxsuite/schema/guards";
 
 /** Collect slot elements from the document tree. Whitespace-only names count as unnamed. */
 export function collectSlots(node?: JxMutableNode | null, slots: string[] = []) {
@@ -69,9 +74,9 @@ export function exportCemManifest(
   const seenEvents = new Set<string>();
 
   for (const [key, d] of Object.entries(state)) {
-    if (key.startsWith("#")) {
+    if (isPrivateStateKey(key)) {
       continue;
-    } // Private
+    } // Private (spec.md §5.6)
 
     const cat = defCategory(d);
 

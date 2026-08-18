@@ -2,7 +2,7 @@
 
 ## Declarative Document Object Model — JSON Edition
 
-**Version:** 0.5.2-draft
+**Version:** 0.5.3-draft
 **Status:** Partial
 **Updated:** 2026-08-18
 **License:** MIT
@@ -500,7 +500,9 @@ State entries prefixed with `#` are private. They are never exposed to the studi
 }
 ```
 
-> **Status: Partial.** The studio enforces the convention: `#` entries are excluded from the editable prop list (`componentPropEntries`) and skipped during CEM extraction (`cem-export`), so they never surface in the property panel or the exported manifest. The runtime does not yet enforce it — `#` entries build into scope like any other state entry, and a `$props` write against a `#` name is not blocked.
+> **Status: Implemented.** All three clauses hold. The studio excludes `#` entries from the editable prop list (`componentPropEntries`) and from CEM extraction (`cem-export`), and both tiers now refuse a `$props` write against one: the interpreter at each of its four absorption paths (`runtime.ts`) and the compiled element target in the `connectedCallback` it emits. The predicate is `isPrivateStateKey` in `@jxsuite/schema/guards`, in one place because the rule has to hold identically in code that is compiled and code that is interpreted.
+>
+> Two details are part of the contract rather than of the implementation. A private entry gets **no property accessor** on the custom element — the property-first interface _is_ the props mechanism, so defining one would leave `el["#cache"] = x` writing through every other guard. And a refused write is **ignored and named**, not thrown: a `$props` block mentioning a private key is an authoring mistake, not a broken document, and failing the render would turn a typo into a blank page. The warning fires once per key.
 
 ### 5.7 Shape Detection Algorithm
 
@@ -2480,6 +2482,7 @@ This rewrites the mutating handlers of Appendix A's idiom using `$expression`, l
 
 ## Changelog
 
+- **0.5.3-draft** (2026-08-18) — §5.6: both tiers refuse a $props write against a private key, and a private entry gets no property accessor.
 - **0.5.2-draft** (2026-08-18) — §21.5: ship the Trusted Types observation stage, and correct two claims its first boot disproved.
 - **0.5.1-draft** (2026-08-18) — §7.1: state the one-separator rule without showcasing a dotted key; note that forbidding one would itself depart from RFC 6901.
 - **0.5.0-draft** (2026-08-17) — $ref is JSON Pointer: `/` is the only separator and `~0`/`~1` are implemented; one shared tokenizer replaces five disagreeing ones.
@@ -2536,4 +2539,4 @@ This rewrites the mutating handlers of Appendix A's idiom using `$expression`, l
 
 ---
 
-_Jx Specification v0.5.2-draft — subject to revision_
+_Jx Specification v0.5.3-draft — subject to revision_

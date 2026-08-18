@@ -34,6 +34,7 @@ import {
   isJsonObject,
   isMappedArray,
   isNamedFormulaDef,
+  isPrivateStateKey,
   isPrototypeDef,
   isRef as isRefValue,
   isServerFnDef,
@@ -2157,6 +2158,42 @@ function getPath(obj: unknown, path: string) {
   return readPath(obj, path);
 }
 
+/** Keys already reported, so a component rendered in a loop warns once rather than per instance. */
+const _privatePropWarned = new Set<string>();
+
+/**
+ * Refuse a `$props` write against a private (`#`) state key — `spec.md` §5.6.
+ *
+ * Ignored rather than thrown. A `$props` block naming a private entry is an authoring mistake, not
+ * a broken document: the rest of the instance is well-formed and refusing to render it would turn a
+ * typo into a blank page. But silence was the previous behavior and it is the wrong kind — the
+ * author sees a prop that looks accepted and does nothing — so the write is dropped and named.
+ *
+ * @param {string} key
+ * @param {string} [where] - The site refusing it, for a message that points somewhere
+ * @returns {boolean} True when the key is private and the caller must skip it
+ */
+function refusePrivateProp(key: string, where?: string): boolean {
+  if (!isPrivateStateKey(key)) {
+    return false;
+  }
+  const seen = where === undefined ? key : `${where}:${key}`;
+  if (!_privatePropWarned.has(seen)) {
+    _privatePropWarned.add(seen);
+    console.warn(
+      `Jx: "${key}" is private state (spec.md §5.6) and cannot be set through $props` +
+        `${where === undefined ? "" : ` (${where})`}. The write was ignored; rename the entry ` +
+        "without the leading # to make it part of the component's interface.",
+    );
+  }
+  return true;
+}
+
+/** Tests only — the warn-once set outlives a single render by design. */
+export function _resetPrivatePropWarnings(): void {
+  _privatePropWarned.clear();
+}
+
 /**
  * @param {JxElement} def
  * @param {JxScope} parentState
@@ -2165,6 +2202,9 @@ function getPath(obj: unknown, path: string) {
 function mergeProps(def: JxElement, parentState: JxScope): JxScope {
   const child = Object.create(parentState) as JxScope;
   for (const [k, v] of Object.entries(def.$props ?? {})) {
+    if (refusePrivateProp(k, "$props")) {
+      continue;
+    }
     child[k] = isRefObj(v) ? resolveRef(v.$ref, parentState) : v;
   }
   return child;
@@ -2435,6 +2475,9 @@ export async function defineElement(source: string | JxDocument, baseUrl?: strin
         try {
           const props = JSON.parse(propsAttr) as Record<string, unknown>;
           for (const [key, val] of Object.entries(props)) {
+            if (refusePrivateProp(key, "data-jx-props")) {
+              continue;
+            }
             if (key in (def.state ?? {})) {
               state[key] = val;
             }
@@ -2452,6 +2495,10 @@ export async function defineElement(source: string | JxDocument, baseUrl?: strin
       );
       for (const name of propAttrNames) {
         const key = name.slice("props.".length);
+        if (refusePrivateProp(key, "props.* attribute")) {
+          this.removeAttribute(name);
+          continue;
+        }
         if (key in (def.state ?? {})) {
           state[key] = this.getAttribute(name);
           this.removeAttribute(name);
@@ -2460,12 +2507,22 @@ export async function defineElement(source: string | JxDocument, baseUrl?: strin
 
       // Merge $props set as JS properties by parent before connection
       for (const key of Object.keys(def.state ?? {})) {
+        if (isPrivateStateKey(key)) {
+          continue;
+        }
         if (key in this && (this as Record<string, unknown>)[key] !== undefined) {
           state[key] = (this as Record<string, unknown>)[key];
         }
       }
-      // Set up property getters/setters that forward into reactive state
+      /*
+       * Set up property getters/setters that forward into reactive state. Private entries get NO
+       * accessor: the property-first interface IS the props mechanism, so defining one would leave
+       * `el["#cache"] = x` writing straight through everything above.
+       */
       for (const key of Object.keys(def.state ?? {})) {
+        if (isPrivateStateKey(key)) {
+          continue;
+        }
         if (!(key in HTMLElement.prototype)) {
           Object.defineProperty(this, key, {
             configurable: true,
@@ -2563,6 +2620,9 @@ function renderCustomElementWithProps(
 
   // Set JS properties from $props (before connection)
   for (const [key, val] of Object.entries(def.$props ?? {})) {
+    if (refusePrivateProp(key, "$props")) {
+      continue;
+    }
     if (isRefObj(val)) {
       const refVal = val;
       const resolved = resolveRef(refVal.$ref, state);
