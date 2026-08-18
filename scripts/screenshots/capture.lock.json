@@ -121,9 +121,9 @@
       "width": 3840
     },
     "docs/images/blog-grid.png": {
-      "bytes": 230345,
-      "capturedAt": "2026-08-18T12:15:57Z",
-      "capturedBy": "screenshots@ci/32135645242",
+      "bytes": 230351,
+      "capturedAt": "2026-08-18T13:46:43Z",
+      "capturedBy": "screenshots@ci/32143977374",
       "definition": "0e8a0d9df9c3c6cc71eff7f71406b315871323a5e311e73d87d4d3b8a00c4e0f",
       "height": 2000,
       "runtime": {
@@ -131,7 +131,7 @@
         "fontset": "fc:cac8f480b341",
         "os": "debian-12"
       },
-      "sha256": "ad7e5f794cd659527966aedbae42b46ed484ed6bebc603f78a66f0d0f1b8de6f",
+      "sha256": "5bb1c23fd140285c5b6f97530d5e4f3af5b28a27244dab2129113636aa862aeb",
       "shot": "blog-grid",
       "width": 3840
     },
@@ -661,9 +661,9 @@
       "width": 836
     },
     "docs/images/media-upload.png": {
-      "bytes": 262070,
-      "capturedAt": "2026-08-18T12:16:42Z",
-      "capturedBy": "screenshots@ci/32135645242",
+      "bytes": 261492,
+      "capturedAt": "2026-08-18T13:47:41Z",
+      "capturedBy": "screenshots@ci/32143977374",
       "definition": "ac0e427d3f9e29401cf944d5957009c5a615bf559b5de440f0a488e78f776b18",
       "height": 1638,
       "runtime": {
@@ -671,14 +671,14 @@
         "fontset": "fc:cac8f480b341",
         "os": "debian-12"
       },
-      "sha256": "ef3497a583e992e29602a0de11fd326f59900683f1b1095f7c9d38d0cedd8523",
+      "sha256": "ebaa2e0ee6439544f6dc5d6ea465d0df7ad4571511cc7de9d05d59b1bc8216ef",
       "shot": "media-upload",
       "width": 2688
     },
     "docs/images/mode-design.png": {
-      "bytes": 768888,
-      "capturedAt": "2026-08-17T00:43:06Z",
-      "capturedBy": "screenshots@ci/31982773241",
+      "bytes": 768250,
+      "capturedAt": "2026-08-18T13:44:30Z",
+      "capturedBy": "screenshots@ci/32143977374",
       "definition": "51eaafbafa8f6ffbd4f7c91f468f277429a27c85a0dc250b02b3b1b43e841780",
       "height": 2000,
       "runtime": {
@@ -686,7 +686,7 @@
         "fontset": "fc:cac8f480b341",
         "os": "debian-12"
       },
-      "sha256": "906d27f3a7d6aa3fa3e5be7dbf5f2b4a766808ca3ad9350b7f02a8013672e00d",
+      "sha256": "d456a112da8febaf87018de496f3737fbd4655a7b17ada68c53c878c0e567383",
       "shot": "mode-design",
       "width": 3840
     },
