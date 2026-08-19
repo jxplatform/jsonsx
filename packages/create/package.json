@@ -26,7 +26,8 @@
     ".": "./index.ts",
     "./generate": "./generate.ts",
     "./templates": "./templates.ts",
-    "./scaffold": "./scaffold.ts"
+    "./scaffold": "./scaffold.ts",
+    "./template-versions.json": "./template-versions.json"
   },
   "publishConfig": {
     "provenance": true

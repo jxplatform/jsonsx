@@ -186,6 +186,15 @@ describe("against the committed tree", () => {
     expect(problems).toEqual([]);
   });
 
+  test("the version map is importable by name, not just by relative path", async () => {
+    // The Jx platform scaffolds cloud projects too, and today it writes `"@jxsuite/compiler":
+    // "latest"` into every one of them — a floating reference resolved at the USER's build time,
+    // Which a future major silently breaks. It cannot consume this map by a relative path, so the
+    // Map has to be a named subpath export.
+    const pkg = await Bun.file("packages/create/package.json").json();
+    expect(pkg.exports["./template-versions.json"]).toBe("./template-versions.json");
+  });
+
   test("packages/create ships the version map it imports", async () => {
     // The failure mode this guards is invisible in the monorepo and in every test: npm drops the
     // File, and `bun create @jxsuite` throws "Cannot find module ./template-versions.json" for
