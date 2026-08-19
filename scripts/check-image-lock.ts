@@ -597,7 +597,15 @@ export interface LockCheckResult {
   shots: number;
 }
 
-function formatBytes(bytes: number): string {
+/**
+ * Byte sizes as the lane's report writes them.
+ *
+ * Exported for the tests, which must DERIVE the string they expect rather than snapshot it: the
+ * only inputs `describeChange` has are real committed PNGs, and this lane rewrites those on every
+ * visual change. A hardcoded "6 KB → 9 KB" went red the first time it re-captured, for a reason
+ * that had nothing to do with the function under test.
+ */
+export function formatBytes(bytes: number): string {
   return bytes >= 1_000_000
     ? `${(bytes / 1_000_000).toFixed(1)} MB`
     : `${Math.round(bytes / 1000)} KB`;
