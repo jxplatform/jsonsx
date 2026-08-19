@@ -2,9 +2,9 @@
 
 ## Platform Abstraction, Project Loading, and Component Scoping
 
-**Version:** 0.3.11-draft
+**Version:** 0.3.12-draft
 **Status:** Pending
-**Updated:** 2026-08-16
+**Updated:** 2026-08-19
 **License:** MIT
 
 ---
@@ -809,13 +809,28 @@ The flake's `packages.default` produces a fully sandboxed NixOS package:
 - **Build dependencies** are fetched via [bun2nix](https://github.com/nix-community/bun2nix), which generates a `bun.nix` lockfile mapping all packages to fixed-output derivations — no network access needed during build
 - **`bun.nix` auto-refresh:** The root `package.json` postinstall script runs `bun2nix -o bun.nix` after every `bun install`, keeping the nix lockfile in sync with `bun.lock`
 - **Build phase** runs `bun run build` (compiler, runtime, studio, schema) and `pre-build.ts` (bundles the studio init bridge and copies assets)
-- **Install phase** copies `chromium-mode.ts`, studio assets, and dereferenced `node_modules` (via `cp -rL` to resolve workspace symlinks) into the nix store
-- **Wrapper** creates a `jx-studio` binary that runs `bun chromium-mode.ts` with `CHROMIUM_BIN` and `JX_STUDIO_ASSETS` pre-set to nix store paths
+- **Install phase** copies `packages/`, `extensions/` and `node_modules` into the nix store with plain `cp -r`, then deletes dangling symlinks (`find … -xtype l -delete`) rather than dereferencing with `cp -rL`. The prune is why `packages/desktop/tests/nix-bundle-completeness.test.ts` exists: it reads the copied directories back out of `package.nix` and asserts every `@jxsuite/*` dependency of the desktop app lands under one of them, after `extensions/parser` was once pruned out of the bundle silently
+- **Wrapper** creates a `jx-studio` binary that runs `bun run packages/desktop/src/chromium/index.ts` with `CHROMIUM_BIN` and `JX_STUDIO_ASSETS` pre-set to nix store paths. The first positional argument is the **project root**; there is no flag surface
+
+**Which ref a consumer gets.** `packages/desktop/package.nix` builds `src = lib.cleanSource ../..`
+— whatever tree was fetched — so the ref names the release. `main` is the development trunk and
+gives the tip; **`release` holds only released code**, advanced by CI to each `desktop-v*` tag once
+that tag has both produced its installers and passed a real `nix build`. A NixOS user therefore
+pins the branch, not the trunk:
 
 ```
-$ nix build
-$ ./result/bin/jx-studio [project-root]
+$ nix run github:jxsuite/jx/release
+$ nix build github:jxsuite/jx/release && ./result/bin/jx-studio [project-root]
 ```
+
+Locally, `nix build` (no ref) builds the working tree, which is what a contributor wants.
+
+`release` never advances to a commit whose flake does not build: `.github/workflows/nix.yml` builds
+`.#default` at the tag and asserts the wrapper's `CHROMIUM_BIN` and `JX_STUDIO_ASSETS` resolve, and
+the branch moves only if that succeeds. When it does not, the branch stays where it is and an issue
+is opened — a stale ref that works beats a fresh one that does not. The same workflow runs on any
+pull request touching `flake.nix`, `bun.nix`, `bun.lock` or `packages/desktop/**`, which is the
+first time the flake has been built by CI at all.
 
 ---
 
@@ -923,6 +938,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.3.12-draft** (2026-08-19) — §9.3 documents the release branch as the ref a Nix consumer pins, and the nix build that gates it; corrects the install phase, which has used cp -r plus a dangling-symlink prune and src/chromium/index.ts since before this text was written.
 - **0.3.11-draft** (2026-08-16) — §3.6 the desktop signs in with an RFC 8252 loopback redirect and PKCE; the token rests in a 0600 credential store, not localStorage. RFC 8414 and RFC 7519 recorded Rejected as vacuous. Closes gap:native-oauth and gap:oauth-pkce.
 - **0.3.10-draft** (2026-08-16) — §5 the contract's failure half is specified — one RFC 9457 registry; gap:backend-failure-contract closed.
 - **0.3.9-draft** (2026-08-15) — Add §12 Standards Alignment; §5 marked Partial — the Backend API Contract specifies no failure shape.
@@ -953,4 +969,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx Studio Desktop Architecture Specification v0.3.11-draft_
+_Jx Studio Desktop Architecture Specification v0.3.12-draft_

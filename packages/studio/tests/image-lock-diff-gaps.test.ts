@@ -23,6 +23,7 @@ import {
   LOCK_VERSION,
   checkImageLock,
   describeChange,
+  formatBytes,
   describeImage,
   detectFontFamilies,
   main,
@@ -159,16 +160,22 @@ describe("describeChange", () => {
 
   test("falls back to bytes when both decode but the pixels are not comparable", () => {
     // The lock entries agree on 8×4, so the dimension branch is not what answers here: the PNGs
-    // Themselves are 1420×68 and 550×132, so `changedPixelRatio` refuses and the bytes speak.
-    expect(
-      describeChange({
-        after: entry({ bytes: fieldMode.length }),
-        afterBytes: fieldMode,
-        before: entry({ bytes: tabStrip.length }),
-        beforeBytes: tabStrip,
-        state: "changed",
-      }),
-    ).toBe("6 KB → 9 KB");
+    // Themselves are different sizes, so `changedPixelRatio` refuses and the bytes speak.
+    //
+    // DERIVED, not snapshotted. These are real committed PNGs and the screenshot lane rewrites them
+    // Whenever anything visual changes — this assertion used to read "6 KB → 9 KB" and went red the
+    // First time the lane re-captured, naming a function that was working perfectly. What is under
+    // Test is the FALLBACK, not today's file sizes.
+    const answer = describeChange({
+      after: entry({ bytes: fieldMode.length }),
+      afterBytes: fieldMode,
+      before: entry({ bytes: tabStrip.length }),
+      beforeBytes: tabStrip,
+      state: "changed",
+    });
+    expect(answer).toBe(`${formatBytes(tabStrip.length)} → ${formatBytes(fieldMode.length)}`);
+    // And it really is the byte branch, not a pixel ratio that happens to format alike.
+    expect(answer).not.toContain("%");
   });
 });
 

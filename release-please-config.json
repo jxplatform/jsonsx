@@ -16,7 +16,20 @@
     },
     "packages/runtime": {
       "release-type": "node",
-      "component": "runtime"
+      "component": "runtime",
+      "extra-files": [
+        {
+          "type": "json",
+          "glob": true,
+          "path": "/packages/starters/sites/*/package.json",
+          "jsonpath": "$.devDependencies[?(@property === '@jxsuite/runtime')]"
+        },
+        {
+          "type": "json",
+          "path": "/packages/create/template-versions.json",
+          "jsonpath": "$.runtime"
+        }
+      ]
     },
     "packages/markup": {
       "release-type": "node",
@@ -24,7 +37,20 @@
     },
     "extensions/parser": {
       "release-type": "node",
-      "component": "parser"
+      "component": "parser",
+      "extra-files": [
+        {
+          "type": "json",
+          "glob": true,
+          "path": "/packages/starters/sites/*/package.json",
+          "jsonpath": "$.dependencies[?(@property === '@jxsuite/parser')]"
+        },
+        {
+          "type": "json",
+          "path": "/packages/create/template-versions.json",
+          "jsonpath": "$.parser"
+        }
+      ]
     },
     "extensions/connector": {
       "release-type": "node",
@@ -36,7 +62,20 @@
     },
     "packages/compiler": {
       "release-type": "node",
-      "component": "compiler"
+      "component": "compiler",
+      "extra-files": [
+        {
+          "type": "json",
+          "glob": true,
+          "path": "/packages/starters/sites/*/package.json",
+          "jsonpath": "$.devDependencies[?(@property === '@jxsuite/compiler')]"
+        },
+        {
+          "type": "json",
+          "path": "/packages/create/template-versions.json",
+          "jsonpath": "$.compiler"
+        }
+      ]
     },
     "packages/import": {
       "release-type": "node",
@@ -52,7 +91,14 @@
     },
     "packages/server": {
       "release-type": "node",
-      "component": "server"
+      "component": "server",
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "/packages/create/template-versions.json",
+          "jsonpath": "$.server"
+        }
+      ]
     },
     "packages/studio": {
       "release-type": "node",
@@ -75,6 +121,16 @@
       "component": "formulas",
       "bump-minor-pre-major": true,
       "bump-patch-for-minor-pre-major": true
+    },
+    "extensions/search": {
+      "release-type": "node",
+      "component": "search",
+      "bump-minor-pre-major": true
+    },
+    "extensions/feed": {
+      "release-type": "node",
+      "component": "feed",
+      "bump-minor-pre-major": true
     }
   }
 }

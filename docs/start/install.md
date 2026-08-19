@@ -20,15 +20,33 @@ Grab an installer for your platform from the [latest release](https://github.com
 
 The macOS builds are notarized, so they open without a Gatekeeper prompt. The Windows installer is not yet code-signed — SmartScreen will warn on first run; choose **More info → Run anyway**. The [Download page](/download) has the same links plus checksums and release notes.
 
+## NixOS
+
+On NixOS the same desktop app is built from source instead of downloaded, because its bundler cannot run in a Nix sandbox. It runs Studio in a Chromium app window and presents the identical editor.
+
+```
+nix run github:jxsuite/jx/release
+```
+
+Pin the `release` branch, not `main`: `release` holds only released code, and it advances to a release only after that release has built. `main` is the development trunk, so it will sometimes be ahead of anything that has shipped.
+
+To install it rather than run it once:
+
+```
+nix profile install github:jxsuite/jx/release
+```
+
+Either form takes an optional project directory — `nix run github:jxsuite/jx/release -- ~/sites/my-site` — and opens the project picker without one.
+
 Once installed, open Studio and either **create a new project**, **open an existing folder**, or **clone a repository** — see [Your first project](/docs/start/first-project).
 
 ## Updating
 
-Studio checks your project's `@jxsuite/*` dependencies against the version it ships with and offers to update them when they drift, and prompts when a newer release of the app itself is available.
+Studio checks your project's `@jxsuite/*` dependencies against each package's own newest published version and offers to update them when one is behind, and prompts when a newer release of the app itself is available. Studio's own copy of those packages is separate — your project's ranges govern `jx build` and your project's types, not the running app, so there's no reason for them to match Studio's version.
 
 ## For developers: scaffolding from a terminal
 
-The visual editor only runs as the desktop app above — there's no way to install or serve Studio itself from a command line. If you'd rather generate a project's files from a terminal before opening them in Studio, see [CLI commands](/docs/framework/build/cli) for `bun create @jxsuite` and the `jx` CLI.
+The visual editor only runs as the desktop app above — the Nix commands build and launch that same app, and there's no way to serve Studio itself as a headless web app. If you'd rather generate a project's files from a terminal before opening them in Studio, see [CLI commands](/docs/framework/build/cli) for `bun create @jxsuite` and the `jx` CLI.
 
 ## Next
 

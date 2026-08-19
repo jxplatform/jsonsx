@@ -597,7 +597,15 @@ export interface LockCheckResult {
   shots: number;
 }
 
-function formatBytes(bytes: number): string {
+/**
+ * Byte sizes as the lane's report writes them.
+ *
+ * Exported for the tests, which must DERIVE the string they expect rather than snapshot it: the
+ * only inputs `describeChange` has are real committed PNGs, and this lane rewrites those on every
+ * visual change. A hardcoded "6 KB → 9 KB" went red the first time it re-captured, for a reason
+ * that had nothing to do with the function under test.
+ */
+export function formatBytes(bytes: number): string {
   return bytes >= 1_000_000
     ? `${(bytes / 1_000_000).toFixed(1)} MB`
     : `${Math.round(bytes / 1000)} KB`;
@@ -736,6 +744,37 @@ export function checkImageLock(input: LockCheckInput): LockCheckResult {
     warnings.push(
       `shot "${shot.name}" has never been captured (no entry in ${DEFAULT_LOCK})${tail}`,
     );
+  }
+
+  // The other direction, which nothing asked until now: a picture NO page reads. `docs:check` owns
+  // "a page references an image the lock does not name"; this owns "the lock names an image no page
+  // References". Without it a shot runs on every invocation of a lane whose whole cost is minutes of
+  // Browser and a commit on someone's branch, to produce bytes nobody will ever see — and the only
+  // Way to notice was to go looking. Three shots were in that state, one of them 865 KB.
+  //
+  // Only when a page scan actually happened: the lane's `--report` mode passes no refs, and every
+  // Image would look orphaned.
+  if (refs.length > 0) {
+    for (const [path, entry] of Object.entries(entries)) {
+      const name = path.slice(path.lastIndexOf("/") + 1).replace(/\.png$/, "");
+      if (referenced.has(name)) {
+        continue;
+      }
+      const shot = byName.get(entry.shot);
+      if (shot?.status?.state === "quarantined") {
+        // A quarantined shot's image MUST be unreferenced — `docs:check` fails if a page still
+        // Illustrates itself with one. Requiring a reference here would be the opposite rule.
+        continue;
+      }
+      const declares = shot?.docs?.length
+        ? shot.docs.map((d) => `"${d}"`).join(", ")
+        : "no page at all";
+      violations.push(
+        `${path} is captured by shot "${entry.shot}" and read by no docs page. The shot declares ` +
+          `${declares} — illustrate it, or delete the shot, its image and its lock entry. ` +
+          `Deleting a shot is a first-class fix.`,
+      );
+    }
   }
 
   for (const shot of shots) {
