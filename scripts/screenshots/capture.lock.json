@@ -676,9 +676,9 @@
       "width": 2688
     },
     "docs/images/mode-design.png": {
-      "bytes": 1058645,
-      "capturedAt": "2026-08-19T16:03:24Z",
-      "capturedBy": "screenshots@ci/32273537346",
+      "bytes": 1057797,
+      "capturedAt": "2026-08-19T19:55:13Z",
+      "capturedBy": "screenshots@ci/32295546490",
       "definition": "51eaafbafa8f6ffbd4f7c91f468f277429a27c85a0dc250b02b3b1b43e841780",
       "height": 2000,
       "runtime": {
@@ -686,7 +686,7 @@
         "fontset": "fc:cac8f480b341",
         "os": "debian-12"
       },
-      "sha256": "a5d22ceb7e78d090b52a6eb9f13da9be0d48dfa269feadc1a2ef6f34f5e0b2f8",
+      "sha256": "ab51deffb1c1275f686805f3737db26ec7fa01d7f11e593716eda814d76ead9c",
       "shot": "mode-design",
       "width": 3840
     },
