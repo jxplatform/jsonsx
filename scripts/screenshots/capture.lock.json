@@ -721,9 +721,9 @@
       "width": 3840
     },
     "docs/images/mode-script.png": {
-      "bytes": 402274,
-      "capturedAt": "2026-08-19T16:03:32Z",
-      "capturedBy": "screenshots@ci/32273537346",
+      "bytes": 401469,
+      "capturedAt": "2026-08-19T20:22:00Z",
+      "capturedBy": "screenshots@ci/32297971459",
       "definition": "d7d80b2dc6705384f70a78a8edc6fb0758d0110d6dcc94a7242ae3adb12880c8",
       "height": 2000,
       "runtime": {
@@ -731,7 +731,7 @@
         "fontset": "fc:cac8f480b341",
         "os": "debian-12"
       },
-      "sha256": "5efc76ed793610ff0c688789006002c72c101458c25db5a4afa83b9a7139f228",
+      "sha256": "82353871b8b193c31c893d42dee4b47070c6e58f7988f8bffcf906a9ce7070a6",
       "shot": "mode-script",
       "width": 3840
     },
