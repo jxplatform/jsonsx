@@ -30,7 +30,12 @@ import {
   resolveSidecarEntry,
 } from "./bundler.ts";
 import { loadProjectConfig } from "./site-loader.ts";
-import { discoverPages, expandDynamicRoutes, readPageDocument } from "./pages-discovery.ts";
+import {
+  discoverPages,
+  expandDynamicRoutes,
+  readPageDocument,
+  readTranslationKeys,
+} from "./pages-discovery.ts";
 import {
   buildHeaderRules,
   contentTypeRules,
@@ -86,10 +91,11 @@ import {
   localeOfRoute,
   pageLanguage,
   resolveI18n,
+  translationSets,
   undeclaredLocalePrefix,
   unprefixedRoutes,
 } from "./i18n.ts";
-import type { LocaleAlternate, ResolvedI18n } from "./i18n.ts";
+import type { LocaleAlternate, PageLocaleContext } from "./i18n.ts";
 import {
   isPrefixSpecifier,
   renderImportMap,
@@ -352,6 +358,16 @@ export async function buildSite(
     projectConfig,
     i18n,
   );
+  /*
+   * Every route carries the locale it serves, resolved once here rather than re-derived by each
+   * reader. It is what scopes a `ContentEntry` lookup on a localized collection: two translations
+   * of one entry share an id (§13.3), so a page that asked for `hello` without saying in which
+   * language got whichever translation was loaded first — the English copy under a French route,
+   * silently, on a page whose `<html lang>` said otherwise.
+   */
+  for (const route of routes) {
+    (route as { locale?: string | null }).locale = localeOfRoute(route.urlPattern, i18n);
+  }
   log(`  ${routes.length} route(s) after expansion`);
 
   let fileCount = 0;
@@ -493,11 +509,59 @@ export async function buildSite(
    * page's alternates include its siblings, which do not exist until every route is known.
    * Dynamic patterns are excluded — an unexpanded `:slug` is not a URL.
    */
-  const alternateMap = localeAlternates(
-    routes.filter((r) => !r.urlPattern.includes(":") && !r.urlPattern.includes("*")),
-    i18n,
-    siteUrl ?? "",
+  const concreteRoutes = routes.filter(
+    (r) => !r.urlPattern.includes(":") && !r.urlPattern.includes("*"),
   );
+  /*
+   * A localized slug shares nothing with the page it translates — `/fr-ca/a-propos/` and `/about/`
+   * reduce to different keys — so the document says so itself, and the whole annotation follows
+   * from the one key. Read only when the project has locales to group across.
+   */
+  const declaredKeys =
+    i18n === null
+      ? new Map<string, string>()
+      : await readTranslationKeys(
+          concreteRoutes as { sourcePath: string; urlPattern: string }[],
+          formatRegistry,
+        );
+  const keyedRoutes = concreteRoutes.map((r) => ({
+    translationKey: declaredKeys.get(r.urlPattern),
+    urlPattern: r.urlPattern,
+  }));
+  const alternateMap = localeAlternates(keyedRoutes, i18n, siteUrl ?? "");
+  /*
+   * The same sets, site-absolute, for `$page.alternates`. Computed from the whole table for the
+   * same reason the alternates are — and separately from them because a switcher must work in a
+   * project that has not configured `url` yet, which is every project in development.
+   */
+  const { conflicts, sets: translationMap } = translationSets(keyedRoutes, i18n);
+
+  /*
+   * Two routes claiming to be the same page in the same language. A set is single-valued, so one
+   * of them is dropped either way; what differs is whether the author asserted it.
+   *
+   * A **declared** collision fails the build: `$translationKey` is a promise written down twice,
+   * and silently advertising one of the two URLs as *the* page in that language is a wrong answer
+   * nobody can see. A derived one warns — parallel paths that happen to collide may be a deliberate
+   * alias, and failing a build over pages that work would be the compiler overruling a decision it
+   * cannot see the reason for.
+   */
+  for (const conflict of conflicts) {
+    const [kept, dropped] = conflict.urlPatterns;
+    const fix = conflict.declared
+      ? "Give one of them a different $translationKey."
+      : "Move one out of the locale tree, or give it its own $translationKey.";
+    const message =
+      `${dropped} and ${kept} are both the "${conflict.locale}" version of ` +
+      `"${conflict.key}". A translation set names one URL per language, so ${dropped} is ` +
+      `dropped from it — it carries no alternates and no switcher. ${fix}`;
+    if (conflict.declared) {
+      errors.push(message);
+      console.error(message);
+    } else {
+      console.warn(message);
+    }
+  }
 
   /*
    * `prefix-always` says every URL names its language, and until now nothing checked it: a page
@@ -512,6 +576,30 @@ export async function buildSite(
         `tree and are served as "${i18n?.defaultLocale}": ${unprefixed.slice(0, 10).join(", ")}` +
         `${unprefixed.length > 10 ? `, and ${unprefixed.length - 10} more` : ""}. ` +
         `Move them under a locale directory, or use "prefix-except-default".`,
+    );
+  }
+
+  /*
+   * `prefix-always` with no adapter, and no page at `/`. The mode leaves the root for negotiation
+   * to answer (§13.6), negotiation needs a request, and a static deployment never sees one — so the
+   * site's front door is a 404 and nothing else in the build says so. `unprefixedRoutes` above
+   * deliberately never reports `/`, because under an adapter it is handled; this is the one shape
+   * where it is not.
+   *
+   * A warning rather than a generated redirect: which URL the root should send a visitor to is a
+   * deployment decision, and inventing one would be the compiler overruling a choice it cannot see.
+   */
+  if (
+    i18n !== null &&
+    i18n.routing === "prefix-always" &&
+    !projectConfig.build.adapter &&
+    !routes.some((r) => r.urlPattern === "/")
+  ) {
+    console.warn(
+      `i18n.routing is "prefix-always" and no page claims "/", so the site root is a 404. ` +
+        `Locale negotiation answers "/" only when build.adapter is set — a static deployment has ` +
+        `no runtime to read Accept-Language. Add a redirect from "/" to "/${i18n.defaultLocale.toLowerCase()}/", ` +
+        `set build.adapter, or use "prefix-except-default".`,
     );
   }
 
@@ -549,8 +637,11 @@ export async function buildSite(
         assetMounts,
         extensionHead,
         rewriteNpmAsset,
-        i18n,
-        alternateMap.get(route.urlPattern) ?? [],
+        {
+          alternates: alternateMap.get(route.urlPattern) ?? [],
+          i18n,
+          translations: translationMap.get(route.urlPattern) ?? [],
+        },
         runtimeImports,
         registerElementBundle,
       );
@@ -1047,7 +1138,7 @@ export async function buildSite(
  *   serverHandler: string | null;
  *   doc: JxDocument;
  * }>}
- *   Every parameter is required. There is exactly one caller and it passes all sixteen, so the
+ *   Every parameter is required. There is exactly one caller and it passes all fifteen, so the
  *   defaults this list used to carry described no reachable call — and one of them, an identity
  *   `rewriteNpmAsset`, was a function that could never run pretending to be a safety net.
  */
@@ -1065,8 +1156,7 @@ async function compilePage(
   assetMounts: readonly AssetMount[],
   extensionHead: readonly JxHeadEntry[],
   rewriteNpmAsset: (specifier: string) => string,
-  i18n: ResolvedI18n | null,
-  alternates: readonly LocaleAlternate[],
+  locale: PageLocaleContext,
   runtimeImports: Record<string, string>,
   /** Registers a page's npm `$elements` set as one bundle and returns its URL. */
   registerElementBundle: (specifiers: string[]) => string,
@@ -1087,7 +1177,7 @@ async function compilePage(
   delete layoutDoc._pageTitle;
 
   // Inject $site and $page context
-  injectContext(layoutDoc, projectConfig, route, projectRoot, i18n);
+  injectContext(layoutDoc, projectConfig, route, projectRoot, locale.i18n, locale.translations);
 
   /*
    * The page's language and writing direction. `$lang` on the document wins over the locale its
@@ -1098,7 +1188,7 @@ async function compilePage(
     defaults: projectConfig.defaults,
     pageDir: typeof pageDoc.$dir === "string" ? pageDoc.$dir : undefined,
     pageLang: typeof pageDoc.$lang === "string" ? pageDoc.$lang : undefined,
-    routeLocale: localeOfRoute(route.urlPattern, i18n),
+    routeLocale: localeOfRoute(route.urlPattern, locale.i18n),
   });
 
   // Resolve generic $prototype entries via .class.json imports (and lower registry classes)
@@ -1237,7 +1327,7 @@ async function compilePage(
     charset: projectConfig.defaults?.charset ?? "utf8",
     ...(projectConfig.name != null && { siteName: projectConfig.name }),
     ...(projectConfig.url != null && { siteUrl: projectConfig.url }),
-    ...(alternates.length > 0 && { alternates }),
+    ...(locale.alternates.length > 0 && { alternates: locale.alternates }),
     pageUrl: route.urlPattern,
   });
 

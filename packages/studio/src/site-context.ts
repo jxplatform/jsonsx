@@ -4,12 +4,16 @@
  *
  * When a project has a project.json, its $media and style cascade into every file. File-level
  * definitions merge on top (file wins on conflict).
+ *
+ * @docs framework/site/i18n
  */
 
 import { projectState } from "./store";
 import { getPlatform } from "./platform";
 import { commitProjectConfig } from "./tabs/project-config";
 
+import { resolveI18n } from "@jxsuite/schema/locale";
+import type { ResolvedI18n } from "@jxsuite/schema/locale";
 import type {
   JxElement,
   JxHeadEntry,
@@ -131,6 +135,27 @@ export function getEffectiveHead(docHead?: JxHeadEntry[]) {
     }
   }
   return merged;
+}
+
+/**
+ * The project's resolved locales, or null when it declares none.
+ *
+ * The resolution is `@jxsuite/schema/locale`'s own — literally the function the compiler runs — so
+ * a tag Studio offers is a tag the build accepts, and the two cannot drift into disagreeing about
+ * what `EN-us` means or which locales exist.
+ *
+ * Errors are dropped here on purpose. Every helper in this file answers a render, and a render has
+ * nowhere to put a sentence; `settings/locales-section.ts` is where a malformed tag is refused with
+ * words, before it can reach the file.
+ *
+ * Called at render time rather than cached: `projectState` is a plain module-level binding replaced
+ * wholesale on a project switch, so a cached answer would outlive the project it described.
+ *
+ * @returns {ResolvedI18n | null}
+ */
+export function getEffectiveLocales(): ResolvedI18n | null {
+  const config = projectState?.projectConfig;
+  return config ? resolveI18n(config).i18n : null;
 }
 
 // ─── Layout resolution ──────────────────────────────────────────────────────

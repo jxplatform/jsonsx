@@ -61,7 +61,21 @@ const opened: { paneId: string; path: string }[] = [];
 const diffsAsked: { path: string; fileStatus: string }[] = [];
 let nextDiff: GitDiffState | null = null;
 
+/**
+ * Every `fileExists` the locale companion asked for, and the files the fake disk actually holds.
+ *
+ * Recorded rather than counted, because the interesting assertion is that the SAME wanted path is
+ * asked about once however many frames resolve — a probe re-issued per frame is the failure
+ * {@link _localeProbes} exists to prevent, and a bare call count cannot tell it from two panes.
+ */
+const existsAsked: string[] = [];
+const filesOnDisk = new Set<string>();
+
 const deps: DerivationDeps = {
+  fileExists: (path: string) => {
+    existsAsked.push(path);
+    return Promise.resolve(filesOnDisk.has(path));
+  },
   loadDiff: (path: string, fileStatus: string) => {
     diffsAsked.push({ fileStatus, path });
     return Promise.resolve(nextDiff && { ...nextDiff, filePath: path });
@@ -172,12 +186,37 @@ function companionOn(preset: "layout" | "component") {
   return derivation;
 }
 
+/** A locale companion on the secondary pane, holding `locale` and deriving from the primary. */
+function localeCompanionOn(locale: string | null) {
+  const derivation: PaneDerivation = {
+    kind: "companion",
+    locale,
+    preset: "locale",
+    reason: "",
+    resolved: null,
+    sourcePaneId: PRIMARY_PANE,
+    status: "loading",
+  };
+  setPaneDerivation(SECONDARY_PANE, derivation);
+  return derivation;
+}
+
+/** A project declaring `tags`, default first — the shape `resolveI18n` answers for. */
+function multilingual(...tags: string[]): void {
+  resetStudioState({
+    projectConfig: { i18n: { defaultLocale: tags[0], locales: tags } },
+  });
+}
+
 let scope: EffectScope | null = null;
 
 beforeEach(() => {
   opened.length = 0;
   diffsAsked.length = 0;
+  existsAsked.length = 0;
+  filesOnDisk.clear();
   nextDiff = null;
+  resetStudioState();
   resetCanvasPerf();
   componentRegistry.length = 0;
   shell.git.diffState = null;
@@ -287,6 +326,7 @@ describe("derivedTarget answers each preset, and writes nothing", () => {
       media: null,
       mode: "source",
       path: null,
+      probePath: null,
       reason: "",
       select: null,
       status: "ready",
@@ -607,6 +647,7 @@ describe("the component follow memoises on its ANSWER", () => {
     scope = effectScope();
     scope.run(() => {
       installDerivationEffects(SECONDARY_PANE, {
+        fileExists: async () => false,
         loadDiff: async () => null,
         openFileInPane: () => {
           throw new Error("boom");
@@ -992,6 +1033,7 @@ describe("applyDerivation", () => {
     try {
       lensOn("diff");
       applyDerivation(SECONDARY_PANE, {
+        fileExists: async () => false,
         loadDiff: () => Promise.reject(new Error("git exploded")),
         openFileInPane: () => {},
       });
@@ -1646,6 +1688,291 @@ describe("the lifecycle of a derived pane", () => {
     // …and a lens whose source pane holds nothing answers null rather than a stale id.
     workspace.panes[0]!.activeTabId = null;
     expect(workspace.activeTabId).toBeNull();
+  });
+});
+
+// ─── The locale companion ────────────────────────────────────────────────────
+
+/**
+ * `locale` is a COMPANION, and the two halves that makes true: the record carries a tag, and the
+ * pane refuses to open a file that is not there.
+ *
+ * Jx has no message catalogue (§13.3) — a translation is a different file in a different directory
+ * — so a preset that changed only the chip would be the defect this module's header warns about.
+ * The probe is the other half: `companionTarget` is pure, so "is there a French copy" is a question
+ * only the disk can answer, and answering it wrongly is either a blank pane (a path that does not
+ * exist) or a sentence about a missing translation shown for every frame before the answer lands.
+ */
+describe("the locale companion — a different FILE, and only when it is there", () => {
+  function registry() {
+    const reg = createCommandRegistry({
+      getContext: () => makeContext({ document: { open: workspace.tabs.size > 0 } }),
+    });
+    reg.registerAll(derivationCommands(deps));
+    return reg;
+  }
+
+  /** Issue → answer → re-enter: the three microtask turns a probe takes to become a status. */
+  async function settleProbe(): Promise<void> {
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+  }
+
+  test("the refusal names one missing thing at a time", () => {
+    const page = twoPanes();
+    // No `i18n` block at all: this is not a projection the project has.
+    expect(presetRefusal("locale", PRIMARY_PANE, null, "fr")).toBe(
+      "a project that declares more than one locale — see Project Settings › Locales",
+    );
+    // One declared locale is still monolingual — there is no OTHER language to show.
+    multilingual("en");
+    expect(presetRefusal("locale", PRIMARY_PANE, null, "en")).toBe(
+      "a project that declares more than one locale — see Project Settings › Locales",
+    );
+
+    multilingual("en", "fr");
+    /* A DOCUMENT WITH NO PATH has nowhere for a sibling to be. Without this the next answer would
+       be `translationPathFor`'s, which is a sentence about locales for a problem about saving. */
+    page.documentPath = null;
+    expect(presetRefusal("locale", PRIMARY_PANE, null, "fr")).toBe(
+      "a document that has been saved",
+    );
+
+    page.documentPath = "pages/index.json";
+    // A tag the project does not declare, and the missing argument, get the same answer.
+    expect(presetRefusal("locale", PRIMARY_PANE, null, "de")).toBe(
+      "a locale this project declares",
+    );
+    expect(presetRefusal("locale", PRIMARY_PANE, null)).toBe("a locale this project declares");
+    expect(presetRefusal("locale", PRIMARY_PANE, null, "fr")).toBeNull();
+  });
+
+  /* THE RECORD IS A COMPANION AND IT CARRIES THE TAG. Both halves are the preset: a lens would
+     draw a second copy of the same page under a chip naming another language, and a companion with
+     no tag has no file to resolve — `companionTarget` would answer "no path in that locale" about
+     a locale nobody named. */
+  test("the preset builds a companion carrying its tag, not a lens over the same page", async () => {
+    twoPanes();
+    multilingual("en", "fr");
+    filesOnDisk.add("pages/fr/index.json");
+
+    await registry().run("pane.derive", { locale: "fr", preset: "locale" });
+
+    expect(derivationOfPane(SECONDARY_PANE)).toMatchObject({
+      kind: "companion",
+      locale: "fr",
+      preset: "locale",
+    });
+  });
+
+  test("the pane opens the translation the build would serve, once it is known to exist", async () => {
+    twoPanes();
+    multilingual("en", "fr");
+    filesOnDisk.add("pages/fr/index.json");
+    localeCompanionOn("fr");
+
+    /* NOTHING IS OPENED ON THE STRENGTH OF A PATH ALONE. The pane holds for exactly as long as the
+       probe is out, which is the frame `applyDerivation` cannot skip: a path that turns out not to
+       be there is a blank pane, and a blank pane is what §18.4's last paragraph refuses. */
+    applyDerivation(SECONDARY_PANE, deps);
+    expect(opened).toEqual([]);
+    expect(derivationOfPane(SECONDARY_PANE)?.status).toBe("loading");
+
+    await settleProbe();
+    expect(existsAsked).toEqual(["pages/fr/index.json"]);
+    expect(opened).toEqual([{ paneId: SECONDARY_PANE, path: "pages/fr/index.json" }]);
+    expect(derivationOfPane(SECONDARY_PANE)).toMatchObject({
+      resolved: "pages/fr/index.json",
+      status: "ready",
+    });
+  });
+
+  /* THE DEFAULT LOCALE IS A ROW LIKE ANY OTHER, and `prefix-except-default` is why its file is the
+     unprefixed one. A companion that spelled every locale as a directory would send the author of
+     `pages/fr/about.json` to `pages/en/about.json`, which nothing serves and nothing has. */
+  test("the default locale resolves to the unprefixed path, from a translated document", async () => {
+    open("pages/fr/about.json");
+    open("scratch.json");
+    expect(splitRight()?.id).toBe(SECONDARY_PANE);
+    focusPane(PRIMARY_PANE);
+    multilingual("en", "fr");
+    filesOnDisk.add("pages/about.json");
+
+    await registry().run("pane.derive", { locale: "en", preset: "locale" });
+    await settleProbe();
+
+    expect(opened).toEqual([{ paneId: SECONDARY_PANE, path: "pages/about.json" }]);
+  });
+
+  /* A TERMINAL ANSWER, not a hold and not a blank. `component` holds when its rule resolves to
+     nothing because the next click may resolve it; a language nobody has written stays unwritten
+     until somebody writes it, and a pane that quietly went on showing the previous document under
+     a chip reading "Same page in français" would be lying in the one place the author is looking.
+     Forcing the probe's answer to `true` — the mutant — opens `pages/fr/index.json`, which is not
+     there, and `openFileInPane` fails into a blank pane. */
+  test("a locale with no copy yet is unavailable IN WORDS, and nothing is opened", async () => {
+    twoPanes();
+    multilingual("en", "fr");
+
+    await registry().run("pane.derive", { locale: "fr", preset: "locale" });
+    await settleProbe();
+
+    expect(opened).toEqual([]);
+    const derived = derivationOfPane(SECONDARY_PANE)!;
+    expect(derived.status).toBe("unavailable");
+    // The autonym, and the recovery: the sentence says which language and what to do about it.
+    expect(derived.reason).toContain("français");
+    expect(derived.reason).toContain("Languages");
+  });
+
+  test("the probe is issued once per wanted path however many frames resolve", async () => {
+    twoPanes();
+    multilingual("en", "fr", "de");
+    localeCompanionOn("fr");
+
+    applyDerivation(SECONDARY_PANE, deps);
+    applyDerivation(SECONDARY_PANE, deps);
+    await settleProbe();
+    applyDerivation(SECONDARY_PANE, deps);
+    await settleProbe();
+    expect(existsAsked).toEqual(["pages/fr/index.json"]);
+
+    /* …and a DIFFERENT wanted path is a different question. Retargeting the source pane at another
+       document — or the author choosing another language — must ask again, or the second locale
+       inherits the first one's answer. */
+    localeCompanionOn("de");
+    applyDerivation(SECONDARY_PANE, deps);
+    await settleProbe();
+    expect(existsAsked).toEqual(["pages/fr/index.json", "pages/de/index.json"]);
+  });
+
+  /* A READ THAT LANDS AFTER THE QUESTION CHANGED IS NOT AN ANSWER. `fileExists` is a real disk
+     read, so the author choosing another language while one is out is ordinary rather than exotic
+     — and without the guard the pane that is now asking about German would be handed French's
+     answer, then re-resolve on the strength of it. `loadDiffFor` carries the same hazard for the
+     same reason; this is its half of it. */
+  test("a probe that lands after the pane moved on is dropped, not written onto the new question", async () => {
+    twoPanes();
+    multilingual("en", "fr", "de");
+    filesOnDisk.add("pages/fr/index.json");
+    let answer: (exists: boolean) => void = () => {};
+    const slow: DerivationDeps = {
+      ...deps,
+      fileExists: (path: string) => {
+        existsAsked.push(path);
+        return new Promise<boolean>((resolve) => {
+          answer = resolve;
+        });
+      },
+    };
+
+    localeCompanionOn("fr");
+    applyDerivation(SECONDARY_PANE, slow);
+    // The author picks another language while the first read is still out.
+    localeCompanionOn("de");
+    answer(true);
+    await settleProbe();
+
+    /* NOTHING HAPPENED: no file opened on French's answer, and — the sharper half — no re-resolve,
+       which is what would have asked German's question through the stale read's own `deps`. */
+    expect(opened).toEqual([]);
+    expect(existsAsked).toEqual(["pages/fr/index.json"]);
+
+    // German then asks for itself, and gets its own answer: nobody has written that copy either.
+    applyDerivation(SECONDARY_PANE, deps);
+    await settleProbe();
+    expect(existsAsked).toEqual(["pages/fr/index.json", "pages/de/index.json"]);
+    expect(derivationOfPane(SECONDARY_PANE)?.status).toBe("unavailable");
+  });
+
+  /* A READ THAT THROWS IS THE PLATFORM FAILING, not the translation being absent — the two must
+     not become the same sentence, or a backend that is down tells every author their copies have
+     all disappeared. The probe stays out, the pane goes on holding, and the reason is on the
+     console where a platform failure belongs. */
+  test("a REJECTED probe is reported, not turned into a missing translation", async () => {
+    twoPanes();
+    multilingual("en", "fr");
+    const logged: unknown[] = [];
+    const console_ = console.error;
+    console.error = (...args: unknown[]) => logged.push(args[0]);
+    try {
+      localeCompanionOn("fr");
+      applyDerivation(SECONDARY_PANE, {
+        ...deps,
+        fileExists: () => Promise.reject(new Error("no disk")),
+      });
+      await settleProbe();
+    } finally {
+      console.error = console_;
+    }
+    expect(logged).toContain("fileExists error:");
+    expect(derivationOfPane(SECONDARY_PANE)?.status).toBe("loading");
+    expect(opened).toEqual([]);
+  });
+
+  /* A NEW DERIVATION IS A NEW QUESTION, and `writeDerivation` is the one place that forgets. The
+     probe outliving the derivation that asked it means a pane pointed at `fr` a second time —
+     after the author created the file — would still be holding "there is no French copy". */
+  test("writing a derivation forgets the probe, so the same locale is asked again", async () => {
+    twoPanes();
+    multilingual("en", "fr");
+    localeCompanionOn("fr");
+    applyDerivation(SECONDARY_PANE, deps);
+    await settleProbe();
+    expect(derivationOfPane(SECONDARY_PANE)?.status).toBe("unavailable");
+
+    // The author writes the file, and points the pane at French again.
+    filesOnDisk.add("pages/fr/index.json");
+    localeCompanionOn("fr");
+    applyDerivation(SECONDARY_PANE, deps);
+    await settleProbe();
+
+    expect(existsAsked).toEqual(["pages/fr/index.json", "pages/fr/index.json"]);
+    expect(derivationOfPane(SECONDARY_PANE)?.status).toBe("ready");
+  });
+
+  /* THE REFUSAL RUNS ONCE; THE TARGET RUNS EVERY FRAME. `presetRefusal` cannot see a locale removed
+     from `project.json` after the companion opened, so `companionTarget` re-reads the project's
+     list every time it resolves and says so — trap 12's second half. */
+  test("a locale the project stopped declaring goes unavailable, with words", async () => {
+    twoPanes();
+    multilingual("en", "fr");
+    filesOnDisk.add("pages/fr/index.json");
+    localeCompanionOn("fr");
+    applyDerivation(SECONDARY_PANE, deps);
+    await settleProbe();
+    expect(derivationOfPane(SECONDARY_PANE)?.status).toBe("ready");
+
+    multilingual("en");
+    applyDerivation(SECONDARY_PANE, deps);
+    expect(derivationOfPane(SECONDARY_PANE)).toMatchObject({
+      reason: "This document has no path in that locale.",
+      status: "unavailable",
+    });
+  });
+
+  /* A DERIVATION WITH NO TAG, and a document no locale can address, are the same answer: there is
+     no path to open. The first is reachable only through a hand-built record — `pane.derive`
+     refuses it — and the second is ordinary, because a layout is shared by every language. */
+  test("a document no locale can address, and a companion with no tag, both say so", async () => {
+    twoPanes();
+    multilingual("en", "fr");
+
+    localeCompanionOn(null);
+    applyDerivation(SECONDARY_PANE, deps);
+    expect(derivationOfPane(SECONDARY_PANE)?.reason).toBe(
+      "This document has no path in that locale.",
+    );
+
+    tabOfPane(PRIMARY_PANE)!.documentPath = "layouts/base.json";
+    localeCompanionOn("fr");
+    applyDerivation(SECONDARY_PANE, deps);
+    expect(derivationOfPane(SECONDARY_PANE)).toMatchObject({
+      reason: "This document has no path in that locale.",
+      status: "unavailable",
+    });
+    expect(existsAsked).toEqual([]);
   });
 });
 

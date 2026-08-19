@@ -83,6 +83,12 @@ export interface QueryOptions {
    * the list.
    */
   pageCap?: number;
+  /**
+   * The language to search in. Omitted, it is the page's own — `<html lang>`, which the build wrote
+   * from the route's locale, so a reader searching a French page is not handed English results.
+   * `null` searches every language.
+   */
+  locale?: string | null;
 }
 
 interface ClientState {
@@ -94,7 +100,58 @@ interface ClientState {
 const state: ClientState = { indexUrl: "/search-index.json", loading: null, mini: null };
 
 /** `text` is stored so flat results can carry a highlighted excerpt of the body. */
-const STORE_FIELDS = ["collection", "slug", "url", "title", "description", "heading", "text"];
+const STORE_FIELDS = [
+  "collection",
+  "slug",
+  "url",
+  "title",
+  "description",
+  "heading",
+  "text",
+  "locale",
+];
+
+/**
+ * The language this page is in, from `<html lang>`.
+ *
+ * The document element is the right source and the only one available: the build wrote that
+ * attribute from the route's locale (site-architecture.md §13.4), so it is the same answer the
+ * index was built against, and it is correct inside a component, an island and a fragment alike.
+ *
+ * @returns {string} The tag, or `""` off a document
+ */
+function pageLocale(): string {
+  return globalThis.document?.documentElement?.lang ?? "";
+}
+
+/**
+ * Whether a document in `docLocale` answers a search made in `want`.
+ *
+ * A document with no locale always answers: an unlocalized collection is not in one language, it is
+ * outside the question, and hiding it would empty the search box on a site whose docs are shared.
+ *
+ * Region is ignored when the tags disagree on it alone — a reader on `/fr-ca/` wants the French
+ * posts — which is RFC 4647 Lookup's truncation, at the one length that matters here.
+ */
+/**
+ * What makes two hits the same page.
+ *
+ * The locale is part of it because two translations of one entry **share a slug** (§13.3): without
+ * it, an unscoped search collapses the French copy and the English one into a single group whose
+ * title is whichever was indexed first.
+ */
+function pageKey(hit: RawHit): string {
+  return `${hit.collection}:${hit.locale ?? ""}:${hit.slug}`;
+}
+
+function localeAnswers(docLocale: string | undefined, want: string): boolean {
+  if (docLocale === undefined || want === "") {
+    return true;
+  }
+  const a = docLocale.toLowerCase();
+  const b = want.toLowerCase();
+  return a === b || a.split("-")[0] === b.split("-")[0];
+}
 
 /** A fresh word scanner — regexes with `g` carry `lastIndex`, so never share one. */
 function wordScanner(): RegExp {
@@ -256,6 +313,7 @@ interface RawHit {
   description: string;
   heading: string;
   text: string;
+  locale?: string;
 }
 
 /** Turn a raw hit into a presentation-ready row: breadcrumbs plus highlighted title and excerpt. */
@@ -299,7 +357,15 @@ export function query(q: string, opts: QueryOptions = {}): SearchResultGroup[] |
   if (!text) {
     return [];
   }
-  const raw = state.mini.search(text) as unknown as RawHit[];
+  /*
+   * Scoped to the page's language unless the caller says otherwise. A multilingual site's index
+   * holds every translation of every post, so an unscoped search hands a French reader the English
+   * copy of the page they are already on — ranked first, because it matched the same words.
+   */
+  const want = opts.locale === undefined ? pageLocale() : (opts.locale ?? "");
+  const raw = (state.mini.search(text) as unknown as RawHit[]).filter((hit) =>
+    localeAnswers(hit.locale, want),
+  );
   if (!group) {
     const pageCap = opts.pageCap ?? PAGE_CAP;
     const perPage = new Map<string, number>();
@@ -308,7 +374,7 @@ export function query(q: string, opts: QueryOptions = {}): SearchResultGroup[] |
       if (rows.length >= limit) {
         break;
       }
-      const key = `${hit.collection}:${hit.slug}`;
+      const key = pageKey(hit);
       const taken = perPage.get(key) ?? 0;
       if (taken >= pageCap) {
         continue;
@@ -321,7 +387,7 @@ export function query(q: string, opts: QueryOptions = {}): SearchResultGroup[] |
 
   const groups = new Map<string, SearchResultGroup>();
   for (const hit of raw) {
-    const key = `${hit.collection}:${hit.slug}`;
+    const key = pageKey(hit);
     let entry = groups.get(key);
     if (!entry) {
       entry = {

@@ -10,6 +10,7 @@ code:
   - packages/studio/src/settings/general-settings.ts
   - packages/studio/src/settings/contexts-section.ts
   - packages/studio/src/settings/head-editor.ts
+  - packages/studio/src/settings/locales-section.ts
   - packages/studio/src/settings/css-vars-editor.ts
   - packages/studio/src/settings/defs-editor.ts
   - packages/studio/src/settings/dependencies-editor.ts
@@ -70,6 +71,12 @@ What goes into every page's `<head>` — the invisible part of a web page that l
 
 - **Google Fonts** — type a font family name and press :kbd[Enter] or click **+ Add** to load it across the whole site. Loaded fonts are listed with a delete button each.
 - **Head** — add a **Link** (external stylesheet), **Meta** (page metadata), **Script**, or **Style** entry and fill in its fields. Script and Style entries get a text box for their body — this is where an analytics snippet or a custom style block goes.
+
+## Locales
+
+The languages this site is published in. Add a [BCP 47](https://www.rfc-editor.org/info/bcp47) tag — `fr-CA`, `ar`, `de` — pick which one is the default, and choose whether the default language's pages sit at the bare URL (`/about`) or under a prefix like every other (`/en/about`).
+
+Tags are checked as you type by the same parser the build uses, so a tag this field accepts is one that builds: `en_US` is refused here rather than discovered later. Declaring a second language is what turns on every other language surface in Studio — see **[Languages](/docs/studio/interface/languages)**.
 
 ## CSS Variables
 

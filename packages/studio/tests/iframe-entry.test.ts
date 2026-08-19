@@ -76,6 +76,33 @@ describe("startCanvasIframe", () => {
     expect(document.documentElement.dataset.colorScheme).toBeUndefined();
   });
 
+  /*
+   * The visible half of an axis-3 locale. `dir` is what makes an RTL preview actually mirror, and
+   * `lang` is what `:lang()` and the font stack select on — and neither costs a render, because a
+   * translation in Jx is a different file rather than a different rendering of this one.
+   */
+  test("setLocale writes lang and dir on the root, and clears both", async () => {
+    const pair = fakeChannelPair<ParentToIframe, IframeToParent>();
+    const fromIframe: IframeToParent[] = [];
+    pair.parent.onMessage((m) => fromIframe.push(m));
+    const container = document.createElement("div");
+    document.body.append(container);
+    teardown = startCanvasIframe({ channel: pair.iframe, container });
+    pair.flush();
+
+    pair.parent.post({ dir: "rtl", kind: "setLocale", locale: "ar" });
+    pair.flush();
+    expect(document.documentElement.getAttribute("lang")).toBe("ar");
+    expect(document.documentElement.getAttribute("dir")).toBe("rtl");
+    expect(fromIframe.map((m) => m.kind)).toEqual(["ready"]);
+
+    // Removed rather than blanked: `lang=""` is a document claiming to be in no language at all.
+    pair.parent.post({ dir: "ltr", kind: "setLocale", locale: null });
+    pair.flush();
+    expect(document.documentElement.hasAttribute("lang")).toBe(false);
+    expect(document.documentElement.hasAttribute("dir")).toBe(false);
+  });
+
   test("the keymap message arms the forwarding, and only then", async () => {
     /* The frame's authority arrives from the host, and the gap before it is deliberate: an unarmed
        frame forwards NOTHING and `preventDefault`s nothing, because a frame that guessed would

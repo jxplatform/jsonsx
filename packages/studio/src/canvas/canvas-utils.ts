@@ -29,7 +29,7 @@ import {
   panelOfSurface,
 } from "./canvas-helpers";
 import { rectOf } from "../utils/geometry";
-import { getEffectiveMedia } from "../site-context";
+import { getEffectiveLocales, getEffectiveMedia } from "../site-context";
 import { dynamicRouteParams } from "../page-params";
 import {
   argsSchema,
@@ -1203,6 +1203,58 @@ export function canvasViewCommands(deps: CanvasCommandDeps): AnyCommand[] {
         repaint(args);
       },
       title: "Set Color Scheme",
+    },
+    /*
+     * The language a pane RENDERS AS — and only that.
+     *
+     * Jx has no message catalogue: a translation is a different file in a different directory
+     * (site-architecture §13.3), so "show this page in French" is a navigation and the locale
+     * preset owns it. What is left over is genuinely a rendering context, and it is the half of
+     * §13.4 the canvas can show today: the artboard root's `lang` and `dir`. That is why this is a
+     * verb and not a label — an RTL locale mirrors the layout on screen. (§13.4's other half,
+     * `$page.locale` in the rendered state, is injected by the compiler and not by the canvas's
+     * `substitutePreviewParams`; previewing it is a separate change to the render path.)
+     *
+     * It lives in this file rather than in `i18n/i18n-commands.ts` because `contextTab`, `paneArg`
+     * and `repaint` are local closures here, and every rendering-context verb needs all three: the
+     * bar is drawn per pane, so a verb that could only reach the focused one would repaint the
+     * wrong stage. `insert.data` sits outside its namespace's module for the same reason.
+     */
+    {
+      args: argsSchema(
+        {
+          ...paneArg,
+          locale: stringProperty("BCP 47 tag this pane renders as."),
+        },
+        ["locale"],
+      ),
+      category: "View",
+      id: "i18n.switchLocale",
+      level: "document",
+      menus: ["palette"],
+      group: "3_canvas",
+      requires: "an open document in a project that declares more than one locale",
+      when: (ctx) => ctx.document.open && ctx.project.isMultilingual,
+      run: (_commandCtx, args) => {
+        const tab = contextTab("i18n.switchLocale", args);
+        const locale = stringArg("i18n.switchLocale", args, "locale");
+        /* Read at RUN time. `projectState` is replaced wholesale rather than mutated, so a value
+           cached at module scope answers for whichever project was open when this file loaded. */
+        const i18n = getEffectiveLocales();
+        /* REFUSES a tag the project does not declare, rather than clamping to the default — the
+           rule `canvas.setBreakpoint` applies to a breakpoint key. A locale is a URL prefix and an
+           `hreflang` at the same time, so rendering "as" a language the site does not have would
+           preview a page that cannot exist. */
+        if (i18n === null || !i18n.locales.includes(locale)) {
+          throw new RangeError(
+            `command "i18n.switchLocale" argument "locale": "${locale}" is not a locale this ` +
+              `project declares — it declares: ${i18n === null ? "nothing" : i18n.locales.join(", ")}`,
+          );
+        }
+        tab.session.ui.previewLocale = locale;
+        repaint(args);
+      },
+      title: "Set Rendering Language",
     },
     {
       args: argsSchema({

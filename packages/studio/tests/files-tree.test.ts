@@ -149,9 +149,11 @@ function seedTreeState(): void {
   st.expanded.add("pages");
 }
 
-function rowFor(container: HTMLElement, path: string): HTMLElement {
+function rowFor(container: HTMLElement, path: string, expected = true): HTMLElement {
   const row = container.querySelector(`.file-tree-item[data-path="${path}"]`);
-  expect(row).not.toBeNull();
+  if (expected) {
+    expect(row).not.toBeNull();
+  }
   return row as HTMLElement;
 }
 
@@ -335,6 +337,36 @@ describe("file tree listing", () => {
     expect(names).toContain("assets");
     expect(names).toContain("pages");
     expect(names).not.toContain("zeta.json");
+  });
+
+  test("a language is a CHIP on the row, never a term the search matches", async () => {
+    installFsPlatform();
+    siteState({
+      projectConfig: { i18n: { defaultLocale: "en", locales: ["en", "fr"] }, name: "Demo" },
+    });
+    const st = requireProjectState();
+    st.dirs.set(".", [{ name: "pages", path: "pages", type: "directory" }]);
+    st.dirs.set("pages", [
+      { name: "fr", path: "pages/fr", type: "directory" },
+      { name: "index.json", path: "pages/index.json", type: "file" },
+    ]);
+    st.dirs.set("pages/fr", [{ name: "about.json", path: "pages/fr/about.json", type: "file" }]);
+    st.expanded.add("pages");
+    st.expanded.add("pages/fr");
+    const { ctx } = makeTreeCtx();
+    const out = await renderInto(renderFilesTemplate(ctx), host);
+
+    // The chip is drawn — and the query that matches it exactly still matches no FILE, because the
+    // Filter reads `entry.name` alone. A search that silently also matched a language would make
+    // "why is this file here" unanswerable from what is on screen.
+    expect(rowFor(out, "pages/fr/about.json").querySelector(".file-tree-locale")?.textContent).toBe(
+      "français",
+    );
+    expect(rowFor(out, "pages/index.json").querySelector(".file-tree-locale")).toBeNull();
+
+    requireProjectState().searchQuery = "français";
+    const filtered = await renderInto(renderFilesTemplate(ctx), host);
+    expect(rowFor(filtered, "pages/fr/about.json", false)).toBeNull();
   });
 
   test("search input updates the query and re-renders", async () => {

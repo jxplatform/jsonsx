@@ -1,0 +1,29 @@
+{
+  "$layout": "./layouts/base.json",
+  "state": {
+    "brand": "أتريوم",
+    "skipLabel": "انتقل إلى المحتوى",
+    "railNote": "متحف المدينة للفنّ والتاريخ · مفتوح اليوم من ١٠:٠٠ إلى ١٨:٠٠",
+    "languageNavLabel": "اللغة",
+    "mainNavLabel": "التنقّل الرئيسيّ",
+    "navExhibitions": "المعارض",
+    "navVisit": "الزيارة",
+    "navAbout": "عن المتحف",
+    "homeHref": "/ar/",
+    "exhibitionsHref": "/ar/exhibitions/",
+    "visitHref": "/ar/visit/",
+    "aboutHref": "/ar/about/",
+    "footerTagline": "متحف بلديّ تحت سقف من زجاج: أربعة قرون من المرفأ وصنّاعه وخرائطه، محفوظة أمانةً لكلّ من يعيش في هذه المدينة.",
+    "footerVisitLabel": "أين تجدنا",
+    "footerAddress": "٢ رصيف الأهوسة، المرفأ القديم",
+    "footerHours": "من الثلاثاء إلى الأحد، من ١٠:٠٠ إلى ١٨:٠٠. مغلق يوم الاثنين.",
+    "footerReadLabel": "للقراءة",
+    "footerExhibitionsLink": "المعارض",
+    "footerVisitLink": "خطّط لزيارتك",
+    "footerAboutLink": "عن المتحف",
+    "footerContactLabel": "للتواصل",
+    "footerLegal": "© ٢٠٢٦ أتريوم — متحف المدينة للفنّ والتاريخ",
+    "footerCredit": "متحف بلديّ، الدخول إليه مجّانيّ، بثلاث لغات."
+  },
+  "children": [{ "tagName": "slot" }]
+}

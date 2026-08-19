@@ -320,6 +320,8 @@ export interface JxDocument extends JxElement {
   tagName?: string;
   state?: Record<string, JxStateDefinition>;
   $layout?: string | false;
+  /** This page's identity across languages, overriding the one its path implies (§13.5). */
+  $translationKey?: string;
   $paths?: JxPathsDef;
   $elements?: (JxElement | string)[];
   $head?: JxHeadEntry[];

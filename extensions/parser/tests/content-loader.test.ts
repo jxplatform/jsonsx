@@ -918,6 +918,58 @@ describe("localesForExpansion", () => {
     expect(localesForExpansion({})).toEqual([]);
     expect(localesForExpansion({ i18n: {} })).toEqual([]);
   });
+
+  /*
+   * Canonical, from the resolver the compiler and Studio also run. This module read the raw list
+   * until the resolver moved out of the compiler, which left the loader as the one place a
+   * locale's spelling came from the config — and `_meta.locale` is compared against the canonical
+   * tag a route resolves to, so `fr-ca` here meant a `[slug]` route under `/fr-ca/` scoped to
+   * nothing.
+   */
+  it("canonicalizes, so a route's locale and an entry's are the same string", () => {
+    expect(
+      localesForExpansion({ i18n: { defaultLocale: "EN", locales: ["en-us", "FR-ca"] } }),
+    ).toEqual(["en", "en-US", "fr-CA"]);
+  });
+});
+
+describe("a locale directory's spelling", () => {
+  const ROOT = resolve(TMP, "spelling");
+  const section: ContentSection = {
+    notes: { format: "Markdown", source: "./notes/{locale}/" },
+  };
+  const config: ProjectConfig = { i18n: { defaultLocale: "en", locales: ["en", "fr-CA"] } };
+
+  beforeAll(() => {
+    // Studio writes the lowercase spelling, because a locale directory becomes a URL segment.
+    for (const dir of ["en", "fr-ca"]) {
+      mkdirSync(resolve(ROOT, "notes", dir), { recursive: true });
+      writeFileSync(resolve(ROOT, "notes", dir, "hello.md"), `---\ntitle: ${dir}\n---\n`);
+    }
+  });
+
+  /*
+   * Two writers name this directory and they differ: an author who declared `fr-CA` most likely
+   * typed `fr-CA/`, while Studio creates `fr-ca/`. Reading only one spelling makes a translation
+   * somebody just created invisible to the build — the directory is there, the entries are there,
+   * and the collection loads none of them, with no error.
+   */
+  it("is matched case-insensitively, so a lowercase directory is still found", () => {
+    const mounts = contentAssetMounts(section, ROOT, config);
+    expect(mounts.map((m) => m.urlPrefix)).toEqual(["/content/notes/en", "/content/notes/fr-CA"]);
+    // The URL namespace is the canonical tag; the directory behind it is whatever is on disk.
+    expect(mounts[1]?.dir).toBe(resolve(ROOT, "notes/fr-ca").split("\\").join("/"));
+  });
+
+  // A locale nobody has written yet resolves to the canonical spelling, so the miss is reported
+  // Against the name that was declared rather than against a spelling nobody typed.
+  it("falls back to the canonical spelling when the directory is absent", () => {
+    const three: ProjectConfig = { i18n: { defaultLocale: "en", locales: ["en", "fr-CA", "ar"] } };
+    expect(contentAssetMounts(section, ROOT, three).map((m) => m.urlPrefix)).toEqual([
+      "/content/notes/en",
+      "/content/notes/fr-CA",
+    ]);
+  });
 });
 
 describe("Content.resolvePaths — localized collections", () => {

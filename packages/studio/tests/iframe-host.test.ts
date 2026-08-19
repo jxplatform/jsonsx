@@ -118,6 +118,7 @@ const {
   panToStylebookTag,
   postApplyFormat,
   postColorSchemeToLiveHosts,
+  postLocaleToLiveHosts,
   postDragMessage,
   postSiteStyleToLiveHosts,
   postPatchToHosts,
@@ -512,6 +513,34 @@ describe("mountIframeCanvas", () => {
 
     postColorSchemeToLiveHosts(null);
     expect(channels[0]!.posts.at(-1)).toEqual({ kind: "setColorScheme", scheme: null });
+  });
+
+  /*
+   * The direction rides with the tag rather than being derived in the frame: the frame would have
+   * to carry the script table to work it out, and the answer is already known on this side.
+   */
+  test("postLocaleToLiveHosts carries the direction with the tag, to ready hosts only", async () => {
+    const canvasEl = document.createElement("div");
+    document.body.append(canvasEl);
+    await mountIframeCanvas(1, { tagName: "div" } as never, canvasEl);
+
+    postLocaleToLiveHosts("ar");
+    expect(channels[0]!.posts).toHaveLength(0);
+
+    channels[0]!.deliver({ kind: "ready" });
+    postLocaleToLiveHosts("ar");
+    expect(channels[0]!.posts.at(-1)).toEqual({ dir: "rtl", kind: "setLocale", locale: "ar" });
+
+    postLocaleToLiveHosts(null);
+    expect(channels[0]!.posts.at(-1)).toEqual({ dir: "ltr", kind: "setLocale", locale: null });
+
+    /* Scoped, for the reason the scheme post is: the side pane's control must not re-language the
+       primary pane's document. */
+    const elsewhere = document.createElement("div");
+    document.body.append(elsewhere);
+    const before = channels[0]!.posts.length;
+    postLocaleToLiveHosts("fr", elsewhere);
+    expect(channels[0]!.posts).toHaveLength(before);
   });
 
   test("uses the platform's canvasUrl when set, default otherwise", async () => {

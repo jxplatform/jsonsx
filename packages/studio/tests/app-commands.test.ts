@@ -70,6 +70,11 @@ describe("the set", () => {
       "git",
       "grid",
       "help",
+      // `i18n.*` — the translation verbs. Four of the five live in `i18n/i18n-commands.ts` and are
+      // About FILES (a translation is a sibling document, not a re-rendering of one); the fifth,
+      // `i18n.switchLocale`, is a rendering context and is declared with the other per-pane ones in
+      // `canvas/canvas-utils.ts`. One namespace either way, because "which language" is one idea.
+      "i18n",
       // `insert.data` — a `${…}` merge tag placed at the live caret. Its one definition site is
       // `canvas/canvas-render.ts`, beside `selection.set`: both name what the pane points at.
       "insert",

@@ -52,7 +52,7 @@ The vertical strip on the far left. Every button carries a **text label under it
 
 **Project**
 
-- **Files** (:kbd[⌘1]) — the project file tree. Open, rename and organize the files in your project folder. **New File…** — from the panel's toolbar, or from a folder's right-click menu — opens the [creation dialog](#creating-a-file) with `untitled.json` pre-filled and only the name part selected, so typing replaces the name and keeps the extension. Studio picks the starting content from the extension you give it. Drag files in from your desktop and they upload into whichever folder you drop them on — see [Media](/docs/studio/projects/media).
+- **Files** (:kbd[⌘1]) — the project file tree. Open, rename and organize the files in your project folder. **New File…** — from the panel's toolbar, or from a folder's right-click menu — opens the [creation dialog](#creating-a-file) with `untitled.json` pre-filled and only the name part selected, so typing replaces the name and keeps the extension. Studio picks the starting content from the extension you give it. Drag files in from your desktop and they upload into whichever folder you drop them on — see [Media](/docs/studio/projects/media). On a [multilingual project](/docs/studio/interface/languages), a file under a language's directory carries that language's name beside it — _français_, not _French_.
 - **Source Control** (:kbd[⌘3]) — the built-in git client. A badge counts changed files. See [Git & publish](/docs/studio/publish).
 
 **Document**

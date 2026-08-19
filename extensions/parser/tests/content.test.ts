@@ -335,6 +335,63 @@ describe("ContentEntry", () => {
     expect(entry.resolve()).toBeNull();
   });
 
+  /*
+   * Two translations of one entry share an id (site-architecture.md §13.3), so a lookup that does
+   * not say which language answers with whichever was loaded first — the English copy under a
+   * French route, on a page whose `<html lang>` says otherwise, with nothing to report it.
+   */
+  describe("on a localized collection", () => {
+    const localized = [
+      { ...makeEntry("hello", { title: "Hello" }), _meta: { locale: "en" } },
+      { ...makeEntry("hello", { title: "Bonjour" }), _meta: { locale: "fr-CA" } },
+    ] as unknown as ContentLoaderEntry[];
+    const project = { content: new Map([["posts", localized]]) };
+
+    test("answers with the route's own language", () => {
+      const fr = new ContentEntry({
+        _document: { route: { locale: "fr-CA" } },
+        _project: project,
+        contentType: "posts",
+        id: "hello",
+      });
+      expect(fr.resolve()?.data.title).toBe("Bonjour");
+      const en = new ContentEntry({
+        _document: { route: { locale: "en" } },
+        _project: project,
+        contentType: "posts",
+        id: "hello",
+      });
+      expect(en.resolve()?.data.title).toBe("Hello");
+    });
+
+    test("a language the collection has nothing in answers with nothing", () => {
+      const ar = new ContentEntry({
+        _document: { route: { locale: "ar" } },
+        _project: project,
+        contentType: "posts",
+        id: "hello",
+      });
+      expect(ar.resolve()).toBeNull();
+    });
+
+    // A route with no locale — a monolingual project, a standalone evaluation — is unscoped.
+    test("no route locale reads the whole collection", () => {
+      const any = new ContentEntry({ _project: project, contentType: "posts", id: "hello" });
+      expect(any.resolve()?.data.title).toBe("Hello");
+    });
+
+    // An unlocalized collection is not in one language; filtering it by the route's would empty it.
+    test("an unlocalized collection is untouched by the route's language", () => {
+      const plain = new ContentEntry({
+        _document: { route: { locale: "fr-CA" } },
+        _project: makeProject(),
+        contentType: "posts",
+        id: "alpha",
+      });
+      expect(plain.resolve()?.data.title).toBe("Alpha");
+    });
+  });
+
   test("returns null when the id matches nothing", () => {
     const entry = new ContentEntry({ _project: makeProject(), contentType: "posts", id: "nope" });
     expect(entry.resolve()).toBeNull();

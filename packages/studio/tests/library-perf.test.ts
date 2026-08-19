@@ -34,6 +34,7 @@ const {
   renderLibraryMode,
   setLibraryCategory,
   setLibraryLayout,
+  setLibraryLocale,
   setLibrarySearch,
 } = await import("../src/browse/library-pane");
 const { PREVIEW_CACHE_LIMIT } = await import("../src/browse/library-preview");
@@ -154,6 +155,7 @@ beforeEach(() => {
   invalidateLibrary();
   setLibraryCategory("all");
   setLibraryLayout("cards");
+  setLibraryLocale("");
   setLibrarySearch("");
   install();
 });
@@ -243,6 +245,53 @@ describe(`${PAGE_COUNT} pages, "All"`, () => {
     await layOutPane();
     // 700px / 32px = 22 visible rows, +1 partial, +3 overscan.
     expect(host.querySelectorAll(".library-table-row").length).toBe(26);
+  });
+
+  test("the same project in two languages renders the same window, and one language less", async () => {
+    /* The locale is derived once per SCAN and drawn as text, so the facet must cost the window
+       nothing at all: a Library that rendered a card per language would be 600 cards on the same
+       300 files. The second half is the facet doing its job — a narrower list, not a wider one. */
+    const half = PAGE_COUNT / 2;
+    const named = (locale: string, index: number) => ({
+      name: `page-${String(index).padStart(3, "0")}.json`,
+      path: `pages/${locale}/page-${String(index).padStart(3, "0")}.json`,
+      type: "file" as const,
+    });
+    const tree: Record<string, DirEntry[]> = {
+      pages: [
+        { name: "fr", path: "pages/fr", type: "directory" },
+        { name: "de", path: "pages/de", type: "directory" },
+      ],
+      "pages/de": Array.from({ length: half }, (_v, index) => named("de", index)),
+      "pages/fr": Array.from({ length: half }, (_v, index) => named("fr", index)),
+    };
+    previewReads = [];
+    installMockPlatform({
+      listDirectory: (path: string) => Promise.resolve(tree[path] ?? []),
+      readFile: (path: string) => {
+        previewReads.push(path);
+        return Promise.resolve('{"tagName":"div","children":[]}');
+      },
+    });
+    resetStudioState({
+      projectConfig: { i18n: { defaultLocale: "en", locales: ["en", "fr", "de"] } },
+      projectDirs: ["pages"],
+      projectRoot: "",
+    });
+
+    await mount();
+    await layOutPane();
+    expect(librarySource().files().length).toBe(PAGE_COUNT);
+    expect(cards()).toBe(40);
+
+    setLibraryLocale("fr");
+    await flush();
+    expect(cards()).toBe(40);
+    expect(
+      [...host.querySelectorAll<HTMLElement>(".library-card")].every((c) =>
+        c.dataset.path?.startsWith("pages/fr/"),
+      ),
+    ).toBe(true);
   });
 
   test("Board draws no live preview at all, however many files it groups", async () => {

@@ -1,0 +1,104 @@
+{
+  "$translationKey": "exhibitions",
+  "$layout": "./layouts/fr-ca.json",
+  "title": "Expositions — Atrium",
+  "description": "La programmation en cours à Atrium : trois expositions puisées dans la collection de la ville, avec dates, salles et commissaires.",
+  "$head": [
+    {
+      "tagName": "meta",
+      "attributes": {
+        "name": "description",
+        "content": "La programmation en cours à Atrium : trois expositions puisées dans la collection de la ville, avec dates, salles et commissaires."
+      }
+    }
+  ],
+  "state": {
+    "shows": {
+      "$prototype": "ContentCollection",
+      "$src": "@jxsuite/parser/ContentCollection.class.json",
+      "contentType": "exhibitions",
+      "filter": [{ "field": "lang", "op": "==", "value": "fr-CA" }],
+      "sort": [{ "field": "order", "order": "asc" }]
+    }
+  },
+  "children": [
+    {
+      "tagName": "mu-pagehead",
+      "$props": {
+        "kicker": "Programmation",
+        "title": "Ce qui est accroché, et jusqu'à quand",
+        "standfirst": "Trois expositions se tiennent en même temps : une longue, une saisonnière, une dans la cour. Toutes sont puisées dans les réserves du musée plutôt qu'empruntées ; ce que vous voyez ici, c'est la ville qui se regarde.",
+        "metaLabel": "Entrée",
+        "metaValue": "Libre, sans réservation"
+      }
+    },
+    {
+      "tagName": "mu-band",
+      "$props": { "index": "01", "label": "En ce moment", "tone": "chalk" },
+      "children": [
+        {
+          "tagName": "div",
+          "style": { "borderBlockEnd": "1px solid var(--color-hairline)" },
+          "children": {
+            "$prototype": "Array",
+            "items": { "$ref": "#/state/shows" },
+            "map": {
+              "tagName": "mu-exhibition-row",
+              "$props": {
+                "index": "0${item.data.order}",
+                "title": "${item.data.title}",
+                "description": "${item.data.description}",
+                "gallery": "${item.data.gallery}",
+                "curator": "${item.data.curator}",
+                "curatorLabel": "Commissariat",
+                "href": "/fr-ca/expositions/${item.id}/",
+                "hue": "${item.data.hue}",
+                "date": "${item.data.date}",
+                "until": "${item.data.until}",
+                "locale": "${$page.locale}"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "tagName": "mu-band",
+      "$props": { "index": "02", "label": "Comment fonctionne la programmation", "tone": "card" },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "minmax(0, 1fr) minmax(0, 1fr)",
+            "columnGap": "clamp(2rem, 5vw, 4rem)",
+            "rowGap": "1.25rem",
+            "@--md": { "gridTemplateColumns": "minmax(0, 1fr)" }
+          },
+          "children": [
+            {
+              "tagName": "p",
+              "style": { "margin": "0", "lineHeight": "1.75" },
+              "textContent": "Une exposition change à chaque saison et deux se tiennent longtemps : il y a donc toujours quelque chose que vous n'avez pas vu et quelque chose sur quoi revenir. Rien n'est billetté séparément et rien ne ferme pour une location privée pendant les heures d'ouverture."
+            },
+            {
+              "tagName": "p",
+              "style": { "margin": "0", "lineHeight": "1.75" },
+              "textContent": "Chaque exposition est écrite de façon autonome dans chacune des langues que le musée publie : la commissaire qui a rédigé le texte de salle en arabe pour la salle 2 ne traduit pas la version anglaise, et les deux divergent par endroits. Le sélecteur en haut de cette page liste les langues où une page existe, et rien d'autre."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "mu-cta",
+      "$props": {
+        "kicker": "Visites guidées",
+        "heading": "Quatre-vingt-dix minutes, le samedi, dans celle des trois langues qui vous convient.",
+        "text": "Réservez au comptoir le jour même, ou écrivez à l'avance si vous venez en groupe de plus de huit personnes.",
+        "label": "Renseignements aux visiteurs",
+        "href": "/fr-ca/visite/"
+      }
+    }
+  ]
+}

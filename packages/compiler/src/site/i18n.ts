@@ -13,78 +13,19 @@
  */
 
 import { canonicalizeLocale, localeDirection } from "@jxsuite/schema/locale";
-import type { ProjectConfig } from "@jxsuite/schema/types";
-import type { TextDirection } from "@jxsuite/schema/locale";
+import type { ResolvedI18n, TextDirection } from "@jxsuite/schema/locale";
 
-/** How locales appear in URLs. */
-export type LocaleRouting = "prefix-except-default" | "prefix-always";
-
-/** A project's `i18n` block after validation, or null when the project declares none. */
-export interface ResolvedI18n {
-  defaultLocale: string;
-  /** Canonical tags, default first, in declaration order. */
-  locales: string[];
-  routing: LocaleRouting;
-}
-
-const DEFAULT_ROUTING: LocaleRouting = "prefix-except-default";
-
-/**
- * Validate and canonicalize `i18n`.
+/*
+ * `resolveI18n` and the two types beside it live in `@jxsuite/schema/locale` rather than here.
+ * Studio needs the same answer and cannot import this package — there is no `./site/i18n` export,
+ * the dependency graph carries `sharp` and `esbuild`, and Studio bundles for a browser. One
+ * resolution with two hosts is the only shape in which the tag Studio offers is certain to be the
+ * tag the build accepts.
  *
- * A malformed tag is a **build error**, not a warning. A locale is a URL prefix, an `hreflang`
- * value and an `<html lang>` all at once, so a typo does not degrade — it produces a site whose
- * every page claims a language that does not exist, and nothing downstream can tell.
- *
- * @param {ProjectConfig} projectConfig
- * @returns {{ i18n: ResolvedI18n | null; errors: string[] }}
+ * Everything below is route-shaped and has no Studio consumer, so it stays.
  */
-export function resolveI18n(projectConfig: ProjectConfig): {
-  i18n: ResolvedI18n | null;
-  errors: string[];
-} {
-  const raw = projectConfig.i18n;
-  const errors: string[] = [];
-  if (!raw || typeof raw !== "object") {
-    return { errors, i18n: null };
-  }
-
-  const declared = Array.isArray(raw.locales) ? raw.locales : [];
-  const locales: string[] = [];
-  for (const tag of declared) {
-    const canonical = canonicalizeLocale(tag);
-    if (canonical === null) {
-      errors.push(`i18n.locales: "${String(tag)}" is not a well-formed BCP 47 language tag.`);
-      continue;
-    }
-    if (!locales.includes(canonical)) {
-      locales.push(canonical);
-    }
-  }
-
-  const defaultLocale = canonicalizeLocale(raw.defaultLocale) ?? locales[0] ?? null;
-  if (raw.defaultLocale !== undefined && canonicalizeLocale(raw.defaultLocale) === null) {
-    errors.push(
-      `i18n.defaultLocale: "${String(raw.defaultLocale)}" is not a well-formed BCP 47 language tag.`,
-    );
-  }
-  if (defaultLocale === null) {
-    errors.push("i18n is declared with no usable locale — set `defaultLocale` or `locales`.");
-    return { errors, i18n: null };
-  }
-  if (!locales.includes(defaultLocale)) {
-    // A default outside the list is a config the author cannot have meant either way round, so it
-    // Joins the list rather than being rejected: the pages under it exist regardless.
-    locales.unshift(defaultLocale);
-  }
-
-  const routing: LocaleRouting =
-    raw.routing === "prefix-always" || raw.routing === "prefix-except-default"
-      ? raw.routing
-      : DEFAULT_ROUTING;
-
-  return { errors, i18n: { defaultLocale, locales, routing } };
-}
+export { resolveI18n } from "@jxsuite/schema/locale";
+export type { LocaleRouting, ResolvedI18n } from "@jxsuite/schema/locale";
 
 /**
  * The locale a URL belongs to.
@@ -189,9 +130,13 @@ export function undeclaredLocalePrefix(
  * A route's identity across locales: its path with the locale prefix removed.
  *
  * `/fr-ca/about/` and `/about/` share the key `about/`, which is what makes them translations of
- * one another. Nothing else could establish that — Jx has no translation metadata, and there is no
- * per-page id to join on — so the directory layout **is** the mapping. That is a real limitation: a
- * localized slug (`/fr-ca/a-propos/`) is not recognized as a translation of `/about/`.
+ * one another. The directory layout is the default mapping, and it is enough whenever the paths are
+ * parallel.
+ *
+ * A **localized slug** is not parallel, and that is the case this cannot derive: `/fr-ca/a-propos/`
+ * shares nothing with `/about/`. A document says so itself with `$translationKey`, which overrides
+ * this exactly as `$lang` overrides the locale its route implies (§13.4) — one key, and the whole
+ * annotation follows.
  *
  * @param {string} urlPattern
  * @param {ResolvedI18n | null} i18n
@@ -212,6 +157,127 @@ export interface LocaleAlternate {
   href: string;
 }
 
+/** One route in a translation set: the locale it serves, and where it lives. */
+export interface TranslationMember {
+  /** Canonical BCP 47 tag. */
+  locale: string;
+  /** Site-absolute route pattern, e.g. `/fr-ca/about/`. */
+  urlPattern: string;
+}
+
+/** A route as translation grouping sees it: its URL, and the key its document declared. */
+export interface TranslationRoute {
+  /** From the document's `$translationKey`; absent when the key is derived from the path. */
+  translationKey?: string | undefined;
+  urlPattern: string;
+}
+
+/** Two routes claiming to be the same page in the same language. */
+export interface TranslationConflict {
+  /** True when at least one of them said so with `$translationKey`. */
+  declared: boolean;
+  key: string;
+  locale: string;
+  /** In route order; the first is the one that keeps the set. */
+  urlPatterns: string[];
+}
+
+/** Everything a page needs to know about its own locale, gathered once per build. */
+export interface PageLocaleContext {
+  /** Absolute alternates for `<head>` and the sitemap; empty without a site `url`. */
+  alternates: readonly LocaleAlternate[];
+  i18n: ResolvedI18n | null;
+  /** The page's translation set, site-absolute and including itself. */
+  translations: readonly TranslationMember[];
+}
+
+/**
+ * Group routes into translation sets: for each route, every route that is the same page in another
+ * language, itself included, ordered by tag.
+ *
+ * One derivation, two readers. {@link localeAlternates} turns a set into absolute `<link
+ * rel="alternate">` hrefs for crawlers; `injectContext` turns it into `$page.alternates` for a
+ * language switcher a reader can click. Deriving it twice is how the two would come to disagree
+ * about which pages are translations of one another — and the disagreement would be invisible,
+ * because one of them is only ever read by a machine.
+ *
+ * **A set of one is kept here and dropped there.** A lone `hreflang` pointing at itself is noise in
+ * `<head>` (§13.5), but a template asking "which languages is this page in" wants the honest
+ * answer, and dropping the page itself would leave a switcher unable to mark where the reader is.
+ *
+ * URLs stay **site-absolute** rather than becoming absolute hrefs, because a switcher is a link
+ * within the site and works before `url` is configured — which is every project during
+ * development.
+ *
+ * @param {readonly TranslationRoute[]} routes - Concrete routes only
+ * @param {ResolvedI18n | null} i18n
+ * @returns {{ conflicts: TranslationConflict[]; sets: Map<string, TranslationMember[]> }} Sets are
+ *   keyed by `urlPattern`; members of one set share one array
+ */
+export function translationSets(
+  routes: readonly TranslationRoute[],
+  i18n: ResolvedI18n | null,
+): { conflicts: TranslationConflict[]; sets: Map<string, TranslationMember[]> } {
+  const out = new Map<string, TranslationMember[]>();
+  const conflicts: TranslationConflict[] = [];
+  if (i18n === null) {
+    return { conflicts, sets: out };
+  }
+
+  const sets = new Map<string, TranslationMember[]>();
+  const declared = new Set<string>();
+  for (const route of routes) {
+    /*
+     * Slashes at the ends are trimmed so a declared key can be written the way the URL reads.
+     * The derived form has none — `/about/` reduces to `about` — and a `"/about"` that silently
+     * matched nothing would look exactly like a key that was ignored.
+     */
+    const key =
+      route.translationKey === undefined
+        ? translationKey(route.urlPattern, i18n)
+        : route.translationKey.replaceAll(/^\/+|\/+$/g, "");
+    if (route.translationKey !== undefined) {
+      declared.add(route.urlPattern);
+    }
+    const locale = localeOfRoute(route.urlPattern, i18n);
+    if (locale === null) {
+      continue;
+    }
+    const members = sets.get(key) ?? [];
+    /*
+     * A duplicate locale in one set means two routes claim to be the same page in one language.
+     * The first wins, which keeps the set single-valued rather than advertising a contradiction;
+     * the loser is keyed nowhere, so it carries no alternates and no switcher.
+     *
+     * How loudly to say so is the caller's decision, and it turns on which kind of collision it
+     * is: a declared one is a promise the author wrote down and broke, while a derived one may be
+     * a deliberate alias the compiler cannot see the reason for.
+     */
+    const taken = members.find((m) => m.locale === locale);
+    if (taken === undefined) {
+      members.push({ locale, urlPattern: route.urlPattern });
+    } else {
+      conflicts.push({
+        declared: declared.has(taken.urlPattern) || route.translationKey !== undefined,
+        key,
+        locale,
+        urlPatterns: [taken.urlPattern, route.urlPattern],
+      });
+    }
+    sets.set(key, members);
+  }
+
+  for (const members of sets.values()) {
+    const ordered = members.toSorted((a, b) =>
+      a.locale === b.locale ? 0 : a.locale < b.locale ? -1 : 1,
+    );
+    for (const member of members) {
+      out.set(member.urlPattern, ordered);
+    }
+  }
+  return { conflicts, sets: out };
+}
+
 /**
  * Group routes into translation sets and give each one its alternates.
  *
@@ -224,13 +290,13 @@ export interface LocaleAlternate {
  * Reciprocity is automatic: every member of a set lists every member **including itself**, which is
  * what the annotation is specified to do and what validators check for.
  *
- * @param {readonly { urlPattern: string }[]} routes - Concrete routes only
+ * @param {readonly TranslationRoute[]} routes - Concrete routes only
  * @param {ResolvedI18n | null} i18n
  * @param {string} siteUrl - Absolute site URL; alternates must be absolute
  * @returns {Map<string, LocaleAlternate[]>} Keyed by `urlPattern`
  */
 export function localeAlternates(
-  routes: readonly { urlPattern: string }[],
+  routes: readonly TranslationRoute[],
   i18n: ResolvedI18n | null,
   siteUrl: string,
 ): Map<string, LocaleAlternate[]> {
@@ -239,43 +305,28 @@ export function localeAlternates(
     return out;
   }
 
-  const sets = new Map<string, { locale: string; urlPattern: string }[]>();
-  for (const route of routes) {
-    const key = translationKey(route.urlPattern, i18n);
-    const locale = localeOfRoute(route.urlPattern, i18n);
-    if (locale === null) {
-      continue;
-    }
-    const members = sets.get(key) ?? [];
-    // A duplicate locale in one set means two routes claim the same translation; the first wins,
-    // Which keeps the annotation single-valued rather than emitting a contradiction.
-    if (!members.some((m) => m.locale === locale)) {
-      members.push({ locale, urlPattern: route.urlPattern });
-    }
-    sets.set(key, members);
-  }
-
-  for (const members of sets.values()) {
+  /* Built once per set rather than once per member: every member advertises the same list. */
+  const built = new Map<readonly TranslationMember[], LocaleAlternate[]>();
+  for (const [urlPattern, members] of translationSets(routes, i18n).sets) {
     if (members.length < 2) {
       continue;
     }
-    const ordered = members.toSorted((a, b) =>
-      a.locale === b.locale ? 0 : a.locale < b.locale ? -1 : 1,
-    );
-    const alternates: LocaleAlternate[] = ordered.map((m) => ({
-      href: new URL(m.urlPattern, siteUrl).href,
-      hreflang: m.locale,
-    }));
-    const fallback = ordered.find((m) => m.locale === i18n.defaultLocale);
-    if (fallback !== undefined) {
-      alternates.push({
-        href: new URL(fallback.urlPattern, siteUrl).href,
-        hreflang: "x-default",
-      });
+    let alternates = built.get(members);
+    if (alternates === undefined) {
+      alternates = members.map((m) => ({
+        href: new URL(m.urlPattern, siteUrl).href,
+        hreflang: m.locale,
+      }));
+      const fallback = members.find((m) => m.locale === i18n.defaultLocale);
+      if (fallback !== undefined) {
+        alternates.push({
+          href: new URL(fallback.urlPattern, siteUrl).href,
+          hreflang: "x-default",
+        });
+      }
+      built.set(members, alternates);
     }
-    for (const member of members) {
-      out.set(member.urlPattern, alternates);
-    }
+    out.set(urlPattern, alternates);
   }
   return out;
 }

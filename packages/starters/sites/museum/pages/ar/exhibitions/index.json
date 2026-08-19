@@ -1,0 +1,103 @@
+{
+  "$layout": "./layouts/ar.json",
+  "title": "المعارض — أتريوم",
+  "description": "البرنامج الجاري في أتريوم: ثلاثة معارض مستقاة من مجموعة المدينة نفسها، بتواريخها وصالاتها وأمنائها.",
+  "$head": [
+    {
+      "tagName": "meta",
+      "attributes": {
+        "name": "description",
+        "content": "البرنامج الجاري في أتريوم: ثلاثة معارض مستقاة من مجموعة المدينة نفسها، بتواريخها وصالاتها وأمنائها."
+      }
+    }
+  ],
+  "state": {
+    "shows": {
+      "$prototype": "ContentCollection",
+      "$src": "@jxsuite/parser/ContentCollection.class.json",
+      "contentType": "exhibitions",
+      "filter": [{ "field": "lang", "op": "==", "value": "ar" }],
+      "sort": [{ "field": "order", "order": "asc" }]
+    }
+  },
+  "children": [
+    {
+      "tagName": "mu-pagehead",
+      "$props": {
+        "kicker": "البرنامج",
+        "title": "ما هو معلّق، وإلى متى",
+        "standfirst": "ثلاثة معارض تجري في وقت واحد: واحد طويل، وواحد موسميّ، وواحد في الفناء. وكلّها مستقاة من مخازن المتحف لا مستعارة، فما ترونه هنا هو المدينة تنظر إلى نفسها.",
+        "metaLabel": "الدخول",
+        "metaValue": "مجّانيّ، بلا حجز"
+      }
+    },
+    {
+      "tagName": "mu-band",
+      "$props": { "index": "٠١", "label": "في هذه الأيّام", "tone": "chalk" },
+      "children": [
+        {
+          "tagName": "div",
+          "style": { "borderBlockEnd": "1px solid var(--color-hairline)" },
+          "children": {
+            "$prototype": "Array",
+            "items": { "$ref": "#/state/shows" },
+            "map": {
+              "tagName": "mu-exhibition-row",
+              "$props": {
+                "order": "${item.data.order}",
+                "title": "${item.data.title}",
+                "description": "${item.data.description}",
+                "gallery": "${item.data.gallery}",
+                "curator": "${item.data.curator}",
+                "curatorLabel": "بإشراف",
+                "href": "/ar/exhibitions/${item.id}/",
+                "hue": "${item.data.hue}",
+                "date": "${item.data.date}",
+                "until": "${item.data.until}",
+                "locale": "${$page.locale}"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "tagName": "mu-band",
+      "$props": { "index": "٠٢", "label": "كيف يعمل البرنامج", "tone": "card" },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "minmax(0, 1fr) minmax(0, 1fr)",
+            "columnGap": "clamp(2rem, 5vw, 4rem)",
+            "rowGap": "1.25rem",
+            "@--md": { "gridTemplateColumns": "minmax(0, 1fr)" }
+          },
+          "children": [
+            {
+              "tagName": "p",
+              "style": { "margin": "0", "lineHeight": "1.9" },
+              "textContent": "يتبدّل معرض واحد كلّ فصل ويستمرّ اثنان طويلًا، فيبقى دائمًا شيء لم تروه وشيء يمكن أن تعودوا إليه. لا شيء منها بتذكرة منفصلة، ولا يُغلق شيء منها لمناسبة خاصّة في ساعات العمل."
+            },
+            {
+              "tagName": "p",
+              "style": { "margin": "0", "lineHeight": "1.9" },
+              "textContent": "يُكتب كلّ معرض كتابةً مستقلّة بكلّ لغة ينشر بها المتحف — فالأمين الذي كتب النصّ الجداريّ العربيّ للصالة ٢ لا يترجم النصّ الإنجليزيّ، والاثنان يختلفان في مواضع. والمبدّل في أعلى هذه الصفحة يذكر اللغات التي توجد بها الصفحة، وتلك وحدها."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "mu-cta",
+      "$props": {
+        "kicker": "الجولات المرشدة",
+        "heading": "تسعون دقيقة، أيّام السبت، بأيّ من اللغات الثلاث تختارون.",
+        "text": "الحجز عند المكتب في اليوم نفسه، أو راسلونا مسبقًا إن كنتم مجموعة تزيد على ثمانية.",
+        "label": "معلومات الزيارة",
+        "href": "/ar/visit/"
+      }
+    }
+  ]
+}

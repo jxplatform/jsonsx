@@ -21,17 +21,28 @@ import {
   stringProperty,
 } from "../commands/command-args";
 import { openLibraryTab } from "../grid/grid-open";
-import { LIBRARY_CATEGORY_KEYS, LIBRARY_LAYOUTS, LIBRARY_LAYOUT_LABELS } from "./library-model";
+import {
+  LIBRARY_CATEGORY_KEYS,
+  LIBRARY_LAYOUTS,
+  LIBRARY_LAYOUT_LABELS,
+  projectLocales,
+} from "./library-model";
 import {
   createLibraryEntry,
   libraryNewEntries,
   refreshLibrary,
   setLibraryCategory,
   setLibraryLayout,
+  setLibraryLocale,
   setLibrarySearch,
 } from "./library-pane";
 import type { LibraryLayout } from "./library-model";
 import type { AnyCommand, CommandRegistry } from "../commands/registry";
+
+/** Every value `library.setLocale` accepts: the project's own locales, plus "all" for none of them. */
+function localeChoices(): string[] {
+  return ["all", ...projectLocales()];
+}
 
 /** The Library's command records. */
 export function libraryCommands(): AnyCommand[] {
@@ -131,6 +142,46 @@ export function libraryCommands(): AnyCommand[] {
         setLibrarySearch(optionalStringArg("library.setSearch", args, "query") ?? "");
       },
       title: "Library: Filter Files",
+    },
+    {
+      args: argsSchema({
+        locale: {
+          /*
+           * A getter, for the reason `content/entry-commands.ts` gives at length: this record is
+           * built at module scope, before any project is open, so `enum: localeChoices()` would
+           * freeze at `["all"]` and the palette would offer that forever. The getter is read when
+           * the prompt opens and when the AI tool list is serialised.
+           */
+          get enum() {
+            return localeChoices();
+          },
+          description:
+            'Which language the Library lists, as a BCP 47 tag the project declares. "all" ' +
+            "clears the language filter.",
+          type: "string",
+        },
+      }),
+      category: "Project",
+      id: "library.setLocale",
+      level: "project",
+      menus: ["palette"],
+      group: "1_file",
+      requires: "a project with more than one locale",
+      // A monolingual project has no facet to set: the Library draws no picker, and offering the
+      // Verb would name a value space with one member in it.
+      when: (ctx) => ctx.project.open && ctx.project.isMultilingual,
+      aiTool: {
+        description:
+          "Filter the Library to the files under one language's directory. Files outside a " +
+          "locale directory — which under prefix-except-default includes the default language's " +
+          "own pages — are not in any language's list.",
+        name: "set_library_locale",
+      },
+      run: (_ctx, args) => {
+        const choice = enumArg("library.setLocale", args, "locale", localeChoices());
+        setLibraryLocale(choice === "all" ? "" : choice);
+      },
+      title: "Library: Show Language",
     },
     {
       category: "Project",

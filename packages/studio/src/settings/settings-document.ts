@@ -50,6 +50,7 @@ import {
 } from "./project-sections";
 import { renderGeneralSettings } from "./general-settings";
 import { renderHeadEditor } from "./head-editor";
+import { renderLocalesSection } from "./locales-section";
 import { selectContributedEntry } from "./contributed-section";
 import type { Tab } from "../tabs/tab";
 import type { AnyCommand, CommandRegistry } from "../commands/registry";
@@ -99,6 +100,20 @@ registerSettingsSection({
   label: "Site head",
   order: 20,
   render: renderHeadEditor,
+});
+/*
+ * Locales sits under Site head because both are facts about the whole site's HEAD rather than about
+ * one page: `<html lang>` and `<html dir>` are what a locale decides, and the routing choice below
+ * them decides what a page's URL looks like. It is also the definition site the pane's language
+ * control, the Languages panel and `i18n.addLocale` all read — there is one `i18n.locales` and this
+ * is the form over it.
+ */
+registerSettingsSection({
+  icon: "sp-icon-globe",
+  key: "locales",
+  label: "Locales",
+  order: 25,
+  render: renderLocalesSection,
 });
 /*
  * CSS Variables is the one section §12 P6.2 does not list, and it stays until P6.4 lands the
@@ -320,8 +335,8 @@ export function settingsCommands(): AnyCommand[] {
       aiTool: {
         description:
           "Open the project's Settings, optionally on a named section (overview, contexts, head, " +
-          "cssVars, definitions, dependencies, extensions, deploy, rawJson, or a section an " +
-          "extension contributes) and optionally at a named entry within it.",
+          "locales, cssVars, definitions, dependencies, extensions, deploy, rawJson, or a section " +
+          "an extension contributes) and optionally at a named entry within it.",
         name: "open_settings",
       },
       run: async (_commandCtx, args) => {

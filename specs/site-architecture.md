@@ -2,9 +2,9 @@
 
 ## File-Based Routing, Content Collections, Layouts, and Static Site Generation
 
-**Version:** 0.5.13-draft
+**Version:** 0.5.16-draft
 **Status:** Partial
-**Updated:** 2026-08-18
+**Updated:** 2026-08-19
 **License:** MIT
 
 ---
@@ -509,23 +509,27 @@ This allows `blog-post.json` layout to wrap within `base.json`, providing blog-s
 
 Layouts receive page metadata via the `$page` context object:
 
-| Property            | Source                                         | Description                |
-| ------------------- | ---------------------------------------------- | -------------------------- |
-| `$page.title`       | Page's `$head` title or explicit `title` field | Page title                 |
-| `$page.description` | Page's `$head` meta description                | Meta description           |
-| `$page.url`         | Computed from file path                        | Page URL path              |
-| `$page.lang`        | Page-level or site default                     | Language code              |
-| `$page.$head`       | Page's `$head` array                           | Page-specific head entries |
-| `$page.frontmatter` | Content entry frontmatter (for content pages)  | All frontmatter fields     |
+| Property            | Source                                                          | Description                   |
+| ------------------- | --------------------------------------------------------------- | ----------------------------- |
+| `$page.title`       | Page's `$head` title or explicit `title` field                  | Page title                    |
+| `$page.description` | Page's `$head` meta description                                 | Meta description              |
+| `$page.url`         | Computed from file path                                         | Page URL path                 |
+| `$page.locale`      | `$lang`, else the route's locale, else the site default (§13.4) | BCP 47 language tag           |
+| `$page.dir`         | Derived from `$page.locale`'s script (§13.4)                    | `ltr` or `rtl`                |
+| `$page.alternates`  | The page's translation set (§13.5)                              | `{code, url, dir, current}[]` |
+| `$page.$head`       | Page's `$head` array                                            | Page-specific head entries    |
+| `$page.frontmatter` | Content entry frontmatter (for content pages)                   | All frontmatter fields        |
 
 The `$site` context provides site-level data:
 
-| Property      | Source                 | Description         |
-| ------------- | ---------------------- | ------------------- |
-| `$site.name`  | `project.json` `name`  | Site name           |
-| `$site.url`   | `project.json` `url`   | Production URL      |
-| `$site.state` | `project.json` `state` | Site-wide state     |
-| `$site.$head` | `project.json` `$head` | Global head entries |
+| Property              | Source                        | Description                     |
+| --------------------- | ----------------------------- | ------------------------------- |
+| `$site.name`          | `project.json` `name`         | Site name                       |
+| `$site.url`           | `project.json` `url`          | Production URL                  |
+| `$site.state`         | `project.json` `state`        | Site-wide state                 |
+| `$site.$head`         | `project.json` `$head`        | Global head entries             |
+| `$site.locales`       | `i18n.locales`, canonicalized | Declared locales, default first |
+| `$site.defaultLocale` | `i18n.defaultLocale`          | The locale `/` serves           |
 
 ---
 
@@ -798,6 +802,17 @@ archives, and claiming otherwise would be believed.
 (`extensions.md` §8.6), not from `emit` — emitters run after every page is written and cannot reach
 a `<head>`. Both formats' links survive the merge because §8.3 keys a link on its `type` as well as
 its `rel` and `href`.
+
+**A localized collection is several feeds, not one.** When the named collection's `source` carries
+`{locale}` (§13.3), each language is published in its own URL space — `/feed.xml` and
+`/fr-ca/feed.xml` — holding only that language's entries, at that language's item URLs, and saying
+what it carries: `xml:lang` on the Atom feed element, which RFC 4287 §2 makes every child inherit,
+and JSON Feed's `language` member. One feed mixing three languages is worse than it sounds: a reader
+subscribes in theirs and receives every post three times, twice in a language they do not read.
+
+Discovery advertises **all** of them, each with `hreflang`. The `head` capability runs before
+routing and cannot know which locale its page is in — one link per language, and the client picks,
+which is what `hreflang` on an `alternate` link is for.
 
 ## 7. Data Management in Studio
 
@@ -1749,6 +1764,13 @@ Static assets are emitted per component, with page styles inlined:
 > **Jx is not a translation system**, and this section will not become one. There is no message
 > catalogue, no `t()` and no fallback chain. A locale is a property of a _route_; what the route
 > serves is whatever the author put in that directory.
+>
+> That decision is recorded here and nowhere else, deliberately. Unicode MessageFormat 2.0 is the
+> format a reversal would adopt — it is stable in CLDR and it is what `Intl.MessageFormat` will be
+> when TC39 finishes with it — but it is part of UTS #35, which this specification already cites
+> as `Borrowed` (§16), and a standard may not be cited in one place and rejected in another
+> (`standards.md` §8). So there is no row to write: the decision lives in this paragraph, and
+> reversing it means designing the section that would own it first.
 
 ### 13.1 Locale-Based Routing
 
@@ -1805,6 +1827,10 @@ language tag, so warning on "looks like a tag" would fire on `/docs/` and `/api/
 A `defaultLocale` absent from `locales` joins the list rather than being rejected — the pages under
 it exist either way, and no reading of that config is the one the author meant.
 
+**Studio edits this block through `studio.md` §20.5**, and resolves it with this section's own
+resolver rather than a second implementation of it — which is why the resolver lives in
+`@jxsuite/schema/locale`, reachable from a package that cannot import the compiler.
+
 **`prefix-always` is checked.** The mode is a promise that every URL names its language, and a page
 outside the locale tree breaks it silently: it builds, it serves, and `localeOfRoute` calls it the
 default locale — so a site that declared "no unprefixed URLs" ships them anyway, and the only reader
@@ -1857,6 +1883,19 @@ than informational. **Two translations of one post share an id** — `blog/en/he
 each URL twice and let the second overwrite the first. The route's own locale prefix scopes the
 expansion, so `/fr/blog/:slug` expands the French entries and no others. A collection whose entries
 carry no locale is untouched by this, whatever the route's locale happens to be.
+
+**A `ContentEntry` lookup is scoped the same way.** Two translations share an id, so an unscoped
+lookup answers with whichever language loaded first: under `/fr-ca/…` that is the English copy,
+rendered on a page whose `<html lang>` and every `hreflang` say French. The route carries the locale
+it serves and the lookup reads it, exactly as route expansion does. A collection whose entries carry
+no locale is untouched — it is not in one language, and filtering it by the route's would empty it.
+
+**The directory is matched case-insensitively.** Two writers name it: an author who declared `fr-CA`
+most likely typed `fr-CA/`, while Studio creates the lowercase form, because a locale directory
+becomes a URL segment and the site's own URLs are lowercase. Reading one spelling only would make a
+translation somebody just created invisible to the build — the directory there, the entries there,
+and the collection loading none of them, with nothing to report. The canonical spelling wins where
+both exist, and a locale nobody has written yet reports against the tag that was declared.
 
 Asset mounts expand with the source: each locale directory publishes at `/content/<type>/<locale>`,
 so a French post's `./hero.png` and its English translation's cannot collide at one URL.
@@ -1919,11 +1958,53 @@ in a translation set therefore advertises the whole set, in `<head>`:
 and again as `xhtml:link` inside the page's `<url>` entry in `sitemap.xml`, under a
 `xmlns:xhtml` declaration the document carries only when some entry uses it.
 
-**A translation set is a directory layout.** Two routes are translations when they share a path
-with the locale prefix removed: `/fr-ca/about/` and `/about/` share `about`. Nothing else could
-establish it — Jx has no translation metadata and no per-page id to join on — and this is the
-limitation to state plainly: **a localized slug is not recognized.** `/fr-ca/a-propos/` is a
-different page from `/about/`, and no annotation connects them.
+**A translation set is a directory layout, unless a page says otherwise.** Two routes are
+translations when they share a path with the locale prefix removed: `/fr-ca/about/` and `/about/`
+share `about`. That derivation is right whenever the paths are parallel, and it is the whole mapping
+for most sites.
+
+A **localized slug** is the case it cannot reach. `/fr-ca/a-propos/` shares nothing with `/about/`,
+and translating a URL is ordinary practice rather than an edge case — the words in a path are read
+by the same person who reads the page. A document therefore declares its own identity:
+
+```json
+{ "$translationKey": "about", "title": "À propos" }
+```
+
+at `pages/fr-ca/a-propos.json`. `$translationKey` overrides the derived key exactly as `$lang`
+overrides the derived locale (§13.4), and it is the **only** new key this needs: the grouping is
+already keyed, so `hreflang`, `x-default`, the sitemap and `$page.alternates` all follow from it
+with nothing else changed. Leading and trailing slashes are trimmed, so the key can be written the
+way the URL reads.
+
+It is read in a **pre-pass**, before the first page compiles, because a page's alternates depend on
+the whole route table — a document cannot tell the build what its key is while it is being
+compiled. Pages that do not mention the key are not parsed twice for it.
+
+**Two routes claiming one language is a contradiction, and the build says so.** A set names one URL
+per language, so one of the two is dropped from it either way. What differs is whether the author
+asserted it:
+
+- **Declared on both** — a build error. `$translationKey` is a promise written down twice, and
+  silently advertising one of the two URLs as _the_ page in that language is a wrong answer nobody
+  downstream can detect.
+- **Derived** — a warning. Parallel paths that happen to meet (`pages/about.json` beside
+  `pages/en/about.json` under `prefix-except-default`) may be a deliberate alias, and failing a
+  build over pages that work would be the compiler overruling a decision it cannot see.
+
+A `$paths` template that declares a key is the declared case by construction: every route it expands
+to claims the same one, and the error names them.
+
+**A key may name its route's own parameters**, written `${slug}`, and that is what makes a
+collection's localized URLs work. One `[slug]` template expands to one route per entry, so a fixed
+key would claim a single identity for the whole collection — every entry the translation of every
+other, which the duplicate rule above reports rather than serves. `pages/fr-ca/expositions/[slug].json`
+declaring `"exhibitions/${slug}"` pairs each French post with the English one, because two
+translations of an entry share an id (§13.3) and the id is what the parameter carries.
+
+A parameter with no value is left as written rather than blanked, so the duplicate it produces is
+reported against a key that still says `${slug}` — which names what is wrong instead of describing
+a collection that collapsed.
 
 Four rules follow from what the annotation means rather than from convenience:
 
@@ -1941,6 +2022,39 @@ An author-supplied alternate for the same `hreflang` wins, like every other auto
 differ only in `hreflang`, and `x-default` conventionally shares its `href` with the default
 locale's entry, so a key of `rel` + `href` alone collapsed the set into one link.
 
+**The same set is readable from the page**, as `$page.alternates`: an array of
+`{ code, label, url, dir, current }`, ordered by tag, which maps straight into a language switcher
+through the ordinary `{"$prototype": "Array"}` form. A switcher is the one part of a multilingual site the
+framework cannot write for the author, and without this the only way to build one is a hardcoded
+list of URLs — which goes stale the moment a page gains or loses a translation, silently, in the
+one place a reader would have used it.
+
+Three differences from the `<head>` annotation above, each following from who reads it:
+
+- **URLs are site-absolute, not absolute.** A switcher is an internal link, and it has to work in a
+  project that has not configured `url` yet — which is every project in development. The `<head>`
+  form must be absolute because a crawler may have arrived at the page by any URL.
+- **A page with no translations gets itself**, where `<head>` gets nothing. A lone `hreflang`
+  pointing at itself is noise to a crawler; a template asking "which languages is this page in"
+  wants the honest answer, and dropping the page itself would leave a switcher unable to mark where
+  the reader is.
+- **`x-default` is absent.** It names no language a reader could choose.
+
+`current` marks the member this route **is**, taken from the route rather than from `$page.locale`,
+because a document whose `$lang` disagrees with its directory (§13.4) is still served from that
+directory.
+
+`label` is the locale's **autonym** — its name in its own language, from CLDR — because that is what
+a reader scans a switcher for: a menu reading "French" is unreadable to exactly the person it exists
+for. It is resolved into the array rather than left to `Intl/displayName` (§13.7) because a switcher
+is a mapped array, and a map template interpolates scope values rather than evaluating expressions;
+without the field the only label available is one the author typed, which is the hand-kept table
+CLDR exists to replace.
+
+Both readings are derived from one grouping, so they cannot come to disagree about which pages are
+translations of one another — a disagreement that would otherwise be invisible, because only a
+machine ever reads one of them.
+
 **Negotiation is not this.** Discovery tells a crawler the set exists; §13.6 is what sends a
 visitor to their own language.
 
@@ -1955,6 +2069,17 @@ static output has no runtime that sees one: `dist/` is files, and the preview se
 mapper. That is a property of the output shape, not missing work, and it is stated here rather than
 tracked as a gap so nobody sets out to close it. A site with `build.adapter` set gets a generated
 worker, the worker sees the request, and negotiation runs there.
+
+**A static `prefix-always` site is told about its root.** The two facts above compose into one
+deployment that is simply broken: `prefix-always` puts every page under a locale, negotiation is
+what answers `/`, and an adapter-less build has no runtime to negotiate with — so the site's front
+door is a 404 and nothing else in the build says so. The `prefix-always` check in §13.2 deliberately
+never reports `/`, because under an adapter it is handled; this is the one shape where it is not, so
+the build names it, once, with the locale a visitor would have been sent to.
+
+A warning and not a generated redirect. Which URL the root should serve is a deployment decision —
+a redirect, a language-choice page, a rewrite at the CDN — and emitting one would be the compiler
+overruling a choice it cannot see the reason for.
 
 **The bare `/` only.** A visitor who asked for `/fr/about/` has expressed a preference far stronger
 than a header, and overriding it would make a shared link mean different things to different people.
@@ -2006,12 +2131,20 @@ sentence naming three helpers, checked by nothing — is what made a single sour
 grammar and should not be; each helper wraps construct-then-format, which is the shape an author
 wants anyway.
 
-**A helper that is given no locale uses `en-US`, and `Intl/formatDate` with no `timeZone` uses
-`UTC`.** Not the host's, in either case. `new Intl.NumberFormat(undefined)` reads the build
+**A helper that is given no locale uses the page's own**, and `Intl/formatDate` with no `timeZone`
+uses `UTC`. Never the host's, in either case. `new Intl.NumberFormat(undefined)` reads the build
 machine's locale, so the same document emits `1,234.5` on one machine and `1.234,5` on another and a
 site's output stops being a function of its input. The time zone is the worse of the two: a locale
 changes how a date reads, a zone can change **which day it is** — `2026-08-16T02:00Z` is the 16th in
 UTC and the 15th in New York.
+
+`$page.locale` (§13.4) is the default because it has the same property the fixed one was chosen for
+— it is a function of the route and the document, not of the machine — and because the alternative
+is worse than it looks: a page under `/fr/` that formats a number without naming a locale used to
+render it in English, on a page whose `<html lang>` and every `hreflang` on it said French. That
+defect is invisible to whoever built the site in their own language and obvious to every reader of
+the other one. An explicit locale still wins; a scope with **no page** — a component's own state, or
+the runtime evaluated standalone — keeps `en-US`, which is what the fixed default now exists for.
 
 **`compare` is the one worth saying out loud.** `<` and `Array.sort()` order by UTF-16 code unit,
 which puts `Zebra` before `apple` and sorts every accented word after `z`. A sorted list built any
@@ -2021,12 +2154,12 @@ other way is wrong in every language with an accent.
 global that throws on a browser Jx claims to support is worse than one that does not exist: the
 author writes a formula that works on their machine and fails on a visitor's.
 
-**What is not built.** A project's `i18n.defaultLocale` is not substituted into a helper call that
-omits one — the fixed default is what runs. Wiring the project's locale through would mean threading
-compile options into every expression call site, and the determinism the fixed default buys is the
-part that mattered; a project-locale default is an improvement on top of a correct baseline rather
-than a fix for a broken one. There is no `i18n.timeZone` key for the same reason: an unread config
-key is the exact defect §13.2 records `i18n` itself having had for months.
+**What is not built.** There is no `i18n.timeZone` key: an unread config key is the exact defect
+§13.2 records `i18n` itself having had for months, and unlike a locale a time zone is not derivable
+from anything the route already says. A **component's** own scope has no `$page`, so a formula
+inside a custom element formats in `en-US` unless the locale is passed to it — the component
+boundary is the state boundary (§10.4), and reaching across it for one value would make `$page`
+ambient in a way nothing else is.
 
 ## 14. Deployment
 
@@ -2349,8 +2482,8 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 | Standard                                                                                  | Class         | Binds             | Evidence                                                                                                                                                                             | Note                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | ----------------------------------------------------------------------------------------- | ------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [RFC 4287](https://www.rfc-editor.org/rfc/rfc4287)                                        | **Subset**    | §6.7              | extensions/feed/src/atom.ts, extensions/feed/tests/feed.test.ts                                                                                                                      | Feed and entry documents carry the required `id`, `title` and `updated`, plus `self` and `alternate` links. Not implemented: `<category>`, `<contributor>`, `<rights>`, and Atom's own paging — RFC 5005 covers the last of those.                                                                                                                                                                                                                                                                                                                                                                                  |
-| [JSON Feed 1.1](https://www.jsonfeed.org/version/1.1/)                                    | **Subset**    | §6.7              | extensions/feed/src/json-feed.ts, extensions/feed/tests/feed.test.ts                                                                                                                 | Feed identity, `language`, and per-item content, dates and authors. Attachments, tags, `banner_image` and hubs are not emitted; `next_url` is available but archives are offered in Atom alone rather than mixing two pagination conventions in one feed.                                                                                                                                                                                                                                                                                                                                                           |
+| [RFC 4287](https://www.rfc-editor.org/rfc/rfc4287)                                        | **Subset**    | §6.7              | extensions/feed/src/atom.ts, extensions/feed/tests/feed.test.ts                                                                                                                      | Feed and entry documents carry the required `id`, `title` and `updated`, plus `self` and `alternate` links, and `xml:lang` on the feed element (§2) when the feed is one language of a localized collection. Not implemented: `<category>`, `<contributor>`, `<rights>`, and Atom's own paging — RFC 5005 covers the last of those.                                                                                                                                                                                                                                                                                 |
+| [JSON Feed 1.1](https://www.jsonfeed.org/version/1.1/)                                    | **Subset**    | §6.7              | extensions/feed/src/json-feed.ts, extensions/feed/tests/feed.test.ts                                                                                                                 | Feed identity, `language` — the locale of the collection directory the entries came from, when there is one — and per-item content, dates and authors. Attachments, tags, `banner_image` and hubs are not emitted; `next_url` is available but archives are offered in Atom alone rather than mixing two pagination conventions in one feed.                                                                                                                                                                                                                                                                        |
 | [RFC 5005](https://www.rfc-editor.org/rfc/rfc5005)                                        | **Subset**    | §6.7              | extensions/feed/src/feed.ts, extensions/feed/tests/feed.test.ts                                                                                                                      | The archived-feeds flavour (§2) plus `<fh:complete/>` (§4), which is the one designed for static hosting. Paged feeds (§3) are not offered: they are explicitly unstable for subscription, which is the only thing a static site publishes.                                                                                                                                                                                                                                                                                                                                                                         |
 | [RFC 9309](https://www.rfc-editor.org/rfc/rfc9309)                                        | **Adopted**   | §8.4.1            | packages/compiler/src/site/site-build.ts                                                                                                                                             | A minimal `robots.txt` is created when none was provided, and an existing one is appended to rather than replaced. The `Sitemap:` line the build adds is a sitemaps.org extension, not part of this standard.                                                                                                                                                                                                                                                                                                                                                                                                       |
 | [Sitemaps 0.9](https://www.sitemaps.org/protocol.html)                                    | **Subset**    | §8.4.1, §13.5     | packages/compiler/src/site/site-build.ts, packages/compiler/src/site/pages-discovery.ts, packages/compiler/tests/sitemap-lastmod.test.ts                                             | `<loc>`, a full RFC 3339 `<lastmod>` — taken from the content entry a generated route came from, not from the template that rendered it — and `xhtml:link` alternates for translated pages. Absent: `<changefreq>` and `<priority>`, both advisory and widely ignored, and the sitemap index, which is for sites past the 50,000-URL limit.                                                                                                                                                                                                                                                                         |
@@ -2360,7 +2493,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 | [JSON-LD 1.1](https://www.w3.org/TR/json-ld11/)                                           | **Subset**    | §8.5              | packages/compiler/src/site/head-merger.ts, packages/compiler/tests/head-merger.test.ts                                                                                               | An object `textContent` is serialized into the tag and templates inside it resolve, so a document can carry structured data that references itself. Jx does not process the JSON-LD — no context expansion, no compaction, no framing; it is emitted for the consumer to interpret.                                                                                                                                                                                                                                                                                                                                 |
 | [BCP 47](https://www.rfc-editor.org/info/bcp47)                                           | **Subset**    | §13.2, §13.4      | packages/schema/src/locale.ts, packages/schema/tests/locale.test.ts, packages/compiler/src/site/i18n.ts                                                                              | Tags are parsed against the RFC 5646 grammar and canonicalized (`EN-us` → `en-US`) through `Intl.Locale`; a malformed tag fails the build. Well-formedness only — the IANA registry is not consulted, so `zz` and `xx-YY` are accepted for languages that do not exist.                                                                                                                                                                                                                                                                                                                                             |
 | [RFC 4647](https://www.rfc-editor.org/rfc/rfc4647)                                        | **Subset**    | §13.6             | packages/compiler/src/site/locale-negotiation.ts, packages/compiler/tests/locale-negotiation.test.ts, packages/compiler/tests/locale-worker.test.ts                                  | §3.4 Lookup, run against `i18n.locales` in the generated worker: progressive truncation, singleton subtags removed with their parent, RFC 9110 §12.5.4 quality order, `q=0` honoured as a refusal. Absent: §3.3 Filtering, which returns a set and cannot answer "which page". Adapter-less static output negotiates nothing and permanently cannot — there is no runtime that sees a request (§13.6).                                                                                                                                                                                                              |
-| [ECMA-402](https://ecma-international.org/publications-and-standards/standards/ecma-402/) | **Subset**    | §13.4, §13.7      | packages/schema/src/intl.ts, packages/schema/src/locale.ts, packages/schema/tests/intl.test.ts, packages/runtime/tests/expression.test.ts                                            | `Intl.Locale` supplies tag parsing, canonical case and likely-subtags maximization. The formatting half is now reachable from a document: eight blessed helpers wrap the ECMA-402 constructors as pure calls, and each defaults to a **fixed** locale and time zone rather than the host's, so a build's output is a function of its input. `DurationFormat` is deliberately not offered — its baseline support is not universal, and a blessed global that throws on a supported browser is worse than its absence.                                                                                                |
+| [ECMA-402](https://ecma-international.org/publications-and-standards/standards/ecma-402/) | **Subset**    | §13.4, §13.7      | packages/schema/src/intl.ts, packages/schema/src/locale.ts, packages/schema/tests/intl.test.ts, packages/runtime/tests/expression.test.ts                                            | `Intl.Locale` supplies tag parsing, canonical case and likely-subtags maximization. The formatting half is now reachable from a document: eight blessed helpers wrap the ECMA-402 constructors as pure calls, and each defaults to the **page's** locale and a **fixed** time zone rather than the host's, so a build's output is a function of its input. `DurationFormat` is deliberately not offered — its baseline support is not universal, and a blessed global that throws on a supported browser is worse than its absence.                                                                                 |
 | [RFC 9111](https://www.rfc-editor.org/rfc/rfc9111)                                        | **Adopted**   | §14.3             | packages/compiler/src/site/headers-emitter.ts, packages/compiler/tests/headers-emitter.test.ts                                                                                       | Every output declares its cacheability: `must-revalidate` for anything whose URL does not change with its content, and a year for the one output whose URL does.                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | [RFC 8246](https://www.rfc-editor.org/rfc/rfc8246)                                        | **Adopted**   | §14.3             | packages/compiler/src/site/headers-emitter.ts, packages/compiler/tests/headers-emitter.test.ts                                                                                       | `immutable` is emitted for `/images/_optimized/*` alone. A test asserts no other path can acquire it, because every other filename is reused when its content changes.                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | [RFC 6797](https://www.rfc-editor.org/rfc/rfc6797)                                        | **Subset**    | §14.3             | packages/compiler/src/site/headers-emitter.ts                                                                                                                                        | Off by default and opt-in per project, with `max-age`, `includeSubDomains` and `preload`. `preload` without `includeSubDomains` is refused rather than emitted, since the preload list would reject it.                                                                                                                                                                                                                                                                                                                                                                                                             |
@@ -2421,6 +2554,7 @@ This spec introduces the following new reserved keywords:
 | `$site`             | Template string     | Site metadata context                            |
 | `$head`             | Page/site root      | `<head>` element declarations                    |
 | `$sitemap`          | Page root           | Set `false` to exclude from `sitemap.xml`        |
+| `$translationKey`   | Page root           | This page's identity across languages (§13.5)    |
 | `ContentCollection` | `$prototype` value  | Collection query                                 |
 | `ContentEntry`      | `$prototype` value  | Single entry access                              |
 
@@ -2499,6 +2633,9 @@ This spec builds on existing Jx primitives wherever possible:
 
 ## Changelog
 
+- **0.5.16-draft** (2026-08-19) — §13.5: a translation key may name its route's parameters, so a collection's URLs can be localized; §13.3: a ContentEntry lookup is scoped to the route's language and a locale directory is matched case-insensitively; §6.7: a localized collection publishes one feed per language.
+- **0.5.15-draft** (2026-08-18) — §13.5: a document declares its identity across languages with $translationKey, so a localized slug is a translation; two routes claiming one language are reported, as an error when declared.
+- **0.5.14-draft** (2026-08-18) — §13.5 exposes the translation set to the page as $page.alternates, with each locale's autonym; §13.7 defaults a helper's locale to the page's own; §13.6 reports a prefix-always root no static deployment can answer.
 - **0.5.13-draft** (2026-08-18) — §8.7: the subpath entry is bundled rather than externalised, and the shared core is reached through an emitted stub — a self-referential asset broke every page using a directive.
 - **0.5.12-draft** (2026-08-18) — §8.7: subpaths resolve through a prefix key and an npm $elements set bundles as one self-contained module.
 - **0.5.11-draft** (2026-08-18) — §8.7: bare specifiers resolve on page and layout too, npm-only pages get an import map, and the package-subpath gap is recorded.

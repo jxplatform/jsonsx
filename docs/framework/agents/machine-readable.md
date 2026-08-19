@@ -57,7 +57,7 @@ This is the fetch for an agent that wants the whole thing at once — one reques
 
 [`https://jxsuite.com/search-index.json`](https://jxsuite.com/search-index.json)
 
-The index that powers the site's own search box, emitted by the [search extension](/docs/framework/site/search) during the build. An envelope — `version`, `engine` (`"minisearch"`), the indexed `fields`, and per-field `boost` weights — wrapped around a `documents` array. Each document is one page or one heading-level section within a page, carrying `id`, `collection`, `slug`, `url`, `title`, `description`, `heading`, and `text`.
+The index that powers the site's own search box, emitted by the [search extension](/docs/framework/site/search) during the build. An envelope — `version`, `engine` (`"minisearch"`), the indexed `fields`, and per-field `boost` weights — wrapped around a `documents` array. Each document is one page or one heading-level section within a page, carrying `id`, `collection`, `slug`, `url`, `title`, `description`, `heading`, and `text` — plus `locale` when the collection it came from keeps one directory per language, in which case the `id` carries the tag too (`docs:fr-CA:start/install`), because two translations share an entry id.
 
 Reach for it when you want lookup rather than reading: it is section-granular, so a query lands on a heading instead of a whole page.
 

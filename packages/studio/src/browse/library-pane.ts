@@ -44,6 +44,7 @@ import { createFileIn, openFileInTab } from "../files/files";
 import { createEntry } from "../content/entry-commands";
 import { entryCollections } from "../content/entry-model";
 import { UPLOAD_ACCEPT, uploadAssets } from "../files/media-upload";
+import { localeLabel } from "@jxsuite/schema/locale";
 import {
   LIBRARY_CATEGORIES,
   LIBRARY_LAYOUTS,
@@ -51,6 +52,7 @@ import {
   PREVIEW_LAYOUTS,
   filterLibrary,
   libraryCategory,
+  libraryLocales,
   uploadDirForCategory,
 } from "./library-model";
 import { createLibrarySource, libraryColumns } from "./library-source";
@@ -83,6 +85,13 @@ export interface LibraryViewState {
   category: string;
   layout: LibraryLayout;
   query: string;
+  /**
+   * The language facet: a canonical tag, or "" for every language.
+   *
+   * A tag rather than a label, because two locales can display the same autonym and only the tag
+   * matches what {@link LibraryFile.locale} carries.
+   */
+  locale: string;
   /** Bumped to force a repaint from a non-reactive source (a scroll, a finished scan). */
   revision: number;
   /** A scan is running. Distinct from "scanned and empty", which is what the old view conflated. */
@@ -101,6 +110,7 @@ export const libraryView: LibraryViewState = reactive({
   category: "all",
   layout: "cards",
   loading: false,
+  locale: "",
   query: "",
   revision: 0,
 });
@@ -141,6 +151,12 @@ export function setLibraryLayout(layout: LibraryLayout): void {
 
 export function setLibrarySearch(query: string): void {
   libraryView.query = query;
+  bump();
+}
+
+/** Show one language, or `""` for all of them. A setter, so "" is a value and not an absence. */
+export function setLibraryLocale(locale: string): void {
+  libraryView.locale = locale;
   bump();
 }
 
@@ -654,7 +670,38 @@ async function uploadIntoLibrary(files: FileList | File[]) {
 
 // ─── Templates ───────────────────────────────────────────────────────────────
 
-function toolbarTpl(panel: ActiveLibraryPane) {
+/**
+ * The language facet, drawn only where it can change the answer.
+ *
+ * Its options come from ALL scanned files, never from the filtered ones: a picker whose choices
+ * collapse to the choice just made cannot be used to make another. One locale — or none — means
+ * every file already agrees, and a permanently-selected chip is chrome that says nothing.
+ */
+function localeFilterTpl(files: readonly LibraryFile[]) {
+  const locales = libraryLocales(files);
+  if (locales.length < 2) {
+    return nothing;
+  }
+  const value = libraryView.locale === "" ? "all" : libraryView.locale;
+  return html`
+    <sp-picker
+      size="s"
+      quiet
+      class="library-locale-filter"
+      label="All languages"
+      .value=${value}
+      @change=${(e: Event) => {
+        const chosen = (e.target as HTMLElement & { value: string }).value;
+        setLibraryLocale(chosen === "all" ? "" : chosen);
+      }}
+    >
+      <sp-menu-item value="all">All languages</sp-menu-item>
+      ${locales.map((tag) => html`<sp-menu-item value=${tag}>${localeLabel(tag)}</sp-menu-item>`)}
+    </sp-picker>
+  `;
+}
+
+function toolbarTpl(panel: ActiveLibraryPane, files: readonly LibraryFile[]) {
   const destination = uploadDirForCategory(libraryView.category);
   return html`
     <div class="library-toolbar">
@@ -671,6 +718,7 @@ function toolbarTpl(panel: ActiveLibraryPane) {
           `,
         )}
       </sp-action-group>
+      ${localeFilterTpl(files)}
       <sp-search
         size="s"
         placeholder="Filter files…"
@@ -804,7 +852,13 @@ function emptyTpl(current: LibrarySource, total: number) {
     </div>`;
   }
   const category = libraryCategory(libraryView.category);
-  const where = category && category.key !== "all" ? ` in ${category.label}` : "";
+  // Both facets in one clause, so a reader who filtered twice is told about both rather than being
+  // Sent to clear one and find the list still empty.
+  const scopes = [
+    category && category.key !== "all" ? category.label : "",
+    libraryView.locale === "" ? "" : localeLabel(libraryView.locale),
+  ].filter((scope) => scope !== "");
+  const where = scopes.length === 0 ? "" : ` in ${scopes.join(" and ")}`;
   const term = libraryView.query.trim();
   return html`<div class="library-empty">
     <p>
@@ -817,6 +871,7 @@ function emptyTpl(current: LibrarySource, total: number) {
       @click=${() => {
         setLibrarySearch("");
         setLibraryCategory("all");
+        setLibraryLocale("");
       }}
     >
       Clear filters
@@ -934,11 +989,13 @@ export function renderLibraryMode(surface: CanvasSurface, tab: Tab): void {
       void libraryView.category;
       void libraryView.layout;
       void libraryView.query;
+      void libraryView.locale;
       void libraryView.loading;
 
       const current = librarySource();
       const files = filterLibrary(current.files(), {
         category: libraryView.category,
+        locale: libraryView.locale,
         query: libraryView.query,
       });
       const total = current.files().length;
@@ -950,7 +1007,7 @@ export function renderLibraryMode(surface: CanvasSurface, tab: Tab): void {
       litRender(
         html`
           <div class="library" data-jx-region=${paneRegion(paneId, "library")}>
-            ${toolbarTpl(panel)} ${failureBannerTpl(current)}
+            ${toolbarTpl(panel, current.files())} ${failureBannerTpl(current)}
             <div
               class="library-body"
               data-jx-region=${paneRegion(paneId, "library/dropZone")}

@@ -8,7 +8,7 @@ generated: true
 
 # Starter templates
 
-Jx Studio ships 12 starter templates. Pick one in the **New Project** dialog — Studio copies it into your project folder as a complete, editable site with real content, components, and styles. Nothing about a starter is special afterward: it is plain Jx files you own.
+Jx Studio ships 13 starter templates. Pick one in the **New Project** dialog — Studio copies it into your project folder as a complete, editable site with real content, components, and styles. Nothing about a starter is special afterward: it is plain Jx files you own.
 
 ## Bistro & Café
 
@@ -137,3 +137,15 @@ A residential real-estate agency starter with a CSV-driven property listings col
 - Split search hero + sidebar filter island
 - Neighborhood tiles & data-forward listing cards
 - Dynamic per-listing detail pages with gallery
+
+## Atrium
+
+**Museum & Culture** — A city museum in three languages, from one set of pages.
+
+A multilingual site for a city museum or public gallery: English, Canadian French and Arabic from one layout, with a header language switcher built from $page.alternates, an exhibitions collection kept one directory per locale, and dates, numbers and lists formatted in each page's own language. RTL comes from the route, so the Arabic pages are the same components laid out the other way.
+
+- Locale routing (en, fr-CA, ar)
+- Language switcher from $page.alternates
+- Per-locale exhibitions collection
+- Direction-agnostic, RTL-ready layout
+- Intl date, number and list formatting

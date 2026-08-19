@@ -796,6 +796,23 @@ export function startCanvasIframe(opts: {
       applyPreviewColorScheme(container.ownerDocument, msg.scheme);
       return;
     }
+    if (msg.kind === "setLocale") {
+      /* The other document-level attribute flip, and the whole visible half of an axis-3 locale:
+         `dir` is what makes an RTL preview actually mirror, and `lang` is what CSS's `:lang()` and
+         the font stack select on. Patch-free like the scheme above — the TEXT is whatever file is
+         open, because a translation in Jx is a different file rather than a different rendering.
+         Cleared rather than blanked when the pane goes back to the document's own language: an
+         empty `lang=""` is a document that claims to be in no language at all. */
+      const root = container.ownerDocument.documentElement;
+      if (msg.locale === null) {
+        root.removeAttribute("lang");
+        root.removeAttribute("dir");
+      } else {
+        root.setAttribute("lang", msg.locale);
+        root.setAttribute("dir", msg.dir);
+      }
+      return;
+    }
     if (msg.kind === "siteStyleUpdate") {
       // Live design-token edit: swap the site-style sheet in place, no re-render.
       applySiteStyle(msg.siteStyle, msg.media);

@@ -1,0 +1,64 @@
+{
+  "tagName": "mu-fact",
+  "state": {
+    "term": "",
+    "value": "",
+    "note": "",
+    "layout": "row"
+  },
+  "style": {
+    "display": "grid",
+    "gridTemplateColumns": "${state.layout === 'stack' ? 'minmax(0, 1fr)' : 'var(--label-column) minmax(0, 1fr)'}",
+    "columnGap": "clamp(1rem, 3vw, 2rem)",
+    "paddingBlock": "0.95rem",
+    "borderBlockStart": "1px solid var(--color-hairline)",
+    "@--sm": {
+      "gridTemplateColumns": "minmax(0, 1fr)",
+      "rowGap": "0.3rem"
+    },
+    "rowGap": "0.3rem"
+  },
+  "children": [
+    {
+      "tagName": "span",
+      "style": {
+        "paddingBlockStart": "0.28rem",
+        "fontFamily": "var(--font-label)",
+        "fontSize": "0.66rem",
+        "lineHeight": "1.5",
+        "letterSpacing": "var(--label-tracking)",
+        "textTransform": "var(--label-case)",
+        "color": "var(--color-muted)"
+      },
+      "textContent": "${state.term}"
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "minWidth": "0"
+      },
+      "children": [
+        {
+          "tagName": "p",
+          "style": {
+            "margin": "0",
+            "fontSize": "1.03rem",
+            "lineHeight": "1.55"
+          },
+          "textContent": "${state.value}"
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "display": "${state.note ? 'block' : 'none'}",
+            "margin": "0.25rem 0 0",
+            "fontSize": "0.9rem",
+            "lineHeight": "1.55",
+            "color": "var(--color-muted)"
+          },
+          "textContent": "${state.note}"
+        }
+      ]
+    }
+  ]
+}

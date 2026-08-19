@@ -1,0 +1,179 @@
+{
+  "$schema": "./project.schema.json",
+  "name": "Atrium",
+  "url": "https://example.com",
+  "defaults": {
+    "layout": "./layouts/base.json",
+    "lang": "en"
+  },
+  "i18n": {
+    "defaultLocale": "en",
+    "locales": ["en", "fr-CA", "ar"],
+    "routing": "prefix-except-default"
+  },
+  "$head": [
+    {
+      "tagName": "meta",
+      "attributes": {
+        "name": "viewport",
+        "content": "width=device-width, initial-scale=1"
+      }
+    },
+    {
+      "tagName": "meta",
+      "attributes": {
+        "name": "description",
+        "content": "Atrium is the city museum of art and history — four centuries of the harbour, its makers and its maps, in a glass hall open to everyone, in English, French and Arabic."
+      }
+    },
+    {
+      "tagName": "link",
+      "attributes": {
+        "rel": "icon",
+        "href": "/favicon.svg",
+        "type": "image/svg+xml"
+      }
+    },
+    {
+      "tagName": "link",
+      "attributes": {
+        "rel": "preconnect",
+        "href": "https://fonts.googleapis.com"
+      }
+    },
+    {
+      "tagName": "link",
+      "attributes": {
+        "rel": "preconnect",
+        "href": "https://fonts.gstatic.com",
+        "crossorigin": ""
+      }
+    },
+    {
+      "tagName": "link",
+      "attributes": {
+        "rel": "stylesheet",
+        "href": "https://fonts.googleapis.com/css2?family=Noto+Sans+Display:wght@400;500;700&family=Noto+Sans+Mono:wght@400;500&family=Noto+Serif:wght@400;500;600&family=Noto+Kufi+Arabic:wght@400;500;700&family=Noto+Naskh+Arabic:wght@400;500;600&display=swap"
+      }
+    }
+  ],
+  "$media": {
+    "--lg": "(max-width: 1080px)",
+    "--md": "(max-width: 840px)",
+    "--sm": "(max-width: 600px)"
+  },
+  "style": {
+    "--color-ink": "#17181d",
+    "--color-ink-deep": "#0b0c10",
+    "--color-chalk": "#e7e3da",
+    "--color-chalk-deep": "#d8d3c6",
+    "--color-card": "#f7f5f0",
+    "--color-pigment": "#2438c8",
+    "--color-pigment-deep": "#182a9c",
+    "--color-pigment-tint": "rgba(36, 56, 200, 0.09)",
+    "--color-clay": "#ad4529",
+    "--color-muted": "#5c5a66",
+    "--color-hairline": "#cbc5b8",
+    "--font-display": "'Noto Sans Display', 'Noto Kufi Arabic', system-ui, -apple-system, sans-serif",
+    "--font-text": "'Noto Serif', 'Noto Naskh Arabic', Georgia, 'Times New Roman', serif",
+    "--font-label": "'Noto Sans Mono', 'Noto Kufi Arabic', ui-monospace, SFMono-Regular, Menlo, monospace",
+    "--label-tracking": "0.16em",
+    "--label-case": "uppercase",
+    "--display-tracking": "-0.035em",
+    "--radius": "0",
+    "--max-width": "1240px",
+    "--measure": "62ch",
+    "--label-column": "9.5rem",
+    "--gutter": "clamp(1.25rem, 4vw, 3rem)",
+    "--band-space": "clamp(3.25rem, 7vw, 6rem)",
+    "--flip-inline": "1",
+    "--leading-scale": "1",
+    "margin": "0",
+    "padding": "0",
+    "fontFamily": "var(--font-text)",
+    "fontSize": "17px",
+    "lineHeight": "1.7",
+    "color": "var(--color-ink)",
+    "backgroundColor": "var(--color-chalk)",
+    "WebkitFontSmoothing": "antialiased",
+    ":lang(ar)": {
+      "--label-tracking": "0",
+      "--label-case": "none",
+      "--display-tracking": "0",
+      "--flip-inline": "-1",
+      "--leading-scale": "1.35"
+    },
+    ":dir(rtl)": {
+      "--flip-inline": "-1"
+    },
+    ":lang(ar) h1, :lang(ar) h2, :lang(ar) h3": {
+      "textWrap": "balance"
+    }
+  },
+  "images": {
+    "optimize": false,
+    "lazyLoad": true
+  },
+  "content": {
+    "exhibitions": {
+      "source": "./content/exhibitions/{locale}/",
+      "format": "Markdown",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Exhibition title, as it appears on the wall."
+          },
+          "description": {
+            "type": "string",
+            "description": "One-sentence standfirst for cards and search results."
+          },
+          "date": {
+            "type": "string",
+            "description": "Opening date, ISO 8601 (YYYY-MM-DD) — Intl/formatDate renders it in each page's own language."
+          },
+          "until": {
+            "type": "string",
+            "description": "Closing date, ISO 8601 (YYYY-MM-DD)."
+          },
+          "gallery": {
+            "type": "string",
+            "description": "Where in the building it hangs."
+          },
+          "curator": {
+            "type": "string",
+            "description": "Curator's name — a proper noun, so it stays the same in every language."
+          },
+          "works": {
+            "type": "number",
+            "description": "Number of objects on show; formatted with Intl/formatNumber, so Arabic pages get Arabic-Indic digits."
+          },
+          "hue": {
+            "type": "number",
+            "description": "Hue (0–360) of this exhibition's drawn plate. The starter ships no photographs; each card's art is CSS, generated from this one number."
+          },
+          "enKey": {
+            "type": "string",
+            "description": "This entry's id, repeated as a field only the English entries carry. Three translations share one id, and ContentEntry matches a field value across the whole collection — so each locale's detail route matches its own key field, and the value being the id is what keeps the three URLs parallel."
+          },
+          "lang": {
+            "type": "string",
+            "description": "BCP 47 tag of the directory this entry came from. One collection holds every language at once, so a locale's index filters on this to list only its own."
+          },
+          "order": {
+            "type": "number",
+            "description": "Running order on the exhibitions index."
+          }
+        },
+        "required": ["title", "description", "date", "until", "gallery", "lang"]
+      }
+    }
+  },
+  "build": {
+    "outDir": "./dist",
+    "format": "directory",
+    "trailingSlash": "always"
+  },
+  "extensions": ["@jxsuite/parser"]
+}

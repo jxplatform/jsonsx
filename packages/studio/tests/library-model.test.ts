@@ -22,6 +22,8 @@ import {
   isLibraryLayout,
   libraryCategory,
   libraryDate,
+  libraryLocales,
+  projectLocales,
   scanLibrary,
   uploadDirForCategory,
 } from "../src/browse/library-model";
@@ -211,6 +213,147 @@ describe("filterLibrary", () => {
 
   test("an unknown category filters nothing rather than everything", () => {
     expect(filterLibrary(files, { category: "gone", query: "" }).length).toBe(2);
+  });
+
+  test("an absent or blank locale is the identity — the third clause does not copy either", () => {
+    expect(filterLibrary(files, { category: "all", query: "" })).toBe(files);
+    expect(filterLibrary(files, { category: "all", locale: "", query: "" })).toBe(files);
+    expect(filterLibrary(files, { category: "all", locale: "   ", query: "" })).toBe(files);
+  });
+
+  test("filters on the canonical TAG, never on the label two locales can share", () => {
+    const localized: LibraryFile[] = [
+      { ...files[0]!, locale: "fr", path: "pages/fr/index.json" },
+      { ...files[0]!, locale: "fr-CA", name: "ca.json", path: "pages/fr-ca/ca.json" },
+      files[1]!,
+    ];
+    expect(filterLibrary(localized, { category: "all", locale: "fr", query: "" })).toHaveLength(1);
+    expect(
+      filterLibrary(localized, { category: "all", locale: "fr-CA", query: "" }).map((f) => f.name),
+    ).toEqual(["ca.json"]);
+  });
+
+  test("stacks with the other two rather than replacing them", () => {
+    const localized: LibraryFile[] = [
+      { ...files[0]!, locale: "fr", path: "pages/fr/index.json" },
+      { ...files[0]!, locale: "fr", name: "about.json", path: "pages/fr/about.json" },
+    ];
+    expect(
+      filterLibrary(localized, { category: "pages", locale: "fr", query: "about" }).map(
+        (f) => f.name,
+      ),
+    ).toEqual(["about.json"]);
+    expect(filterLibrary(localized, { category: "media", locale: "fr", query: "" })).toEqual([]);
+  });
+});
+
+// ─── Locales ─────────────────────────────────────────────────────────────────
+
+describe("the locale a file sits under", () => {
+  const I18N_TREE: Record<string, DirEntry[]> = {
+    layouts: [file("main.json", "layouts/main.json")],
+    pages: [dir("fr", "pages/fr"), dir("de", "pages/de"), file("index.json", "pages/index.json")],
+    "pages/de": [file("index.json", "pages/de/index.json")],
+    "pages/fr": [file("index.json", "pages/fr/index.json")],
+  };
+
+  function multilingual(locales: string[] = ["en", "fr", "de"]) {
+    resetStudioState({
+      projectConfig: { i18n: { defaultLocale: "en", locales } },
+      projectDirs: ["pages", "layouts"],
+    });
+  }
+
+  async function scan() {
+    return scanLibrary(["pages", "layouts"], { listDirectory: listDirectory(I18N_TREE) });
+  }
+
+  test("comes from the path, and from routing where the path is silent", async () => {
+    multilingual();
+    const files = await scan();
+    const byPath = new Map(files.files.map((f) => [f.path, f.locale]));
+    expect(byPath.get("pages/fr/index.json")).toBe("fr");
+    expect(byPath.get("pages/de/index.json")).toBe("de");
+    /*
+     * Under `prefix-except-default` the unprefixed page IS the English copy, and saying so is what
+     * lets the facet answer "show me the English pages" — the question it is most often asked, and
+     * the one it could not answer while every unprefixed file had no language at all.
+     */
+    expect(byPath.get("pages/index.json")).toBe("en");
+    // Not a page: a layout is shared by every locale rather than belonging to one.
+    expect(byPath.get("layouts/main.json")).toBeUndefined();
+  });
+
+  // Under `prefix-always` an unprefixed page is outside the locale tree, which routing calls a
+  // Mistake rather than the default language — so the facet says nothing about it either.
+  test("says nothing about an unprefixed page under prefix-always", async () => {
+    resetStudioState({
+      projectConfig: {
+        i18n: { defaultLocale: "en", locales: ["en", "fr", "de"], routing: "prefix-always" },
+      },
+      projectDirs: ["pages", "layouts"],
+    });
+    const files = await scan();
+    const byPath = new Map(files.files.map((f) => [f.path, f.locale]));
+    expect(byPath.get("pages/index.json")).toBeUndefined();
+    expect(byPath.get("pages/fr/index.json")).toBe("fr");
+  });
+
+  test("a project that declares no i18n gives every file no locale at all", async () => {
+    resetStudioState({ projectConfig: {}, projectDirs: ["pages"] });
+    const files = await scan();
+    expect(files.files.every((f) => f.locale === undefined)).toBe(true);
+  });
+
+  /*
+   * `fr` is not a locale this project has, so `pages/fr/` is not a locale directory — it is an
+   * ordinary path segment, and the build serves everything under it as the default locale, warning
+   * once about the directory that looks like a language and is not (§13.2). The facet says the same
+   * thing the build does rather than inventing a language nothing declares.
+   */
+  test("a directory the project does not declare is not a locale", async () => {
+    multilingual(["en", "de"]);
+    const files = await scan();
+    const byPath = new Map(files.files.map((f) => [f.path, f.locale]));
+    expect(byPath.get("pages/fr/index.json")).toBe("en");
+    expect(byPath.get("pages/de/index.json")).toBe("de");
+    expect(libraryLocales(files.files)).toEqual(["en", "de"]);
+  });
+
+  test("projectLocales answers the declaration, canonicalized and default-first", () => {
+    resetStudioState({
+      projectConfig: { i18n: { defaultLocale: "EN-us", locales: ["fr", "not_a_tag"] } },
+    });
+    expect(projectLocales()).toEqual(["en-US", "fr"]);
+    resetStudioState({ projectConfig: {} });
+    expect(projectLocales()).toEqual([]);
+  });
+
+  test("libraryLocales lists only what is PRESENT, in declaration order", async () => {
+    multilingual(["en", "de", "fr"]);
+    const files = await scan();
+    /* `en` is present without a directory of its own — under `prefix-except-default` the unprefixed
+       pages are its, which is the whole reason the facet can offer it at all. `layouts/main.json`
+       belongs to no language and puts nothing in the list. */
+    expect(libraryLocales(files.files)).toEqual(["en", "de", "fr"]);
+  });
+
+  // Under `prefix-always` an unprefixed page is outside the locale tree, so the default language
+  // Appears only once something is actually written in it.
+  test("libraryLocales offers the default only where routing puts pages in it", async () => {
+    resetStudioState({
+      projectConfig: {
+        i18n: { defaultLocale: "en", locales: ["en", "de", "fr"], routing: "prefix-always" },
+      },
+      projectDirs: ["pages", "layouts"],
+    });
+    const files = await scan();
+    expect(libraryLocales(files.files)).toEqual(["de", "fr"]);
+  });
+
+  test("libraryLocales is empty when nothing carries a locale", () => {
+    multilingual();
+    expect(libraryLocales([])).toEqual([]);
   });
 });
 

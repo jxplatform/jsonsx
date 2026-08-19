@@ -1,0 +1,246 @@
+{
+  "$layout": "./layouts/ar.json",
+  "title": "أتريوم — متحف المدينة للفنّ والتاريخ",
+  "description": "متحف بلديّ تحت سقف من زجاج: أربعة قرون من المرفأ وصنّاعه وخرائطه. الدخول مجّانيّ، من الثلاثاء إلى الأحد، بالإنجليزيّة والفرنسيّة والعربيّة.",
+  "$head": [
+    {
+      "tagName": "meta",
+      "attributes": {
+        "name": "description",
+        "content": "متحف بلديّ تحت سقف من زجاج: أربعة قرون من المرفأ وصنّاعه وخرائطه. الدخول مجّانيّ، من الثلاثاء إلى الأحد، بالإنجليزيّة والفرنسيّة والعربيّة."
+      }
+    }
+  ],
+  "state": {
+    "objects": {
+      "$expression": {
+        "operator": "call",
+        "target": { "$ref": "window#/Intl/formatNumber" },
+        "value": [18400]
+      }
+    },
+    "visitors": {
+      "$expression": {
+        "operator": "call",
+        "target": { "$ref": "window#/Intl/formatNumber" },
+        "value": [212000]
+      }
+    },
+    "founded": {
+      "$expression": {
+        "operator": "call",
+        "target": { "$ref": "window#/Intl/formatDate" },
+        "value": ["1897-11-04", null, { "day": "numeric", "month": "long", "year": "numeric" }]
+      }
+    },
+    "openDays": {
+      "$expression": {
+        "operator": "call",
+        "target": { "$ref": "window#/Intl/formatList" },
+        "value": [["الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت", "الأحد"]]
+      }
+    },
+    "shows": {
+      "$prototype": "ContentCollection",
+      "$src": "@jxsuite/parser/ContentCollection.class.json",
+      "contentType": "exhibitions",
+      "filter": [{ "field": "lang", "op": "==", "value": "ar" }],
+      "sort": [{ "field": "order", "order": "asc" }],
+      "limit": 3
+    }
+  },
+  "children": [
+    {
+      "tagName": "mu-hero",
+      "$props": {
+        "kicker": "متحف المدينة للفنّ والتاريخ",
+        "title": "أربعة قرون تحت سقف واحد",
+        "standfirst": "يحفظ أتريوم ما صنعته المدينة واشترته وانتشلته واختلفت عليه منذ وُضع أوّل رصيف حجريّ، ويعرضه مجّانًا، بثلاث لغات، ستّة أيّام في الأسبوع.",
+        "primaryLabel": "خطّط لزيارتك",
+        "primaryHref": "/ar/visit/",
+        "secondaryLabel": "المعروض الآن",
+        "secondaryHref": "/ar/exhibitions/",
+        "noteLabel": "الدخول مجّانيّ",
+        "note": "من الثلاثاء إلى الأحد، من ١٠:٠٠ إلى ١٨:٠٠"
+      }
+    },
+    {
+      "tagName": "mu-band",
+      "$props": { "index": "٠١", "label": "معروض الآن", "tone": "chalk" },
+      "children": [
+        {
+          "tagName": "h2",
+          "style": {
+            "margin": "0 0 2.25rem",
+            "fontFamily": "var(--font-display)",
+            "fontSize": "clamp(1.7rem, 3.6vw, 2.6rem)",
+            "fontWeight": "500",
+            "lineHeight": "calc(1.08 * var(--leading-scale))",
+            "letterSpacing": "var(--display-tracking)",
+            "maxWidth": "24ch"
+          },
+          "textContent": "ثلاثة معارض، وكلّها عن هذا المكان"
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "repeat(3, minmax(0, 1fr))",
+            "gap": "clamp(1rem, 2.5vw, 1.75rem)",
+            "@--md": { "gridTemplateColumns": "repeat(2, minmax(0, 1fr))" },
+            "@--sm": { "gridTemplateColumns": "minmax(0, 1fr)" }
+          },
+          "children": {
+            "$prototype": "Array",
+            "items": { "$ref": "#/state/shows" },
+            "map": {
+              "tagName": "mu-exhibition-card",
+              "$props": {
+                "title": "${item.data.title}",
+                "description": "${item.data.description}",
+                "gallery": "${item.data.gallery}",
+                "status": "مفتوح الآن",
+                "href": "/ar/exhibitions/${item.id}/",
+                "hue": "${item.data.hue}",
+                "date": "${item.data.date}",
+                "until": "${item.data.until}",
+                "locale": "${$page.locale}"
+              }
+            }
+          }
+        },
+        {
+          "tagName": "mu-more",
+          "$props": {
+            "label": "البرنامج كاملًا",
+            "href": "/ar/exhibitions/",
+            "space": "2rem"
+          }
+        }
+      ]
+    },
+    {
+      "tagName": "mu-band",
+      "$props": { "index": "٠٢", "label": "المتحف بالأرقام", "tone": "card" },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "repeat(2, minmax(0, 1fr))",
+            "columnGap": "clamp(2rem, 5vw, 4rem)",
+            "@--md": { "gridTemplateColumns": "minmax(0, 1fr)" }
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "children": [
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "المقتنيات",
+                    "value": "${state.objects}",
+                    "note": "قطعة مفهرسة، يُعرض نحو عُشرها في أيّ وقت."
+                  }
+                },
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "الزوّار",
+                    "value": "${state.visitors}",
+                    "note": "في آخر سنة كاملة، محسوبين عند الباب."
+                  }
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "children": [
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "التأسيس",
+                    "value": "${state.founded}",
+                    "note": "باكتتاب مئتين وأربعين أسرة، في غرفة فوق دار الجمارك."
+                  }
+                },
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "أيّام الفتح",
+                    "value": "${state.openDays}",
+                    "note": "مغلق يوم الاثنين، وفي اليومين اللذين تُنظَّف فيهما القاعة كلّ سنة."
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "margin": "2rem 0 0",
+            "paddingBlockStart": "1.1rem",
+            "borderBlockStart": "1px solid var(--color-hairline)",
+            "fontSize": "0.95rem",
+            "lineHeight": "1.8",
+            "color": "var(--color-muted)",
+            "maxWidth": "var(--measure)"
+          },
+          "textContent": "كلّ رقم هنا تصوغه لغة الصفحة نفسها: هذه الوثيقة تكتب ١٨٬٤٠٠ بالعربيّة، و18,400 بالإنجليزيّة، و18 400 بالفرنسيّة، لأنّ المسار قد قال أصلًا بأيّ لغة هو."
+        }
+      ]
+    },
+    {
+      "tagName": "mu-band",
+      "$props": { "index": "٠٣", "label": "من قاعة المطالعة", "tone": "chalk" },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "minmax(0, 1.05fr) minmax(0, 1fr)",
+            "columnGap": "clamp(2rem, 5vw, 4rem)",
+            "alignItems": "start",
+            "@--md": { "gridTemplateColumns": "minmax(0, 1fr)", "rowGap": "2rem" }
+          },
+          "children": [
+            {
+              "tagName": "mu-quote",
+              "$props": {
+                "quote": "المتحف غرفة تحفظ فيها المدينة ما لا تتّفق عليه.",
+                "attribution": "هيلين فورنييه، أوّل أمينة للمتحف، ١٨٩٧"
+              }
+            },
+            {
+              "tagName": "div",
+              "style": { "maxWidth": "var(--measure)" },
+              "children": [
+                {
+                  "tagName": "p",
+                  "style": { "margin": "0", "lineHeight": "1.9" },
+                  "textContent": "قاعة المطالعة في الطابق الثاني مفتوحة لكلّ من لديه سؤال. على رفوفها سجلّات المرفأ، ودفاتر المسح، وأربعمئة صندوق من مراسلات الورش، ودفاتر محاضر المتحف نفسه — بما فيها تلك التي دوّنت خلافات كان الأمناء يفضّلون كتمانها."
+                },
+                {
+                  "tagName": "p",
+                  "style": { "margin": "1.1rem 0 0", "lineHeight": "1.9" },
+                  "textContent": "لا حاجة إلى موعد للقراءة، وثمّة حاجة إليه لمناولة المواد. اسأل عند المكتب، ويحضر أحد الموظّفين الصندوق خلال ساعة."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "mu-cta",
+      "$props": {
+        "kicker": "الدخول مجّانيّ",
+        "heading": "القاعة مفتوحة. تعالوا واختلفوا معنا.",
+        "text": "ستّة أيّام في الأسبوع، من العاشرة إلى السادسة، بلا تذكرة وبلا حجز. ويبقى الفناء مفتوحًا ساعة إضافيّة طوال الصيف.",
+        "label": "خطّط لزيارتك",
+        "href": "/ar/visit/"
+      }
+    }
+  ]
+}

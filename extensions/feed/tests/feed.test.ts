@@ -372,3 +372,90 @@ describe("failure modes", () => {
     expect(xml).toContain("</feed>");
   });
 });
+
+// ─── One feed per language ──────────────────────────────────────────────────
+
+/*
+ * A collection spread over one directory per locale (site-architecture.md §13.3) is several feeds,
+ * not one. A single feed mixing three languages is worse than it sounds: a reader subscribes in
+ * theirs and receives every post three times, twice in a language they do not read.
+ */
+describe("a localized collection", () => {
+  const LOCALIZED_PROJECT = {
+    content: { blog: { format: "Markdown", source: "./content/blog/{locale}/" } },
+    i18n: { defaultLocale: "en", locales: ["en", "fr-ca"] },
+    url: "https://x.example",
+  };
+  const LOCALIZED_SECTION = { blog: { basePath: "/blog/", collection: "blog", title: "Journal" } };
+  const ENTRIES = [
+    {
+      _meta: { locale: "en" },
+      body: "",
+      data: { date: "2026-01-02", title: "Hello" },
+      id: "hello",
+    },
+    {
+      _meta: { locale: "fr-ca" },
+      body: "",
+      data: { date: "2026-01-02", title: "Bonjour" },
+      id: "hello",
+    },
+  ] as unknown as ContentLoaderEntry[];
+
+  const emitted = () =>
+    Feed.emit(LOCALIZED_SECTION, {
+      projectConfig: LOCALIZED_PROJECT as never,
+      sections: { content: new Map([["blog", ENTRIES]]) },
+    });
+
+  test("publishes one feed per locale, in that locale's URL space", () => {
+    expect(
+      emitted()
+        .map((f) => f.path)
+        .toSorted(),
+    ).toEqual(["/feed.json", "/feed.xml", "/fr-ca/feed.json", "/fr-ca/feed.xml"]);
+  });
+
+  test("each feed holds only its own language's entries, at its own URLs", () => {
+    const french = emitted().find((f) => f.path === "/fr-ca/feed.xml")!.content;
+    expect(french).toContain("<title>Bonjour</title>");
+    expect(french).not.toContain("<title>Hello</title>");
+    expect(french).toContain("https://x.example/fr-ca/blog/hello/");
+  });
+
+  // RFC 4287 §2: `xml:lang` on the feed element, inherited by every child. JSON Feed says the same
+  // Thing with `language`.
+  // The tag is canonical (`fr-CA`) while the directory is lowercase (`/fr-ca/`): one is a language
+  // Attribute, the other is a URL, and each follows its own convention.
+  test("each feed states the language it carries", () => {
+    expect(emitted().find((f) => f.path === "/fr-ca/feed.xml")!.content).toContain(
+      'xml:lang="fr-CA"',
+    );
+    const json = JSON.parse(emitted().find((f) => f.path === "/fr-ca/feed.json")!.content) as {
+      language?: string;
+    };
+    expect(json.language).toBe("fr-CA");
+  });
+
+  /*
+   * `head` runs before routing and cannot know which locale its page is in, so it advertises every
+   * feed and lets the client choose — which is what `hreflang` on an `alternate` link is for.
+   */
+  test("discovery advertises each language's feed by hreflang", () => {
+    const links = Feed.head(LOCALIZED_SECTION, { projectConfig: LOCALIZED_PROJECT as never });
+    expect(links.map((l) => [l.attributes?.hreflang, l.attributes?.href]).toSorted()).toEqual([
+      ["en", "https://x.example/feed.json"],
+      ["en", "https://x.example/feed.xml"],
+      ["fr-CA", "https://x.example/fr-ca/feed.json"],
+      ["fr-CA", "https://x.example/fr-ca/feed.xml"],
+    ]);
+  });
+
+  // A project whose collection is not localized keeps exactly what it had: one feed, no hreflang.
+  test("an unlocalized collection is untouched", () => {
+    const plain = Feed.head(LOCALIZED_SECTION, {
+      projectConfig: { url: "https://x.example" } as never,
+    });
+    expect(plain.every((l) => l.attributes?.hreflang === undefined)).toBe(true);
+  });
+});

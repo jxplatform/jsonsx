@@ -1,0 +1,237 @@
+{
+  "tagName": "mu-exhibition-row",
+  "state": {
+    "index": "",
+    "title": "",
+    "description": "",
+    "gallery": "",
+    "curator": "",
+    "curatorLabel": "Curated by",
+    "href": "#",
+    "hue": 214,
+    "date": "",
+    "until": "",
+    "locale": "en",
+    "order": 0,
+    "orderLabel": {
+      "$expression": {
+        "operator": "call",
+        "target": {
+          "$ref": "window#/Intl/formatNumber"
+        },
+        "value": [
+          {
+            "$ref": "#/state/order"
+          },
+          {
+            "$ref": "#/state/locale"
+          },
+          {
+            "minimumIntegerDigits": 2,
+            "useGrouping": false
+          }
+        ]
+      }
+    },
+    "opens": {
+      "$expression": {
+        "operator": "call",
+        "target": {
+          "$ref": "window#/Intl/formatDate"
+        },
+        "value": [
+          {
+            "$ref": "#/state/date"
+          },
+          {
+            "$ref": "#/state/locale"
+          },
+          {
+            "day": "numeric",
+            "month": "long",
+            "year": "numeric"
+          }
+        ]
+      }
+    },
+    "closes": {
+      "$expression": {
+        "operator": "call",
+        "target": {
+          "$ref": "window#/Intl/formatDate"
+        },
+        "value": [
+          {
+            "$ref": "#/state/until"
+          },
+          {
+            "$ref": "#/state/locale"
+          },
+          {
+            "day": "numeric",
+            "month": "long",
+            "year": "numeric"
+          }
+        ]
+      }
+    }
+  },
+  "style": {
+    "display": "block",
+    "borderBlockStart": "1px solid var(--color-hairline)"
+  },
+  "children": [
+    {
+      "tagName": "a",
+      "attributes": {
+        "href": "${state.href}"
+      },
+      "style": {
+        "display": "grid",
+        "gridTemplateColumns": "var(--label-column) 7.5rem minmax(0, 1fr)",
+        "columnGap": "clamp(1.25rem, 3.5vw, 3rem)",
+        "alignItems": "start",
+        "paddingBlock": "clamp(1.75rem, 4vw, 2.75rem)",
+        "color": "inherit",
+        "textDecoration": "none",
+        "@--md": {
+          "gridTemplateColumns": "4.5rem minmax(0, 1fr)",
+          "rowGap": "1rem"
+        },
+        ":hover": {
+          "color": "var(--color-pigment)"
+        },
+        "transition": "color 0.15s"
+      },
+      "children": [
+        {
+          "tagName": "span",
+          "style": {
+            "fontFamily": "var(--font-label)",
+            "fontSize": "0.95rem",
+            "fontVariantNumeric": "tabular-nums",
+            "lineHeight": "1.1",
+            "color": "var(--color-pigment)"
+          },
+          "textContent": "${state.index ? state.index : state.orderLabel}"
+        },
+        {
+          "tagName": "span",
+          "attributes": {
+            "aria-hidden": "true"
+          },
+          "style": {
+            "display": "block",
+            "aspectRatio": "1",
+            "border": "2px solid var(--color-ink)",
+            "background": "radial-gradient(circle at 60% 40%, hsl(${state.hue} 55% 45%) 0 34%, transparent 34.5%), repeating-linear-gradient(${state.hue}deg, var(--color-chalk-deep) 0 7px, var(--color-card) 7px 14px)",
+            "@--md": {
+              "display": "none"
+            }
+          }
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "minWidth": "0"
+          },
+          "children": [
+            {
+              "tagName": "h2",
+              "style": {
+                "margin": "0",
+                "fontFamily": "var(--font-display)",
+                "fontSize": "clamp(1.6rem, 3.4vw, 2.4rem)",
+                "fontWeight": "500",
+                "lineHeight": "calc(1.06 * var(--leading-scale))",
+                "letterSpacing": "var(--display-tracking)"
+              },
+              "textContent": "${state.title}"
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "display": "flex",
+                "flexWrap": "wrap",
+                "gap": "0.45rem",
+                "margin": "0.85rem 0 0",
+                "fontFamily": "var(--font-label)",
+                "fontSize": "0.7rem",
+                "fontVariantNumeric": "tabular-nums",
+                "color": "var(--color-pigment)"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "textContent": "${state.opens}"
+                },
+                {
+                  "tagName": "span",
+                  "attributes": {
+                    "aria-hidden": "true"
+                  },
+                  "style": {
+                    "opacity": "0.55"
+                  },
+                  "textContent": "—"
+                },
+                {
+                  "tagName": "span",
+                  "textContent": "${state.closes}"
+                }
+              ]
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "margin": "0.9rem 0 0",
+                "fontSize": "1.05rem",
+                "lineHeight": "1.7",
+                "color": "var(--color-muted)",
+                "maxWidth": "var(--measure)"
+              },
+              "textContent": "${state.description}"
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "display": "flex",
+                "flexWrap": "wrap",
+                "gap": "0.4rem 1.5rem",
+                "margin": "1.1rem 0 0",
+                "fontFamily": "var(--font-label)",
+                "fontSize": "0.64rem",
+                "letterSpacing": "var(--label-tracking)",
+                "textTransform": "var(--label-case)",
+                "color": "var(--color-muted)"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "textContent": "${state.gallery}"
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "${state.curator ? 'inline-flex' : 'none'}",
+                    "gap": "0.35rem"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "textContent": "${state.curatorLabel}"
+                    },
+                    {
+                      "tagName": "span",
+                      "textContent": "${state.curator}"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

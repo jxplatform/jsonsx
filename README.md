@@ -83,7 +83,7 @@ jx validate   # validate project.json, documents, classes, and extension fragmen
 jx db push    # sync data tables to their connections (additive only)
 ```
 
-Start from a blank project or one of 12 starters. Publishing is git-push-driven — commit, and your
+Start from a blank project or one of 13 starters. Publishing is git-push-driven — commit, and your
 host builds. See [Build output and adapters](https://jxsuite.com/docs/framework/site/deployment).
 
 ## Studio

@@ -1,0 +1,211 @@
+{
+  "$layout": "./layouts/ar.json",
+  "$paths": {
+    "contentType": "exhibitions",
+    "param": "slug",
+    "field": "id"
+  },
+  "title": "${state.entry.data.title} — أتريوم",
+  "description": "${state.entry.data.description}",
+  "$head": [
+    {
+      "tagName": "meta",
+      "attributes": { "name": "description", "content": "${state.entry.data.description}" }
+    }
+  ],
+  "state": {
+    "entry": {
+      "$prototype": "ContentEntry",
+      "$src": "@jxsuite/parser/ContentEntry.class.json",
+      "contentType": "exhibitions",
+      "field": "id",
+      "id": { "$ref": "#/$params/slug" }
+    },
+    "opens": {
+      "$expression": {
+        "operator": "call",
+        "target": { "$ref": "window#/Intl/formatDate" },
+        "value": [
+          { "$ref": "#/state/entry/data/date" },
+          null,
+          { "day": "numeric", "month": "long", "year": "numeric" }
+        ]
+      }
+    },
+    "closes": {
+      "$expression": {
+        "operator": "call",
+        "target": { "$ref": "window#/Intl/formatDate" },
+        "value": [
+          { "$ref": "#/state/entry/data/until" },
+          null,
+          { "day": "numeric", "month": "long", "year": "numeric" }
+        ]
+      }
+    },
+    "works": {
+      "$expression": {
+        "operator": "call",
+        "target": { "$ref": "window#/Intl/formatNumber" },
+        "value": [{ "$ref": "#/state/entry/data/works" }]
+      }
+    }
+  },
+  "children": [
+    {
+      "tagName": "article",
+      "children": [
+        {
+          "tagName": "mu-pagehead",
+          "$props": {
+            "kicker": "${state.entry.data.gallery}",
+            "title": "${state.entry.data.title}",
+            "standfirst": "${state.entry.data.description}",
+            "metaLabel": "بإشراف",
+            "metaValue": "${state.entry.data.curator}"
+          }
+        },
+        {
+          "tagName": "mu-band",
+          "$props": { "index": "٠١", "label": "المعرض", "tone": "chalk" },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "display": "grid",
+                "gridTemplateColumns": "minmax(0, 1.35fr) minmax(0, 0.75fr)",
+                "columnGap": "clamp(2rem, 5vw, 4rem)",
+                "alignItems": "start",
+                "@--md": { "gridTemplateColumns": "minmax(0, 1fr)", "rowGap": "2.5rem" }
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "maxWidth": "var(--measure)",
+                    "fontSize": "1.08rem",
+                    "lineHeight": "2"
+                  },
+                  "children": {
+                    "$prototype": "Array",
+                    "items": { "$ref": "#/state/entry/$children" },
+                    "map": {
+                      "tagName": "p",
+                      "style": { "margin": "0 0 1.35rem" },
+                      "textContent": "${item.textContent}"
+                    }
+                  }
+                },
+                {
+                  "tagName": "aside",
+                  "style": {
+                    "border": "2px solid var(--color-ink)",
+                    "backgroundColor": "var(--color-card)",
+                    "padding": "clamp(1.1rem, 2.5vw, 1.6rem)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "p",
+                      "style": {
+                        "margin": "0 0 0.5rem",
+                        "fontFamily": "var(--font-label)",
+                        "fontSize": "0.64rem",
+                        "letterSpacing": "var(--label-tracking)",
+                        "textTransform": "var(--label-case)",
+                        "color": "var(--color-muted)"
+                      },
+                      "textContent": "بطاقة الجدار"
+                    },
+                    {
+                      "tagName": "div",
+                      "attributes": { "aria-hidden": "true" },
+                      "style": {
+                        "aspectRatio": "4 / 3",
+                        "border": "2px solid var(--color-ink)",
+                        "marginBlockEnd": "1.1rem",
+                        "background": "radial-gradient(circle at 62% 40%, hsl(${state.entry.data.hue} 55% 45%) 0 31%, transparent 31.5%), repeating-linear-gradient(${state.entry.data.hue}deg, var(--color-chalk-deep) 0 9px, var(--color-card) 9px 18px)"
+                      }
+                    },
+                    {
+                      "tagName": "mu-fact",
+                      "$props": { "term": "يفتح", "value": "${state.opens}", "layout": "stack" }
+                    },
+                    {
+                      "tagName": "mu-fact",
+                      "$props": { "term": "يغلق", "value": "${state.closes}", "layout": "stack" }
+                    },
+                    {
+                      "tagName": "mu-fact",
+                      "$props": {
+                        "term": "عدد القطع",
+                        "value": "${state.works}",
+                        "layout": "stack"
+                      }
+                    },
+                    {
+                      "tagName": "mu-fact",
+                      "$props": {
+                        "term": "المكان",
+                        "value": "${state.entry.data.gallery}",
+                        "layout": "stack"
+                      }
+                    },
+                    {
+                      "tagName": "mu-fact",
+                      "$props": {
+                        "term": "القيّم",
+                        "value": "${state.entry.data.curator}",
+                        "layout": "stack"
+                      }
+                    },
+                    {
+                      "tagName": "p",
+                      "style": {
+                        "margin": "1.25rem 0 0",
+                        "paddingBlockStart": "0.9rem",
+                        "borderBlockStart": "1px solid var(--color-hairline)",
+                        "fontSize": "0.9rem",
+                        "lineHeight": "1.8",
+                        "color": "var(--color-muted)"
+                      },
+                      "textContent": "كلّ بطاقة جدار في هذه الغرفة مكتوبة بثلاث لغات، وبالطول نفسه. ولا يُختصر شيء من أجل جدار أقصر."
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tagName": "mu-band",
+          "$props": { "index": "٠٢", "label": "معروض أيضًا", "tone": "card" },
+          "children": [
+            {
+              "tagName": "p",
+              "style": {
+                "margin": "0 0 1.5rem",
+                "lineHeight": "1.9",
+                "maxWidth": "var(--measure)"
+              },
+              "textContent": "معرضان آخران مفتوحان في الوقت نفسه، والتذكرة نفسها — أي لا تذكرة — تُدخلكم الثلاثة."
+            },
+            {
+              "tagName": "mu-more",
+              "$props": { "label": "البرنامج كاملًا", "href": "/ar/exhibitions/" }
+            }
+          ]
+        },
+        {
+          "tagName": "mu-cta",
+          "$props": {
+            "kicker": "الدخول مجّانيّ",
+            "heading": "هو في الطابق الأرضيّ، وهو مفتوح الآن.",
+            "text": "من العاشرة إلى السادسة، من الثلاثاء إلى الأحد. ادخلوا من جهة الرصيف ثمّ اتّجهوا نحو جدار دار الجمارك.",
+            "label": "خطّط لزيارتك",
+            "href": "/ar/visit/"
+          }
+        }
+      ]
+    }
+  ]
+}

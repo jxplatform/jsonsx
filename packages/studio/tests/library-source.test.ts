@@ -83,6 +83,30 @@ describe("columns and rows", () => {
     expect(row.key).toBe("pages/b.json");
     expect(row.cells.size).toBeNull();
     expect(row.cells.modified).toBeNull();
+    expect(row.cells.locale).toBeNull();
+  });
+
+  /*
+   * A GridColumn lives in three places no type connects: `libraryColumns`, this cell bag, and
+   * `library-layouts.ts`'s `cellText`. The pane draws from the third and the GridSource contract
+   * needs the second, so a column declared in one alone is a header over nothing — with no type
+   * error and, without this pair of assertions, no failing test either.
+   */
+  test("every declared column has a cell in the row the GridSource hands back", () => {
+    const row = libraryRow({
+      category: "Pages",
+      ext: ".json",
+      locale: "fr",
+      name: "b.json",
+      path: "pages/fr/b.json",
+      type: ".json",
+    });
+    expect(Object.keys(row.cells).toSorted()).toEqual(
+      libraryColumns()
+        .map((c) => c.field)
+        .toSorted(),
+    );
+    expect(row.cells.locale).toBe("fr");
   });
 });
 
@@ -165,6 +189,7 @@ describe("createLibrarySource", () => {
     expect(columns.map((c) => c.field)).toEqual([
       "name",
       "category",
+      "locale",
       "type",
       "size",
       "modified",

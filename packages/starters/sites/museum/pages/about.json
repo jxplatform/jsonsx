@@ -1,0 +1,378 @@
+{
+  "title": "About the museum — Atrium",
+  "description": "Atrium is the city's museum of art and history: a glass hall over the old customs house, free to enter, run by the city and its readers since 1897.",
+  "state": {
+    "catalogued": {
+      "$expression": {
+        "operator": "call",
+        "target": {
+          "$ref": "window#/Intl/formatNumber"
+        },
+        "value": [
+          0.94,
+          null,
+          {
+            "style": "percent"
+          }
+        ]
+      }
+    },
+    "archive": {
+      "$expression": {
+        "operator": "call",
+        "target": {
+          "$ref": "window#/Intl/formatNumber"
+        },
+        "value": [
+          1240,
+          null,
+          {
+            "style": "unit",
+            "unit": "meter",
+            "unitDisplay": "long"
+          }
+        ]
+      }
+    },
+    "staff": {
+      "$expression": {
+        "operator": "call",
+        "target": {
+          "$ref": "window#/Intl/formatNumber"
+        },
+        "value": [61]
+      }
+    },
+    "languages": {
+      "$expression": {
+        "operator": "call",
+        "target": {
+          "$ref": "window#/Intl/formatList"
+        },
+        "value": [["English", "French", "Arabic"]]
+      }
+    }
+  },
+  "children": [
+    {
+      "tagName": "mu-pagehead",
+      "$props": {
+        "kicker": "About",
+        "title": "A museum that argues with itself",
+        "standfirst": "Atrium was founded by 240 households who each put in what they could and demanded, in writing, that entry stay free. It has been kept that way for a hundred and twenty-nine years, through two rebuildings and one fire.",
+        "metaLabel": "Reading room",
+        "metaValue": "Second floor, no appointment needed"
+      }
+    },
+    {
+      "tagName": "mu-band",
+      "$props": {
+        "index": "01",
+        "label": "The building",
+        "tone": "chalk"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "minmax(0, 1.4fr) minmax(0, 0.8fr)",
+            "columnGap": "clamp(2rem, 5vw, 4rem)",
+            "rowGap": "1.25rem",
+            "@--md": {
+              "gridTemplateColumns": "minmax(0, 1fr)"
+            },
+            "alignItems": "start"
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "maxWidth": "var(--measure)"
+              },
+              "children": [
+                {
+                  "tagName": "p",
+                  "style": {
+                    "margin": "0",
+                    "lineHeight": "1.75"
+                  },
+                  "textContent": "The museum began in a room above the customs house, which it outgrew in nineteen years. The glass hall that replaced it in 1916 was built over the customs house rather than instead of it: the old stone walls are still standing inside, holding up nothing, and the tour begins by walking between them."
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "margin": "1.1rem 0 0",
+                    "lineHeight": "1.75"
+                  },
+                  "textContent": "The roof is the reason people photograph the building and the reason the conservators dislike it. Every object on the ground floor is placed by how much light it can take, which is why the map cabinet sits in the darkest corner and the salt pan sits outside in the rain."
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "margin": "1.1rem 0 0",
+                    "lineHeight": "1.75"
+                  },
+                  "textContent": "Nothing here is a copy. Where the museum shows a reproduction — three of the maps are too fragile to hang — the label says so in the first line, in the same size type as the title."
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "margin": "1.1rem 0 0",
+                    "lineHeight": "1.75"
+                  },
+                  "textContent": "Where the museum does not know something, the label says that too. Roughly one object in nine has no attributed maker, and the catalogue records the gap rather than a guess."
+                }
+              ]
+            },
+            {
+              "tagName": "mu-oculus",
+              "$props": {
+                "size": "20rem",
+                "tone": "card"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "mu-band",
+      "$props": {
+        "index": "02",
+        "label": "What we hold",
+        "tone": "card"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "repeat(2, minmax(0, 1fr))",
+            "columnGap": "clamp(2rem, 5vw, 4rem)",
+            "@--md": {
+              "gridTemplateColumns": "minmax(0, 1fr)"
+            }
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "children": [
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "Catalogued",
+                    "value": "${state.catalogued}",
+                    "note": "Of everything accessioned. The remainder is mostly the 2019 workshop bequest."
+                  }
+                },
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "Archive",
+                    "value": "${state.archive}",
+                    "note": "Of shelved paper: ledgers, survey notebooks, and workshop correspondence."
+                  }
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "children": [
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "Staff",
+                    "value": "${state.staff}",
+                    "note": "Curators, conservators, front-of-house and the two people who keep the roof clean."
+                  }
+                },
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "Labels in",
+                    "value": "${state.languages}",
+                    "note": "Every wall label, every room, with no abridged version for any of the three."
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "mu-band",
+      "$props": {
+        "index": "03",
+        "label": "Three languages",
+        "tone": "chalk"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "minmax(0, 1fr) minmax(0, 0.85fr)",
+            "columnGap": "clamp(2rem, 5vw, 4rem)",
+            "alignItems": "start",
+            "@--md": {
+              "gridTemplateColumns": "minmax(0, 1fr)",
+              "rowGap": "2rem"
+            }
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "maxWidth": "var(--measure)"
+              },
+              "children": [
+                {
+                  "tagName": "p",
+                  "style": {
+                    "margin": "0",
+                    "lineHeight": "1.75"
+                  },
+                  "textContent": "A third of this city reads French at home and a growing share reads Arabic, so the museum is written three times over rather than once with translations bolted on. Each language has its own pages, its own wall text and its own reading of the collection — the Arabic route through Gallery 2 is not the English one reversed, it is a different argument by a different curator."
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "margin": "1.1rem 0 0",
+                    "lineHeight": "1.75"
+                  },
+                  "textContent": "Every page carries the same switch, and it lists only the languages that page actually exists in. If a language is missing from the switch, the page has not been written in it yet — that is a commitment we would rather show than hide."
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "border": "2px solid var(--color-ink)",
+                "backgroundColor": "var(--color-card)",
+                "padding": "clamp(1.25rem, 3vw, 1.9rem)"
+              },
+              "children": [
+                {
+                  "tagName": "p",
+                  "style": {
+                    "margin": "0 0 1.1rem",
+                    "fontFamily": "var(--font-label)",
+                    "fontSize": "0.66rem",
+                    "letterSpacing": "var(--label-tracking)",
+                    "textTransform": "var(--label-case)",
+                    "color": "var(--color-muted)"
+                  },
+                  "textContent": "This page, in every language it exists in"
+                },
+                {
+                  "tagName": "ul",
+                  "style": {
+                    "listStyle": "none",
+                    "margin": "0",
+                    "padding": "0",
+                    "display": "grid",
+                    "gap": "0.55rem"
+                  },
+                  "children": {
+                    "$prototype": "Array",
+                    "items": {
+                      "$ref": "#/state/$page/alternates"
+                    },
+                    "map": {
+                      "tagName": "li",
+                      "children": [
+                        {
+                          "tagName": "a",
+                          "lang": "${item.code}",
+                          "attributes": {
+                            "dir": "${item.dir}",
+                            "href": "${item.url}",
+                            "hreflang": "${item.code}",
+                            "aria-current": "${item.current ? 'page' : 'false'}"
+                          },
+                          "style": {
+                            "display": "flex",
+                            "alignItems": "baseline",
+                            "gap": "0.7rem",
+                            "textDecoration": "none",
+                            "paddingBlock": "0.35rem",
+                            "borderBlockEnd": "1px solid var(--color-hairline)",
+                            "color": "${item.current ? 'var(--color-muted)' : 'var(--color-pigment)'}",
+                            ":hover": {
+                              "color": "var(--color-ink)"
+                            }
+                          },
+                          "children": [
+                            {
+                              "tagName": "span",
+                              "style": {
+                                "fontFamily": "var(--font-label)",
+                                "fontSize": "0.64rem",
+                                "letterSpacing": "var(--label-tracking)",
+                                "textTransform": "var(--label-case)",
+                                "opacity": "0.7"
+                              },
+                              "textContent": "${item.code}"
+                            },
+                            {
+                              "tagName": "span",
+                              "style": {
+                                "fontSize": "1.02rem"
+                              },
+                              "textContent": "${item.label}"
+                            },
+                            {
+                              "tagName": "span",
+                              "style": {
+                                "marginInlineStart": "auto",
+                                "fontFamily": "var(--font-label)",
+                                "fontSize": "0.62rem",
+                                "letterSpacing": "var(--label-tracking)",
+                                "textTransform": "var(--label-case)",
+                                "display": "${item.current ? 'inline' : 'none'}"
+                              },
+                              "textContent": "You are here"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "mu-band",
+      "$props": {
+        "index": "04",
+        "label": "In the founders' words",
+        "tone": "ink"
+      },
+      "children": [
+        {
+          "tagName": "mu-quote",
+          "$props": {
+            "quote": "Let it be free at the door, or let it be something other than ours.",
+            "attribution": "Subscription minute book, 4 November 1897"
+          }
+        }
+      ]
+    },
+    {
+      "tagName": "mu-cta",
+      "$props": {
+        "kicker": "Come in",
+        "heading": "The reading room is open to anyone with a question.",
+        "text": "Second floor, above the map cabinet. No appointment to read; ask at the desk to handle.",
+        "label": "Plan your visit",
+        "href": "/visit/"
+      }
+    }
+  ]
+}

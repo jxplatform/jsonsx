@@ -67,6 +67,136 @@ describe("buildSite — a route prefix i18n does not declare", () => {
   });
 });
 
+describe("buildSite — prefix-always with no runtime to answer the root", () => {
+  const DIR = resolve(import.meta.dir, "__test-site-static-root__");
+
+  beforeAll(() => {
+    scaffold(DIR, {
+      i18n: { defaultLocale: "en", locales: ["en", "fr"], routing: "prefix-always" },
+      name: "Rootless",
+    });
+    // `prefix-always` means every page lives under a locale, so the site has no page at `/`.
+    rmSync(resolve(DIR, "pages/index.json"), { force: true });
+    mkdirSync(resolve(DIR, "pages/en"), { recursive: true });
+    writeFileSync(
+      resolve(DIR, "pages/en/index.json"),
+      JSON.stringify({ $children: ["Hello"], tagName: "main" }),
+      "utf8",
+    );
+  });
+  afterAll(() => rmSync(DIR, { force: true, recursive: true }));
+
+  /*
+   * The one deployment shape where the root is genuinely broken and nothing said so: negotiation
+   * answers `/` only inside a generated worker, and an adapter-less build has no runtime that sees
+   * a request. `unprefixedRoutes` deliberately never reports `/` because under an adapter it is
+   * handled — so without this the site's front door is a 404 the author finds out about in
+   * production.
+   */
+  it("names the root, the locale it would send a visitor to, and why negotiation is absent", async () => {
+    const { warnings } = await captured(() => buildSite(DIR));
+
+    const warning = warnings.find((w) => w.includes('no page claims "/"'));
+    expect(warning).toBeDefined();
+    expect(warning).toContain("/en/");
+    expect(warning).toContain("build.adapter");
+  });
+
+  it("says nothing once a page claims the root", async () => {
+    writeFileSync(
+      resolve(DIR, "pages/index.json"),
+      JSON.stringify({ $children: ["Choose"], tagName: "main" }),
+      "utf8",
+    );
+    const { warnings } = await captured(() => buildSite(DIR));
+    rmSync(resolve(DIR, "pages/index.json"), { force: true });
+
+    expect(warnings.some((w) => w.includes('no page claims "/"'))).toBe(false);
+  });
+});
+
+describe("buildSite — two pages claiming one language", () => {
+  const DIR = resolve(import.meta.dir, "__test-site-translation-conflict__");
+
+  beforeAll(() => {
+    scaffold(DIR, {
+      i18n: { defaultLocale: "en", locales: ["en", "fr-CA"] },
+      name: "Conflicted",
+      url: "https://conflict.example",
+    });
+    writeFileSync(
+      resolve(DIR, "pages/about.json"),
+      JSON.stringify({ $children: ["About"], tagName: "main" }),
+      "utf8",
+    );
+  });
+  afterAll(() => rmSync(DIR, { force: true, recursive: true }));
+
+  /*
+   * A declared collision is a promise the author wrote down twice. A translation set names one URL
+   * per language, so one of them is dropped either way — and silently advertising the other as
+   * *the* French page is a wrong answer nobody downstream can detect.
+   */
+  it("fails the build when both said so with $translationKey", async () => {
+    mkdirSync(resolve(DIR, "pages/fr-ca"), { recursive: true });
+    for (const [file, key] of [
+      ["a-propos", "about"],
+      ["apropos", "about"],
+    ] as const) {
+      writeFileSync(
+        resolve(DIR, `pages/fr-ca/${file}.json`),
+        JSON.stringify({ $children: ["À propos"], $translationKey: key, tagName: "main" }),
+        "utf8",
+      );
+    }
+    const { errors, result } = await captured(() => buildSite(DIR));
+    rmSync(resolve(DIR, "pages/fr-ca"), { force: true, recursive: true });
+
+    const named = result.errors.find((e) => e.includes('both the "fr-CA" version'));
+    expect(named).toBeDefined();
+    expect(named).toContain("/fr-ca/apropos");
+    expect(named).toContain("$translationKey");
+    expect(errors.some((e) => e.includes('both the "fr-CA" version'))).toBe(true);
+  });
+
+  /*
+   * A derived collision only warns: parallel paths that happen to meet may be a deliberate alias,
+   * and failing a build over pages that work would be the compiler overruling a decision it cannot
+   * see the reason for.
+   */
+  it("only warns when the paths collided on their own", async () => {
+    mkdirSync(resolve(DIR, "pages/en"), { recursive: true });
+    writeFileSync(
+      resolve(DIR, "pages/en/about.json"),
+      JSON.stringify({ $children: ["About"], tagName: "main" }),
+      "utf8",
+    );
+    const { result, warnings } = await captured(() => buildSite(DIR));
+    rmSync(resolve(DIR, "pages/en"), { force: true, recursive: true });
+
+    expect(warnings.some((w) => w.includes('both the "en" version'))).toBe(true);
+    expect(result.errors.some((e) => e.includes('both the "en" version'))).toBe(false);
+  });
+
+  /*
+   * The key pre-pass reads every page that mentions `$translationKey` before anything compiles. A
+   * page that cannot be parsed must not take the site down from there — it fails again a moment
+   * later while compiling, where the error names the page and the rest of the site still builds.
+   */
+  it("leaves an unparseable page to the compile step that can name it", async () => {
+    writeFileSync(
+      resolve(DIR, "pages/broken.json"),
+      '{ "$translationKey": "about", NOT json',
+      "utf8",
+    );
+    const { result } = await captured(() => buildSite(DIR));
+    rmSync(resolve(DIR, "pages/broken.json"), { force: true });
+
+    expect(result.errors.some((e) => e.includes("broken.json"))).toBe(true);
+    expect(result.files).toBeGreaterThan(0);
+  });
+});
+
 describe("buildSite — well-known emitters", () => {
   const DIR = resolve(import.meta.dir, "__test-site-well-known-report__");
 

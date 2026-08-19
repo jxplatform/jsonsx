@@ -24,8 +24,9 @@ Two controls sit at the top left, and they compose:
 
 - **Categories** — **All**, **Pages**, **Layouts**, **Components**, **Content**, **Media**. A file's category comes from the folder it lives in (`pages/`, `layouts/`, `components/`, `content/` and `data/`, `public/` and `styles/`), except that anything with an image, video, audio, font or PDF extension counts as Media wherever it sits.
 - **Filter files** — free text, matched against each file's name and its path, so `blog/` narrows to a folder and `hero` narrows to a name.
+- **Language** — appears only on a [multilingual project](/docs/framework/site/i18n), and only once the scan actually holds more than one language. Each file's language is the locale directory it sits under (`pages/fr-ca/about.json` is French), shown in its own column and named in its own language — _français_, not _French_.
 
-Every one of these is a command as well as a control, so the toolbar is never the only way in — :kbd[⌘K] → **Library: Show Category** → the category points the Library at Content whether or not the Library is the tab in front of you. **Library: Filter Files**, **Library: Set Layout** and **Library: Rescan Files** are the rest of the set; they are listed with everything else on **[Commands](/docs/studio/interface/commands)**.
+Every one of these is a command as well as a control, so the toolbar is never the only way in — :kbd[⌘K] → **Library: Show Category** → the category points the Library at Content whether or not the Library is the tab in front of you. **Library: Filter Files**, **Library: Show Language**, **Library: Set Layout** and **Library: Rescan Files** are the rest of the set; they are listed with everything else on **[Commands](/docs/studio/interface/commands)**.
 
 :::doc-note
 The Library lists files, so a draft entry sits in it beside a published one. Being a draft is a property of the entry: the switch, the pill on its tab and the project-wide **Include Drafts** perspective are covered in **[Content types](/docs/studio/projects/content-types#drafts)**.

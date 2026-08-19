@@ -376,6 +376,16 @@ export async function generateSchema() {
         examples: ["en", "fr", "ar-EG"],
         type: "string",
       },
+      $translationKey: {
+        description:
+          "This page's identity across languages, overriding the one its path implies " +
+          "(site-architecture.md §13.5). Two routes are translations when their keys match; " +
+          "the default key is the path with the locale prefix removed, which is right whenever " +
+          "the paths are parallel and wrong for a localized slug — /fr-ca/a-propos/ shares " +
+          "nothing with /about/ until one of them says so.",
+        examples: ["about", "blog/hello-world"],
+        type: "string",
+      },
       $layout: {
         description:
           "Layout reference for pages. String path to a layout JSON file, " +

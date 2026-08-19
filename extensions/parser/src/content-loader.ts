@@ -20,6 +20,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, dirname, extname, resolve } from "node:path";
 import { assetUrlFor } from "@jxsuite/schema/asset-paths";
+import { resolveI18n } from "@jxsuite/schema/locale";
 import type { AssetMount } from "@jxsuite/schema/asset-paths";
 import type { ExtensionRegistry } from "@jxsuite/schema/extension-registry";
 import type { FormatEntry, FormatHostIO, FormatRegistry } from "@jxsuite/schema/format-registry";
@@ -129,25 +130,55 @@ export const LOCALE_PLACEHOLDER = "{locale}";
 /**
  * The locales a `{locale}` source expands over, or `[]` when the project declares none.
  *
- * Reading `i18n` directly rather than through `resolveI18n` is deliberate: that lives in the
- * compiler, this is an extension, and the contract between them is the config — not a function.
- * Canonicalization is the compiler's job and its errors are its to report; a tag that is malformed
- * fails the build there, so a source expanded over the raw list can never outlive it.
+ * The **canonical** tags, from the same resolver the compiler and Studio run — it lives in
+ * `@jxsuite/schema/locale` precisely so that three hosts cannot disagree about what `EN-us` means.
+ * This module used to read the raw list, on the reasoning that canonicalization was the compiler's
+ * job; that was true when the function was the compiler's, and it left this the one place where a
+ * locale's spelling came from the config rather than from the parser.
  *
  * @param {ProjectConfig | undefined} projectConfig
  * @returns {string[]}
  */
 export function localesForExpansion(projectConfig: ProjectConfig | undefined): string[] {
-  const raw = projectConfig?.i18n;
-  if (!raw || typeof raw !== "object") {
-    return [];
+  return resolveI18n(projectConfig ?? {}).i18n?.locales ?? [];
+}
+
+/**
+ * The directory a locale's entries live in, out of the spellings that can legitimately be on disk.
+ *
+ * A locale directory is matched **case-insensitively**, because two writers name it and they
+ * differ: a project that declared `fr-CA` most likely typed `fr-CA/`, while Studio creates
+ * `content/<type>/fr-ca/` — lowercase, because a page directory becomes a URL and the site's own
+ * URLs are lowercase (`site-architecture.md` §13.2). Reading only one of the two spellings makes a
+ * translation somebody just created invisible to the build, with no error: the directory is there,
+ * the entries are there, and the collection loads none of them.
+ *
+ * The canonical spelling is preferred so an existing tree keeps its own answer, and a scan of the
+ * parent runs only when neither exact spelling exists.
+ *
+ * @param {string} root
+ * @param {string} source - The `{locale}`-bearing source
+ * @param {string} locale - Canonical tag
+ * @returns {string} The source with `{locale}` replaced by the spelling that is on disk
+ */
+export function localeSource(root: string, source: string, locale: string): string {
+  const candidates = [locale, locale.toLowerCase()];
+  for (const spelling of candidates) {
+    const path = source.split(LOCALE_PLACEHOLDER).join(spelling);
+    if (existsSync(resolve(root, path))) {
+      return path;
+    }
   }
-  const declared = Array.isArray(raw.locales)
-    ? raw.locales.filter((t) => typeof t === "string")
-    : [];
-  const fallback = typeof raw.defaultLocale === "string" ? [raw.defaultLocale] : [];
-  const all = declared.length > 0 ? declared : fallback;
-  return [...new Set(all)];
+  const parent = resolve(root, source.slice(0, source.indexOf(LOCALE_PLACEHOLDER)));
+  if (existsSync(parent) && statSync(parent).isDirectory()) {
+    const match = readdirSync(parent).find((name) => name.toLowerCase() === locale.toLowerCase());
+    if (match !== undefined) {
+      return source.split(LOCALE_PLACEHOLDER).join(match);
+    }
+  }
+  /* Nothing on disk: the canonical spelling, so the miss is reported against the name that was
+     declared rather than against a spelling nobody wrote. */
+  return source.split(LOCALE_PLACEHOLDER).join(locale);
 }
 
 /** The project.json section key this class owns; also the URL namespace for its asset mounts. */
@@ -202,7 +233,7 @@ export function contentAssetMounts(
         if (!SAFE_TYPE_NAME.test(locale)) {
           continue;
         }
-        const dir = resolve(root, source.split(LOCALE_PLACEHOLDER).join(locale))
+        const dir = resolve(root, localeSource(root, source, locale))
           .split("\\")
           .join("/");
         if (SAFE_TYPE_NAME.test(name) && existsSync(dir) && statSync(dir).isDirectory()) {
@@ -413,10 +444,7 @@ export async function loadContentSection(
     }
     const all: ContentLoaderEntry[] = [];
     for (const locale of locales) {
-      const localized = {
-        ...contentTypeDef,
-        source: source.split(LOCALE_PLACEHOLDER).join(locale),
-      };
+      const localized = { ...contentTypeDef, source: localeSource(root, source, locale) };
       const entries = await loadContentType(
         name,
         localized,

@@ -67,6 +67,104 @@ export async function readPageDocument(
 }
 
 /**
+ * The `$translationKey` each route's document declares, for the routes that declare one.
+ *
+ * A **pre-pass**, because a page's alternates depend on the whole route table (§13.5): the set has
+ * to be complete before the first page is compiled, so a document cannot tell the build what its
+ * key is while it is being compiled.
+ *
+ * The file is read and the **parse is skipped** unless the text mentions the key. Most pages of a
+ * multilingual site never declare one — their paths are parallel and the derivation is right — so
+ * paying a second full parse for every page to find a key that is usually absent would be a cost
+ * with nothing behind it. Documents sharing a source (a `$paths` template's expansions) are read
+ * once.
+ *
+ * A document that fails to parse is skipped rather than thrown from here. It will fail again a
+ * moment later while being compiled, where the error names the page and the rest of the site still
+ * builds; failing in a pre-pass would turn one bad page into no site at all.
+ *
+ * **A key may name its route's parameters**, as `${slug}`, and that is what makes a collection's
+ * localized URLs work: one `[slug]` template expands to one route per entry, so a key that could
+ * not vary per entry would claim a single identity for the whole collection and the build would
+ * report it as a duplicate. `pages/fr-ca/expositions/[slug].json` declaring `"exhibitions/${slug}"`
+ * pairs each French post with the English one it translates, because two translations of an entry
+ * share an id (§13.3) and the id is what the parameter carries.
+ *
+ * @param {readonly {
+ *   sourcePath: string;
+ *   urlPattern: string;
+ *   _pathParams?: Record<string, string>;
+ * }[]} routes
+ *   - Concrete routes
+ * @param {FormatRegistry} [registry]
+ * @returns {Promise<Map<string, string>>} Keyed by `urlPattern`
+ */
+export async function readTranslationKeys(
+  routes: readonly {
+    sourcePath: string;
+    urlPattern: string;
+    _pathParams?: Record<string, string> | undefined;
+  }[],
+  registry?: FormatRegistry,
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const byFile = new Map<string, string | null>();
+  for (const route of routes) {
+    if (!byFile.has(route.sourcePath)) {
+      byFile.set(route.sourcePath, await declaredTranslationKey(route.sourcePath, registry));
+    }
+    const key = byFile.get(route.sourcePath);
+    if (key !== null && key !== undefined) {
+      out.set(route.urlPattern, withRouteParams(key, route._pathParams));
+    }
+  }
+  return out;
+}
+
+/**
+ * Substitute a route's own parameters into a declared key.
+ *
+ * A parameter with no value is left as it was written rather than blanked: a key that quietly
+ * became `exhibitions/` would pair every entry in the collection with every other, which is a
+ * duplicate the build reports — and the report naming `${slug}` says what is actually wrong.
+ *
+ * @param {string} key
+ * @param {Record<string, string> | undefined} params
+ * @returns {string}
+ */
+function withRouteParams(key: string, params: Record<string, string> | undefined): string {
+  if (!key.includes("${")) {
+    return key;
+  }
+  return key.replaceAll(/\$\{(\w+)\}/g, (whole, name: string) => params?.[name] ?? whole);
+}
+
+/**
+ * One document's `$translationKey`, or null when it declares none or cannot be read.
+ *
+ * @param {string} sourcePath
+ * @param {FormatRegistry} [registry]
+ * @returns {Promise<string | null>}
+ */
+async function declaredTranslationKey(
+  sourcePath: string,
+  registry?: FormatRegistry,
+): Promise<string | null> {
+  if (!readFileSync(sourcePath, "utf8").includes("$translationKey")) {
+    return null;
+  }
+  let doc: JxDocument;
+  try {
+    doc = await readPageDocument(sourcePath, registry);
+  } catch {
+    return null;
+  }
+  return typeof doc.$translationKey === "string" && doc.$translationKey !== ""
+    ? doc.$translationKey
+    : null;
+}
+
+/**
  * Discover all routable pages in a pages/ directory.
  *
  * @param {string} pagesDir - Absolute path to the pages/ directory

@@ -7,7 +7,12 @@
  * @module expression
  */
 
-import { DEFAULT_FORMAT_LOCALE, DEFAULT_TIME_ZONE, INTL_HELPER_PATHS } from "@jxsuite/schema/intl";
+import {
+  DEFAULT_FORMAT_LOCALE,
+  DEFAULT_TIME_ZONE,
+  INTL_HELPER_PATHS,
+  INTL_LOCALE_PARAM,
+} from "@jxsuite/schema/intl";
 import type { JxExpressionNode, JxExpressionOperand } from "@jxsuite/schema/types";
 import type { JxScope } from "./types.ts";
 import { readPath, refAccessor, refSegments } from "./pointer.ts";
@@ -234,6 +239,40 @@ const BLESSED_HELPERS: Record<string, (...a: unknown[]) => unknown> = {
       }).segment(value as string),
     ].map((part) => part.segment),
 };
+
+/**
+ * Fill in a helper's omitted `locale` argument from the page's own locale.
+ *
+ * A page under `/fr/` that formats a date without naming a locale means French: the route said so,
+ * `<html lang>` says so, and `hreflang` tells every crawler so. Requiring the author to repeat it
+ * at every call site is how a translated page ends up with English dates and English number
+ * grouping on it — a defect that is invisible to the person who built the site in their own
+ * language, and obvious to every reader of the other one.
+ *
+ * Determinism is untouched, which is the property `DEFAULT_FORMAT_LOCALE` exists to protect:
+ * `$page.locale` is a function of the route and the document (site-architecture.md §13.4), not of
+ * the machine the build runs on. A scope with no `$page` — a component's own state, the runtime
+ * used standalone — keeps the fixed default.
+ *
+ * @param {string} path - Helper callee path, e.g. `Intl/formatNumber`
+ * @param {unknown[]} args - Resolved arguments, in declaration order
+ * @param {JxScope} state
+ * @returns {unknown[]}
+ */
+function withPageLocale(path: string, args: unknown[], state: JxScope): unknown[] {
+  const index = INTL_LOCALE_PARAM[path];
+  if (index === undefined || index < 0 || args[index] != null) {
+    return args;
+  }
+  const page = (state as { $page?: { locale?: unknown } }).$page;
+  const locale = page?.locale;
+  if (typeof locale !== "string" || locale === "") {
+    return args;
+  }
+  const filled = [...args];
+  filled[index] = locale;
+  return filled;
+}
 
 /** Whether a `window#/…` callee ref is on the blessed pure-globals list. */
 export function isBlessedGlobal(ref: string): boolean {
@@ -507,7 +546,7 @@ function evaluateNode(
       const globalPath = calleeRef.slice("window#/".length);
       const helper = BLESSED_HELPERS[globalPath];
       if (helper) {
-        return helper(...argValues);
+        return helper(...withPageLocale(globalPath, argValues, state));
       }
       const fn = getPath(globalThis.window, globalPath) as (...a: unknown[]) => unknown;
       const lastSlash = globalPath.lastIndexOf("/");
@@ -918,12 +957,18 @@ function compileTarget(target: unknown, opts: CompileOpts): string {
  *
  * @param {string} path - The `window#/`-stripped callee path (e.g. "Intl/formatNumber")
  * @param {string[]} args - Already-compiled argument expressions
+ * @param {CompileOpts} opts
  * @returns {string | null}
  */
-function compileHelperCall(path: string, args: string[]): string | null {
+function compileHelperCall(path: string, args: string[], opts: CompileOpts): string | null {
   const a = (i: number) => args[i] ?? "undefined";
-  /* The same deterministic defaults the interpreter applies, inlined — see @jxsuite/schema/intl. */
-  const L = JSON.stringify(DEFAULT_FORMAT_LOCALE);
+  /*
+   * The same defaults the interpreter applies, inlined — see @jxsuite/schema/intl. The page's own
+   * locale comes first and the fixed one behind it, so an island formats in the language of the
+   * page it is on. `?.` and not `.`: a component's state has no `$page`, and neither does the
+   * runtime evaluated standalone.
+   */
+  const L = `(${opts.statePrefix ?? "state"}?.$page?.locale ?? ${JSON.stringify(DEFAULT_FORMAT_LOCALE)})`;
   const Z = JSON.stringify(DEFAULT_TIME_ZONE);
   switch (path) {
     case "Intl/formatNumber": {
@@ -987,7 +1032,7 @@ export function compileExpression(node: ExpressionNode, opts: CompileOpts = {}):
       if (!isBlessedGlobal(calleeRef)) {
         throw new Error(`$expression: "${calleeRef}" is not a blessed pure global`);
       }
-      const helperJs = compileHelperCall(calleeRef.slice("window#/".length), args);
+      const helperJs = compileHelperCall(calleeRef.slice("window#/".length), args, opts);
       if (helperJs) {
         return helperJs;
       }

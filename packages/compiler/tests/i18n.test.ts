@@ -5,67 +5,30 @@ import {
   pageLanguage,
   resolveI18n,
   translationKey,
+  translationSets,
   undeclaredLocalePrefix,
   unprefixedRoutes,
 } from "../src/site/i18n.ts";
+import { resolveI18n as schemaResolveI18n } from "@jxsuite/schema/locale";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 
 const project = (i18n?: ProjectConfig["i18n"]): ProjectConfig =>
   ({ name: "Test", ...(i18n === undefined ? {} : { i18n }) }) as ProjectConfig;
 
 describe("resolveI18n", () => {
-  test("a project without i18n resolves to null, not to a default", () => {
-    expect(resolveI18n(project())).toEqual({ errors: [], i18n: null });
-  });
-
-  test("canonicalizes every tag", () => {
-    const { i18n } = resolveI18n(project({ defaultLocale: "EN", locales: ["en", "fr-ca", "AR"] }));
-    expect(i18n?.defaultLocale).toBe("en");
-    expect(i18n?.locales).toEqual(["en", "fr-CA", "ar"]);
-  });
-
   /*
-   * A malformed tag is an error rather than a warning because a locale is a URL prefix, an
-   * `hreflang` value and an `<html lang>` at once. It does not degrade — it produces a site whose
-   * pages claim a language that does not exist, and nothing downstream can tell.
+   * The resolution itself lives in `@jxsuite/schema/locale` and is tested there — Studio needs the
+   * same answer and cannot import this package, so one function has two hosts. What belongs here
+   * is that the compiler's callers reach it: a re-export that stopped resolving would take the
+   * whole locale half of the build with it, and every test below would still pass.
    */
-  test("a malformed tag is a build error", () => {
-    const { errors, i18n } = resolveI18n(project({ locales: ["en", "not_a_tag"] }));
-    expect(errors[0]).toContain("not_a_tag");
-    expect(i18n?.locales).toEqual(["en"]);
-  });
-
-  test("a malformed defaultLocale is reported and falls back to the first locale", () => {
-    const { errors, i18n } = resolveI18n(project({ defaultLocale: "en_US", locales: ["fr"] }));
-    expect(errors[0]).toContain("en_US");
-    expect(i18n?.defaultLocale).toBe("fr");
-  });
-
-  // A default outside the list is a config that cannot have been meant either way, and the pages
-  // Under it exist regardless — so it joins the list rather than being rejected.
-  test("a default missing from locales joins the front of the list", () => {
-    const { i18n } = resolveI18n(project({ defaultLocale: "de", locales: ["en", "fr"] }));
-    expect(i18n?.locales).toEqual(["de", "en", "fr"]);
-  });
-
-  test("duplicates collapse after canonicalization", () => {
-    const { i18n } = resolveI18n(project({ defaultLocale: "en", locales: ["en", "EN", "en-us"] }));
-    expect(i18n?.locales).toEqual(["en", "en-US"]);
-  });
-
-  test("i18n with no usable locale is an error", () => {
-    const { errors, i18n } = resolveI18n(project({ locales: [] }));
-    expect(errors[0]).toContain("no usable locale");
-    expect(i18n).toBeNull();
-  });
-
-  test("routing defaults to prefix-except-default", () => {
-    expect(resolveI18n(project({ defaultLocale: "en" })).i18n?.routing).toBe(
-      "prefix-except-default",
-    );
-    expect(
-      resolveI18n(project({ defaultLocale: "en", routing: "prefix-always" })).i18n?.routing,
-    ).toBe("prefix-always");
+  test("is the schema resolver, reached through this module", () => {
+    expect(resolveI18n).toBe(schemaResolveI18n);
+    expect(resolveI18n(project({ defaultLocale: "EN", locales: ["en", "fr-ca"] })).i18n).toEqual({
+      defaultLocale: "en",
+      locales: ["en", "fr-CA"],
+      routing: "prefix-except-default",
+    });
   });
 });
 
@@ -166,6 +129,135 @@ describe("translationKey", () => {
 
   test("a localized slug is a different page, and says so", () => {
     expect(translationKey("/fr-ca/a-propos/", i18n)).not.toBe(translationKey("/about/", i18n));
+  });
+});
+
+describe("translationSets", () => {
+  const { i18n } = resolveI18n(project({ defaultLocale: "en", locales: ["en", "fr-ca", "ar"] }));
+  const routes = [
+    { urlPattern: "/about/" },
+    { urlPattern: "/fr-ca/about/" },
+    { urlPattern: "/ar/about/" },
+    { urlPattern: "/only-english/" },
+  ];
+  const { sets } = translationSets(routes, i18n);
+
+  test("every member sees the whole set, itself included, ordered by tag", () => {
+    for (const pattern of ["/about/", "/fr-ca/about/", "/ar/about/"]) {
+      expect(sets.get(pattern)?.map((m) => m.locale)).toEqual(["ar", "en", "fr-CA"]);
+    }
+  });
+
+  /*
+   * The one place this deliberately disagrees with `localeAlternates`. A lone `hreflang` pointing
+   * at itself is noise in `<head>`; a switcher asking "which languages is this page in" wants the
+   * honest answer, and dropping the page itself would leave it unable to mark where the reader is.
+   */
+  test("a page with no translations keeps itself, where the head annotation drops it", () => {
+    expect(sets.get("/only-english/")?.map((m) => m.locale)).toEqual(["en"]);
+    expect(localeAlternates(routes, i18n, "https://x.example").has("/only-english/")).toBe(false);
+  });
+
+  // Site-absolute, so a switcher works in a project that has not configured `url` yet.
+  test("URLs stay site-absolute and need no site URL to compute", () => {
+    expect(sets.get("/ar/about/")?.find((m) => m.locale === "fr-CA")?.urlPattern).toBe(
+      "/fr-ca/about/",
+    );
+  });
+
+  test("nothing without i18n", () => {
+    expect(translationSets(routes, null).sets.size).toBe(0);
+  });
+
+  /*
+   * The case the derivation cannot reach: a localized slug shares no path with the page it
+   * translates. `$translationKey` says so, and everything downstream follows from the one key.
+   */
+  test("a declared key is trimmed, so it can be written the way the URL reads", () => {
+    const { sets: trimmed } = translationSets(
+      [
+        { translationKey: "about", urlPattern: "/about/" },
+        { translationKey: "/about/", urlPattern: "/fr-ca/a-propos/" },
+      ],
+      i18n,
+    );
+    expect(trimmed.get("/about/")?.map((m) => m.locale)).toEqual(["en", "fr-CA"]);
+  });
+
+  test("a declared key joins pages whose paths share nothing", () => {
+    const { sets: declared } = translationSets(
+      [{ urlPattern: "/about/" }, { translationKey: "/about/", urlPattern: "/fr-ca/a-propos/" }],
+      i18n,
+    );
+    expect(declared.get("/about/")?.map((m) => m.urlPattern)).toEqual([
+      "/about/",
+      "/fr-ca/a-propos/",
+    ]);
+    expect(declared.get("/fr-ca/a-propos/")).toEqual(declared.get("/about/")!);
+  });
+
+  test("a declared key also splits pages whose paths would have joined them", () => {
+    const { sets: split } = translationSets(
+      [{ urlPattern: "/about/" }, { translationKey: "team", urlPattern: "/fr-ca/about/" }],
+      i18n,
+    );
+    expect(split.get("/about/")?.map((m) => m.locale)).toEqual(["en"]);
+    expect(split.get("/fr-ca/about/")?.map((m) => m.locale)).toEqual(["fr-CA"]);
+  });
+
+  /*
+   * Two routes claiming one language is a contradiction, and the layout can produce one: under
+   * `prefix-except-default` an author with both `pages/about.json` and `pages/en/about.json` has
+   * written the English page twice. The first wins, and the loser is keyed nowhere — no
+   * alternates, no switcher — rather than the set advertising two Englishes.
+   */
+  test("a duplicate locale in a set is dropped, and carries no set of its own", () => {
+    const { conflicts, sets: dup } = translationSets(
+      [{ urlPattern: "/about/" }, { urlPattern: "/en/about/" }, { urlPattern: "/ar/about/" }],
+      i18n,
+    );
+    expect(dup.get("/about/")?.map((m) => m.locale)).toEqual(["ar", "en"]);
+    expect(dup.get("/about/")?.find((m) => m.locale === "en")?.urlPattern).toBe("/about/");
+    expect(dup.has("/en/about/")).toBe(false);
+    expect(conflicts).toEqual([
+      { declared: false, key: "about", locale: "en", urlPatterns: ["/about/", "/en/about/"] },
+    ]);
+  });
+
+  // Whether the author asserted it is what decides how loudly the build says so, so the flag is
+  // Part of the report rather than something the caller has to work out again.
+  test("a conflict knows whether a document declared it", () => {
+    const { conflicts } = translationSets(
+      [
+        { translationKey: "about", urlPattern: "/fr-ca/a-propos/" },
+        { urlPattern: "/fr-ca/about/" },
+      ],
+      i18n,
+    );
+    expect(conflicts).toEqual([
+      {
+        declared: true,
+        key: "about",
+        locale: "fr-CA",
+        urlPatterns: ["/fr-ca/a-propos/", "/fr-ca/about/"],
+      },
+    ]);
+  });
+
+  // The alternates are built from these sets, so a disagreement between them is impossible by
+  // Construction rather than by a test — this asserts the construction.
+  test("the head annotation is this set, minus the singletons, made absolute", () => {
+    const alternates = localeAlternates(routes, i18n, "https://x.example");
+    for (const [pattern, members] of sets) {
+      const heads = alternates.get(pattern);
+      if (members.length < 2) {
+        expect(heads).toBeUndefined();
+        continue;
+      }
+      expect(heads?.filter((a) => a.hreflang !== "x-default").map((a) => a.hreflang)).toEqual(
+        members.map((m) => m.locale),
+      );
+    }
   });
 });
 

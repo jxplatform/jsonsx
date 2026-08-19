@@ -32,6 +32,11 @@
         "identifier": "index",
         "type": { "type": "string" },
         "description": "Index URL override (defaults to the project's search.output)"
+      },
+      "locale": {
+        "identifier": "locale",
+        "type": { "type": ["string", "null"] },
+        "description": "Language to search in \u2014 omitted, the page's own (<html lang>); null searches every language"
       }
     },
     "constructor": {
@@ -40,7 +45,8 @@
         { "$ref": "#/$defs/parameters/query" },
         { "$ref": "#/$defs/parameters/limit" },
         { "$ref": "#/$defs/parameters/group" },
-        { "$ref": "#/$defs/parameters/index" }
+        { "$ref": "#/$defs/parameters/index" },
+        { "$ref": "#/$defs/parameters/locale" }
       ],
       "body": ["this.config = config;"]
     },

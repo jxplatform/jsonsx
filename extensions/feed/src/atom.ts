@@ -66,9 +66,16 @@ function renderEntry(item: FeedItem): string {
 export function renderAtom(page: AtomPage): string {
   const { feed, items, siteUrl } = page;
   const ns = page.complete ? ` xmlns:fh="${HISTORY_NS}"` : "";
+  /*
+   * `xml:lang` on the feed element, which RFC 4287 §2 says every child inherits — the Atom way of
+   * saying what language this document carries. JSON Feed says it with a `language` member; the two
+   * are the same fact, and a multilingual site publishes one feed per language rather than one feed
+   * that cannot answer the question.
+   */
+  const lang = feed.language === null ? "" : ` xml:lang="${escapeXml(feed.language)}"`;
   const head = [
     '<?xml version="1.0" encoding="utf-8"?>\n',
-    `<feed xmlns="${ATOM_NS}"${ns}>\n`,
+    `<feed xmlns="${ATOM_NS}"${ns}${lang}>\n`,
     tag("id", page.selfUrl),
     tag("title", feed.title === "" ? "Feed" : feed.title),
     tag("subtitle", feed.description),

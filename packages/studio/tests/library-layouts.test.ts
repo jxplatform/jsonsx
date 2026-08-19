@@ -121,6 +121,24 @@ describe("cell text", () => {
     expect(cellText(file, "invented")).toBe("");
   });
 
+  /*
+   * The assertion above passes for a column `cellText` has no `case` for: `default:` returns "",
+   * which is still a string. A file with every field populated must therefore produce text for
+   * every column `libraryColumns()` declares — that is the shape that catches a header over blanks.
+   */
+  test("a fully-populated file has NON-EMPTY text in every declared column", () => {
+    const file: LibraryFile = { ...page(1), locale: "fr", path: "pages/fr/page-1.json" };
+    for (const column of libraryColumns()) {
+      expect([column.field, cellText(file, column.field)]).not.toEqual([column.field, ""]);
+    }
+  });
+
+  test("the locale column shows the language's own name, and nothing where there is none", () => {
+    expect(cellText({ ...page(1), locale: "fr" }, "locale")).toBe("français");
+    expect(cellText({ ...page(1), locale: "fr-CA" }, "locale")).toBe("français canadien");
+    expect(cellText(page(1), "locale")).toBe("");
+  });
+
   test("a raw grid cell prints as text, and null prints as nothing", () => {
     expect(cellTextOf(null)).toBe("");
     expect(cellTextOf(42)).toBe("42");
@@ -135,7 +153,7 @@ describe("Table", () => {
     const host = await renderInto(html`${tableHeadTpl(libraryColumns())}`);
     expect(
       [...host.querySelectorAll("[role=columnheader]")].map((c) => c.textContent?.trim()),
-    ).toEqual(["Name", "Category", "Type", "Size", "Modified", "Path"]);
+    ).toEqual(["Name", "Category", "Locale", "Type", "Size", "Modified", "Path"]);
   });
 
   test("draws one row per file, and opens on click", async () => {
