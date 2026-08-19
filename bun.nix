@@ -501,9 +501,9 @@
     url = "https://registry.npmjs.org/@better-fetch/fetch/-/fetch-1.3.1.tgz";
     hash = "sha512-ABkD1WhyfPZprKRQI3bhATjeiFuNWC9PXhfGWqL+sg/gKrM977oFrYkdb4msM3hgUGonr7KlOsOFT5TU2rht9g==";
   };
-  "@cloudflare/workers-types@5.20260818.1" = fetchurl {
-    url = "https://registry.npmjs.org/@cloudflare/workers-types/-/workers-types-5.20260818.1.tgz";
-    hash = "sha512-a89taQDbqb7Ni+xAVSsiOSd5wQPcbBJBnZgIG3EujVdDcdQkGVwab3xa2e9z29uqtMQb/P2gYDeDcNXcBRSWQQ==";
+  "@cloudflare/workers-types@5.20260819.1" = fetchurl {
+    url = "https://registry.npmjs.org/@cloudflare/workers-types/-/workers-types-5.20260819.1.tgz";
+    hash = "sha512-nUoWrl+16WfocHgXAARAvpQ7dLMF4tSmTvvgLLg5clYhP2j8CYerZ2KC8agnlWHqOAKp45B3F+LcsjNZrZyiRA==";
   };
   "@commitlint/cli@21.2.2" = fetchurl {
     url = "https://registry.npmjs.org/@commitlint/cli/-/cli-21.2.2.tgz";
@@ -1694,17 +1694,17 @@
     url = "https://registry.npmjs.org/@vue/shared/-/shared-3.5.41.tgz";
     hash = "sha512-IOnwSCma8j+9xJT6b8H0dEYidC80NsYmNMlZxRsukYcSoGaDBohog5hDxzeUXdFeGWFA++vWvxqOmrr96VlqMA==";
   };
-  "@webref/css@8.7.1" = fetchurl {
-    url = "https://registry.npmjs.org/@webref/css/-/css-8.7.1.tgz";
-    hash = "sha512-O60bIKYKl5RpLYsWOnOlWzBCEa2NYKapaeg28gOxsjfHHFK51BWRFcwFNJG04lcZxE6yzrEhWzsW35Bjv5RRXA==";
+  "@webref/css@8.7.2" = fetchurl {
+    url = "https://registry.npmjs.org/@webref/css/-/css-8.7.2.tgz";
+    hash = "sha512-UVZGKmrSzIlvBqarVTC7vG8lIIGiOsOyH9+BVbj0nj30t2kFu61cHHK44z7A4pytvJbSkjAVpnqiPYU3wBL6EQ==";
   };
   "@webref/elements@2.7.1" = fetchurl {
     url = "https://registry.npmjs.org/@webref/elements/-/elements-2.7.1.tgz";
     hash = "sha512-ke5VQWxr7vGket8tObjgNrmQ/+BO7MY1XL9gb0auPnHRzW7EN1Xpv5O237glCd4HWRrro05fBpBFXTPHlb24pw==";
   };
-  "@webref/idl@3.82.1" = fetchurl {
-    url = "https://registry.npmjs.org/@webref/idl/-/idl-3.82.1.tgz";
-    hash = "sha512-x5Nb9skKe7PZ2JFh8NawD0p0bdHjc3Txb83KJE+W6wYX+GSkbUvVgPf2yI+jYUJ3nPlRHLSEQplQmUgi87HJjg==";
+  "@webref/idl@3.82.2" = fetchurl {
+    url = "https://registry.npmjs.org/@webref/idl/-/idl-3.82.2.tgz";
+    hash = "sha512-CouSiDVY94eUGzdnRTC+89fCkUqcX+5kMKr6/GOJHOl4tc9wk/YZlKrqr6SbPN+sKqNFxmabiK2rkUNLxT6luQ==";
   };
   "@xmldom/xmldom@0.8.13" = fetchurl {
     url = "https://registry.npmjs.org/@xmldom/xmldom/-/xmldom-0.8.13.tgz";
