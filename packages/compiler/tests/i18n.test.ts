@@ -9,64 +9,26 @@ import {
   undeclaredLocalePrefix,
   unprefixedRoutes,
 } from "../src/site/i18n.ts";
+import { resolveI18n as schemaResolveI18n } from "@jxsuite/schema/locale";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 
 const project = (i18n?: ProjectConfig["i18n"]): ProjectConfig =>
   ({ name: "Test", ...(i18n === undefined ? {} : { i18n }) }) as ProjectConfig;
 
 describe("resolveI18n", () => {
-  test("a project without i18n resolves to null, not to a default", () => {
-    expect(resolveI18n(project())).toEqual({ errors: [], i18n: null });
-  });
-
-  test("canonicalizes every tag", () => {
-    const { i18n } = resolveI18n(project({ defaultLocale: "EN", locales: ["en", "fr-ca", "AR"] }));
-    expect(i18n?.defaultLocale).toBe("en");
-    expect(i18n?.locales).toEqual(["en", "fr-CA", "ar"]);
-  });
-
   /*
-   * A malformed tag is an error rather than a warning because a locale is a URL prefix, an
-   * `hreflang` value and an `<html lang>` at once. It does not degrade — it produces a site whose
-   * pages claim a language that does not exist, and nothing downstream can tell.
+   * The resolution itself lives in `@jxsuite/schema/locale` and is tested there — Studio needs the
+   * same answer and cannot import this package, so one function has two hosts. What belongs here
+   * is that the compiler's callers reach it: a re-export that stopped resolving would take the
+   * whole locale half of the build with it, and every test below would still pass.
    */
-  test("a malformed tag is a build error", () => {
-    const { errors, i18n } = resolveI18n(project({ locales: ["en", "not_a_tag"] }));
-    expect(errors[0]).toContain("not_a_tag");
-    expect(i18n?.locales).toEqual(["en"]);
-  });
-
-  test("a malformed defaultLocale is reported and falls back to the first locale", () => {
-    const { errors, i18n } = resolveI18n(project({ defaultLocale: "en_US", locales: ["fr"] }));
-    expect(errors[0]).toContain("en_US");
-    expect(i18n?.defaultLocale).toBe("fr");
-  });
-
-  // A default outside the list is a config that cannot have been meant either way, and the pages
-  // Under it exist regardless — so it joins the list rather than being rejected.
-  test("a default missing from locales joins the front of the list", () => {
-    const { i18n } = resolveI18n(project({ defaultLocale: "de", locales: ["en", "fr"] }));
-    expect(i18n?.locales).toEqual(["de", "en", "fr"]);
-  });
-
-  test("duplicates collapse after canonicalization", () => {
-    const { i18n } = resolveI18n(project({ defaultLocale: "en", locales: ["en", "EN", "en-us"] }));
-    expect(i18n?.locales).toEqual(["en", "en-US"]);
-  });
-
-  test("i18n with no usable locale is an error", () => {
-    const { errors, i18n } = resolveI18n(project({ locales: [] }));
-    expect(errors[0]).toContain("no usable locale");
-    expect(i18n).toBeNull();
-  });
-
-  test("routing defaults to prefix-except-default", () => {
-    expect(resolveI18n(project({ defaultLocale: "en" })).i18n?.routing).toBe(
-      "prefix-except-default",
-    );
-    expect(
-      resolveI18n(project({ defaultLocale: "en", routing: "prefix-always" })).i18n?.routing,
-    ).toBe("prefix-always");
+  test("is the schema resolver, reached through this module", () => {
+    expect(resolveI18n).toBe(schemaResolveI18n);
+    expect(resolveI18n(project({ defaultLocale: "EN", locales: ["en", "fr-ca"] })).i18n).toEqual({
+      defaultLocale: "en",
+      locales: ["en", "fr-CA"],
+      routing: "prefix-except-default",
+    });
   });
 });
 

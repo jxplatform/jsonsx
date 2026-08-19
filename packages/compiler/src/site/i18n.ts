@@ -13,78 +13,19 @@
  */
 
 import { canonicalizeLocale, localeDirection } from "@jxsuite/schema/locale";
-import type { ProjectConfig } from "@jxsuite/schema/types";
-import type { TextDirection } from "@jxsuite/schema/locale";
+import type { ResolvedI18n, TextDirection } from "@jxsuite/schema/locale";
 
-/** How locales appear in URLs. */
-export type LocaleRouting = "prefix-except-default" | "prefix-always";
-
-/** A project's `i18n` block after validation, or null when the project declares none. */
-export interface ResolvedI18n {
-  defaultLocale: string;
-  /** Canonical tags, default first, in declaration order. */
-  locales: string[];
-  routing: LocaleRouting;
-}
-
-const DEFAULT_ROUTING: LocaleRouting = "prefix-except-default";
-
-/**
- * Validate and canonicalize `i18n`.
+/*
+ * `resolveI18n` and the two types beside it live in `@jxsuite/schema/locale` rather than here.
+ * Studio needs the same answer and cannot import this package — there is no `./site/i18n` export,
+ * the dependency graph carries `sharp` and `esbuild`, and Studio bundles for a browser. One
+ * resolution with two hosts is the only shape in which the tag Studio offers is certain to be the
+ * tag the build accepts.
  *
- * A malformed tag is a **build error**, not a warning. A locale is a URL prefix, an `hreflang`
- * value and an `<html lang>` all at once, so a typo does not degrade — it produces a site whose
- * every page claims a language that does not exist, and nothing downstream can tell.
- *
- * @param {ProjectConfig} projectConfig
- * @returns {{ i18n: ResolvedI18n | null; errors: string[] }}
+ * Everything below is route-shaped and has no Studio consumer, so it stays.
  */
-export function resolveI18n(projectConfig: ProjectConfig): {
-  i18n: ResolvedI18n | null;
-  errors: string[];
-} {
-  const raw = projectConfig.i18n;
-  const errors: string[] = [];
-  if (!raw || typeof raw !== "object") {
-    return { errors, i18n: null };
-  }
-
-  const declared = Array.isArray(raw.locales) ? raw.locales : [];
-  const locales: string[] = [];
-  for (const tag of declared) {
-    const canonical = canonicalizeLocale(tag);
-    if (canonical === null) {
-      errors.push(`i18n.locales: "${String(tag)}" is not a well-formed BCP 47 language tag.`);
-      continue;
-    }
-    if (!locales.includes(canonical)) {
-      locales.push(canonical);
-    }
-  }
-
-  const defaultLocale = canonicalizeLocale(raw.defaultLocale) ?? locales[0] ?? null;
-  if (raw.defaultLocale !== undefined && canonicalizeLocale(raw.defaultLocale) === null) {
-    errors.push(
-      `i18n.defaultLocale: "${String(raw.defaultLocale)}" is not a well-formed BCP 47 language tag.`,
-    );
-  }
-  if (defaultLocale === null) {
-    errors.push("i18n is declared with no usable locale — set `defaultLocale` or `locales`.");
-    return { errors, i18n: null };
-  }
-  if (!locales.includes(defaultLocale)) {
-    // A default outside the list is a config the author cannot have meant either way round, so it
-    // Joins the list rather than being rejected: the pages under it exist regardless.
-    locales.unshift(defaultLocale);
-  }
-
-  const routing: LocaleRouting =
-    raw.routing === "prefix-always" || raw.routing === "prefix-except-default"
-      ? raw.routing
-      : DEFAULT_ROUTING;
-
-  return { errors, i18n: { defaultLocale, locales, routing } };
-}
+export { resolveI18n } from "@jxsuite/schema/locale";
+export type { LocaleRouting, ResolvedI18n } from "@jxsuite/schema/locale";
 
 /**
  * The locale a URL belongs to.
