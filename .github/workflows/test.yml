@@ -54,6 +54,12 @@ jobs:
     # A `strategy.matrix` built from an empty include is a workflow ERROR, not a skipped job.
     if: needs.changes.outputs.has_tests == 'true'
     runs-on: ubuntu-latest
+    # The slowest workspace in this matrix is studio at ~6 minutes; every other one is under a
+    # minute. The cap is not a performance budget, it is a liveness one: on 19 Aug the compiler
+    # job — a 40-second job — sat inside `bun test` for over an hour, and with GitHub's 360-minute
+    # default it would have held the `ci` required check pending for six. A hung runner should
+    # report a red X while someone is still looking at the PR.
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       # dir = workspace path (packages/* core, extensions/* extensions);
@@ -67,9 +73,20 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
+          status=0
           bun test --isolate --coverage \
             --reporter=junit --reporter-outfile=junit.xml \
-            2>&1 | tee /tmp/test-output.txt
+            2>&1 | tee /tmp/test-output.txt || status=$?
+          # An exit status above 128 is a SIGNAL: the test RUNNER died, and the counts above it
+          # are the files that happened to finish first, not a verdict on the suite. Bun has
+          # trapped this way on main three times since 14 Aug (133 = SIGTRAP, ~10s in, studio,
+          # never with a failing test and never on a diff that touched it) — and the only trace
+          # it leaves is one shell line buried mid-log, so the job reads exactly like a broken
+          # test. Say which it was, here, where the failure is annotated.
+          if [ "$status" -gt 128 ]; then
+            echo "::error::bun test was killed by signal $((status - 128)) (exit $status) in ${{ matrix.package.dir }} — the runner crashed partway through, so no test reported this. Treat the counts above as a partial run, not a result."
+          fi
+          exit "$status"
         working-directory: ${{ matrix.package.dir }}
       - run: bun scripts/check-coverage-manifest.ts ${{ matrix.package.dir }}
       - name: Upload coverage reports to Codecov
@@ -100,7 +117,11 @@ jobs:
           # dashes / header / dashes / rows / dashes.
           awk '/^-+\|/ { n++; print; if (n == 3) exit; next } n >= 1' /tmp/test-output.txt \
             > /tmp/coverage-report/${{ matrix.package.flag }}.txt
-          tests=$(grep -E '^ [0-9]+ (pass|fail)' /tmp/test-output.txt | sed 's/^ *//' | awk '{printf "%s%s", sep, $0; sep=", "}')
+          # `|| true`, because this step runs `if: always()` and a run that DIED has no summary
+          # line to grep: under `bash -e -o pipefail` the empty grep failed the assignment, so a
+          # crashed suite painted a second red X on a diagnostics step and buried the first.
+          tests=$(grep -E '^ [0-9]+ (pass|fail)' /tmp/test-output.txt | sed 's/^ *//' | awk '{printf "%s%s", sep, $0; sep=", "}' || true)
+          tests=${tests:-'no test summary — the run did not finish'}
           all=$(grep '^All files' /tmp/coverage-report/${{ matrix.package.flag }}.txt || echo 'no coverage data')
           {
             echo "### \`${{ matrix.package.flag }}\` coverage"
