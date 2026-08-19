@@ -36,18 +36,42 @@ on:
       # The surfaces a picture is OF. `packages/starters/**` was too wide: a starters README
       # cannot move a pixel, and the only starter inputs a shot opens are the project roots.
       - "packages/studio/src/**"
-      - "packages/starters/sites/**"
+      # The project roots shots actually open. GENERATED, and guarded:
+      # scripts/screenshots/shot-paths.test.ts asserts this list is exactly the set of
+      # `open.project` values in the manifest that live outside `scripts/screenshots/`. Six of the
+      # twelve starters are photographed by nothing, and `examples` was photographed by
+      # `data-source-request` while matching no filter at all — the derivation finds both.
+      - "examples/**"
+      - "packages/starters/sites/blog/**"
+      - "packages/starters/sites/course/**"
+      - "packages/starters/sites/event/**"
+      - "packages/starters/sites/real-estate/**"
+      - "packages/starters/sites/restaurant/**"
+      - "packages/starters/sites/shop/**"
+      # Every starter is in ONE picture regardless of `open.project`: `new-project` photographs the
+      # new-project modal, whose gallery is `listStarters()` reading this file.
       - "packages/starters/registry.json"
       # The pipeline itself, and the lock's own definition.
       - "scripts/screenshots/**"
+      # …but NOT the lock, which is the lane's own OUTPUT. A `pull_request` filter is evaluated
+      # against the whole PR diff, not the latest push, so one re-capture armed this filter for the
+      # life of the PR and every later push re-ran all 61 shots. That is most of 65 bot commits in
+      # ten days. The `github.actor` refusal below declines only the run immediately following the
+      # push; the next human push was a full re-capture with nothing to re-capture for.
+      - "!scripts/screenshots/capture.lock.json"
       - "scripts/check-image-lock.ts"
       - "scripts/lib/png.ts"
       # NOT this file. It listed itself, so a dependabot bump of an action version — a diff that
       # cannot change a picture — booted the container, re-captured all 61 shots, and pushed the
       # result onto the bot's branch. That is how PR #131, titled "bump actions/upload-artifact
       # from 4 to 7", merged 26 re-captured PNGs. Editing the *steps* has `workflow_dispatch`.
-      # Someone hand-editing bytes: the lane is the fastest way to say so out loud.
-      - "docs/images/**"
+      #
+      # And NOT `docs/images/**`, for the same reason as the lock: it is this lane's output, so it
+      # armed the filter permanently. It was here to catch someone hand-editing bytes — but
+      # `docs:images:check` already fails on any PNG whose sha256 has no lock entry, it is chained
+      # into `docs:verify`, and `docs:verify` runs in the UNGATED `checks` job. A hand-edited
+      # image is therefore already a blocking red X with a name on it, which is strictly stronger
+      # than a bot commit.
   schedule:
     # Nightly on main. Not a push gate — it catches drift that no PR caused (a base-image rebuild,
     # A font package, a dependency bump), which is drift nobody would otherwise see until the next
@@ -247,11 +271,26 @@ jobs:
       # (0.0001 — about 920 px of a 3840x2400 frame, sized in shot.ts against the thinnest surface
       # this pipeline has to keep honest), so `git diff` becomes an honest proxy for "the picture
       # moved" and a run with nothing to say pushes nothing.
+      # Which shots this diff can actually change. A shot names the project it opens, so a change
+      # confined to project roots cannot move any other picture; anything touching Studio, the
+      # runner or the manifest can move all of them and runs everything. Unknown paths FAIL OPEN.
+      # The step summary names what it skipped — a narrowed run that stays quiet about it reads
+      # exactly like a full one. See scripts/screenshots/affected.ts.
+      - name: Scope the capture
+        id: scope
+        shell: bash
+        env:
+          BASE_REF: ${{ github.base_ref || github.event.repository.default_branch }}
+        run: bun scripts/screenshots/affected.ts
+
       - name: Capture
         id: capture
+        # `none` means every shot this diff could change is quarantined. It cannot be expressed as
+        # an empty `--only`, which the runner reads as ALL shots.
+        if: steps.scope.outputs.mode != 'none'
         continue-on-error: true
         shell: bash
-        run: bun run screenshots
+        run: bun run screenshots ${{ steps.scope.outputs.only }}
 
       # Integrity: the runner must have written a lock that names every byte it produced. This
       # Failing means the pipeline is broken, not that a picture changed — so it is also red.
@@ -294,6 +333,12 @@ jobs:
           steps.target.outputs.fork != 'true' &&
           steps.target.outputs.branch != ''
         shell: bash
+        env:
+          # The repo's husky hooks ran INSIDE this commit — nano-staged, oxfmt and the site-claims
+          # check all executed in the container on a diff of PNG bytes. They are a local authoring
+          # aid; the lane already ran everything they cover, and one of them failing would abort a
+          # push whose contents CI had already accepted.
+          HUSKY: "0"
         run: |
           set -euo pipefail
           git config user.name "jx-screenshots[bot]"
@@ -301,7 +346,10 @@ jobs:
           git add docs/images scripts/screenshots/capture.lock.json
           git commit -m "chore(screenshots): re-capture for ${{ steps.target.outputs.ref }}" \
             -m "Written by .github/workflows/screenshots.yml. Review the pictures, not the bytes."
-          git push origin "HEAD:${{ steps.target.outputs.branch }}"
+          # FULLY QUALIFIED on purpose. `HEAD:<branch>` makes git guess the destination ref, and
+          # when it cannot it fails with "The destination you provided is not a full refname" —
+          # which is how the last run on feat/standards-registry died after a clean capture.
+          git push origin "HEAD:refs/heads/${{ steps.target.outputs.branch }}"
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       # The "after" thumbnails can only be addressed once the commit exists, so the report is built
