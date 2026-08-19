@@ -4,6 +4,8 @@ import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { generateProject } from "../generate";
 
+import TEMPLATE_VERSIONS from "../template-versions.json";
+
 const TMP = resolve(tmpdir(), `jx-create-test-${Date.now()}`);
 
 afterEach(() => {
@@ -66,8 +68,24 @@ describe("generateProject — wrangler.jsonc", () => {
     expect(project.imports).toBeUndefined();
     expect(project.contentTypes).toBeUndefined();
 
-    // Projects own their extension dependencies.
+    // Projects own their extension dependencies, at the ranges the generated version map names.
+    // A shape-only regex passed happily while every one of these was four majors stale, which is
+    // How scaffolded projects shipped asking for a compiler that predates their own template.
     const pkg = JSON.parse(readFileSync(join(TMP, "package.json"), "utf8"));
-    expect(pkg.dependencies["@jxsuite/parser"]).toMatch(/^\^\d+\.\d+\.\d+$/);
+    expect(pkg.dependencies["@jxsuite/parser"]).toBe(TEMPLATE_VERSIONS.parser);
+    expect(pkg.devDependencies["@jxsuite/compiler"]).toBe(TEMPLATE_VERSIONS.compiler);
+    expect(pkg.devDependencies["@jxsuite/runtime"]).toBe(TEMPLATE_VERSIONS.runtime);
+    expect(pkg.devDependencies["@jxsuite/server"]).toBe(TEMPLATE_VERSIONS.server);
+
+    // Every @jxsuite range a scaffold emits must come FROM the map, so a future hardcoded literal
+    // In generate.ts is red here rather than discovered by a user's failing install.
+    const mapped = new Set(Object.values(TEMPLATE_VERSIONS));
+    for (const bag of [pkg.dependencies, pkg.devDependencies]) {
+      for (const [name, range] of Object.entries(bag ?? {})) {
+        if (name.startsWith("@jxsuite/")) {
+          expect(mapped.has(range as string)).toBe(true);
+        }
+      }
+    }
   });
 });

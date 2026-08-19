@@ -17,6 +17,7 @@
     "cli-args.ts",
     "templates.ts",
     "scaffold.ts",
+    "template-versions.json",
     "template/",
     "templates/"
   ],

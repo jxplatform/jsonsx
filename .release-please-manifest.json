@@ -15,5 +15,7 @@
   "packages/desktop": "2.0.1",
   "packages/protocol": "1.0.0",
   "packages/collab": "0.6.0",
-  "packages/formulas": "0.0.6"
+  "packages/formulas": "0.0.6",
+  "extensions/search": "0.1.0",
+  "extensions/feed": "0.1.0"
 }

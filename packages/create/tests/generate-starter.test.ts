@@ -8,6 +8,8 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
+import TEMPLATE_VERSIONS from "../template-versions.json";
+
 const FIXTURE = resolve(tmpdir(), `jx-starter-fixture-${Date.now()}`);
 const TMP = resolve(tmpdir(), `jx-create-starter-test-${Date.now()}`);
 
@@ -84,7 +86,11 @@ describe("generateProject — starter clone", () => {
     const pkg = JSON.parse(readFileSync(join(TMP, "package.json"), "utf8"));
     expect(pkg.name).toBe("my-diner");
     expect(pkg.scripts.build).toBe("jx build");
-    expect(pkg.devDependencies["@jxsuite/compiler"]).toBeDefined();
+    // ScaffoldFromStarter REBUILDS package.json rather than copying the starter's, so the ranges
+    // Must be the map's — not whatever the in-repo starter happened to pin.
+    expect(pkg.devDependencies["@jxsuite/compiler"]).toBe(TEMPLATE_VERSIONS.compiler);
+    expect(pkg.devDependencies["@jxsuite/runtime"]).toBe(TEMPLATE_VERSIONS.runtime);
+    expect(pkg.dependencies["@jxsuite/parser"]).toBe(TEMPLATE_VERSIONS.parser);
 
     // Content, components, and public assets are copied verbatim.
     expect(existsSync(join(TMP, "pages", "index.md"))).toBe(true);

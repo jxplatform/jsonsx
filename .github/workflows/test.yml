@@ -230,6 +230,12 @@ jobs:
       # Core packages must never depend on extension packages — see
       # specs/extensions.md §2 and scripts/check-dep-rules.ts.
       - run: bun scripts/check-dep-rules.ts
+      # Template dependency ranges: every @jxsuite range that SHIPS inside a template — the twelve
+      # published starter manifests and create's scaffold map — must name the version that package
+      # actually released. release-please rewrites them inside the release commit (extra-files), so
+      # this is green on the release PR's first run; it fires when a template gains a dependency or
+      # an extra-files entry is dropped. `bun run templates:sync` fixes it.
+      - run: bun run templates:check
       # Studio commands: every declared `menus` placement must admit the command's
       # containment level (the level × placement matrix — UX-REDESIGN-PLAN §5.1,
       # normative copy in specs/studio-ui-guidelines.md §12).
