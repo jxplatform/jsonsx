@@ -10,7 +10,7 @@ The Jx monorepo ([github.com/jxsuite/jx](https://github.com/jxsuite/jx)) is a Bu
 ## Layout
 
 - `packages/` — the `@jxsuite/*` core packages: runtime, compiler, schema, server, studio, desktop, protocol, formulas, collab, ai, markup, import, starters, create.
-- `extensions/` — extension packages built on the public hooks: parser (Markdown/CSV formats and content), connector (databases), auth.
+- `extensions/` — extension packages built on the public hooks: parser (Markdown/CSV formats and content), connector (databases), auth, search, feed.
 - `specs/` — the numbered specifications. These are the living source of truth: consult and update them **before** implementing a feature.
 - `sites/` — real sites built with Jx, including jxsuite.com.
 - `docs/` — this documentation (see [Contributing to these docs](/docs/extending/contributing/docs/)).
@@ -49,3 +49,43 @@ Pushes to `main`, the nightly cron, and manual dispatch are never gated: they al
 :::doc-note
 `ci` is the aggregate job. It passes when every other job either succeeded or was skipped, and fails if any failed or was cancelled — so a job your diff never reached leaves the run green.
 :::
+
+## Releases, branches, and template versions
+
+Versions are release-please's job. Every publishable workspace is a component in
+`release-please-config.json` with a matching `.release-please-manifest.json` entry, and both lists
+are **derived-checked** by `scripts/release-config.test.ts` — a package that is publishable but
+unlisted is never versioned, tagged or published, and nothing else in the pipeline can notice. Two
+extensions sat in exactly that state before the check existed.
+
+Two branches:
+
+- **`main`** is the trunk. Every PR targets it, and it is the tip of development.
+- **`release`** holds only released code. CI fast-forwards it to each `desktop-v*` release commit,
+  but only after that release's installers are attached and `nix build` succeeds at the tag. It is
+  what a NixOS user pins (`nix run github:jxsuite/jx/release`), so it must never point at a tree
+  that does not build. Nothing pushes to it by hand.
+
+### Template dependency ranges are generated
+
+Two places ship `@jxsuite/*` version ranges to people outside this repo, and neither is a workspace,
+so `bun install` never resolves them:
+
+- `packages/starters/sites/*/package.json` — `@jxsuite/starters` publishes `sites/`, so these are the
+  ranges a scaffolded project installs, and the ones Studio installs when it iterates a starter.
+- `packages/create/template-versions.json` — the ranges `create` stamps into every project it
+  generates, including starter clones, whose `package.json` it rebuilds from scratch.
+
+Both are **generated**. `bun run templates:check` blocks in CI; `bun run templates:sync` is the
+fixer. Never hand-edit `template-versions.json`.
+
+Keeping them current at release time is release-please's `extra-files`, which rewrites both surfaces
+**inside the release commit**, so the tree that gets published already carries the right ranges.
+A jsonpath addressing a scoped key must use the `[?(@property === '@jxsuite/x')]` filter form — the
+bracket form throws when a section exists without that key, which aborts the run and produces no
+release PR for any package. A test pins the spelling.
+
+Left to drift, these ranges do more than annoy: a starter four majors behind is one a user cannot
+install, and opening it in Studio raises a dependency-update dialog whose underlay covers the
+canvas — which is how that dialog ended up baked into 33 committed screenshots.
+
