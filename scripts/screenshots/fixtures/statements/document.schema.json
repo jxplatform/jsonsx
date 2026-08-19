@@ -18323,6 +18323,16 @@
                 }
               ]
             },
+            "scroll-axis-lock": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            },
             "scroll-behavior": {
               "oneOf": [
                 {
@@ -18634,6 +18644,16 @@
               ]
             },
             "scroll-timeline-name": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            },
+            "scrollAxisLock": {
               "oneOf": [
                 {
                   "type": "string"
