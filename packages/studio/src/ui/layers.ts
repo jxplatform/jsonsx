@@ -739,8 +739,11 @@ function reducedMotion(): boolean {
 }
 
 /**
- * **The one listed exception to §13.3 clause 6** — the only behaviour in Studio that differs under
- * `?automation=1` beyond installing the hook, pinning the clock and selecting a profile.
+ * **One of the three listed exceptions to §13.3 clause 6** — behaviour that differs under
+ * `?automation=1` beyond installing the hook, pinning the clock and selecting a profile. The other
+ * Two are both refusals to touch the project on disk: `packages/ensure-deps.ts` declines to run
+ * `bun install`, and `packages/jxsuite-update.ts` declines to prompt for a dependency update. This
+ * One is the only exception that changes what a picture SHOWS rather than what it avoids doing.
  *
  * A toast is the single surface in the app whose lifetime is a TIMER rather than a state. Every
  * other surface a shot can photograph is there because the app is in a state, and it stays there

@@ -702,7 +702,7 @@ describe("checkImageLock", () => {
     // The direction nothing checked: `docs:check` owns "a page references an image the lock does
     // Not name"; this owns the reverse. Three shots were running on every lane invocation to
     // Produce bytes no page read, one of them 865 KB, and the only way to notice was to go looking.
-    const manifest = {
+    const twoShots = {
       shots: [
         { name: "hero", docs: ["studio/design"], capture: [{ image: "hero" }] },
         { name: "ghost", docs: ["studio/ghosts"], capture: [{ image: "ghost" }] },
@@ -715,7 +715,7 @@ describe("checkImageLock", () => {
     const result = checkImageLock({
       disk: [],
       lock,
-      manifest,
+      manifest: twoShots,
       refs: [{ image: "docs/images/hero.png", name: "hero", page: "docs/a.md" }],
     });
     const orphans = result.violations.filter((v) => v.includes("read by no docs page"));

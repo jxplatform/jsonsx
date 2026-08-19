@@ -24,7 +24,7 @@ Once installed, open Studio and either **create a new project**, **open an exist
 
 ## Updating
 
-Studio checks your project's `@jxsuite/*` dependencies against the version it ships with and offers to update them when they drift, and prompts when a newer release of the app itself is available.
+Studio checks your project's `@jxsuite/*` dependencies against each package's own newest published version and offers to update them when one is behind, and prompts when a newer release of the app itself is available. Studio's own copy of those packages is separate — your project's ranges govern `jx build` and your project's types, not the running app, so there's no reason for them to match Studio's version.
 
 ## For developers: scaffolding from a terminal
 

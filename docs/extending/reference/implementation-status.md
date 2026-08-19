@@ -29,7 +29,7 @@ This page is generated from the `> **Status: …**` markers in the specification
 | `spec.md`                 | 0.5.4-draft  | Partial     | 2026-08-18 |
 | `standards.md`            | 0.1.15-draft | Partial     | 2026-08-17 |
 | `studio-ui-guidelines.md` | 0.3.12       | Implemented | 2026-08-16 |
-| `studio.md`               | 0.9.30-draft | Partial     | 2026-08-18 |
+| `studio.md`               | 0.9.31-draft | Partial     | 2026-08-19 |
 
 ## Sections not yet implemented
 

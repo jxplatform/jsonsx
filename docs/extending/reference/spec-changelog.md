@@ -405,6 +405,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.9.31-draft** (2026-08-19) — §13.5 lists the three behaviours ?automation=1 may change, and makes booting with an uninvited modal a refusal — an underlay swallows the viewport, so a dialog nobody scripted scrims the capture.
 - **0.9.30-draft** (2026-08-18) — §15: the Keyboard sheet is no longer read-only — rebinding ships, Editor and Updates/About remain pending.
 - **0.9.29-draft** (2026-08-18) — §16 and §19: the notify announcement ships — correct a marker and a WAI-ARIA note that both described the gap it closed.
 - **0.9.28-draft** (2026-08-18) — §6.8: the From data… picker addresses only what it can list — nested paths and tokens holding a dot or slash are legal pointers it cannot author.

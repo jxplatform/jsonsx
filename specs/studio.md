@@ -2,9 +2,9 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.30-draft
+**Version:** 0.9.31-draft
 **Status:** Partial
-**Updated:** 2026-08-18
+**Updated:** 2026-08-19
 **License:** MIT
 
 ---
@@ -1589,6 +1589,26 @@ bypasses the transaction log** — automation mutates documents by running the c
 **No compatibility shim**: a branch that exists to keep an external caller's verb working is that
 caller's coupling living inside the product.
 
+**What `?automation=1` is allowed to change, exhaustively.** Beyond installing the hook, pinning the
+clock and selecting a profile, exactly three behaviours differ, and each is listed here because an
+unlisted one is indistinguishable from the compatibility shim the rule above forbids:
+
+1. `packages/ensure-deps.ts` does not run `bun install`.
+2. `packages/jxsuite-update.ts` does not prompt to update the project's `@jxsuite/*` dependencies.
+3. `ui/layers.ts` holds a toast open instead of retiring it on its timer.
+
+The first two are the same rule — **an automated run opens a project read-only** — and neither
+changes what a picture shows; they refuse to write to someone else's tree. Only the third changes
+what is on screen, and it is argued for in place.
+
+That an uninvited dialog is a **blocking** defect, not a cosmetic one, is a property of the layer
+stack rather than a matter of taste: a dialog renders with an underlay, and an underlay swallows
+every pointer event across the viewport. So a dialog the script did not raise does not appear beside
+the subject — it silently redirects every subsequent click, caret and hover into a scrim, and the
+capture shows one. A run therefore **refuses to photograph a Studio that booted with a modal
+already open**, naming it (`scripts/screenshots/lib/shot.ts`); no shot raises a dialog before its
+first step, so this needs no opt-out.
+
 **"Settled" is a predicate, not a sleep** (`packages/studio/src/services/idle.ts`). `probe.idle()`
 resolves once four subsystems have been quiet for two consecutive animation frames — no renderer
 mid-paint (`store.ts`), no panel scheduler holding a frame or withholding a render
@@ -2147,6 +2167,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.9.31-draft** (2026-08-19) — §13.5 lists the three behaviours ?automation=1 may change, and makes booting with an uninvited modal a refusal — an underlay swallows the viewport, so a dialog nobody scripted scrims the capture.
 - **0.9.30-draft** (2026-08-18) — §15: the Keyboard sheet is no longer read-only — rebinding ships, Editor and Updates/About remain pending.
 - **0.9.29-draft** (2026-08-18) — §16 and §19: the notify announcement ships — correct a marker and a WAI-ARIA note that both described the gap it closed.
 - **0.9.28-draft** (2026-08-18) — §6.8: the From data… picker addresses only what it can list — nested paths and tokens holding a dot or slash are legal pointers it cannot author.
@@ -2232,4 +2253,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.30-draft_
+_`@jxsuite/studio` Specification v0.9.31-draft_
