@@ -698,6 +698,63 @@ describe("checkImageLock", () => {
     expect(used.warnings[0]).toContain("a docs page already references it");
   });
 
+  test("a locked image no page reads is a violation, naming the page the shot declares", () => {
+    // The direction nothing checked: `docs:check` owns "a page references an image the lock does
+    // Not name"; this owns the reverse. Three shots were running on every lane invocation to
+    // Produce bytes no page read, one of them 865 KB, and the only way to notice was to go looking.
+    const manifest = {
+      shots: [
+        { name: "hero", docs: ["studio/design"], capture: [{ image: "hero" }] },
+        { name: "ghost", docs: ["studio/ghosts"], capture: [{ image: "ghost" }] },
+      ],
+    };
+    const lock = lockOf({
+      "docs/images/ghost.png": entry({ shot: "ghost" }),
+      "docs/images/hero.png": entry({ shot: "hero" }),
+    });
+    const result = checkImageLock({
+      disk: [],
+      lock,
+      manifest,
+      refs: [{ image: "docs/images/hero.png", name: "hero", page: "docs/a.md" }],
+    });
+    const orphans = result.violations.filter((v) => v.includes("read by no docs page"));
+    expect(orphans).toHaveLength(1);
+    expect(orphans[0]).toContain("docs/images/ghost.png");
+    expect(orphans[0]).toContain('"studio/ghosts"');
+  });
+
+  test("a quarantined shot's image is exempt from the orphan rule", () => {
+    // Inverted on purpose: `docs:check` FAILS if a page still illustrates itself with a quarantined
+    // Shot, so demanding a reference here would make the two rules contradict each other.
+    const result = checkImageLock({
+      disk: [],
+      lock: lockOf({ "docs/images/ghost.png": entry({ shot: "ghost" }) }),
+      manifest: {
+        shots: [
+          {
+            name: "ghost",
+            docs: ["studio/ghosts"],
+            capture: [{ image: "ghost" }],
+            status: { state: "quarantined", reason: "why", since: "abc123" },
+          },
+        ],
+      },
+      refs: [{ image: "docs/images/hero.png", name: "hero", page: "docs/a.md" }],
+    });
+    expect(result.violations.filter((v) => v.includes("read by no docs page"))).toEqual([]);
+  });
+
+  test("the orphan rule is silent when no page scan happened", () => {
+    // The lane's `--report` mode passes no refs, and every image would look orphaned.
+    const result = checkImageLock({
+      disk: [],
+      lock: lockOf({ "docs/images/ghost.png": entry({ shot: "ghost" }) }),
+      manifest: { shots: [{ name: "ghost", capture: [{ image: "ghost" }] }] },
+    });
+    expect(result.violations.filter((v) => v.includes("read by no docs page"))).toEqual([]);
+  });
+
   test("quarantine is reported, its shape is enforced, and it silences the capture warning", () => {
     const result = checkImageLock({
       disk: [],
