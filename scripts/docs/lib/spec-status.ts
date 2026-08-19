@@ -133,6 +133,29 @@ export function compareSpecVersion(a: string, b: string): number | null {
   return pa.draft ? -1 : 1;
 }
 
+/**
+ * The version a bump has to clear: the higher of the working file's and the base branch's.
+ *
+ * `spec:bump` used to read only the working file, so a branch forked before a release on main saw
+ * the old version, minted the next one, and landed a number main had already used — two changelog
+ * entries claiming `0.9.31-draft`. Nothing caught it until the merge, where check-spec-status
+ * reported it as an ordering fault ("0.9.31-draft is not older than 0.9.31-draft") and unpicking it
+ * meant renumbering the header, the footer and every entry above the collision by hand.
+ *
+ * A null base means no floor: an unfetched ref, a shallow clone, or a spec that does not exist on
+ * the base yet because this branch is what adds it.
+ */
+export function versionFloor(
+  local: ParsedVersion,
+  base: ParsedVersion | null,
+): { version: ParsedVersion; raised: boolean } {
+  if (!base) {
+    return { version: local, raised: false };
+  }
+  const raised = (compareSpecVersion(base.raw, local.raw) ?? 0) > 0;
+  return { version: raised ? base : local, raised };
+}
+
 /** Parse one spec file's status markers and release metadata. */
 export function parseSpecFile(path: string, file: string): SpecStatus {
   return parseSpecSource(readFileSync(path, "utf8"), file);

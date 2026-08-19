@@ -6,10 +6,15 @@
 // It, everything else keeps it (check-spec-status.ts enforces the same rule). To graduate a spec,
 // Set `**Status:** Implemented` first, then bump: the suffix drops automatically.
 //
+// The next version is computed from the HIGHER of this file and the same file on the base branch,
+// So a branch forked before a release cannot re-mint a number main has already used. `--base <ref>`
+// Overrides the ref; see resolveBaseVersion below for why it reads the tip rather than a merge base.
+//
 // Usage:
 //   `bun run spec:bump <spec.md> <major|minor|patch|stable> -m "<what changed>"`
 // E.g.
 //   `bun run spec:bump server.md patch -m "Clarify proxy resolution order in §6.3"`
+//   `bun run spec:bump server.md patch --base upstream/main -m "..."`
 //
 // Bump levels: `major` = breaking change to a documented contract, `minor` = additive (new
 // Sections/behavior), `patch` = editorial (wording, examples, non-normative clarification),
@@ -17,9 +22,10 @@
 // Release-please bump-minor-pre-major policy applies: `major` moves the minor, `minor` and
 // `patch` both move the patch. That is the policy the reconstructed history was derived under.
 
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
-import { parseSpecSource, splitVersion } from "./lib/spec-status.ts";
+import { parseSpecSource, splitVersion, versionFloor } from "./lib/spec-status.ts";
 
 const ROOT = resolve(import.meta.dir, "../..");
 const SPECS_DIR = join(ROOT, "specs");
@@ -35,7 +41,8 @@ function die(message: string): never {
     '\nUsage: bun run spec:bump <spec.md> <major|minor|patch|stable> -m "<what changed>"\n' +
       "  major = breaking contract change, minor = additive, patch = editorial,\n" +
       "  stable = graduate a 0.x spec to 1.0.0\n" +
-      "  (pre-1.0: major moves the minor, minor and patch both move the patch)",
+      "  (pre-1.0: major moves the minor, minor and patch both move the patch)\n" +
+      "  --base <ref>  the branch whose released version is the floor (default origin/main, main)",
   );
   process.exit(1);
 }
@@ -51,7 +58,21 @@ const summary = (args[messageFlag + 1] ?? "").replaceAll(/\s+/g, " ").trim();
 if (!summary) {
   die("the changelog summary (-m) is empty");
 }
-const positional = args.filter((_, i) => i !== messageFlag && i !== messageFlag + 1);
+const baseFlag = args.indexOf("--base");
+const explicitBase = baseFlag === -1 ? null : (args[baseFlag + 1] ?? null);
+if (baseFlag !== -1 && (!explicitBase || explicitBase.startsWith("-"))) {
+  // Without this, `--base -m "..."` swallows the message flag as a ref and reports "no such git
+  // Ref", which sends you looking at your remotes instead of at your command line.
+  die(`--base needs a git ref (got ${explicitBase ? `"${explicitBase}"` : "nothing"})`);
+}
+// Only the flags actually present consume an index. `baseFlag + 1` is 0 when --base is absent,
+// Which would eat the spec name.
+const consumed = new Set([messageFlag, messageFlag + 1]);
+if (baseFlag !== -1) {
+  consumed.add(baseFlag);
+  consumed.add(baseFlag + 1);
+}
+const positional = args.filter((_, i) => !consumed.has(i));
 const [rawSpec, bump] = positional;
 if (!rawSpec) {
   die("which spec? e.g. server.md");
@@ -80,6 +101,65 @@ if (!current) {
   );
 }
 
+function gitSafe(gitArgs: string[]): string | null {
+  try {
+    return execFileSync("git", gitArgs, {
+      cwd: ROOT,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The version this spec already carries on the base branch, or null when that cannot be read.
+ *
+ * This existed because `spec:bump` used to read only the working file. A branch forked before a
+ * release on main would see the old version, mint the next one, and land a number main had already
+ * used — two changelog entries claiming `0.9.31-draft`. Nothing said so until the merge, where it
+ * surfaced as check-spec-status's "changelog must run newest-first — 0.9.31-draft is not older than
+ * 0.9.31-draft": true, but it names the ordering symptom, and the fix is renumbering the header,
+ * the footer and every entry above the collision by hand.
+ *
+ * It reads the base's TIP, deliberately, which is where this differs from check-spec-release.ts.
+ * That script asks "did the body change since I forked", which is a merge-base question. This asks
+ * "is the number I am about to mint already taken", and only the tip knows.
+ *
+ * Every failure path returns null and the local version stands: an unfetched or missing ref, a
+ * shallow clone, no network, or a spec that does not exist on the base yet because it is new. A
+ * stale `origin/main` therefore under-reports rather than blocking — which is why the ref and the
+ * version it found are printed whenever they move the answer.
+ */
+function resolveBaseVersion(): { ref: string; version: typeof current } | null {
+  const candidates = explicitBase ? [explicitBase] : ["origin/main", "main"];
+  for (const ref of candidates) {
+    if (!gitSafe(["rev-parse", "--verify", `${ref}^{commit}`])) {
+      // An explicit ref that does not resolve is a typo worth stopping for. A default one that
+      // Does not is just a repo without it — try the next, then give up quietly.
+      if (explicitBase) {
+        die(`--base ${explicitBase}: no such git ref`);
+      }
+      continue;
+    }
+    // The ref exists but the spec does not: a spec added on this branch has no base version, which
+    // Is not an error at any level. It simply has no floor.
+    const text = gitSafe(["show", `${ref}:specs/${file}`]);
+    if (!text) {
+      return null;
+    }
+    const header = parseSpecSource(text, file).headerVersion;
+    const version = header ? splitVersion(header) : null;
+    return version ? { ref, version } : null;
+  }
+  return null;
+}
+
+const base = resolveBaseVersion();
+/** Bump from whichever is higher, so the result clears what the base has already published. */
+const { version: floor, raised } = versionFloor(current, base?.version ?? null);
+
 /**
  * Pre-1.0 specs (every spec today) follow release-please's bump-minor-pre-major policy, the same
  * One the reconstructed history was derived under: a structural break moves the minor, everything
@@ -106,7 +186,7 @@ function nextOf(v: typeof current, level: string): { major: number; minor: numbe
   return { major: v.major, minor: v.minor, patch: v.patch + 1 };
 }
 
-const next = nextOf(current, bump);
+const next = nextOf(floor, bump);
 
 // The suffix follows the status, not the previous version.
 const draft = parsed.headerStatus !== "Implemented";
@@ -179,6 +259,12 @@ if (fmt.exitCode !== 0) {
   process.exit(fmt.exitCode);
 }
 
+if (raised) {
+  console.log(
+    `specs/${file}: ${base!.ref} already released ${floor.raw}, so this bumps from there rather ` +
+      `than from the local ${current.raw}.`,
+  );
+}
 console.log(`specs/${file}: ${parsed.headerVersion} → ${nextVersion} (${today})`);
 console.log(`  ${entry}`);
 console.log("\nNext: `bun run docs:generate` so the derived reference pages match.");
