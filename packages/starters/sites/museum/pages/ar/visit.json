@@ -1,0 +1,327 @@
+{
+  "$layout": "./layouts/ar.json",
+  "title": "خطّط لزيارتك — أتريوم",
+  "description": "المواعيد والدخول والمواصلات وسبل الوصول إلى أتريوم، متحف المدينة للفنّ والتاريخ. الدخول مجّانيّ، من الثلاثاء إلى الأحد، من ١٠:٠٠ إلى ١٨:٠٠.",
+  "$head": [
+    {
+      "tagName": "meta",
+      "attributes": {
+        "name": "description",
+        "content": "المواعيد والدخول والمواصلات وسبل الوصول إلى أتريوم، متحف المدينة للفنّ والتاريخ. الدخول مجّانيّ، من الثلاثاء إلى الأحد، من ١٠:٠٠ إلى ١٨:٠٠."
+      }
+    }
+  ],
+  "state": {
+    "tourPrice": {
+      "$expression": {
+        "operator": "call",
+        "target": { "$ref": "window#/Intl/formatNumber" },
+        "value": [12, null, { "style": "currency", "currency": "CAD" }]
+      }
+    },
+    "membership": {
+      "$expression": {
+        "operator": "call",
+        "target": { "$ref": "window#/Intl/formatNumber" },
+        "value": [45, null, { "style": "currency", "currency": "CAD" }]
+      }
+    },
+    "trams": {
+      "$expression": {
+        "operator": "call",
+        "target": { "$ref": "window#/Intl/formatList" },
+        "value": [["٢", "٦", "١١"]]
+      }
+    },
+    "closedFrom": {
+      "$expression": {
+        "operator": "call",
+        "target": { "$ref": "window#/Intl/formatDate" },
+        "value": ["2026-12-24", null, { "day": "numeric", "month": "long" }]
+      }
+    },
+    "closedTo": {
+      "$expression": {
+        "operator": "call",
+        "target": { "$ref": "window#/Intl/formatDate" },
+        "value": ["2026-12-26", null, { "day": "numeric", "month": "long", "year": "numeric" }]
+      }
+    }
+  },
+  "children": [
+    {
+      "tagName": "mu-pagehead",
+      "$props": {
+        "kicker": "الزيارة",
+        "title": "من العاشرة إلى السادسة، ستّة أيّام في الأسبوع",
+        "standfirst": "لا يوجد شبّاك تذاكر، لأنّه لا توجد تذكرة. ادخل من جهة الرصيف، واترك حقيبتك عند المكتب إن كانت أكبر من حقيبة كتف، وابدأ من حيث تشاء.",
+        "metaLabel": "العنوان",
+        "metaValue": "٢ رصيف الأهوسة، المرفأ القديم"
+      }
+    },
+    {
+      "tagName": "mu-band",
+      "$props": { "index": "٠١", "label": "المواعيد", "tone": "chalk" },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "repeat(2, minmax(0, 1fr))",
+            "columnGap": "clamp(2rem, 5vw, 4rem)",
+            "@--md": { "gridTemplateColumns": "minmax(0, 1fr)" }
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "children": [
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "الثلاثاء – الجمعة",
+                    "value": "١٠:٠٠ – ١٨:٠٠",
+                    "note": "آخر دخول إلى قاعة المطالعة في الساعة ١٧:٠٠."
+                  }
+                },
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "السبت – الأحد",
+                    "value": "١٠:٠٠ – ١٨:٠٠",
+                    "note": "يبقى الفناء مفتوحًا حتى ١٩:٠٠ من أيّار إلى أيلول."
+                  }
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "children": [
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "الاثنين",
+                    "value": "مغلق",
+                    "note": "يوم الصيانة. ويبقى المقهى على جهة الرصيف مفتوحًا."
+                  }
+                },
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "الإغلاق الشتويّ",
+                    "value": "من ${state.closedFrom} إلى ${state.closedTo}",
+                    "note": "الأيّام الثلاثة المتتالية الوحيدة التي تُغلق فيها القاعة طوال السنة."
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "mu-band",
+      "$props": { "index": "٠٢", "label": "الدخول", "tone": "card" },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "minmax(0, 1fr) minmax(0, 1fr)",
+            "columnGap": "clamp(2rem, 5vw, 4rem)",
+            "rowGap": "1.5rem",
+            "@--md": { "gridTemplateColumns": "minmax(0, 1fr)" }
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "border": "2px solid var(--color-ink)",
+                "backgroundColor": "var(--color-pigment)",
+                "color": "var(--color-card)",
+                "padding": "clamp(1.5rem, 3.5vw, 2.25rem)"
+              },
+              "children": [
+                {
+                  "tagName": "p",
+                  "style": {
+                    "margin": "0 0 0.9rem",
+                    "fontFamily": "var(--font-label)",
+                    "fontSize": "0.66rem",
+                    "letterSpacing": "var(--label-tracking)",
+                    "textTransform": "var(--label-case)",
+                    "opacity": "0.8"
+                  },
+                  "textContent": "الدخول العامّ"
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "margin": "0",
+                    "fontFamily": "var(--font-display)",
+                    "fontSize": "clamp(2.4rem, 6vw, 3.6rem)",
+                    "fontWeight": "700",
+                    "lineHeight": "calc(1 * var(--leading-scale))",
+                    "letterSpacing": "var(--display-tracking)"
+                  },
+                  "textContent": "مجّانيّ"
+                },
+                {
+                  "tagName": "p",
+                  "style": { "margin": "1.1rem 0 0", "lineHeight": "1.8", "maxWidth": "38ch" },
+                  "textContent": "مكتوب في اكتتاب التأسيس سنة ١٨٩٧ ولم يتغيّر قطّ. لا تذكرة، ولا حجز، ولا ساعة خاصّة بالأعضاء."
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "children": [
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "جولة مرشدة",
+                    "value": "${state.tourPrice}",
+                    "note": "تسعون دقيقة، أيّام السبت في ١١:٠٠ و١٥:٠٠. الحجز عند المكتب."
+                  }
+                },
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "العضويّة",
+                    "value": "${state.membership}",
+                    "note": "سنة من الجولات، والمجلّة الفصليّة، وصوت في الاجتماع السنويّ."
+                  }
+                },
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "المدارس",
+                    "value": "بلا مقابل، دائمًا",
+                    "note": "بما في ذلك الحافلة. راسلوا مكتب التربية قبل ستّة أسابيع."
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "mu-band",
+      "$props": { "index": "٠٣", "label": "كيف تصل", "tone": "chalk" },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "repeat(2, minmax(0, 1fr))",
+            "columnGap": "clamp(2rem, 5vw, 4rem)",
+            "@--md": { "gridTemplateColumns": "minmax(0, 1fr)" }
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "children": [
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "الترام",
+                    "value": "الخطوط ${state.trams}",
+                    "note": "المحطّة: الأهوسة. القاعة هي السقف الزجاجيّ الذي تراه أمامك حين تنزل."
+                  }
+                },
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "سيرًا",
+                    "value": "إحدى عشرة دقيقة من بوّابة البلدة القديمة",
+                    "note": "اتبع الرصيف؛ آخر المسافة مرصوف بالحصى وغير مستوٍ."
+                  }
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "children": [
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "بالدرّاجة",
+                    "value": "أربعون حاملًا تحت المظلّة الشماليّة",
+                    "note": "مغطّاة ومضاءة وعلى مرأى من مكتب الاستقبال."
+                  }
+                },
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "بالسيّارة",
+                    "value": "لا موقف خاصّ بالمتحف",
+                    "note": "موقف عامّ في الحوض الشماليّ، على بعد ستّ دقائق سيرًا فوق جسر الهويس."
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "mu-band",
+      "$props": { "index": "٠٤", "label": "سهولة الوصول", "tone": "card" },
+      "children": [
+        {
+          "tagName": "div",
+          "style": { "maxWidth": "var(--measure)" },
+          "children": [
+            {
+              "tagName": "p",
+              "style": { "margin": "0 0 1.5rem", "lineHeight": "1.9" },
+              "textContent": "كلّ صالة يمكن بلوغها دون درج من مدخل الرصيف، بما في ذلك الفناء وقاعة المطالعة. الاستثناء الوحيد ممرّ دار الجمارك، وفيه أربع درجات حجريّة بلا درابزين؛ وثمّة طريق مستوٍ يلتفّ حوله، مُشار إليه عند المدخل."
+            },
+            {
+              "tagName": "mu-fact",
+              "$props": {
+                "term": "بلا درج",
+                "value": "كلّ الصالات وقاعة المطالعة",
+                "note": "مصعدان، كلاهما يتّسع لكرسيّ متحرّك ومرافق."
+              }
+            },
+            {
+              "tagName": "mu-fact",
+              "$props": {
+                "term": "أماكن الجلوس",
+                "value": "مقعد في كلّ غرفة",
+                "note": "وكراسٍ قابلة للطيّ عند المكتب، تُعار مجّانًا وبلا تأمين."
+              }
+            },
+            {
+              "tagName": "mu-fact",
+              "$props": {
+                "term": "ساعة الهدوء",
+                "value": "الأربعاء، ١٠:٠٠ – ١١:٠٠",
+                "note": "إضاءة كاملة، وصوت مطفأ، ونصف عدد الزوّار المعتاد."
+              }
+            },
+            {
+              "tagName": "mu-fact",
+              "$props": {
+                "term": "كلاب المساعدة",
+                "value": "مرحّب بها في كلّ مكان",
+                "note": "أوعية ماء عند المدخلين وفي الفناء."
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "mu-cta",
+      "$props": {
+        "kicker": "قبل أن تأتي",
+        "heading": "انظر ما هو معلّق هذا الأسبوع.",
+        "text": "ثلاثة معارض مفتوحة، والبرنامج يذكر ما سيتغيّر بعدها.",
+        "label": "المعروض الآن",
+        "href": "/ar/exhibitions/"
+      }
+    }
+  ]
+}

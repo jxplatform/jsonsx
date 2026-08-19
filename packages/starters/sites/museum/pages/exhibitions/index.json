@@ -1,0 +1,93 @@
+{
+  "title": "Exhibitions — Atrium",
+  "description": "The current programme at Atrium: three exhibitions drawn from the city's own collection, with dates, galleries and curators.",
+  "state": {
+    "shows": {
+      "$prototype": "ContentCollection",
+      "$src": "@jxsuite/parser/ContentCollection.class.json",
+      "contentType": "exhibitions",
+      "filter": [{ "field": "lang", "op": "==", "value": "en" }],
+      "sort": [{ "field": "order", "order": "asc" }]
+    }
+  },
+  "children": [
+    {
+      "tagName": "mu-pagehead",
+      "$props": {
+        "kicker": "Programme",
+        "title": "What is hanging, and until when",
+        "standfirst": "Three exhibitions run at once: one long, one seasonal, one in the courtyard. All of them are drawn from the museum's own store rather than borrowed, so what you see here is the city looking at itself.",
+        "metaLabel": "Entry",
+        "metaValue": "Free, no booking"
+      }
+    },
+    {
+      "tagName": "mu-band",
+      "$props": { "index": "01", "label": "On now", "tone": "chalk" },
+      "children": [
+        {
+          "tagName": "div",
+          "style": { "borderBlockEnd": "1px solid var(--color-hairline)" },
+          "children": {
+            "$prototype": "Array",
+            "items": { "$ref": "#/state/shows" },
+            "map": {
+              "tagName": "mu-exhibition-row",
+              "$props": {
+                "index": "0${item.data.order}",
+                "title": "${item.data.title}",
+                "description": "${item.data.description}",
+                "gallery": "${item.data.gallery}",
+                "curator": "${item.data.curator}",
+                "curatorLabel": "Curated by",
+                "href": "/exhibitions/${item.id}/",
+                "hue": "${item.data.hue}",
+                "date": "${item.data.date}",
+                "until": "${item.data.until}",
+                "locale": "${$page.locale}"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "tagName": "mu-band",
+      "$props": { "index": "02", "label": "How the programme works", "tone": "card" },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "minmax(0, 1fr) minmax(0, 1fr)",
+            "columnGap": "clamp(2rem, 5vw, 4rem)",
+            "rowGap": "1.25rem",
+            "@--md": { "gridTemplateColumns": "minmax(0, 1fr)" }
+          },
+          "children": [
+            {
+              "tagName": "p",
+              "style": { "margin": "0", "lineHeight": "1.75" },
+              "textContent": "One exhibition changes each season and two run long, so there is always something you have not seen and something you can come back to. Nothing is ticketed separately and nothing closes for private hire during opening hours."
+            },
+            {
+              "tagName": "p",
+              "style": { "margin": "0", "lineHeight": "1.75" },
+              "textContent": "Each exhibition is written independently in every language the museum publishes — the curator who wrote the Arabic wall text for Gallery 2 is not translating the English one, and the two disagree in places. The switch at the top of this page lists the languages a page exists in, and only those."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "mu-cta",
+      "$props": {
+        "kicker": "Guided tours",
+        "heading": "Ninety minutes, Saturdays, in whichever of the three you prefer.",
+        "text": "Book at the desk on the day, or write ahead if you are bringing a group of more than eight.",
+        "label": "Visitor information",
+        "href": "/visit/"
+      }
+    }
+  ]
+}

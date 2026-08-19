@@ -1,0 +1,92 @@
+{
+  "tagName": "mu-band",
+  "state": {
+    "index": "",
+    "label": "",
+    "tone": "chalk"
+  },
+  "style": {
+    "display": "block",
+    "borderBlockStart": "2px solid var(--color-ink)",
+    "paddingBlock": "var(--band-space)",
+    "paddingInline": "var(--gutter)",
+    "backgroundColor": "${state.tone === 'card' ? 'var(--color-card)' : state.tone === 'ink' ? 'var(--color-ink)' : 'var(--color-chalk)'}",
+    "color": "${state.tone === 'ink' ? 'var(--color-chalk)' : 'var(--color-ink)'}"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "maxWidth": "var(--max-width)",
+        "marginInline": "auto",
+        "display": "grid",
+        "gridTemplateColumns": "var(--label-column) minmax(0, 1fr)",
+        "columnGap": "clamp(1.5rem, 4vw, 3.5rem)",
+        "@--md": {
+          "gridTemplateColumns": "minmax(0, 1fr)",
+          "rowGap": "1.75rem"
+        }
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "flex",
+            "flexDirection": "column",
+            "alignItems": "start",
+            "gap": "0.6rem",
+            "@--md": {
+              "flexDirection": "row",
+              "alignItems": "baseline",
+              "gap": "0.9rem"
+            }
+          },
+          "children": [
+            {
+              "tagName": "span",
+              "style": {
+                "display": "${state.index ? 'block' : 'none'}",
+                "fontFamily": "var(--font-label)",
+                "fontSize": "0.95rem",
+                "fontWeight": "500",
+                "fontVariantNumeric": "tabular-nums",
+                "lineHeight": "1",
+                "color": "${state.tone === 'ink' ? 'var(--color-chalk)' : 'var(--color-pigment)'}"
+              },
+              "textContent": "${state.index}"
+            },
+            {
+              "tagName": "span",
+              "attributes": { "aria-hidden": "true" },
+              "style": {
+                "display": "block",
+                "width": "2.25rem",
+                "height": "2px",
+                "backgroundColor": "${state.tone === 'ink' ? 'rgba(231, 227, 218, 0.5)' : 'var(--color-pigment)'}",
+                "@--md": { "display": "none" }
+              }
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "display": "${state.label ? 'block' : 'none'}",
+                "fontFamily": "var(--font-label)",
+                "fontSize": "0.66rem",
+                "lineHeight": "1.5",
+                "letterSpacing": "var(--label-tracking)",
+                "textTransform": "var(--label-case)",
+                "color": "${state.tone === 'ink' ? 'rgba(231, 227, 218, 0.7)' : 'var(--color-muted)'}"
+              },
+              "textContent": "${state.label}"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": { "minWidth": "0" },
+          "children": [{ "tagName": "slot" }]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "tagName": "mu-oculus",
+  "state": {
+    "size": "26rem",
+    "tone": "chalk"
+  },
+  "style": {
+    "display": "block",
+    "width": "100%",
+    "maxWidth": "${state.size}",
+    "marginInline": "auto",
+    "border": "2px solid var(--color-ink)",
+    "padding": "clamp(0.9rem, 2.5vw, 1.75rem)",
+    "boxSizing": "border-box",
+    "backgroundColor": "${state.tone === 'card' ? 'var(--color-card)' : 'var(--color-chalk)'}"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "attributes": {
+        "aria-hidden": "true"
+      },
+      "style": {
+        "aspectRatio": "1",
+        "borderRadius": "50%",
+        "display": "grid",
+        "placeItems": "center",
+        "background": "conic-gradient(from -90deg, var(--color-pigment) 0 25%, var(--color-pigment-deep) 25% 50%, var(--color-chalk-deep) 50% 75%, var(--color-card) 75% 100%)"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "width": "40%",
+            "aspectRatio": "1",
+            "borderRadius": "50%",
+            "backgroundColor": "var(--color-card)",
+            "border": "2px solid var(--color-ink)"
+          }
+        }
+      ]
+    }
+  ]
+}

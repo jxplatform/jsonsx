@@ -1,0 +1,317 @@
+{
+  "title": "Plan your visit — Atrium",
+  "description": "Hours, admission, transport and access for Atrium, the city museum of art and history. Free entry, Tuesday to Sunday, 10:00 to 18:00.",
+  "state": {
+    "tourPrice": {
+      "$expression": {
+        "operator": "call",
+        "target": { "$ref": "window#/Intl/formatNumber" },
+        "value": [12, null, { "style": "currency", "currency": "CAD" }]
+      }
+    },
+    "membership": {
+      "$expression": {
+        "operator": "call",
+        "target": { "$ref": "window#/Intl/formatNumber" },
+        "value": [45, null, { "style": "currency", "currency": "CAD" }]
+      }
+    },
+    "trams": {
+      "$expression": {
+        "operator": "call",
+        "target": { "$ref": "window#/Intl/formatList" },
+        "value": [["2", "6", "11"]]
+      }
+    },
+    "closedFrom": {
+      "$expression": {
+        "operator": "call",
+        "target": { "$ref": "window#/Intl/formatDate" },
+        "value": ["2026-12-24", null, { "day": "numeric", "month": "long" }]
+      }
+    },
+    "closedTo": {
+      "$expression": {
+        "operator": "call",
+        "target": { "$ref": "window#/Intl/formatDate" },
+        "value": ["2026-12-26", null, { "day": "numeric", "month": "long", "year": "numeric" }]
+      }
+    }
+  },
+  "children": [
+    {
+      "tagName": "mu-pagehead",
+      "$props": {
+        "kicker": "Visit",
+        "title": "Ten to six, six days a week",
+        "standfirst": "There is no ticket desk, because there is no ticket. Walk in from the quay side, leave your bag at the counter if it is bigger than a satchel, and start wherever you like.",
+        "metaLabel": "Address",
+        "metaValue": "2 Quai des Écluses, Old Harbour"
+      }
+    },
+    {
+      "tagName": "mu-band",
+      "$props": { "index": "01", "label": "Hours", "tone": "chalk" },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "repeat(2, minmax(0, 1fr))",
+            "columnGap": "clamp(2rem, 5vw, 4rem)",
+            "@--md": { "gridTemplateColumns": "minmax(0, 1fr)" }
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "children": [
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "Tue – Fri",
+                    "value": "10:00 – 18:00",
+                    "note": "Last entry to the reading room at 17:00."
+                  }
+                },
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "Sat – Sun",
+                    "value": "10:00 – 18:00",
+                    "note": "The courtyard stays open until 19:00 from May to September."
+                  }
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "children": [
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "Monday",
+                    "value": "Closed",
+                    "note": "Conservation day. The café on the quay side stays open."
+                  }
+                },
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "Winter closure",
+                    "value": "From ${state.closedFrom} to ${state.closedTo}",
+                    "note": "The only three consecutive days the hall is shut all year."
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "mu-band",
+      "$props": { "index": "02", "label": "Admission", "tone": "card" },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "minmax(0, 1fr) minmax(0, 1fr)",
+            "columnGap": "clamp(2rem, 5vw, 4rem)",
+            "rowGap": "1.5rem",
+            "@--md": { "gridTemplateColumns": "minmax(0, 1fr)" }
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "border": "2px solid var(--color-ink)",
+                "backgroundColor": "var(--color-pigment)",
+                "color": "var(--color-card)",
+                "padding": "clamp(1.5rem, 3.5vw, 2.25rem)"
+              },
+              "children": [
+                {
+                  "tagName": "p",
+                  "style": {
+                    "margin": "0 0 0.9rem",
+                    "fontFamily": "var(--font-label)",
+                    "fontSize": "0.66rem",
+                    "letterSpacing": "var(--label-tracking)",
+                    "textTransform": "var(--label-case)",
+                    "opacity": "0.8"
+                  },
+                  "textContent": "General admission"
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "margin": "0",
+                    "fontFamily": "var(--font-display)",
+                    "fontSize": "clamp(2.4rem, 6vw, 3.6rem)",
+                    "fontWeight": "700",
+                    "lineHeight": "calc(1 * var(--leading-scale))",
+                    "letterSpacing": "var(--display-tracking)"
+                  },
+                  "textContent": "Free"
+                },
+                {
+                  "tagName": "p",
+                  "style": { "margin": "1.1rem 0 0", "lineHeight": "1.65", "maxWidth": "34ch" },
+                  "textContent": "Written into the founding subscription of 1897 and never changed. No ticket, no booking, no members-only hour."
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "children": [
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "Guided tour",
+                    "value": "${state.tourPrice}",
+                    "note": "Ninety minutes, Saturdays at 11:00 and 15:00. Book at the desk."
+                  }
+                },
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "Membership",
+                    "value": "${state.membership}",
+                    "note": "A year of tours, the quarterly, and a vote at the annual meeting."
+                  }
+                },
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "Schools",
+                    "value": "No charge, ever",
+                    "note": "Including the coach. Write to the education desk six weeks ahead."
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "mu-band",
+      "$props": { "index": "03", "label": "Getting here", "tone": "chalk" },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "repeat(2, minmax(0, 1fr))",
+            "columnGap": "clamp(2rem, 5vw, 4rem)",
+            "@--md": { "gridTemplateColumns": "minmax(0, 1fr)" }
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "children": [
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "Tram",
+                    "value": "Lines ${state.trams}",
+                    "note": "Stop: Écluses. The hall is the glass roof on your left as you step down."
+                  }
+                },
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "On foot",
+                    "value": "Eleven minutes from the old town gate",
+                    "note": "Follow the quay; the last stretch is cobbled and uneven."
+                  }
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "children": [
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "By bicycle",
+                    "value": "Forty racks under the north canopy",
+                    "note": "Covered, lit, and in view of the front desk."
+                  }
+                },
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "By car",
+                    "value": "No museum car park",
+                    "note": "Public parking at Bassin Nord, six minutes' walk over the lock bridge."
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "mu-band",
+      "$props": { "index": "04", "label": "Access", "tone": "card" },
+      "children": [
+        {
+          "tagName": "div",
+          "style": { "maxWidth": "var(--measure)" },
+          "children": [
+            {
+              "tagName": "p",
+              "style": { "margin": "0 0 1.5rem", "lineHeight": "1.75" },
+              "textContent": "Every gallery is reachable step-free from the quay-side entrance, including the courtyard and the reading room. The only exception is the customs-house walk, which has four stone steps and no handrail; a level route around it is signed at the entrance."
+            },
+            {
+              "tagName": "mu-fact",
+              "$props": {
+                "term": "Step-free",
+                "value": "All galleries and the reading room",
+                "note": "Two lifts, both large enough for a wheelchair and a companion."
+              }
+            },
+            {
+              "tagName": "mu-fact",
+              "$props": {
+                "term": "Seating",
+                "value": "A bench in every room",
+                "note": "Folding stools at the desk, free to borrow, no deposit."
+              }
+            },
+            {
+              "tagName": "mu-fact",
+              "$props": {
+                "term": "Quiet hour",
+                "value": "Wednesdays, 10:00 – 11:00",
+                "note": "Lights up, sound off, and half the usual visitor numbers."
+              }
+            },
+            {
+              "tagName": "mu-fact",
+              "$props": {
+                "term": "Assistance dogs",
+                "value": "Welcome everywhere",
+                "note": "Water bowls at both entrances and in the courtyard."
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "mu-cta",
+      "$props": {
+        "kicker": "Before you come",
+        "heading": "See what is hanging this week.",
+        "text": "Three exhibitions are open, and the programme lists what changes next.",
+        "label": "What's on",
+        "href": "/exhibitions/"
+      }
+    }
+  ]
+}

@@ -1,0 +1,329 @@
+{
+  "tagName": "div",
+  "$elements": [
+    {
+      "$ref": "../components/mu-footer.json"
+    }
+  ],
+  "state": {
+    "brand": "Atrium",
+    "skipLabel": "Skip to content",
+    "railNote": "City Museum of Art & History · Open today 10:00–18:00",
+    "languageNavLabel": "Language",
+    "mainNavLabel": "Main",
+    "navExhibitions": "Exhibitions",
+    "navVisit": "Visit",
+    "navAbout": "About",
+    "homeHref": "/",
+    "exhibitionsHref": "/exhibitions/",
+    "visitHref": "/visit/",
+    "aboutHref": "/about/",
+    "footerTagline": "A city museum in a glass hall: four centuries of the harbour, its makers and its maps, held in trust for everyone who lives here.",
+    "footerVisitLabel": "Find us",
+    "footerAddress": "2 Quai des Écluses, Old Harbour",
+    "footerHours": "Tuesday to Sunday, 10:00–18:00. Closed Mondays.",
+    "footerReadLabel": "Read",
+    "footerExhibitionsLink": "Exhibitions",
+    "footerVisitLink": "Plan your visit",
+    "footerAboutLink": "About the museum",
+    "footerContactLabel": "Contact",
+    "footerEmail": "bonjour@atrium.example",
+    "footerPhone": "+1 555 0140",
+    "footerLegal": "© 2026 Atrium — City Museum of Art & History",
+    "footerCredit": "A civic museum, free to enter, in three languages."
+  },
+  "style": {
+    "minHeight": "100vh",
+    "display": "flex",
+    "flexDirection": "column",
+    "backgroundColor": "var(--color-chalk)"
+  },
+  "children": [
+    {
+      "tagName": "a",
+      "attributes": {
+        "href": "#main"
+      },
+      "textContent": "${state.skipLabel}",
+      "style": {
+        "position": "absolute",
+        "insetBlockStart": "0.5rem",
+        "insetInlineStart": "0.5rem",
+        "zIndex": "100",
+        "backgroundColor": "var(--color-ink)",
+        "color": "var(--color-chalk)",
+        "fontFamily": "var(--font-label)",
+        "fontSize": "0.7rem",
+        "letterSpacing": "var(--label-tracking)",
+        "textTransform": "var(--label-case)",
+        "textDecoration": "none",
+        "padding": "0.6rem 1rem",
+        "transform": "translateY(-250%)",
+        ":focus": {
+          "transform": "translateY(0)"
+        }
+      }
+    },
+    {
+      "tagName": "header",
+      "style": {
+        "position": "sticky",
+        "insetBlockStart": "0",
+        "zIndex": "50",
+        "backgroundColor": "var(--color-card)",
+        "borderBlockEnd": "2px solid var(--color-ink)"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "backgroundColor": "var(--color-ink)",
+            "color": "var(--color-chalk)"
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "maxWidth": "var(--max-width)",
+                "marginInline": "auto",
+                "paddingInline": "var(--gutter)",
+                "minHeight": "2.5rem",
+                "display": "flex",
+                "alignItems": "stretch",
+                "justifyContent": "space-between",
+                "gap": "1.5rem",
+                "fontFamily": "var(--font-label)",
+                "fontSize": "0.66rem",
+                "letterSpacing": "var(--label-tracking)",
+                "textTransform": "var(--label-case)"
+              },
+              "children": [
+                {
+                  "tagName": "p",
+                  "style": {
+                    "margin": "0",
+                    "alignSelf": "center",
+                    "color": "rgba(231, 227, 218, 0.66)",
+                    "@--md": {
+                      "display": "none"
+                    }
+                  },
+                  "textContent": "${state.railNote}"
+                },
+                {
+                  "tagName": "nav",
+                  "attributes": {
+                    "aria-label": "${state.languageNavLabel}"
+                  },
+                  "style": {
+                    "display": "flex",
+                    "alignItems": "stretch",
+                    "marginInlineStart": "auto"
+                  },
+                  "children": {
+                    "$prototype": "Array",
+                    "items": {
+                      "$ref": "#/state/$page/alternates"
+                    },
+                    "map": {
+                      "tagName": "a",
+                      "lang": "${item.code}",
+                      "attributes": {
+                        "dir": "${item.dir}",
+                        "href": "${item.url}",
+                        "hreflang": "${item.code}",
+                        "aria-current": "${item.current ? 'page' : 'false'}"
+                      },
+                      "textContent": "${item.label}",
+                      "style": {
+                        "display": "inline-flex",
+                        "alignItems": "center",
+                        "paddingInline": "0.85rem",
+                        "paddingBlock": "0.7rem",
+                        "textDecoration": "none",
+                        "whiteSpace": "nowrap",
+                        "transition": "color 0.15s, background-color 0.15s",
+                        "color": "${item.current ? 'var(--color-chalk)' : 'rgba(231, 227, 218, 0.6)'}",
+                        "backgroundColor": "${item.current ? 'rgba(231, 227, 218, 0.1)' : 'transparent'}",
+                        "boxShadow": "${item.current ? 'inset 0 -2px 0 0 var(--color-chalk)' : 'none'}",
+                        ":hover": {
+                          "color": "var(--color-chalk)",
+                          "backgroundColor": "rgba(231, 227, 218, 0.1)"
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "maxWidth": "var(--max-width)",
+            "marginInline": "auto",
+            "paddingInline": "var(--gutter)",
+            "minHeight": "4.6rem",
+            "display": "flex",
+            "alignItems": "center",
+            "justifyContent": "space-between",
+            "gap": "1.5rem"
+          },
+          "children": [
+            {
+              "tagName": "a",
+              "attributes": {
+                "href": "${state.homeHref}"
+              },
+              "style": {
+                "display": "inline-flex",
+                "alignItems": "center",
+                "gap": "0.7rem",
+                "textDecoration": "none",
+                "color": "var(--color-ink)"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "attributes": {
+                    "aria-hidden": "true"
+                  },
+                  "style": {
+                    "width": "1.05rem",
+                    "height": "1.05rem",
+                    "borderRadius": "50%",
+                    "backgroundColor": "var(--color-pigment)",
+                    "flex": "0 0 auto"
+                  }
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontFamily": "var(--font-display)",
+                    "fontSize": "1.55rem",
+                    "fontWeight": "700",
+                    "lineHeight": "1",
+                    "letterSpacing": "var(--display-tracking)"
+                  },
+                  "textContent": "${state.brand}"
+                }
+              ]
+            },
+            {
+              "tagName": "nav",
+              "attributes": {
+                "aria-label": "${state.mainNavLabel}"
+              },
+              "style": {
+                "display": "flex",
+                "alignItems": "center",
+                "gap": "1.9rem",
+                "fontFamily": "var(--font-label)",
+                "fontSize": "0.7rem",
+                "letterSpacing": "var(--label-tracking)",
+                "textTransform": "var(--label-case)",
+                "@--sm": {
+                  "gap": "1.1rem"
+                }
+              },
+              "children": [
+                {
+                  "tagName": "a",
+                  "attributes": {
+                    "href": "${state.exhibitionsHref}"
+                  },
+                  "textContent": "${state.navExhibitions}",
+                  "style": {
+                    "color": "var(--color-ink)",
+                    "textDecoration": "none",
+                    "paddingBlock": "0.35rem",
+                    "borderBlockEnd": "2px solid transparent",
+                    "transition": "color 0.15s, border-color 0.15s",
+                    ":hover": {
+                      "color": "var(--color-pigment)",
+                      "borderBlockEnd": "2px solid var(--color-pigment)"
+                    }
+                  }
+                },
+                {
+                  "tagName": "a",
+                  "attributes": {
+                    "href": "${state.visitHref}"
+                  },
+                  "textContent": "${state.navVisit}",
+                  "style": {
+                    "color": "var(--color-ink)",
+                    "textDecoration": "none",
+                    "paddingBlock": "0.35rem",
+                    "borderBlockEnd": "2px solid transparent",
+                    "transition": "color 0.15s, border-color 0.15s",
+                    ":hover": {
+                      "color": "var(--color-pigment)",
+                      "borderBlockEnd": "2px solid var(--color-pigment)"
+                    }
+                  }
+                },
+                {
+                  "tagName": "a",
+                  "attributes": {
+                    "href": "${state.aboutHref}"
+                  },
+                  "textContent": "${state.navAbout}",
+                  "style": {
+                    "color": "var(--color-ink)",
+                    "textDecoration": "none",
+                    "paddingBlock": "0.35rem",
+                    "borderBlockEnd": "2px solid transparent",
+                    "@--sm": {
+                      "display": "none"
+                    },
+                    "transition": "color 0.15s, border-color 0.15s",
+                    ":hover": {
+                      "color": "var(--color-pigment)",
+                      "borderBlockEnd": "2px solid var(--color-pigment)"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "main",
+      "id": "main",
+      "style": {
+        "flex": "1"
+      },
+      "children": [
+        {
+          "tagName": "slot"
+        }
+      ]
+    },
+    {
+      "tagName": "mu-footer",
+      "$props": {
+        "brand": "${state.brand}",
+        "tagline": "${state.footerTagline}",
+        "visitLabel": "${state.footerVisitLabel}",
+        "address": "${state.footerAddress}",
+        "hours": "${state.footerHours}",
+        "readLabel": "${state.footerReadLabel}",
+        "exhibitionsLink": "${state.footerExhibitionsLink}",
+        "visitLink": "${state.footerVisitLink}",
+        "aboutLink": "${state.footerAboutLink}",
+        "contactLabel": "${state.footerContactLabel}",
+        "email": "${state.footerEmail}",
+        "phone": "${state.footerPhone}",
+        "legal": "${state.footerLegal}",
+        "credit": "${state.footerCredit}",
+        "exhibitionsHref": "${state.exhibitionsHref}",
+        "visitHref": "${state.visitHref}",
+        "aboutHref": "${state.aboutHref}"
+      }
+    }
+  ]
+}

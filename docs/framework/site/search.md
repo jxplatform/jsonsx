@@ -67,7 +67,17 @@ Bind an input to `state.q` and map over `state.results`. Each result group is a 
 }
 ```
 
-In compiled sites the def lowers to plain client code that lazily loads the bundled client and fetches the index on first use — nothing is downloaded until the visitor actually searches. Options: `limit` (max rows, default 8), `group` (set `false` for the flat row list described below), `index` (override the index URL).
+In compiled sites the def lowers to plain client code that lazily loads the bundled client and fetches the index on first use — nothing is downloaded until the visitor actually searches. Options: `limit` (max rows, default 8), `group` (set `false` for the flat row list described below), `index` (override the index URL), `locale` (see below).
+
+### On a multilingual site
+
+A collection kept [one directory per locale](./i18n.md#content-in-one-directory-per-locale) is indexed once per language, and the search box **searches the page's own language** with no configuration — it reads `<html lang>`, which the build wrote from the route's locale. Results link into that language's URL space.
+
+Set `locale` to override it: a tag to search one named language, or `null` to search every one.
+
+:::doc-note
+Without that default, a reader searching a French page would be handed the English copy of the page they're already on — ranked first, because it matched the same words.
+:::
 
 ## Building a search UI component
 

@@ -32,6 +32,12 @@ export interface SearchDef {
   group?: boolean;
   /** Override the index URL (defaults to the project's `search.output`). */
   index?: string;
+  /**
+   * Language to search in. Omitted, the client uses the page's own — `<html lang>`, which the build
+   * wrote from the route's locale — so a search box needs no configuration to stop handing a French
+   * reader the English copy of the page they are on. `null` searches every language.
+   */
+  locale?: string | null;
   default?: unknown;
   [key: string]: unknown;
 }
@@ -75,13 +81,17 @@ export class Search {
     const clientUrl = sidecarAssetPath(CLIENT_SPECIFIER);
     const client = (await import(clientUrl)) as {
       preload: (url?: string) => Promise<void>;
-      query: (q: string, opts?: { limit?: number; group?: boolean }) => unknown;
+      query: (
+        q: string,
+        opts?: { limit?: number; group?: boolean; locale?: string | null },
+      ) => unknown;
     };
     await client.preload(this.indexUrl());
     const query = typeof this.config.query === "string" ? this.config.query : "";
     return client.query(query, {
       group: this.config.group ?? true,
       limit: this.config.limit ?? 8,
+      ...(this.config.locale === undefined ? {} : { locale: this.config.locale }),
     });
   }
 
@@ -98,7 +108,16 @@ export class Search {
   static lower(def: SearchDef, context: LowerContext = {}): Record<string, unknown> {
     const indexUrl = def.index ?? context.projectConfig?.search?.output ?? "/search-index.json";
     const clientUrl = sidecarAssetPath(CLIENT_SPECIFIER);
-    const opts = JSON.stringify({ group: def.group ?? true, limit: def.limit ?? 8 });
+    /*
+     * `locale` is passed only when the def names one. Omitting the key is not the same as passing
+     * `undefined` through JSON — the client reads "absent" as "the page's own language", which is
+     * the default a search box should have and the one nobody has to configure.
+     */
+    const opts = JSON.stringify({
+      group: def.group ?? true,
+      limit: def.limit ?? 8,
+      ...(def.locale === undefined ? {} : { locale: def.locale }),
+    });
     const body = [
       // Reading the ready flag makes the computed re-run when the client finishes loading.
       "void state.__jxSearchReady;",

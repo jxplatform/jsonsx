@@ -83,12 +83,28 @@ export async function readPageDocument(
  * moment later while being compiled, where the error names the page and the rest of the site still
  * builds; failing in a pre-pass would turn one bad page into no site at all.
  *
- * @param {readonly { sourcePath: string; urlPattern: string }[]} routes - Concrete routes
+ * **A key may name its route's parameters**, as `${slug}`, and that is what makes a collection's
+ * localized URLs work: one `[slug]` template expands to one route per entry, so a key that could
+ * not vary per entry would claim a single identity for the whole collection and the build would
+ * report it as a duplicate. `pages/fr-ca/expositions/[slug].json` declaring `"exhibitions/${slug}"`
+ * pairs each French post with the English one it translates, because two translations of an entry
+ * share an id (§13.3) and the id is what the parameter carries.
+ *
+ * @param {readonly {
+ *   sourcePath: string;
+ *   urlPattern: string;
+ *   _pathParams?: Record<string, string>;
+ * }[]} routes
+ *   - Concrete routes
  * @param {FormatRegistry} [registry]
  * @returns {Promise<Map<string, string>>} Keyed by `urlPattern`
  */
 export async function readTranslationKeys(
-  routes: readonly { sourcePath: string; urlPattern: string }[],
+  routes: readonly {
+    sourcePath: string;
+    urlPattern: string;
+    _pathParams?: Record<string, string> | undefined;
+  }[],
   registry?: FormatRegistry,
 ): Promise<Map<string, string>> {
   const out = new Map<string, string>();
@@ -99,10 +115,28 @@ export async function readTranslationKeys(
     }
     const key = byFile.get(route.sourcePath);
     if (key !== null && key !== undefined) {
-      out.set(route.urlPattern, key);
+      out.set(route.urlPattern, withRouteParams(key, route._pathParams));
     }
   }
   return out;
+}
+
+/**
+ * Substitute a route's own parameters into a declared key.
+ *
+ * A parameter with no value is left as it was written rather than blanked: a key that quietly
+ * became `exhibitions/` would pair every entry in the collection with every other, which is a
+ * duplicate the build reports — and the report naming `${slug}` says what is actually wrong.
+ *
+ * @param {string} key
+ * @param {Record<string, string> | undefined} params
+ * @returns {string}
+ */
+function withRouteParams(key: string, params: Record<string, string> | undefined): string {
+  if (!key.includes("${")) {
+    return key;
+  }
+  return key.replaceAll(/\$\{(\w+)\}/g, (whole, name: string) => params?.[name] ?? whole);
 }
 
 /**

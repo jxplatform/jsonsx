@@ -138,6 +138,22 @@ beforeAll(async () => {
   // Arabic has a home page and no About: a partial set is the ordinary case, not the exception.
   write("pages/ar/index.json", page("الرئيسية"));
 
+  /*
+   * A collection whose French URLs are translated too: the directory differs (`carnet` vs `notes`)
+   * and only a declared key naming the route's own parameter can pair the two.
+   */
+  const notes = JSON.stringify({
+    $paths: { param: "slug", values: ["first", "second"] },
+    children: [{ tagName: "h1", textContent: "${$page.params.slug}" }],
+    tagName: "article",
+    title: "Note",
+  });
+  write("pages/notes/[slug].json", notes);
+  write(
+    "pages/fr-ca/carnet/[slug].json",
+    JSON.stringify({ ...(JSON.parse(notes) as object), $translationKey: "notes/${slug}" }),
+  );
+
   await buildSite(root);
 });
 
@@ -219,6 +235,22 @@ describe("the hreflang graph", () => {
         expect(existsSync(join(root, "dist", path, "index.html"))).toBe(true);
       }
     }
+  });
+});
+
+describe("a localized collection URL", () => {
+  /*
+   * The case a per-page key cannot reach: one `[slug]` template expands to one route per entry, so
+   * a key that could not vary per entry would claim one identity for the whole collection. Two
+   * translations of an entry share an id (§13.3), and the id is what the route parameter carries.
+   */
+  it("pairs each entry with its translation through a parameter in the key", () => {
+    expect(alternates(html("notes/first"))["fr-CA"]).toBe(`${SITE}/fr-ca/carnet/first`);
+    expect(alternates(html("fr-ca/carnet/first"))["en"]).toBe(`${SITE}/notes/first`);
+  });
+
+  it("keeps entries apart — one key per entry, not one for the collection", () => {
+    expect(alternates(html("notes/second"))["fr-CA"]).toBe(`${SITE}/fr-ca/carnet/second`);
   });
 });
 

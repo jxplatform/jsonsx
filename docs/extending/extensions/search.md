@@ -11,6 +11,7 @@ code:
   - extensions/search/src/search-index.ts
   - extensions/search/src/search-state.ts
   - extensions/search/src/shared.ts
+  - extensions/search/src/client.ts
 ---
 
 # Search indexes
@@ -73,6 +74,30 @@ The result is one JSON envelope at the configured `output` path:
 ```
 
 The emitter returns data; **the host writes the files**, guards against path traversal, and skips the emitter entirely when the project declares no `search` section — the same gating as section loading and server mounts.
+
+### Multilingual collections
+
+A collection kept [one directory per locale](/docs/framework/site/i18n) indexes each language separately. Every document from a localized entry carries three things the monolingual case doesn't need:
+
+| Field    | Is                                                                         |
+| -------- | -------------------------------------------------------------------------- |
+| `url`    | the entry's URL **in its own language** — `/fr-ca/blog/hello/`             |
+| `id`     | `<collection>:<locale>:<entry-id>`, because translations share an entry id |
+| `locale` | the canonical tag                                                          |
+
+The client then searches **the page's language by default**, read from `<html lang>` — which the build wrote from the route's locale, so it is the same answer the index was built against:
+
+```js
+query("bonjour"); // the page's language
+query("bonjour", { locale: "fr-CA" }); // a named language
+query("bonjour", { locale: null }); // every language
+```
+
+A document with no `locale` — an unlocalized collection — answers every search. It isn't in one language; it's outside the question.
+
+:::doc-note
+Without the scoping, a reader searching a French page gets the English copy of the page they're already on, ranked first, because it matched the same words.
+:::
 
 ## Lowering `Search` to client code
 

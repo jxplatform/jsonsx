@@ -1,0 +1,236 @@
+{
+  "title": "Atrium — City Museum of Art and History",
+  "description": "A city museum in a glass hall: four centuries of the harbour, its makers and its maps. Free entry, Tuesday to Sunday, in English, French and Arabic.",
+  "state": {
+    "objects": {
+      "$expression": {
+        "operator": "call",
+        "target": { "$ref": "window#/Intl/formatNumber" },
+        "value": [18400]
+      }
+    },
+    "visitors": {
+      "$expression": {
+        "operator": "call",
+        "target": { "$ref": "window#/Intl/formatNumber" },
+        "value": [212000]
+      }
+    },
+    "founded": {
+      "$expression": {
+        "operator": "call",
+        "target": { "$ref": "window#/Intl/formatDate" },
+        "value": ["1897-11-04", null, { "day": "numeric", "month": "long", "year": "numeric" }]
+      }
+    },
+    "openDays": {
+      "$expression": {
+        "operator": "call",
+        "target": { "$ref": "window#/Intl/formatList" },
+        "value": [["Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]]
+      }
+    },
+    "shows": {
+      "$prototype": "ContentCollection",
+      "$src": "@jxsuite/parser/ContentCollection.class.json",
+      "contentType": "exhibitions",
+      "filter": [{ "field": "lang", "op": "==", "value": "en" }],
+      "sort": [{ "field": "order", "order": "asc" }],
+      "limit": 3
+    }
+  },
+  "children": [
+    {
+      "tagName": "mu-hero",
+      "$props": {
+        "kicker": "City Museum of Art & History",
+        "title": "Four centuries, one glass hall",
+        "standfirst": "Atrium holds what the city made, bought, salvaged and argued over since the first stone quay went in — and shows it free, in three languages, six days a week.",
+        "primaryLabel": "Plan your visit",
+        "primaryHref": "/visit/",
+        "secondaryLabel": "What's on",
+        "secondaryHref": "/exhibitions/",
+        "noteLabel": "Free entry",
+        "note": "Tuesday to Sunday, 10:00–18:00"
+      }
+    },
+    {
+      "tagName": "mu-band",
+      "$props": { "index": "01", "label": "Now on view", "tone": "chalk" },
+      "children": [
+        {
+          "tagName": "h2",
+          "style": {
+            "margin": "0 0 2.25rem",
+            "fontFamily": "var(--font-display)",
+            "fontSize": "clamp(1.7rem, 3.6vw, 2.6rem)",
+            "fontWeight": "500",
+            "lineHeight": "calc(1.08 * var(--leading-scale))",
+            "letterSpacing": "var(--display-tracking)",
+            "maxWidth": "22ch"
+          },
+          "textContent": "Three exhibitions, all of them about this place"
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "repeat(3, minmax(0, 1fr))",
+            "gap": "clamp(1rem, 2.5vw, 1.75rem)",
+            "@--md": { "gridTemplateColumns": "repeat(2, minmax(0, 1fr))" },
+            "@--sm": { "gridTemplateColumns": "minmax(0, 1fr)" }
+          },
+          "children": {
+            "$prototype": "Array",
+            "items": { "$ref": "#/state/shows" },
+            "map": {
+              "tagName": "mu-exhibition-card",
+              "$props": {
+                "title": "${item.data.title}",
+                "description": "${item.data.description}",
+                "gallery": "${item.data.gallery}",
+                "status": "Open now",
+                "href": "/exhibitions/${item.id}/",
+                "hue": "${item.data.hue}",
+                "date": "${item.data.date}",
+                "until": "${item.data.until}",
+                "locale": "${$page.locale}"
+              }
+            }
+          }
+        },
+        {
+          "tagName": "mu-more",
+          "$props": {
+            "label": "The whole programme",
+            "href": "/exhibitions/",
+            "space": "2rem"
+          }
+        }
+      ]
+    },
+    {
+      "tagName": "mu-band",
+      "$props": { "index": "02", "label": "The museum in numbers", "tone": "card" },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "repeat(2, minmax(0, 1fr))",
+            "columnGap": "clamp(2rem, 5vw, 4rem)",
+            "@--md": { "gridTemplateColumns": "minmax(0, 1fr)" }
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "children": [
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "Objects",
+                    "value": "${state.objects}",
+                    "note": "Catalogued, of which about a tenth are on show at any one time."
+                  }
+                },
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "Visitors",
+                    "value": "${state.visitors}",
+                    "note": "In the last full year, counted at the door."
+                  }
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "children": [
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "Founded",
+                    "value": "${state.founded}",
+                    "note": "By a subscription of 240 households, in a room above the customs house."
+                  }
+                },
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "Open",
+                    "value": "${state.openDays}",
+                    "note": "Closed Mondays, and on the two days a year the hall is cleaned."
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "margin": "2rem 0 0",
+            "paddingBlockStart": "1.1rem",
+            "borderBlockStart": "1px solid var(--color-hairline)",
+            "fontSize": "0.95rem",
+            "lineHeight": "1.6",
+            "color": "var(--color-muted)",
+            "maxWidth": "var(--measure)"
+          },
+          "textContent": "Every figure here is formatted by the page's own language: this document renders 18,400 in English, 18 400 in French and ١٨٬٤٠٠ in Arabic, because the route already said which language it is."
+        }
+      ]
+    },
+    {
+      "tagName": "mu-band",
+      "$props": { "index": "03", "label": "From the reading room", "tone": "chalk" },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "minmax(0, 1.05fr) minmax(0, 1fr)",
+            "columnGap": "clamp(2rem, 5vw, 4rem)",
+            "alignItems": "start",
+            "@--md": { "gridTemplateColumns": "minmax(0, 1fr)", "rowGap": "2rem" }
+          },
+          "children": [
+            {
+              "tagName": "mu-quote",
+              "$props": {
+                "quote": "A museum is a room where a city keeps the things it cannot agree about.",
+                "attribution": "Hélène Fournier, first curator, 1897"
+              }
+            },
+            {
+              "tagName": "div",
+              "style": { "maxWidth": "var(--measure)" },
+              "children": [
+                {
+                  "tagName": "p",
+                  "style": { "margin": "0", "lineHeight": "1.75" },
+                  "textContent": "The reading room on the second floor is open to anyone with a question. Its shelves hold the harbour ledgers, the survey notebooks, four hundred boxes of workshop correspondence, and the museum's own minute books — including the ones recording arguments the trustees would rather have kept quiet."
+                },
+                {
+                  "tagName": "p",
+                  "style": { "margin": "1.1rem 0 0", "lineHeight": "1.75" },
+                  "textContent": "No appointment is needed to read; one is needed to handle. Ask at the desk and a member of staff will bring the box up within the hour."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "mu-cta",
+      "$props": {
+        "kicker": "Free entry",
+        "heading": "The hall is open. Come and disagree with us.",
+        "text": "Six days a week, ten to six, no ticket and no booking. The courtyard stays open an hour later through the summer.",
+        "label": "Plan your visit",
+        "href": "/visit/"
+      }
+    }
+  ]
+}

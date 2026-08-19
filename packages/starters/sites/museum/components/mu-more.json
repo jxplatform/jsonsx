@@ -1,0 +1,63 @@
+{
+  "tagName": "mu-more",
+  "state": {
+    "label": "",
+    "href": "#",
+    "space": "0"
+  },
+  "style": {
+    "display": "block"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "marginBlockStart": "${state.space}"
+      },
+      "children": [
+        {
+          "tagName": "a",
+          "attributes": {
+            "href": "${state.href}"
+          },
+          "style": {
+            "display": "inline-flex",
+            "alignItems": "baseline",
+            "gap": "0.6rem",
+            "fontFamily": "var(--font-label)",
+            "fontSize": "0.7rem",
+            "letterSpacing": "var(--label-tracking)",
+            "textTransform": "var(--label-case)",
+            "textDecoration": "none",
+            "paddingBlockEnd": "0.2rem",
+            "color": "var(--color-pigment)",
+            "borderBlockEnd": "2px solid var(--color-pigment)",
+            "transition": "color 0.15s, border-color 0.15s",
+            ":hover": {
+              "color": "var(--color-ink)",
+              "borderColor": "var(--color-ink)"
+            }
+          },
+          "children": [
+            {
+              "tagName": "span",
+              "textContent": "${state.label}"
+            },
+            {
+              "tagName": "span",
+              "attributes": {
+                "aria-hidden": "true"
+              },
+              "style": {
+                "display": "inline-block",
+                "lineHeight": "1",
+                "transform": "scaleX(var(--flip-inline, 1))"
+              },
+              "textContent": "→"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

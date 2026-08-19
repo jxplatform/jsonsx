@@ -1,0 +1,246 @@
+{
+  "$layout": "./layouts/fr-ca.json",
+  "title": "Atrium — Musée municipal d'art et d'histoire",
+  "description": "Un musée municipal sous une halle de verre : quatre siècles de port, de métiers et de cartes. Entrée libre, du mardi au dimanche, en anglais, en français et en arabe.",
+  "$head": [
+    {
+      "tagName": "meta",
+      "attributes": {
+        "name": "description",
+        "content": "Un musée municipal sous une halle de verre : quatre siècles de port, de métiers et de cartes. Entrée libre, du mardi au dimanche, en anglais, en français et en arabe."
+      }
+    }
+  ],
+  "state": {
+    "objects": {
+      "$expression": {
+        "operator": "call",
+        "target": { "$ref": "window#/Intl/formatNumber" },
+        "value": [18400]
+      }
+    },
+    "visitors": {
+      "$expression": {
+        "operator": "call",
+        "target": { "$ref": "window#/Intl/formatNumber" },
+        "value": [212000]
+      }
+    },
+    "founded": {
+      "$expression": {
+        "operator": "call",
+        "target": { "$ref": "window#/Intl/formatDate" },
+        "value": ["1897-11-04", null, { "day": "numeric", "month": "long", "year": "numeric" }]
+      }
+    },
+    "openDays": {
+      "$expression": {
+        "operator": "call",
+        "target": { "$ref": "window#/Intl/formatList" },
+        "value": [["mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]]
+      }
+    },
+    "shows": {
+      "$prototype": "ContentCollection",
+      "$src": "@jxsuite/parser/ContentCollection.class.json",
+      "contentType": "exhibitions",
+      "filter": [{ "field": "lang", "op": "==", "value": "fr-CA" }],
+      "sort": [{ "field": "order", "order": "asc" }],
+      "limit": 3
+    }
+  },
+  "children": [
+    {
+      "tagName": "mu-hero",
+      "$props": {
+        "kicker": "Musée municipal d'art et d'histoire",
+        "title": "Quatre siècles, une seule halle de verre",
+        "standfirst": "Atrium conserve ce que la ville a fabriqué, acheté, repêché et contesté depuis la pose du premier quai de pierre — et le montre gratuitement, en trois langues, six jours sur sept.",
+        "primaryLabel": "Préparer sa visite",
+        "primaryHref": "/fr-ca/visite/",
+        "secondaryLabel": "À l'affiche",
+        "secondaryHref": "/fr-ca/expositions/",
+        "noteLabel": "Entrée libre",
+        "note": "Du mardi au dimanche, de 10 h à 18 h"
+      }
+    },
+    {
+      "tagName": "mu-band",
+      "$props": { "index": "01", "label": "En salle en ce moment", "tone": "chalk" },
+      "children": [
+        {
+          "tagName": "h2",
+          "style": {
+            "margin": "0 0 2.25rem",
+            "fontFamily": "var(--font-display)",
+            "fontSize": "clamp(1.7rem, 3.6vw, 2.6rem)",
+            "fontWeight": "500",
+            "lineHeight": "calc(1.08 * var(--leading-scale))",
+            "letterSpacing": "var(--display-tracking)",
+            "maxWidth": "22ch"
+          },
+          "textContent": "Trois expositions, et toutes parlent d'ici"
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "repeat(3, minmax(0, 1fr))",
+            "gap": "clamp(1rem, 2.5vw, 1.75rem)",
+            "@--md": { "gridTemplateColumns": "repeat(2, minmax(0, 1fr))" },
+            "@--sm": { "gridTemplateColumns": "minmax(0, 1fr)" }
+          },
+          "children": {
+            "$prototype": "Array",
+            "items": { "$ref": "#/state/shows" },
+            "map": {
+              "tagName": "mu-exhibition-card",
+              "$props": {
+                "title": "${item.data.title}",
+                "description": "${item.data.description}",
+                "gallery": "${item.data.gallery}",
+                "status": "À l'affiche",
+                "href": "/fr-ca/expositions/${item.id}/",
+                "hue": "${item.data.hue}",
+                "date": "${item.data.date}",
+                "until": "${item.data.until}",
+                "locale": "${$page.locale}"
+              }
+            }
+          }
+        },
+        {
+          "tagName": "mu-more",
+          "$props": {
+            "label": "Toute la programmation",
+            "href": "/fr-ca/expositions/",
+            "space": "2rem"
+          }
+        }
+      ]
+    },
+    {
+      "tagName": "mu-band",
+      "$props": { "index": "02", "label": "Le musée en chiffres", "tone": "card" },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "repeat(2, minmax(0, 1fr))",
+            "columnGap": "clamp(2rem, 5vw, 4rem)",
+            "@--md": { "gridTemplateColumns": "minmax(0, 1fr)" }
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "children": [
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "Objets",
+                    "value": "${state.objects}",
+                    "note": "Catalogués, dont environ un dixième est exposé à un moment donné."
+                  }
+                },
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "Visites",
+                    "value": "${state.visitors}",
+                    "note": "Au cours de la dernière année complète, comptées à la porte."
+                  }
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "children": [
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "Fondation",
+                    "value": "${state.founded}",
+                    "note": "Par une souscription de 240 ménages, dans une pièce au-dessus de la douane."
+                  }
+                },
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "Ouvert",
+                    "value": "${state.openDays}",
+                    "note": "Fermé le lundi, et les deux jours par année où la halle est nettoyée."
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "margin": "2rem 0 0",
+            "paddingBlockStart": "1.1rem",
+            "borderBlockStart": "1px solid var(--color-hairline)",
+            "fontSize": "0.95rem",
+            "lineHeight": "1.6",
+            "color": "var(--color-muted)",
+            "maxWidth": "var(--measure)"
+          },
+          "textContent": "Chaque chiffre est mis en forme par la langue de la page : ce document affiche 18 400 en français, 18,400 en anglais et ١٨٬٤٠٠ en arabe, parce que la route avait déjà dit de quelle langue il s'agit."
+        }
+      ]
+    },
+    {
+      "tagName": "mu-band",
+      "$props": { "index": "03", "label": "Depuis la salle de lecture", "tone": "chalk" },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "minmax(0, 1.05fr) minmax(0, 1fr)",
+            "columnGap": "clamp(2rem, 5vw, 4rem)",
+            "alignItems": "start",
+            "@--md": { "gridTemplateColumns": "minmax(0, 1fr)", "rowGap": "2rem" }
+          },
+          "children": [
+            {
+              "tagName": "mu-quote",
+              "$props": {
+                "quote": "Un musée, c'est la salle où une ville garde ce sur quoi elle n'arrive pas à s'entendre.",
+                "attribution": "Hélène Fournier, première conservatrice, 1897"
+              }
+            },
+            {
+              "tagName": "div",
+              "style": { "maxWidth": "var(--measure)" },
+              "children": [
+                {
+                  "tagName": "p",
+                  "style": { "margin": "0", "lineHeight": "1.75" },
+                  "textContent": "La salle de lecture du deuxième étage est ouverte à quiconque a une question. Ses rayons portent les registres du port, les carnets d'arpentage, quatre cents boîtes de correspondance d'atelier et les livres de procès-verbaux du musée lui-même — y compris ceux qui consignent des chicanes que le conseil d'administration aurait préféré taire."
+                },
+                {
+                  "tagName": "p",
+                  "style": { "margin": "1.1rem 0 0", "lineHeight": "1.75" },
+                  "textContent": "Aucun rendez-vous pour lire ; il en faut un pour manipuler. Demandez au comptoir et un membre du personnel montera la boîte dans l'heure."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "mu-cta",
+      "$props": {
+        "kicker": "Entrée libre",
+        "heading": "La halle est ouverte. Venez nous contredire.",
+        "text": "Six jours sur sept, de dix heures à six heures, sans billet ni réservation. La cour reste ouverte une heure de plus pendant l'été.",
+        "label": "Préparer sa visite",
+        "href": "/fr-ca/visite/"
+      }
+    }
+  ]
+}

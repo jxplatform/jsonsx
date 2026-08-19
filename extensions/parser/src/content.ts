@@ -32,7 +32,11 @@ interface EntryConfig {
     [k: string]: unknown;
   };
   _document?: {
-    route?: { _pathParams?: Record<string, string> };
+    route?: {
+      _pathParams?: Record<string, string>;
+      /** The language this route serves, when the project declares any (§13.4). */
+      locale?: string | null;
+    };
     [k: string]: unknown;
   };
   [k: string]: unknown;
@@ -235,9 +239,26 @@ export class ContentEntry {
       return null;
     }
 
+    /*
+     * Scoped to the route's language, exactly as `resolvePaths` scopes an expansion and for the
+     * same reason: two translations of one entry share an id (site-architecture.md §13.3), so an
+     * unscoped lookup answers with whichever language was loaded first. Under `/fr-ca/…` that is
+     * the English copy, rendered on a page whose `<html lang>` and every `hreflang` say French —
+     * a defect no error reports and every reader of the other language sees.
+     *
+     * Applied only when the entries actually carry a locale: an unlocalized collection is not in
+     * one language, and filtering it by the route's would empty it.
+     */
+    const wanted = _document?.route?.locale;
+    const localized = entries.some((e: ContentLoaderEntry) => e._meta?.locale !== undefined);
+    const scoped =
+      localized && typeof wanted === "string"
+        ? entries.filter((e: ContentLoaderEntry) => e._meta?.locale === wanted)
+        : entries;
+
     if (field && field !== "id") {
-      return entries.find((e: ContentLoaderEntry) => e.data[field] === resolvedId) ?? null;
+      return scoped.find((e: ContentLoaderEntry) => e.data[field] === resolvedId) ?? null;
     }
-    return findEntry(entries, resolvedId as string);
+    return findEntry(scoped, resolvedId as string);
   }
 }

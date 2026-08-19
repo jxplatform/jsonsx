@@ -358,6 +358,16 @@ export async function buildSite(
     projectConfig,
     i18n,
   );
+  /*
+   * Every route carries the locale it serves, resolved once here rather than re-derived by each
+   * reader. It is what scopes a `ContentEntry` lookup on a localized collection: two translations
+   * of one entry share an id (§13.3), so a page that asked for `hello` without saying in which
+   * language got whichever translation was loaded first — the English copy under a French route,
+   * silently, on a page whose `<html lang>` said otherwise.
+   */
+  for (const route of routes) {
+    (route as { locale?: string | null }).locale = localeOfRoute(route.urlPattern, i18n);
+  }
   log(`  ${routes.length} route(s) after expansion`);
 
   let fileCount = 0;

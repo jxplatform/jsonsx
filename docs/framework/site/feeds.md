@@ -63,6 +63,24 @@ With `archive: true`, entries past `pageSize` are written to `/feed/archive/1.xm
 
 When a feed contains your entire history it says so, and readers can stop looking for more.
 
+## One feed per language
+
+If the feed's collection keeps [one directory per locale](./i18n.md#content-in-one-directory-per-locale), you get one feed per language — no extra configuration:
+
+| File              | Holds             | Says               |
+| ----------------- | ----------------- | ------------------ |
+| `/feed.xml`       | the English posts | `xml:lang="en"`    |
+| `/fr-ca/feed.xml` | the French posts  | `xml:lang="fr-CA"` |
+| `/ar/feed.xml`    | the Arabic posts  | `xml:lang="ar"`    |
+
+Item links point into that language's URL space too, so a French subscriber who clicks through lands on the French post rather than the English one.
+
+Every page advertises all of them, each tagged with `hreflang` — the discovery links are written before the build knows which language the page is in, so they name every language and let the reader's client choose.
+
+:::doc-note
+One feed carrying three languages would deliver every post three times to every subscriber, twice in a language they don't read. That's why the split isn't optional.
+:::
+
 ## Why not RSS?
 
 RSS 2.0 has no standards body, its date format is a 1982 email spec, and its `<guid>` semantics were never pinned down. Atom is an IETF standard with required identity and timestamps, and every reader made in the last twenty years handles it. If you need RSS for a specific consumer, open an issue with the case.

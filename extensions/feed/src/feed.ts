@@ -9,6 +9,8 @@
  * @docs framework/site/feeds
  */
 
+import { canonicalizeLocale, localeUrlPrefix, resolveI18n } from "@jxsuite/schema/locale";
+import type { ResolvedI18n } from "@jxsuite/schema/locale";
 import type { ContentLoaderEntry, JxHeadEntry, ProjectConfig } from "@jxsuite/schema/types";
 import { atomUrl, renderAtom } from "./atom.ts";
 import { jsonFeedUrl, renderJsonFeed } from "./json-feed.ts";
@@ -41,6 +43,45 @@ function siteUrlOf(projectConfig: ProjectConfig | undefined): string | null {
   return typeof url === "string" && url !== "" ? url : null;
 }
 
+/**
+ * The locales a feed is published in, or `[]` when it is published once.
+ *
+ * A feed says what language it carries, and a collection spread over one directory per locale
+ * (site-architecture.md §13.3) carries several — so it is several feeds. One feed mixing three
+ * languages is worse than it sounds: a reader subscribes to it in theirs and receives every post
+ * three times, twice in a language they do not read.
+ *
+ * Read from the collection's `source`, because `head` has to answer this before any content is
+ * loaded and configuration is all it has. That the `content` section belongs to another extension
+ * is not a coupling this introduces — a feed already names a collection out of it.
+ *
+ * @param {ProjectConfig | undefined} projectConfig
+ * @param {string} collection
+ * @returns {{ i18n: ResolvedI18n | null; locales: string[] }}
+ */
+function feedLocales(
+  projectConfig: ProjectConfig | undefined,
+  collection: string,
+): { i18n: ResolvedI18n | null; locales: string[] } {
+  const { i18n } = resolveI18n(projectConfig ?? {});
+  const content = (projectConfig as { content?: Record<string, { source?: unknown }> } | undefined)
+    ?.content;
+  const source = content?.[collection]?.source;
+  const localized = typeof source === "string" && source.includes("{locale}");
+  return { i18n, locales: i18n !== null && localized ? i18n.locales : [] };
+}
+
+/** One locale's view of a feed: its own URL space, its own language. */
+function localeVariant(feed: NormalizedFeed, locale: string, i18n: ResolvedI18n | null) {
+  const prefix = localeUrlPrefix(locale, i18n);
+  return {
+    ...feed,
+    basePath: `${prefix}${feed.basePath}`,
+    language: locale,
+    output: `${prefix}${feed.output}`,
+  };
+}
+
 export const Feed = {
   /** Normalize the `feed` section into `_project.feed`. */
   projectData(sectionValue: unknown, ctx?: HeadContext): NormalizedFeedConfig {
@@ -61,18 +102,33 @@ export const Feed = {
     const config = normalizeFeedConfig(sectionValue, ctx.projectConfig?.defaults?.lang);
     const entries: JxHeadEntry[] = [];
     for (const feed of Object.values(config)) {
-      for (const format of feed.formats) {
-        const href =
-          format === "atom" ? atomUrl(siteUrl, feed.output) : jsonFeedUrl(siteUrl, feed.output);
-        entries.push({
-          attributes: {
-            href,
-            rel: "alternate",
-            title: feed.title === "" ? "Feed" : feed.title,
-            type: MEDIA_TYPES[format],
-          },
-          tagName: "link",
-        });
+      const { i18n, locales } = feedLocales(ctx.projectConfig, feed.collection);
+      /*
+       * One link per language, each carrying `hreflang`. `head` runs before routing and cannot know
+       * which locale the page it lands on is in, so it advertises all of them and lets the client
+       * choose — which is what `hreflang` on an `alternate` link is for.
+       */
+      const published =
+        locales.length > 0 ? locales.map((l) => localeVariant(feed, l, i18n)) : [feed];
+      for (const variant of published) {
+        for (const format of variant.formats) {
+          const href =
+            format === "atom"
+              ? atomUrl(siteUrl, variant.output)
+              : jsonFeedUrl(siteUrl, variant.output);
+          entries.push({
+            attributes: {
+              href,
+              ...(variant.language !== null && locales.length > 0
+                ? { hreflang: variant.language }
+                : {}),
+              rel: "alternate",
+              title: variant.title === "" ? "Feed" : variant.title,
+              type: MEDIA_TYPES[format],
+            },
+            tagName: "link",
+          });
+        }
       }
     }
     return entries;
@@ -99,7 +155,22 @@ export const Feed = {
         );
         continue;
       }
-      files.push(...renderFeed(feed, entries, siteUrl, trailingSlash));
+      const { i18n, locales } = feedLocales(ctx.projectConfig, feed.collection);
+      if (locales.length === 0) {
+        files.push(...renderFeed(feed, entries, siteUrl, trailingSlash));
+        continue;
+      }
+      /*
+       * One feed per language, each holding only that language's entries. An entry with no locale
+       * belongs to none of them — it cannot happen for a `{locale}` source, and inventing a home
+       * for it would publish it in every language at once.
+       */
+      for (const locale of locales) {
+        const own = entries.filter((e) => canonicalizeLocale(e._meta?.locale) === locale);
+        if (own.length > 0) {
+          files.push(...renderFeed(localeVariant(feed, locale, i18n), own, siteUrl, trailingSlash));
+        }
+      }
     }
     return files;
   },

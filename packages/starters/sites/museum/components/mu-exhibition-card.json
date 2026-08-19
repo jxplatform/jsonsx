@@ -1,0 +1,191 @@
+{
+  "tagName": "mu-exhibition-card",
+  "state": {
+    "title": "",
+    "description": "",
+    "gallery": "",
+    "status": "",
+    "href": "#",
+    "hue": 214,
+    "date": "",
+    "until": "",
+    "locale": "en",
+    "opens": {
+      "$expression": {
+        "operator": "call",
+        "target": {
+          "$ref": "window#/Intl/formatDate"
+        },
+        "value": [
+          {
+            "$ref": "#/state/date"
+          },
+          {
+            "$ref": "#/state/locale"
+          },
+          {
+            "day": "numeric",
+            "month": "long"
+          }
+        ]
+      }
+    },
+    "closes": {
+      "$expression": {
+        "operator": "call",
+        "target": {
+          "$ref": "window#/Intl/formatDate"
+        },
+        "value": [
+          {
+            "$ref": "#/state/until"
+          },
+          {
+            "$ref": "#/state/locale"
+          },
+          {
+            "day": "numeric",
+            "month": "long",
+            "year": "numeric"
+          }
+        ]
+      }
+    }
+  },
+  "style": {
+    "display": "block",
+    "height": "100%"
+  },
+  "children": [
+    {
+      "tagName": "a",
+      "attributes": {
+        "href": "${state.href}"
+      },
+      "style": {
+        "display": "flex",
+        "flexDirection": "column",
+        "height": "100%",
+        "border": "2px solid var(--color-ink)",
+        "backgroundColor": "var(--color-card)",
+        "color": "inherit",
+        "textDecoration": "none",
+        "transition": "border-color 0.15s",
+        ":hover": {
+          "borderColor": "var(--color-pigment)"
+        }
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "attributes": {
+            "aria-hidden": "true"
+          },
+          "style": {
+            "aspectRatio": "5 / 4",
+            "borderBlockEnd": "2px solid var(--color-ink)",
+            "background": "radial-gradient(circle at 64% 38%, hsl(${state.hue} 55% 45%) 0 29%, transparent 29.5%), repeating-linear-gradient(${state.hue}deg, var(--color-chalk-deep) 0 9px, var(--color-card) 9px 18px)"
+          }
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "flex",
+            "flexDirection": "column",
+            "gap": "0.75rem",
+            "flex": "1",
+            "padding": "1.25rem"
+          },
+          "children": [
+            {
+              "tagName": "p",
+              "style": {
+                "display": "${state.status ? 'inline-block' : 'none'}",
+                "alignSelf": "start",
+                "margin": "0",
+                "paddingInline": "0.55rem",
+                "paddingBlock": "0.3rem",
+                "backgroundColor": "var(--color-pigment-tint)",
+                "color": "var(--color-pigment-deep)",
+                "fontFamily": "var(--font-label)",
+                "fontSize": "0.62rem",
+                "letterSpacing": "var(--label-tracking)",
+                "textTransform": "var(--label-case)"
+              },
+              "textContent": "${state.status}"
+            },
+            {
+              "tagName": "h3",
+              "style": {
+                "margin": "0",
+                "fontFamily": "var(--font-display)",
+                "fontSize": "1.3rem",
+                "fontWeight": "500",
+                "lineHeight": "calc(1.15 * var(--leading-scale))",
+                "letterSpacing": "-0.015em"
+              },
+              "textContent": "${state.title}"
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "display": "flex",
+                "flexWrap": "wrap",
+                "gap": "0.4rem",
+                "margin": "0",
+                "fontFamily": "var(--font-label)",
+                "fontSize": "0.72rem",
+                "fontVariantNumeric": "tabular-nums",
+                "color": "var(--color-pigment)"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "textContent": "${state.opens}"
+                },
+                {
+                  "tagName": "span",
+                  "attributes": {
+                    "aria-hidden": "true"
+                  },
+                  "style": {
+                    "opacity": "0.55"
+                  },
+                  "textContent": "—"
+                },
+                {
+                  "tagName": "span",
+                  "textContent": "${state.closes}"
+                }
+              ]
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "margin": "0",
+                "fontSize": "0.97rem",
+                "lineHeight": "1.6",
+                "color": "var(--color-muted)"
+              },
+              "textContent": "${state.description}"
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "margin": "auto 0 0",
+                "paddingBlockStart": "0.9rem",
+                "borderBlockStart": "1px solid var(--color-hairline)",
+                "fontFamily": "var(--font-label)",
+                "fontSize": "0.64rem",
+                "letterSpacing": "var(--label-tracking)",
+                "textTransform": "var(--label-case)",
+                "color": "var(--color-muted)"
+              },
+              "textContent": "${state.gallery}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -2,9 +2,9 @@
 
 ## File-Based Routing, Content Collections, Layouts, and Static Site Generation
 
-**Version:** 0.5.15-draft
+**Version:** 0.5.16-draft
 **Status:** Partial
-**Updated:** 2026-08-18
+**Updated:** 2026-08-19
 **License:** MIT
 
 ---
@@ -802,6 +802,17 @@ archives, and claiming otherwise would be believed.
 (`extensions.md` §8.6), not from `emit` — emitters run after every page is written and cannot reach
 a `<head>`. Both formats' links survive the merge because §8.3 keys a link on its `type` as well as
 its `rel` and `href`.
+
+**A localized collection is several feeds, not one.** When the named collection's `source` carries
+`{locale}` (§13.3), each language is published in its own URL space — `/feed.xml` and
+`/fr-ca/feed.xml` — holding only that language's entries, at that language's item URLs, and saying
+what it carries: `xml:lang` on the Atom feed element, which RFC 4287 §2 makes every child inherit,
+and JSON Feed's `language` member. One feed mixing three languages is worse than it sounds: a reader
+subscribes in theirs and receives every post three times, twice in a language they do not read.
+
+Discovery advertises **all** of them, each with `hreflang`. The `head` capability runs before
+routing and cannot know which locale its page is in — one link per language, and the client picks,
+which is what `hreflang` on an `alternate` link is for.
 
 ## 7. Data Management in Studio
 
@@ -1753,6 +1764,13 @@ Static assets are emitted per component, with page styles inlined:
 > **Jx is not a translation system**, and this section will not become one. There is no message
 > catalogue, no `t()` and no fallback chain. A locale is a property of a _route_; what the route
 > serves is whatever the author put in that directory.
+>
+> That decision is recorded here and nowhere else, deliberately. Unicode MessageFormat 2.0 is the
+> format a reversal would adopt — it is stable in CLDR and it is what `Intl.MessageFormat` will be
+> when TC39 finishes with it — but it is part of UTS #35, which this specification already cites
+> as `Borrowed` (§16), and a standard may not be cited in one place and rejected in another
+> (`standards.md` §8). So there is no row to write: the decision lives in this paragraph, and
+> reversing it means designing the section that would own it first.
 
 ### 13.1 Locale-Based Routing
 
@@ -1809,6 +1827,10 @@ language tag, so warning on "looks like a tag" would fire on `/docs/` and `/api/
 A `defaultLocale` absent from `locales` joins the list rather than being rejected — the pages under
 it exist either way, and no reading of that config is the one the author meant.
 
+**Studio edits this block through `studio.md` §20.5**, and resolves it with this section's own
+resolver rather than a second implementation of it — which is why the resolver lives in
+`@jxsuite/schema/locale`, reachable from a package that cannot import the compiler.
+
 **`prefix-always` is checked.** The mode is a promise that every URL names its language, and a page
 outside the locale tree breaks it silently: it builds, it serves, and `localeOfRoute` calls it the
 default locale — so a site that declared "no unprefixed URLs" ships them anyway, and the only reader
@@ -1861,6 +1883,19 @@ than informational. **Two translations of one post share an id** — `blog/en/he
 each URL twice and let the second overwrite the first. The route's own locale prefix scopes the
 expansion, so `/fr/blog/:slug` expands the French entries and no others. A collection whose entries
 carry no locale is untouched by this, whatever the route's locale happens to be.
+
+**A `ContentEntry` lookup is scoped the same way.** Two translations share an id, so an unscoped
+lookup answers with whichever language loaded first: under `/fr-ca/…` that is the English copy,
+rendered on a page whose `<html lang>` and every `hreflang` say French. The route carries the locale
+it serves and the lookup reads it, exactly as route expansion does. A collection whose entries carry
+no locale is untouched — it is not in one language, and filtering it by the route's would empty it.
+
+**The directory is matched case-insensitively.** Two writers name it: an author who declared `fr-CA`
+most likely typed `fr-CA/`, while Studio creates the lowercase form, because a locale directory
+becomes a URL segment and the site's own URLs are lowercase. Reading one spelling only would make a
+translation somebody just created invisible to the build — the directory there, the entries there,
+and the collection loading none of them, with nothing to report. The canonical spelling wins where
+both exist, and a locale nobody has written yet reports against the tag that was declared.
 
 Asset mounts expand with the source: each locale directory publishes at `/content/<type>/<locale>`,
 so a French post's `./hero.png` and its English translation's cannot collide at one URL.
@@ -1960,9 +1995,16 @@ asserted it:
 A `$paths` template that declares a key is the declared case by construction: every route it expands
 to claims the same one, and the error names them.
 
-**A collection's localized slugs are the collection's business.** Two translations of one entry
-share an id (§13.3), so their URLs are parallel already and the derivation is right; a key declared
-on a `[slug]` template would apply to every entry it expands.
+**A key may name its route's own parameters**, written `${slug}`, and that is what makes a
+collection's localized URLs work. One `[slug]` template expands to one route per entry, so a fixed
+key would claim a single identity for the whole collection — every entry the translation of every
+other, which the duplicate rule above reports rather than serves. `pages/fr-ca/expositions/[slug].json`
+declaring `"exhibitions/${slug}"` pairs each French post with the English one, because two
+translations of an entry share an id (§13.3) and the id is what the parameter carries.
+
+A parameter with no value is left as written rather than blanked, so the duplicate it produces is
+reported against a key that still says `${slug}` — which names what is wrong instead of describing
+a collection that collapsed.
 
 Four rules follow from what the annotation means rather than from convenience:
 
@@ -2440,8 +2482,8 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 | Standard                                                                                  | Class         | Binds             | Evidence                                                                                                                                                                             | Note                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | ----------------------------------------------------------------------------------------- | ------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [RFC 4287](https://www.rfc-editor.org/rfc/rfc4287)                                        | **Subset**    | §6.7              | extensions/feed/src/atom.ts, extensions/feed/tests/feed.test.ts                                                                                                                      | Feed and entry documents carry the required `id`, `title` and `updated`, plus `self` and `alternate` links. Not implemented: `<category>`, `<contributor>`, `<rights>`, and Atom's own paging — RFC 5005 covers the last of those.                                                                                                                                                                                                                                                                                                                                                                                  |
-| [JSON Feed 1.1](https://www.jsonfeed.org/version/1.1/)                                    | **Subset**    | §6.7              | extensions/feed/src/json-feed.ts, extensions/feed/tests/feed.test.ts                                                                                                                 | Feed identity, `language`, and per-item content, dates and authors. Attachments, tags, `banner_image` and hubs are not emitted; `next_url` is available but archives are offered in Atom alone rather than mixing two pagination conventions in one feed.                                                                                                                                                                                                                                                                                                                                                           |
+| [RFC 4287](https://www.rfc-editor.org/rfc/rfc4287)                                        | **Subset**    | §6.7              | extensions/feed/src/atom.ts, extensions/feed/tests/feed.test.ts                                                                                                                      | Feed and entry documents carry the required `id`, `title` and `updated`, plus `self` and `alternate` links, and `xml:lang` on the feed element (§2) when the feed is one language of a localized collection. Not implemented: `<category>`, `<contributor>`, `<rights>`, and Atom's own paging — RFC 5005 covers the last of those.                                                                                                                                                                                                                                                                                 |
+| [JSON Feed 1.1](https://www.jsonfeed.org/version/1.1/)                                    | **Subset**    | §6.7              | extensions/feed/src/json-feed.ts, extensions/feed/tests/feed.test.ts                                                                                                                 | Feed identity, `language` — the locale of the collection directory the entries came from, when there is one — and per-item content, dates and authors. Attachments, tags, `banner_image` and hubs are not emitted; `next_url` is available but archives are offered in Atom alone rather than mixing two pagination conventions in one feed.                                                                                                                                                                                                                                                                        |
 | [RFC 5005](https://www.rfc-editor.org/rfc/rfc5005)                                        | **Subset**    | §6.7              | extensions/feed/src/feed.ts, extensions/feed/tests/feed.test.ts                                                                                                                      | The archived-feeds flavour (§2) plus `<fh:complete/>` (§4), which is the one designed for static hosting. Paged feeds (§3) are not offered: they are explicitly unstable for subscription, which is the only thing a static site publishes.                                                                                                                                                                                                                                                                                                                                                                         |
 | [RFC 9309](https://www.rfc-editor.org/rfc/rfc9309)                                        | **Adopted**   | §8.4.1            | packages/compiler/src/site/site-build.ts                                                                                                                                             | A minimal `robots.txt` is created when none was provided, and an existing one is appended to rather than replaced. The `Sitemap:` line the build adds is a sitemaps.org extension, not part of this standard.                                                                                                                                                                                                                                                                                                                                                                                                       |
 | [Sitemaps 0.9](https://www.sitemaps.org/protocol.html)                                    | **Subset**    | §8.4.1, §13.5     | packages/compiler/src/site/site-build.ts, packages/compiler/src/site/pages-discovery.ts, packages/compiler/tests/sitemap-lastmod.test.ts                                             | `<loc>`, a full RFC 3339 `<lastmod>` — taken from the content entry a generated route came from, not from the template that rendered it — and `xhtml:link` alternates for translated pages. Absent: `<changefreq>` and `<priority>`, both advisory and widely ignored, and the sitemap index, which is for sites past the 50,000-URL limit.                                                                                                                                                                                                                                                                         |
@@ -2591,6 +2633,7 @@ This spec builds on existing Jx primitives wherever possible:
 
 ## Changelog
 
+- **0.5.16-draft** (2026-08-19) — §13.5: a translation key may name its route's parameters, so a collection's URLs can be localized; §13.3: a ContentEntry lookup is scoped to the route's language and a locale directory is matched case-insensitively; §6.7: a localized collection publishes one feed per language.
 - **0.5.15-draft** (2026-08-18) — §13.5: a document declares its identity across languages with $translationKey, so a localized slug is a translation; two routes claiming one language are reported, as an error when declared.
 - **0.5.14-draft** (2026-08-18) — §13.5 exposes the translation set to the page as $page.alternates, with each locale's autonym; §13.7 defaults a helper's locale to the page's own; §13.6 reports a prefix-always root no static deployment can answer.
 - **0.5.13-draft** (2026-08-18) — §8.7: the subpath entry is bundled rather than externalised, and the shared core is reached through an emitted stub — a self-referential asset broke every page using a directive.

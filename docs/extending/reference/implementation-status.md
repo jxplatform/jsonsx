@@ -25,11 +25,11 @@ This page is generated from the `> **Status: …**` markers in the specification
 | `relationships.md`        | 0.1.4-draft  | Partial     | 2026-08-15 |
 | `schema.md`               | 0.4.8-draft  | Partial     | 2026-08-16 |
 | `server.md`               | 0.2.9        | Implemented | 2026-08-18 |
-| `site-architecture.md`    | 0.5.15-draft | Partial     | 2026-08-18 |
+| `site-architecture.md`    | 0.5.16-draft | Partial     | 2026-08-19 |
 | `spec.md`                 | 0.5.4-draft  | Partial     | 2026-08-18 |
 | `standards.md`            | 0.1.15-draft | Partial     | 2026-08-17 |
 | `studio-ui-guidelines.md` | 0.3.12       | Implemented | 2026-08-16 |
-| `studio.md`               | 0.9.30-draft | Partial     | 2026-08-18 |
+| `studio.md`               | 0.9.32-draft | Partial     | 2026-08-19 |
 
 ## Sections not yet implemented
 
@@ -52,6 +52,8 @@ This page is generated from the `> **Status: …**` markers in the specification
 - `studio.md` §14 — Tabs and Document Identity
 - `studio.md` §15 — Application Preferences
 - `studio.md` §17 — Project Documents (Settings and Styles)
+- `studio.md` §20 — Internationalization Surfaces
+- `studio.md` §20.2 — Rendering Language
 
 ### Pending
 
