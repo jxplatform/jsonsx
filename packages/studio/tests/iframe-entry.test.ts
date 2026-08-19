@@ -1105,6 +1105,21 @@ describe("startCanvasIframe — content-height auto-sizing + wheel forwarding", 
     // Neither swallowed nor forwarded: preview is a real viewport and the document scrolls itself.
     expect(acks.some((m) => m.kind === "forwardWheel")).toBe(false);
     expect(evt.defaultPrevented).toBe(false);
+
+    /* Ctrl/⌘ is the exception to the exception. It is page zoom to the browser (a trackpad pinch
+       arrives as this event), and the page it would scale is the whole Studio window — so the
+       frame blocks it, still without forwarding: there is nothing on the host to zoom either. */
+    const zoomEvt = new WheelEvent("wheel", {
+      bubbles: true,
+      cancelable: true,
+      ctrlKey: true,
+      deltaY: -7,
+    });
+    Object.defineProperty(zoomEvt, "ctrlKey", { value: true });
+    container.ownerDocument.dispatchEvent(zoomEvt);
+    pair.flush();
+    expect(zoomEvt.defaultPrevented).toBe(true);
+    expect(acks.some((m) => m.kind === "forwardWheel")).toBe(false);
   });
 
   test("teardown removes the wheel listener: a later wheel dispatch posts nothing", async () => {

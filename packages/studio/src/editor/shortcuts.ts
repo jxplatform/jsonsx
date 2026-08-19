@@ -930,6 +930,34 @@ export function initShortcuts(registry: CommandRegistry, stageContext: StageCont
   );
 }
 
+/**
+ * Canvas modes whose stage scrolls ITSELF, so the wheel is never a pan.
+ *
+ * None of these mounts a panzoom wrap — `canvas/canvas-render.ts` nulls `surface.panzoomWrap` on
+ * the way into every one of them — so the pan branch below could only ever have preventDefaulted a
+ * wheel on behalf of a transform that does not exist: `applyTransform` returns at its own
+ * `!panzoomWrap` guard, while `setPan` still wrote offsets (and cleared `needsCenter`) that the
+ * next Design render would inherit. The visible cost is the whole of it: the surface could not be
+ * scrolled with the wheel at all.
+ *
+ * - `grid` — a Tabulator viewport with its own virtual scroller.
+ * - `manage` — the Library's ordinary overflow container.
+ * - `settings` — the Project Settings document (`panels/settings-pane.ts`): an `overflow-y: auto`
+ *   section column, plus the Raw JSON `<pre>`'s own box inside it.
+ * - `entry` — the Entry editor's `overflow-y: auto` form (`content/entry-editor.ts`).
+ * - `preview` — the fidelity surface: ONE frame at the pane's own height over its own document, which
+ *   is what lets `position: sticky`, scroll-driven animation and `IntersectionObserver` reveals
+ *   fire at all. It is in this set for the same reason as the other four and for one of its own —
+ *   there is no artboard here to zoom, either.
+ */
+const SELF_SCROLLING_MODES: ReadonlySet<string> = new Set([
+  "entry",
+  "grid",
+  "manage",
+  "preview",
+  "settings",
+]);
+
 /** The stage-context reader, published by {@link initShortcuts} for {@link installStageGestures}. */
 let _stageContext: StageContext | null = null;
 
@@ -976,17 +1004,19 @@ export function installStageGestures(surface: CanvasSurface): () => void {
         }
         return;
       }
-      /* Surfaces that scroll themselves. The grid is a Tabulator viewport with its own virtual
-         scroller and the browse table is an ordinary overflow container — panning a transform over
-         either is why neither could be scrolled with the wheel at all. */
-      if (canvasMode === "grid" || canvasMode === "manage") {
-        return;
-      }
-      /* Preview scrolls for real. Its frame is a normally-sized viewport over its own document, so
-         the wheel belongs to that document — panning a transform here is exactly what stopped
-         `position:sticky`, scroll-driven animation and IntersectionObserver reveals from ever
-         firing. Nothing is preventDefaulted, and there is no artboard to zoom. */
-      if (canvasMode === "preview") {
+      /* Surfaces that scroll themselves — see {@link SELF_SCROLLING_MODES}. The plain wheel is the
+         scroll container's under the pointer, and nothing here takes it.
+
+         Ctrl/⌘ is the other half, and it is not the same question: the browser reads it as PAGE
+         ZOOM (so does a trackpad pinch, which arrives as exactly this event), and the guard in
+         {@link initShortcuts} declines to block it inside a stage because a stage is expected to
+         answer the gesture with a zoom of its own. These five have none to give — no artboard, no
+         transform — so the gesture would scale the whole of Studio around a table or a form. Block
+         it here, which is what every other surface in the app already does. */
+      if (SELF_SCROLLING_MODES.has(canvasMode)) {
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+        }
         return;
       }
       e.preventDefault();
