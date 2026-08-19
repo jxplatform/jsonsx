@@ -187,6 +187,57 @@ jobs:
             echo "All expected desktop assets present on $TAG."
           fi
 
+  # `release` is the branch a Nix consumer pins: `nix run github:jxsuite/jx/release`. It must only
+  # Ever point at a commit that BUILDS, and nothing had ever built the flake in CI — so the branch
+  # Advances behind a real `nix build` at the release tag rather than on faith.
+  #
+  # The desktop component is the right gate: the flake's only output is `jx-studio`, whose version
+  # Comes from packages/desktop/package.json. A release that carries only, say, `schema` leaves
+  # `release` where it is, which is the correct answer for a ref that names an app.
+  nix-build:
+    needs: release-please
+    if: needs.release-please.outputs.desktop_released == 'true'
+    uses: ./.github/workflows/nix.yml
+    with:
+      ref: ${{ needs.release-please.outputs.desktop_tag }}
+
+  # Advance `release` to the commit that just released and built. A plain (fast-forward) push, never
+  # A force: `release` only ever moves forward along main's history, so a non-fast-forward here means
+  # Something is wrong and should fail loudly rather than rewrite the branch NixOS users are on.
+  #
+  # If `nix-build` fails, `release` stays where it is and an issue is opened. A stale ref that works
+  # Beats a fresh one that does not.
+  advance-release-branch:
+    needs: [release-please, nix-build, desktop-linux, desktop-macos, desktop-windows, build-msix, verify-desktop-assets]
+    if: always() && needs.release-please.outputs.desktop_released == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.release-please.outputs.desktop_tag }}
+          fetch-depth: 0
+      - name: Advance `release`, or say why it did not move
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.release-please.outputs.desktop_tag }}
+          NIX_RESULT: ${{ needs.nix-build.result }}
+        run: |
+          set -euo pipefail
+          if [ "$NIX_RESULT" != "success" ]; then
+            echo "::warning::nix-build was $NIX_RESULT for $TAG; leaving \`release\` where it is"
+            gh issue create \
+              --title "\`release\` did not advance to $TAG" \
+              --label release-incomplete \
+              --body "The Nix build at $TAG was $NIX_RESULT, so \`release\` still points at the previous release. Anyone on \`github:jxsuite/jx/release\` keeps the older, working tree until this is fixed." || true
+            exit 0
+          fi
+          git push origin "$(git rev-parse HEAD):refs/heads/release"
+          echo "release -> $TAG ($(git rev-parse --short HEAD))"
+
   pin-desktop-latest:
     needs:
       [

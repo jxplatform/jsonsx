@@ -19,6 +19,8 @@ A repeater renders one element once per item of a list — design a single card,
 4. Optionally pick a **Filter** or **Sort** function, if the document defines any.
 5. Click **Create Repeater**.
 
+![The Repeat dialog with an items source picker and optional filter and sort selectors](../../images/repeat-dialog.png)
+
 Your element is now the template of a repeater, marked **↻** in Outline. The repeated items render directly where the element stood — no wrapper is added around them.
 
 The command needs an element with a sibling position to repeat into, and refuses on the document root and on a repeater you have already made. See **[Commands](/docs/studio/interface/commands)** for the full list.

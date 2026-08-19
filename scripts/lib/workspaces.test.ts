@@ -9,6 +9,7 @@ function fixture(): Workspace[] {
     name: `@jxsuite/${dir.split("/")[1]}`,
     flag: dir.split("/")[1]!,
     publishable: true,
+    version: "1.0.0",
     deps,
     devDeps,
   });
@@ -32,6 +33,15 @@ describe("readWorkspaces", () => {
     // Every workspace directory in the repo is a workspace here; if this drifts, the CI matrix
     // Silently loses a package (the exact failure the derived matrix exists to prevent).
     expect(ws.length).toBeGreaterThanOrEqual(18);
+  });
+
+  test("every workspace reports a real semver version", async () => {
+    // Check-template-versions.ts derives `^<version>` from this, so an empty or malformed one
+    // Would be proposed as a range into twelve published starter manifests.
+    const ws = await readWorkspaces();
+    for (const w of ws) {
+      expect(w.version).toMatch(/^\d+\.\d+\.\d+/);
+    }
   });
 
   test("is sorted by dir, so callers need not sort", async () => {

@@ -47,6 +47,8 @@ You can also move the selection from the keyboard: :kbd[↑] and :kbd[↓] step 
 
 A small floating toolbar appears above the selected element:
 
+![The block action bar floating above a selected paragraph, showing the parent, tag, move, duplicate and formatting controls](../../images/block-action-bar.png)
+
 - A **back arrow** selects the parent element.
 - The **name badge** shows what's selected — the element's type or its name. When the element can become something else (a paragraph into a heading, for example), clicking the badge lists the conversions.
 - The **⠿ drag handle** — drag it to move the element somewhere else on the page.

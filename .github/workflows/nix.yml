@@ -1,0 +1,85 @@
+# Builds the Nix package — the ONLY thing that decides what a `nix run github:jxsuite/jx/release`
+# consumer receives, because packages/desktop/package.nix builds `src = lib.cleanSource ../..`, i.e.
+# whatever tree was fetched. Nothing in CI had ever built it: the flake was checked by exactly one
+# static unit test (packages/desktop/tests/nix-bundle-completeness.test.ts, which parses `cp -r`
+# lines out of package.nix) and otherwise ran only on whoever happened to type `nix build`.
+#
+# Two callers, one definition:
+#
+#   * `pull_request`, path-filtered to the inputs that can break it. Measured at ~90s of build on a
+#     warm store, so a PR that touches the packaging finds out in the PR.
+#   * `workflow_call` from release-please.yml at the desktop release tag, where it is the gate the
+#     `release` branch advances behind.
+name: Nix
+
+on:
+  pull_request:
+    paths:
+      # The derivation, the generated dependency set, and the lockfile it is generated from.
+      - "flake.nix"
+      - "flake.lock"
+      - "bun.nix"
+      - "bun.lock"
+      # `src` is the whole tree, but only the desktop app's own sources and manifest change what the
+      # Derivation produces in a way the build can notice. Everything else is caught by the release
+      # Path and the nightly-equivalent: a red `release` that refuses to advance.
+      - "packages/desktop/**"
+      - ".github/workflows/nix.yml"
+  workflow_call:
+    inputs:
+      ref:
+        description: "Git ref to build. Defaults to the checked-out ref."
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nix-${{ github.event.pull_request.number || inputs.ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - uses: DeterminateSystems/nix-installer-action@main
+        with:
+          # The flake declares the nix-community substituter in `nixConfig`. Without accepting it,
+          # Every dependency is built from source instead of fetched, and a 90-second build becomes
+          # An afternoon.
+          extra-conf: |
+            accept-flake-config = true
+
+      - name: Build
+        run: nix build .#default --accept-flake-config -L
+
+      - name: The bundle is complete and its wrapper points at real paths
+        # NOT `jx-studio --help`: there is no --help. The first argument is the PROJECT ROOT, so
+        # That command launches Chromium against a directory named "--help" and hangs a runner with
+        # No display. What is worth asserting is what the derivation is FOR — that the wrapper
+        # Resolves, and that the two paths it exports exist, which is the failure mode
+        # `find -xtype l -delete` caused once already by pruning extensions/parser out of the bundle.
+        run: |
+          set -euo pipefail
+          wrapper="$(readlink -f ./result)/bin/jx-studio"
+          test -x "$wrapper"
+          for var in CHROMIUM_BIN JX_STUDIO_ASSETS; do
+            path="$(sed -n "s/^export $var='\(.*\)'$/\1/p" "$wrapper")"
+            if [ -z "$path" ]; then
+              echo "::error::$var is not exported by the jx-studio wrapper"
+              exit 1
+            fi
+            if [ ! -e "$path" ]; then
+              echo "::error::$var points at $path, which does not exist"
+              exit 1
+            fi
+            echo "$var -> $path"
+          done
+          entry="$(sed -n 's#.*bun[^ ]*/bin/bun"  *run \([^ ]*\).*#\1#p' "$wrapper")"
+          test -f "$entry"
+          echo "entry -> $entry"

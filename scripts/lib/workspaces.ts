@@ -30,6 +30,16 @@ export interface Workspace {
   flag: string;
   /** True when the package is published to npm (not private, declares publishConfig). */
   publishable: boolean;
+  /**
+   * The version on disk.
+   *
+   * Release-please writes this in the release commit, so it is the about-to-be-published version on
+   * the release branch and the last-published version everywhere else. That makes it the one number
+   * a template's dependency range can be checked against at EVERY commit — see
+   * scripts/check-template-versions.ts, and the manifest identity asserted in
+   * scripts/release-config.test.ts.
+   */
+  version: string;
   /** Runtime dependency names: dependencies, peerDependencies, optionalDependencies. */
   deps: string[];
   /** Dev dependency names. Tests import these; the publish graph does not. */
@@ -70,6 +80,7 @@ export async function readWorkspaces(root = "."): Promise<Workspace[]> {
         name: j.name,
         flag: entry,
         publishable: j.private !== true && j.publishConfig != null,
+        version: j.version ?? "",
         deps: jxOnly(j.dependencies, j.peerDependencies, j.optionalDependencies),
         devDeps: jxOnly(j.devDependencies),
       });

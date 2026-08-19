@@ -97,6 +97,55 @@ describe("checkJxsuiteUpdate", () => {
 });
 
 describe("maybePromptJxsuiteUpdate", () => {
+  test("never prompts in automation mode, and never asks the registry", async () => {
+    // The same read-only rule ensure-deps.ts states, and for a second reason on top of it:
+    // `showConfirmDialog` renders an `<sp-dialog-wrapper open underlay>`, and an underlay swallows
+    // Every pointer event across the viewport. Raised at boot, it redirected every click a
+    // Screenshot shot dispatched into a scrim — which is how this dialog ended up in the middle of
+    // 33 committed images, `docs/images/hero.png` (the jxsuite.com marketing hero) among them.
+    //
+    // Correct dependency pins do not make this unnecessary: `outdatedPackages` compares the range's
+    // BASE version against the registry's `latest`, so a project pinned `^1.4.1` is "outdated" the
+    // Moment 1.4.2 publishes, and every starter shot would be scrimmed again by the next patch
+    // Release of any @jxsuite package.
+    const { happyDOM } = globalThis as unknown as { happyDOM: { setURL: (u: string) => void } };
+    happyDOM.setURL("http://localhost:3000/packages/studio/index.html?automation=1");
+    let asked = 0;
+    let wrote = 0;
+    installMockPlatform({
+      outdatedPackages: async () => {
+        asked += 1;
+        return [{ current: "^1.2.0", latest: "1.4.0", name: "@jxsuite/parser" }];
+      },
+      setPackageVersions: async () => {
+        wrote += 1;
+        return { ok: true };
+      },
+    });
+    try {
+      await maybePromptJxsuiteUpdate("/project");
+      await flush();
+      expect(dialog()).toBeNull();
+      expect(asked).toBe(0);
+      expect(wrote).toBe(0);
+    } finally {
+      happyDOM.setURL("http://localhost:3000/packages/studio/index.html");
+    }
+  });
+
+  test("still prompts when automation is not requested", async () => {
+    // The guard must key on the flag, not on merely being in a test.
+    withRegistry([{ current: "^1.2.0", latest: "1.4.0", name: "@jxsuite/parser" }], {
+      setPackageVersions: async () => ({ ok: true }),
+    });
+    const p = maybePromptJxsuiteUpdate("/project-not-automated");
+    await flush();
+    expect(dialog()).not.toBeNull();
+    dialog()?.dispatchEvent(new Event("cancel"));
+    await p;
+    await flush();
+  });
+
   test("confirm pins each package to its OWN latest", async () => {
     let received: unknown;
     withRegistry(

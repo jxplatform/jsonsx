@@ -57,6 +57,8 @@
     "spec:bump": "bun scripts/docs/spec-bump.ts",
     "test": "bun test --isolate",
     "test:workspaces": "bun run --workspaces test --isolate",
+    "templates:check": "bun scripts/check-template-versions.ts",
+    "templates:sync": "bun scripts/check-template-versions.ts --fix",
     "test:coverage": "bun test --isolate --coverage",
     "test:coverage:workspaces": "bun run --workspaces test:coverage",
     "typecheck": "tsc",
