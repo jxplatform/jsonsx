@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.33-draft
+**Version:** 0.9.34-draft
 **Status:** Partial
 **Updated:** 2026-08-19
 **License:** MIT
@@ -270,6 +270,20 @@ The design canvas supports pan and zoom:
 - **Zoom**: Ctrl+scroll wheel, pinch gesture, or toolbar controls
 - **Fit to view**: Intelligent centering of documents on load and window resize
 - **Responsive presets**: Width presets matching `$media` breakpoints
+
+**The wheel belongs to whatever is under it.** A mode that mounts no pan/zoom surface — Grid,
+Library, Project Settings, the Entry form, Source and Preview — leaves the wheel to the scroll
+container under the pointer. Consuming it there is never harmless in only one direction: the pan
+lands on offsets no transform reads and suppresses the stage's next fit, while the surface the
+author is actually looking at (a section column, the `<pre>` of `project.json`, a virtualised
+table) cannot be scrolled with the wheel at all.
+
+**Ctrl/⌘+wheel is a different gesture, and no surface hands it to the browser.** Studio blocks page
+zoom everywhere and exempts only a stage, because a stage answers the gesture with a zoom of its
+own; a stage with none to give — every mode named above, and a trackpad pinch arrives as exactly
+this event — blocks it like the rest of the chrome rather than scaling the whole window around a
+form. Preview blocks it in the FRAME: a cross-origin canvas frame's wheel never reaches the host,
+and preview is the one mode that forwards nothing, so the block has to be where the gesture lands.
 
 **Entering a pan/zoom mode fits the artboard.** Design and Stylebook apply a fit on the mode
 transition, capped at 100% so a narrow artboard is never magnified, and skipped when the pane has no
@@ -2284,6 +2298,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.9.34-draft** (2026-08-19) — A stage with no pan/zoom surface leaves the wheel to the scroll container under it, and blocks ctrl/cmd+wheel page zoom instead of handing it to the browser.
 - **0.9.33-draft** (2026-08-19) — §20.4: the parity grid keys on the document's $translationKey, so a localized slug is one row rather than two half-translated ones.
 - **0.9.32-draft** (2026-08-19) — §20 Internationalization Surfaces — the locale reader, the rendering-language axis, the locale companion, the Languages parity panel and the Locales settings section; §18.4 gains the locale preset and its probe.
 - **0.9.31-draft** (2026-08-19) — §13.5 lists the three behaviours ?automation=1 may change, and makes booting with an uninvited modal a refusal — an underlay swallows the viewport, so a dialog nobody scripted scrims the capture.
@@ -2372,4 +2387,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.33-draft_
+_`@jxsuite/studio` Specification v0.9.34-draft_
