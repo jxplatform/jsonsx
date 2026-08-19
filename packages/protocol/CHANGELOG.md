@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.1.0](https://github.com/jxsuite/jx/compare/protocol-v1.0.0...protocol-v1.1.0) (2026-08-19)
+
+
+### Features
+
+* **collab:** negotiate the wire envelope on the handshake — jx.collab.v1 ([5db8ae8](https://github.com/jxsuite/jx/commit/5db8ae8b781a1b5aeffbdd8f27cdf4c08ebb4540))
+* **protocol:** one failure shape — RFC 9457 problem details ([2ab94b1](https://github.com/jxsuite/jx/commit/2ab94b189e1c1265f90713e36b8cb8030f9afd40))
+* **studio,server,desktop:** P4 wave A — the app can say what happened ([98a4a3a](https://github.com/jxsuite/jx/commit/98a4a3a1f895981ebc0b06483ef31953d8ebf7ef))
+* **studio:** the Named Shell — P0–P8, the full UX redesign ([b576cbb](https://github.com/jxsuite/jx/commit/b576cbb24c7e0d8d36075f6d682e9b3b6b971166))
+
+
+### Bug Fixes
+
+* **server:** give the previewed site its own origin, so Open in Browser is the real site ([90eb4b4](https://github.com/jxsuite/jx/commit/90eb4b4b3eba897a1028fa5a4029ef0dcae61f88))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/schema bumped to 1.6.0
+
 ## [1.0.0](https://github.com/jxsuite/jx/compare/protocol-v0.6.1...protocol-v1.0.0) (2026-07-30)
 
 

@@ -1,5 +1,51 @@
 # Changelog
 
+## [2.1.0](https://github.com/jxsuite/jx/compare/server-v2.0.0...server-v2.1.0) (2026-08-19)
+
+
+### Features
+
+* **auth:** a loopback redirect with PKCE, and cookies a browser will keep ([053f67c](https://github.com/jxsuite/jx/commit/053f67cf94216020dd2a39982cea30b3802ba3aa))
+* **collab:** negotiate the wire envelope on the handshake — jx.collab.v1 ([5db8ae8](https://github.com/jxsuite/jx/commit/5db8ae8b781a1b5aeffbdd8f27cdf4c08ebb4540))
+* **protocol:** one failure shape — RFC 9457 problem details ([2ab94b1](https://github.com/jxsuite/jx/commit/2ab94b189e1c1265f90713e36b8cb8030f9afd40))
+* **schema:** serve markdown and YAML under the media types their RFCs register ([c336b6f](https://github.com/jxsuite/jx/commit/c336b6fc4e4935954cc897a3dc8d0579ad6ca27c))
+* **server:** read Fetch Metadata, and close the three ungated project-server routes ([18bd5da](https://github.com/jxsuite/jx/commit/18bd5dab144d76c5c97b08fb43c28fb3e5ad127b))
+* **server:** ship the Trusted Types observation stage (spec.md §21.5) ([cb563a5](https://github.com/jxsuite/jx/commit/cb563a5d3665cfde9fac34745f55f8b481c66416))
+* **server:** the live-reload stream reconnects, and the import stream stops hiding drops ([af72f6f](https://github.com/jxsuite/jx/commit/af72f6f20f54d332434dd3550818ffc8d61f497d))
+* **studio,server,desktop:** P4 wave A — the app can say what happened ([98a4a3a](https://github.com/jxsuite/jx/commit/98a4a3a1f895981ebc0b06483ef31953d8ebf7ef))
+* **studio:** the Named Shell — P0–P8, the full UX redesign ([b576cbb](https://github.com/jxsuite/jx/commit/b576cbb24c7e0d8d36075f6d682e9b3b6b971166))
+
+
+### Bug Fixes
+
+* **parser:** localized content never reached its own locale's asset mount ([179311b](https://github.com/jxsuite/jx/commit/179311b3f56d001eea37c092d73956c20056c55d))
+* **server:** give the previewed site its own origin, so Open in Browser is the real site ([90eb4b4](https://github.com/jxsuite/jx/commit/90eb4b4b3eba897a1028fa5a4029ef0dcae61f88))
+* **studio:** the icon I deleted, the two I never fixed, and the checker that approved all three ([7452caa](https://github.com/jxsuite/jx/commit/7452caa09312674b523588c991d05116c8bc41f4))
+* **studio:** the update prompt asks the registry, not this build's version number ([cea13c1](https://github.com/jxsuite/jx/commit/cea13c1f4ee9e4ad0ce7e937af290bbdd3973144))
+
+
+### Reverts
+
+* **studio:** stop reporting Trusted Types violations nobody can act on ([1ae1911](https://github.com/jxsuite/jx/commit/1ae19111b71b6d13f3659b925dfd12996910eb00))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/collab bumped to 0.7.0
+    * @jxsuite/compiler bumped to 2.0.0
+    * @jxsuite/create bumped to 1.3.0
+    * @jxsuite/import bumped to 0.39.0
+    * @jxsuite/protocol bumped to 1.1.0
+    * @jxsuite/runtime bumped to 2.0.0
+    * @jxsuite/schema bumped to 1.6.0
+    * @jxsuite/starters bumped to 1.3.0
+  * devDependencies
+    * @jxsuite/auth bumped to 0.5.0
+    * @jxsuite/connector bumped to 0.5.0
+    * @jxsuite/parser bumped to 1.5.0
+
 ## [2.0.0](https://github.com/jxsuite/jx/compare/server-v1.3.0...server-v2.0.0) (2026-07-30)
 
 

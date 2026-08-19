@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.39.0](https://github.com/jxsuite/jx/compare/import-v0.38.2...import-v0.39.0) (2026-08-19)
+
+
+### Features
+
+* **schema,runtime,compiler,studio:** a tag can be chosen at element creation ([e31a20f](https://github.com/jxsuite/jx/commit/e31a20fb52b7e718be67ed59338d149abf3562c1))
+* **studio:** the Named Shell — P0–P8, the full UX redesign ([b576cbb](https://github.com/jxsuite/jx/commit/b576cbb24c7e0d8d36075f6d682e9b3b6b971166))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/markup bumped to 0.4.3
+    * @jxsuite/schema bumped to 1.6.0
+  * optionalDependencies
+    * @jxsuite/compiler bumped to 2.0.0
+
 ## [0.38.2](https://github.com/jxsuite/jx/compare/import-v0.38.1...import-v0.38.2) (2026-07-30)
 
 
