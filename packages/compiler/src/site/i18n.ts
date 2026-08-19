@@ -189,9 +189,13 @@ export function undeclaredLocalePrefix(
  * A route's identity across locales: its path with the locale prefix removed.
  *
  * `/fr-ca/about/` and `/about/` share the key `about/`, which is what makes them translations of
- * one another. Nothing else could establish that — Jx has no translation metadata, and there is no
- * per-page id to join on — so the directory layout **is** the mapping. That is a real limitation: a
- * localized slug (`/fr-ca/a-propos/`) is not recognized as a translation of `/about/`.
+ * one another. The directory layout is the default mapping, and it is enough whenever the paths are
+ * parallel.
+ *
+ * A **localized slug** is not parallel, and that is the case this cannot derive: `/fr-ca/a-propos/`
+ * shares nothing with `/about/`. A document says so itself with `$translationKey`, which overrides
+ * this exactly as `$lang` overrides the locale its route implies (§13.4) — one key, and the whole
+ * annotation follows.
  *
  * @param {string} urlPattern
  * @param {ResolvedI18n | null} i18n
@@ -218,6 +222,23 @@ export interface TranslationMember {
   locale: string;
   /** Site-absolute route pattern, e.g. `/fr-ca/about/`. */
   urlPattern: string;
+}
+
+/** A route as translation grouping sees it: its URL, and the key its document declared. */
+export interface TranslationRoute {
+  /** From the document's `$translationKey`; absent when the key is derived from the path. */
+  translationKey?: string | undefined;
+  urlPattern: string;
+}
+
+/** Two routes claiming to be the same page in the same language. */
+export interface TranslationConflict {
+  /** True when at least one of them said so with `$translationKey`. */
+  declared: boolean;
+  key: string;
+  locale: string;
+  /** In route order; the first is the one that keeps the set. */
+  urlPatterns: string[];
 }
 
 /** Everything a page needs to know about its own locale, gathered once per build. */
@@ -247,23 +268,36 @@ export interface PageLocaleContext {
  * within the site and works before `url` is configured — which is every project during
  * development.
  *
- * @param {readonly { urlPattern: string }[]} routes - Concrete routes only
+ * @param {readonly TranslationRoute[]} routes - Concrete routes only
  * @param {ResolvedI18n | null} i18n
- * @returns {Map<string, TranslationMember[]>} Keyed by `urlPattern`; members of one set share one
- *   array
+ * @returns {{ conflicts: TranslationConflict[]; sets: Map<string, TranslationMember[]> }} Sets are
+ *   keyed by `urlPattern`; members of one set share one array
  */
 export function translationSets(
-  routes: readonly { urlPattern: string }[],
+  routes: readonly TranslationRoute[],
   i18n: ResolvedI18n | null,
-): Map<string, TranslationMember[]> {
+): { conflicts: TranslationConflict[]; sets: Map<string, TranslationMember[]> } {
   const out = new Map<string, TranslationMember[]>();
+  const conflicts: TranslationConflict[] = [];
   if (i18n === null) {
-    return out;
+    return { conflicts, sets: out };
   }
 
   const sets = new Map<string, TranslationMember[]>();
+  const declared = new Set<string>();
   for (const route of routes) {
-    const key = translationKey(route.urlPattern, i18n);
+    /*
+     * Slashes at the ends are trimmed so a declared key can be written the way the URL reads.
+     * The derived form has none — `/about/` reduces to `about` — and a `"/about"` that silently
+     * matched nothing would look exactly like a key that was ignored.
+     */
+    const key =
+      route.translationKey === undefined
+        ? translationKey(route.urlPattern, i18n)
+        : route.translationKey.replaceAll(/^\/+|\/+$/g, "");
+    if (route.translationKey !== undefined) {
+      declared.add(route.urlPattern);
+    }
     const locale = localeOfRoute(route.urlPattern, i18n);
     if (locale === null) {
       continue;
@@ -273,9 +307,21 @@ export function translationSets(
      * A duplicate locale in one set means two routes claim to be the same page in one language.
      * The first wins, which keeps the set single-valued rather than advertising a contradiction;
      * the loser is keyed nowhere, so it carries no alternates and no switcher.
+     *
+     * How loudly to say so is the caller's decision, and it turns on which kind of collision it
+     * is: a declared one is a promise the author wrote down and broke, while a derived one may be
+     * a deliberate alias the compiler cannot see the reason for.
      */
-    if (!members.some((m) => m.locale === locale)) {
+    const taken = members.find((m) => m.locale === locale);
+    if (taken === undefined) {
       members.push({ locale, urlPattern: route.urlPattern });
+    } else {
+      conflicts.push({
+        declared: declared.has(taken.urlPattern) || route.translationKey !== undefined,
+        key,
+        locale,
+        urlPatterns: [taken.urlPattern, route.urlPattern],
+      });
     }
     sets.set(key, members);
   }
@@ -288,7 +334,7 @@ export function translationSets(
       out.set(member.urlPattern, ordered);
     }
   }
-  return out;
+  return { conflicts, sets: out };
 }
 
 /**
@@ -303,13 +349,13 @@ export function translationSets(
  * Reciprocity is automatic: every member of a set lists every member **including itself**, which is
  * what the annotation is specified to do and what validators check for.
  *
- * @param {readonly { urlPattern: string }[]} routes - Concrete routes only
+ * @param {readonly TranslationRoute[]} routes - Concrete routes only
  * @param {ResolvedI18n | null} i18n
  * @param {string} siteUrl - Absolute site URL; alternates must be absolute
  * @returns {Map<string, LocaleAlternate[]>} Keyed by `urlPattern`
  */
 export function localeAlternates(
-  routes: readonly { urlPattern: string }[],
+  routes: readonly TranslationRoute[],
   i18n: ResolvedI18n | null,
   siteUrl: string,
 ): Map<string, LocaleAlternate[]> {
@@ -320,7 +366,7 @@ export function localeAlternates(
 
   /* Built once per set rather than once per member: every member advertises the same list. */
   const built = new Map<readonly TranslationMember[], LocaleAlternate[]>();
-  for (const [urlPattern, members] of translationSets(routes, i18n)) {
+  for (const [urlPattern, members] of translationSets(routes, i18n).sets) {
     if (members.length < 2) {
       continue;
     }

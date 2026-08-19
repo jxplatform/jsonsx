@@ -178,7 +178,7 @@ describe("translationSets", () => {
     { urlPattern: "/ar/about/" },
     { urlPattern: "/only-english/" },
   ];
-  const sets = translationSets(routes, i18n);
+  const { sets } = translationSets(routes, i18n);
 
   test("every member sees the whole set, itself included, ordered by tag", () => {
     for (const pattern of ["/about/", "/fr-ca/about/", "/ar/about/"]) {
@@ -204,7 +204,43 @@ describe("translationSets", () => {
   });
 
   test("nothing without i18n", () => {
-    expect(translationSets(routes, null).size).toBe(0);
+    expect(translationSets(routes, null).sets.size).toBe(0);
+  });
+
+  /*
+   * The case the derivation cannot reach: a localized slug shares no path with the page it
+   * translates. `$translationKey` says so, and everything downstream follows from the one key.
+   */
+  test("a declared key is trimmed, so it can be written the way the URL reads", () => {
+    const { sets: trimmed } = translationSets(
+      [
+        { translationKey: "about", urlPattern: "/about/" },
+        { translationKey: "/about/", urlPattern: "/fr-ca/a-propos/" },
+      ],
+      i18n,
+    );
+    expect(trimmed.get("/about/")?.map((m) => m.locale)).toEqual(["en", "fr-CA"]);
+  });
+
+  test("a declared key joins pages whose paths share nothing", () => {
+    const { sets: declared } = translationSets(
+      [{ urlPattern: "/about/" }, { translationKey: "/about/", urlPattern: "/fr-ca/a-propos/" }],
+      i18n,
+    );
+    expect(declared.get("/about/")?.map((m) => m.urlPattern)).toEqual([
+      "/about/",
+      "/fr-ca/a-propos/",
+    ]);
+    expect(declared.get("/fr-ca/a-propos/")).toEqual(declared.get("/about/")!);
+  });
+
+  test("a declared key also splits pages whose paths would have joined them", () => {
+    const { sets: split } = translationSets(
+      [{ urlPattern: "/about/" }, { translationKey: "team", urlPattern: "/fr-ca/about/" }],
+      i18n,
+    );
+    expect(split.get("/about/")?.map((m) => m.locale)).toEqual(["en"]);
+    expect(split.get("/fr-ca/about/")?.map((m) => m.locale)).toEqual(["fr-CA"]);
   });
 
   /*
@@ -214,13 +250,36 @@ describe("translationSets", () => {
    * alternates, no switcher — rather than the set advertising two Englishes.
    */
   test("a duplicate locale in a set is dropped, and carries no set of its own", () => {
-    const dup = translationSets(
+    const { conflicts, sets: dup } = translationSets(
       [{ urlPattern: "/about/" }, { urlPattern: "/en/about/" }, { urlPattern: "/ar/about/" }],
       i18n,
     );
     expect(dup.get("/about/")?.map((m) => m.locale)).toEqual(["ar", "en"]);
     expect(dup.get("/about/")?.find((m) => m.locale === "en")?.urlPattern).toBe("/about/");
     expect(dup.has("/en/about/")).toBe(false);
+    expect(conflicts).toEqual([
+      { declared: false, key: "about", locale: "en", urlPatterns: ["/about/", "/en/about/"] },
+    ]);
+  });
+
+  // Whether the author asserted it is what decides how loudly the build says so, so the flag is
+  // Part of the report rather than something the caller has to work out again.
+  test("a conflict knows whether a document declared it", () => {
+    const { conflicts } = translationSets(
+      [
+        { translationKey: "about", urlPattern: "/fr-ca/a-propos/" },
+        { urlPattern: "/fr-ca/about/" },
+      ],
+      i18n,
+    );
+    expect(conflicts).toEqual([
+      {
+        declared: true,
+        key: "about",
+        locale: "fr-CA",
+        urlPatterns: ["/fr-ca/a-propos/", "/fr-ca/about/"],
+      },
+    ]);
   });
 
   // The alternates are built from these sets, so a disagreement between them is impossible by

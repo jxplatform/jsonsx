@@ -34,8 +34,9 @@ function html(route: string): string {
  * One page: a language switcher mapped straight from `$page.alternates`, and a number formatted
  * with no locale named — the two things a template can only get from the route.
  */
-function page(title: string): string {
+function page(title: string, translationKey?: string): string {
   return JSON.stringify({
+    ...(translationKey === undefined ? {} : { $translationKey: translationKey }),
     children: [
       {
         children: {
@@ -128,7 +129,12 @@ beforeAll(async () => {
   write("pages/index.json", page("Home"));
   write("pages/about.json", page("About"));
   write("pages/fr-ca/index.json", page("Accueil"));
-  write("pages/fr-ca/about.json", page("À propos"));
+  /*
+   * A localized slug: nothing about `/fr-ca/a-propos` matches `/about`, so the document says what
+   * page it is. Everything downstream — the switcher, `hreflang`, `x-default`, the sitemap — is
+   * derived from that one key, which is the whole test of whether the shipped grouping was right.
+   */
+  write("pages/fr-ca/a-propos.json", page("À propos", "about"));
   // Arabic has a home page and no About: a partial set is the ordinary case, not the exception.
   write("pages/ar/index.json", page("الرئيسية"));
 
@@ -142,12 +148,12 @@ describe("a language switcher", () => {
     // No Arabic About exists, so the switcher must not offer one.
     expect(switcher(html("about"))).toEqual({
       en: { current: "true", dir: "ltr", url: "/about" },
-      "fr-CA": { current: "false", dir: "ltr", url: "/fr-ca/about" },
+      "fr-CA": { current: "false", dir: "ltr", url: "/fr-ca/a-propos" },
     });
   });
 
   it("marks the page the reader is on", () => {
-    const links = switcher(html("fr-ca/about"));
+    const links = switcher(html("fr-ca/a-propos"));
     expect(links["fr-CA"]?.current).toBe("true");
     expect(links.en?.current).toBe("false");
   });
@@ -172,7 +178,7 @@ describe("a language switcher", () => {
   });
 
   it("offers what the head advertises — the same set, minus x-default", () => {
-    for (const route of ["", "about", "fr-ca", "fr-ca/about", "ar"]) {
+    for (const route of ["", "about", "fr-ca", "fr-ca/a-propos", "ar"]) {
       const source = html(route);
       const advertised = Object.keys(alternates(source)).filter((l) => l !== "x-default");
       expect(Object.keys(switcher(source)).toSorted()).toEqual(advertised.toSorted());
@@ -181,7 +187,7 @@ describe("a language switcher", () => {
 });
 
 describe("the hreflang graph", () => {
-  const routes = ["", "about", "fr-ca", "fr-ca/about", "ar"];
+  const routes = ["", "about", "fr-ca", "fr-ca/a-propos", "ar"];
 
   it("is complete and symmetric: every member names every member, itself included", () => {
     const graph = new Map(
@@ -201,7 +207,7 @@ describe("the hreflang graph", () => {
   });
 
   it("names exactly one x-default per set, pointing at the default locale", () => {
-    expect(alternates(html("fr-ca/about"))["x-default"]).toBe(`${SITE}/about`);
+    expect(alternates(html("fr-ca/a-propos"))["x-default"]).toBe(`${SITE}/about`);
     expect(alternates(html("ar"))["x-default"]).toBe(`${SITE}/`);
     expect(html("about").match(/hreflang="x-default"/g)).toHaveLength(1);
   });
@@ -216,9 +222,27 @@ describe("the hreflang graph", () => {
   });
 });
 
+describe("a localized slug", () => {
+  /*
+   * The limitation §13.5 used to state — "a localized slug is not recognized" — with one line of
+   * document. If the shipped grouping was the right shape, this needs nothing else: no second
+   * mechanism, no route table entry, no metadata file.
+   */
+  it("is joined to the page it translates, in both directions", () => {
+    expect(alternates(html("about"))["fr-CA"]).toBe(`${SITE}/fr-ca/a-propos`);
+    expect(alternates(html("fr-ca/a-propos"))["en"]).toBe(`${SITE}/about`);
+  });
+
+  it("reaches the sitemap with the rest of the set", () => {
+    const sitemap = readFileSync(join(root, "dist/sitemap.xml"), "utf8");
+    expect(sitemap).toContain(`<loc>${SITE}/fr-ca/a-propos</loc>`);
+    expect(sitemap).toContain(`hreflang="fr-CA" href="${SITE}/fr-ca/a-propos"`);
+  });
+});
+
 describe("the page's own language", () => {
   it("reaches <html lang>, and dir only where it is not the default", () => {
-    expect(html("fr-ca/about")).toContain('lang="fr-CA"');
+    expect(html("fr-ca/a-propos")).toContain('lang="fr-CA"');
     expect(html("ar")).toMatch(/<html[^>]*dir="rtl"[^>]*lang="ar"/);
     expect(html("about")).toContain('lang="en"');
     expect(html("about")).not.toContain('dir="ltr"><head');
@@ -231,7 +255,7 @@ describe("the page's own language", () => {
    */
   it("is the locale a formula formats in when it names none", () => {
     expect(html("about")).toContain(new Intl.NumberFormat("en").format(1234.5));
-    expect(html("fr-ca/about")).toContain(new Intl.NumberFormat("fr-CA").format(1234.5));
+    expect(html("fr-ca/a-propos")).toContain(new Intl.NumberFormat("fr-CA").format(1234.5));
     expect(html("ar")).toContain(new Intl.NumberFormat("ar").format(1234.5));
   });
 });

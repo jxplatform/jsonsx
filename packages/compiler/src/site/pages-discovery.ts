@@ -67,6 +67,70 @@ export async function readPageDocument(
 }
 
 /**
+ * The `$translationKey` each route's document declares, for the routes that declare one.
+ *
+ * A **pre-pass**, because a page's alternates depend on the whole route table (§13.5): the set has
+ * to be complete before the first page is compiled, so a document cannot tell the build what its
+ * key is while it is being compiled.
+ *
+ * The file is read and the **parse is skipped** unless the text mentions the key. Most pages of a
+ * multilingual site never declare one — their paths are parallel and the derivation is right — so
+ * paying a second full parse for every page to find a key that is usually absent would be a cost
+ * with nothing behind it. Documents sharing a source (a `$paths` template's expansions) are read
+ * once.
+ *
+ * A document that fails to parse is skipped rather than thrown from here. It will fail again a
+ * moment later while being compiled, where the error names the page and the rest of the site still
+ * builds; failing in a pre-pass would turn one bad page into no site at all.
+ *
+ * @param {readonly { sourcePath: string; urlPattern: string }[]} routes - Concrete routes
+ * @param {FormatRegistry} [registry]
+ * @returns {Promise<Map<string, string>>} Keyed by `urlPattern`
+ */
+export async function readTranslationKeys(
+  routes: readonly { sourcePath: string; urlPattern: string }[],
+  registry?: FormatRegistry,
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const byFile = new Map<string, string | null>();
+  for (const route of routes) {
+    if (!byFile.has(route.sourcePath)) {
+      byFile.set(route.sourcePath, await declaredTranslationKey(route.sourcePath, registry));
+    }
+    const key = byFile.get(route.sourcePath);
+    if (key !== null && key !== undefined) {
+      out.set(route.urlPattern, key);
+    }
+  }
+  return out;
+}
+
+/**
+ * One document's `$translationKey`, or null when it declares none or cannot be read.
+ *
+ * @param {string} sourcePath
+ * @param {FormatRegistry} [registry]
+ * @returns {Promise<string | null>}
+ */
+async function declaredTranslationKey(
+  sourcePath: string,
+  registry?: FormatRegistry,
+): Promise<string | null> {
+  if (!readFileSync(sourcePath, "utf8").includes("$translationKey")) {
+    return null;
+  }
+  let doc: JxDocument;
+  try {
+    doc = await readPageDocument(sourcePath, registry);
+  } catch {
+    return null;
+  }
+  return typeof doc.$translationKey === "string" && doc.$translationKey !== ""
+    ? doc.$translationKey
+    : null;
+}
+
+/**
  * Discover all routable pages in a pages/ directory.
  *
  * @param {string} pagesDir - Absolute path to the pages/ directory

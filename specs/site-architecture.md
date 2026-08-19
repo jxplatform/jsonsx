@@ -2,7 +2,7 @@
 
 ## File-Based Routing, Content Collections, Layouts, and Static Site Generation
 
-**Version:** 0.5.14-draft
+**Version:** 0.5.15-draft
 **Status:** Partial
 **Updated:** 2026-08-18
 **License:** MIT
@@ -1923,11 +1923,46 @@ in a translation set therefore advertises the whole set, in `<head>`:
 and again as `xhtml:link` inside the page's `<url>` entry in `sitemap.xml`, under a
 `xmlns:xhtml` declaration the document carries only when some entry uses it.
 
-**A translation set is a directory layout.** Two routes are translations when they share a path
-with the locale prefix removed: `/fr-ca/about/` and `/about/` share `about`. Nothing else could
-establish it — Jx has no translation metadata and no per-page id to join on — and this is the
-limitation to state plainly: **a localized slug is not recognized.** `/fr-ca/a-propos/` is a
-different page from `/about/`, and no annotation connects them.
+**A translation set is a directory layout, unless a page says otherwise.** Two routes are
+translations when they share a path with the locale prefix removed: `/fr-ca/about/` and `/about/`
+share `about`. That derivation is right whenever the paths are parallel, and it is the whole mapping
+for most sites.
+
+A **localized slug** is the case it cannot reach. `/fr-ca/a-propos/` shares nothing with `/about/`,
+and translating a URL is ordinary practice rather than an edge case — the words in a path are read
+by the same person who reads the page. A document therefore declares its own identity:
+
+```json
+{ "$translationKey": "about", "title": "À propos" }
+```
+
+at `pages/fr-ca/a-propos.json`. `$translationKey` overrides the derived key exactly as `$lang`
+overrides the derived locale (§13.4), and it is the **only** new key this needs: the grouping is
+already keyed, so `hreflang`, `x-default`, the sitemap and `$page.alternates` all follow from it
+with nothing else changed. Leading and trailing slashes are trimmed, so the key can be written the
+way the URL reads.
+
+It is read in a **pre-pass**, before the first page compiles, because a page's alternates depend on
+the whole route table — a document cannot tell the build what its key is while it is being
+compiled. Pages that do not mention the key are not parsed twice for it.
+
+**Two routes claiming one language is a contradiction, and the build says so.** A set names one URL
+per language, so one of the two is dropped from it either way. What differs is whether the author
+asserted it:
+
+- **Declared on both** — a build error. `$translationKey` is a promise written down twice, and
+  silently advertising one of the two URLs as _the_ page in that language is a wrong answer nobody
+  downstream can detect.
+- **Derived** — a warning. Parallel paths that happen to meet (`pages/about.json` beside
+  `pages/en/about.json` under `prefix-except-default`) may be a deliberate alias, and failing a
+  build over pages that work would be the compiler overruling a decision it cannot see.
+
+A `$paths` template that declares a key is the declared case by construction: every route it expands
+to claims the same one, and the error names them.
+
+**A collection's localized slugs are the collection's business.** Two translations of one entry
+share an id (§13.3), so their URLs are parallel already and the derivation is right; a key declared
+on a `[slug]` template would apply to every entry it expands.
 
 Four rules follow from what the annotation means rather than from convenience:
 
@@ -2477,6 +2512,7 @@ This spec introduces the following new reserved keywords:
 | `$site`             | Template string     | Site metadata context                            |
 | `$head`             | Page/site root      | `<head>` element declarations                    |
 | `$sitemap`          | Page root           | Set `false` to exclude from `sitemap.xml`        |
+| `$translationKey`   | Page root           | This page's identity across languages (§13.5)    |
 | `ContentCollection` | `$prototype` value  | Collection query                                 |
 | `ContentEntry`      | `$prototype` value  | Single entry access                              |
 
@@ -2555,6 +2591,7 @@ This spec builds on existing Jx primitives wherever possible:
 
 ## Changelog
 
+- **0.5.15-draft** (2026-08-18) — §13.5: a document declares its identity across languages with $translationKey, so a localized slug is a translation; two routes claiming one language are reported, as an error when declared.
 - **0.5.14-draft** (2026-08-18) — §13.5 exposes the translation set to the page as $page.alternates, with each locale's autonym; §13.7 defaults a helper's locale to the page's own; §13.6 reports a prefix-always root no static deployment can answer.
 - **0.5.13-draft** (2026-08-18) — §8.7: the subpath entry is bundled rather than externalised, and the shared core is reached through an emitted stub — a self-referential asset broke every page using a directive.
 - **0.5.12-draft** (2026-08-18) — §8.7: subpaths resolve through a prefix key and an npm $elements set bundles as one self-contained module.

@@ -30,7 +30,12 @@ import {
   resolveSidecarEntry,
 } from "./bundler.ts";
 import { loadProjectConfig } from "./site-loader.ts";
-import { discoverPages, expandDynamicRoutes, readPageDocument } from "./pages-discovery.ts";
+import {
+  discoverPages,
+  expandDynamicRoutes,
+  readPageDocument,
+  readTranslationKeys,
+} from "./pages-discovery.ts";
 import {
   buildHeaderRules,
   contentTypeRules,
@@ -497,13 +502,56 @@ export async function buildSite(
   const concreteRoutes = routes.filter(
     (r) => !r.urlPattern.includes(":") && !r.urlPattern.includes("*"),
   );
-  const alternateMap = localeAlternates(concreteRoutes, i18n, siteUrl ?? "");
+  /*
+   * A localized slug shares nothing with the page it translates — `/fr-ca/a-propos/` and `/about/`
+   * reduce to different keys — so the document says so itself, and the whole annotation follows
+   * from the one key. Read only when the project has locales to group across.
+   */
+  const declaredKeys =
+    i18n === null
+      ? new Map<string, string>()
+      : await readTranslationKeys(
+          concreteRoutes as { sourcePath: string; urlPattern: string }[],
+          formatRegistry,
+        );
+  const keyedRoutes = concreteRoutes.map((r) => ({
+    translationKey: declaredKeys.get(r.urlPattern),
+    urlPattern: r.urlPattern,
+  }));
+  const alternateMap = localeAlternates(keyedRoutes, i18n, siteUrl ?? "");
   /*
    * The same sets, site-absolute, for `$page.alternates`. Computed from the whole table for the
    * same reason the alternates are — and separately from them because a switcher must work in a
    * project that has not configured `url` yet, which is every project in development.
    */
-  const translationMap = translationSets(concreteRoutes, i18n);
+  const { conflicts, sets: translationMap } = translationSets(keyedRoutes, i18n);
+
+  /*
+   * Two routes claiming to be the same page in the same language. A set is single-valued, so one
+   * of them is dropped either way; what differs is whether the author asserted it.
+   *
+   * A **declared** collision fails the build: `$translationKey` is a promise written down twice,
+   * and silently advertising one of the two URLs as *the* page in that language is a wrong answer
+   * nobody can see. A derived one warns — parallel paths that happen to collide may be a deliberate
+   * alias, and failing a build over pages that work would be the compiler overruling a decision it
+   * cannot see the reason for.
+   */
+  for (const conflict of conflicts) {
+    const [kept, dropped] = conflict.urlPatterns;
+    const fix = conflict.declared
+      ? "Give one of them a different $translationKey."
+      : "Move one out of the locale tree, or give it its own $translationKey.";
+    const message =
+      `${dropped} and ${kept} are both the "${conflict.locale}" version of ` +
+      `"${conflict.key}". A translation set names one URL per language, so ${dropped} is ` +
+      `dropped from it — it carries no alternates and no switcher. ${fix}`;
+    if (conflict.declared) {
+      errors.push(message);
+      console.error(message);
+    } else {
+      console.warn(message);
+    }
+  }
 
   /*
    * `prefix-always` says every URL names its language, and until now nothing checked it: a page
