@@ -55,6 +55,7 @@ beforeEach(() => {
   invalidateLibrary();
   libraryView.category = "all";
   libraryView.layout = "cards";
+  libraryView.locale = "";
   libraryView.query = "";
   ctx = makeContext({ project: { isSite: true, open: true } });
   registry = createCommandRegistry({ getContext: () => ctx });
@@ -86,6 +87,35 @@ describe("running the verbs", () => {
     expect(libraryView.query).toBe("");
   });
 
+  test('library.setLocale names a language, and "all" clears it', async () => {
+    resetStudioState({
+      projectConfig: { i18n: { defaultLocale: "en", locales: ["en", "fr"] } },
+      projectDirs: ["pages"],
+    });
+    ctx = makeContext({ project: { isMultilingual: true, isSite: true, open: true } });
+    await registry.run("library.setLocale", { locale: "fr" });
+    expect(libraryView.locale).toBe("fr");
+    await registry.run("library.setLocale", { locale: "all" });
+    expect(libraryView.locale).toBe("");
+  });
+
+  test("library.setLocale refuses a language the project does not declare, naming the set", async () => {
+    resetStudioState({
+      projectConfig: { i18n: { defaultLocale: "en", locales: ["en", "fr"] } },
+      projectDirs: ["pages"],
+    });
+    ctx = makeContext({ project: { isMultilingual: true, isSite: true, open: true } });
+    // `run` throws synchronously out of `enumArg`, so the refusal has to be caught, not awaited.
+    let refusal = "";
+    try {
+      await Promise.resolve(registry.run("library.setLocale", { locale: "de" }));
+    } catch (error) {
+      refusal = error instanceof Error ? error.message : String(error);
+    }
+    expect(refusal).toContain("all, en, fr");
+    expect(libraryView.locale).toBe("");
+  });
+
   test("library.refresh re-reads the project", async () => {
     await registry.run("library.refresh");
     expect(listed).toEqual(["pages"]);
@@ -108,6 +138,32 @@ describe("running the verbs", () => {
 });
 
 describe("the records", () => {
+  /*
+   * The enum is a GETTER for the reason `content/entry-commands.ts` documents: these records are
+   * built at module scope, before any project exists, so a snapshot would freeze at `["all"]` and
+   * the palette would offer that forever after. Reading it twice across a project switch is the
+   * only assertion that can tell a getter from a value.
+   */
+  test("library.setLocale's enum is read when the palette asks, not when the record is built", () => {
+    const record = libraryCommands().find((c) => c.id === "library.setLocale")!;
+    const property = (record.args as { properties: { locale: { enum: string[] } } }).properties
+      .locale;
+    resetStudioState({ projectConfig: {} });
+    expect(property.enum).toEqual(["all"]);
+    resetStudioState({
+      projectConfig: { i18n: { defaultLocale: "EN-us", locales: ["fr"] } },
+    });
+    expect(property.enum).toEqual(["all", "en-US", "fr"]);
+  });
+
+  test("library.setLocale is the only one a monolingual project hides", () => {
+    ctx = makeContext({ project: { isMultilingual: false, isSite: true, open: true } });
+    const hidden = libraryCommands()
+      .map((c) => c.id)
+      .filter((id) => !registry.isVisible(id));
+    expect(hidden).toEqual(["library.setLocale"]);
+  });
+
   test("every one is project-level and offered to the assistant", () => {
     for (const command of libraryCommands()) {
       expect(command.level).toBe("project");

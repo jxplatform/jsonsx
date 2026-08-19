@@ -29,6 +29,7 @@
         { "path": "studio/interface/quick-access", "label": "Quick Access" },
         { "path": "studio/interface/shortcuts", "label": "Keyboard shortcuts" },
         { "path": "studio/interface/preferences", "label": "Preferences" },
+        { "path": "studio/interface/languages", "label": "Languages" },
         {
           "path": "studio/interface/problems-and-progress",
           "label": "Problems and progress"

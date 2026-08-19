@@ -55,6 +55,8 @@ Name a context in plain language; Studio derives the stored name ("Wide screen" 
 
 Whatever you declare here is also what a [design token](/docs/studio/design/tokens) can carry a different value in: declare a Dark scheme and every color token gains a **Dark** row, declare a breakpoint and any token can be given a value at it.
 
+The same popover carries a **Language** control on a [multilingual project](/docs/studio/interface/languages), which sets the language the artboard renders in — its `lang` and direction, not which file is open.
+
 A colour scheme is what turns on the **Auto / Light / Dark** control in the context bar's **Context** popover. Auto follows your OS preference; Light and Dark force that scheme on the canvas — exactly what a visitor's [color-scheme switcher](/docs/framework/concepts/color-schemes) does on the published site. The control appears only once the project declares a scheme.
 
 Forcing a scheme while the size is **Base** points your edits at that scheme's overrides, and the Target Line grows a segment to say so — `⌖ h1 · Base · Dark variant`. Base values show through as inherited, their chips reading **from Base**, and clicking one sets the control back to **Auto** so you can edit the value where it lives. A size breakpoint is always breakpoint-scoped: schemes and sizes don't compound into a single block.

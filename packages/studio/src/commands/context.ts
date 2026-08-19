@@ -147,6 +147,8 @@ export interface CommandContext {
     open: boolean;
     isSite: boolean;
     isRepo: boolean;
+    /** The project declares two or more locales — the gate on every `i18n.*` verb and surface. */
+    isMultilingual: boolean;
   };
   git: {
     ahead: number;
@@ -266,7 +268,7 @@ export const hasElementSelection = (ctx: CommandContext) =>
 
 export function emptyContext(): CommandContext {
   return {
-    project: { open: false, isSite: false, isRepo: false },
+    project: { open: false, isSite: false, isRepo: false, isMultilingual: false },
     git: { ahead: 0, behind: 0, dirtyCount: 0 },
     document: { open: false, dirty: false, mode: "", canUndo: false, canRedo: false },
     editor: { kind: "none" },

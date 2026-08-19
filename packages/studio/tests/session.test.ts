@@ -71,10 +71,12 @@ describe("captureSession", () => {
     tab.session.ui.zoom = 1.5;
     tab.session.ui.activeMedia = "md";
     tab.session.ui.previewColorScheme = "dark";
+    tab.session.ui.previewLocale = "fr-CA";
     expect(captureSession().ui["pages/a.md"]).toMatchObject({
       activeMedia: "md",
       canvasMode: "source",
       previewColorScheme: "dark",
+      previewLocale: "fr-CA",
       zoom: 1.5,
     });
   });
@@ -167,6 +169,23 @@ describe("readSession — every field is untrusted input", () => {
     // The string boolean do not — a bad neighbour must not cost a good field.
     expect(parsed?.ui["a.md"]).toEqual({ canvasMode: "source" });
   });
+
+  test("a stored locale is kept only if it is a well-formed tag — and `null` is a value", () => {
+    const read = (previewLocale: unknown) =>
+      readSession({
+        panes: [{ activeFile: null, files: ["a.md"], id: PRIMARY_PANE }],
+        ui: { "a.md": { previewLocale } },
+      })?.ui["a.md"];
+
+    expect(read("fr-CA")).toEqual({ previewLocale: "fr-CA" });
+    // `null` means "the document's own language". Dropping it would restore a pane that had been
+    // Deliberately put back onto its own file's language into the tag it was moved off.
+    expect(read(null)).toEqual({ previewLocale: null });
+    // Well-formedness is all this reader can answer. Whether the project still DECLARES the tag is
+    // A question about `project.json`, which is not in this record and changes between sessions.
+    expect(read("en_US")).toEqual({});
+    expect(read(7)).toEqual({});
+  });
 });
 
 describe("restoreSession", () => {
@@ -212,6 +231,7 @@ describe("restoreSession", () => {
             editZoom: 1.25,
             preview: false,
             previewColorScheme: "dark",
+            previewLocale: "ar",
             showLayout: false,
             zoom: 0.5,
           },
@@ -227,6 +247,7 @@ describe("restoreSession", () => {
       editZoom: ui.editZoom,
       preview: ui.preview,
       previewColorScheme: ui.previewColorScheme,
+      previewLocale: ui.previewLocale,
       showLayout: ui.showLayout,
       zoom: ui.zoom,
     }).toEqual({
@@ -234,6 +255,7 @@ describe("restoreSession", () => {
       editZoom: 1.25,
       preview: false,
       previewColorScheme: "dark",
+      previewLocale: "ar",
       showLayout: false,
       zoom: 0.5,
     });

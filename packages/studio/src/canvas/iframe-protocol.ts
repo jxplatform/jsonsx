@@ -99,6 +99,19 @@ export type ParentToIframe =
   // Idempotent attribute write, deliberately gen-less (like endEdit).
   | { kind: "setColorScheme"; scheme: "light" | "dark" | null }
   /**
+   * Set the language the artboard is drawn in — `lang` and `dir` on the frame's document element.
+   *
+   * Render-free and gen-less, like `setColorScheme` above, because it changes no content: Jx has no
+   * message catalogue, so the TEXT is whatever file is open and only the direction, the font stack
+   * and CSS's own `:lang()` selectors move. `dir` travels with the tag rather than being derived in
+   * the frame — `localeDirection` is CLDR's answer via `Intl.Locale`, and the frame has no reason
+   * to hold a second copy of the RTL script list.
+   *
+   * `null` is "the document's own language": both attributes come off, and the frame falls back to
+   * whatever the rendered document declares.
+   */
+  | { kind: "setLocale"; locale: string | null; dir: "ltr" | "rtl" }
+  /**
    * Open the slash menu at the caret, by name rather than by typing "/".
    *
    * The gesture is recognised inside the frame (`canvas/iframe-inline-edit.ts`), because that is

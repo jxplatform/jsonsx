@@ -57,6 +57,7 @@ import { publishCommands } from "../publish/publish-commands";
 import { gridViewCommands } from "../grid/grid-panel";
 import { redirectsCommands } from "../grid/redirects-grid";
 import { contentCommands } from "../content/entry-commands";
+import { i18nCommands } from "../i18n/i18n-commands";
 import { newProjectCommands } from "../new-project/new-project-modal";
 import { canvasCommands } from "../editor/shortcuts";
 import { formatCommands, registerSelectionCommands } from "../panels/block-action-bar";
@@ -140,6 +141,9 @@ export function appCommandSet(): AnyCommand[] {
     ...aboutCommands(),
     ...libraryCommands(),
     ...contentCommands(),
+    // The four translation verbs. `i18n.switchLocale` is deliberately not among them: it is a
+    // Rendering context, defined in `canvas/canvas-utils.ts` beside the per-tab UI state it writes.
+    ...i18nCommands(),
     ...sourceControlCommands(),
     ...publishCommands(),
     ...gridViewCommands(),

@@ -25,6 +25,7 @@
  * studio.ts, and lets a test state a context without standing up the app.
  */
 
+import { resolveI18n } from "@jxsuite/schema/locale";
 import { componentRegistry } from "../files/components";
 import { getNodeAtPath, projectState } from "../store";
 import { shell } from "../shell";
@@ -106,6 +107,17 @@ export function createLiveContext(sources: LiveContextSources): () => CommandCon
     // A project is a repository once git has answered for it. Before the first refresh the honest
     // Answer is "not yet", and Source Control's own commands are the ones that refresh it.
     ctx.project.isRepo = shell.git.status?.isRepo === true;
+    /*
+     * Two locales, not two entries in the array: the shared resolver canonicalizes and drops what
+     * it cannot parse, so `["en", "en", "not_a_tag"]` is one locale and gates nothing on. Reading
+     * `.length` off the raw config would open every i18n surface on a project that has none.
+     *
+     * `@jxsuite/schema/locale` and not `site-context.ts`: everything reachable from
+     * `app-commands.ts` has to load in a bare Bun process with no DOM, and that module reaches the
+     * platform. This one is `Intl` and string math.
+     */
+    ctx.project.isMultilingual =
+      (resolveI18n(project?.projectConfig ?? {}).i18n?.locales.length ?? 0) > 1;
     ctx.git.ahead = shell.git.status?.ahead ?? 0;
     ctx.git.behind = shell.git.status?.behind ?? 0;
     ctx.git.dirtyCount = shell.git.status?.files.length ?? 0;

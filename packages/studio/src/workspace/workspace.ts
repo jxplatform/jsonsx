@@ -67,9 +67,9 @@ export interface Pane {
  *   untouched — what changes is only the unstated operational corollary that a tab lived in one
  *   pane. Ownership stays one-to-one; DISPLAY becomes many-to-one.
  * - A **companion** shows a DIFFERENT document chosen by a rule from the source — the layout that
- *   wraps its page, the component definition under its selection. That is an ordinary path-keyed
- *   tab which this pane owns normally; the derivation only decides WHICH of its tabs is on screen,
- *   which is what `activateTab` has always done.
+ *   wraps its page, the component definition under its selection, the same page written in another
+ *   language. That is an ordinary path-keyed tab which this pane owns normally; the derivation only
+ *   decides WHICH of its tabs is on screen, which is what `activateTab` has always done.
  *
  * The split is also the answer to what Pin means: a companion can be pinned (it names a different
  * file), a lens cannot (a second tab for the source's own path IS the §14.1 violation) — its exit
@@ -99,6 +99,29 @@ export type PaneDerivation =
       kind: "companion";
       sourcePaneId: string;
       preset: "layout" | "component";
+      /** The follow's memo: the path this derivation last resolved to. */
+      resolved: string | null;
+      status: DerivationStatus;
+      reason: string;
+    }
+  /*
+   * The `locale` companion is a THIRD member rather than a `locale: string | null` on the arm
+   * above, because a locale is the one thing this preset cannot be without: `companionTarget` has
+   * no answer at all for a locale derivation that names no locale, and a field every other
+   * companion carries as `null` forever is a field the type system stops guarding. Narrowing on
+   * `preset === "locale"` — which the resolver and the strip chip both already do to say anything
+   * useful — is what makes the tag reachable, so nothing reads it without having asked which
+   * preset this is.
+   */
+  | {
+      kind: "companion";
+      sourcePaneId: string;
+      preset: "locale";
+      /**
+       * The canonical BCP 47 tag this pane holds. Null only while `pane.derive` was given none —
+       * {@link presetRefusal} refuses that, and the pane says so rather than opening a file.
+       */
+      locale: string | null;
       /** The follow's memo: the path this derivation last resolved to. */
       resolved: string | null;
       status: DerivationStatus;

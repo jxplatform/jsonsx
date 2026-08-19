@@ -49,6 +49,20 @@ export interface TabUi {
    * which scheme layer edits target.
    */
   previewColorScheme: "auto" | "light" | "dark";
+  /**
+   * The locale this pane renders AS — the artboard's `lang` and `dir` (§13.4), never which file is
+   * open.
+   *
+   * Jx has no message catalogue: a translation is a different file in a different directory, so
+   * "show this page in French" is a navigation and belongs to the locale preset. This axis is the
+   * other half — the rendering context a document is _drawn_ under, which is how an author sees
+   * their layout mirror under an RTL locale without leaving the document they are editing.
+   *
+   * `null` is "the document's own language", resolved from its path at render time rather than
+   * baked in here: a file moved into `pages/fr/` must change what the pane draws, and a stored tag
+   * would go on claiming the language the file used to be in.
+   */
+  previewLocale: string | null;
   styleSections: Record<string, boolean>;
   /**
    * Which Data rows have their editor and value open, by state-entry name.
@@ -211,6 +225,7 @@ function createDefaultUi(canvasMode: string, preview = false) {
     pendingInlineEdit: null,
     preview,
     previewColorScheme: "auto" as const,
+    previewLocale: null as string | null,
     previewParams: {},
     previewProps: null,
     rightTab: "properties",

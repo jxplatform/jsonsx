@@ -27,6 +27,7 @@ import { registerFilesPanel } from "../files/files";
 import { registerDataPanel } from "./data-explorer";
 import { registerInsertPanel } from "./elements-panel";
 import { registerGitPanel } from "./git-panel";
+import { registerI18nPanel } from "./i18n-panel";
 import { registerPagePanel } from "./head-panel";
 import { registerPackagesPanel } from "./imports-panel";
 import { registerBottomPanels } from "./bottom-dock";
@@ -63,6 +64,11 @@ export function registerNavigatorPanels(): void {
     render: () => nothingYet(),
   });
   registerGitPanel();
+  /* Off the rail, and registered in the PROJECT group anyway: registration order is roster order,
+     so this is what puts Languages beside the panels it belongs with in the palette and in
+     `panel.focus.*`. Its `when` is `project.isMultilingual` — a project written in one language
+     never sees it. */
+  registerI18nPanel();
 
   // ── DOCUMENT group ──────────────────────────────────────────────────────────
   registerLayersPanel();

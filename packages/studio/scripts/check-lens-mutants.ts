@@ -813,6 +813,21 @@ const MUTANTS: Mutant[] = [
   {
     edits: [
       {
+        find: `      disabled: deriveReason ?? presetRefusal("locale", paneId, null, locale),`,
+        replace: `      disabled: deriveReason,`,
+      },
+    ],
+    file: "src/panels/pane-context.ts",
+    id: "pane-context.ts · the locale row carries its own refusal",
+    means:
+      "every language the project names is offered over a monolingual project and over a " +
+      "document that has never been saved — and choosing one throws a `RangeError` out of a " +
+      "click handler",
+    test: "tests/lens-chrome.test.ts",
+  },
+  {
+    edits: [
+      {
         find: `      workspace.panes.length > 1 ? null : (registry?.get("pane.unsplit")?.requires ?? null),`,
         replace: `      null,`,
       },
@@ -922,13 +937,32 @@ const MUTANTS: Mutant[] = [
         find:
           `    derived.kind === "lens" && derived.preset === "breakpoint"\n` +
           '      ? `${PRESET_LABELS.breakpoint} ${derived.media ? mediaDisplayName(derived.media) : "Base"}`\n' +
-          `      : PRESET_LABELS[derived.preset];`,
+          `      : derived.kind === "companion" && derived.preset === "locale"\n` +
+          '        ? `${PRESET_LABELS.locale} ${derived.locale ? localeLabel(derived.locale) : "—"}`\n' +
+          `        : PRESET_LABELS[derived.preset];`,
         replace: `    PRESET_LABELS[derived.preset];`,
       },
     ],
     file: "src/panels/tab-strip.ts",
     id: "tab-strip.ts · the breakpoint chip names its breakpoint",
     means: 'every breakpoint lens\'s only chip reads "Same page at" and never says at WHAT',
+    test: "tests/lens-chrome.test.ts",
+  },
+  {
+    edits: [
+      {
+        find:
+          `      : derived.kind === "companion" && derived.preset === "locale"\n` +
+          '        ? `${PRESET_LABELS.locale} ${derived.locale ? localeLabel(derived.locale) : "—"}`\n' +
+          `        : PRESET_LABELS[derived.preset];`,
+        replace: `      : PRESET_LABELS[derived.preset];`,
+      },
+    ],
+    file: "src/panels/tab-strip.ts",
+    id: "tab-strip.ts · the locale chip names its locale",
+    means:
+      'every locale companion\'s chip reads "Same page in" and never says in WHAT — the one fact ' +
+      "the author opened the pane to be told",
     test: "tests/lens-chrome.test.ts",
   },
   {
@@ -1064,8 +1098,8 @@ const MUTANTS: Mutant[] = [
   {
     edits: [
       {
-        find: `const derivationDeps: DerivationDeps = { loadDiff: loadDiffForLens, openFileInPane };`,
-        replace: `const derivationDeps: DerivationDeps = { loadDiff: () => Promise.resolve(null), openFileInPane };`,
+        find: `  loadDiff: loadDiffForLens,\n  openFileInPane,\n};`,
+        replace: `  loadDiff: () => Promise.resolve(null),\n  openFileInPane,\n};`,
       },
     ],
     file: "src/studio.ts",
@@ -1238,6 +1272,23 @@ const MUTANTS: Mutant[] = [
   {
     edits: [
       {
+        find:
+          `    return locale !== null && i18n.locales.includes(locale)\n` +
+          `      ? null\n` +
+          `      : "a locale this project declares";`,
+        replace: `    return null;`,
+      },
+    ],
+    file: "src/workspace/pane-derive.ts",
+    id: "pane-derive.ts · a locale the project stopped declaring is refused",
+    means:
+      "the menu offers, and the pane opens, a language nothing builds — a companion pointed at a " +
+      "directory the router has never heard of",
+    test: "tests/pane-derive.test.ts",
+  },
+  {
+    edits: [
+      {
         find: `  if (needed && !source.capabilities.modes.includes(needed)) {`,
         replace: `  if (false as boolean) {`,
       },
@@ -1367,6 +1418,20 @@ const MUTANTS: Mutant[] = [
   {
     edits: [
       {
+        find: `  if (preset === "locale") {\n    return {\n      kind: "companion",`,
+        replace: `  if (false as boolean) {\n    return {\n      kind: "companion",`,
+      },
+    ],
+    file: "src/workspace/pane-derive.ts",
+    id: "pane-derive.ts · locale builds a COMPANION, not a lens",
+    means:
+      "the preset becomes a second copy of the page under a chip naming another language — a " +
+      "projection that changes nothing but the chip, which is what a companion exists not to be",
+    test: "tests/pane-derive.test.ts",
+  },
+  {
+    edits: [
+      {
         find: `  return pane && pane.activeTabId !== null && pane.derived === null ? null : DERIVE_REQUIRES;`,
         replace: `  return pane && pane.derived === null ? null : DERIVE_REQUIRES;`,
       },
@@ -1457,6 +1522,32 @@ const MUTANTS: Mutant[] = [
   {
     edits: [
       {
+        find:
+          `        live?.kind !== "companion" ||\n` +
+          `        live.preset !== "locale" ||\n` +
+          `        _localeProbes.get(paneId)?.path !== path`,
+        replace: `        false as boolean`,
+      },
+    ],
+    file: "src/workspace/pane-derive.ts",
+    id: "pane-derive.ts · a translation probe answers only the question still being asked",
+    means:
+      "the author picks another language while the first read is out, and that read's answer is " +
+      "written onto the new locale's memo — the pane resolves German against French's disk",
+    test: "tests/pane-derive.test.ts",
+  },
+  {
+    edits: [{ find: `    _localeProbes.delete(paneId);`, replace: `    void paneId;` }],
+    file: "src/workspace/pane-derive.ts",
+    id: "pane-derive.ts · writing a derivation FORGETS the pane's translation probe",
+    means:
+      "the author creates the missing translation and points the pane at that language again, " +
+      "and the pane still says there is no copy — the answer to a question nobody asked twice",
+    test: "tests/pane-derive.test.ts",
+  },
+  {
+    edits: [
+      {
         find: `    if (pane.tabOrder.length > 0 || pane.activeTabId !== null) {`,
         replace: `    if (false as boolean) {`,
       },
@@ -1515,6 +1606,15 @@ const MUTANTS: Mutant[] = [
     file: "src/workspace/pane-derive.ts",
     id: "pane-derive.ts · a component companion HOLDS when the click resolves to nothing",
     means: "the pane flickers between a definition and an empty state as the author works",
+    test: "tests/pane-derive.test.ts",
+  },
+  {
+    edits: [{ find: `    if (!probe.exists) {`, replace: `    if (false as boolean) {` }],
+    file: "src/workspace/pane-derive.ts",
+    id: "pane-derive.ts · a translation that does not exist is unavailable, not blank",
+    means:
+      "choosing a language nobody has written yet hands `openFileInPane` a path with no file " +
+      "behind it: an empty pane with no words, where the sentence names the language and the fix",
     test: "tests/pane-derive.test.ts",
   },
   {

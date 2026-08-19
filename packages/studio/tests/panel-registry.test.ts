@@ -1,4 +1,4 @@
-import { flush, installMockPlatform, renderInto } from "./harness";
+import { flush, installMockPlatform, renderInto, resetStudioState } from "./harness";
 import { afterEach, describe, expect, test } from "bun:test";
 import { html } from "lit-html";
 import {
@@ -156,11 +156,15 @@ describe("panel placement matrix", () => {
 // ─── the composed set ─────────────────────────────────────────────────────────
 
 describe("the Navigator's panel set", () => {
-  test("registers eight records, in rail order — and Problems is not one of them", () => {
+  test("registers nine records, in registration order — and Problems is not one of them", () => {
     expect(navigatorPanelSet().map((p) => p.id)).toEqual([
       "files",
       "search",
       "git",
+      // Languages is registered with the PROJECT group and draws no rail button, so it sits here
+      // Rather than beside Insert at the end — registration order is roster order, and this list
+      // Is what `view.setActivity` and the shot manifest address the panel by.
+      "i18n",
       "layers",
       "page",
       "data",
@@ -178,7 +182,7 @@ describe("the Navigator's panel set", () => {
   test("registerNavigatorPanels is idempotent — the app mounts once, a suite mounts per case", () => {
     registerNavigatorPanels();
     registerNavigatorPanels();
-    expect(listPanels("navigator")).toHaveLength(8);
+    expect(listPanels("navigator")).toHaveLength(9);
     // …and it composes the Bottom dock's tabs in the same pass, still exactly once each. There is
     // No `diff` among them: it was a reserved id with no record behind it, so it could only ever
     // Select a hidden tab.
@@ -488,6 +492,25 @@ describe("panelContext", () => {
     expect(panelContext().git.dirtyCount).toBe(3);
     shell.git.status = null;
     expect(panelContext().git.dirtyCount).toBe(0);
+  });
+
+  /*
+   * A key a panel gates on has to be computed here, and this one was not: `isMultilingual` was
+   * declared, assigned in `live-context.ts`, and left at its `emptyContext()` default in this
+   * subset — so the Languages panel's `when` was false on a project declaring three languages and
+   * the Navigator answered "No Navigator panel is registered as i18n". Nothing threw; the panel was
+   * simply never visible.
+   */
+  test("computes isMultilingual, which a panel gates on", () => {
+    resetStudioState({
+      projectConfig: { i18n: { defaultLocale: "en", locales: ["en", "fr-CA"] } },
+    });
+    expect(panelContext().project.isMultilingual).toBe(true);
+    // Counted after canonicalization, so a duplicate or a typo declares one language, not two.
+    resetStudioState({ projectConfig: { i18n: { locales: ["en", "EN"] } } });
+    expect(panelContext().project.isMultilingual).toBe(false);
+    resetStudioState({ projectConfig: {} });
+    expect(panelContext().project.isMultilingual).toBe(false);
   });
 });
 

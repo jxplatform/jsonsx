@@ -277,6 +277,10 @@
 .library-toolbar sp-search {
   width: 220px;
 }
+/* Narrow on purpose: it holds one language name, and the toolbar wraps before it grows. */
+.library-locale-filter {
+  width: 160px;
+}
 .library-upload-input {
   display: none;
 }
@@ -442,6 +446,13 @@
 .library-table-cell[data-field="size"],
 .library-table-cell[data-field="modified"] {
   flex: 0 0 96px;
+}
+/* Fixed, like size and modified: a language name is short and never earns width from Name. Without
+   this it inherits `flex: 1` above and the Name column loses a quarter of itself in every
+   multilingual project. */
+.library-table-cell[data-field="locale"] {
+  flex: 0 0 90px;
+  color: var(--fg-dim);
 }
 
 /* Calendar and Board — grouped, capped, and each states what it left out. */
@@ -2671,4 +2682,23 @@
 .entry-pill--draft {
   background: var(--spectrum-yellow-400, #d8b400);
   color: var(--spectrum-gray-900, #000);
+}
+
+/* ─── Locales section ─── */
+/* The raw BCP 47 tag beside the language's own name. Both are shown because they answer different
+   questions — "which language is this" is the autonym, "what do I type in a path" is the tag, and a
+   row showing only one of them sends the author to the docs to find the other. */
+.settings-locale-tag {
+  margin-inline-start: auto;
+  font-family: var(--font-mono);
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--fg-dim);
+}
+.settings-locale-name {
+  flex: 1;
+  min-width: 0;
+}
+.settings-default-locale,
+.settings-locale-routing {
+  max-width: 320px;
 }

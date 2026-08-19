@@ -23,6 +23,7 @@
 
 import { html, nothing } from "lit-html";
 import { errorMessage } from "@jxsuite/schema/parse";
+import { localeLabel, localeOfPath, resolveI18n } from "@jxsuite/schema/locale";
 import { classMap } from "lit-html/directives/class-map.js";
 import { ref } from "lit-html/directives/ref.js";
 import { renderPopover, showPromptDialog } from "../ui/layers";
@@ -80,6 +81,7 @@ import {
 } from "../ui/virtual-window";
 import type { TemplateResult } from "lit-html";
 import type { JxMutableNode } from "@jxsuite/schema/types";
+import type { ResolvedI18n } from "@jxsuite/schema/locale";
 import type { DirEntry, RenameResult } from "../types";
 import type { ListWindowWatch } from "../ui/virtual-window";
 import { rectOf } from "../utils/geometry";
@@ -527,6 +529,14 @@ interface FileRow {
   posInSet: number;
   /** How many siblings the row has, itself included (`aria-setsize`). */
   setSize: number;
+  /**
+   * The declared locale whose directory this row sits under, or absent.
+   *
+   * A chip, not a filter term: the tree's search still matches `entry.name` alone, because a query
+   * that silently also matched a language would make "why is this file here" unanswerable from what
+   * is on screen.
+   */
+  locale?: string | undefined;
 }
 
 /**
@@ -564,6 +574,7 @@ function collectFileRows(
   depth: number,
   rows: FileRow[],
   ctx: { renderLeftPanel: () => void },
+  i18n: ResolvedI18n | null,
 ): void {
   const entries = requireProjectState().dirs.get(dirPath);
   if (!entries) {
@@ -607,12 +618,13 @@ function collectFileRows(
       loading: false,
       name: entry.name,
       path: entry.path,
+      locale: localeOfPath(entry.path, i18n) ?? undefined,
       posInSet: index + 1,
       setSize: filtered.length,
       type: entry.type,
     });
     if (isExpanded) {
-      collectFileRows(entry.path, depth + 1, rows, ctx);
+      collectFileRows(entry.path, depth + 1, rows, ctx, i18n);
     }
   }
 }
@@ -701,7 +713,10 @@ function fileTreeBodyTemplate(ctx: {
   // One — the Navigator's scheduler is the only thing that knows how to draw this panel.
   _filesRerender = ctx.renderLeftPanel;
   _fileRows = [];
-  collectFileRows(".", 0, _fileRows, ctx);
+  // Resolved once for the whole tree, not once per row: this function runs on EVERY repaint of the
+  // Navigator, and `resolveI18n` canonicalizes every declared tag through `Intl.Locale`.
+  const { i18n } = resolveI18n(projectState?.projectConfig ?? {});
+  collectFileRows(".", 0, _fileRows, ctx, i18n);
   // Windowed against the PREVIOUS render's element, the only one that exists while this template is
   // Being built. There is none on the first paint, and `listWindow` then answers "all of them".
   const range = listWindow(_fileList, { count: _fileRows.length, rowHeight: fileRowHeight() });
@@ -777,6 +792,11 @@ function fileRowTemplate(
       }
       <span class="file-tree-icon">${fileTypeIconTpl(row.path, row.type)}</span>
       <span class="file-tree-name">${row.name}</span>
+      ${
+        row.locale === undefined
+          ? nothing
+          : html`<span class="file-tree-locale">${localeLabel(row.locale)}</span>`
+      }
     </div>
   `;
 }

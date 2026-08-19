@@ -37,7 +37,10 @@ import {
   setUserZoom,
   stageZoom,
   updateActivePanelHeaders,
+  canvasViewCommands,
 } from "../src/canvas/canvas-utils";
+import { createCommandRegistry } from "../src/commands/registry";
+import { makeContext } from "../src/commands/context";
 import { initShellRefs, registerRenderer } from "../src/store";
 import {
   activeCanvasSurface,
@@ -1187,5 +1190,113 @@ describe("the pan-zoom axis is per stage", () => {
     expect(frames.length).toBe(2);
     expect(a.session.ui.editZoom).toBe(1.5);
     expect(b.session.ui.editZoom).toBe(2.5);
+  });
+});
+
+// ─── i18n.switchLocale ────────────────────────────────────────────────────────
+
+/*
+ * The language axis is a rendering context, and this is the file it is defined in: it needs the
+ * same three closures its neighbours do (the addressed tab, the pane argument, the repaint of the
+ * pane it WROTE), and those are local to `canvasViewCommands`.
+ */
+describe("i18n.switchLocale", () => {
+  const rendered: string[] = [];
+
+  /** A registry holding the real records, in a project that declares `locales`. */
+  function installed(locales: string[] | null) {
+    rendered.length = 0;
+    resetStudioState(locales === null ? {} : { projectConfig: { i18n: { locales } } });
+    const registry = createCommandRegistry({
+      getContext: () =>
+        makeContext({
+          document: { open: true },
+          project: { isMultilingual: (locales?.length ?? 0) > 1, open: true },
+        }),
+      mac: true,
+    });
+    registry.registerAll(
+      canvasViewCommands({
+        getCanvasMode: () => "design",
+        renderPane: (paneId: string) => rendered.push(paneId),
+        setCanvasMode: () => {},
+        setResolvingOpen: () => {},
+      }),
+    );
+    return registry;
+  }
+
+  test("writes the pane's own tab and repaints the stage it wrote", () => {
+    const registry = installed(["en", "fr-CA"]);
+    const primaryTab = resetWorkspaceWithTab(undefined, { documentPath: "pages/a.json", id: "a" });
+    const sideTab = openTab({
+      document: { children: [], tagName: "div" },
+      documentPath: "pages/b.json",
+      id: "b",
+    });
+    workspace.panes[0]!.tabOrder = ["a"];
+    workspace.panes[0]!.activeTabId = "a";
+    workspace.panes = [
+      ...workspace.panes,
+      { activeTabId: "b", derived: null, id: SECONDARY_PANE, tabOrder: ["b"] },
+    ];
+    // The keyboard stays in the PRIMARY — that is what makes the side pane the unfocused one.
+    workspace.activePaneId = PRIMARY_PANE;
+
+    void registry.run("i18n.switchLocale", { locale: "fr-CA", pane: SECONDARY_PANE });
+
+    expect(sideTab.session.ui.previewLocale).toBe("fr-CA");
+    // The side pane's control must not re-language the document the keyboard is in.
+    expect(primaryTab.session.ui.previewLocale).toBeNull();
+    expect(rendered).toEqual([SECONDARY_PANE]);
+    expect(workspace.activePaneId).toBe(PRIMARY_PANE);
+  });
+
+  test("defaults to the focused pane, like every rendering-context verb", () => {
+    const registry = installed(["en", "fr"]);
+    const tab = resetWorkspaceWithTab();
+
+    void registry.run("i18n.switchLocale", { locale: "fr" });
+
+    expect(tab.session.ui.previewLocale).toBe("fr");
+    expect(rendered).toEqual([workspace.activePaneId]);
+  });
+
+  test("canonicalizes through the project's declaration rather than matching the raw string", () => {
+    const registry = installed(["en", "fr-ca"]);
+    const tab = resetWorkspaceWithTab();
+
+    // `resolveI18n` canonicalizes `fr-ca` to `fr-CA`, and that is the tag the control offers.
+    void registry.run("i18n.switchLocale", { locale: "fr-CA" });
+    expect(tab.session.ui.previewLocale).toBe("fr-CA");
+  });
+
+  test("REFUSES a locale the project does not declare — never clamps to the default", () => {
+    const registry = installed(["en", "fr"]);
+    const tab = resetWorkspaceWithTab();
+
+    expect(() => registry.run("i18n.switchLocale", { locale: "de" })).toThrow(
+      /"de" is not a locale this project declares — it declares: en, fr/,
+    );
+    // The refusal is total: nothing is written and nothing is repainted, so the stage and the
+    // Control still agree afterwards.
+    expect(tab.session.ui.previewLocale).toBeNull();
+    expect(rendered).toEqual([]);
+  });
+
+  test("refuses in a project that declares no locales at all", () => {
+    const registry = installed(null);
+    resetWorkspaceWithTab();
+    // `when` is false there too, so the registry refuses before the run body — with the sentence
+    // The record states rather than the generic one.
+    expect(() => registry.run("i18n.switchLocale", { locale: "fr" })).toThrow(
+      /more than one locale/,
+    );
+  });
+
+  test("is unavailable in a project that declares exactly one locale", () => {
+    const registry = installed(["en"]);
+    resetWorkspaceWithTab();
+    expect(registry.isVisible("i18n.switchLocale")).toBe(false);
   });
 });

@@ -66,7 +66,7 @@ export type LayoutSelection = LayoutHit;
 export type DockId = "left" | "right" | "bottom";
 
 /**
- * The ids of the panels the NAVIGATOR DOCK draws, in rail order, then the two with no rail button.
+ * The ids of the panels the NAVIGATOR DOCK draws, in REGISTRATION order.
  *
  * This is the DECLARATION `view.setActivity`'s `args` enum is built from, and it is the reason a
  * panel rename fails `scripts/check-shot-contract.ts` in the renaming PR naming both ids instead of
@@ -81,15 +81,21 @@ export type DockId = "left" | "right" | "bottom";
  * `panel.focus.problems` no longer exists, because the roster it was generated from follows the
  * rail and Problems is off the rail.
  *
- * The records themselves live in `panels/navigator-panels.ts`, one per owning module. This list is
- * the same set written down in a module that imports no DOM, because `commands/app-commands.ts`
- * must load the enum in a bare Bun process; `tests/navigator-panels.test.ts` asserts the two agree,
- * so the duplicate cannot drift.
+ * The records themselves live in `panels/navigator-panels.ts`, one per owning module, and that
+ * file's registration order is this one — which is rail order within each level group, with a
+ * rail-less record sitting where its module registers it rather than at the end. Languages is the
+ * one that makes the difference visible: it is registered with the PROJECT group, beside the panels
+ * it belongs with in the palette, and it draws no rail button at all.
+ *
+ * This list is the same set written down in a module that imports no DOM, because
+ * `commands/app-commands.ts` must load the enum in a bare Bun process;
+ * `tests/panel-registry.test.ts` asserts the two agree, so the duplicate cannot drift.
  */
 export const NAVIGATOR_PANEL_IDS = [
   "files",
   "search",
   "git",
+  "i18n",
   "layers",
   "page",
   "data",
@@ -134,9 +140,9 @@ export function isNavigatorPanelId(value: unknown): value is NavigatorPanelId {
  * `PanelRecord.id`, which is deliberately a `string` — the registry hosts the Bottom dock's panels
  * too, and their ids are {@link BOTTOM_TAB_IDS}.
  *
- * It throws rather than returning null because `tests/navigator-panels.test.ts` asserts the enum
- * and the registry agree, so a failure here means the two have drifted — and the symptom of the
- * last drift was a control that silently did nothing.
+ * It throws rather than returning null because `tests/panel-registry.test.ts` asserts the enum and
+ * the registry agree, so a failure here means the two have drifted — and the symptom of the last
+ * drift was a control that silently did nothing.
  */
 export function requireNavigatorPanelId(value: string, source: string): NavigatorPanelId {
   if (!isNavigatorPanelId(value)) {
@@ -179,7 +185,7 @@ export function migratePanelId(stored: unknown): NavigatorPanelId | null {
  * The ORDER is §3.2 ⑨'s — Content · Style · Logic · Assistant — which is the order ⌘⇧1–4 follow.
  * The human titles live in `commands/defaults.ts`'s `INSPECTOR_TABS` (a module with no state and no
  * DOM, so the CI checks can load it); `tests/right-panel.test.ts` asserts the two agree, the same
- * way `tests/navigator-panels.test.ts` does for the rail.
+ * way `tests/panel-registry.test.ts` does for the rail.
  */
 export const INSPECTOR_TAB_IDS = ["properties", "style", "events", "assistant"] as const;
 
@@ -1260,9 +1266,10 @@ export function shellViewCommands(deps: ShellCommandDeps): AnyCommand[] {
       when: projectOpen,
       aiTool: {
         description:
-          "Show one of the Navigator panels (Files, Search, Source Control, Outline, Page, Data, " +
-          "Packages, Insert, State) and open the Navigator dock if it is closed. Problems is a " +
-          "Bottom dock tab — use show_bottom_tab for it.",
+          "Show one of the Navigator panels (Files, Search, Source Control, Languages, Outline, " +
+          "Page, Data, Packages, Insert) and open the Navigator dock if it is closed. Languages is " +
+          "the translation-parity grid, and it exists only in a project that declares two or more " +
+          "locales. Problems is a Bottom dock tab — use show_bottom_tab for it.",
         name: "show_navigator_panel",
       },
       run: (_ctx, args) => {

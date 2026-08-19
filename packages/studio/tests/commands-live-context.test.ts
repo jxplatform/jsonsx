@@ -70,6 +70,45 @@ beforeEach(() => {
 
 // ─── Project and git ──────────────────────────────────────────────────────────
 
+/*
+ * `isMultilingual` gates every i18n verb and surface, and it counts LOCALES rather than array
+ * entries: the shared resolver canonicalizes and drops what it cannot parse, so a config listing
+ * one tag twice — or one tag and one typo — declares one language and opens nothing.
+ */
+describe("project.isMultilingual", () => {
+  const withLocales = (locales: string[], defaultLocale?: string) => {
+    resetStudioState({
+      isSiteProject: true,
+      projectConfig: { i18n: { locales, ...(defaultLocale ? { defaultLocale } : {}) } },
+      projectRoot: "/project",
+    });
+    return context();
+  };
+
+  test("no project, and a project declaring nothing, are monolingual", () => {
+    setProjectState(null);
+    expect(context().project.isMultilingual).toBe(false);
+    resetStudioState({ isSiteProject: true, projectRoot: "/project" });
+    expect(context().project.isMultilingual).toBe(false);
+  });
+
+  test("one locale is not multilingual; two are", () => {
+    expect(withLocales(["en"]).project.isMultilingual).toBe(false);
+    expect(withLocales(["en", "fr-ca"]).project.isMultilingual).toBe(true);
+  });
+
+  // The defaultLocale joins the list when it is missing from it, so this project has two.
+  test("a default outside the list counts as one of them", () => {
+    expect(withLocales(["fr"], "en").project.isMultilingual).toBe(true);
+  });
+
+  // The case that proves the shared resolver runs rather than `.length` on the raw array.
+  test("a duplicate and a malformed tag both fail to make a project multilingual", () => {
+    expect(withLocales(["en", "EN"]).project.isMultilingual).toBe(false);
+    expect(withLocales(["en", "not_a_tag"]).project.isMultilingual).toBe(false);
+  });
+});
+
 describe("project and git", () => {
   test("a loaded site project reports open + isSite", () => {
     const ctx = context();

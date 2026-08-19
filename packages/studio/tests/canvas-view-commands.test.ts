@@ -206,6 +206,10 @@ describe("the records themselves", () => {
       // The `⌘⌥↑`/`⌘⌥⇧S` cycles §5.3 declares need `next`/`prev` records of their own.
       "canvas.setBreakpoint",
       "canvas.setColorScheme",
+      // The language axis. Its id keeps the `i18n.` namespace and its definition site is here,
+      // Because the three rendering-context closures a per-pane verb needs — the tab, the pane
+      // Argument and the repaint — are local to this module. `insert.data` is the precedent.
+      "i18n.switchLocale",
       "canvas.setLayoutVisible",
       // The route params and component test props live in a popover now, and a transient surface
       // Opens by command rather than by clicking (§13.2) — otherwise the shot that types a test

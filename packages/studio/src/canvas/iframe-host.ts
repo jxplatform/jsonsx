@@ -43,6 +43,7 @@ import { setLayoutSelection, shell } from "../shell";
 import { formatEditableVerdicts } from "../format/constraints";
 import { formatByName } from "../format/format-host";
 import { collabState } from "../collab/collab-state";
+import { localeDirection } from "@jxsuite/schema/locale";
 import { getPlatform, hasPlatform } from "../platform";
 import type {
   ApplyFormatIntent,
@@ -2808,6 +2809,37 @@ export function postColorSchemeToLiveHosts(
     }
     if (host.ready) {
       host.channel.post({ kind: "setColorScheme", scheme });
+    }
+  }
+}
+
+/**
+ * Flip the artboard's language on every ready host — `lang` and `dir`, and nothing else.
+ *
+ * This is what makes `i18n.switchLocale` a rendering context rather than a chip. Jx has no message
+ * catalogue, so the text does not change; the direction does, and a layout that only mirrors in
+ * production is a layout an author cannot check before shipping it.
+ *
+ * SCOPED to one stage when the caller names one, for the reason {@link postColorSchemeToLiveHosts}
+ * carries the same parameter: the preview locale is a per-TAB choice, so with two live hosts an
+ * unscoped post redraws the other pane's document in a language nobody asked it for — and leaves
+ * its own control still naming the language it was never moved off.
+ *
+ * `dir` is computed here and sent with the tag: `localeDirection` is CLDR's answer through
+ * `Intl.Locale`, and a frame deriving it again is a second copy of the RTL script list to keep.
+ */
+export function postLocaleToLiveHosts(locale: string | null, root?: HTMLElement | null): void {
+  const dir = localeDirection(locale);
+  for (const host of liveHosts) {
+    if (!host.iframe.isConnected) {
+      liveHosts.delete(host);
+      continue;
+    }
+    if (root && !root.contains(host.iframe)) {
+      continue;
+    }
+    if (host.ready) {
+      host.channel.post({ dir, kind: "setLocale", locale });
     }
   }
 }

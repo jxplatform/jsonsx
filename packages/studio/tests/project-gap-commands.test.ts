@@ -124,6 +124,7 @@ describe("the records themselves", () => {
       "library.setCategory",
       "library.setLayout",
       "library.setSearch",
+      "library.setLocale",
       "library.refresh",
       "library.newEntry",
       "project.new",
