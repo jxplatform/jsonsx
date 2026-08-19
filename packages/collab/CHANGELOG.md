@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.7.0](https://github.com/jxsuite/jx/compare/collab-v0.6.0...collab-v0.7.0) (2026-08-19)
+
+
+### Features
+
+* **collab:** negotiate the wire envelope on the handshake — jx.collab.v1 ([5db8ae8](https://github.com/jxsuite/jx/commit/5db8ae8b781a1b5aeffbdd8f27cdf4c08ebb4540))
+* **studio:** P5 — the inspector states what it edits and where the edit lands ([13604ab](https://github.com/jxsuite/jx/commit/13604ab8914ef3fa2800b97b6144e7c449459858))
+* **studio:** the Named Shell — P0–P8, the full UX redesign ([b576cbb](https://github.com/jxsuite/jx/commit/b576cbb24c7e0d8d36075f6d682e9b3b6b971166))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/schema bumped to 1.6.0
+
 ## [0.6.0](https://github.com/jxsuite/jx/compare/collab-v0.5.1...collab-v0.6.0) (2026-07-30)
 
 

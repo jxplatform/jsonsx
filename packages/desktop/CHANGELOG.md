@@ -1,5 +1,44 @@
 # Changelog
 
+## [2.1.0](https://github.com/jxsuite/jx/compare/desktop-v2.0.1...desktop-v2.1.0) (2026-08-19)
+
+
+### Features
+
+* **auth:** a loopback redirect with PKCE, and cookies a browser will keep ([053f67c](https://github.com/jxsuite/jx/commit/053f67cf94216020dd2a39982cea30b3802ba3aa))
+* **server:** read Fetch Metadata, and close the three ungated project-server routes ([18bd5da](https://github.com/jxsuite/jx/commit/18bd5dab144d76c5c97b08fb43c28fb3e5ad127b))
+* **studio,desktop:** P0 wave A — enforcement rails and three dead RPCs ([e078d46](https://github.com/jxsuite/jx/commit/e078d4668cb8ee453852ffe0acd5f1cd561de291))
+* **studio,server,desktop:** P4 wave A — the app can say what happened ([98a4a3a](https://github.com/jxsuite/jx/commit/98a4a3a1f895981ebc0b06483ef31953d8ebf7ef))
+* **studio:** say it out loud — one live region, and the affordances high contrast deletes ([d414bcd](https://github.com/jxsuite/jx/commit/d414bcdda6d01749eda43e1900edf0d2eb6656c7))
+* **studio:** the Named Shell — P0–P8, the full UX redesign ([b576cbb](https://github.com/jxsuite/jx/commit/b576cbb24c7e0d8d36075f6d682e9b3b6b971166))
+
+
+### Bug Fixes
+
+* **desktop:** the Nix bundle deleted the extension packages it depends on ([cf3df55](https://github.com/jxsuite/jx/commit/cf3df5583ee50c1f18acd3d767c386e5ba63bd21))
+* **parser:** localized content never reached its own locale's asset mount ([179311b](https://github.com/jxsuite/jx/commit/179311b3f56d001eea37c092d73956c20056c55d))
+* **server:** give the previewed site its own origin, so Open in Browser is the real site ([90eb4b4](https://github.com/jxsuite/jx/commit/90eb4b4b3eba897a1028fa5a4029ef0dcae61f88))
+* **studio:** Open Project's "New Window" opened in this window ([e233bf1](https://github.com/jxsuite/jx/commit/e233bf13214fce1ec018a4bd91ec7d235edb1056))
+* **studio:** Open Project's "New Window" opened in this window ([2879f4e](https://github.com/jxsuite/jx/commit/2879f4e2034fc89ce39451660313c3418469e96d))
+* **types:** repair the two typecheck errors the workspace tsconfigs see ([373dfe1](https://github.com/jxsuite/jx/commit/373dfe13fba28ec44cd42edd8c862f6124805986))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/compiler bumped to 2.0.0
+    * @jxsuite/create bumped to 1.3.0
+    * @jxsuite/parser bumped to 1.5.0
+    * @jxsuite/protocol bumped to 1.1.0
+    * @jxsuite/schema bumped to 1.6.0
+    * @jxsuite/server bumped to 2.1.0
+    * @jxsuite/starters bumped to 1.3.0
+    * @jxsuite/studio bumped to 2.1.0
+  * devDependencies
+    * @jxsuite/connector bumped to 0.5.0
+    * @jxsuite/server bumped to 2.1.0
+
 ## [2.0.1](https://github.com/jxsuite/jx/compare/desktop-v2.0.0...desktop-v2.0.1) (2026-07-31)
 
 

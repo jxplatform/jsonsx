@@ -1,5 +1,43 @@
 # Changelog
 
+## [1.6.0](https://github.com/jxsuite/jx/compare/schema-v1.5.0...schema-v1.6.0) (2026-08-19)
+
+
+### Features
+
+* **auth:** a loopback redirect with PKCE, and cookies a browser will keep ([053f67c](https://github.com/jxsuite/jx/commit/053f67cf94216020dd2a39982cea30b3802ba3aa))
+* **compiler:** an optional service worker, and the tombstone that removes it ([688e4fd](https://github.com/jxsuite/jx/commit/688e4fd5771d8b797c83e8a6ac5c64bcffc165a5))
+* **compiler:** emit a Content-Security-Policy derived from the built pages ([139402b](https://github.com/jxsuite/jx/commit/139402bba057b3e74c65fb82dc70fc28d36370d6))
+* **compiler:** emit dist/_headers and .nojekyll ([48ff636](https://github.com/jxsuite/jx/commit/48ff63657da9057caa89236d3310f5f925525699))
+* **compiler:** generate manifest.webmanifest and .well-known/security.txt ([8e6dfca](https://github.com/jxsuite/jx/commit/8e6dfca829c4504047566b847e19b1326e452701))
+* **compiler:** locale routing — the i18n config finally has a reader ([b806b4c](https://github.com/jxsuite/jx/commit/b806b4cc8cc4c41f0bb31bf90bc01c8d29a6e0bf))
+* **compiler:** negotiate a locale, expand {locale} sources, and check prefix-always ([72f061c](https://github.com/jxsuite/jx/commit/72f061c9fe9cec6afc0a2c9dfa169e4245db4f24))
+* **compiler:** opt into a shadow root with $shadow ([4a8f2e5](https://github.com/jxsuite/jx/commit/4a8f2e596a2648c55230f907783dd55092746bbb))
+* **compiler:** responsive images — &lt;picture&gt; per format, one owner for loading ([14f920d](https://github.com/jxsuite/jx/commit/14f920de7d5a87ff6c8a71a6ab6c6c1a7820f7d7))
+* **feed:** Atom and JSON Feed from content collections ([6269bce](https://github.com/jxsuite/jx/commit/6269bced4f79ca5bdf71ce97d4a404bfdd8523cc))
+* **i18n:** a localized slug is a translation, when the page says which one ([5d44fb7](https://github.com/jxsuite/jx/commit/5d44fb7062079a573456118ff8a3c7b44b987bf2))
+* **i18n:** a page can render its own language switcher, and formats in its own language ([354e481](https://github.com/jxsuite/jx/commit/354e481b2bb45fc6be72d9af537d560c2f971d80))
+* **i18n:** format for a language, and count what a reader sees ([fa8affd](https://github.com/jxsuite/jx/commit/fa8affdc2b1936d1ef9365379c490aa49608c552))
+* **i18n:** multilingual sites, end to end — framework, Studio, extensions and a starter ([692e50f](https://github.com/jxsuite/jx/commit/692e50f9d7132daf71a63c950fd740b103766cb0))
+* **runtime:** enforce private state against $props (spec.md §5.6) ([c8fffc5](https://github.com/jxsuite/jx/commit/c8fffc5a00a0b022717c81bc303b5331ca9b7488))
+* **schema,runtime,compiler,studio:** a tag can be chosen at element creation ([e31a20f](https://github.com/jxsuite/jx/commit/e31a20fb52b7e718be67ed59338d149abf3562c1))
+* **schema:** normalize identifiers to NFC at the document parse boundary ([831874d](https://github.com/jxsuite/jx/commit/831874d472e1a9acc1e01b000e8962f20e62fcf9))
+* **schema:** parse media types, and enforce I-JSON at the document boundary ([3e7db19](https://github.com/jxsuite/jx/commit/3e7db19e59825c200be4a337565875df4b58b5f9))
+* **schema:** serve markdown and YAML under the media types their RFCs register ([c336b6f](https://github.com/jxsuite/jx/commit/c336b6fc4e4935954cc897a3dc8d0579ad6ca27c))
+* **schema:** validate BCP 47 language tags at author time, not only at build time ([e62191d](https://github.com/jxsuite/jx/commit/e62191deda9032d8580a52f266eee1ef3e913500))
+* **studio:** the Named Shell — P0–P8, the full UX redesign ([b576cbb](https://github.com/jxsuite/jx/commit/b576cbb24c7e0d8d36075f6d682e9b3b6b971166))
+
+
+### Bug Fixes
+
+* **compiler:** head identity, JSON-LD objects, and per-page lang ([61484bc](https://github.com/jxsuite/jx/commit/61484bcc4981eb51062c5fffc5c0574842140dd3))
+* **compiler:** package files in $head and $elements land in /assets/, not /node_modules/ ([038cc40](https://github.com/jxsuite/jx/commit/038cc40157174d92985ec2b40a84f604d17bc289))
+* **compiler:** resolve the open issue sweep ([#121](https://github.com/jxsuite/jx/issues/121)–[#127](https://github.com/jxsuite/jx/issues/127)) ([2c0e044](https://github.com/jxsuite/jx/commit/2c0e04400a5ab99539ed5eb502512a837bc6b761))
+* **parser:** localized content never reached its own locale's asset mount ([179311b](https://github.com/jxsuite/jx/commit/179311b3f56d001eea37c092d73956c20056c55d))
+* **schema,studio:** five defects found by driving Studio against a real production site ([d28b49a](https://github.com/jxsuite/jx/commit/d28b49a33d95c2d8b11a33d8b8acdabd11729352))
+* **schema:** redirects admits the shape the compiler and Studio write ([f6080ef](https://github.com/jxsuite/jx/commit/f6080eff7f8d82d715c5bdf5f7444ff4ea8d18f7))
+* **schema:** the committed core schema is what its generator produces, and CI now says so ([57d804c](https://github.com/jxsuite/jx/commit/57d804c0d70eb81ea22906009fd3af151955d06a))
+
 ## [1.5.0](https://github.com/jxsuite/jx/compare/schema-v1.4.0...schema-v1.5.0) (2026-07-30)
 
 

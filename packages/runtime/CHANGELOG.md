@@ -1,5 +1,37 @@
 # Changelog
 
+## [2.0.0](https://github.com/jxsuite/jx/compare/runtime-v1.3.2...runtime-v2.0.0) (2026-08-19)
+
+
+### ⚠ BREAKING CHANGES
+
+* **runtime:** #/state/a/b.c addresses member "b.c" of "a" rather than walking three levels. 451 of 452 pointers in the corpus are pure-slash and the one dotted ref was in the spec sentence describing the behavior.
+
+### Features
+
+* **auth:** a loopback redirect with PKCE, and cookies a browser will keep ([053f67c](https://github.com/jxsuite/jx/commit/053f67cf94216020dd2a39982cea30b3802ba3aa))
+* **i18n:** a page can render its own language switcher, and formats in its own language ([354e481](https://github.com/jxsuite/jx/commit/354e481b2bb45fc6be72d9af537d560c2f971d80))
+* **i18n:** format for a language, and count what a reader sees ([fa8affd](https://github.com/jxsuite/jx/commit/fa8affdc2b1936d1ef9365379c490aa49608c552))
+* **i18n:** multilingual sites, end to end — framework, Studio, extensions and a starter ([692e50f](https://github.com/jxsuite/jx/commit/692e50f9d7132daf71a63c950fd740b103766cb0))
+* **runtime:** enforce private state against $props (spec.md §5.6) ([c8fffc5](https://github.com/jxsuite/jx/commit/c8fffc5a00a0b022717c81bc303b5331ca9b7488))
+* **schema,runtime,compiler,studio:** a tag can be chosen at element creation ([e31a20f](https://github.com/jxsuite/jx/commit/e31a20fb52b7e718be67ed59338d149abf3562c1))
+* **studio:** a Trusted Types policy that refuses, and two CSP profiles stated as permanent ([0efad17](https://github.com/jxsuite/jx/commit/0efad1772618bf8cc363591f0f89e6b2e154877b))
+* **studio:** the Named Shell — P0–P8, the full UX redesign ([b576cbb](https://github.com/jxsuite/jx/commit/b576cbb24c7e0d8d36075f6d682e9b3b6b971166))
+
+
+### Bug Fixes
+
+* **compiler:** head identity, JSON-LD objects, and per-page lang ([61484bc](https://github.com/jxsuite/jx/commit/61484bcc4981eb51062c5fffc5c0574842140dd3))
+* **parser:** localized content never reached its own locale's asset mount ([179311b](https://github.com/jxsuite/jx/commit/179311b3f56d001eea37c092d73956c20056c55d))
+* **runtime:** one $ref tokenizer, so every lowered ref parses ([d57bed4](https://github.com/jxsuite/jx/commit/d57bed4495c0887b512a07d5e1b9f6e66c4462f3))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/schema bumped to 1.6.0
+
 ## [1.3.2](https://github.com/jxsuite/jx/compare/runtime-v1.3.1...runtime-v1.3.2) (2026-07-30)
 
 
