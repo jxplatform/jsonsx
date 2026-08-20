@@ -886,9 +886,9 @@
       "width": 964
     },
     "docs/images/state-panel.png": {
-      "bytes": 358729,
-      "capturedAt": "2026-08-20T15:43:52Z",
-      "capturedBy": "screenshots@ci/32387692879",
+      "bytes": 358102,
+      "capturedAt": "2026-08-20T21:32:22Z",
+      "capturedBy": "screenshots@ci/32419778499",
       "definition": "51f274a94a6fbb5176c5c2376453d977092fe2472f16195e63c6a2a42fea2083",
       "height": 2000,
       "runtime": {
@@ -896,7 +896,7 @@
         "fontset": "fc:cac8f480b341",
         "os": "debian-12"
       },
-      "sha256": "91c999980878b0838691a3e9aa4e030bd0b4e174a38878a11c27d4f4efe200c5",
+      "sha256": "fb2195c07026de5424ae9f173bef7f9073ed0d4f1c74bcb55b409389dd8bf993",
       "shot": "state-panel",
       "width": 3840
     },
