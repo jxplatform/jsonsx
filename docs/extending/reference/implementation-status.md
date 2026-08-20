@@ -14,7 +14,7 @@ This page is generated from the `> **Status: …**` markers in the specification
 
 | Spec                      | Version      | Status      | Updated    |
 | ------------------------- | ------------ | ----------- | ---------- |
-| `ai.md`                   | 0.1.6-draft  | Partial     | 2026-08-16 |
+| `ai.md`                   | 0.1.7-draft  | Partial     | 2026-08-20 |
 | `collab.md`               | 0.2.4-draft  | Partial     | 2026-08-16 |
 | `compiler.md`             | 0.3.1-draft  | Partial     | 2026-08-18 |
 | `desktop.md`              | 0.3.12-draft | Pending     | 2026-08-19 |
