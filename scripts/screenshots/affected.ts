@@ -63,7 +63,8 @@ const REGISTRY_SHOTS = {
   shots: ["new-project"],
   why:
     "`new-project` photographs the new-project modal, whose gallery is `platform.listStarters()` " +
-    "reading registry.json — so ALL twelve starters are in that one picture, whatever it opens.",
+    "reading registry.json — so EVERY starter in the registry is in that one picture, whatever " +
+    "it opens.",
 } as const;
 
 export interface ShotDecision {
