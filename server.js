@@ -4,6 +4,7 @@
  * Run with: bun run dev
  */
 
+import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { createDevServer } from "@jxsuite/server";
 import { buildMonacoWorkers } from "./packages/studio/scripts/build-workers.ts";
@@ -53,11 +54,34 @@ await createDevServer({
   root: resolve(import.meta.dir, "."),
 });
 
+/**
+ * The example routes are READ OFF DISK, never listed here.
+ *
+ * A hardcoded list is a promise this server cannot keep. The previous one advertised
+ * `/examples/todo/` and six friends long after the project moved its pages to
+ * `pages/basics/todo.json` — the live route is `/examples/dist/basics/todo/`, so every advertised
+ * one 404'd. Scanning the build output says only what is actually served.
+ *
+ * `builds` above covers the runtime and the Studio entrypoints only, so nothing here ever produces
+ * `examples/dist` — `bun run --cwd examples build` does, and the directory is gitignored. On a
+ * fresh checkout the scan is therefore empty, which is the truth worth printing.
+ */
+function exampleRoutes() {
+  const dist = resolve(import.meta.dir, "examples/dist");
+  if (!existsSync(dist)) {
+    return [];
+  }
+  return [...new Bun.Glob("**/index.html").scanSync(dist)]
+    .map((file) => `/examples/dist/${file.slice(0, -"index.html".length)}`)
+    .toSorted();
+}
+
 console.log("  /packages/studio/index.html     ← Jx Studio");
-console.log("  /examples/todo/");
-console.log("  /examples/counter/");
-console.log("  /examples/computed/");
-console.log("  /examples/list/");
-console.log("  /examples/fetch/");
-console.log("  /examples/form/");
-console.log("  /examples/switch/");
+const routes = exampleRoutes();
+if (routes.length === 0) {
+  console.log("  /examples/dist/                 ← empty; run `bun run --cwd examples build`");
+} else {
+  for (const route of routes) {
+    console.log(`  ${route}`);
+  }
+}
