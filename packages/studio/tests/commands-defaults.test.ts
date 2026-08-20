@@ -21,6 +21,7 @@ import { createCommandRegistry } from "../src/commands/registry";
 import { checkPlacements } from "../src/commands/levels";
 import { checkChromeBudget } from "../src/commands/budget";
 import { CAPABILITIES, emptyContext, makeContext } from "../src/commands/context";
+import type { CommandContext } from "../src/commands/context";
 
 /**
  * A stand-in rail, so the ⌘1–8 generator is testable without the panel registry.
@@ -75,6 +76,9 @@ function recordingDeps() {
     openProject: () => {
       calls.push("openProject");
     },
+    newWindow: () => {
+      calls.push("newWindow");
+    },
     panelRoster: RAIL_PANELS,
     focusPanel: (panelId: string) => {
       calls.push(`focusPanel:${panelId}`);
@@ -92,6 +96,10 @@ function recordingDeps() {
 /** A context in which every default command is both visible and enabled. */
 const everythingContext = () =>
   makeContext({
+    // A host with every PAL family, so a capability-gated record is exercised rather than skipped.
+    capability: Object.fromEntries(
+      CAPABILITIES.map((name) => [name, true]),
+    ) as CommandContext["capability"],
     project: { open: true, isSite: true, isRepo: true },
     document: { open: true, dirty: true, mode: "json", canUndo: true, canRedo: true },
     editor: { kind: "canvas" },
@@ -340,6 +348,7 @@ describe("the implementations", () => {
       "openPalette:commands",
       "openPalette:nodes",
       "openProject",
+      "newWindow",
       "openPalette:projects",
       ...RAIL_PANELS.filter((panel) => panel.when?.(everythingContext()) !== false).map(
         (panel) => `focusPanel:${panel.id}`,
@@ -364,6 +373,7 @@ describe("the implementations", () => {
       void deps.saveDocument();
       deps.undo();
       deps.redo();
+      void deps.newWindow();
       void deps.openInBrowser();
       deps.closeDocument();
       deps.duplicateSelection();

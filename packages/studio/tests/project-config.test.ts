@@ -17,6 +17,7 @@
 import { flush, installMockPlatform, resetStudioState } from "./harness";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { globSync, readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { problems, resetNotifications } from "../src/services/notify";
 import { projectState, setProjectState } from "../src/store";
 import { canUndo, undo } from "../src/tabs/transact";
@@ -50,12 +51,16 @@ const { updateSiteConfig } = await import("../src/site-context");
 /**
  * Every `project.json` this repository commits — the only fixture with real formatting in it.
  *
- * Studio's tests run with `packages/studio` as the working directory (several assert it), so the
- * repository root is two levels up.
+ * Resolved from THIS FILE rather than from the working directory. It used to read `cwd: "../.."` on
+ * the stated assumption that studio's tests always run from `packages/studio`; run from the repo
+ * root, `../..` points above the repository, the glob matches nothing, and the loop below iterates
+ * an empty list — passing, vacuously. The count assertion is what catches that, and it should never
+ * have had to.
  */
+const REPO_ROOT = resolve(import.meta.dir, "../../..");
 const COMMITTED_CONFIGS = ["sites", "packages/starters/sites"]
-  .flatMap((dir) => globSync(`${dir}/*/project.json`, { cwd: "../.." }))
-  .map((relative) => `../../${relative}`)
+  .flatMap((dir) => globSync(`${dir}/*/project.json`, { cwd: REPO_ROOT }))
+  .map((relative) => join(REPO_ROOT, relative))
   .toSorted();
 
 type AnyConfig = Record<string, unknown>;

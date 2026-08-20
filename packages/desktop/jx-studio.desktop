@@ -7,4 +7,8 @@ Terminal=false
 Type=Application
 Categories=Development;WebDevelopment;
 MimeType=application/json;text/markdown;
-StartupWMClass=jx-studio
+# Chromium's app_id for our --app window, NOT the binary name. It derives that id from the shell
+# URL and the profile directory and ignores --class, so this is the only string a taskbar can match
+# a Jx Studio window against. Kept in step with the launcher by
+# packages/desktop/src/chromium/app-id.ts and the test beside it.
+StartupWMClass=chrome-127.0.0.1____studio___index.html-Default

@@ -24,7 +24,7 @@ runs:
         # silently move the per-file coverageThreshold ratchet, so bumping this means
         # re-baselining every packages/*/bunfig.toml in the same PR (CLAUDE.md, Testing &
         # Coverage Policy). It used to be copied across five workflows.
-        bun-version: 1.3.13
+        bun-version: 1.4
     - if: inputs.install == 'true'
       run: bun install --frozen-lockfile
       shell: bash

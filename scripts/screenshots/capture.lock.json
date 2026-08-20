@@ -122,8 +122,8 @@
     },
     "docs/images/blog-grid.png": {
       "bytes": 230198,
-      "capturedAt": "2026-08-20T15:57:56Z",
-      "capturedBy": "screenshots@ci/32388912771",
+      "capturedAt": "2026-08-20T20:39:46Z",
+      "capturedBy": "screenshots@ci/32414989528",
       "definition": "0e8a0d9df9c3c6cc71eff7f71406b315871323a5e311e73d87d4d3b8a00c4e0f",
       "height": 2000,
       "runtime": {
@@ -661,9 +661,9 @@
       "width": 836
     },
     "docs/images/media-upload.png": {
-      "bytes": 237684,
-      "capturedAt": "2026-08-20T15:58:44Z",
-      "capturedBy": "screenshots@ci/32388912771",
+      "bytes": 238104,
+      "capturedAt": "2026-08-20T20:17:48Z",
+      "capturedBy": "screenshots@ci/32412862170",
       "definition": "ac0e427d3f9e29401cf944d5957009c5a615bf559b5de440f0a488e78f776b18",
       "height": 1638,
       "runtime": {
@@ -671,14 +671,14 @@
         "fontset": "fc:cac8f480b341",
         "os": "debian-12"
       },
-      "sha256": "dca56823d6cddfe4bd6e848d350f8b8cbfa4fc92a0c02330f5554ac2e479d116",
+      "sha256": "a424d56163a90d10f052bc66dd394818f1cef1694454c7fe33fdb45c022d3519",
       "shot": "media-upload",
       "width": 2688
     },
     "docs/images/mode-design.png": {
-      "bytes": 1058560,
-      "capturedAt": "2026-08-20T12:49:34Z",
-      "capturedBy": "screenshots@ci/32370755890",
+      "bytes": 1057797,
+      "capturedAt": "2026-08-20T20:14:37Z",
+      "capturedBy": "screenshots@ci/32412862170",
       "definition": "51eaafbafa8f6ffbd4f7c91f468f277429a27c85a0dc250b02b3b1b43e841780",
       "height": 2000,
       "runtime": {
@@ -686,7 +686,7 @@
         "fontset": "fc:cac8f480b341",
         "os": "debian-12"
       },
-      "sha256": "cf49dd0e190b2b4ccb789380f4f622dd7136109c61082dd75f50b1c5d5937808",
+      "sha256": "ab51deffb1c1275f686805f3737db26ec7fa01d7f11e593716eda814d76ead9c",
       "shot": "mode-design",
       "width": 3840
     },
@@ -721,9 +721,9 @@
       "width": 3840
     },
     "docs/images/mode-script.png": {
-      "bytes": 402409,
-      "capturedAt": "2026-08-20T12:49:42Z",
-      "capturedBy": "screenshots@ci/32370755890",
+      "bytes": 401469,
+      "capturedAt": "2026-08-20T20:38:09Z",
+      "capturedBy": "screenshots@ci/32414989528",
       "definition": "d7d80b2dc6705384f70a78a8edc6fb0758d0110d6dcc94a7242ae3adb12880c8",
       "height": 2000,
       "runtime": {
@@ -731,7 +731,7 @@
         "fontset": "fc:cac8f480b341",
         "os": "debian-12"
       },
-      "sha256": "df28d8e4f57c8d6111474a8939fdd358547cdae22898e92ab28270d619973466",
+      "sha256": "82353871b8b193c31c893d42dee4b47070c6e58f7988f8bffcf906a9ce7070a6",
       "shot": "mode-script",
       "width": 3840
     },
@@ -886,9 +886,9 @@
       "width": 964
     },
     "docs/images/state-panel.png": {
-      "bytes": 358729,
-      "capturedAt": "2026-08-20T15:43:52Z",
-      "capturedBy": "screenshots@ci/32387692879",
+      "bytes": 358102,
+      "capturedAt": "2026-08-20T21:32:22Z",
+      "capturedBy": "screenshots@ci/32419778499",
       "definition": "51f274a94a6fbb5176c5c2376453d977092fe2472f16195e63c6a2a42fea2083",
       "height": 2000,
       "runtime": {
@@ -896,7 +896,7 @@
         "fontset": "fc:cac8f480b341",
         "os": "debian-12"
       },
-      "sha256": "91c999980878b0838691a3e9aa4e030bd0b4e174a38878a11c27d4f4efe200c5",
+      "sha256": "fb2195c07026de5424ae9f173bef7f9073ed0d4f1c74bcb55b409389dd8bf993",
       "shot": "state-panel",
       "width": 3840
     },
@@ -916,9 +916,9 @@
       "width": 498
     },
     "docs/images/stylebook.png": {
-      "bytes": 455030,
-      "capturedAt": "2026-08-19T16:03:51Z",
-      "capturedBy": "screenshots@ci/32273537346",
+      "bytes": 454169,
+      "capturedAt": "2026-08-20T21:36:41Z",
+      "capturedBy": "screenshots@ci/32420122472",
       "definition": "5b6e375cdeacd320989a8c0ca98b57cd01a787783bd8a7e814c62d1784bc85f2",
       "height": 2000,
       "runtime": {
@@ -926,7 +926,7 @@
         "fontset": "fc:cac8f480b341",
         "os": "debian-12"
       },
-      "sha256": "e098e0fe4631afe34121883ba4d7d0e4163b3338f8d880bedeb24f60986b01d9",
+      "sha256": "cce7736475efc855622fa02e04c1b6957d7ea6549d4b2dc04a0ae51c90a07c83",
       "shot": "stylebook",
       "width": 3840
     },

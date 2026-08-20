@@ -26,6 +26,7 @@
  */
 
 import { resolve, sep } from "node:path";
+import type { ServerWebSocket } from "bun";
 import { handleJxMounts } from "./jx-mounts.ts";
 import { handleResolve, handleServerFunction, projectAssetMounts } from "./resolve.ts";
 import { handleAiApi } from "./ai-api.ts";
@@ -78,6 +79,18 @@ export interface ProjectServerHandle {
   rpcToken: string;
   canvasUrl: string;
   /**
+   * Push an UNSOLICITED message to the connected shells — the server-to-client half of the RPC.
+   *
+   * Every other frame on this socket answers an `id` the client chose; these carry a `method` and
+   * no `id`, which is how the client's dispatcher tells the two apart. It exists because some
+   * things the shell must know are not answers to anything it asked: a file changed on disk, or
+   * another window wants this one raised.
+   *
+   * @param winId Deliver only to sockets stashed with this window id; omit for every socket.
+   * @returns How many sockets the message reached — 0 means nothing is listening yet.
+   */
+  push: (method: string, params?: unknown, winId?: string | null) => number;
+  /**
    * The RFC 8252 loopback authorization host. The desktop launcher drives it: `begin()` for the URL
    * to open in the user's browser, then `await pending.code` and {@link exchangeCode}.
    */
@@ -105,6 +118,11 @@ export function createProjectServer(options: CreateProjectServerOptions): Projec
 
   /* Outstanding OAuth authorizations (RFC 8252). Per server, so a stopped server abandons them. */
   const authorizer: LoopbackAuthorizer = createLoopbackAuthorizer();
+
+  /* Live shell sockets, so the server can speak first (see ProjectServerHandle.push). Membership is
+     the socket's whole lifetime — added on open, dropped on close — so a push after a window is
+     gone reaches nobody rather than throwing. */
+  const sockets = new Set<ServerWebSocket<{ winId: string | null }>>();
 
   const server = Bun.serve<{ winId: string | null }>({
     hostname,
@@ -312,6 +330,12 @@ export function createProjectServer(options: CreateProjectServerOptions): Projec
     },
 
     websocket: {
+      open(ws) {
+        sockets.add(ws);
+      },
+      close(ws) {
+        sockets.delete(ws);
+      },
       async message(ws, raw) {
         let msg: { id: number; method: string; params?: unknown };
         try {
@@ -362,6 +386,22 @@ export function createProjectServer(options: CreateProjectServerOptions): Projec
     rpcToken,
     canvasUrl,
     authorizer,
+    push: (method, params, winId) => {
+      const frame = JSON.stringify(params === undefined ? { method } : { method, params });
+      let delivered = 0;
+      for (const ws of sockets) {
+        if (winId !== undefined && winId !== null && ws.data.winId !== winId) {
+          continue;
+        }
+        try {
+          ws.send(frame);
+          delivered += 1;
+        } catch {
+          // A socket that closed between the iteration and the send is simply not a recipient.
+        }
+      }
+      return delivered;
+    },
     stop: () => {
       // Abandon outstanding sign-ins first: their callbacks can no longer arrive.
       authorizer.stop();

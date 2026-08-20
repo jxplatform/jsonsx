@@ -2,9 +2,9 @@
 
 ## Platform Abstraction, Project Loading, and Component Scoping
 
-**Version:** 0.3.12-draft
+**Version:** 0.3.14-draft
 **Status:** Pending
-**Updated:** 2026-08-19
+**Updated:** 2026-08-20
 **License:** MIT
 
 ---
@@ -153,12 +153,26 @@ if (!hasPlatform()) {
 
 ### 3.5 Leaving the Webview
 
-The desktop shell registers Studio's preview-navigation override (`@jxsuite/studio/preview-navigate`)
-so a link clicked in Preview mode goes to the **user's default browser** via an `openExternal` RPC onto
-`Utils.openExternal`, not to this webview. Following a link in Preview exists to see the page behave
-like the deployed thing — routing, history, devtools — and a webview with no address bar is not that;
-navigating it would also replace the editor. When the shell is unavailable or the OS refuses, the
-studio's own `window.open` default still applies.
+**Both** desktop launchers register Studio's preview-navigation override
+(`@jxsuite/studio/preview-navigate`) so a link clicked in Preview mode goes to the **user's default
+browser** via an `openExternal` RPC, not to the editor's own window. Following a link in Preview
+exists to see the page behave like the deployed thing — routing, history, devtools — and neither a
+webview nor a frameless Chromium `--app` window is that; navigating either would also replace the
+editor. `View: Open in Browser` (§9.5) and the sign-in redirect (§3.6) use the same seam.
+
+The Bun side hands the URL over in two steps, and the second is not redundancy. ElectroBun's
+`Utils.openExternal` comes from `electrobun/bun` — the module the chromium launcher is defined by
+never loading — so when that is the only path, **every** URL on that build is silently dropped: a
+preview click did nothing at all and sign-in reported "Could not open a browser". The fallback hands
+the URL to the desktop's own opener (`xdg-open`, `open`, `rundll32 url.dll,FileProtocolHandler`) as a
+single argument with no shell, and only for `http`, `https` and `mailto`. The scheme restriction is
+the point of having a list at all: an opener resolves a scheme to whatever handler the desktop
+registered for it, and the pages whose links arrive here are a project's own content.
+
+Refusal is a **return value**, not an exception — `{ ok: false }` — because both steps can decline
+without anything going wrong. A caller that branches only on a rejection loses the click, which is
+what both platform adapters did before. On a genuine refusal Studio's own `window.open` default
+applies.
 
 ### 3.6 Signing In
 
@@ -300,6 +314,8 @@ on every branch above.
 ```
 
 **The outcome is reported, never the intent.** The three results — opened here, opened in a new window, raised an existing window — are distinguishable, and a cancelled picker is silent. Announcing the chosen target instead produces reports of things that did not happen: "Opening the project in a new window…" over a dismissed file dialog, or over a window that merely came to the front.
+
+**An empty window is its own verb.** `newWindow` opens a welcome window with no project, and it is the `view.newWindow` command (`Cmd/Ctrl+Shift+N`, gated on the same multi-window capability every member above is) — not a menu item. It was a menu item, and only ElectroBun's native application menu had it, so on a launcher whose window has no menu bar the member existed on the platform and could not be run. The native menu keeps the item and **claims no accelerator**: a chord with two owners fires twice, which is two welcome windows from one press.
 
 ### 4.3 Single File Mode
 
@@ -771,36 +787,54 @@ On NixOS, ElectroBun cannot be built in a Nix sandbox, and system Chromium provi
 ### 9.1 Architecture
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│                  Chromium App-Mode                        │
-│                                                          │
-│  ┌──────────────────┐           ┌──────────────────────┐ │
-│  │   Bun Process     │  HTTP     │  Chromium --app       │ │
-│  │                   │◄────────►│                        │ │
-│  │  @jxsuite/server  │          │  @jxsuite/studio       │ │
-│  │  - File I/O       │          │  @jxsuite/runtime      │ │
-│  │  - Studio API     │          │  Lit + Spectrum        │ │
-│  │  - Code services  │          │  Monaco                │ │
-│  └──────────────────┘          └──────────────────────┘ │
-│                                                          │
-└──────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│  One window = one launcher process                            │
+│                                                               │
+│  ┌────────────────────────┐  HTTP + WS  ┌───────────────────┐ │
+│  │  Bun launcher          │◄───────────►│  Chromium --app   │ │
+│  │  createProjectServer() │             │  @jxsuite/studio  │ │
+│  │  one ProjectSession    │             │  chromium/        │ │
+│  │  fs watcher            │             │   platform.ts     │ │
+│  └───────────┬────────────┘             └───────────────────┘ │
+└──────────────┼────────────────────────────────────────────────┘
+               │  <data>/jx-studio/windows/<pid>.json
+               ▼
+      ┌────────────────────┐
+      │  window registry   │  ← every other launcher on this machine
+      └────────────────────┘
 ```
 
-Unlike ElectroBun (which uses WebSocket RPC between the Bun process and a native webview), the Chromium app-mode runtime reuses the `@jxsuite/server` dev server as its backend. The Bun process starts the server on a random port, then launches Chromium with `--app=<serverUrl>/studio/index.html`. Studio registers the `DevServerPlatform` adapter — the same one used in Chrome development mode.
+The backend is `createProjectServer()` from `@jxsuite/server` — the same loopback-bound factory
+each ElectroBun window stands up (§7.1), with the same token gate, the same `/__studio__/` asset
+namespace and the same WS-RPC dispatch. It is **not** the dev server, and Studio does **not**
+register the dev-server adapter: `packages/desktop/src/chromium/platform.ts` is this launcher's own
+PAL implementation, translating each member into a WS request against `chromium/index.ts`'s handler
+map. `packages/desktop/tests/_rpc-parity.ts` reads the request names back out of `rpc-schema.ts` and
+fails when either launcher declares one it does not answer.
 
-### 9.2 Launcher (`chromium-mode.ts`)
+The WS carries traffic in both directions. Frames with an `id` answer something the shell asked;
+frames with a `method` and **no** `id` are the launcher speaking first (`ProjectServerHandle.push`),
+which is how filesystem events reach the sidebar and how a focus request reaches a window.
 
-The entry point (`packages/desktop/src/chromium-mode.ts`) performs:
+### 9.2 Launcher (`chromium/index.ts`)
 
-1. Starts `@jxsuite/server` on a random port with middleware for studio assets and project public files
-2. Locates a Chromium binary via `CHROMIUM_BIN` env var or PATH lookup (`chromium`, `chromium-browser`, `google-chrome`, `google-chrome-stable`)
-3. Launches Chromium with app-mode flags:
-   - `--app=<serverUrl>/studio/index.html` — frameless window
+The entry point performs, in order:
+
+1. Resolves the project root: the first positional argument, else `JSONSX_PROJECT_ROOT`, else the
+   working directory — unless `JX_STUDIO_NO_PROJECT` marks it a welcome window (§9.4)
+2. **Raises an existing window instead of opening a second one** for a project already open (§9.4)
+3. Locates a Chromium binary via `CHROMIUM_BIN` or PATH (`chromium`, `chromium-browser`,
+   `google-chrome`, `google-chrome-stable`); this binary is also the import pipeline's browser
+4. Starts `createProjectServer()` on an ephemeral loopback port, and hosts the sign-in redirect on it
+5. Points the session's filesystem-event sink at the server's push channel, so the sidebar is live
+6. Publishes itself in the window registry and starts watching for focus requests
+7. Launches Chromium with app-mode flags:
+   - `--app=<serverUrl>/__studio__/index.html?token=<rpcToken>` — frameless window, gated surface
    - `--no-first-run --no-default-browser-check` — suppress first-run prompts
    - `--window-size=1400,900`
-   - `--user-data-dir=<projectRoot>/.jx/chromium-profile` — isolated profile
+   - `--user-data-dir=<profile>` — this window's profile (§9.4)
    - `--ozone-platform=wayland --enable-features=UseOzonePlatform` — when `WAYLAND_DISPLAY` is set
-4. Exits when the browser window closes
+8. Leaves the registry and exits when the browser window closes
 
 ### 9.3 Nix Package
 
@@ -811,6 +845,26 @@ The flake's `packages.default` produces a fully sandboxed NixOS package:
 - **Build phase** runs `bun run build` (compiler, runtime, studio, schema) and `pre-build.ts` (bundles the studio init bridge and copies assets)
 - **Install phase** copies `packages/`, `extensions/` and `node_modules` into the nix store with plain `cp -r`, then deletes dangling symlinks (`find … -xtype l -delete`) rather than dereferencing with `cp -rL`. The prune is why `packages/desktop/tests/nix-bundle-completeness.test.ts` exists: it reads the copied directories back out of `package.nix` and asserts every `@jxsuite/*` dependency of the desktop app lands under one of them, after `extensions/parser` was once pruned out of the bundle silently
 - **Wrapper** creates a `jx-studio` binary that runs `bun run packages/desktop/src/chromium/index.ts` with `CHROMIUM_BIN` and `JX_STUDIO_ASSETS` pre-set to nix store paths. The first positional argument is the **project root**; there is no flag surface
+
+**The desktop entry and the window have to agree.** A taskbar or dock does not read the process,
+the title or `--class`: it takes the window's Wayland `app_id` (X11: `WM_CLASS`) and looks for an
+entry claiming it. Two things were in the way, and each hid the other:
+
+- The entry was installed through `desktopItems`, which takes the **store path's basename** — so it
+  shipped as `<hash>-jx-studio.desktop`, an id that changed with every rebuild. It is installed by
+  hand at a fixed name now.
+- Chromium derives an `--app` window's id from the shell URL and the profile directory and
+  **ignores `--class`** — measured across two ports and two `--user-data-dir` values, all producing
+  `chrome-127.0.0.1____studio___index.html-Default`, and there is no switch to override it
+  (`--wm-class-name` / `--wm-class-class` are Electron's, and absent from the binary).
+
+So the entry declares that derived string in `StartupWMClass`, which makes a file in
+`packages/desktop/` depend on a URL composed in `chromium/index.ts`. `chromium/app-id.ts` owns the
+derivation and the shell path the launcher builds the URL from, and the test beside it asserts the
+entry carries exactly what the launcher produces — because the failure mode is silent. Nothing
+errors; the icon is a generic square, and everything else about the app still works, which is why
+it survived in the app launcher (which reads the file, never the window) while the taskbar showed
+nothing.
 
 **Which ref a consumer gets.** `packages/desktop/package.nix` builds `src = lib.cleanSource ../..`
 — whatever tree was fetched — so the ref names the release. `main` is the development trunk and
@@ -831,6 +885,71 @@ the branch moves only if that succeeds. When it does not, the branch stays where
 is opened — a stale ref that works beats a fresh one that does not. The same workflow runs on any
 pull request touching `flake.nix`, `bun.nix`, `bun.lock` or `packages/desktop/**`, which is the
 first time the flake has been built by CI at all.
+
+### 9.4 Windows Are Processes
+
+> **Status: Implemented.**
+
+An ElectroBun window is a `BrowserWindow` inside one process, so its window manager is a `Map`
+(§7.1). Chromium owns its own browser process, and the only thing that lives exactly as long as one
+`--app` window is the launcher that started it — so **on this build a window is a process**, and
+`newWindow` / `openProjectInNewWindow` spawn another launcher rather than another object.
+
+That makes the window list the one thing a `Map` cannot be: an answer that spans processes. It is a
+directory of one small owner-only file per window, named for its pid:
+
+```
+<data>/jx-studio/windows/<pid>.json     ← written and deleted by that window, nobody else
+<data>/jx-studio/windows/<pid>.focus    ← written by ANOTHER window to ask this one forward
+```
+
+**One writer per file is the whole concurrency design.** Nothing read-modify-writes a shared
+document, so two launchers starting at the same instant cannot lose each other's row, and a launcher
+that dies without cleaning up leaves a row whose pid no longer resolves — pruned by the next window
+to read the directory, with no daemon to have missed the death. `JX_STUDIO_WINDOWS_DIR` relocates
+the store, which is what keeps a test run out of the real user's windows.
+
+**A focus request is a file, not a signal.** A pid the OS has recycled would receive a signal meant
+for a process that no longer exists, and `SIGUSR2` terminates a process that installed no handler.
+A file only the real launcher watches for is inert to anyone else. The request is consumed before
+the window is raised, so a window asked twice comes forward twice.
+
+**Raising is the page's job.** Nothing on the Bun side can bring a Chromium `--app` window forward,
+so the launcher relays the request to its shell as a `focusWindow` push and the page calls
+`window.focus()`. A window manager that refuses the raise leaves the window where it is.
+
+**Every window needs a profile directory of its own**, because Chromium's process singleton is keyed
+on it: two windows sharing one directory would be one browser process, and the second launcher's
+window would be handed to the first launcher's browser pointing at a server about to die. A
+project's window uses `<root>/.jx/chromium-profile`, so its Studio layout, theme and open tabs
+survive a restart; a welcome window has no project to key on and takes the lowest `welcome-<n>` slot
+no live window is using. The parent chooses the child's directory (`JX_STUDIO_PROFILE_DIR`) because
+only the parent can see which ones are taken.
+
+**Dedupe is by normalized root** — resolved, symlinks followed, case-folded on Windows — and it
+applies at three points: launching for a project already open (which raises that window and exits),
+`openProjectInNewWindow`, and `setWindowProject`. The third excludes the calling window, so
+re-rooting never dedupes against itself.
+
+### 9.5 What This Build Does Not Implement, and Why
+
+Two PAL families are absent on purpose, and their absence is a claim recorded in
+`CHROMIUM_RPC_EXEMPT`:
+
+- **The self-updater.** This build is installed and replaced by whatever packaged it. It has no feed
+  to check, so it answers the About screen through `appInfo` — version, channel (`system` when the
+  Nix wrapper's `JX_STUDIO_ASSETS` is set, `development` otherwise), commit — and reports **no**
+  update status rather than an "Up to date" it never verified. ElectroBun answers the same request
+  from its updater, so the About screen has one shape and each launcher fills in only what it knows.
+- **Client-side window decorations.** Studio draws minimize/maximize/close only when the launcher
+  exposes `windowControls`, which ElectroBun does because its `BrowserWindow` is frameless. A
+  Chromium `--app` window is decorated by the desktop environment, and a second set of buttons
+  inside the page would minimize and close nothing.
+
+Everything else the ElectroBun launcher implements, this one implements: `buildSite` behind
+`View: Open in Browser`, `subscribeFileEvents` behind the live sidebar, `findReferences`,
+`importSite`, the data and secrets surfaces, the native folder and project pickers (via the XDG
+desktop portal, §8.2.1), and sign-in (§3.6).
 
 ---
 
@@ -901,11 +1020,15 @@ Package Studio as an ElectroBun app:
 
 Package Studio as a NixOS-native app using Chromium `--app` mode:
 
-- [x] Implement `chromium-mode.ts` launcher (server + Chromium `--app`)
+- [x] Implement `chromium/index.ts` launcher (project server + Chromium `--app`)
 - [x] Wayland support via `--ozone-platform=wayland` auto-detection
 - [x] Sandboxed `nix build` via bun2nix (no `__noChroot`, no network at build time)
 - [x] `makeWrapper` producing `jx-studio` binary with bundled Chromium and Bun
 - [x] Auto-refresh `bun.nix` via postinstall hook
+- [x] Its own PAL adapter over `createProjectServer`, not the dev-server adapter (§9.1)
+- [x] Multi-window through the cross-process window registry (§9.4)
+- [x] Live sidebar sync and `View: Open in Browser`, over the server-to-client push channel (§9.1)
+- [x] About-screen build info via `appInfo`, with no update status it cannot verify (§9.5)
 
 ### Phase 3: Feature Parity
 
@@ -938,6 +1061,8 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.3.14-draft** (2026-08-20) — §9.3: the desktop entry ships under a stable id and claims the app_id Chromium actually gives an --app window, so the taskbar/dock can resolve the brand icon.
+- **0.3.13-draft** (2026-08-20) — Chromium launcher reaches PAL parity: its own adapter over createProjectServer (§9.1), multi-window through a cross-process window registry (§9.4), a server-to-client push channel behind live sidebar sync and focus, buildSite behind View: Open in Browser, appInfo for the About screen, and an OS-opener fallback so preview links and sign-in leave the app at all (§3.5, §9.5). New Window becomes the `view.newWindow` command rather than a native-menu-only item, and the native menu drops its duplicate accelerators (§4.2a).
 - **0.3.12-draft** (2026-08-19) — §9.3 documents the release branch as the ref a Nix consumer pins, and the nix build that gates it; corrects the install phase, which has used cp -r plus a dangling-symlink prune and src/chromium/index.ts since before this text was written.
 - **0.3.11-draft** (2026-08-16) — §3.6 the desktop signs in with an RFC 8252 loopback redirect and PKCE; the token rests in a 0600 credential store, not localStorage. RFC 8414 and RFC 7519 recorded Rejected as vacuous. Closes gap:native-oauth and gap:oauth-pkce.
 - **0.3.10-draft** (2026-08-16) — §5 the contract's failure half is specified — one RFC 9457 registry; gap:backend-failure-contract closed.
@@ -969,4 +1094,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx Studio Desktop Architecture Specification v0.3.12-draft_
+_Jx Studio Desktop Architecture Specification v0.3.14-draft_

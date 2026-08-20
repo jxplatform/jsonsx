@@ -113,25 +113,36 @@ export const CHROMIUM_RPC_EXEMPT: Record<string, string> = {
     "chromium/platform.ts aiChatUrl() returns the local /__studio__/ai/chat path directly, with the project server's token",
   getCanvasUrl: "chromium/platform.ts builds `canvasUrl` from location.search; no round trip",
   importSiteUrl: "chromium/platform.ts importSite() posts to /__studio__/import-site directly",
-  listOpenWindows: "single-window launcher; chromium/platform.ts implements no multi-window PAL",
-  newWindow: "single-window launcher; chromium/platform.ts implements no multi-window PAL",
-  openProjectInNewWindow:
-    "single-window launcher; chromium/platform.ts implements no multi-window PAL",
-  pickProject:
-    "picking without binding exists for the New Window branch alone; single-window launcher, so chromium/platform.ts offers no such branch and its openProject() picks and binds together",
-  updaterApplyUpdate: "no self-updater outside electrobun; not implemented by chromium/platform.ts",
+  /*
+   * The two families below are NOT gaps — they are things this build would have to lie about.
+   *
+   * The updater: this build is installed and replaced by whatever packaged it (`nix build`, a
+   * distro package). It has no feed to check, so it answers the one question the About screen
+   * actually renders — the channel — through `appInfo`, and reports no update status rather than an
+   * "Up to date" it never verified.
+   *
+   * The window controls: Studio draws client-side decorations only when the launcher exposes them,
+   * which electrobun does because its BrowserWindow is frameless. A Chromium `--app` window is
+   * decorated by the desktop environment, and a second set of buttons inside the page would
+   * minimize and close nothing.
+   */
+  updaterApplyUpdate: "no self-updater outside electrobun; the system package manager owns updates",
   updaterCheckForUpdate:
-    "no self-updater outside electrobun; not implemented by chromium/platform.ts",
+    "no self-updater outside electrobun; the system package manager owns updates",
   updaterDownloadUpdate:
-    "no self-updater outside electrobun; not implemented by chromium/platform.ts",
+    "no self-updater outside electrobun; the system package manager owns updates",
   updaterGetLocalInfo:
-    "no self-updater outside electrobun; not implemented by chromium/platform.ts",
-  updaterGetStatus: "no self-updater outside electrobun; not implemented by chromium/platform.ts",
-  windowClose: "the browser owns the --app window chrome; no window controls on this launcher",
-  windowGetFrame: "the browser owns the --app window chrome; no window controls on this launcher",
-  windowMaximize: "the browser owns the --app window chrome; no window controls on this launcher",
-  windowMinimize: "the browser owns the --app window chrome; no window controls on this launcher",
-  windowSetFrame: "the browser owns the --app window chrome; no window controls on this launcher",
+    "no self-updater outside electrobun; `appInfo` answers the About screen instead",
+  updaterGetStatus: "no self-updater outside electrobun; there is no feed to have a status from",
+  windowClose: "the desktop environment decorates the --app window; no client-side window controls",
+  windowGetFrame:
+    "the desktop environment decorates the --app window; no client-side window controls",
+  windowMaximize:
+    "the desktop environment decorates the --app window; no client-side window controls",
+  windowMinimize:
+    "the desktop environment decorates the --app window; no client-side window controls",
+  windowSetFrame:
+    "the desktop environment decorates the --app window; no client-side window controls",
 };
 
 /**

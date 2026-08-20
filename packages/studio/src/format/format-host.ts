@@ -146,7 +146,8 @@ async function shareProjectSchemas(platform: {
   // Monaco's copy is HELD, not applied: this runs at project activation, and importing monaco-setup
   // Here would fetch the whole editor on every cold load for a code view most sessions never open.
   // `services/monaco-lazy` registers them when an editor is actually created.
-  setProjectSchemasForMonaco(schemas);
+  // Fire-and-forget: activation must not wait on Monaco, and a failure degrades to core schemas.
+  void setProjectSchemasForMonaco(schemas);
   await import("../services/jx-validate")
     .then(({ applyProjectSchemas }) => applyProjectSchemas(schemas))
     .catch(() => false);

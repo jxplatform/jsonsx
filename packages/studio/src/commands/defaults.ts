@@ -111,6 +111,13 @@ export interface CommandDeps {
   openPalette: (mode: PaletteMode) => void;
   openProject: () => void | Promise<void>;
   /**
+   * Open a fresh window with no project — `StudioPlatform.newWindow`.
+   *
+   * A no-op on hosts that have one window; the record is gated on the same capability, so on those
+   * hosts it is not offered at all rather than offered and inert.
+   */
+  newWindow: () => void | Promise<void>;
+  /**
    * The rail's panels in rail order, then the rail-less ones — the roster ⌘1–8 is generated from.
    *
    * Every entry is a Navigator panel: the rail is the Navigator's, and a Bottom-dock tab is
@@ -148,6 +155,7 @@ export function noopCommandDeps(): CommandDeps {
     toggleZen: () => {},
     openPalette: () => {},
     openProject: () => {},
+    newWindow: () => {},
     panelRoster: [],
     focusPanel: () => {},
     focusInspectorTab: () => {},
@@ -469,6 +477,27 @@ export function defaultCommands(deps: CommandDeps): AnyCommand[] {
       menus: ["commandbar/overflow", "statusbar/project", "palette"],
       group: "1_file",
       run: () => deps.openProject(),
+    },
+    {
+      /*
+       * The other half of multi-window, and the half that had no door.
+       *
+       * "Open a project ELSEWHERE" is reachable from Open Project and from Recents (§4.2a); "open
+       * an EMPTY window" was reachable only from the ElectroBun launcher's native application menu
+       * — so on a launcher whose window has no menu bar, `newWindow` existed on the platform and
+       * could not be run. Gated on the same capability every other multi-window verb is, so a host
+       * with one window does not offer it.
+       */
+      id: "view.newWindow",
+      title: "New Window",
+      category: "View",
+      level: "application",
+      keybinding: "mod+shift+n",
+      menus: ["commandbar/overflow", "palette"],
+      group: "1_file",
+      when: (ctx: CommandContext) => ctx.capability.windowControls,
+      requires: "a host that can hold more than one window",
+      run: () => deps.newWindow(),
     },
     {
       // The no-project palette stops being a hidden domain swap on `!projectState` and becomes a

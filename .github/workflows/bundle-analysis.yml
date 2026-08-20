@@ -64,7 +64,7 @@ jobs:
         with:
           # Keep in sync with test.yml: bundle sizes shift between Bun
           # versions, which would move the Codecov baseline.
-          bun-version: 1.3.13
+          bun-version: 1.4
       - run: bun install --frozen-lockfile
       - name: Build with metafile
         run: bun run build:metafile

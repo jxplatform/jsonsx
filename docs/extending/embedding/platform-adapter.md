@@ -10,6 +10,7 @@ code:
   - packages/studio/src/types.ts
   - packages/studio/src/platforms/devserver.ts
   - packages/desktop/src/platform.ts
+  - packages/desktop/src/chromium/platform.ts
 ---
 
 # Writing a platform adapter
@@ -142,6 +143,17 @@ if (!match) {
 ### Desktop (`packages/desktop/src/platform.ts`)
 
 The desktop adapter translates the same interface into ElectroBun RPC: each member is a one-line `rpc.request.*` call into Bun-side handlers (`openProject()` is literally `return await rpc.request.openProject()`, backed by a native file dialog in the Bun process). Beyond the mapping, it patches `window.fetch` so the runtime's dev-proxy endpoints (`/__jx_resolve__`, `/__jx_server__`) also ride the RPC bridge, and it implements the desktop-only families — multi-window, backend-persisted recents and settings, `getAppInfo`.
+
+### Desktop, Chromium build (`packages/desktop/src/chromium/platform.ts`)
+
+The NixOS build runs Studio in a Chromium `--app` window and talks to its launcher over a WebSocket instead of ElectroBun's bridge, so it is a **second adapter over the same handler names** — one `request(method, params)` helper per member. It is a useful thing to read if you are writing your own: it implements the same optional families as the ElectroBun adapter, over a completely different transport, and the two are checked against one declaration (`packages/desktop/tests/_rpc-parity.ts`).
+
+Two lessons from it generalize to any adapter:
+
+- **A member you do not implement is a feature the user does not get, silently.** Studio probes for methods rather than asking what kind of host you are, so the launcher answered `buildSite` over RPC for months while its adapter never exposed the method — and **Open in Browser** reported that this backend could not build a preview. If you add a backend handler, add the member in the same change.
+- **Not every absent member is a gap.** This adapter deliberately omits the updater family (the system package manager owns updates, so there is no feed to report on) and `windowControls` (the desktop environment decorates the window, so Studio must not draw its own buttons). Omission is how you say "not here" — the alternative is a control that does nothing.
+
+Its transport also carries messages the launcher sends **unprompted**: a frame with a `method` and no request id. That is how `subscribeFileEvents` is fed, and how another window asks this one to come forward. If your host can push, a subscription member is a local handler plus a dispatch line, not a poll.
 
 ## Related
 

@@ -2,9 +2,9 @@
 
 ## Development Server with Live Reload, Proxy Resolution, and Studio API
 
-**Version:** 0.2.9
+**Version:** 0.2.10
 **Status:** Implemented
-**Updated:** 2026-08-18
+**Updated:** 2026-08-20
 **License:** MIT
 
 ---
@@ -188,6 +188,8 @@ A second, looser **`embeddable`** policy exists for one reason: the desktop canv
 
 **Loopback project server (`src/project-server.ts`, used by the desktop launchers).** Adds, on top of the above, a **per-server token** as the hard gate on the WebSocket RPC upgrade, the resolve/import routes, and the AI proxy — the desktop canvas iframe is cross-origin, so it carries the token in its URL where the same-origin dev server does not need one.
 
+The RPC socket carries traffic in **both** directions. A frame with an `id` answers something the shell asked; a frame with a `method` and **no** `id` is the server speaking first (`ProjectServerHandle.push`), which is how the desktop launchers deliver what is not an answer to anything: batched filesystem events for the sidebar — the loopback twin of the dev server's named `fs` SSE event (§3.1) — and a request that a window come forward. A push may be addressed to one window id or broadcast, and reports how many sockets it reached, so a launcher can tell "delivered" from "nobody is listening yet".
+
 Which instrument gates which surface is a judgement about who calls it, not a uniform strength:
 
 - **Token** on the RPC upgrade, `/__jx_resolve__`, `/__jx_server__`, `/__studio__/import-site`, and `/__studio__/ai/*`. Each either runs code, writes files, or spends the user's own API credit; an ungated AI proxy is an open relay for any process on the machine, and it was dispatched ahead of every gate until this closed.
@@ -321,6 +323,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.2.10** (2026-08-20) — The loopback project server's RPC socket carries server-initiated frames (ProjectServerHandle.push) — the loopback twin of the dev server's named fs SSE event, and the channel a desktop launcher raises a window over (§4.2).
 - **0.2.9** (2026-08-18) — §4.2: the Studio shell's report-only Trusted Types header is removed — see spec.md §21.5.
 - **0.2.8** (2026-08-18) — §4.2: both entry points send the Studio shell a report-only Trusted Types policy, and nothing else.
 - **0.2.7** (2026-08-16) — §4.2 Fetch Metadata on every gated surface, the loopback block, a constant-time token, and the three ungated project-server routes closed; gap:fetch-metadata closed.
@@ -344,4 +347,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/server` Specification v0.2.9_
+_`@jxsuite/server` Specification v0.2.10_

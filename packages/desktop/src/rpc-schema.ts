@@ -4,6 +4,7 @@ import type { ProjectConfig } from "@jxsuite/schema/types";
 import type { FsEventPayload, ReferencesResult, RenameReport } from "@jxsuite/server/refactor";
 import type { StarterMeta } from "@jxsuite/starters";
 import type {
+  AppInfo,
   ComponentMeta,
   DataConnectionsResponse,
   DataConnectionTestResult,
@@ -427,6 +428,19 @@ export interface StudioRPC {
       listStarters: {
         params: void;
         response: StarterMeta[];
+      };
+      /**
+       * Build info for the About screen — version, channel, commit, and (where the launcher has an
+       * updater) a human-readable update status.
+       *
+       * Composed on the Bun side rather than in the webview, because what it can truthfully say
+       * differs per launcher and only the launcher knows which one it is: the electrobun build
+       * checks its own update feed, while the system-packaged build has no feed to check and says
+       * nothing rather than guessing.
+       */
+      appInfo: {
+        params: void;
+        response: AppInfo;
       };
       // Updates
       updaterGetLocalInfo: {
