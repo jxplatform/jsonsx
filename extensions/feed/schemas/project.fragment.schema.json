@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://jxsuite.com/schema/extensions/feed/v1",
+  "$id": "https://jxsuite.com/schema/ext/feed/project/v1",
   "title": "@jxsuite/feed project section",
   "type": "object",
   "properties": {

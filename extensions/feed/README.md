@@ -13,7 +13,7 @@ declares the section key) and the schema fragment that gives the section its sha
   its entries are served under, and optional metadata (`title`, `description`, `author`), output
   shape (`formats`, `output`, `pageSize`, `archive`, `contentMode`), frontmatter field names
   (`dateField`, `updatedField`) and `language`. The schema
-  (`schemas/project.fragment.schema.json`, `$id` `https://jxsuite.com/schema/extensions/feed/v1`)
+  (`schemas/project.fragment.schema.json`, `$id` `https://jxsuite.com/schema/ext/feed/project/v1`)
   declares the same defaults `normalizeFeedConfig` applies at runtime (`DEFAULTS` in
   `src/shared.ts`), two lists kept in step by hand; it requires at least one feed and rejects
   unknown keys.
