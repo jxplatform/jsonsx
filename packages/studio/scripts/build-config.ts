@@ -16,30 +16,30 @@
  */
 
 import { join } from "node:path";
-import type { BuildConfig, BunPlugin } from "bun";
+import type { BuildConfig } from "bun";
 
 /** The studio package root, derived from this file's location. */
 export const STUDIO_DIR = join(import.meta.dir, "..");
 
-/**
- * Resolve EVERY `monaco-editor` specifier from the studio package, so all consumers share one
- * module identity.
+/*
+ * THERE IS NO MONACO DE-DUPLICATION PLUGIN HERE ANY MORE, and the reason is worth keeping.
  *
- * Without this, studio's own `monaco-editor/esm/...` resolves through
- * `packages/studio/node_modules/monaco-editor` (a symlink into `node_modules/.bun/…`) while
- * `y-monaco`'s bare `monaco-editor` resolves to the separate physical copy hoisted at the workspace
- * root. Same version, two paths, so the bundler emits Monaco twice — 5.1 MB, 27% of the bundle.
- * Delegating to `Bun.resolveSync` from a fixed base keeps this correct across install re-layouts,
- * which a version pin or an `overrides` entry would not (both copies are already 0.55.1).
+ * A `dedupe-monaco` `onResolve` hook used to force every `monaco-editor` specifier through
+ * `Bun.resolveSync` from this package — because there were TWO importers with two resolutions:
+ * studio's own `monaco-editor/esm/...` went through `packages/studio/node_modules/monaco-editor`
+ * (a symlink into `node_modules/.bun/…`) while `y-monaco`'s bare `monaco-editor` resolved to the
+ * physically separate copy hoisted at the workspace root. Same version, two paths, so the bundler
+ * emitted Monaco TWICE — 5.1 MB, 27% of the bundle.
+ *
+ * Replacing y-monaco with the first-party binding (`src/collab/monaco-binding.ts`) left exactly one
+ * importer, so the hook became an identity transform. Verified rather than reasoned: a `bun build
+ * --metafile` pass, which does NOT install this plugin, reports **one** physical
+ * `monaco-editor` root in the input graph, and removing the plugin left the emitted bundle
+ * byte-identical.
+ *
+ * If a second consumer of `monaco-editor` is ever added, check the metafile before assuming this
+ * stays true.
  */
-export const dedupeMonaco: BunPlugin = {
-  name: "dedupe-monaco",
-  setup(build) {
-    build.onResolve({ filter: /^monaco-editor(\/|$)/ }, (args) => ({
-      path: Bun.resolveSync(args.path, STUDIO_DIR),
-    }));
-  },
-};
 
 /**
  * Bundler options every studio build must use. Spread into a `Bun.build` call (or into a
@@ -64,7 +64,6 @@ export const studioBundleOptions = {
     chunk: "chunks/[name]-[hash].[ext]",
     entry: "[name].[ext]",
   },
-  plugins: [dedupeMonaco],
   sourcemap: "linked",
   /*
    * Splitting is what makes the ~18 `await import()` sites in studio src defer PAYLOAD rather than

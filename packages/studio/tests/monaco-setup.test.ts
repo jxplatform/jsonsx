@@ -1,22 +1,16 @@
 /**
- * Monaco-setup wiring tests (E9). Monaco itself cannot load in happy-dom, so the ESM contribution
- * modules are mocked and the test asserts the wiring: worker environment registration and JX/
- * project JSON schema registration on jsonDefaults.
+ * Monaco-setup wiring tests (E9). Monaco itself cannot load in happy-dom, so every entrypoint it
+ * imports is mocked (`./monaco-setup-mocks`) and the test asserts the wiring: worker environment
+ * registration and JX/project JSON schema registration on jsonDefaults — plus that the mock list
+ * still matches the feature set the module declares.
  */
 import "./harness";
 import { describe, expect, mock, test } from "bun:test";
+import { installMonacoSetupMocks, MONACO_SETUP_ENTRIES } from "./monaco-setup-mocks";
 
 const setDiagnosticsOptions = mock((_opts: unknown) => {});
 
-void mock.module("monaco-editor/esm/vs/language/json/monaco.contribution.js", () => ({
-  jsonDefaults: { setDiagnosticsOptions },
-}));
-void mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({}));
-void mock.module("monaco-editor/esm/vs/language/typescript/monaco.contribution.js", () => ({}));
-void mock.module(
-  "monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution.js",
-  () => ({}),
-);
+installMonacoSetupMocks({ jsonDefaults: { setDiagnosticsOptions } });
 
 class FakeWorker {
   url: string;
@@ -217,5 +211,40 @@ describe("monaco-setup — applyProjectSchemas", () => {
     const opts = latestDiagnosticsArg();
     expect(opts.schemas[0].schema).toBe(bundledDocumentSchema);
     expect(opts.schemas[1].schema).toBe(bundledProjectSchema);
+  });
+});
+
+/**
+ * The declared feature set, checked against the doubles that stand in for it.
+ *
+ * Since 0.56 Studio DECLARES what the code editor can do — one `register` import per capability
+ * (studio.md §11.1) — and a suite that imports `monaco-setup` must mock every one of them, because
+ * real Monaco cannot load under happy-dom. Adding a feature and forgetting the double crashes some
+ * unrelated suite with a DOM error that names nothing; this fails here, naming the specifier.
+ */
+describe("the declared Monaco feature set", () => {
+  test("is exactly what ./monaco-setup-mocks doubles", async () => {
+    const source = await Bun.file(
+      new URL("../src/services/monaco-setup.ts", import.meta.url),
+    ).text();
+    const imported = new Set(
+      [...source.matchAll(/(?:from|import)\s*\(?\s*"(monaco-editor[^"]*)"/g)].map((m) => m[1]!),
+    );
+    // Named both ways round, so the failure says which side to fix.
+    const undoubled = [...imported].filter((s) => !MONACO_SETUP_ENTRIES.includes(s)).toSorted();
+    const stale = MONACO_SETUP_ENTRIES.filter((s) => !imported.has(s)).toSorted();
+    expect({ stale, undoubled }).toEqual({ stale: [], undoubled: [] });
+  });
+
+  test("registers the suggest WIDGET, not just the suggest provider", async () => {
+    /* `features/suggest/register` registers the provider that renders suggest items as inline text;
+       `contrib/suggest/browser/suggestController.js` is the widget, and `features/inlineCompletions/
+       register` is the only public entry that reaches it. Drop that import and the JSON schema
+       completions and the Logic tab's `state.*` completions both register and never appear — with
+       no error anywhere. */
+    const source = await Bun.file(
+      new URL("../src/services/monaco-setup.ts", import.meta.url),
+    ).text();
+    expect(source).toContain('import "monaco-editor/features/inlineCompletions/register"');
   });
 });

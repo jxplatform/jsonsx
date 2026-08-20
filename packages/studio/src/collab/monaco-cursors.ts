@@ -1,9 +1,9 @@
 /**
- * Remote cursor colors for y-monaco. MonacoBinding decorates other clients' text cursors with
- * per-client class names (`yRemoteSelection-<id>`, `yRemoteSelectionHead-<id>`) but ships no
- * styling — this module maintains one injected <style> element with a rule set per remote client,
- * colored from the presence palette (`user.color`) and labeled with the author's name on hover of
- * the cursor head.
+ * Remote cursor colors for the code view. `./monaco-binding.ts` decorates other clients' text
+ * cursors with per-client class names (`yRemoteSelection-<id>`, `yRemoteSelectionHead-<id>`) but
+ * carries no styling — this module maintains one injected <style> element with a rule set per
+ * remote client, colored from the presence palette (`user.color`) and labeled with the author's
+ * name on hover of the cursor head.
  */
 
 /** The slice of y-protocols Awareness the style manager uses (duck-typed; stays yjs-free). */

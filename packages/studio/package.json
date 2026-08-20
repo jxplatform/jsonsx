@@ -99,9 +99,8 @@
     "ajv-formats": "^3.0.1",
     "lit": "^3.3.3",
     "lit-html": "^3.3.3",
-    "monaco-editor": "^0.55.1",
+    "monaco-editor": "^0.56.0",
     "tabulator-tables": "^6.5",
-    "y-monaco": "^0.1.6",
     "yaml": "^2.9.0"
   },
   "devDependencies": {

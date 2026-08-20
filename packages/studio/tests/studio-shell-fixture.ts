@@ -96,7 +96,7 @@ export async function bootStudio(opts: {
 
   void mock.module("../src/services/monaco-setup.js", () => ({}));
 
-  void mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
+  void mock.module("monaco-editor/editor", () => ({
     KeyCode: {},
     KeyMod: {},
     MarkerSeverity: { Error: 8, Warning: 4 },

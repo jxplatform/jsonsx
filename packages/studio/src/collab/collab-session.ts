@@ -452,8 +452,8 @@ async function sourceParseNow(session: ActiveSession): Promise<void> {
  * The code view's co-editing surface for a tab, or null when the tab isn't in a synced session.
  * `enter()` flips the canonical lock to source (seeding the text from the flipper's serialization);
  * `leave()` reverts to structure-canonical when the last source editor departs. `text` is the real
- * Y.Text and `awareness` the connection's Awareness — exactly what y-monaco's MonacoBinding
- * consumes (it owns the awareness `selection` field while bound).
+ * Y.Text and `awareness` the connection's Awareness — exactly what `collab/monaco-binding.ts`'s
+ * `bindMonacoToYText` consumes (it owns the awareness `selection` field while bound).
  */
 export function collabSourceContext(tab: Tab): {
   text: unknown;
@@ -1041,7 +1041,8 @@ function createSession(
 
     // Publish the local structural selection for remote canvas overlays (peers filter by
     // FocusedPath, so per-doc boxes come free from the one project-level awareness state). The
-    // Plain `selection` field is y-monaco's (in-buffer text cursors) — never write it here.
+    // Plain `selection` field belongs to the code view's Monaco binding (in-buffer text cursors)
+    // — never write it here.
     effect(() => {
       // The whole selection SET crosses awareness, so a peer's canvas draws every node the author
       // Has selected. A selection of one publishes a one-entry list, which is the same box.

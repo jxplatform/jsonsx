@@ -9,7 +9,7 @@
 import "./with-dom.js";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 
-void mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
+void mock.module("monaco-editor/editor", () => ({
   MarkerSeverity: { Error: 8, Warning: 4 },
   Uri: { parse: (u: string) => ({ toString: () => u }) },
   editor: { create: () => ({}) },

@@ -2,9 +2,9 @@
 
 ## Real-Time Co-Editing for Jx Projects
 
-**Version:** 0.2.4-draft
+**Version:** 0.2.5-draft
 **Status:** Partial
-**Updated:** 2026-08-16
+**Updated:** 2026-08-20
 **License:** MIT
 
 ---
@@ -135,6 +135,13 @@ responding the way it normally does:
   became indistinguishable from a bug.
 - **Read-only** carries a banner, not a silent refusal of every edit.
 
+**Presence that has ended must stop being published.** A client's in-buffer text cursor lives in the
+awareness `selection` field, written only while a code view is bound; unbinding clears it. Left set,
+the field describes a person who is no longer there — every peer still in the code view keeps drawing
+that caret and name flag at the position it was abandoned at, for the rest of the session, and no
+event ever arrives to correct it. A stale cursor is worse than an absent one: it is a claim about
+where a collaborator is working, and it is false.
+
 **Undo is scoped to your own edits and says so.** The scoping was always correct and entirely
 unstated, which is worse than not scoping it: an author who does not know it cannot predict what
 :kbd[⌘Z] will do, and the guess that it might take back a collaborator's work is the one that stops
@@ -175,6 +182,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.2.5-draft** (2026-08-20) — Presence that has ended must stop being published: a client leaving the code view clears its in-buffer text cursor, so peers stop drawing a caret for someone who is no longer there.
 - **0.2.4-draft** (2026-08-16) — §2.1 subprotocol negotiation: jx.collab.v1 offered from the capability probe and echoed on the handshake; §5 wire-envelope skew closed; RFC 7692 non-adoption stated in §2.
 - **0.2.3-draft** (2026-08-15) — Add §6 Standards Alignment; §5 separates wire-envelope skew from document-format skew and is marked Pending.
 - **0.2.2-draft** (2026-08-05) — §4 project.json is excluded from replication, and why.
@@ -185,4 +193,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx `@jxsuite/collab` Specification v0.2.4-draft — a stub, subject to expansion._
+_Jx `@jxsuite/collab` Specification v0.2.5-draft — a stub, subject to expansion._
