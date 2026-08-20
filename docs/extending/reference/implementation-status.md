@@ -18,7 +18,7 @@ This page is generated from the `> **Status: …**` markers in the specification
 | `collab.md`               | 0.2.4-draft  | Partial     | 2026-08-16 |
 | `compiler.md`             | 0.3.1-draft  | Partial     | 2026-08-18 |
 | `desktop.md`              | 0.3.12-draft | Pending     | 2026-08-19 |
-| `extensions.md`           | 0.3.9-draft  | Partial     | 2026-08-16 |
+| `extensions.md`           | 0.3.10-draft | Partial     | 2026-08-20 |
 | `imports.md`              | 0.1.9-draft  | Partial     | 2026-08-15 |
 | `jx-markdown.md`          | 0.1.8-draft  | Partial     | 2026-08-15 |
 | `parser.md`               | 0.2.9-draft  | Partial     | 2026-08-16 |

@@ -2,9 +2,9 @@
 
 ## Extension Packages, Schema Composition, and the Capability Contract
 
-**Version:** 0.3.9-draft
+**Version:** 0.3.10-draft
 **Status:** Partial
-**Updated:** 2026-08-16
+**Updated:** 2026-08-20
 **License:** MIT
 
 Supersedes v1 ("Format-Extension Classes and the Capability Contract"). The
@@ -189,6 +189,14 @@ not define behavior — behavior lives in the class descriptors it points to.
 - **Each extension** ships fragments named in its manifest. A project fragment
   contributes plain `properties` for its section keys. Fragments must be
   **standalone-valid** 2020-12 schema documents with their own `$id`.
+- **First-party fragment `$id`s** follow
+  `https://jxsuite.com/schema/ext/<extension>/<kind>/v<n>`, where `<kind>` names
+  what the fragment contributes (`project`, `document`, `fields`). Nothing
+  resolves by `$id` — §5.2 embeds fragments by slug and drops the `$id` — so this
+  is a convention rather than a resolution requirement, and a third-party
+  fragment with any other `$id` composes normally. It is worth holding to because
+  the `<kind>` segment is what lets one extension ship a second fragment without
+  renaming its first.
 
 ### 5.2 Generated entry documents
 
@@ -1109,6 +1117,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.3.10-draft** (2026-08-20) — §5.1 records the first-party fragment $id shape, https://jxsuite.com/schema/ext/<extension>/<kind>/v<n>.
 - **0.3.9-draft** (2026-08-16) — §13.1 auth session cookies: __Host- prefix derived from the origin's scheme, rate limiting on everywhere, session lifetime stated, Partitioned never set. Closes gap:cookie-prefixes.
 - **0.3.8-draft** (2026-08-16) — §8 _meta is reserved in a resolvePaths result — it carries the source entry's facts, never a route parameter.
 - **0.3.7-draft** (2026-08-15) — mediaType is validated against RFC 6838 and carries RFC 7763 variant parameters; mediaTypeEssence for callers that key on a type (§7).
@@ -1133,4 +1142,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx Extensions Specification v0.3.9-draft_
+_Jx Extensions Specification v0.3.10-draft_
