@@ -57,9 +57,20 @@ export function createDesktopPlatform() {
    * studio's own `window.open` default still applies.
    */
   setPreviewNavigateHandler((url) => {
-    void rpc.request.openExternal({ url }).catch(() => {
+    const fallback = () => {
       window.open(url, "_blank", "noopener,noreferrer");
-    });
+    };
+    /* `{ ok: false }` is a REFUSAL, not a rejection — the backend answers the request either way,
+       and branching only on a thrown error left the click doing nothing at all when the OS had no
+       opener for it. */
+    void rpc.request
+      .openExternal({ url })
+      .then((result) => {
+        if (!result?.ok) {
+          fallback();
+        }
+      })
+      .catch(fallback);
   });
 
   const electroview = new Electroview({ rpc });
@@ -590,27 +601,12 @@ export function createDesktopPlatform() {
       return rpc.request.setPackageVersions({ updates });
     },
 
+    /* One request, composed on the Bun side. It used to be assembled here from two updater calls,
+       which made the About screen's contents a property of THIS launcher's webview rather than of
+       the build it describes — so the chromium launcher, which has no updater to call, could not
+       answer the question at all. */
     async getAppInfo() {
-      const info = await rpc.request.updaterGetLocalInfo();
-      let updateStatus: string | undefined;
-      try {
-        const status = await rpc.request.updaterGetStatus();
-        updateStatus = status.error
-          ? `Update check failed: ${status.error}`
-          : status.updateReady
-            ? `Update ready (${status.version ?? "?"})`
-            : status.updateAvailable
-              ? `Update available (${status.version ?? "?"})`
-              : "Up to date";
-      } catch {
-        // Status is best-effort; omit it if the updater isn't reachable.
-      }
-      return {
-        version: info.version,
-        channel: info.channel,
-        hash: info.hash,
-        ...(updateStatus === undefined ? {} : { updateStatus }),
-      };
+      return rpc.request.appInfo();
     },
 
     async createProject(opts: {

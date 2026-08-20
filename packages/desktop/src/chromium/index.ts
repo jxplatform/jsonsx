@@ -1,5 +1,5 @@
 // oxlint-disable unicorn/no-process-exit -- standalone launcher CLI; exit codes are its interface
-import { isAbsolute, resolve } from "node:path";
+import { basename, isAbsolute, resolve } from "node:path";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import {
@@ -38,6 +38,8 @@ import {
   searchFiles,
   setDirectoryDialog,
   setFileDialog,
+  pickProjectFile,
+  setFileEventSink,
   setProjectRoot,
   setSecrets,
 } from "../handlers";
@@ -69,6 +71,18 @@ import {
   setPackageVersions,
 } from "../packages";
 import { openDirectoryDialog, openFileDialog } from "./utils";
+import { appInfo } from "./app-info";
+import {
+  findWindowByRoot,
+  listWindows,
+  nextWelcomeProfile,
+  projectProfile,
+  registerWindow,
+  requestFocus,
+  unregisterWindow,
+  updateWindow,
+  watchFocusRequests,
+} from "./window-registry";
 import { createProjectServer } from "@jxsuite/server/project-server";
 import { listStarters } from "@jxsuite/starters";
 import { readRecents, writeRecents } from "../recent-store";
@@ -83,10 +97,97 @@ import type { RecentProjectEntry } from "../rpc-schema";
 
 // ─── Project root ────────────────────────────────────────────────────────────
 
-const projectRoot = process.argv[2] || process.env.JSONSX_PROJECT_ROOT || process.cwd();
+/* A welcome window — one this launcher opened for `File → New Window`, with no project yet. The
+   positional argument is the project root and there is no flag surface (specs/desktop.md §9.3), so
+   "no project" travels as an environment variable the parent sets and a user never types. Without
+   it the child would adopt the parent's cwd, and a New Window opened from a project directory would
+   silently re-open that project. */
+const welcomeWindow = process.env.JX_STUDIO_NO_PROJECT === "1";
+const projectRoot = welcomeWindow
+  ? null
+  : process.argv[2] || process.env.JSONSX_PROJECT_ROOT || process.cwd();
+
+/**
+ * Ask an existing window for this project to come forward; report whether there was one.
+ *
+ * Two windows on one project is not merely redundant — they would edit the same files through two
+ * independent watchers and two undo histories. And before the registry existed the second launcher
+ * fared worse than that: its Chromium shares the project's profile directory, so the browser
+ * singleton handed the new window to the FIRST launcher's browser and the second launcher exited,
+ * leaving a window pointing at a server that had just died.
+ */
+export function raiseExistingWindow(root: string | null): boolean {
+  if (!root) {
+    return false;
+  }
+  const openElsewhere = findWindowByRoot(root);
+  if (!openElsewhere) {
+    return false;
+  }
+  console.log(`[chromium] ${root} is already open (pid ${openElsewhere.pid}) — raising it`);
+  requestFocus(openElsewhere.pid);
+  return true;
+}
+
+if (raiseExistingWindow(projectRoot)) {
+  process.exit(0);
+}
+
 setProjectRoot(projectRoot);
 setFileDialog(openFileDialog);
 setDirectoryDialog(openDirectoryDialog);
+
+// ─── Windows ─────────────────────────────────────────────────────────────────
+
+/* Where THIS window's browser profile lives. Chromium's process singleton is keyed on it, so it is
+   also what makes a window a window: the parent picks the child's directory and passes it down,
+   because only the parent can see which ones are already taken. */
+const profileDir =
+  process.env.JX_STUDIO_PROFILE_DIR ||
+  (projectRoot ? projectProfile(projectRoot) : nextWelcomeProfile());
+
+/**
+ * Open another window: a fresh launcher process, which is what a window is on this build.
+ *
+ * @param root Project to open, or null for a welcome window.
+ */
+function spawnWindow(root: string | null): void {
+  const env: Record<string, string> = {
+    ...(process.env as Record<string, string>),
+    JX_STUDIO_PROFILE_DIR: root ? projectProfile(root) : nextWelcomeProfile(),
+    /* "No project" has to be explicit, because the child inherits this process's cwd and would
+       otherwise adopt whatever project lives there. */
+    JX_STUDIO_NO_PROJECT: root ? "" : "1",
+  };
+  if (root) {
+    delete env.JX_STUDIO_NO_PROJECT;
+  }
+  /* `import.meta.path`, not argv[1]: it names THIS module however the launcher was started —
+     `bun run src/chromium/index.ts`, the Nix wrapper's absolute store path, or a bundle. */
+  const child = spawn(process.execPath, [import.meta.path, ...(root ? [root] : [])], {
+    detached: true,
+    env,
+    stdio: "inherit",
+  });
+  /* Unreferenced and detached: closing the window that opened another must not close the other. */
+  child.unref();
+}
+
+/**
+ * Open `root` in another window, or raise the window that already holds it.
+ *
+ * The answer is asked BEFORE anything is opened, because the caller has to be able to report which
+ * of the two happened — "opened in a new window" is a lie when a window merely came forward.
+ */
+function openProjectInNewWindow(root: string): { focused: boolean } {
+  const existing = findWindowByRoot(root);
+  if (existing) {
+    requestFocus(existing.pid);
+    return { focused: true };
+  }
+  spawnWindow(root);
+  return { focused: false };
+}
 
 // ─── RPC handler dispatch map ────────────────────────────────────────────────
 
@@ -143,6 +244,23 @@ export const handlers: Record<string, (params: unknown) => Promise<unknown>> = {
     setPackageVersions(params as { updates: { name: string; version: string; dev?: boolean }[] }),
   openProject: () => openProject(),
   openExternal: (params) => openExternal(params as { url: string }),
+  // About screen. No `updateStatus`: this build is replaced by whatever packaged it, not by itself.
+  appInfo: () => Promise.resolve(appInfo()),
+  // The picker WITHOUT the binding — `openProject` above re-roots this window as part of picking,
+  // Which is the one thing the New Window branch must not do (see StudioPlatform.pickProject).
+  pickProject: async () => {
+    const picked = await pickProjectFile();
+    return picked && { name: picked.name, root: picked.root };
+  },
+  // Multi-window. A window is a launcher process here; window-registry.ts is the map.
+  newWindow: () => {
+    spawnWindow(null);
+    return Promise.resolve();
+  },
+  openProjectInNewWindow: (params) =>
+    Promise.resolve(openProjectInNewWindow((params as { root: string }).root)),
+  listOpenWindows: () =>
+    Promise.resolve(listWindows().map((win) => ({ id: win.pid, projectRoot: win.root }))),
   createProject: (params) =>
     createProject(
       params as {
@@ -169,9 +287,19 @@ export const handlers: Record<string, (params: unknown) => Promise<unknown>> = {
   pickDirectory: async () => ({ path: await openDirectoryDialog() }),
   getProjectRoot: () => Promise.resolve({ root: getProjectRoot() }),
   setWindowProject: (params) => {
-    // Single-window launcher: rebind the process-global root in place. Studio re-reads the
-    // Project.json itself, so no config is returned and dedup never applies.
-    setProjectRoot((params as { root: string }).root);
+    const { root } = params as { root: string };
+    /* Dedupe first: if ANOTHER window already holds this project, raise it and say so rather than
+       binding a second window to the same files. Studio treats `deduped` as "nothing was loaded
+       here", so this window keeps whatever it was showing. */
+    const existing = findWindowByRoot(root, process.pid);
+    if (existing) {
+      requestFocus(existing.pid);
+      return Promise.resolve({ config: null, deduped: true });
+    }
+    // Rebind this launcher's root in place, then tell the registry so other windows can dedupe
+    // Against it. Studio re-reads the project.json itself, so no config is returned.
+    setProjectRoot(root);
+    updateWindow(process.pid, { name: basename(root.replace(/[/\\]+$/, "")) || null, root });
     return Promise.resolve({ config: null, deduped: false });
   },
   getRecentProjects: () => readRecents(),
@@ -210,8 +338,8 @@ export const handlers: Record<string, (params: unknown) => Promise<unknown>> = {
 
 const studioDir = process.env.JX_STUDIO_ASSETS || resolve(import.meta.dir, "../../assets/studio");
 
-// Single-window chromium launcher: one default session whose root tracks the process-global root.
-// The factory re-resolves this on every request/message, so setWindowProject takes effect live.
+// One window, one launcher, one session — whose root tracks the process-global root. The factory
+// Re-resolves this on every request/message, so setWindowProject takes effect live.
 const defaultSession = {
   get projectRoot(): string | null {
     return getProjectRoot();
@@ -270,9 +398,45 @@ setAuthorizationHost({
   port: projectServer.server.port ?? 0,
 });
 
+/* Push filesystem changes to the shell so the sidebar stays live, the way the dev server's SSE
+   `fs` event does and electrobun's per-window `onFileEvents` message does. Registering the sink is
+   what STARTS the watcher, and re-rooting the session re-arms it, so this one call covers the whole
+   life of the window including the projects it is pointed at later. */
+setFileEventSink((events) => {
+  projectServer.push("onFileEvents", { events });
+});
+
+/* Another window may ask this one to come forward (see window-registry.ts). Only the page can
+   raise an `--app` window, so the request is relayed to it. */
+const stopFocusWatch = watchFocusRequests(process.pid, () => {
+  projectServer.push("focusWindow");
+});
+
+/* Publish this window so other launchers can find, dedupe against, and raise it. Registered after
+   the server exists so the entry can name the origin it is serving. */
+registerWindow({
+  name: projectRoot ? basename(projectRoot.replace(/[/\\]+$/, "")) || null : null,
+  pid: process.pid,
+  profileDir,
+  root: projectRoot,
+  url: serverUrl,
+});
+
+/** Leave the registry exactly once, however this process is ending. */
+let released = false;
+export function releaseWindow(): void {
+  if (released) {
+    return;
+  }
+  released = true;
+  stopFocusWatch();
+  unregisterWindow(process.pid);
+}
+process.on("exit", releaseWindow);
+
 console.log(`[chromium] Studio server at ${serverUrl}`);
 console.log(`[chromium] WebSocket RPC at ${serverUrl.replace(/^http/, "ws")}`);
-console.log(`[chromium] Project root: ${projectRoot}`);
+console.log(`[chromium] Project root: ${projectRoot ?? "(none — welcome window)"}`);
 
 // ─── Launch Chromium ─────────────────────────────────────────────────────────
 
@@ -310,7 +474,7 @@ export function seedChromiumPreferences(userDataDir: string): void {
 
 console.log(`[chromium] Launching: ${chromiumBin}`);
 
-const userDataDir = resolve(projectRoot, ".jx/chromium-profile");
+const userDataDir = profileDir;
 seedChromiumPreferences(userDataDir);
 
 const chromiumArgs = [

@@ -72,6 +72,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `desktop.md`
 
+- **0.3.13-draft** (2026-08-20) — Chromium launcher reaches PAL parity: its own adapter over createProjectServer (§9.1), multi-window through a cross-process window registry (§9.4), a server-to-client push channel behind live sidebar sync and focus, buildSite behind View: Open in Browser, appInfo for the About screen, and an OS-opener fallback so preview links and sign-in leave the app at all (§3.5, §9.5). New Window becomes the `view.newWindow` command rather than a native-menu-only item, and the native menu drops its duplicate accelerators (§4.2a).
 - **0.3.12-draft** (2026-08-19) — §9.3 documents the release branch as the ref a Nix consumer pins, and the nix build that gates it; corrects the install phase, which has used cp -r plus a dangling-symlink prune and src/chromium/index.ts since before this text was written.
 - **0.3.11-draft** (2026-08-16) — §3.6 the desktop signs in with an RFC 8252 loopback redirect and PKCE; the token rests in a 0600 credential store, not localStorage. RFC 8414 and RFC 7519 recorded Rejected as vacuous. Closes gap:native-oauth and gap:oauth-pkce.
 - **0.3.10-draft** (2026-08-16) — §5 the contract's failure half is specified — one RFC 9457 registry; gap:backend-failure-contract closed.
@@ -209,6 +210,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `server.md`
 
+- **0.2.10** (2026-08-20) — The loopback project server's RPC socket carries server-initiated frames (ProjectServerHandle.push) — the loopback twin of the dev server's named fs SSE event, and the channel a desktop launcher raises a window over (§4.2).
 - **0.2.9** (2026-08-18) — §4.2: the Studio shell's report-only Trusted Types header is removed — see spec.md §21.5.
 - **0.2.8** (2026-08-18) — §4.2: both entry points send the Studio shell a report-only Trusted Types policy, and nothing else.
 - **0.2.7** (2026-08-16) — §4.2 Fetch Metadata on every gated surface, the loopback block, a constant-time token, and the three ungated project-server routes closed; gap:fetch-metadata closed.

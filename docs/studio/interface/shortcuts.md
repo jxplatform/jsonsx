@@ -86,6 +86,7 @@ Every row is also a command: press :kbd[⌘K] and type the name to run it withou
 | `⌘⇧4`   | `Ctrl+Shift+4`   | Show Assistant         | `inspector.focus.assistant`  |
 | `⌘⇧A`   | `Ctrl+Shift+A`   | Focus Composer         | `assistant.focus`            |
 | `⌘⇧E`   | `Ctrl+Shift+E`   | Open Library           | `library.open`               |
+| `⌘⇧N`   | `Ctrl+Shift+N`   | New Window             | `view.newWindow`             |
 | `⌘⇧O`   | `Ctrl+Shift+O`   | Open in Browser        | `view.openInBrowser`         |
 | `⌘⇧P`   | `Ctrl+Shift+P`   | Run Command…           | `palette.openCommands`       |
 | `⌘⇧T`   | `Ctrl+Shift+T`   | Reopen Closed Document | `document.reopenClosed`      |

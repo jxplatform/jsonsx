@@ -20,6 +20,18 @@ export function configFile(name: string): string {
 }
 
 /**
+ * Absolute path of `name` inside the app's DATA directory — `$XDG_DATA_HOME`/`~/.local/share` on
+ * Linux, `%LOCALAPPDATA%` on Windows, the user Library on macOS.
+ *
+ * Separate from {@link configFile} because the two answer different questions. Config is what the
+ * user chose and would want to keep; this is what the running app knows about itself — which
+ * windows are open, where their browser profiles live — and losing it costs nothing but a restart.
+ */
+export function dataFile(name: string): string {
+  return join(envPaths("jx-studio", { suffix: "" }).data, name);
+}
+
+/**
  * One-time migration: releases before the env-paths move kept store files under `~/.jx`. When the
  * new-location file is absent and a legacy one exists, copy it across (the legacy file is left in
  * place so a downgrade still works). Returns the new-location path either way.
