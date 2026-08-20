@@ -72,6 +72,7 @@ import {
 } from "../packages";
 import { openDirectoryDialog, openFileDialog } from "./utils";
 import { appInfo } from "./app-info";
+import { STUDIO_SHELL_PATH } from "./app-id";
 import {
   findWindowByRoot,
   listWindows,
@@ -478,7 +479,9 @@ const userDataDir = profileDir;
 seedChromiumPreferences(userDataDir);
 
 const chromiumArgs = [
-  `--app=${serverUrl}/__studio__/index.html?token=${rpcToken}`,
+  /* The shell path is a constant because Chromium bakes it into the window's app_id, which is the
+     only string a taskbar can match this window to `jx-studio.desktop` by (see app-id.ts). */
+  `--app=${serverUrl}${STUDIO_SHELL_PATH}?token=${rpcToken}`,
   "--class=jx-studio",
   "--no-first-run",
   "--no-default-browser-check",

@@ -2,7 +2,7 @@
 
 ## Platform Abstraction, Project Loading, and Component Scoping
 
-**Version:** 0.3.13-draft
+**Version:** 0.3.14-draft
 **Status:** Pending
 **Updated:** 2026-08-20
 **License:** MIT
@@ -846,6 +846,26 @@ The flake's `packages.default` produces a fully sandboxed NixOS package:
 - **Install phase** copies `packages/`, `extensions/` and `node_modules` into the nix store with plain `cp -r`, then deletes dangling symlinks (`find … -xtype l -delete`) rather than dereferencing with `cp -rL`. The prune is why `packages/desktop/tests/nix-bundle-completeness.test.ts` exists: it reads the copied directories back out of `package.nix` and asserts every `@jxsuite/*` dependency of the desktop app lands under one of them, after `extensions/parser` was once pruned out of the bundle silently
 - **Wrapper** creates a `jx-studio` binary that runs `bun run packages/desktop/src/chromium/index.ts` with `CHROMIUM_BIN` and `JX_STUDIO_ASSETS` pre-set to nix store paths. The first positional argument is the **project root**; there is no flag surface
 
+**The desktop entry and the window have to agree.** A taskbar or dock does not read the process,
+the title or `--class`: it takes the window's Wayland `app_id` (X11: `WM_CLASS`) and looks for an
+entry claiming it. Two things were in the way, and each hid the other:
+
+- The entry was installed through `desktopItems`, which takes the **store path's basename** — so it
+  shipped as `<hash>-jx-studio.desktop`, an id that changed with every rebuild. It is installed by
+  hand at a fixed name now.
+- Chromium derives an `--app` window's id from the shell URL and the profile directory and
+  **ignores `--class`** — measured across two ports and two `--user-data-dir` values, all producing
+  `chrome-127.0.0.1____studio___index.html-Default`, and there is no switch to override it
+  (`--wm-class-name` / `--wm-class-class` are Electron's, and absent from the binary).
+
+So the entry declares that derived string in `StartupWMClass`, which makes a file in
+`packages/desktop/` depend on a URL composed in `chromium/index.ts`. `chromium/app-id.ts` owns the
+derivation and the shell path the launcher builds the URL from, and the test beside it asserts the
+entry carries exactly what the launcher produces — because the failure mode is silent. Nothing
+errors; the icon is a generic square, and everything else about the app still works, which is why
+it survived in the app launcher (which reads the file, never the window) while the taskbar showed
+nothing.
+
 **Which ref a consumer gets.** `packages/desktop/package.nix` builds `src = lib.cleanSource ../..`
 — whatever tree was fetched — so the ref names the release. `main` is the development trunk and
 gives the tip; **`release` holds only released code**, advanced by CI to each `desktop-v*` tag once
@@ -1041,6 +1061,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.3.14-draft** (2026-08-20) — §9.3: the desktop entry ships under a stable id and claims the app_id Chromium actually gives an --app window, so the taskbar/dock can resolve the brand icon.
 - **0.3.13-draft** (2026-08-20) — Chromium launcher reaches PAL parity: its own adapter over createProjectServer (§9.1), multi-window through a cross-process window registry (§9.4), a server-to-client push channel behind live sidebar sync and focus, buildSite behind View: Open in Browser, appInfo for the About screen, and an OS-opener fallback so preview links and sign-in leave the app at all (§3.5, §9.5). New Window becomes the `view.newWindow` command rather than a native-menu-only item, and the native menu drops its duplicate accelerators (§4.2a).
 - **0.3.12-draft** (2026-08-19) — §9.3 documents the release branch as the ref a Nix consumer pins, and the nix build that gates it; corrects the install phase, which has used cp -r plus a dangling-symlink prune and src/chromium/index.ts since before this text was written.
 - **0.3.11-draft** (2026-08-16) — §3.6 the desktop signs in with an RFC 8252 loopback redirect and PKCE; the token rests in a 0600 credential store, not localStorage. RFC 8414 and RFC 7519 recorded Rejected as vacuous. Closes gap:native-oauth and gap:oauth-pkce.
@@ -1073,4 +1094,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx Studio Desktop Architecture Specification v0.3.13-draft_
+_Jx Studio Desktop Architecture Specification v0.3.14-draft_
