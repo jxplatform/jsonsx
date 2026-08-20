@@ -9,6 +9,7 @@ code:
   - packages/protocol/src/problems.ts
   - packages/protocol/src/types.ts
   - packages/protocol/README.md
+  - packages/ai/src/streaming-client.ts
 ---
 
 # The backend protocol
@@ -87,7 +88,7 @@ Route shapes alone don't capture everything. These semantics are part of the con
 - **`git/commit`** commits the staged files if any are staged, otherwise all dirty files. Cloud backends may make commit+push atomic and treat `git/push` as a sync check (`ahead` stays 0).
 - **`git/pull`** returns `409 { code: "pull_conflict", conflicts: [paths] }` when local dirty files overlap remote changes; a clean pull fast-forwards.
 - **`format`** dispatches `{ format, action: "parse" | "serialize", source? | doc?, options? }` through the project's format registry. Without it, only `.json` documents open.
-- **`ai/chat`** accepts `{ messages, tools, systemPrompt, model }` and streams the normalized `StreamEvent` SSE defined by `@jxsuite/ai/streaming-client`. `ai/models` returns `AiModelsResponse`; report `configured: true` when the backend holds credentials (Studio then unlocks the assistant without a locally stored key) and `managed: true` when the platform brokers them.
+- **`ai/chat`** accepts `{ messages, tools, systemPrompt, model }` and streams the normalized `StreamEvent` SSE defined by `@jxsuite/ai/streaming-client` — the union and its six members are exported, so implementers can import the type they are satisfying rather than reconstruct it. `ai/models` returns `AiModelsResponse`; report `configured: true` when the backend holds credentials (Studio then unlocks the assistant without a locally stored key) and `managed: true` when the platform brokers them.
 - **`collab`** is a WebSocket upgrade speaking the `@jxsuite/collab` wire envelope — one socket per project, documents multiplexed by path. A plain GET (no Upgrade) answers `{ collab: true, protocols, version }` as the capability probe.
 
   `protocols` lists the WebSocket subprotocols the backend speaks, currently `["jx.collab.v1"]`, and it is also the negotiation: Studio offers one of them as `Sec-WebSocket-Protocol` and the backend must echo the one it accepts. **A backend that lists none is offered none** — [RFC 6455 §4.1](https://www.rfc-editor.org/rfc/rfc6455#section-4.1) makes a client whose offer went unechoed fail the connection, so an older backend keeps working exactly as before. A backend that lists only tokens Studio cannot parse gets no socket at all, which is the point: two peers whose envelopes disagree would merge divergent histories.
