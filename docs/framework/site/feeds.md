@@ -6,6 +6,7 @@ spec:
   - extensions.md#8.6
 code:
   - extensions/feed/src/feed.ts
+  - extensions/feed/src/shared.ts
   - extensions/feed/src/atom.ts
   - extensions/feed/src/json-feed.ts
 ---
@@ -44,7 +45,7 @@ The build writes `dist/feed.xml` and `dist/feed.json`, and adds the discovery li
 | `archive`                   | `false`            | Write older entries to archive documents                          |
 | `author`                    | —                  | `{ name, uri, email }`, overridden per entry by an `author` field |
 | `dateField`, `updatedField` | `date`, `updated`  | Which frontmatter fields carry the timestamps                     |
-| `contentMode`               | `"summary"`        | `full` puts the whole entry in the feed; `none` omits content     |
+| `contentMode`               | `"summary"`        | `full` adds the entry body beside the summary; `summary` omits it |
 | `language`                  | `defaults.lang`    | BCP 47 tag                                                        |
 
 ## Dates

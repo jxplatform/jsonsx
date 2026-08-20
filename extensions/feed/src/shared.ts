@@ -20,7 +20,7 @@ export interface FeedConfig {
   author?: { name?: string; uri?: string; email?: string };
   dateField?: string;
   updatedField?: string;
-  contentMode?: "full" | "summary" | "none";
+  contentMode?: "full" | "summary";
   language?: string;
 }
 
