@@ -3,9 +3,25 @@
  *
  * Monaco (pulled in transitively via code-services) is mocked. The repeater config dialog is driven
  * through the real lit-rendered sp-dialog-wrapper in #layer-dialog.
+ *
+ * **The subject is imported STATICALLY, and that is a coverage decision rather than a style one.**
+ * Bun counts a source file only if the run loaded it, so the manifest gate
+ * (`scripts/check-coverage-manifest.ts`) is really asking "did some test pull this module in".
+ * `convert-to-repeater.ts` was answering that question through a top-level `await import()` in this
+ * file and in `editor-coverage-gaps.test.ts` — i.e. at RUNTIME, from inside the test body's own
+ * evaluation — and on 20 Aug the studio job on `main` reported it as the one file of 302 absent
+ * from coverage while all fourteen tests below passed in that same run. A static import puts the
+ * module in this file's own graph, resolved before a single test runs, which is the strongest claim
+ * on Bun's coverage set a test can make.
+ *
+ * The dynamic form is what CLAUDE.md asks for when a module reads its mocks at IMPORT time, and
+ * this one does not: its transitive graph reaches Monaco only through `import type` and
+ * `code-services`' `loadedMonaco()`, which is a function call, not an import-time read. The
+ * `monaco-editor/editor` double below stays for the modules that follow it.
  */
 import { flush, installMockPlatform, resetStudioState, resetWorkspaceWithTab } from "./harness";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { convertToRepeater } from "../src/editor/convert-to-repeater";
 import type { Tab } from "../src/tabs/tab";
 
 void mock.module("monaco-editor/editor", () => ({
@@ -15,7 +31,6 @@ void mock.module("monaco-editor/editor", () => ({
   languages: { registerCompletionItemProvider: mock(() => {}) },
 }));
 
-const { convertToRepeater } = await import("../src/editor/convert-to-repeater");
 const { initLayers } = await import("../src/ui/layers");
 const { pluginSchemaCache } = await import("../src/services/code-services");
 
