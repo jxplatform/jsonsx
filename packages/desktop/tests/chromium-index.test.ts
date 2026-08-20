@@ -106,9 +106,12 @@ const handlerMocks = {
   openExternal: mock(({ url }: { url: string }) => ({ ok: url.startsWith("http") })),
   openProject: mock(() => Promise.resolve({ config: { name: "P" }, handle: { root: "." } })),
   createProject: mock(() => Promise.resolve({ config: { name: "New" }, root: "/new" })),
-  // The picker WITHOUT the binding — the New Window branch of Open Project.
-  pickProjectFile: mock(() =>
-    Promise.resolve({ config: { name: "Picked" }, name: "Picked", root: "/picked/project" }),
+  /* The picker WITHOUT the binding — the New Window branch of Open Project. Typed to the real
+     signature rather than inferred from this one answer: a cancel resolves null, and a stand-in
+     that cannot express it cannot stand in for the case that matters most. */
+  pickProjectFile: mock(
+    (): Promise<{ config: { name: string }; name: string; root: string } | null> =>
+      Promise.resolve({ config: { name: "Picked" }, name: "Picked", root: "/picked/project" }),
   ),
   setDirectoryDialog: mock(() => {}),
   setFileDialog: mock(() => {}),

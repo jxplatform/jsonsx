@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, jest, mock, test } from "bun:test";
+import type { UpdateStatus } from "../src/updater";
 
 const mockGetLocalInfo = mock(() => ({
   baseUrl: "https://updates.example.com",
@@ -9,7 +10,10 @@ const mockGetLocalInfo = mock(() => ({
   version: "1.0.0",
 }));
 
-const mockCheckForUpdate = mock(() => ({
+/* Annotated, not inferred. Inference off this one answer pins `version` to `string` and `error` to
+   `null`, which are exactly the two fields the interesting cases vary — an update with no version,
+   and a check that failed. */
+const mockCheckForUpdate = mock((): UpdateStatus => ({
   error: null,
   updateAvailable: true,
   updateReady: false,
