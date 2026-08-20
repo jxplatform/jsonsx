@@ -138,8 +138,10 @@ that were never published, so `bun install` in a fresh scaffold could not resolv
 - **A starter's `package.json` is rebuilt, not copied** — anything its manifest declared beyond
   name/scripts/deps is lost by design.
 - **The design quickstart is best-effort on a starter**: an override only lands on a key the
-  starter's style already declares, and `--color-primary-hover` is deliberately left alone. On a
-  blank scaffold values are written directly. A non-empty `design.media` replaces `$media` wholesale;
+  starter's style already declares, and `--color-primary-hover` is deliberately left alone. Two of
+  them fall back rather than give up — `text` and `bodyFont` try `--color-text-primary` and
+  `--font-body` first, then the plain `color` / `fontFamily` keys. On a blank scaffold values are
+  written directly. A non-empty `design.media` replaces `$media` wholesale;
   an empty one is treated as absent.
 - **`design.logo.name` is the only untrusted-input path to the filesystem.** It is flattened to its
   basename and must match `/\.(svg|png|jpe?g|webp|gif|ico)$/i` or generation throws. That is a
