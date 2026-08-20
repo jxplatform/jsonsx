@@ -97,16 +97,17 @@ describe("survey", () => {
   });
 
   test("a merely-behind caret inside the same major is `drift`", async () => {
+    /*
+     * The behind-version is derived from a SYNTHETIC release rather than the live one. Deriving it
+     * as `^<major>.<minor - 1>.0` worked only while compiler had a non-zero minor: at 2.0.0 the
+     * clamp produced `^2.0.0`, the current version, so the fixture described no drift at all and
+     * the test asserted `["drift"]` against `[]`. Moving one release ahead instead of one behind
+     * keeps the scenario expressible at every version shape.
+     */
     const [major, minor] = V.compiler.split(".");
-    const behind = `^${major}.${Math.max(0, Number(minor) - 1)}.0`;
-    const root = await scratch(
-      {
-        ...GOOD_STARTER,
-        devDependencies: { ...GOOD_STARTER.devDependencies, "@jxsuite/compiler": behind },
-      },
-      GOOD_MAP,
-    );
-    const { problems } = await survey(root, versions);
+    const ahead = `${major}.${Number(minor) + 1}.0`;
+    const root = await scratch(GOOD_STARTER, { ...GOOD_MAP, compiler: wantedRange(ahead) });
+    const { problems } = await survey(root, new Map(versions).set("@jxsuite/compiler", ahead));
     expect(problems.map((p) => p.kind)).toEqual(["drift"]);
     await rm(root, { force: true, recursive: true });
   });
