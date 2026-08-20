@@ -11,10 +11,10 @@ import {
   setLintMarkers,
   getFunctionArgs,
 } from "../src/services/code-services";
-import * as monaco from "monaco-editor/esm/vs/editor/editor.api.js";
+import * as monaco from "monaco-editor/editor";
 
 // Mock monaco-editor
-void mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
+void mock.module("monaco-editor/editor", () => ({
   MarkerSeverity: { Error: 8, Warning: 4 },
   Uri: { parse: (url: any) => ({ toString: () => url }) },
   editor: {

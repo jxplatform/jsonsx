@@ -109,7 +109,7 @@ const registerCompletionItemProvider = mock((_lang: string, _provider: unknown) 
   dispose: () => {},
 }));
 
-void mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
+void mock.module("monaco-editor/editor", () => ({
   MarkerSeverity: { Error: 8, Warning: 4 },
   Uri: { parse: (u: string) => ({ target: u, toString: () => u }) },
   editor: {

@@ -16,7 +16,7 @@ import type { SlashCommand } from "../src/editor/inline-edit";
 import type { Tab } from "../src/tabs/tab";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
-void mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
+void mock.module("monaco-editor/editor", () => ({
   MarkerSeverity: { Error: 8, Warning: 4 },
   Uri: { parse: (url: string) => ({ toString: () => url }) },
   editor: { setModelMarkers: mock(() => {}) },

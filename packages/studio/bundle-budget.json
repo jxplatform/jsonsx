@@ -1,7 +1,8 @@
 {
   "$comment": "Size ceilings (bytes) for built Studio bundles, checked by scripts/check-bundle-budget.ts. Studio is a dev tool so end users don't download it, but it is unmonitored otherwise (the codecov bundle path is broken — see codecov-bundle-analysis-diagnosis.md). Raise a ceiling deliberately, with justification, when a real feature grows it.",
+  "$ratchet": "studio.js measured 2859010 bytes on the monaco-0.56 build (2858942 before it), against a 14000000 ceiling set when Monaco was still inlined in the entry. Splitting moved Monaco into dist/chunks, so the old ceiling had stopped describing anything: it left 5x headroom and would not have caught a doubling. Lowered to just above the measured figure.",
   "tolerance": 0.05,
   "budgets": {
-    "studio.js": 14000000
+    "studio.js": 2900000
   }
 }

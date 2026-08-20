@@ -2,9 +2,9 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.34-draft
+**Version:** 0.9.35-draft
 **Status:** Partial
-**Updated:** 2026-08-19
+**Updated:** 2026-08-20
 **License:** MIT
 
 ---
@@ -1348,6 +1348,13 @@ The build **code-splits**. Everything reached only through a dynamic `import()` 
 
 **Monaco is never on the startup path.** It is roughly two thirds of the editor's code and most sessions never open a code view, so `services/monaco-lazy` loads the editor API and its worker/language registration together, memoized, on first use by source mode, the function editor, or the formula workspace. Nothing in the eager import graph may reference `monaco-editor` — including indirectly, via a module whose own top-level imports pull it in (the reason the model-URI helper lives apart from the Monaco setup module).
 
+**The editor's feature set is written down.** `services/monaco-setup` imports one `register` module per editor capability, and that list is the answer to "what can the code editor do": adding a capability means adding its import. A missing register is **silent** — the editor simply lacks the capability, with no error and no console line — so a change set that touches the list owes a browser pass over the capabilities it names, and nothing else stands in for that.
+
+Two facts the list cannot state about itself, both measured rather than reasoned:
+
+- **The suggest widget does not come from the suggest register.** `features/suggest/register` registers the provider that renders suggest items as inline text; the widget is `contrib/suggest/browser/suggestController.js`, and `features/inlineCompletions/register` is the only public entry that reaches it. Omitting it leaves JSON schema completion and the Logic tab's `state.*` completion registered and invisible.
+- **The exclusions do not yet take effect.** In monaco 0.56.0 the contribution modules import one another densely and the suggest stack reaches nearly all of them, so every feature the list declines is still bundled and still registers itself. The declaration is a statement of intent and the place the saving lands if that graph is ever untangled; it is not evidence that a feature is absent. Only the metafile answers that.
+
 **Both build paths share one contract.** The release build (`scripts/build.ts`) and the repo dev
 server's watcher (`server.js` → `@jxsuite/server`'s `builds`) spread the same options from
 `scripts/build-config.ts`. They diverged once, and the failure mode is instructive: the watcher had its
@@ -1355,6 +1362,14 @@ own inline config with no de-duplication and no splitting, and because it overwr
 next keystroke, a developer never saw the built output at all — `bun run dev` served 18.8 MB while
 `bun run build` produced 3.3 MB. A `@jxsuite/server` build entry forwards every unrecognised key to
 `Bun.build`, which is what makes one shared contract possible.
+
+**One importer, so no de-duplication step.** That shared contract used to include a resolver plugin
+forcing every `monaco-editor` specifier through the studio package, because a second importer —
+`y-monaco`, with a bare specifier — resolved to a physically separate copy of the same version and
+the bundler emitted Monaco twice. Replacing that dependency with the first-party binding
+(`src/collab/monaco-binding`) left one importer and the plugin became an identity transform;
+it is gone. **A second `monaco-editor` consumer would bring the hazard back**, and the check is the
+metafile, which must show exactly one physical `monaco-editor` root in the input graph.
 
 **Nothing may fetch Monaco at startup, including via a dynamic import.** `import()` defers evaluation,
 not payload: an `import()` that RUNS during activation still puts the editor on the critical path.
@@ -2298,6 +2313,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.9.35-draft** (2026-08-20) — Declare the Monaco editor feature set in monaco-setup (one register import per capability, and the measured caveat that 0.56.0's contrib graph does not yet honour the exclusions); drop the Monaco de-duplication plugin now that the first-party collab binding leaves one importer.
 - **0.9.34-draft** (2026-08-19) — A stage with no pan/zoom surface leaves the wheel to the scroll container under it, and blocks ctrl/cmd+wheel page zoom instead of handing it to the browser.
 - **0.9.33-draft** (2026-08-19) — §20.4: the parity grid keys on the document's $translationKey, so a localized slug is one row rather than two half-translated ones.
 - **0.9.32-draft** (2026-08-19) — §20 Internationalization Surfaces — the locale reader, the rendering-language axis, the locale companion, the Languages parity panel and the Locales settings section; §18.4 gains the locale preset and its probe.
@@ -2387,4 +2403,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.34-draft_
+_`@jxsuite/studio` Specification v0.9.35-draft_

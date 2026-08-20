@@ -25,6 +25,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `collab.md`
 
+- **0.2.5-draft** (2026-08-20) — Presence that has ended must stop being published: a client leaving the code view clears its in-buffer text cursor, so peers stop drawing a caret for someone who is no longer there.
 - **0.2.4-draft** (2026-08-16) — §2.1 subprotocol negotiation: jx.collab.v1 offered from the capability probe and echoed on the handshake; §5 wire-envelope skew closed; RFC 7692 non-adoption stated in §2.
 - **0.2.3-draft** (2026-08-15) — Add §6 Standards Alignment; §5 separates wire-envelope skew from document-format skew and is marked Pending.
 - **0.2.2-draft** (2026-08-05) — §4 project.json is excluded from replication, and why.
@@ -411,6 +412,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.9.35-draft** (2026-08-20) — Declare the Monaco editor feature set in monaco-setup (one register import per capability, and the measured caveat that 0.56.0's contrib graph does not yet honour the exclusions); drop the Monaco de-duplication plugin now that the first-party collab binding leaves one importer.
 - **0.9.34-draft** (2026-08-19) — A stage with no pan/zoom surface leaves the wheel to the scroll container under it, and blocks ctrl/cmd+wheel page zoom instead of handing it to the browser.
 - **0.9.33-draft** (2026-08-19) — §20.4: the parity grid keys on the document's $translationKey, so a localized slug is one row rather than two half-translated ones.
 - **0.9.32-draft** (2026-08-19) — §20 Internationalization Surfaces — the locale reader, the rendering-language axis, the locale companion, the Languages parity panel and the Locales settings section; §18.4 gains the locale preset and its probe.

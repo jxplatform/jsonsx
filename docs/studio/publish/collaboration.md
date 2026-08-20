@@ -8,6 +8,7 @@ code:
   - packages/studio/src/tabs/project-config.ts
   - packages/studio/src/collab/presence-chips.ts
   - packages/studio/src/collab/monaco-cursors.ts
+  - packages/studio/src/collab/monaco-binding.ts
   - packages/server/src/collab.ts
 ---
 
@@ -23,7 +24,7 @@ When two people open the same file through the same Studio backend, the tab beco
 - **Flags beside the pill** — **Read-only** when you may look but not publish, and **Code view held** while a collaborator has the text view (see below). Both are standing statements, not error messages.
 - **Presence chips** — one colored circle per collaborator, showing their avatar or initial. Hover one to see who it is and which file they're in; peers elsewhere in the project show up too, labeled with the file they're browsing.
 - **Selections on the canvas** — every element a peer has selected is outlined in their color, labeled with their name, and follows them live. A peer working across several elements at once shows all of them, so you can see the whole shape of what they are about to change rather than one node of it.
-- **Cursors in Code view** — in the **[Code](/docs/studio/logic/code)** mode the shared text carries every writer's caret and selection in their color, with their name on the caret.
+- **Cursors in Code view** — in the **[Code](/docs/studio/logic/code)** mode the shared text carries every writer's caret and selection in their color, with their name on the caret. A caret goes away when its author leaves Code view, so the ones you can see are the people actually in the text with you.
 
 ## How co-editing behaves
 

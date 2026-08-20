@@ -24,11 +24,12 @@
  * work with it.
  *
  * **And on a co-edited tab there is a FIFTH writer, which is not in that list because it never
- * calls anything here.** y-monaco binds the source model to a shared `Y.Text`, so every peer's
- * keystrokes arrive in the buffer directly and say nothing to anyone. It is also the only writer
- * whose text reaches other people's machines: the binding is two-way, so a local `setValue` over a
- * bound model is a whole-document replace PUBLISHED to every peer. A buffer in that state declares
- * itself with {@link BufferWrites.markShared} and clause 5 refuses every write into it.
+ * calls anything here.** `collab/monaco-binding.ts` binds the source model to a shared `Y.Text`, so
+ * every peer's keystrokes arrive in the buffer directly and say nothing to anyone. It is also the
+ * only writer whose text reaches other people's machines: the binding is two-way, so a local
+ * `setValue` over a bound model is a whole-document replace PUBLISHED to every peer. A buffer in
+ * that state declares itself with {@link BufferWrites.markShared} and clause 5 refuses every write
+ * into it.
  *
  * The rule was already discovered once, in one branch of one fast path:
  *

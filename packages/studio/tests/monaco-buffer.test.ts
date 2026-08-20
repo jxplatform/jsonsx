@@ -6,9 +6,9 @@
  * which is the module header's rule and the only count kept anywhere: writes OUT are the two
  * debounced commits, and they ask `bufferIsLive` instead.) All four asked identity — "is this still
  * the same editor object?" — which is a different question from "has the buffer moved on?", and is
- * passed by a repaint into a live editor mid-word. A co-edited tab has a FIFTH writer (y-monaco,
- * writing peers' keystrokes into the model) which asked nothing at all, because it does not know
- * this module exists.
+ * passed by a repaint into a live editor mid-word. A co-edited tab has a FIFTH writer (the collab
+ * Monaco binding, writing peers' keystrokes into the model) which asked nothing at all, because it
+ * does not know this module exists.
  *
  * These tests pin the five clauses of the shared predicate in isolation, plus the two questions a
  * TAB asks of its buffers when it is about to be destroyed; `tests/editors.test.ts`,
