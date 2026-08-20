@@ -535,6 +535,10 @@ When the user navigates into a sub-component (via `pushDocument()` in the state 
 
 The Bun process owns all filesystem and OS operations. The webview contains Studio's UI. Communication happens via ElectroBun's RPC bridge.
 
+**Toolchain boundary (ElectroBun 2).** Build orchestration belongs to **Hutch**, ElectroBun's build CLI, and the two config files divide cleanly: `hutch.config.ts` pins the exact ElectroBun release and names the project's tasks, while `electrobun.config.ts` describes the application and the build Hutch produces. ElectroBun 2 publishes no SDK to npm — `hutch electrobun sync` copies the pinned release's SDK out of its platform core archive into a generated, gitignored `.hutch/devkit` sysroot, which is where every `electrobun/*` import resolves from. `electrobun/main` is the runtime-neutral main-process namespace (`electrobun/bun` remains a deprecated alias); `electrobun/view` is unchanged.
+
+ElectroBun 2 defaults its main process to Cottontail. Jx Studio selects `build.mainProcess: "bun"` explicitly, because the main-process module graph is Bun-native throughout — `Bun.serve`, `Bun.$`, `Bun.spawn`, `Bun.Glob`. Hutch itself runs project TypeScript with Cottontail regardless, so the `preBuild` and `postBuild` hook scripts stay on portable APIs rather than Bun's shell.
+
 ### 7.2 Desktop Platform Adapter
 
 The desktop platform adapter runs in the **webview** and translates PAL calls into RPC calls to the Bun process:
@@ -575,7 +579,7 @@ The Bun process implements the actual operations:
 
 ```javascript
 // src/bun/studio-handlers.js (runs in Bun process)
-import { Utils } from "electrobun/bun";
+import { Utils } from "electrobun/main";
 import { readdir, readFile, writeFile, unlink, rename, stat } from "fs/promises";
 import { resolve, relative, join, basename } from "path";
 
@@ -627,7 +631,8 @@ export async function handleListDirectory(dir) {
 
 ```
 jx-studio-app/
-├── electrobun.config.js         # ElectroBun build config
+├── hutch.config.ts              # Pinned ElectroBun release + project tasks
+├── electrobun.config.ts         # App identity, main process, views, copy, signing, release
 ├── src/
 │   ├── bun/
 │   │   ├── main.js              # App entry: create window, register RPC handlers
@@ -638,11 +643,13 @@ jx-studio-app/
 │           ├── index.html        # Studio HTML shell
 │           └── init.js           # registerPlatform(createDesktopPlatform())
 ├── package.json
+├── .hutch/devkit/               # Generated: the pinned release's SDK, where electrobun/* resolves
 └── node_modules/
     ├── @jxsuite/studio/           # UI package (the studio itself)
-    ├── @jxsuite/runtime/          # Canvas rendering
-    └── electrobun/               # Framework
+    └── @jxsuite/runtime/          # Canvas rendering
 ```
+
+`.hutch/devkit` is written by Hutch and gitignored — never edited or committed. There is deliberately no `electrobun` entry under `node_modules`: the npm package of that name is only a bootstrap that installs and invokes Hutch, and it carries neither runtime nor SDK.
 
 **Packaged static data.** In a packaged build, ElectroBun inlines the whole bun-side JS graph into `app/bun/index.js`, so `import.meta.dirname` in every inlined module resolves to `app/bun/` at runtime. Static data directories read relative to it — `@jxsuite/create`'s `template/` and `templates/`, and `@jxsuite/starters`' `registry.json` and `sites/` — must therefore be staged to those exact paths by `build.copy` in `electrobun.config.ts`. The `postBuild` hook verifies the staged bundle (including the studio view assets) and fails the build on any omission.
 

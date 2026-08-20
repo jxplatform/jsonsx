@@ -4,8 +4,8 @@
  * project.json, opens/focuses its window
  */
 
-import { ApplicationMenu } from "electrobun/bun";
-import type { ApplicationMenuItemConfig } from "electrobun/bun";
+import { ApplicationMenu } from "electrobun/main";
+import type { ApplicationMenuItemConfig } from "electrobun/main";
 import { dirname } from "node:path";
 import { openFileDialog } from "./utils";
 import { openProjectWindow } from "./window-manager";

@@ -15,15 +15,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Pinned to macos-15 (arm64 GA image), NOT macos-latest. On 2026-06-15
-          # `macos-latest` migrated to the macOS 26 beta image, where posix_spawn
-          # of electrobun's ad-hoc/linker-signed arm64 CLI fails with ENOEXEC
-          # (the Developer-ID-signed x64 CLI runs fine on macos-26-intel below).
-          # Revisit once electrobun ships a properly-signed arm64 CLI or macOS 26 GA works.
+          # Apple Silicon only. Electrobun 2's release matrix publishes core archives for
+          # macos-arm64, win-x64, linux-x64 and linux-arm64 — there is no macOS x64 artifact — so
+          # the macos-15-intel lane that produced stable-macos-x64-JxStudio.dmg was removed with
+          # the 1.18 toolchain. Intel Mac users stay on the last 1.18-built release.
+          #
+          # Pinned to macos-15 (arm64 GA image), NOT macos-latest. On 2026-06-15 `macos-latest`
+          # migrated to the macOS 26 beta image, where posix_spawn of electrobun 1.x's
+          # ad-hoc/linker-signed arm64 CLI failed with ENOEXEC. Electrobun 2 no longer ships that
+          # CLI (Hutch replaced it), so this pin is a candidate for removal — but only after a
+          # green run on the newer image, not on the reasoning alone.
           - os: macos-15
             platform: macos-arm64
-          - os: macos-15-intel
-            platform: macos-x64
 
     runs-on: ${{ matrix.os }}
 
@@ -44,6 +47,12 @@ jobs:
 
       - name: Install dependencies
         run: bun install
+
+      # Electrobun 2's build CLI. `bun install` no longer supplies the runtime or SDK — Hutch
+      # downloads the release pinned in packages/desktop/hutch.config.ts and projects its SDK
+      # into .hutch/devkit.
+      - name: Install Hutch
+        uses: ./.github/actions/install-hutch
 
       - name: Free disk space
         run: |

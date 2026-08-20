@@ -4,3 +4,13 @@ assets/
 # Electrobun build output
 build/
 artifacts/
+
+# Hutch's generated SDK sysroot — copied out of the pinned Electrobun core archive by
+# `hutch electrobun sync`, replaced whenever the pin or target changes, and never edited or
+# committed. tsconfig.json `paths` point into it; `electrobun/*` imports resolve through it.
+.hutch/
+
+# Scratch Hutch writes while running the build hooks and the config loader under Cottontail. Left
+# behind after a build, so without this every local build dirties the tree — which `docs:verify`
+# refuses to run against.
+.cottontail-tmp/

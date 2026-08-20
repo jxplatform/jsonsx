@@ -31,6 +31,12 @@ jobs:
       - name: Install dependencies
         run: bun install
 
+      # Electrobun 2's build CLI. `bun install` no longer supplies the runtime or SDK — Hutch
+      # downloads the release pinned in packages/desktop/hutch.config.ts and projects its SDK into
+      # .hutch/devkit. build-msi.ts also reads the runtime binaries out of Hutch's product cache.
+      - name: Install Hutch
+        uses: ./.github/actions/install-hutch
+
       - name: Install WiX Toolset
         run: |
           dotnet tool install --global wix

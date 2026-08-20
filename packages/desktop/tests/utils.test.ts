@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, mock, test } from "bun:test";
 const mockOpenFileDialog = mock(async () => ["/home/user/projects/project.json"]);
 const mockOpenExternal = mock((_url: string) => true);
 
-void mock.module("electrobun/bun", () => ({
+void mock.module("electrobun/main", () => ({
   BrowserWindow: class {},
   Electrobun: { start: () => {} },
   Updater: {

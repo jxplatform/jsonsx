@@ -12,6 +12,15 @@ import config from "../electrobun.config";
 const desktopDir = resolve(import.meta.dir, "..");
 
 describe("electrobun config", () => {
+  /* Electrobun 2 defaults `mainProcess` to Cottontail. Dropping this key does not fail the build —
+     it silently ignores `build.bun` and packages a runtime this app's Bun.serve / Bun.$ / Bun.Glob
+     graph was never validated against, which would only surface as a runtime failure in a packaged
+     bundle. It also moves the entrypoint the copy paths below are keyed to. */
+  test("selects the Bun main process explicitly", () => {
+    expect(config.build.mainProcess).toBe("bun");
+    expect(config.build.bun.entrypoint).toBe("src/index.ts");
+  });
+
   test("stages create/starters static data next to the bundled module (app/bun/)", () => {
     expect(config.build.copy).toMatchObject({
       "../create/template": "bun/template",

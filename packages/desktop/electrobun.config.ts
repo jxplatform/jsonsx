@@ -1,7 +1,13 @@
 import type { ElectrobunConfig } from "electrobun";
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
-const pkg = JSON.parse(readFileSync("./package.json", "utf8")) as { version: string };
+// Anchored to this file, not to cwd. The Electrobun 1.x CLI always evaluated the config with the
+// Project directory as cwd, so a bare "./package.json" worked; Hutch makes no such promise and
+// Loading the config failed outright with ENOENT until this was resolved properly.
+const pkg = JSON.parse(readFileSync(join(import.meta.dirname, "package.json"), "utf8")) as {
+  version: string;
+};
 
 export default {
   app: {
@@ -18,6 +24,14 @@ export default {
   },
 
   build: {
+    // Electrobun 2 defaults `mainProcess` to Cottontail, which would ignore the `bun` block below.
+    // This app's main process is Bun-native throughout — Bun.serve in src/index.ts, and Bun.$ /
+    // Bun.spawn / Bun.Glob across @jxsuite/server, /create and /compiler, every one of which gets
+    // Inlined into app/bun/index.js — so it stays on Bun, which Electrobun still ships as a
+    // First-class option. The vendored Bun (BUN_VERSION in electrobun's src/shared/bun-version.ts)
+    // Is 1.3.13, the same version CI pins for the workspace.
+    mainProcess: "bun",
+
     bun: {
       entrypoint: "src/index.ts",
       external: [

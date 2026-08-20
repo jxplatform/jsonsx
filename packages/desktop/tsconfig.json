@@ -3,11 +3,12 @@
      nothing here was typechecked at all until an unbound identifier shipped through `bun run
      typecheck` unnoticed.
 
-     The cause is that electrobun's dist ships raw TypeScript (`dist/api/bun/core/*.ts`, not `.d.ts`),
-     so importing it pulls its sources into the program as first-class files. `skipLibCheck` does not
-     apply to those — it only suppresses `.d.ts` — and under the root's two strictest flags they emit
-     165 errors we cannot fix in a dependency. Dropping exactly those two flags brings electrobun to
-     zero and leaves only our own code, which is the point of the exercise:
+     The cause is that electrobun's SDK ships raw TypeScript (Electrobun 2 projects `.ts` sources,
+     not `.d.ts`, under `.hutch/devkit/api` — see `extends` below), so importing it pulls its
+     sources into the program as first-class files. `skipLibCheck` does not apply to those — it only
+     suppresses `.d.ts` — and under the root's two strictest flags they emit 165 errors we cannot fix
+     in a dependency. Dropping exactly those two flags brings electrobun to zero and leaves only our
+     own code, which is the point of the exercise:
 
        exactOptionalPropertyTypes  → 160 of them, every `tooltip?: string` given `string | undefined`
        noUncheckedIndexedAccess    → the rest, plus one TS7030 in electrobun's Socket.ts
@@ -15,6 +16,7 @@
      Everything else stays on `strict`. That still catches unbound identifiers, wrong RPC shapes, and
      bad handler signatures — the failures this package actually has. Prefer narrowing this file back
      toward the root config over widening it. */
+
   "compilerOptions": {
     "allowImportingTsExtensions": true,
     "lib": ["ESNext", "DOM"],
@@ -23,6 +25,21 @@
     "noEmit": true,
     "noFallthroughCasesInSwitch": true,
     "noImplicitOverride": true,
+
+    /* Where `electrobun/*` resolves from. Electrobun 2 ships no SDK on npm — `hutch electrobun
+       sync` copies the pinned release's SDK trees into a generated `.hutch/devkit` sysroot (run
+       `bun run --cwd packages/desktop sync`, or any build, which syncs implicitly). Hutch also
+       writes `.hutch/devkit/tsconfig.json` with the full 46-entry path map, and the intended
+       wiring is to `extends` it — but that file sets `baseUrl`, which TypeScript 7 removed, so
+       extending it fails the whole project with TS5102. These three entries are the entire
+       `electrobun` surface this package imports; add one here if a fourth is ever needed, and
+       revisit the `extends` when Hutch stops emitting `baseUrl`. */
+    "paths": {
+      "electrobun": ["./.hutch/devkit/api/sdks/main/index.ts"],
+      "electrobun/main": ["./.hutch/devkit/api/sdks/main/index.ts"],
+      "electrobun/view": ["./.hutch/devkit/api/browser/index.ts"]
+    },
+
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "strict": true,

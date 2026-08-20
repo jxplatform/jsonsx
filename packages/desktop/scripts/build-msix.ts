@@ -8,6 +8,12 @@ import {
   renderAppxManifest,
   toQuadVersion,
 } from "./msix-identity.ts";
+import {
+  WINDOWS_RUNTIME_FILES,
+  describeRuntimeSearch,
+  resolveWindowsRuntime,
+} from "./electrobun-runtime.ts";
+import hutchConfig from "../hutch.config.ts";
 
 if (process.platform !== "win32") {
   console.log("[build-msix] Skipping MSIX build (not Windows)");
@@ -23,20 +29,20 @@ const artifactsDir = join(desktopDir, "artifacts");
 await mkdir(distDir, { recursive: true });
 await mkdir(artifactsDir, { recursive: true });
 
-const buildDir = join(desktopDir, "build", "stable-win-x64", "JxStudio");
+const buildDir = join(desktopDir, "build", "production-win-x64", "JxStudio");
 if (!existsSync(buildDir)) {
   console.error(
-    "[build-msix] Build dir not found. Run 'bunx electrobun build --env=stable' first.",
+    "[build-msix] Build dir not found. Run 'hutch electrobun build --env=production' first.",
   );
   process.exit(1);
 }
 
-// Resolve electrobun dist (may be hoisted to workspace root in monorepos)
-const localDist = join(desktopDir, "node_modules", "electrobun", "dist-win-x64");
-const rootDist = join(desktopDir, "..", "..", "node_modules", "electrobun", "dist-win-x64");
-const electrobunDist = existsSync(localDist) ? localDist : rootDist;
-if (!existsSync(electrobunDist)) {
-  console.error("[build-msix] Cannot find electrobun/dist-win-x64.");
+// Electrobun 2 keeps no runtime in node_modules; Hutch caches it per pinned version. The pin is
+// Read from hutch.config.ts so this cannot drift from what the build actually used. See
+// Scripts/electrobun-runtime.ts for the cache layout and the fallback search.
+const { dir: electrobunDist, searched } = resolveWindowsRuntime(hutchConfig.electrobun.version);
+if (!electrobunDist) {
+  console.error(`[build-msix] ${describeRuntimeSearch(searched)}`);
   process.exit(1);
 }
 
@@ -57,17 +63,10 @@ if (existsSync(resourcesDir) && !existsSync(join(resourcesDir, "app"))) {
   }
 }
 
-// --- Step 2: Place runtime files from electrobun dist ---
+// --- Step 2: Place runtime files from the Hutch product cache ---
 const binDir = join(buildDir, "bin");
-const runtimeFiles = [
-  "launcher.exe",
-  "libNativeWrapper.dll",
-  "WebView2Loader.dll",
-  "d3dcompiler_47.dll",
-  "webgpu_dawn.dll",
-  "process_helper.exe",
-];
-for (const file of runtimeFiles) {
+// No bun.exe here: step 3 compiles the patched launcher into one instead.
+for (const file of WINDOWS_RUNTIME_FILES) {
   const src = join(electrobunDist, file);
   if (existsSync(src)) {
     await copyFile(src, join(binDir, file));
