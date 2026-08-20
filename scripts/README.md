@@ -124,5 +124,3 @@ git diff --name-only origin/main... | bun scripts/ci/affected.ts --stdin
   build and writes into `dist/`, so nothing it produces is committed or diffed.
 - **`migrate-project-extensions.ts` calls itself disposable but is not yet deletable** —
   `packages/compiler` names it in a user-facing error and asserts on that string in a test.
-  `restore-coverage-work.sh` is dead weight: a one-shot with an absolute path hardcoded, referenced
-  by nothing.

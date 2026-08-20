@@ -18,9 +18,6 @@ This file covers the directory and its machinery.
 | [`nav.json`](./nav.json)                     | The sidebar manifest — `{ id, sections[{ path, label, children[] }] }`                                    |
 | [`images/`](./images)                        | Screenshots, every one produced by `bun run screenshots`                                                  |
 
-`docs/jx-pitch.html` is tracked but orphaned: no gate scans it (every docs check globs `**/*.md`), it
-has no nav entry, and nothing in the repo references it. It is not part of the documentation.
-
 ## Anatomy of a page
 
 ```markdown

@@ -32,9 +32,9 @@ bun run --cwd examples dev     # jx dev, rooted here
 Root `bun run dev` boots the dev server at the **repo root** on port 3000 and serves this project's build
 output at `/examples/dist/` alongside Studio at `/packages/studio/index.html`. It does not build it —
 `server.js`'s `builds` array covers only the runtime and the Studio entrypoints — so on a fresh checkout
-those routes 404 until `jx build` has run. The banner `server.js` prints is stale: it advertises
-`/examples/todo/`, `/examples/counter/` and friends, and every one of them 404s. The live routes are
-`/examples/dist/basics/todo/` and the rest of the two tiers.
+those routes 404 until `jx build` has run. The banner `server.js` prints scans `examples/dist` for
+`index.html` files instead of listing routes, so it names exactly the two tiers that were built — and
+on a fresh checkout it says the directory is empty rather than advertising routes that 404.
 
 ## Rules
 
