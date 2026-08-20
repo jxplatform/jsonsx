@@ -44,7 +44,7 @@
     "kysely": "^0.29.5"
   },
   "devDependencies": {
-    "@happy-dom/global-registrator": "^20.11.2",
+    "@happy-dom/global-registrator": "^20.11.6",
     "ajv": "^8.20.0"
   },
   "jx": "./jx-extension.json"
