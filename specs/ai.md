@@ -2,9 +2,9 @@
 
 ## AI Assistant for Jx Studio
 
-**Version:** 0.1.6-draft
+**Version:** 0.1.7-draft
 **Status:** Partial
-**Updated:** 2026-08-16
+**Updated:** 2026-08-20
 **License:** MIT
 
 ---
@@ -32,9 +32,12 @@ built on `@vue/reactivity`.
 - Local and self-hosted OpenAI-compatible endpoints (e.g. LM Studio, Ollama's OpenAI shim) are
   supported by pointing the base URL at them.
 
-> **Status: Partial.** The **Anthropic provider is not yet implemented** (planned; the client throws
-> a clear "use OpenAI" error today — `packages/ai/src/streaming-client.ts`). Only the
-> OpenAI-compatible path ships.
+> **Status: Partial.** The **Anthropic provider is not yet implemented** (planned). Its client
+> **yields** a single `error` event carrying `code: "NOT_IMPLEMENTED"` and a "use OpenAI" message —
+> it does not throw, so a caller that wraps `streamChat` in `try`/`catch` never sees it
+> (`packages/ai/src/streaming-client.ts`). That frame carries no `problem`, so a conforming reader
+> must tolerate an `error` event without an RFC 9457 document. Only the OpenAI-compatible path
+> ships.
 
 ## 3. Tool Surface
 
@@ -117,6 +120,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.1.7-draft** (2026-08-20) — The Anthropic client yields an error event with code NOT_IMPLEMENTED; it does not throw (§2).
 - **0.1.6-draft** (2026-08-16) — §2 failures are problem documents and the mid-stream frame carries one; gap:ai-problem-details closed.
 - **0.1.5-draft** (2026-08-15) — Add §5 Standards Alignment: SSE, the IANA special-purpose address registries the SSRF guard uses, and the problem+json gap.
 - **0.1.4-draft** (2026-08-12) — The assistant's six capabilities are command records, gated on ai.configured and ai.streaming.
@@ -127,4 +131,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx `@jxsuite/ai` Specification v0.1.6-draft — a stub, subject to expansion._
+_Jx `@jxsuite/ai` Specification v0.1.7-draft — a stub, subject to expansion._

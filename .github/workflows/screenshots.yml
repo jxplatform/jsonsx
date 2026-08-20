@@ -38,8 +38,8 @@ on:
       - "packages/studio/src/**"
       # The project roots shots actually open. GENERATED, and guarded:
       # scripts/screenshots/shot-paths.test.ts asserts this list is exactly the set of
-      # `open.project` values in the manifest that live outside `scripts/screenshots/`. Six of the
-      # twelve starters are photographed by nothing, and `examples` was photographed by
+      # `open.project` values in the manifest that live outside `scripts/screenshots/`. Most
+      # starters are photographed by nothing, and `examples` was photographed by
       # `data-source-request` while matching no filter at all — the derivation finds both.
       - "examples/**"
       - "packages/starters/sites/blog/**"

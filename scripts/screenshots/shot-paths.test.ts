@@ -5,9 +5,9 @@
  *
  * So it is checked against the manifest. Every project a shot opens must be in the filter, and
  * every project root in the filter must be one a shot opens. Both directions, because the list was
- * wrong in both at once: `packages/starters/sites/**` matched all twelve starters while shots open
- * six, and `examples` — which `data-source-request` opens — matched nothing at all, so a change
- * there moved a picture and the lane never ran.
+ * wrong in both at once: `packages/starters/sites/**` matched every starter root while shots open
+ * only some of them, and `examples` — which `data-source-request` opens — matched nothing at all,
+ * so a change there moved a picture and the lane never ran.
  *
  * Fixtures under `scripts/screenshots/` are deliberately NOT derived into their own entries: the
  * `scripts/screenshots/**` entry already covers them, and listing them twice would mean two places

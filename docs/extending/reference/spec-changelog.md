@@ -14,6 +14,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `ai.md`
 
+- **0.1.7-draft** (2026-08-20) — The Anthropic client yields an error event with code NOT_IMPLEMENTED; it does not throw (§2).
 - **0.1.6-draft** (2026-08-16) — §2 failures are problem documents and the mid-stream frame carries one; gap:ai-problem-details closed.
 - **0.1.5-draft** (2026-08-15) — Add §5 Standards Alignment: SSE, the IANA special-purpose address registries the SSRF guard uses, and the problem+json gap.
 - **0.1.4-draft** (2026-08-12) — The assistant's six capabilities are command records, gated on ai.configured and ai.streaming.
@@ -101,6 +102,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `extensions.md`
 
+- **0.3.10-draft** (2026-08-20) — §5.1 records the first-party fragment $id shape, https://jxsuite.com/schema/ext/<extension>/<kind>/v<n>.
 - **0.3.9-draft** (2026-08-16) — §13.1 auth session cookies: __Host- prefix derived from the origin's scheme, rate limiting on everywhere, session lifetime stated, Partitioned never set. Closes gap:cookie-prefixes.
 - **0.3.8-draft** (2026-08-16) — §8 _meta is reserved in a resolvePaths result — it carries the source entry's facts, never a route parameter.
 - **0.3.7-draft** (2026-08-15) — mediaType is validated against RFC 6838 and carries RFC 7763 variant parameters; mediaTypeEssence for callers that key on a type (§7).

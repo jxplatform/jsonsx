@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://jxsuite.com/schema/extensions/feed/v1",
+  "$id": "https://jxsuite.com/schema/ext/feed/project/v1",
   "title": "@jxsuite/feed project section",
   "type": "object",
   "properties": {
@@ -53,7 +53,7 @@
           },
           "dateField": { "type": "string", "default": "date" },
           "updatedField": { "type": "string", "default": "updated" },
-          "contentMode": { "enum": ["full", "summary", "none"], "default": "summary" },
+          "contentMode": { "enum": ["full", "summary"], "default": "summary" },
           "language": {
             "type": "string",
             "description": "BCP 47 language tag; defaults to defaults.lang"

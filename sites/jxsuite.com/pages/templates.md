@@ -4,7 +4,7 @@ $head:
   - tagName: meta
     attributes:
       name: description
-      content: "Start a new Jx project from one of twelve production-ready starter sites — restaurants, shops, portfolios, SaaS landings, and more. Pick one in Studio's New Project dialog or clone it from the CLI."
+      content: "Start a new Jx project from a production-ready starter site — restaurants, shops, portfolios, SaaS landings, and more. Pick one in Studio's New Project dialog or clone it from the CLI."
   - tagName: meta
     attributes:
       property: "og:title"

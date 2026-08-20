@@ -37,7 +37,7 @@ describe("readWorkspaces", () => {
 
   test("every workspace reports a real semver version", async () => {
     // Check-template-versions.ts derives `^<version>` from this, so an empty or malformed one
-    // Would be proposed as a range into twelve published starter manifests.
+    // Would be proposed as a range into every published starter manifest.
     const ws = await readWorkspaces();
     for (const w of ws) {
       expect(w.version).toMatch(/^\d+\.\d+\.\d+/);

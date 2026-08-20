@@ -251,8 +251,14 @@ jobs:
       # Core packages must never depend on extension packages — see
       # specs/extensions.md §2 and scripts/check-dep-rules.ts.
       - run: bun scripts/check-dep-rules.ts
-      # Template dependency ranges: every @jxsuite range that SHIPS inside a template — the twelve
-      # published starter manifests and create's scaffold map — must name the version that package
+      # A project root that ships its own @jxsuite/* copy, or keeps a link to one that moved,
+      # resolves past this workspace. Run BARE, and EARLY: `schema:verify` below runs
+      # `schema:generate-all`, whose first step is this same script with `--fix`. Anywhere after
+      # that a shadow is already gone and this step is a tautology — which is how the condition
+      # went six weeks unreported the first time.
+      - run: bun scripts/check-shadowed-core.ts
+      # Template dependency ranges: every @jxsuite range that SHIPS inside a template — every
+      # published starter manifest and create's scaffold map — must name the version that package
       # actually released. release-please rewrites them inside the release commit (extra-files), so
       # this is green on the release PR's first run; it fires when a template gains a dependency or
       # an extra-files entry is dropped. `bun run templates:sync` fixes it.

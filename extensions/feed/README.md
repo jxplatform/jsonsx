@@ -13,7 +13,7 @@ declares the section key) and the schema fragment that gives the section its sha
   its entries are served under, and optional metadata (`title`, `description`, `author`), output
   shape (`formats`, `output`, `pageSize`, `archive`, `contentMode`), frontmatter field names
   (`dateField`, `updatedField`) and `language`. The schema
-  (`schemas/project.fragment.schema.json`, `$id` `https://jxsuite.com/schema/extensions/feed/v1`)
+  (`schemas/project.fragment.schema.json`, `$id` `https://jxsuite.com/schema/ext/feed/project/v1`)
   declares the same defaults `normalizeFeedConfig` applies at runtime (`DEFAULTS` in
   `src/shared.ts`), two lists kept in step by hand; it requires at least one feed and rejects
   unknown keys.
@@ -69,8 +69,10 @@ its collection key. A default build writes `dist/feed.xml` and `dist/feed.json`,
 - **`head(sectionValue, ctx)`** — timing `["compiler"]`. Returns one `<link rel="alternate">` per
   configured format — one per format _and_ locale when the collection is localized — typed
   `application/atom+xml` / `application/feed+json` and titled with the feed's `title` (or
-  `"Feed"`). Both links survive `<head>` dedup because the merger keys a link on `type` as well as
-  `rel` and `href` (specs/site-architecture.md §8.3).
+  `"Feed"`). Both links survive `<head>` dedup because the merger keys a link on `rel` plus `href`
+  plus whichever of `hreflang`, `type`, `media` or `sizes` is present
+  (specs/site-architecture.md §8.3) — for two formats that qualifier is `type`; for a localized
+  feed it is `hreflang`, and the links differ by `href` anyway.
 - **`emit(sectionValue, ctx)`** — timing `["compiler"]`. Returns `{ path, content }[]`; the host
   writes them.
 
@@ -125,7 +127,9 @@ serializers and the pure feed model — `normalizeFeedConfig`, `entryToItem`, `s
   Discovery advertises every language with `hreflang`, because `head` runs before routing and cannot
   know which locale its page is in.
 - **`contentMode` branches only on `"full"`** (`src/shared.ts`), which is what adds
-  `<content type="html">` / `content_html`; the summary is emitted either way.
+  `<content type="html">` / `content_html`; the summary is emitted either way. A third value,
+  `"none"`, was accepted until 0.3.0 and did nothing — JSON Feed 1.1 requires one of
+  `content_html`/`content_text`, so "omit the content" was never expressible.
 - **A feed naming a collection that is not loaded is skipped with a console warning**, not a build
   error.
 - **The schema requires `collection` and `basePath`, but the runtime tolerates their absence** —

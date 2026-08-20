@@ -1,17 +1,21 @@
 /**
  * Streaming-client.js — Provider-agnostic streaming LLM client abstraction
  *
- * Defines the StreamingClient interface (as JSDoc typedefs), the StreamEvent union type,
+ * Defines the StreamingClient interface, the StreamEvent union every implementation yields,
  * and concrete implementations for OpenAI and Anthropic. Designed upfront so switching
  * providers is a new implementation, not a refactor.
  *
+ * The union and its six members are exported because they are the contract a third-party Studio
+ * backend implements for the `ai/chat` route, not an internal detail — see the docs page below.
+ *
  * @license MIT
  * @module @jxsuite/ai/streaming-client
+ * @docs extending/embedding/backend-protocol
  */
 
 import type { ProblemDetails } from "@jxsuite/protocol";
 
-type StreamEvent =
+export type StreamEvent =
   | StreamDeltaEvent
   | StreamToolCallStartEvent
   | StreamToolCallDeltaEvent
@@ -19,29 +23,29 @@ type StreamEvent =
   | StreamDoneEvent
   | StreamErrorEvent;
 
-interface StreamDeltaEvent {
+export interface StreamDeltaEvent {
   type: "delta";
   content: string;
 }
 
-interface StreamToolCallStartEvent {
+export interface StreamToolCallStartEvent {
   type: "tool_call_start";
   id: string;
   name: string;
 }
 
-interface StreamToolCallDeltaEvent {
+export interface StreamToolCallDeltaEvent {
   type: "tool_call_delta";
   id: string;
   args: string;
 }
 
-interface StreamToolCallEndEvent {
+export interface StreamToolCallEndEvent {
   type: "tool_call_end";
   id: string;
 }
 
-interface StreamDoneEvent {
+export interface StreamDoneEvent {
   type: "done";
   stopReason: string;
 }
@@ -56,7 +60,7 @@ interface StreamDoneEvent {
  * half (a `type` a client can key on), `message` stays the human half every existing reader already
  * shows, and `code` remains for the providers that send one.
  */
-interface StreamErrorEvent {
+export interface StreamErrorEvent {
   type: "error";
   message: string;
   code?: string;
@@ -162,17 +166,19 @@ export const STREAM_EVENT_TYPES = {
  *   near-deterministic eval runs.
  * @returns {StreamingClient}
  */
+export interface OpenAIStreamingClientOptions {
+  baseUrl: string;
+  apiKey: string;
+  model?: string;
+  temperature?: number | undefined;
+}
+
 export function createOpenAIStreamingClient({
   baseUrl,
   apiKey,
   model = "gpt-4o",
   temperature,
-}: {
-  baseUrl: string;
-  apiKey: string;
-  model?: string;
-  temperature?: number | undefined;
-}): StreamingClient {
+}: OpenAIStreamingClientOptions): StreamingClient {
   /**
    * @param {object[]} messages
    * @param {object[]} tools
@@ -398,10 +404,14 @@ export function createOpenAIStreamingClient({
  * @param {string} _opts.apiKey
  * @returns {StreamingClient}
  */
-export function createAnthropicStreamingClient(_opts: {
+export interface AnthropicStreamingClientOptions {
   baseUrl: string;
   apiKey: string;
-}): StreamingClient {
+}
+
+export function createAnthropicStreamingClient(
+  _opts: AnthropicStreamingClientOptions,
+): StreamingClient {
   /**
    * @yields {StreamEvent} Normalized stream events.
    * @returns {AsyncGenerator<StreamEvent>}
@@ -431,17 +441,19 @@ export function createAnthropicStreamingClient(_opts: {
  * @param {string} [opts.baseUrl] - Optional OpenAI-compatible base URL, sent as `X-Api-Base-URL`
  * @returns {StreamingClient}
  */
+export interface ProxyStreamingClientOptions {
+  chatUrl: string;
+  model?: string;
+  apiKey?: string | undefined;
+  baseUrl?: string | undefined;
+}
+
 export function createProxyStreamingClient({
   chatUrl,
   model = "gpt-4o",
   apiKey,
   baseUrl,
-}: {
-  chatUrl: string;
-  model?: string;
-  apiKey?: string | undefined;
-  baseUrl?: string | undefined;
-}): StreamingClient {
+}: ProxyStreamingClientOptions): StreamingClient {
   /**
    * @param {object[]} messages
    * @param {object[]} tools

@@ -1,6 +1,6 @@
 # Jx Specifications
 
-These specs are the source of truth for Jx behavior. User documentation (`/docs`, published at jxsuite.com/docs) tracks what actually ships; the specs define what the contract is. Each top-level `*.md` here is one spec; files under `design-notes/` are working notes, not specs, and are exempt from everything below.
+These specs are the source of truth for Jx behavior. User documentation ([`docs/`](../docs/README.md), published at jxsuite.com/docs) tracks what actually ships; the specs define what the contract is. Each top-level `*.md` here is one spec; files under `design-notes/` are working notes, not specs, and are exempt from everything below.
 
 ## Anatomy of a spec
 
@@ -101,4 +101,4 @@ They are deliberately bullets rather than headings so changelog versions never c
 
 A spec's "body" is everything except the release metadata — the `**Version:**` and `**Updated:**` lines, the `## Changelog` section, and the footer version. Header `**Status:**` and the per-section `> **Status: …**` markers _are_ body: changing what is built is a change worth releasing.
 
-Two pages are generated from the metadata here and must never be hand-edited: [implementation status](../docs/extending/reference/implementation-status.md) and [spec changelog](../docs/extending/reference/spec-changelog.md).
+Three pages are generated from the metadata here and must never be hand-edited: [implementation status](../docs/extending/reference/implementation-status.md) from the `**Status:**` markers, [spec changelog](../docs/extending/reference/spec-changelog.md) from the `## Changelog` sections, and [standards](../docs/extending/reference/standards.md) from the `## N. Standards Alignment` tables.

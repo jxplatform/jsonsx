@@ -43,10 +43,13 @@ collection, and rejects unknown keys. `engine` is an enum whose only member toda
 ```
 
 `@jxsuite/parser` is what loads the content collections this indexes. Defaults per collection:
-`fields` `["title", "heading", "text"]`, `boost` `{}`, `sections` `true`, `sectionDepth` `3`;
-`output` defaults to `/search-index.json`. `basePath` is normalized to leading **and** trailing
-slashes, so `"blog"` becomes `"/blog/"`. This is the whole configuration surface — there is no CLI
-of its own.
+`fields` `["title", "heading", "text"]`, `sections` `true`, `sectionDepth` `3`; `output` defaults
+to `/search-index.json`. `basePath` is normalized to leading **and** trailing slashes, so `"blog"`
+becomes `"/blog/"`. This is the whole configuration surface — there is no CLI of its own.
+
+One default does not come from the fragment: `boost` falls back to `{}` in `normalizeSearchConfig`
+(`src/shared.ts`), and the fragment declares no default for it. The schema is the source of truth
+for the section's shape and for every other default.
 
 ## Build-time emission (`SearchIndex`)
 
@@ -59,7 +62,9 @@ which the compiler writes under `outDir` (step 6e of the site build). The conten
 ```
 
 `fields` is the union of every configured collection's `fields` and `boost` their merged boost
-maps — baked in so the client needs no configuration of its own.
+maps — baked in so the client needs no configuration of its own. Both cover only the collections
+that actually loaded: a name matching no content collection is skipped before its fields and boosts
+are merged, so a typo silently narrows the index rather than failing the build.
 
 Each content entry yields a **page document** (`heading: ""`, the entry's full extracted text, id
 `<collection>:<entry-id>`) and, when `sections` is on, one **section document** per heading, id
@@ -101,8 +106,10 @@ the compiler's sidecar bundler uses, so neither side depends on the other.
 
 MiniSearch inside (`fuzzy: 0.2`, `prefix: true`), no UI. Core API: `preload(indexUrl?)`,
 `isReady()`, and a synchronous `query(q, { limit, group, pageCap, locale })` — `limit` 8, `group`
-true, `pageCap` 3 (flat mode). Grouped mode returns `SearchResultGroup[]`: a page with its matching
-sections, sorted by best score. Flat mode returns presentation-ready `SearchResult[]` carrying
+true, `pageCap` 3 (flat mode). That `limit` default governs a direct `query()` call only: the
+`$src` helper `runSearch` below always passes a fixed `UI_LIMIT` of 20. Grouped mode returns
+`SearchResultGroup[]`: a page with its matching sections, sorted by best score. Flat mode returns
+presentation-ready `SearchResult[]` carrying
 `crumbs` (title-cased slug ancestors, plus the page title on a section row), `titleTokens` and
 `excerptTokens` — arrays of `{ t, m }` runs where `m: true` marks a match, so renderers highlight
 without injecting HTML.

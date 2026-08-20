@@ -10,12 +10,12 @@ Bun/Node.
 Governing spec: [`specs/ai.md`](../../specs/ai.md) §1-§2 (Status: Partial). User-facing
 documentation for the Studio feature lives at [`docs/studio/ai.md`](../../docs/studio/ai.md).
 
-| Entrypoint                     | Exports                                                                                                                                |
-| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `@jxsuite/ai`                  | Barrel: the three factories, `createToolDefinition`, `createToolRegistry`, `createChatState`, `STREAM_EVENT_TYPES`                     |
-| `@jxsuite/ai/streaming-client` | `StreamingClient`, `STREAM_EVENT_TYPES`, `createOpenAIStreamingClient`, `createAnthropicStreamingClient`, `createProxyStreamingClient` |
-| `@jxsuite/ai/tools`            | `createToolDefinition`, `createToolRegistry`, `toolSuccess`, `toolError`, and their types                                              |
-| `@jxsuite/ai/chat-state`       | `createChatState`, `ChatStore`, `Message`, `ToolCallRecord`, `ChatState`, `MessageRole`                                                |
+| Entrypoint                     | Exports                                                                                                                                     |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@jxsuite/ai`                  | Barrel: the three factories, `createToolDefinition`, `createToolRegistry`, `createChatState`, `STREAM_EVENT_TYPES`, and the streaming types |
+| `@jxsuite/ai/streaming-client` | `StreamingClient`, `StreamEvent` and its six members, the three factories and their option types, `STREAM_EVENT_TYPES`                      |
+| `@jxsuite/ai/tools`            | `createToolDefinition`, `createToolRegistry`, `toolSuccess`, `toolError`, and their types                                                   |
+| `@jxsuite/ai/chat-state`       | `createChatState`, `ChatStore`, `Message`, `ToolCallRecord`, `ChatState`, `MessageRole`                                                     |
 
 `toolSuccess` / `toolError` are **not** re-exported by the barrel — import them from
 `@jxsuite/ai/tools`. Importing the subpaths rather than the root is also what makes the package
@@ -35,7 +35,8 @@ Every implementation yields the same discriminated union — `delta {content}`,
 `done {stopReason}`, `error {message, code?, problem?}` — whose type strings are also published as
 `STREAM_EVENT_TYPES`. This union is the contract a third-party Studio backend must satisfy for the
 `ai/chat` route (see [`packages/protocol/README.md`](../protocol/README.md)); `@jxsuite/server`
-emits the same format without depending on this package.
+emits the same format without depending on this package. `StreamEvent` and each member are
+exported, so an implementer can import the type rather than reconstruct it.
 
 ```ts
 import { createProxyStreamingClient } from "@jxsuite/ai";
@@ -56,7 +57,8 @@ for await (const event of client.streamChat(messages, tools, systemPrompt, signa
   `stream_options: { include_usage: true }`, and `{ role: "system", content: systemPrompt }`
   prepended to your messages. A non-empty `tools` array also sets `tool_choice: "auto"` and
   `parallel_tool_calls: true`; an empty one sends no `tools` key. `temperature` is forwarded **only
-  when defined**, because reasoning models (GPT-5.x, o-series) reject a custom temperature. It does
+  when defined**, because reasoning models (GPT-5.x, o-series) reject a custom temperature — a
+  provider behaviour recorded in the source comment, not covered by a test here. It does
   its own SSE framing and reassembles fragmented tool-call argument JSON keyed by the provider's
   `delta.tool_calls[].index`.
 - **`createAnthropicStreamingClient({ baseUrl, apiKey })`** is a stub. It makes no network call and
@@ -115,7 +117,7 @@ registry.register(
   registry's own argument validation. `llmStrict` (default `false`) is the only one that reaches the
   wire, adding OpenAI's `strict: true` to the emitted function schema. OpenAI strict mode demands
   `additionalProperties: false` and every property in `required`, which Jx's own tools deliberately
-  violate — GPT-5.x rejects such a request outright.
+  violate — GPT-5.x rejects such a request outright (again, committed rationale rather than a test).
 - **`validate()` is a lightweight structural check, not a JSON Schema validator.** It reads only
   `type`, `properties` and `required`: nested schemas, `enum`, `pattern`, `minimum` and every other
   keyword are ignored. Unknown properties are ignored too (the model may send extra); a required key
@@ -133,10 +135,11 @@ a `ToolRegistry` that filters `list()`/`listForLLM()` through per-tool predicate
 
 ## The reactive chat store
 
-`createChatState({ model = "gpt-4o" })` returns a `@vue/reactivity` `reactive()` store —
+`createChatState(options?: { model?: string })` returns a `@vue/reactivity` `reactive()` store —
 `messages`, `status`, `streamingContent`, `pendingToolCalls`, `error`, `model`, `tokenCount`,
 `contextWarning` — with its mutators `Object.assign`ed onto the same proxy, so the returned value is
-both the state and the API. `status` is `"idle" | "streaming" | "error"`; `toMessagesArray()`
+both the state and the API. The model falls back to `"gpt-4o"` via `||`, so an empty string takes
+the default too. `status` is `"idle" | "streaming" | "error"`; `toMessagesArray()`
 serializes back to OpenAI wire shape (assistant `tool_calls`, `tool` messages with `tool_call_id`,
 everything else `{ role, content }`).
 
@@ -165,8 +168,9 @@ Further surprises:
 
 ## Versioning
 
-Published to npm as `@jxsuite/ai` — TypeScript source, like every `@jxsuite` package, following the
-monorepo's release train; every `exports` subpath resolves to `./src/*.ts`, so a consumer must be
+Published to npm as `@jxsuite/ai` — TypeScript source, like every published `@jxsuite` library,
+following the monorepo's release train; every `exports` subpath resolves to `./src/*.ts`, so a
+consumer must be
 able to compile TypeScript out of `node_modules`. Within the monorepo, `@jxsuite/studio` depends on
 it via `workspace:^` and is its only consumer. `@vue/reactivity` is pinned to an **exact** version,
 matching `@jxsuite/studio`, `@jxsuite/runtime` and `@jxsuite/compiler`: reactive proxies from one

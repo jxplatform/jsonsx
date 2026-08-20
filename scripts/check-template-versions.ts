@@ -12,10 +12,11 @@
  * 2. `packages/create/template-versions.json` — the ranges `buildPackageJson()` stamps into every
  *    scaffolded project, INCLUDING starter clones, whose `package.json` it rebuilds from scratch.
  *
- * They had drifted four majors: `^0.19.0` for a compiler released at 1.5.0. Every one of those
- * ranges was unresolvable, so a scaffolded project installed a toolchain that predates the template
- * it came from — and Studio greeted anyone opening a starter with an "Update @jxsuite packages?"
- * modal, which is also what was covering the canvas in four screenshot shots.
+ * They had drifted past 1.0 entirely: `^0.19.0` for a compiler released at 1.5.0, and most starters
+ * were no better. Every one of those ranges was unresolvable against anything published, so a
+ * scaffolded project installed a toolchain that predates the template it came from — and Studio
+ * greeted anyone opening a starter with an "Update @jxsuite packages?" modal, which is also what
+ * was covering the canvas in four screenshot shots.
  *
  * WHO WRITES THESE. Not this script, in the normal case: release-please rewrites them inside its
  * own release commit via `extra-files` (release-please-config.json), so the tree `publish.yml`

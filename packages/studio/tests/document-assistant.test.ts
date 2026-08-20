@@ -8,13 +8,9 @@
  */
 import { installMockPlatform, resetStudioState, resetWorkspaceWithTab } from "./harness";
 import { createChatState, createToolRegistry } from "@jxsuite/ai";
-import type { StreamingClient } from "@jxsuite/ai/streaming-client";
+import type { StreamEvent, StreamingClient } from "@jxsuite/ai/streaming-client";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
-
-/** The normalized stream event the StreamingClient emits (not exported, so derived here). */
-type StreamEvent =
-  ReturnType<StreamingClient["streamChat"]> extends AsyncGenerator<infer E> ? E : never;
 
 let nextRounds: StreamEvent[][] = [];
 let createErrorMessage: string | null = null;

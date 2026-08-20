@@ -100,6 +100,14 @@ describe("project fragment", () => {
     expect((fragment.properties as Record<string, unknown>).search).toBeDefined();
   });
 
+  test("carries the shared first-party fragment $id shape (specs/extensions.md §5.1)", () => {
+    /*
+     * The assertion connector, parser and auth already had. Adding it here makes the §5.1
+     * convention true by construction across all six first-party fragments rather than by prose.
+     */
+    expect(fragment.$id).toBe("https://jxsuite.com/schema/ext/search/project/v1");
+  });
+
   test("accepts a typical section and rejects malformed ones", () => {
     const ajv = new Ajv2020({ allErrors: true, strict: false, useDefaults: true });
     const validate = ajv.compile(fragment);
