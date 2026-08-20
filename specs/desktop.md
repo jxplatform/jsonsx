@@ -2,9 +2,9 @@
 
 ## Platform Abstraction, Project Loading, and Component Scoping
 
-**Version:** 0.3.12-draft
+**Version:** 0.3.13-draft
 **Status:** Pending
-**Updated:** 2026-08-19
+**Updated:** 2026-08-20
 **License:** MIT
 
 ---
@@ -945,6 +945,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.3.13-draft** (2026-08-20) — §7 records the ElectroBun 2 toolchain boundary: Hutch owns build orchestration, hutch.config.ts pins the release, the SDK is projected into .hutch/devkit, and the main process is pinned to bun explicitly.
 - **0.3.12-draft** (2026-08-19) — §9.3 documents the release branch as the ref a Nix consumer pins, and the nix build that gates it; corrects the install phase, which has used cp -r plus a dangling-symlink prune and src/chromium/index.ts since before this text was written.
 - **0.3.11-draft** (2026-08-16) — §3.6 the desktop signs in with an RFC 8252 loopback redirect and PKCE; the token rests in a 0600 credential store, not localStorage. RFC 8414 and RFC 7519 recorded Rejected as vacuous. Closes gap:native-oauth and gap:oauth-pkce.
 - **0.3.10-draft** (2026-08-16) — §5 the contract's failure half is specified — one RFC 9457 registry; gap:backend-failure-contract closed.
@@ -976,4 +977,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx Studio Desktop Architecture Specification v0.3.12-draft_
+_Jx Studio Desktop Architecture Specification v0.3.13-draft_
