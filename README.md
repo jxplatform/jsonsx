@@ -146,6 +146,7 @@ fragments, and capability methods. Core packages never depend on extensions — 
 | [`@jxsuite/connector`](extensions/connector) | Database connections and dynamic data tables                           |
 | [`@jxsuite/auth`](extensions/auth)           | Sessions, sign-in flows, and table permissions                         |
 | [`@jxsuite/search`](extensions/search)       | Build-time search index and headless client                            |
+| [`@jxsuite/feed`](extensions/feed)           | Atom and JSON Feed syndication from content collections                |
 
 ## Development
 
