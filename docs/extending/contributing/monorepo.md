@@ -85,7 +85,7 @@ A jsonpath addressing a scoped key must use the `[?(@property === '@jxsuite/x')]
 bracket form throws when a section exists without that key, which aborts the run and produces no
 release PR for any package. A test pins the spelling.
 
-Left to drift, these ranges do more than annoy: a starter four majors behind is one a user cannot
-install, and opening it in Studio raises a dependency-update dialog whose underlay covers the
+Left to drift, these ranges do more than annoy: a starter naming a version that was never
+published is one a user cannot install at all, and opening it in Studio raises a dependency-update
+dialog whose underlay covers the
 canvas — which is how that dialog ended up baked into 33 committed screenshots.
-

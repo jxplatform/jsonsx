@@ -125,8 +125,8 @@ commit (each of the four owning packages declares a jsonpath into it via `extra-
 `release-please-config.json`). The gate is `bun run templates:check`, which requires every range to
 be exactly `^<workspace version>` across both shipping surfaces (this file and
 `packages/starters/sites/*/package.json`) and runs on every PR; `bun run templates:sync` is the fixer
-for drift that predates release-please. The gate exists because these ranges once drifted four
-majors, so scaffolded projects installed a toolchain older than their own template.
+for drift that predates release-please. The gate exists because these ranges once named versions
+that were never published, so `bun install` in a fresh scaffold could not resolve them at all.
 
 ## Surprises worth knowing
 

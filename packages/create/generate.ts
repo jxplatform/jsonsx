@@ -399,7 +399,7 @@ function buildPackageJson({
   // The ranges come from ./template-versions.json, which is GENERATED and CI-verified
   // (`bun run templates:check`) and rewritten by release-please inside the release commit itself
   // (release-please-config.json extra-files). Hardcoding them here is what left every scaffolded
-  // Project asking for a compiler four majors behind the one that shipped. Never hand-edit the
+  // Project asking for a compiler version that was never published. Never hand-edit the
   // Map; `bun run templates:sync` is the fixer.
   const dependencies: Record<string, string> = {
     "@jxsuite/parser": TEMPLATE_VERSIONS.parser,

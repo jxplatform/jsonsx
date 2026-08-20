@@ -69,8 +69,8 @@ describe("generateProject — wrangler.jsonc", () => {
     expect(project.contentTypes).toBeUndefined();
 
     // Projects own their extension dependencies, at the ranges the generated version map names.
-    // A shape-only regex passed happily while every one of these was four majors stale, which is
-    // How scaffolded projects shipped asking for a compiler that predates their own template.
+    // A shape-only regex passed happily while every one of these named an unpublishable version,
+    // Which is how scaffolded projects shipped asking for a compiler that predates their template.
     const pkg = JSON.parse(readFileSync(join(TMP, "package.json"), "utf8"));
     expect(pkg.dependencies["@jxsuite/parser"]).toBe(TEMPLATE_VERSIONS.parser);
     expect(pkg.devDependencies["@jxsuite/compiler"]).toBe(TEMPLATE_VERSIONS.compiler);
