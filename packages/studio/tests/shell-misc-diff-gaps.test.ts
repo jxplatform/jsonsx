@@ -12,7 +12,7 @@ import { flush, installMockPlatform, pointer, resetStudioState } from "./harness
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { html, nothing, render } from "lit-html";
 import { notifyModule } from "./notify-mock";
-import { createMockCollabHub, settleCollab } from "./collab-mock";
+import { createMockCollabHub, settleCollab, waitForCollab } from "./collab-mock";
 import { mockFormatAction, seedMarkdownFormat } from "./format-fixture";
 import { keyScopeStack, makeContext } from "../src/commands/context";
 import { persistedSession } from "../src/shell";
@@ -298,11 +298,16 @@ describe("setCollabEnabled is idempotent", () => {
     expect(collabState(tab).active).toBe(false);
     expect(hub.connectionCount(COLLAB_PATH)).toBe(0);
 
-    // A real change of value does reach the room, which is what makes the silence above a refusal
-    // Rather than a platform that cannot connect.
+    /* A real change of value does reach the room, which is what makes the silence above a refusal
+       rather than a platform that cannot connect.
+
+       `waitForCollab`, not `settleCollab`, and the difference is why this test flaked in CI and
+       nowhere else: a disable-then-enable flip is the longest attach chain in the suite — a
+       teardown and then a connect — and `settleCollab`'s six turns covered it on a developer's
+       machine and not on a loaded runner. The claim is about the end state, so the wait is too. */
     setCollabEnabled(tab, false);
     setCollabEnabled(tab, true);
-    await settleCollab();
+    await waitForCollab(() => collabState(tab).active);
     expect(collabState(tab).active).toBe(true);
     expect(hub.connectionCount(COLLAB_PATH)).toBe(1);
 
@@ -356,7 +361,7 @@ describe("the bootstrap's saveDocument hook", () => {
     `;
 
     void mock.module("../src/services/monaco-setup.js", () => ({}));
-    void mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
+    void mock.module("monaco-editor/editor", () => ({
       KeyCode: {},
       KeyMod: {},
       MarkerSeverity: { Error: 8, Warning: 4 },

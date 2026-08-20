@@ -4,11 +4,15 @@ import { join } from "node:path";
 import {
   containedPath,
   decodeAndNormalizePath,
+  fetchMetadataAllows,
   hostIsLoopbackOrAbsent,
   isLoopbackHost,
   loopbackGate,
   originHostGate,
+  normalizeForCompare,
   originIsLoopbackOrAbsent,
+  presentedToken,
+  secretsMatch,
   serveContained,
   serveProjectFile,
 } from "../src/net-guard.ts";
@@ -238,5 +242,229 @@ describe("decodeAndNormalizePath", () => {
     if ("reject" in out) {
       expect(out.reject.status).toBe(400);
     }
+  });
+});
+
+// ─── Unicode normalization in containment ─────────────────────────────────
+
+describe("containment across normalization forms", () => {
+  /*
+   * The defect: containment is a STRING comparison, and macOS `readdir` returns a decomposed
+   * filename while a path from a picker, a config file or a URL arrives precomposed. Two different
+   * strings for one file, so every path holding an accent silently failed containment — the file
+   * existed, the check said it was outside the root, and the request 404'd with nothing to search
+   * for.
+   */
+  test("a decomposed and a precomposed path are the same path", () => {
+    const nfd = "caf\u0065\u0301";
+    const nfc = "caf\u00E9";
+    expect(nfd).not.toBe(nfc);
+    expect(normalizeForCompare(nfd)).toBe(normalizeForCompare(nfc));
+  });
+
+  test("an accented directory is contained however it was spelled", () => {
+    const accented = join(PROJECT, "caf\u00E9");
+    mkdirSync(accented, { recursive: true });
+    writeFileSync(join(accented, "a.txt"), "x");
+    // The same path written decomposed, as a macOS directory listing would produce it.
+    const decomposed = join(PROJECT, "caf\u0065\u0301", "a.txt");
+    expect(containedPath(decomposed, PROJECT)).not.toBeNull();
+  });
+});
+
+// ─── Fetch Metadata (W3C Fetch Metadata Request Headers) ──────────────────
+
+describe("fetchMetadataAllows", () => {
+  const req = (headers: Record<string, string>, method = "GET") =>
+    new Request("http://127.0.0.1/x", { headers, method });
+
+  /*
+   * THE load-bearing case, and the reason this test is named after the property rather than the
+   * behaviour: the header is browser-supplied. curl omits it, Bun-native clients omit it, the
+   * desktop RPC bridge omits it, and this very suite builds well over a hundred bare Requests.
+   * Requiring it would refuse every non-browser client on the machine while stopping no attacker,
+   * because the threat model is a PAGE — and a page always sends it. Deleting this test is the
+   * loudest signal available that the requirement was misread.
+   */
+  test("fetchMetadataAbsentIsAccepted", () => {
+    expect(fetchMetadataAllows(req({}))).toBe(true);
+    expect(fetchMetadataAllows(req({}), "embeddable")).toBe(true);
+    expect(originHostGate(req({}))).toBeNull();
+  });
+
+  test("the served page and a typed URL are allowed", () => {
+    expect(fetchMetadataAllows(req({ "sec-fetch-site": "same-origin" }))).toBe(true);
+    expect(fetchMetadataAllows(req({ "sec-fetch-site": "none" }))).toBe(true);
+  });
+
+  // A person following a link, and nothing else.
+  test("a cross-site request is allowed only as a top-level document navigation", () => {
+    expect(
+      fetchMetadataAllows(
+        req({
+          "sec-fetch-dest": "document",
+          "sec-fetch-mode": "navigate",
+          "sec-fetch-site": "cross-site",
+        }),
+      ),
+    ).toBe(true);
+    // A cross-site subresource is not a navigation.
+    expect(
+      fetchMetadataAllows(
+        req({
+          "sec-fetch-dest": "image",
+          "sec-fetch-mode": "no-cors",
+          "sec-fetch-site": "cross-site",
+        }),
+      ),
+    ).toBe(false);
+    // Nor is a cross-site form POST — this is the CSRF the gate exists for.
+    expect(
+      fetchMetadataAllows(
+        req(
+          {
+            "sec-fetch-dest": "document",
+            "sec-fetch-mode": "navigate",
+            "sec-fetch-site": "cross-site",
+          },
+          "POST",
+        ),
+      ),
+    ).toBe(false);
+  });
+
+  /*
+   * Stricter than the standard's Resource Isolation Policy, deliberately: on 127.0.0.1 there is no
+   * "site" wider than the origin, so `same-site` means a different PORT on this machine — precisely
+   * the other-local-process threat a loopback bind cannot address.
+   */
+  test("same-site is denied under the strict policy", () => {
+    expect(fetchMetadataAllows(req({ "sec-fetch-site": "same-site" }))).toBe(false);
+    expect(originHostGate(req({ "sec-fetch-site": "same-site" }))?.status).toBe(403);
+  });
+
+  /*
+   * The desktop canvas renders the project in a cross-origin iframe, so its images, stylesheets and
+   * modules legitimately arrive cross-site. Refusing them would break the canvas; allowing them on
+   * a route that can write a file would hand away the containment — hence a per-surface policy.
+   */
+  test("the embeddable policy admits a cross-origin iframe's subresources", () => {
+    for (const site of ["cross-site", "same-site"]) {
+      const subresource = req({ "sec-fetch-dest": "image", "sec-fetch-site": site });
+      expect({ site, strict: fetchMetadataAllows(subresource) }).toEqual({ site, strict: false });
+      expect({ site, embeddable: fetchMetadataAllows(subresource, "embeddable") }).toEqual({
+        site,
+        embeddable: true,
+      });
+    }
+  });
+
+  test("an unrecognized value is refused under the strict policy", () => {
+    expect(fetchMetadataAllows(req({ "sec-fetch-site": "nonsense" }))).toBe(false);
+  });
+});
+
+// ─── Loopback address handling ────────────────────────────────────────────
+
+describe("the loopback block", () => {
+  /*
+   * IANA reserves 127.0.0.0/8, and every address in it is this machine. Recognizing only the
+   * canonical spelling would reject a client using any other while granting nothing — someone who
+   * can send from 127.0.0.53 is already on the host.
+   */
+  test("the whole 127.0.0.0/8 block is loopback, not just 127.0.0.1", () => {
+    for (const host of ["127.0.0.1", "127.0.0.2", "127.0.0.53", "127.1.2.3", "127.0.0.1:3000"]) {
+      expect({ host, loopback: isLoopbackHost(host) }).toEqual({ host, loopback: true });
+    }
+    for (const host of ["128.0.0.1", "10.0.0.1", "evil.test", "1270.0.0.1"]) {
+      expect({ host, loopback: isLoopbackHost(host) }).toEqual({ host, loopback: false });
+    }
+  });
+
+  /*
+   * As a Host it is ordinary — a server bound to 0.0.0.0 in a container is reached at that literal.
+   * As an Origin it is meaningless: no page is ever served from http://0.0.0.0, so a request
+   * claiming it is confused or probing.
+   */
+  test("0.0.0.0 is accepted as a Host and never as an Origin", () => {
+    expect(
+      hostIsLoopbackOrAbsent(new Request("http://x/", { headers: { host: "0.0.0.0:3000" } })),
+    ).toBe(true);
+    expect(
+      originIsLoopbackOrAbsent(new Request("http://x/", { headers: { origin: "http://0.0.0.0" } })),
+    ).toBe(false);
+  });
+});
+
+// ─── Token comparison and presentation ────────────────────────────────────
+
+describe("secretsMatch", () => {
+  test("compares by value", () => {
+    expect(secretsMatch("abc", "abc")).toBe(true);
+    expect(secretsMatch("abc", "abd")).toBe(false);
+    expect(secretsMatch("abc", "abcd")).toBe(false);
+    expect(secretsMatch("", "")).toBe(true);
+  });
+
+  /*
+   * The property, not the timing: no early return on the first differing character. A test cannot
+   * measure constant time reliably, but it CAN pin that every position is visited — two strings
+   * differing only in the last character must take the same path as two differing in the first.
+   */
+  test("does not stop at the first difference", () => {
+    const visited: number[] = [];
+    const probe = {
+      codePointAt: (i: number) => {
+        visited.push(i);
+        return 97;
+      },
+      length: 4,
+    };
+    secretsMatch("aaaa", probe as unknown as string);
+    expect(visited).toEqual([0, 1, 2, 3]);
+  });
+});
+
+describe("presentedToken", () => {
+  const url = new URL("http://127.0.0.1/x?token=from-query");
+
+  test("prefers Authorization: Bearer, and falls back to the query", () => {
+    const withHeader = new Request(url, { headers: { authorization: "Bearer from-header" } });
+    expect(presentedToken(withHeader, url)).toBe("from-header");
+    expect(presentedToken(new Request(url), url)).toBe("from-query");
+  });
+
+  // The iframe's `src` is the only place it can carry one, which is why the query form stays.
+  test("an empty or non-bearer Authorization falls through to the query", () => {
+    for (const authorization of ["Bearer ", "Basic abc", ""]) {
+      const req = new Request(url, { headers: { authorization } });
+      expect({ authorization, token: presentedToken(req, url) }).toEqual({
+        authorization,
+        token: "from-query",
+      });
+    }
+  });
+
+  test("no token anywhere is null", () => {
+    const bare = new URL("http://127.0.0.1/x");
+    expect(presentedToken(new Request(bare), bare)).toBeNull();
+  });
+});
+
+describe("loopbackGate token handling", () => {
+  const url = new URL("http://127.0.0.1/x?token=secret");
+
+  test("accepts the token from either place", () => {
+    expect(loopbackGate(new Request(url), url, "secret")).toBeNull();
+    const header = new Request(new URL("http://127.0.0.1/x"), {
+      headers: { authorization: "Bearer secret" },
+    });
+    expect(loopbackGate(header, new URL("http://127.0.0.1/x"), "secret")).toBeNull();
+  });
+
+  test("refuses a wrong or missing token", () => {
+    expect(loopbackGate(new Request(url), url, "other")?.status).toBe(403);
+    const bare = new URL("http://127.0.0.1/x");
+    expect(loopbackGate(new Request(bare), bare, "secret")?.status).toBe(403);
   });
 });

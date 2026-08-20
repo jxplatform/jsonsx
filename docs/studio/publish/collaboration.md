@@ -8,6 +8,7 @@ code:
   - packages/studio/src/tabs/project-config.ts
   - packages/studio/src/collab/presence-chips.ts
   - packages/studio/src/collab/monaco-cursors.ts
+  - packages/studio/src/collab/monaco-binding.ts
   - packages/server/src/collab.ts
 ---
 
@@ -23,7 +24,7 @@ When two people open the same file through the same Studio backend, the tab beco
 - **Flags beside the pill** — **Read-only** when you may look but not publish, and **Code view held** while a collaborator has the text view (see below). Both are standing statements, not error messages.
 - **Presence chips** — one colored circle per collaborator, showing their avatar or initial. Hover one to see who it is and which file they're in; peers elsewhere in the project show up too, labeled with the file they're browsing.
 - **Selections on the canvas** — every element a peer has selected is outlined in their color, labeled with their name, and follows them live. A peer working across several elements at once shows all of them, so you can see the whole shape of what they are about to change rather than one node of it.
-- **Cursors in Code view** — in the **[Code](/docs/studio/logic/code)** mode the shared text carries every writer's caret and selection in their color, with their name on the caret.
+- **Cursors in Code view** — in the **[Code](/docs/studio/logic/code)** mode the shared text carries every writer's caret and selection in their color, with their name on the caret. A caret goes away when its author leaves Code view, so the ones you can see are the people actually in the text with you.
 
 ## How co-editing behaves
 
@@ -75,6 +76,7 @@ On a shared dev server, unsaved co-edits live only in the server's memory. If ev
 Collaboration degrades, never blocks:
 
 - A backend without the endpoint simply gives you ordinary solo editing — no errors, no pill.
+- A backend running a **different version of the co-editing wire format** also gives you solo editing, rather than a session. Studio and the backend agree on a format before the connection opens, and when they can't, joining anyway would mean two copies of the document merging edits neither side reads the same way. Updating whichever side is older restores it.
 - If a session can't sync within a few seconds of opening, the tab proceeds solo and the pill reads **Not connected** with the reason on hover. This is deliberately not the same as **Solo**: **Solo** means nobody else is here, **Not connected** means something went wrong, and the two never wear the same word.
 - If the connection drops, the pill reads **Offline — changes sync on reconnect**: keep editing, and your changes merge when the connection returns.
 - If the file is replaced underneath the session — a git pull or discard, an outside edit — the session resets and rejoins on the new content automatically.

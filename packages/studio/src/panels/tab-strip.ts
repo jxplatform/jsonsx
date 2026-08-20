@@ -49,6 +49,7 @@ import { entryFields } from "../content/entry-fields";
 import { collectionOfPath } from "../content/entry-model";
 import { activeRegistry } from "../commands/active-registry";
 import { PRESET_LABELS } from "../workspace/pane-derive";
+import { localeLabel } from "@jxsuite/schema/locale";
 import { tabOfPane } from "../canvas/canvas-surface";
 import { mediaDisplayName } from "./shared";
 import type { Pane, PaneDerivation } from "../workspace/workspace";
@@ -217,10 +218,15 @@ function derivationChipTpl(pane: Pane, derived: PaneDerivation): TemplateResult 
      answers null — the pane owns no tab yet — and the chip would say "no document" about a
      derivation that knows perfectly well what it is a projection OF. */
   const of = tabOfPane(pane.id) ?? tabOfPane(derived.sourcePaneId);
+  /* THE CHIP FINISHES ITS OWN SENTENCE. Two of the presets are labelled with an unfinished phrase
+     — "Same page at", "Same page in" — because the interesting half is the value: a strip reading
+     "Same page in" over a French document says nothing the pane beside it did not already say. */
   const label =
     derived.kind === "lens" && derived.preset === "breakpoint"
       ? `${PRESET_LABELS.breakpoint} ${derived.media ? mediaDisplayName(derived.media) : "Base"}`
-      : PRESET_LABELS[derived.preset];
+      : derived.kind === "companion" && derived.preset === "locale"
+        ? `${PRESET_LABELS.locale} ${derived.locale ? localeLabel(derived.locale) : "—"}`
+        : PRESET_LABELS[derived.preset];
   return html`
     <div
       class=${classMap({ focused: isPaneFocused(pane.id), "tab-strip-row": true })}

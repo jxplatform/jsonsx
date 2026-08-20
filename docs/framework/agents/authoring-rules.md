@@ -7,6 +7,7 @@ code:
   - packages/schema/project-schema.json
   - packages/schema/class-schema.json
   - packages/compiler/src/site/validate-command.ts
+  - packages/schema/src/ijson.ts
 ---
 
 # Authoring rules for agents
@@ -18,6 +19,34 @@ Everything below is the briefing. Paste it into a system prompt, drop it in the 
 :::doc-tip
 Whatever form you use, include the **check your work** section at the end. A briefing without a verification step tells the agent what good looks like but gives it no way to find out whether it got there.
 :::
+
+## Two ways valid JSON still loses your work
+
+Both of these parse without complaint in any JSON tool, and both are **build errors** in Jx:
+
+```json
+{ "state": { "count": 0 }, "tagName": "div", "state": { "other": 1 } }
+```
+
+A repeated key. `JSON.parse` keeps the last one and discards the first without a word — so the first `state` object is gone, and nothing downstream can tell it ever existed.
+
+```json
+{ "id": 9007199254740993 }
+```
+
+An integer larger than a double can hold. It parses as `9007199254740992`, and the next save writes that wrong number back to your file.
+
+These are errors rather than warnings because a Jx document doesn't stay JSON. It round-trips through markdown frontmatter and through the collaborative editing layer, and each crossing rebuilds the object from the parsed value — so whatever was dropped at the boundary is dropped for good.
+
+Fractions are never flagged. `0.1` isn't exactly representable in binary floating point either, so complaining about it would mean complaining about most real documents while telling you nothing about whether your value survived.
+
+### Names are normalized, so an accent means one thing
+
+A state name is an identifier — declared as a key in `state`, referenced as `${state.été}` in a template and as `#/state/été` in a `$ref`. Typed on macOS an accented letter arrives decomposed (`e` plus a combining acute); typed on Windows, or pasted from most of the web, it arrives precomposed as a single character.
+
+Those are two different property names. A document whose declaration and reference came from different machines used to build cleanly, emit a valid bundle, and render nothing at all — no error, and no way to see the difference in any editor.
+
+Every key and every string value is now put into Unicode Normalization Form C when the file is read, so both spellings become the same name. Values are normalized too: canonically equivalent text is the _same text_ by definition, so nothing about your content changes. NFC composes and never folds or strips — CJK, emoji, and scripts with no composed forms survive exactly as written.
 
 ## The three schemas
 

@@ -16,6 +16,10 @@
     "./validate-project": "./src/validate-project.ts",
     "./types": "./types.ts",
     "./guards": "./src/guards.ts",
+    "./locale": "./src/locale.ts",
+    "./intl": "./src/intl.ts",
+    "./media-type": "./src/media-type.ts",
+    "./ijson": "./src/ijson.ts",
     "./parse": "./src/parse.ts",
     "./defs": "./defs/index.ts",
     "./schema.json": "./schema.json",
@@ -50,7 +54,7 @@
     "upgrade": "bunx npm-check-updates -u && bun install"
   },
   "type": "module",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "devDependencies": {
     "json-schema-to-ts": "^3.1.1"
   }

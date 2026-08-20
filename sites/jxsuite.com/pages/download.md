@@ -91,6 +91,10 @@ Portable archive. Runs on most modern distros.
 :::div{style.maxWidth="var(--max-width)" style.margin="1.5rem auto 0" style.textAlign="center" style.fontSize="0.8125rem" style.color="var(--color-text-muted)"}
 Looking for a specific version, checksums, or the full list of builds? See [all releases on GitHub](https://github.com/jxsuite/jx/releases/latest).
 :::
+
+:::div{style.maxWidth="var(--max-width)" style.margin="0.75rem auto 0" style.textAlign="center" style.fontSize="0.8125rem" style.color="var(--color-text-muted)"}
+On NixOS the same app is built from source — `nix run github:jxsuite/jx/release`. See [Install](/docs/start/install).
+:::
 ::::::
 
 ::::::cli{style.padding="clamp(4rem, 8vw, 6rem) clamp(1rem, 3vw, 2rem)" style.borderTop="1px solid var(--color-border)"}

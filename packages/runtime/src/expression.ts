@@ -7,8 +7,15 @@
  * @module expression
  */
 
+import {
+  DEFAULT_FORMAT_LOCALE,
+  DEFAULT_TIME_ZONE,
+  INTL_HELPER_PATHS,
+  INTL_LOCALE_PARAM,
+} from "@jxsuite/schema/intl";
 import type { JxExpressionNode, JxExpressionOperand } from "@jxsuite/schema/types";
 import type { JxScope } from "./types.ts";
+import { readPath, refAccessor, refSegments } from "./pointer.ts";
 
 /** The runtime's expression node — the schema's expression model. */
 export type ExpressionNode = JxExpressionNode;
@@ -177,11 +184,9 @@ export const BLESSED_GLOBALS = new Set([
   // String
   "String/fromCharCode",
   "String/fromCodePoint",
-  // Intl (synthetic helpers — see BLESSED_HELPERS; Intl formatters are constructors,
-  // So the plain-function call shape wraps construct-then-format)
-  "Intl/formatNumber",
-  "Intl/formatDate",
-  "Intl/formatRelativeTime",
+  // Intl helpers come from @jxsuite/schema/intl — see BLESSED_HELPERS. One list, so the runtime,
+  // The compiler and the JSON-Schema description cannot drift apart.
+  ...INTL_HELPER_PATHS,
 ]);
 
 /**
@@ -190,22 +195,84 @@ export const BLESSED_GLOBALS = new Set([
  * these; the compiler emits the equivalent inline construct-then-format expression.
  */
 const BLESSED_HELPERS: Record<string, (...a: unknown[]) => unknown> = {
+  "Intl/compare": (a, b, locale, options) =>
+    new Intl.Collator(
+      (locale as string | undefined) ?? DEFAULT_FORMAT_LOCALE,
+      options as Intl.CollatorOptions | undefined,
+    ).compare(a as string, b as string),
+  "Intl/displayName": (code, type, locale, options) =>
+    new Intl.DisplayNames((locale as string | undefined) ?? DEFAULT_FORMAT_LOCALE, {
+      ...(options as Intl.DisplayNamesOptions | undefined),
+      type: (type as Intl.DisplayNamesType | undefined) ?? "language",
+    }).of(code as string),
   "Intl/formatDate": (value, locale, options) =>
-    new Intl.DateTimeFormat(
-      locale as string | undefined,
-      options as Intl.DateTimeFormatOptions | undefined,
-    ).format(new Date(value as string | number | Date)),
+    new Intl.DateTimeFormat((locale as string | undefined) ?? DEFAULT_FORMAT_LOCALE, {
+      timeZone: DEFAULT_TIME_ZONE,
+      ...(options as Intl.DateTimeFormatOptions | undefined),
+    }).format(new Date(value as string | number | Date)),
+  "Intl/formatList": (values, locale, options) =>
+    new Intl.ListFormat(
+      (locale as string | undefined) ?? DEFAULT_FORMAT_LOCALE,
+      options as Intl.ListFormatOptions | undefined,
+    ).format(values as string[]),
   "Intl/formatNumber": (value, locale, options) =>
     new Intl.NumberFormat(
-      locale as string | undefined,
+      (locale as string | undefined) ?? DEFAULT_FORMAT_LOCALE,
       options as Intl.NumberFormatOptions | undefined,
     ).format(value as number),
   "Intl/formatRelativeTime": (value, unit, locale, options) =>
     new Intl.RelativeTimeFormat(
-      locale as string | undefined,
+      (locale as string | undefined) ?? DEFAULT_FORMAT_LOCALE,
       options as Intl.RelativeTimeFormatOptions | undefined,
     ).format(value as number, unit as Intl.RelativeTimeFormatUnit),
+  "Intl/plural": (value, locale, options) =>
+    new Intl.PluralRules(
+      (locale as string | undefined) ?? DEFAULT_FORMAT_LOCALE,
+      options as Intl.PluralRulesOptions | undefined,
+    ).select(value as number),
+  /* Returns the segments as plain strings, because a formula's value has to be JSON — the
+     Segmenter's own iterator of {segment, index, isWordLike} records is not. */
+  "Intl/segment": (value, granularity, locale) =>
+    [
+      ...new Intl.Segmenter((locale as string | undefined) ?? DEFAULT_FORMAT_LOCALE, {
+        granularity: (granularity as "grapheme" | "sentence" | "word" | undefined) ?? "grapheme",
+      }).segment(value as string),
+    ].map((part) => part.segment),
 };
+
+/**
+ * Fill in a helper's omitted `locale` argument from the page's own locale.
+ *
+ * A page under `/fr/` that formats a date without naming a locale means French: the route said so,
+ * `<html lang>` says so, and `hreflang` tells every crawler so. Requiring the author to repeat it
+ * at every call site is how a translated page ends up with English dates and English number
+ * grouping on it — a defect that is invisible to the person who built the site in their own
+ * language, and obvious to every reader of the other one.
+ *
+ * Determinism is untouched, which is the property `DEFAULT_FORMAT_LOCALE` exists to protect:
+ * `$page.locale` is a function of the route and the document (site-architecture.md §13.4), not of
+ * the machine the build runs on. A scope with no `$page` — a component's own state, the runtime
+ * used standalone — keeps the fixed default.
+ *
+ * @param {string} path - Helper callee path, e.g. `Intl/formatNumber`
+ * @param {unknown[]} args - Resolved arguments, in declaration order
+ * @param {JxScope} state
+ * @returns {unknown[]}
+ */
+function withPageLocale(path: string, args: unknown[], state: JxScope): unknown[] {
+  const index = INTL_LOCALE_PARAM[path];
+  if (index === undefined || index < 0 || args[index] != null) {
+    return args;
+  }
+  const page = (state as { $page?: { locale?: unknown } }).$page;
+  const locale = page?.locale;
+  if (typeof locale !== "string" || locale === "") {
+    return args;
+  }
+  const filled = [...args];
+  filled[index] = locale;
+  return filled;
+}
 
 /** Whether a `window#/…` callee ref is on the blessed pure-globals list. */
 export function isBlessedGlobal(ref: string): boolean {
@@ -339,15 +406,16 @@ function resolveExprRef(ref: string, state: JxScope, event: Event | null, iterCt
     return parts.length > 2 ? getPath(base, parts.slice(2).join("/")) : base;
   }
   if (ref.startsWith("#/state/")) {
-    const sub = ref.slice("#/state/".length);
-    const slash = sub.indexOf("/");
-    if (slash === -1) {
-      return state[sub];
-    }
-    return getPath(state[sub.slice(0, slash)], sub.slice(slash + 1));
+    // One call, not a hand-split leading token: slicing at the first `/` skipped unescaping it, so
+    // `#/state/a~1b/c` looked for a member called `a~1b` rather than `a/b`.
+    return readPath(state, ref.slice("#/state/".length));
   }
   if (ref.startsWith("parent#/")) {
-    return state[ref.slice("parent#/".length)];
+    /*
+     * A prop name may be a path into the prop. This read the whole path as one key and returned
+     * undefined for `parent#/user/name`, while the lowerer above compiled it to a walk.
+     */
+    return readPath(state, ref.slice("parent#/".length));
   }
   if (ref.startsWith("window#/")) {
     return getPath(globalThis.window, ref.slice("window#/".length));
@@ -355,7 +423,7 @@ function resolveExprRef(ref: string, state: JxScope, event: Event | null, iterCt
   if (ref.startsWith("document#/")) {
     return getPath(globalThis.document, ref.slice("document#/".length));
   }
-  return state[ref] ?? null;
+  return readPath(state, ref) ?? null;
 }
 
 /** Resolve a $ref to a writable location — returns { obj, key } for assignment. */
@@ -394,7 +462,12 @@ function resolveWritableRef(
     if (slash === -1) {
       return { key: sub, obj: state };
     }
-    const parts = sub.split("/");
+    /*
+     * The same tokenizer the read path uses. It used to split on `/` alone while the read split on
+     * `/[./]/`, so a write to `#/state/a/b.c` created a key `"b.c"` that the matching read — which
+     * walked `b` then `c` — could never see. The write simply vanished.
+     */
+    const parts = refSegments(sub);
     const lastKey = parts.pop();
     let obj = state;
     // Pointer paths address objects by construction (validated by the schema).
@@ -473,7 +546,7 @@ function evaluateNode(
       const globalPath = calleeRef.slice("window#/".length);
       const helper = BLESSED_HELPERS[globalPath];
       if (helper) {
-        return helper(...argValues);
+        return helper(...withPageLocale(globalPath, argValues, state));
       }
       const fn = getPath(globalThis.window, globalPath) as (...a: unknown[]) => unknown;
       const lastSlash = globalPath.lastIndexOf("/");
@@ -822,20 +895,18 @@ function compileRef(ref: string, opts: CompileOpts) {
     return "_acc";
   }
   if (ref.startsWith("$args/")) {
-    const parts = ref.slice("$args/".length).split("/");
-    return `_args${parts.map((p) => `[${JSON.stringify(p)}]`).join("")}`;
+    return refAccessor("_args", ref.slice("$args/".length));
   }
 
   if (ref.startsWith("event#/")) {
-    const path = ref.slice("event#/".length);
-    return `${e}.${path.replaceAll("/", ".")}`;
+    return refAccessor(e, ref.slice("event#/".length));
   }
 
   if (ref.startsWith("$map/")) {
     const parts = ref.split("/");
     const [, key] = parts;
     if (key === "item") {
-      return parts.length > 2 ? `_item.${parts.slice(2).join(".")}` : "_item";
+      return parts.length > 2 ? refAccessor("_item", parts.slice(2).join("/")) : "_item";
     }
     if (key === "index") {
       return "_index";
@@ -844,21 +915,24 @@ function compileRef(ref: string, opts: CompileOpts) {
   }
 
   if (ref.startsWith("#/state/")) {
-    const path = ref.slice("#/state/".length);
-    return `${s}.${path.replaceAll("/", ".")}`;
+    return refAccessor(s, ref.slice("#/state/".length));
   }
 
   if (ref.startsWith("parent#/")) {
-    return `${s}.${ref.slice("parent#/".length)}`;
+    return refAccessor(s, ref.slice("parent#/".length));
   }
   if (ref.startsWith("window#/")) {
-    return `window.${ref.slice("window#/".length).replaceAll("/", ".")}`;
+    return refAccessor("window", ref.slice("window#/".length));
   }
   if (ref.startsWith("document#/")) {
-    return `document.${ref.slice("document#/".length).replaceAll("/", ".")}`;
+    return refAccessor("document", ref.slice("document#/".length));
   }
 
-  return `${s}.${ref}`;
+  /*
+   * An unrecognized scheme is still a path under state. Pasting it raw emitted `s.a/b`, which is
+   * not a parse error but a division against an undeclared identifier.
+   */
+  return refAccessor(s, ref);
 }
 
 /** Compile a writable $ref target to its JS equivalent (for LHS of assignment). */
@@ -883,19 +957,52 @@ function compileTarget(target: unknown, opts: CompileOpts): string {
  *
  * @param {string} path - The `window#/`-stripped callee path (e.g. "Intl/formatNumber")
  * @param {string[]} args - Already-compiled argument expressions
+ * @param {CompileOpts} opts
  * @returns {string | null}
  */
-function compileHelperCall(path: string, args: string[]): string | null {
+function compileHelperCall(path: string, args: string[], opts: CompileOpts): string | null {
   const a = (i: number) => args[i] ?? "undefined";
+  /*
+   * The same defaults the interpreter applies, inlined — see @jxsuite/schema/intl. The page's own
+   * locale comes first and the fixed one behind it, so an island formats in the language of the
+   * page it is on. `?.` and not `.`: a component's state has no `$page`, and neither does the
+   * runtime evaluated standalone.
+   */
+  const L = `(${opts.statePrefix ?? "state"}?.$page?.locale ?? ${JSON.stringify(DEFAULT_FORMAT_LOCALE)})`;
+  const Z = JSON.stringify(DEFAULT_TIME_ZONE);
   switch (path) {
     case "Intl/formatNumber": {
-      return `new Intl.NumberFormat(${a(1)}, ${a(2)}).format(${a(0)})`;
+      return `new Intl.NumberFormat(${a(1)} ?? ${L}, ${a(2)}).format(${a(0)})`;
     }
     case "Intl/formatDate": {
-      return `new Intl.DateTimeFormat(${a(1)}, ${a(2)}).format(new Date(${a(0)}))`;
+      return (
+        `new Intl.DateTimeFormat(${a(1)} ?? ${L}, ` +
+        `{timeZone: ${Z}, ...${a(2)}}).format(new Date(${a(0)}))`
+      );
     }
     case "Intl/formatRelativeTime": {
-      return `new Intl.RelativeTimeFormat(${a(2)}, ${a(3)}).format(${a(0)}, ${a(1)})`;
+      return `new Intl.RelativeTimeFormat(${a(2)} ?? ${L}, ${a(3)}).format(${a(0)}, ${a(1)})`;
+    }
+    case "Intl/formatList": {
+      return `new Intl.ListFormat(${a(1)} ?? ${L}, ${a(2)}).format(${a(0)})`;
+    }
+    case "Intl/plural": {
+      return `new Intl.PluralRules(${a(1)} ?? ${L}, ${a(2)}).select(${a(0)})`;
+    }
+    case "Intl/compare": {
+      return `new Intl.Collator(${a(2)} ?? ${L}, ${a(3)}).compare(${a(0)}, ${a(1)})`;
+    }
+    case "Intl/displayName": {
+      return (
+        `new Intl.DisplayNames(${a(2)} ?? ${L}, ` +
+        `{...${a(3)}, type: ${a(1)} ?? 'language'}).of(${a(0)})`
+      );
+    }
+    case "Intl/segment": {
+      return (
+        `[...new Intl.Segmenter(${a(2)} ?? ${L}, {granularity: ${a(1)} ?? 'grapheme'})` +
+        `.segment(${a(0)})].map((p) => p.segment)`
+      );
     }
     default: {
       return null;
@@ -925,7 +1032,7 @@ export function compileExpression(node: ExpressionNode, opts: CompileOpts = {}):
       if (!isBlessedGlobal(calleeRef)) {
         throw new Error(`$expression: "${calleeRef}" is not a blessed pure global`);
       }
-      const helperJs = compileHelperCall(calleeRef.slice("window#/".length), args);
+      const helperJs = compileHelperCall(calleeRef.slice("window#/".length), args, opts);
       if (helperJs) {
         return helperJs;
       }
@@ -1038,13 +1145,9 @@ export function compileExpression(node: ExpressionNode, opts: CompileOpts = {}):
 
 // ─── Utilities ───────────────────────────────────────────────────────────────
 
-/** Resolve a dotted/slashed path on an object. */
+/** Resolve a `$ref` path on an object, through the one tokenizer (`pointer.ts`). */
 function getPath(obj: unknown, path: string): unknown {
-  let current: unknown = obj;
-  for (const k of path.split(/[./]/)) {
-    current = (current as Record<string, unknown>)?.[k];
-  }
-  return current;
+  return readPath(obj, path);
 }
 
 // ─── Statement-Engine Surface (spec §20) ─────────────────────────────────────

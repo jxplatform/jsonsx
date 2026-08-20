@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.5.0](https://github.com/jxsuite/jx/compare/auth-v0.4.2...auth-v0.5.0) (2026-08-19)
+
+
+### Features
+
+* **auth:** a loopback redirect with PKCE, and cookies a browser will keep ([053f67c](https://github.com/jxsuite/jx/commit/053f67cf94216020dd2a39982cea30b3802ba3aa))
+* **studio:** the Named Shell — P0–P8, the full UX redesign ([b576cbb](https://github.com/jxsuite/jx/commit/b576cbb24c7e0d8d36075f6d682e9b3b6b971166))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/connector bumped to 0.5.0
+    * @jxsuite/schema bumped to 1.6.0
+
 ## [0.4.2](https://github.com/jxsuite/jx/compare/auth-v0.4.1...auth-v0.4.2) (2026-07-30)
 
 

@@ -19,3 +19,17 @@ export {
   createAnthropicStreamingClient,
   createProxyStreamingClient,
 } from "./streaming-client.js";
+
+export type {
+  AnthropicStreamingClientOptions,
+  OpenAIStreamingClientOptions,
+  ProxyStreamingClientOptions,
+  StreamDeltaEvent,
+  StreamDoneEvent,
+  StreamErrorEvent,
+  StreamEvent,
+  StreamingClient,
+  StreamToolCallDeltaEvent,
+  StreamToolCallEndEvent,
+  StreamToolCallStartEvent,
+} from "./streaming-client.js";

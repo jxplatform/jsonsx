@@ -44,6 +44,27 @@ export function sidecarAssetPath(specifier: string): string {
   return `${SIDECAR_ASSET_DIR}${base}.js`;
 }
 
+/**
+ * Map a bare npm specifier naming a **file** — a stylesheet, a font, a prebuilt script — to the URL
+ * the build copies it to.
+ *
+ * Unlike {@link sidecarAssetPath} this keeps the extension, because the file is copied rather than
+ * bundled and both the browser and the host dispatch on it.
+ *
+ * @docs framework/site/seo
+ */
+export function npmAssetPath(specifier: string): string {
+  const ext = /\.(\w+)$/.exec(specifier)?.[1] ?? "";
+  const base = specifier
+    .replace(/\.\w+$/, "")
+    .replaceAll("@", "")
+    .replaceAll(/[/\\]+/g, "-")
+    .replaceAll(/[^\w.-]/g, "-")
+    .replaceAll(/-+/g, "-")
+    .replaceAll(/^-|-$/g, "");
+  return ext === "" ? `${SIDECAR_ASSET_DIR}${base}` : `${SIDECAR_ASSET_DIR}${base}.${ext}`;
+}
+
 // ─── Asset mounts (specs/extensions.md §8.5) ─────────────────────────────────
 
 /**

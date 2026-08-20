@@ -4,6 +4,11 @@
  * Walks a Jx document tree, finds <img> nodes with static src paths, and injects srcset, sizes,
  * width, height, loading, and decoding attributes. Collects image references so the build
  * orchestrator knows which files to process.
+ *
+ * Two passes, deliberately separable. The **loading** pass (`images.lazyLoad`) runs on every image
+ * in every project, because deciding not to optimize an image says nothing about when to fetch it.
+ * The **variant** pass (`images.optimize`) is the expensive half and is the one the master switch
+ * turns off.
  */
 
 import { existsSync } from "node:fs";
@@ -16,6 +21,7 @@ import {
   processImage,
 } from "./image-optimizer.ts";
 import { getCached, getImageCacheDir, setCached } from "./image-cache.ts";
+import { imgLoadingAttrs } from "./img-loading.ts";
 import { resolveAssetUrl } from "@jxsuite/schema/asset-paths";
 
 import type { AssetMount } from "@jxsuite/schema/asset-paths";
@@ -239,14 +245,8 @@ export async function transformImageNodes(
   mounts: readonly AssetMount[] = [],
 ) {
   const imageRefs = new Map<string, ImageManifest>();
-
-  if (!config.optimize) {
-    return { imageRefs };
-  }
-
   const meta = metaCache ?? new Map();
   await walkAndTransform(doc, config, projectRoot, cache, meta, imageRefs, mounts);
-
   return { imageRefs };
 }
 
@@ -274,6 +274,11 @@ async function walkAndTransform(
 
   if (node.tagName === "img") {
     await transformImgNode(node, config, projectRoot, cache, metaCache, imageRefs, mounts);
+    // Wrapping rewrote this node into a `<picture>` whose children this pass just authored.
+    // Descending into them would find the `<img>` and wrap it again, forever.
+    if (node.tagName !== "img") {
+      return;
+    }
   }
 
   if (typeof node.innerHTML === "string" && node.innerHTML.includes("<img")) {
@@ -298,6 +303,123 @@ async function walkAndTransform(
   }
 }
 
+/** A `<source>` in a generated `<picture>`: one image format, one candidate list. */
+interface PictureSource {
+  type: string;
+  srcset: string;
+}
+
+/**
+ * Formats in the order a browser should be offered them — best compression first. A `<picture>`
+ * takes the FIRST source it can decode, so this order is the whole negotiation.
+ */
+const PICTURE_FORMAT_ORDER: readonly string[] = ["avif", "webp", "jpeg", "png"];
+const MEDIA_TYPES: Record<string, string> = {
+  avif: "image/avif",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+};
+
+interface ResolvedVariants {
+  /** Candidate list for the `<img>` itself, in the preferred format. */
+  srcset: string;
+  dims: { width: number; height: number } | null;
+  /** One entry per additional format, when the image is to be wrapped in a `<picture>`. */
+  sources: PictureSource[];
+}
+
+/**
+ * Generate (or look up) this image's variants and describe what the markup should say.
+ *
+ * Returns null whenever the image is not ours to touch — a bound `src`, an SVG, a remote URL off
+ * the allowlist, a missing file, an explicit `data-no-optimize`. Both callers treat null the same
+ * way: leave the markup alone apart from the loading attributes.
+ *
+ * @param {string} src
+ * @param {boolean} optedOut - `data-no-optimize` is present
+ * @param {ImageConfig} config
+ * @param {string} projectRoot
+ * @param {CacheManifest | null} cache
+ * @param {ImageMetaCache} metaCache
+ * @param {Map<string, ImageManifest>} imageRefs
+ * @param {readonly AssetMount[]} mounts
+ * @returns {Promise<ResolvedVariants | null>}
+ */
+async function resolveVariants(
+  src: string,
+  optedOut: boolean,
+  config: ImageConfig,
+  projectRoot: string,
+  cache: CacheManifest | null,
+  metaCache: ImageMetaCache,
+  imageRefs: Map<string, ImageManifest>,
+  mounts: readonly AssetMount[],
+): Promise<ResolvedVariants | null> {
+  // Bound ($ref) or missing srcs cannot be optimized at build time.
+  if (typeof src !== "string" || optedOut) {
+    return null;
+  }
+  const remote = isAllowedRemote(src, config);
+  if (!remote && shouldSkip(src)) {
+    return null;
+  }
+
+  if (remote) {
+    // Original dimensions are unknown without fetching — emit every configured width and let
+    // Fit=scale-down avoid upscaling past the source size.
+    return { dims: null, sources: [], srcset: buildCloudflareSrcset(src, config, Infinity, null) };
+  }
+
+  const absoluteSrc = resolveImagePath(src, projectRoot, mounts);
+  if (!existsSync(absoluteSrc)) {
+    return null;
+  }
+
+  if (config.service === "cloudflare") {
+    // Cloudflare negotiates the format itself (`format=auto`), so there is nothing for a
+    // `<picture>` to choose between.
+    const meta = await resolveCfMeta(absoluteSrc, metaCache);
+    const srcset = buildCloudflareSrcset(src, config, meta.width ?? Infinity, meta.hash);
+    const dims = meta.width && meta.height ? { height: meta.height, width: meta.width } : null;
+    return { dims, sources: [], srcset };
+  }
+
+  let manifest = imageRefs.get(absoluteSrc);
+  if (!manifest) {
+    manifest = await resolveManifest(absoluteSrc, src, config, projectRoot, cache!);
+    imageRefs.set(absoluteSrc, manifest);
+  }
+
+  /*
+   * The project's own formats, best-compression first. A format the project did not ask for is not
+   * offered even if a stale manifest happens to hold variants of it, and one this order does not
+   * know keeps the position the project gave it.
+   */
+  const ordered = [
+    ...PICTURE_FORMAT_ORDER.filter((format) => config.formats.includes(format)),
+    ...config.formats.filter((format) => !PICTURE_FORMAT_ORDER.includes(format)),
+  ];
+  const available = ordered
+    .map((format) => ({
+      srcset: buildSrcset(manifest.variants, format),
+      type: MEDIA_TYPES[format] ?? `image/${format}`,
+    }))
+    .filter((source) => source.srcset !== "");
+
+  const dims =
+    manifest.original?.width && manifest.original.height
+      ? { height: manifest.original.height, width: manifest.original.width }
+      : null;
+  /*
+   * One format needs no negotiation, and a srcset in the single format the project asked for is
+   * both smaller markup and the historical behaviour. Two or more do: `srcset` alone carries no
+   * format information, so a browser that cannot decode AVIF would still pick an AVIF candidate.
+   */
+  const wrap = config.picture !== false && available.length > 1;
+  return { dims, sources: wrap ? available : [], srcset: available[0]?.srcset ?? "" };
+}
+
 /**
  * @param {JxMutableNode | JxDocument} node
  * @param {ImageConfig} config
@@ -319,73 +441,88 @@ async function transformImgNode(
   if (!node.attributes) {
     node.attributes = {};
   }
-
-  const src = node.attributes.src ?? node.src;
-  // Bound ($ref) or missing srcs cannot be optimized at build time.
-  if (typeof src !== "string") {
-    return;
-  }
-  const remote = isAllowedRemote(src, config);
-  if (!remote && shouldSkip(src)) {
-    return;
-  }
-  if (node.attributes["data-no-optimize"] !== undefined) {
-    return;
+  const attrs = node.attributes;
+  /*
+   * A node-level `src` is normalized into `attributes` first. The static emitter only renders a
+   * fixed set of node-level DOM properties and `src` is not among them, so an image written that
+   * way used to acquire a `srcset` and lose its `src` — the fallback the srcset exists to have.
+   */
+  if (attrs.src === undefined && typeof node.src === "string") {
+    attrs.src = node.src;
+    delete node.src;
   }
 
-  let srcset;
-  let dims: { width: number; height: number } | null = null;
+  const variants = config.optimize
+    ? await resolveVariants(
+        attrs.src as string,
+        attrs["data-no-optimize"] !== undefined,
+        config,
+        projectRoot,
+        cache,
+        metaCache,
+        imageRefs,
+        mounts,
+      )
+    : null;
 
-  if (remote) {
-    // Original dimensions are unknown without fetching — emit every configured width and let
-    // Fit=scale-down avoid upscaling past the source size.
-    srcset = buildCloudflareSrcset(src, config, Infinity, null);
-  } else {
-    const absoluteSrc = resolveImagePath(src, projectRoot, mounts);
-    if (!existsSync(absoluteSrc)) {
-      return;
+  if (variants) {
+    if (variants.srcset !== "") {
+      attrs.srcset = variants.srcset;
+      attrs.sizes ??= config.sizes;
     }
-
-    if (config.service === "cloudflare") {
-      const meta = await resolveCfMeta(absoluteSrc, metaCache);
-      srcset = buildCloudflareSrcset(src, config, meta.width ?? Infinity, meta.hash);
-      dims = meta.width && meta.height ? { height: meta.height, width: meta.width } : null;
-    } else {
-      let manifest = imageRefs.get(absoluteSrc);
-
-      if (!manifest) {
-        manifest = await resolveManifest(absoluteSrc, src, config, projectRoot, cache!);
-        imageRefs.set(absoluteSrc, manifest);
-      }
-
-      const preferredFormat = config.formats.includes("avif") ? "avif" : config.formats[0]!;
-      srcset = buildSrcset(manifest.variants, preferredFormat);
-      dims =
-        manifest.original?.width && manifest.original.height
-          ? { height: manifest.original.height, width: manifest.original.width }
-          : null;
+    // Intrinsic dimensions prevent layout shift; author-supplied values win.
+    if (variants.dims && attrs.width === undefined && attrs.height === undefined) {
+      attrs.width = String(variants.dims.width);
+      attrs.height = String(variants.dims.height);
     }
   }
 
-  if (srcset) {
-    node.attributes.srcset = srcset;
-    node.attributes.sizes ??= config.sizes;
-  }
+  Object.assign(attrs, imgLoadingAttrs(attrs, config.lazyLoad));
 
-  // Intrinsic dimensions prevent layout shift; author-supplied values win.
-  if (dims && node.attributes.width === undefined && node.attributes.height === undefined) {
-    node.attributes.width = String(dims.width);
-    node.attributes.height = String(dims.height);
-  }
-
-  if (config.lazyLoad && node.attributes.loading !== "eager") {
-    node.attributes.loading = "lazy";
-    node.attributes.decoding = "async";
+  if (variants && variants.sources.length > 0) {
+    wrapInPicture(node, variants.sources, config.sizes);
   }
 }
 
+/**
+ * Turn an `<img>` node into a `<picture>` wrapping it, one `<source>` per format.
+ *
+ * The `<img>` keeps everything that describes the image — `src`, `alt`, dimensions, styles, the
+ * loading attributes — and loses `srcset`/`sizes`, which now live on the sources. That is what
+ * makes it a real fallback: a browser that matches no `<source>` gets the original file, not a
+ * candidate list in a format it just declined.
+ *
+ * @param {JxMutableNode | JxDocument} node - The `<img>` node, mutated into a `<picture>`
+ * @param {PictureSource[]} sources
+ * @param {string} sizes
+ */
+function wrapInPicture(
+  node: JxMutableNode | JxDocument,
+  sources: readonly PictureSource[],
+  sizes: string,
+) {
+  const imgAttrs: Record<string, unknown> = { ...node.attributes };
+  const inheritedSizes = (imgAttrs.sizes as string | undefined) ?? sizes;
+  delete imgAttrs.srcset;
+  delete imgAttrs.sizes;
+  const img: Record<string, unknown> = { attributes: imgAttrs, tagName: "img" };
+  if (node.style !== undefined) {
+    img.style = node.style;
+    delete node.style;
+  }
+
+  node.tagName = "picture";
+  node.attributes = {};
+  node.children = [
+    ...sources.map((source) => ({
+      attributes: { sizes: inheritedSizes, srcset: source.srcset, type: source.type },
+      tagName: "source",
+    })),
+    img,
+  ] as (string | JxMutableNode)[];
+}
+
 const IMG_TAG_RE = /<img\b([^>]*)>/gi;
-const SRC_ATTR_RE = /\bsrc="([^"]*)"/;
 const SRCSET_ATTR_RE = /\bsrcset="/;
 const DATA_NO_OPT_RE = /\bdata-no-optimize\b/;
 
@@ -410,78 +547,57 @@ async function transformInnerHtmlImages(
   imageRefs: Map<string, ImageManifest>,
   mounts: readonly AssetMount[],
 ) {
-  /** @type {{ match: string; replacement: string }[]} */
-  const replacements = [];
+  const replacements: { match: string; replacement: string }[] = [];
 
   for (const m of html.matchAll(IMG_TAG_RE)) {
     const tag = m[0]!;
     const attrs = m[1]!;
 
-    if (SRCSET_ATTR_RE.test(attrs)) {
-      continue;
-    }
-    if (DATA_NO_OPT_RE.test(attrs)) {
-      continue;
-    }
-
-    const srcMatch = attrs.match(SRC_ATTR_RE);
-    if (!srcMatch) {
-      continue;
-    }
-
     // Attribute values in pre-rendered innerHTML are entity-escaped — decode for processing
-    const src = srcMatch[1]!.replaceAll("&amp;", "&");
-    const remote = isAllowedRemote(src, config);
-    if (!remote && shouldSkip(src)) {
+    const src = (attrValue(attrs, "src") ?? "").replaceAll("&amp;", "&");
+    const alreadyResponsive = SRCSET_ATTR_RE.test(attrs);
+    const variants =
+      config.optimize && src !== "" && !alreadyResponsive
+        ? await resolveVariants(
+            src,
+            DATA_NO_OPT_RE.test(attrs),
+            config,
+            projectRoot,
+            cache,
+            metaCache,
+            imageRefs,
+            mounts,
+          )
+        : null;
+
+    let extra = "";
+    if (variants && variants.srcset !== "") {
+      extra += ` srcset="${variants.srcset}" sizes="${config.sizes}"`;
+    }
+    if (variants?.dims && !/\bwidth=/.test(attrs) && !/\bheight=/.test(attrs)) {
+      extra += ` width="${variants.dims.width}" height="${variants.dims.height}"`;
+    }
+    const loading = imgLoadingAttrs(
+      {
+        decoding: attrValue(attrs, "decoding"),
+        fetchpriority: attrValue(attrs, "fetchpriority"),
+        loading: attrValue(attrs, "loading"),
+      },
+      config.lazyLoad,
+    );
+    for (const [key, value] of Object.entries(loading)) {
+      extra += ` ${key}="${value}"`;
+    }
+
+    if (extra === "") {
       continue;
     }
 
-    const absoluteSrc = remote ? null : resolveImagePath(src, projectRoot, mounts);
-    if (absoluteSrc && !existsSync(absoluteSrc)) {
-      continue;
-    }
-
-    let srcset;
-    let dims: { width: number; height: number } | null = null;
-
-    if (remote) {
-      srcset = buildCloudflareSrcset(src, config, Infinity, null);
-    } else if (config.service === "cloudflare") {
-      const meta = await resolveCfMeta(absoluteSrc as string, metaCache);
-      srcset = buildCloudflareSrcset(src, config, meta.width ?? Infinity, meta.hash);
-      dims = meta.width && meta.height ? { height: meta.height, width: meta.width } : null;
-    } else {
-      let manifest = imageRefs.get(absoluteSrc as string);
-      if (!manifest) {
-        manifest = await resolveManifest(absoluteSrc as string, src, config, projectRoot, cache!);
-        imageRefs.set(absoluteSrc as string, manifest);
-      }
-
-      const preferredFormat = config.formats.includes("avif") ? "avif" : config.formats[0]!;
-      srcset = buildSrcset(manifest.variants, preferredFormat);
-      dims =
-        manifest.original?.width && manifest.original.height
-          ? { height: manifest.original.height, width: manifest.original.width }
-          : null;
-    }
-    if (!srcset) {
-      continue;
-    }
-
-    let extra = ` srcset="${srcset}" sizes="${config.sizes}"`;
-    if (dims && !/\bwidth=/.test(attrs) && !/\bheight=/.test(attrs)) {
-      extra += ` width="${dims.width}" height="${dims.height}"`;
-    }
-    if (config.lazyLoad && !/\bloading="eager"/.test(attrs)) {
-      if (!/\bloading=/.test(attrs)) {
-        extra += ` loading="lazy"`;
-      }
-      if (!/\bdecoding=/.test(attrs)) {
-        extra += ` decoding="async"`;
-      }
-    }
-
-    replacements.push({ match: tag, replacement: `<img${attrs}${extra}>` });
+    const img =
+      variants && variants.sources.length > 0
+        ? renderPictureTag(attrs, variants.sources, config.sizes, extra)
+        : `<img${attrs}${extra}>`;
+    replacements.push({ match: tag, replacement: img });
   }
 
   let result = html;
@@ -489,4 +605,39 @@ async function transformInnerHtmlImages(
     result = result.replace(match, replacement);
   }
   return result;
+}
+
+/**
+ * The string-surgery twin of {@link wrapInPicture}: the same markup, built from a raw attribute
+ * string rather than a node. `srcset`/`sizes` stay off the `<img>` so it remains a real fallback.
+ *
+ * @param {string} attrs - The original tag's attribute string
+ * @param {readonly PictureSource[]} sources
+ * @param {string} sizes
+ * @param {string} extra - Attributes this pass decided to add
+ * @returns {string}
+ */
+function renderPictureTag(
+  attrs: string,
+  sources: readonly PictureSource[],
+  sizes: string,
+  extra: string,
+) {
+  const inheritedSizes = attrValue(attrs, "sizes") ?? sizes;
+  const imgExtra = extra.replace(/ srcset="[^"]*"/, "").replace(/ sizes="[^"]*"/, "");
+  const sourceTags = sources
+    .map((s) => `<source type="${s.type}" srcset="${s.srcset}" sizes="${inheritedSizes}">`)
+    .join("");
+  return `<picture>${sourceTags}<img${attrs}${imgExtra}></picture>`;
+}
+
+/**
+ * Read one double-quoted attribute out of a raw tag attribute string.
+ *
+ * @param {string} attrs
+ * @param {string} name
+ * @returns {string | undefined}
+ */
+function attrValue(attrs: string, name: string): string | undefined {
+  return new RegExp(`\\b${name}="([^"]*)"`, "i").exec(attrs)?.[1];
 }

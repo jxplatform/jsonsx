@@ -2,9 +2,9 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.24-draft
+**Version:** 0.9.35-draft
 **Status:** Partial
-**Updated:** 2026-08-13
+**Updated:** 2026-08-20
 **License:** MIT
 
 ---
@@ -271,6 +271,20 @@ The design canvas supports pan and zoom:
 - **Fit to view**: Intelligent centering of documents on load and window resize
 - **Responsive presets**: Width presets matching `$media` breakpoints
 
+**The wheel belongs to whatever is under it.** A mode that mounts no pan/zoom surface — Grid,
+Library, Project Settings, the Entry form, Source and Preview — leaves the wheel to the scroll
+container under the pointer. Consuming it there is never harmless in only one direction: the pan
+lands on offsets no transform reads and suppresses the stage's next fit, while the surface the
+author is actually looking at (a section column, the `<pre>` of `project.json`, a virtualised
+table) cannot be scrolled with the wheel at all.
+
+**Ctrl/⌘+wheel is a different gesture, and no surface hands it to the browser.** Studio blocks page
+zoom everywhere and exempts only a stage, because a stage answers the gesture with a zoom of its
+own; a stage with none to give — every mode named above, and a trackpad pinch arrives as exactly
+this event — blocks it like the rest of the chrome rather than scaling the whole window around a
+form. Preview blocks it in the FRAME: a cross-origin canvas frame's wheel never reaches the host,
+and preview is the one mode that forwards nothing, so the block has to be where the gesture lands.
+
 **Entering a pan/zoom mode fits the artboard.** Design and Stylebook apply a fit on the mode
 transition, capped at 100% so a narrow artboard is never magnified, and skipped when the pane has no
 measurable width (fitting an unlaid-out pane would land on the 5% floor). Without it a 1280px
@@ -336,8 +350,9 @@ it: **Project** panels change the project, **Document** panels change the open d
 | Document | Data           | `data`     | `data`          | State definitions AND what they resolve to |
 | Document | Packages       | `packages` | `box`           | Imported components and packages           |
 
-Two more panels are registered `rail: false` — **Search** (`search`, project level) and **Insert**
-(`insert`, document level, the HTML element palette and the project's component library). They have
+Three more panels are registered `rail: false` — **Search** (`search`, project level), **Insert**
+(`insert`, document level, the HTML element palette and the project's component library) and
+**Languages** (`i18n`, project level, §20.4). They have
 records, regions and `panel.focus.<id>` commands like any other panel; what they give up is a rail
 button, because the group is a glance and a glance does not scale.
 
@@ -582,8 +597,9 @@ is Project Settings › Contexts (§16); the Style tab does not own a third sele
 cannot disagree with the one the canvas is rendering under.
 
 **Each axis is a command**, so the popover is one projection of it rather than the capability
-itself: `canvas.setBreakpoint { media, pane? }`, `canvas.setColorScheme { scheme, pane? }` and
-`canvas.setLayoutVisible { visible, pane? }`. `pane` defaults to the focused pane and exists because
+itself: `canvas.setBreakpoint { media, pane? }`, `canvas.setColorScheme { scheme, pane? }`,
+`canvas.setLayoutVisible { visible, pane? }` and — on a multilingual project — `i18n.switchLocale
+{ locale, pane? }` (§20.2). `pane` defaults to the focused pane and exists because
 the bar is drawn once per pane — the side bar's controls address the side pane's document, and a
 verb that could only reach the focused one would be narrower than the control it stands behind.
 `setBreakpoint` refuses a key the document cannot render under, listing the ones it can, and each
@@ -845,6 +861,41 @@ Three consequences are normative:
     rather than showing the primary's value as though it were everyone's.
 3.  **A selection is replaced, never mutated in place.** Effects track the set, not the array
     identity; an in-place push would move the selection without repainting the panel drawing it.
+
+### 6.8 The `From data…` picker addresses only what it can list
+
+> **Status: Partial.** The picker lists the document's state signals and writes a `$ref` to the one
+> chosen. A pointer the picker cannot construct is not rejected anywhere — it is simply unreachable
+> from the UI, and an author who hand-writes one gets a field that renders correctly and cannot be
+> edited back.
+
+The rung writes a JSON Pointer (`spec.md` §7.1), and JSON Pointer addresses strictly more than a
+flat list of signals. RFC 6901 §3 excludes exactly two characters from a reference token, `/` and
+`~`; every other character is ordinary. Three consequences the picker does not yet cover:
+
+| Pointer                     | Addresses                              | Picker |
+| --------------------------- | -------------------------------------- | ------ |
+| `#/state/count`             | one state signal                       | ✅     |
+| `#/state/nav/data/sections` | a path into a signal's value           | ❌     |
+| `#/state/user.name`         | one signal whose name contains a dot   | ❌     |
+| `#/state/a~1b`              | one signal whose name contains a slash | ❌     |
+
+The first gap is the common one: 3 of the repository's 227 `#/state/` refs walk into a signal's
+value, and the docs site's own layout is one of them. The other two are legal and unused — no
+document here has such a key — but "unused" is not "invalid", and the picker currently makes them
+authorable only by editing JSON by hand.
+
+Two rules for whatever closes this:
+
+1.  **The picker must never write a pointer it cannot read back.** A control that can produce a ref
+    it then renders as blank or as `[object Object]` is the failure §6.6 rule 2 already names.
+2.  **Escaping is the writer's job, not the author's.** An author who names a signal `a/b` types
+    `a/b`; `~1` is an encoding detail of the pointer and must not surface in the UI. The encoder
+    exists — `escapeToken` in `@jxsuite/runtime/pointer` — and is what any path-aware picker builds
+    its segments with.
+
+Until then the gap is stated rather than hidden, because the alternative is a picker that silently
+implies the pointer grammar is flatter than it is.
 
 ## 7. Project Styles
 
@@ -1297,6 +1348,13 @@ The build **code-splits**. Everything reached only through a dynamic `import()` 
 
 **Monaco is never on the startup path.** It is roughly two thirds of the editor's code and most sessions never open a code view, so `services/monaco-lazy` loads the editor API and its worker/language registration together, memoized, on first use by source mode, the function editor, or the formula workspace. Nothing in the eager import graph may reference `monaco-editor` — including indirectly, via a module whose own top-level imports pull it in (the reason the model-URI helper lives apart from the Monaco setup module).
 
+**The editor's feature set is written down.** `services/monaco-setup` imports one `register` module per editor capability, and that list is the answer to "what can the code editor do": adding a capability means adding its import. A missing register is **silent** — the editor simply lacks the capability, with no error and no console line — so a change set that touches the list owes a browser pass over the capabilities it names, and nothing else stands in for that.
+
+Two facts the list cannot state about itself, both measured rather than reasoned:
+
+- **The suggest widget does not come from the suggest register.** `features/suggest/register` registers the provider that renders suggest items as inline text; the widget is `contrib/suggest/browser/suggestController.js`, and `features/inlineCompletions/register` is the only public entry that reaches it. Omitting it leaves JSON schema completion and the Logic tab's `state.*` completion registered and invisible.
+- **The exclusions do not yet take effect.** In monaco 0.56.0 the contribution modules import one another densely and the suggest stack reaches nearly all of them, so every feature the list declines is still bundled and still registers itself. The declaration is a statement of intent and the place the saving lands if that graph is ever untangled; it is not evidence that a feature is absent. Only the metafile answers that.
+
 **Both build paths share one contract.** The release build (`scripts/build.ts`) and the repo dev
 server's watcher (`server.js` → `@jxsuite/server`'s `builds`) spread the same options from
 `scripts/build-config.ts`. They diverged once, and the failure mode is instructive: the watcher had its
@@ -1304,6 +1362,14 @@ own inline config with no de-duplication and no splitting, and because it overwr
 next keystroke, a developer never saw the built output at all — `bun run dev` served 18.8 MB while
 `bun run build` produced 3.3 MB. A `@jxsuite/server` build entry forwards every unrecognised key to
 `Bun.build`, which is what makes one shared contract possible.
+
+**One importer, so no de-duplication step.** That shared contract used to include a resolver plugin
+forcing every `monaco-editor` specifier through the studio package, because a second importer —
+`y-monaco`, with a bare specifier — resolved to a physically separate copy of the same version and
+the bundler emitted Monaco twice. Replacing that dependency with the first-party binding
+(`src/collab/monaco-binding`) left one importer and the plugin became an identity transform;
+it is gone. **A second `monaco-editor` consumer would bring the hazard back**, and the check is the
+metafile, which must show exactly one physical `monaco-editor` root in the input graph.
 
 **Nothing may fetch Monaco at startup, including via a dynamic import.** `import()` defers evaluation,
 not payload: an `import()` that RUNS during activation still puts the editor on the critical path.
@@ -1336,7 +1402,8 @@ See the [Site Architecture Specification](site-architecture.md) for full design 
 
 ## 13. Command Registry and Context Keys
 
-**Status:** Partial — the registry, the keymap and the CI checks ship; the surfaces are being ported onto them.
+> **Status: Partial.** The registry, the keymap and the CI checks ship; the surfaces are being
+> ported onto them.
 
 Every capability Studio has is one **command record**. The Command Bar, the palette, the Navigator
 rail, the context menus, the block action bar, the keymap, `__jxAutomation` and the assistant's tool
@@ -1454,7 +1521,7 @@ and `activeTab`. Predicates read it; nothing writes to it from a predicate.
 
 | Group        | Keys                                                                                                                           |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------ |
-| `project`    | `open`, `isSite`, `isRepo`                                                                                                     |
+| `project`    | `open`, `isSite`, `isRepo`, `isMultilingual`                                                                                   |
 | `git`        | `ahead`, `behind`, `dirtyCount`                                                                                                |
 | `document`   | `open`, `dirty`, `mode`, `canUndo`, `canRedo`                                                                                  |
 | `editor`     | `kind` — `canvas` \| `grid` \| `code` \| `diff` \| `library` \| `config` \| `none`                                             |
@@ -1553,6 +1620,26 @@ bypasses the transaction log** — automation mutates documents by running the c
 **No compatibility shim**: a branch that exists to keep an external caller's verb working is that
 caller's coupling living inside the product.
 
+**What `?automation=1` is allowed to change, exhaustively.** Beyond installing the hook, pinning the
+clock and selecting a profile, exactly three behaviours differ, and each is listed here because an
+unlisted one is indistinguishable from the compatibility shim the rule above forbids:
+
+1. `packages/ensure-deps.ts` does not run `bun install`.
+2. `packages/jxsuite-update.ts` does not prompt to update the project's `@jxsuite/*` dependencies.
+3. `ui/layers.ts` holds a toast open instead of retiring it on its timer.
+
+The first two are the same rule — **an automated run opens a project read-only** — and neither
+changes what a picture shows; they refuse to write to someone else's tree. Only the third changes
+what is on screen, and it is argued for in place.
+
+That an uninvited dialog is a **blocking** defect, not a cosmetic one, is a property of the layer
+stack rather than a matter of taste: a dialog renders with an underlay, and an underlay swallows
+every pointer event across the viewport. So a dialog the script did not raise does not appear beside
+the subject — it silently redirects every subsequent click, caret and hover into a scrim, and the
+capture shows one. A run therefore **refuses to photograph a Studio that booted with a modal
+already open**, naming it (`scripts/screenshots/lib/shot.ts`); no shot raises a dialog before its
+first step, so this needs no opt-out.
+
 **"Settled" is a predicate, not a sleep** (`packages/studio/src/services/idle.ts`). `probe.idle()`
 resolves once four subsystems have been quiet for two consecutive animation frames — no renderer
 mid-paint (`store.ts`), no panel scheduler holding a frame or withholding a render
@@ -1572,7 +1659,8 @@ are its own arithmetic and a caller outside the app can only guess at them.
 
 ## 14. Tabs and Document Identity
 
-**Status:** Partial — the identity model and the strip ship; per-pane tab strips and preview tabs are pending.
+> **Status: Partial.** The identity model and the strip ship; per-pane tab strips and preview tabs
+> are pending.
 
 ### 14.1 A tab's id IS its document
 
@@ -1708,8 +1796,10 @@ instruction and wins. A bare `?project=<dir>` means "open this project", and tha
 
 ## 15. Application Preferences
 
-**Status:** Partial — Appearance, Assistant, Accounts and a read-only Keyboard sheet ship; Editor
-behaviour, rebinding and Updates/About are pending.
+> **Status: Partial.** Appearance, Assistant, Accounts and Keyboard ship, the last of them with
+> rebinding: `preferences-keymap.ts` captures a chord, `rebindCommand` refuses a conflicting one,
+> and the result is an override map laid over the registry and remembered across windows. Editor
+> behaviour and Updates/About are pending — neither exists as a pane.
 
 `project.json` configures a **project** and is edited as a project document (`⌘⇧,`, command id
 `settings.open`). **Preferences** (`⌘,`, command id `app.preferences`) configures the
@@ -1746,8 +1836,16 @@ setup notice) repaint without Preferences having to know they exist.
 
 ## 16. Feedback, Problems and Progress
 
-**Status:** Implemented — the notification substrate, the Bottom dock and all three of its tabs
-(Problems, Logic, Activity), and the inline field slot.
+> **Status: Implemented.** The notification substrate, the Bottom dock and all three of its tabs
+> (Problems, Logic, Activity), the inline field slot and the **announcement** all ship.
+>
+> The announcement was the last piece and it is worth recording where it lives, because the obvious
+> place is wrong. It is not a region on the Problems panel: that panel sits in the Bottom dock, and
+> a live region inside a hidden tab announces nothing. `services/announce.ts` owns two body-level
+> regions — `assertive` and `polite`, because politeness is read when the region is created and not
+> when its text changes (WAI-ARIA §5.2.9) — and `notify()` calls it at one unconditional call site,
+> so a record cannot be posted without being announced and a future host inherits announcements
+> without knowing the module exists. See §19.
 
 Studio's predecessor had one feedback surface: a 24px status bar carrying 78 outcomes — successes
 and failures alike — in identical 11px grey text, destroyed after 3000ms. Nothing persisted, nothing
@@ -1863,12 +1961,43 @@ beats being current — and that deferral is now visible rather than silent. A p
 from before the last edit is correct; a panel showing it with no indication is indistinguishable
 from a panel that has stopped working.
 
+### 16.6 Reports about the author's own content
+
+> **Status: Implemented.**
+
+Two checks run over the document rather than over the app, and both file their findings as
+**Problems**: the accessibility report (`services/a11y-report.ts`) and the SEO warnings the Search
+appearance window already computed.
+
+**Why Problems and not a panel of their own.** Problems is where this app keeps the records that
+outlive the frame the reader was not watching, and both of these are exactly that: a page shipped
+with no description, or with an unlabelled image, is a fact worth knowing whether or not the author
+thought to open a window. The Search appearance window keeps rendering its own list — the previews
+are what that window is for — and files the same warnings, keyed by warning id, so the two surfaces
+are naming one thing rather than two.
+
+**No score, in either report.** A single figure out of a hundred aggregates unrelated facts into a
+verdict, and the verdict is what gets optimised. The list is the report.
+
+**Every accessibility finding names its WCAG criterion**, which is what ATAG 2.0 B.3.1 asks a report
+to carry. B.3.2 — a repair the author can invoke from the finding — is only partly answered: a
+finding whose repair is a command carries it, and most repairs ("give this image alt text") have no
+command yet, so those findings carry none. Naming a command that merely reopens a panel would put a
+button on a finding that does not do what the button says.
+
+**A run says what it could NOT check.** Colour contrast between computed colours, target size in
+rendered pixels, focus order and reading order are all properties of built output in a browser, not
+of a document tree; answering them means running the page with an engine like axe-core. Two
+Problems name that absence on every run, because a report that lists nothing otherwise reads as
+"this page is accessible" — a claim the run cannot make. This is the `redirects-grid.ts` idiom, for
+the same reason it exists there.
+
 ---
 
 ## 17. Project Documents (Settings and Styles)
 
-**Status:** Partial — `project.json` is a document under the transaction log and both surfaces
-render from it; the formatting-preserving writer described in §17.2 is not built.
+> **Status: Partial.** `project.json` is a document under the transaction log and both surfaces
+> render from it; the formatting-preserving writer described in §17.2 is not built.
 
 Project configuration used to be edited through a modal by **29 fire-and-forget call sites across
 eight files**, twenty-one of which dropped a rejected write on the floor — `void
@@ -1880,8 +2009,8 @@ highest-consequence silent-failure path, and it wrote the file that defines the 
 `project.json` is a **Tab**, which is what makes the rest true rather than aspirational: it gets
 undo, the dirty flag, ⌘S and the history delegate from the same machinery every document uses. Two
 surfaces render it — **Project Settings** (sections as inner nav: Overview, Contexts, Site head,
-Definitions, Content types, Packages, Extensions, Deploy, Raw JSON) and **Project Styles** (§7) —
-and both edit one object.
+Locales, Definitions, Content types, Packages, Extensions, Deploy, Raw JSON) and **Project Styles**
+(§7) — and both edit one object.
 
 Three rules follow, and they are the section's whole content:
 
@@ -1924,8 +2053,8 @@ inline (§16), rather than writing and hoping.
 
 ## 18. Panes
 
-**Status:** Implemented — the pane grid, two live Canvas panes, per-pane canvas state, the jump bar,
-the dock takeovers and derived panes.
+> **Status: Implemented.** The pane grid, two live Canvas panes, per-pane canvas state, the jump
+> bar, the dock takeovers and derived panes.
 
 ### 18.1 A pane is where a document is shown
 
@@ -2031,10 +2160,10 @@ its inputs change, and **Pin** ends the following and leaves an ordinary tab.
     `Tab` because `session.ui` is per-tab: the two panes disagree about mode, scroll and zoom while
     agreeing about content. So a projection shares the source's document and history _by reference_
     and carries its own session, and its id names the lens as well as the document.
-2.  **A follow** — Layout and Component definition. These are _different documents_, and a second
-    id over one file would be two documents, two undo stacks, two collaboration rooms and a race to
-    save. §14.1 read in the other direction. So the pane opens the ordinary path-keyed tab and the
-    rule only decides _which_.
+2.  **A follow** — Layout, Component definition, and the same page in another language. These are
+    _different documents_, and a second id over one file would be two documents, two undo stacks,
+    two collaboration rooms and a race to save. §14.1 read in the other direction. So the pane opens
+    the ordinary path-keyed tab and the rule only decides _which_.
 3.  **Neither** — "the same page at ⟨breakpoint⟩" is one artboard of the design board the pane
     already draws. It was specified as a preset and is a filter.
 
@@ -2050,6 +2179,23 @@ documents a close-all would lose.
 gesture that puts a document there — a split, a compare, a drill-in — releases the rule rather than
 stacking on it. The author asked for a document to be somewhere; the projection had nothing to lose.
 
+**The `locale` preset is a follow, and it is the one that had to prove the distinction.** Jx has no
+message catalogue (`site-architecture.md` §13.3): a translation is a different file in a different
+directory, so "the same page in French" opens that file rather than re-rendering this one. A preset
+that redrew the pane under another language would be describing a system Jx does not have. Its label
+and its chip are unfinished phrases completed by the locale's own autonym — "Same page in français"
+— for the reason the breakpoint chip's is: a strip reading "Same page in" over a French document
+says nothing the pane beside it did not already say.
+
+Where a translation _would_ live is string math on the path (§13.5's `translationPathFor`); whether
+anybody has written it is a question only the disk can answer, and the resolver is pure and
+synchronous. So the derivation carries a **probe**: it asks once per wanted path, and until the
+answer lands the pane holds. A locale with no copy yet is `unavailable` **with the sentence that
+names the recovery**, never a blank pane under a chip naming a language — the case §18.4's last
+paragraph refuses, in the one preset where the missing document is the ordinary situation rather
+than the error. `fileExists` joins `openFileInPane` and `loadDiff` as the third read injected into
+the derivation for exactly this, and for the same reason: the module that decides owns no I/O.
+
 **A preset that cannot be supplied is not offered**, and one that stops resolving says so on the
 stage rather than leaving the pane blank. A pane showing a rule that has gone quiet still names the
 document it holds and offers the verb that ends the follow — the alternative is a pane with no
@@ -2057,8 +2203,127 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ---
 
+## 20. Internationalization Surfaces
+
+> **Status: Partial.** The locale reader, the rendering-language segment, the locale companion, the
+> Languages panel, the Locales settings section and the five verbs ship. What is missing is stated
+> in §20.2: a freshly mounted artboard does not learn its pane's rendering language until the value
+> next changes, because the locale is posted to a live host rather than carried on the render
+> message.
+
+Everything here is a reading of one project fact — the `i18n` block `site-architecture.md` §13
+defines — and none of it is a second implementation of it. **Studio resolves locales with the
+compiler's own `resolveI18n`**, which is why the function lives in `@jxsuite/schema/locale` rather
+than in the compiler: Studio cannot import that package, and a tag Studio offers must be a tag the
+build accepts. Two resolutions would disagree about what `EN-us` means, and the disagreement would
+surface as a directory the build ignores.
+
+### 20.1 The Locale Reader
+
+`getEffectiveLocales()` sits beside the other effective-value helpers and answers from the live
+project config every time it is called. It is not cached: the project state is replaced wholesale on
+a project switch, so a cached answer would describe a project that is no longer open.
+
+It **drops** the resolver's errors. Every helper beside it answers a render, and a render has
+nowhere to put a sentence; a malformed tag is refused with words in §20.5, before it can reach the
+file. `project.isMultilingual` (§13.4) counts resolved locales rather than array entries, so a
+config listing one tag twice — or one tag and one typo — opens nothing.
+
+### 20.2 Rendering Language
+
+Axis 3 of the pane context bar gains a **Language** segment, on a multilingual project only, and
+`i18n.switchLocale` is the verb behind it. It sets `session.ui.previewLocale`, which persists with
+`activeMedia` and `previewColorScheme` because it is the same kind of fact: an author's view choice
+about this document.
+
+**What it changes is `lang` and `dir` on the artboard, and nothing else.** The text is whatever file
+is open, and the control says so, because a translation is a different file — §18.4's `locale`
+preset is what opens it. That makes this an honest rendering context rather than a label: `dir` is
+what makes an RTL preview actually mirror, and `lang` is what `:lang()` and the font stack select
+on. An undeclared tag is refused rather than clamped, the way `canvas.setBreakpoint` refuses one.
+
+The segment and the bar's summary name the language **only when it differs from the document's own**
+— a French page open in a French pane is not a rendering context worth reporting, and a bar that
+grew a third term in every multilingual project would stop reading as a state. A lens shares its
+tab, so it renders under the tab's preview language whether it asked to or not; its read-only
+Context line states that, for the reason the line exists.
+
+> **Status: Partial.** A host that mounts after the value was set does not receive it — the post
+> goes to live hosts and the render message carries no locale — so a restored `previewLocale` does
+> not reach the artboard until the author touches the control. The fix is a locale on the render
+> payload, beside the colour scheme.
+
+### 20.3 The Locale Companion
+
+`site-architecture.md` §13.5 in a pane: the same page in another language, side by side. Specified
+in §18.4 with the rest of the presets, because it is one of them rather than a surface of its own.
+
+### 20.4 Translation Parity
+
+A project-level Navigator panel, **Languages**, listing one row per translation key and one column
+per declared locale. A cell is `present`, `stale` or `missing`, and each is a button that runs a
+command by id rather than calling a function — which is what makes every cell reachable from the
+palette and from automation, and what gets the per-state refusal for free.
+
+**This is the surface the rest of the toolchain cannot provide.** The build is happy to ship a
+French page that has been wrong for six months, and §13.5 will dutifully advertise it; the Files
+panel draws `fr/` the way it draws any directory, and a page nobody has translated is invisible
+precisely because the file that would prove it does not exist. Parity is a grid over absence.
+
+**The key is the document's, not the path's.** The grid reads `$translationKey` (§13.5) the way the
+build does, because a **localized slug** is exactly the case it exists to report on: keyed by path
+alone, `pages/about.json` and `pages/fr-ca/a-propos.json` are two half-translated pages and four of
+the cells name files nobody should write. One route can be a page or a directory's index, so a
+declared key is matched against the files actually scanned rather than against a spelling.
+
+**Stale is defined once**: the default locale's file for the same key is newer than the
+translation's. A file the platform reports no timestamp for is `present`, never `stale` — an absent
+timestamp is not evidence of being behind.
+
+**Off the rail.** Rail declarations are not filtered by `when`, so a rail button here would spend a
+rail slot in every monolingual project and shift every document panel's chord by one.
+`i18n.showParity` is how the panel is reached, which is why it is one of the verbs.
+
+### 20.5 Declaring Locales
+
+A **Locales** section in Project Settings, writing through the single `project.json` commit
+chokepoint (§17). It is the one place a malformed tag is refused with words, and the one writer of
+`i18n.locales` — `i18n.addLocale` performs the same write rather than a second one, because two
+writers of one key is how the two come to disagree.
+
+The patch is merged at the top level only (§17.3), so the section spreads the parent block itself: a
+patch of `{ i18n: { locales } }` would delete `defaultLocale` and `routing`. `i18n.addLocale` is the
+one verb here **not** gated on `isMultilingual` — a project with no locales is exactly where it is
+needed.
+
+---
+
+## 19. Standards Alignment
+
+External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md). Detailed accessibility conventions live in [`studio-ui-guidelines.md`](./studio-ui-guidelines.md) §14; this section cites what the Studio _shell_ binds.
+
+| Standard                                                                                  | Class        | Binds | Evidence                                                                                                                          | Note                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ----------------------------------------------------------------------------------------- | ------------ | ----- | --------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [WAI-ARIA](https://www.w3.org/TR/wai-aria-1.2/)                                           | **Subset**   | §16   | packages/studio/src/services/announce.ts, packages/studio/tests/announce.test.ts, packages/studio/src/ui/layers.ts                | Every `notify` record reaches a live region, whatever tier it lands in: `announce.ts` keeps one `role="alert"` and one `role="status"` region on `<body>` and `notify()` posts to the one the severity picks (§5.2.9). Body-level rather than panel-level because the Problems panel lives in a dock tab, and a region in a hidden tab announces nothing. Modals carry `role="dialog"` with `aria-modal`. Absent: the wider authoring surfaces, whose conventions are `studio-ui-guidelines.md` §14.                                                  |
+| [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457)                                        | **Subset**   | §16   | packages/studio/src/platform-errors.ts, packages/studio/src/platforms/devserver.ts, packages/studio/tests/platform-errors.test.ts | A Problem's message comes from one reader over every shape a backend has sent, so a failure can no longer surface blank because the reader that ran was not the one for the shape that arrived. `problemDetail` answers `null` rather than a generic string, which is what lets each call site keep its own better words. Absent: `instance`.                                                                                                                                                                                                         |
+| [BCP 47](https://www.rfc-editor.org/info/bcp47)                                           | **Subset**   | §20   | packages/schema/src/locale.ts, packages/schema/tests/locale.test.ts, packages/studio/src/settings/locales-section.ts              | Studio offers and accepts only tags the shared canonicalizer accepts — the same function the build runs — so a locale declared in Studio cannot fail the build, and a directory Studio names is a directory the router matches. Well-formedness only; the IANA registry is not consulted, so `zz` is accepted here exactly as it is there.                                                                                                                                                                                                            |
+| [UAX #9](https://www.unicode.org/reports/tr9/)                                            | **Subset**   | §20.2 | packages/schema/src/locale.ts, packages/studio/src/canvas/iframe-entry.ts, packages/studio/tests/iframe-entry.test.ts             | The preview's `dir` comes from the tag's script, which is what makes an RTL rendering language visibly mirror on the artboard rather than merely relabel it. The direction is resolved on the Studio side and carried with the tag; the frame writes the attribute and renders nothing.                                                                                                                                                                                                                                                               |
+| [ECMA-402](https://ecma-international.org/publications-and-standards/standards/ecma-402/) | **Borrowed** | §20   | packages/schema/src/locale.ts                                                                                                     | `Intl.DisplayNames` names every locale in every Studio surface by its **autonym** — "français", not "French" — because a language menu exists for the reader who does not read the current one. `Intl.Locale` supplies the canonical spelling those surfaces compare on.                                                                                                                                                                                                                                                                              |
+| [ATAG 2.0](https://www.w3.org/TR/ATAG20/)                                                 | **Subset**   | §16.6 | packages/studio/src/services/a11y-report.ts, packages/studio/tests/a11y-report.test.ts, packages/studio/src/panels/head-panel.ts  | Part B.3.1 is met: a check over the author's document files a Problem per finding, each naming its WCAG criterion, and names what it could not check rather than reporting a clean bill. B.3.2 is partial — a repair command is carried where one exists, and most repairs have none yet. Part A is `studio-ui-guidelines.md` §13.1a and §8.2. Everything needing layout or the cascade is a property of built output and is out of scope for a document-tree check; the two Problems that say so are how the boundary is stated rather than implied. |
+
 ## Changelog
 
+- **0.9.35-draft** (2026-08-20) — Declare the Monaco editor feature set in monaco-setup (one register import per capability, and the measured caveat that 0.56.0's contrib graph does not yet honour the exclusions); drop the Monaco de-duplication plugin now that the first-party collab binding leaves one importer.
+- **0.9.34-draft** (2026-08-19) — A stage with no pan/zoom surface leaves the wheel to the scroll container under it, and blocks ctrl/cmd+wheel page zoom instead of handing it to the browser.
+- **0.9.33-draft** (2026-08-19) — §20.4: the parity grid keys on the document's $translationKey, so a localized slug is one row rather than two half-translated ones.
+- **0.9.32-draft** (2026-08-19) — §20 Internationalization Surfaces — the locale reader, the rendering-language axis, the locale companion, the Languages parity panel and the Locales settings section; §18.4 gains the locale preset and its probe.
+- **0.9.31-draft** (2026-08-19) — §13.5 lists the three behaviours ?automation=1 may change, and makes booting with an uninvited modal a refusal — an underlay swallows the viewport, so a dialog nobody scripted scrims the capture.
+- **0.9.30-draft** (2026-08-18) — §15: the Keyboard sheet is no longer read-only — rebinding ships, Editor and Updates/About remain pending.
+- **0.9.29-draft** (2026-08-18) — §16 and §19: the notify announcement ships — correct a marker and a WAI-ARIA note that both described the gap it closed.
+- **0.9.28-draft** (2026-08-18) — §6.8: the From data… picker addresses only what it can list — nested paths and tokens holding a dot or slash are legal pointers it cannot author.
+- **0.9.27-draft** (2026-08-16) — §16.6 reports about the author's own content — an ATAG Part B accessibility check and the SEO warnings both file Problems, each finding naming its WCAG criterion, and each run naming what it could not check. Closes gap:atag-authoring-support.
+- **0.9.26-draft** (2026-08-16) — §16 one Problem reader over every backend failure shape; gap:studio-error-reader closed.
+- **0.9.25-draft** (2026-08-15) — Add §19 Standards Alignment; six bare **Status:** lines converted to the blockquote form no tool could read, and §16 marked Partial — the one status channel has no live region for the error tier.
 - **0.9.24-draft** (2026-08-13) — Open in Browser serves the built site on its own origin; the build reports the URL.
 - **0.9.23-draft** (2026-08-13) — Open in Browser opens the page's route on a server that serves the built site there, and builds it first.
 - **0.9.22-draft** (2026-08-13) — The slash menu is recognised at the editing host and gains a named door (insert.openSlashMenu).
@@ -2138,4 +2403,4 @@ chrome, no exit and no explanation, which is the shape §16 exists to refuse.
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.24-draft_
+_`@jxsuite/studio` Specification v0.9.35-draft_

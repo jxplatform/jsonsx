@@ -42,7 +42,7 @@
     },
     "extensions/auth": {
       "name": "@jxsuite/auth",
-      "version": "0.4.2",
+      "version": "0.5.0",
       "dependencies": {
         "@jxsuite/connector": "workspace:^",
         "@jxsuite/schema": "workspace:^",
@@ -56,7 +56,7 @@
     },
     "extensions/connector": {
       "name": "@jxsuite/connector",
-      "version": "0.4.2",
+      "version": "0.5.0",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
         "kysely": "^0.29.5",
@@ -70,9 +70,19 @@
         "hono": "^4.13.3",
       },
     },
+    "extensions/feed": {
+      "name": "@jxsuite/feed",
+      "version": "0.2.0",
+      "dependencies": {
+        "@jxsuite/schema": "workspace:^",
+      },
+      "devDependencies": {
+        "ajv": "^8.20.0",
+      },
+    },
     "extensions/parser": {
       "name": "@jxsuite/parser",
-      "version": "1.4.1",
+      "version": "1.5.0",
       "dependencies": {
         "@jxsuite/markup": "workspace:^",
         "@jxsuite/schema": "workspace:^",
@@ -100,7 +110,7 @@
     },
     "extensions/search": {
       "name": "@jxsuite/search",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
         "minisearch": "^7.2.0",
@@ -111,8 +121,9 @@
     },
     "packages/ai": {
       "name": "@jxsuite/ai",
-      "version": "0.34.0",
+      "version": "0.35.0",
       "dependencies": {
+        "@jxsuite/protocol": "workspace:^",
         "@vue/reactivity": "3.5.41",
       },
       "devDependencies": {
@@ -121,17 +132,17 @@
     },
     "packages/collab": {
       "name": "@jxsuite/collab",
-      "version": "0.6.0",
+      "version": "0.7.0",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
-        "lib0": "^0.2.99",
-        "y-protocols": "^1.0.6",
-        "yjs": "13.6.27",
+        "lib0": "^0.2.117",
+        "y-protocols": "^1.0.7",
+        "yjs": "13.6.32",
       },
     },
     "packages/compiler": {
       "name": "@jxsuite/compiler",
-      "version": "1.5.0",
+      "version": "2.0.0",
       "bin": {
         "jx": "./bin/jx.js",
       },
@@ -140,7 +151,9 @@
         "@jxsuite/create": "workspace:^",
         "@jxsuite/runtime": "workspace:^",
         "@jxsuite/schema": "workspace:^",
+        "@vue/reactivity": "3.5.41",
         "esbuild": "^0.28.2",
+        "lit-html": "^3.3.3",
         "sharp": "^0.35.3",
       },
       "devDependencies": {
@@ -152,7 +165,7 @@
     },
     "packages/create": {
       "name": "@jxsuite/create",
-      "version": "1.2.2",
+      "version": "1.3.0",
       "bin": {
         "create-jxsuite": "./index.ts",
       },
@@ -162,7 +175,7 @@
     },
     "packages/desktop": {
       "name": "@jxsuite/desktop",
-      "version": "2.0.1",
+      "version": "2.1.0",
       "dependencies": {
         "@jxsuite/compiler": "workspace:^",
         "@jxsuite/create": "workspace:^",
@@ -186,7 +199,7 @@
     },
     "packages/formulas": {
       "name": "@jxsuite/formulas",
-      "version": "0.0.6",
+      "version": "0.0.7",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
       },
@@ -196,7 +209,7 @@
     },
     "packages/import": {
       "name": "@jxsuite/import",
-      "version": "0.38.2",
+      "version": "0.39.0",
       "bin": {
         "jx-import": "./src/cli.ts",
       },
@@ -217,7 +230,7 @@
     },
     "packages/markup": {
       "name": "@jxsuite/markup",
-      "version": "0.4.2",
+      "version": "0.4.3",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
         "hast-util-from-html": "^2.0.3",
@@ -236,14 +249,14 @@
     },
     "packages/protocol": {
       "name": "@jxsuite/protocol",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
       },
     },
     "packages/runtime": {
       "name": "@jxsuite/runtime",
-      "version": "1.3.2",
+      "version": "2.0.0",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
         "@vue/reactivity": "3.5.41",
@@ -254,7 +267,7 @@
     },
     "packages/schema": {
       "name": "@jxsuite/schema",
-      "version": "1.5.0",
+      "version": "1.6.0",
       "dependencies": {
         "@webref/css": "^8.7.2",
         "@webref/elements": "^2.7.1",
@@ -268,7 +281,7 @@
     },
     "packages/server": {
       "name": "@jxsuite/server",
-      "version": "2.0.0",
+      "version": "2.1.0",
       "dependencies": {
         "@jxsuite/collab": "workspace:^",
         "@jxsuite/compiler": "workspace:^",
@@ -290,8 +303,10 @@
     },
     "packages/starters": {
       "name": "@jxsuite/starters",
-      "version": "1.2.2",
+      "version": "1.3.0",
       "devDependencies": {
+        "@jxsuite/parser": "workspace:^",
+        "@jxsuite/runtime": "workspace:^",
         "@jxsuite/schema": "workspace:^",
         "ajv": "^8.20.0",
         "ajv-formats": "^3.0.1",
@@ -299,7 +314,7 @@
     },
     "packages/studio": {
       "name": "@jxsuite/studio",
-      "version": "2.0.1",
+      "version": "2.1.0",
       "dependencies": {
         "@atlaskit/pragmatic-drag-and-drop": "^3.0.0",
         "@atlaskit/pragmatic-drag-and-drop-hitbox": "^2.1.0",
@@ -354,7 +369,6 @@
         "lit-html": "^3.3.3",
         "monaco-editor": "^0.56.0",
         "tabulator-tables": "^6.5",
-        "y-monaco": "^0.1.6",
         "yaml": "^2.9.0",
       },
       "devDependencies": {
@@ -597,6 +611,8 @@
 
     "@better-auth/core": ["@better-auth/core@1.7.1", "", { "dependencies": { "@opentelemetry/semantic-conventions": "^1.41.1", "@standard-schema/spec": "^1.1.0", "zod": "^4.3.6" }, "peerDependencies": { "@better-auth/utils": "0.4.2", "@better-fetch/fetch": "1.3.1", "@cloudflare/workers-types": ">=4", "@opentelemetry/api": "^1.9.0", "better-call": "1.4.0", "jose": "^6.1.0", "kysely": "^0.28.5 || ^0.29.0", "nanostores": "^1.0.1" }, "optionalPeers": ["@cloudflare/workers-types", "@opentelemetry/api"] }, "sha512-eZ9lqcnVLMZ3QtUByRo4VZqkB1ESyRddd9NfWjBdDPgh+jcwLScoIUAqhtHLR8zaSUJZah8OLGlkzObyPdUH7A=="],
 
+    "@better-auth/core": ["@better-auth/core@1.7.1", "", { "dependencies": { "@opentelemetry/semantic-conventions": "^1.41.1", "@standard-schema/spec": "^1.1.0", "zod": "^4.3.6" }, "peerDependencies": { "@better-auth/utils": "0.4.2", "@better-fetch/fetch": "1.3.1", "@cloudflare/workers-types": ">=4", "@opentelemetry/api": "^1.9.0", "better-call": "1.4.0", "jose": "^6.1.0", "kysely": "^0.28.5 || ^0.29.0", "nanostores": "^1.0.1" }, "optionalPeers": ["@cloudflare/workers-types", "@opentelemetry/api"] }, "sha512-eZ9lqcnVLMZ3QtUByRo4VZqkB1ESyRddd9NfWjBdDPgh+jcwLScoIUAqhtHLR8zaSUJZah8OLGlkzObyPdUH7A=="],
+
     "@better-auth/drizzle-adapter": ["@better-auth/drizzle-adapter@1.7.1", "", { "peerDependencies": { "@better-auth/core": "^1.7.1", "@better-auth/utils": "0.4.2", "drizzle-orm": "^0.45.2 || >=1.0.0-rc.1 <2.0.0" }, "optionalPeers": ["drizzle-orm"] }, "sha512-qlqNyg5V9bXHSP68/vtlsiZayhR4hgvEGiS/E3SIj8bCpWWFGmyQkxJbQCqpBmC7vT30wE/kNtJMHIgnV3rkiw=="],
 
     "@better-auth/kysely-adapter": ["@better-auth/kysely-adapter@1.7.1", "", { "peerDependencies": { "@better-auth/core": "^1.7.1", "@better-auth/utils": "0.4.2", "kysely": "^0.28.17 || ^0.29.0" }, "optionalPeers": ["kysely"] }, "sha512-yWCpE1cZpMUj37nD6JFDK+GDR8zS37L5WI73il3qbU9TXtWsxUQKc/5c3IHsHizWQsmcQI8uv2pAFKxsRDa+AQ=="],
@@ -822,6 +838,8 @@
     "@jxsuite/desktop": ["@jxsuite/desktop@workspace:packages/desktop"],
 
     "@jxsuite/examples": ["@jxsuite/examples@workspace:examples"],
+
+    "@jxsuite/feed": ["@jxsuite/feed@workspace:extensions/feed"],
 
     "@jxsuite/formulas": ["@jxsuite/formulas@workspace:packages/formulas"],
 
@@ -1136,6 +1154,8 @@
     "@ttsc/linux-x64": ["@ttsc/linux-x64@0.28.1", "", { "os": "linux", "cpu": "x64" }, "sha512-2deTIhHV3Z9G1hbEzs4YsPTqxKXflnKkkKdup6LUD62ZEa/KQbNGZnsnIoFw41R8uaux+225kCMi8H77KAPocQ=="],
 
     "@ttsc/win32-arm64": ["@ttsc/win32-arm64@0.28.1", "", { "os": "win32", "cpu": "arm64" }, "sha512-JjHCOFYCQLyB9je0T+90RMn1NZY8BavMQHyJZi91qugiLbQLO6JzZMVISG8qQRuEPHpXNE8wqb8+B68NnGER/g=="],
+
+    "@ttsc/win32-x64": ["@ttsc/win32-x64@0.28.1", "", { "os": "win32", "cpu": "x64" }, "sha512-dqvfvb0hXNHRm9eJEMt/YVkHfLd327/AFrZH1sNCemYEbLaCT543Zdv2qMMT4RyJiAGTo0TeXhyHBRaga63/BQ=="],
 
     "@ttsc/win32-x64": ["@ttsc/win32-x64@0.28.1", "", { "os": "win32", "cpu": "x64" }, "sha512-dqvfvb0hXNHRm9eJEMt/YVkHfLd327/AFrZH1sNCemYEbLaCT543Zdv2qMMT4RyJiAGTo0TeXhyHBRaga63/BQ=="],
 
@@ -2505,8 +2525,6 @@
 
     "xpath": ["xpath@0.0.34", "", {}, "sha512-FxF6+rkr1rNSQrhUNYrAFJpRXNzlDoMxeXN5qI84939ylEv3qqPFKa85Oxr6tDaJKqwW6KKyo2v26TSv3k6LeA=="],
 
-    "y-monaco": ["y-monaco@0.1.6", "", { "dependencies": { "lib0": "^0.2.43" }, "peerDependencies": { "monaco-editor": ">=0.20.0", "yjs": "^13.3.1" } }, "sha512-sYRywMmcylt+Nupl+11AvizD2am06ST8lkVbUXuaEmrtV6Tf+TD4rsEm6u9YGGowYue+Vfg1IJ97SUP2J+PVXg=="],
-
     "y-protocols": ["y-protocols@1.0.7", "", { "dependencies": { "lib0": "^0.2.85" }, "peerDependencies": { "yjs": "^13.0.0" } }, "sha512-YSVsLoXxO67J6eE/nV4AtFtT3QEotZf5sK5BHxFBXso7VDUT3Tx07IfA6hsu5Q5OmBdMkQVmFZ9QOA7fikWvnw=="],
 
     "y18n": ["y18n@5.0.8", "", {}, "sha512-0pfFzegeDWJHJIAmTLRP2DwHjdF5s7jo9tuztdQxAhINCdvS+3nGINqPd00AphqJR/0LhANUS6/+7SCb98YOfA=="],
@@ -2521,7 +2539,7 @@
 
     "yauzl": ["yauzl@2.10.0", "", { "dependencies": { "buffer-crc32": "~0.2.3", "fd-slicer": "~1.1.0" } }, "sha512-p4a9I6X6nu6IhoGmBqAcbJy1mlC4j27vEPZX9F4L4/vZT3Lyq1VkFHw/V/PUcB9Buo+DG3iHkT0x3Qya58zc3g=="],
 
-    "yjs": ["yjs@13.6.27", "", { "dependencies": { "lib0": "^0.2.99" } }, "sha512-OIDwaflOaq4wC6YlPBy2L6ceKeKuF7DeTxx+jPzv1FHn9tCZ0ZwSRnUBxD05E3yed46fv/FWJbvR+Ud7x0L7zw=="],
+    "yjs": ["yjs@13.6.32", "", { "dependencies": { "lib0": "^0.2.99" } }, "sha512-lfiJIIC4Xayt5ItynE407ehlE03pCjeOc4hkR4yxxvvNJ4kuiN25B0g+Qp8XagYz361LLL7DCzR5bvFJ81QKtQ=="],
 
     "zod": ["zod@4.4.3", "", {}, "sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ=="],
 
@@ -2580,6 +2598,8 @@
     "@swc/helpers/tslib": ["tslib@2.8.1", "", {}, "sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w=="],
 
     "@ts-morph/common/minimatch": ["minimatch@5.1.9", "", { "dependencies": { "brace-expansion": "^2.0.1" } }, "sha512-7o1wEA2RyMP7Iu7GNba9vc0RWWGACJOCZBJX2GJWip0ikV+wcOsgVuY9uE8CPiyQhkGFSlhuSkZPavN7u1c2Fw=="],
+
+    "@types/bun/bun-types": ["bun-types@1.3.14", "", { "dependencies": { "@types/node": "*" } }, "sha512-4N0ig0fEomHt5R0KCFWjovxow98rIoRwKolrYdCcknNwMekCXRnWEUvgu5soYV8QXtVsrUD8B95MBOZGPvr6KQ=="],
 
     "ast-types/tslib": ["tslib@2.8.1", "", {}, "sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w=="],
 

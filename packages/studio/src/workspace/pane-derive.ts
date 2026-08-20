@@ -36,7 +36,8 @@ import { getNodeAtPath, parentElementPath } from "../store";
 import { canvasPerf } from "../canvas/canvas-perf";
 import { canvasModeOfTab, tabOfPane } from "../canvas/canvas-surface";
 import { parseMediaEntries } from "../utils/canvas-media";
-import { getEffectiveLayoutPath, getEffectiveMedia } from "../site-context";
+import { getEffectiveLayoutPath, getEffectiveLocales, getEffectiveMedia } from "../site-context";
+import { localeLabel, translationPathFor } from "@jxsuite/schema/locale";
 import { shell } from "../shell";
 import {
   activePane,
@@ -62,7 +63,14 @@ import type { GitDiffState, GitFileStatus } from "../types";
 import type { JxPath } from "../state";
 
 /** Every projection `pane.derive` offers, in the order the preset menu lists them. */
-export const DERIVE_PRESETS = ["code", "layout", "component", "diff", "breakpoint"] as const;
+export const DERIVE_PRESETS = [
+  "code",
+  "layout",
+  "component",
+  "diff",
+  "breakpoint",
+  "locale",
+] as const;
 
 export type DerivePreset = (typeof DERIVE_PRESETS)[number];
 
@@ -125,6 +133,16 @@ export interface DerivationDeps {
    * somebody else's file.
    */
   loadDiff: (path: string, fileStatus: string) => Promise<GitDiffState | null>;
+  /**
+   * Is there a file at this project-relative path? The locale companion's one question.
+   *
+   * Injected for the reason {@link openFileInPane} is, and asked at all for a sharper one:
+   * {@link companionTarget} is pure and synchronous, so it cannot stat anything — and a companion
+   * that answers with the path a translation WOULD have hands `openFileInPane` a file that is not
+   * there, which fails into a blank pane under a chip naming a language. The pane has to be able to
+   * say "there is no French copy of this yet", and only a read of the disk can tell it that.
+   */
+  fileExists: (path: string) => Promise<boolean>;
 }
 
 /**
@@ -139,6 +157,7 @@ export interface DerivationDeps {
  */
 export function noopDerivationDeps(): DerivationDeps {
   return {
+    fileExists: () => Promise.resolve(false),
     loadDiff: () => Promise.resolve(null),
     openFileInPane: () => {},
   };
@@ -151,6 +170,12 @@ export const PRESET_LABELS: Readonly<Record<DerivePreset, string>> = {
   component: "Component definition",
   diff: "Diff vs HEAD",
   layout: "Layout",
+  /* An UNFINISHED sentence, like `breakpoint`'s, because the row and the chip both finish it with
+     the locale's own autonym — "Same page in français". Jx has no message catalogue (§13.3): a
+     translation is a different file in a different directory, so this preset opens that file
+     rather than re-rendering this one, and the label says "the same page" about the document
+     rather than about the text on screen. */
+  locale: "Same page in",
 };
 
 // ─── Reading ──────────────────────────────────────────────────────────────────
@@ -177,6 +202,13 @@ export interface DerivedTarget {
    * right one. The impure half acts on it; resolving it stays a read.
    */
   diffPath: string | null;
+  /**
+   * Companion (`locale`): the translation whose EXISTENCE this pane must still establish, or null
+   * when the answer is already in hand. {@link diffPath}'s companion twin, and for the same reason —
+   * the resolver decides WHAT to ask, {@link probeTranslationFor} asks it, and neither answer
+   * carries a `probePath`, so the follow cannot re-enter.
+   */
+  probePath: string | null;
   /**
    * Companion (`layout`): the node to select once the document is on screen, or null.
    *
@@ -219,6 +251,7 @@ export function derivedTarget(paneId: string): DerivedTarget | null {
       media: null,
       mode: null,
       path: null,
+      probePath: null,
       reason: "The pane this one follows has no document open.",
       select: null,
       status: "unavailable",
@@ -227,7 +260,7 @@ export function derivedTarget(paneId: string): DerivedTarget | null {
   if (derived.kind === "lens") {
     return lensTarget(paneId, derived, source);
   }
-  return companionTarget(derived, source);
+  return companionTarget(paneId, derived, source);
 }
 
 /** A lens's target: a mode, and for `breakpoint` a media the source document actually declares. */
@@ -242,6 +275,7 @@ function lensTarget(
     media: derived.media,
     mode: derived.mode,
     path: null,
+    probePath: null,
     select: null,
   };
   if (derived.preset === "diff") {
@@ -325,8 +359,16 @@ function gitChangeFor(path: string | null): GitFileStatus | null {
  * and one nobody leaves open. Clicking a paragraph outside any component resolves to no definition;
  * blanking the pane on that click makes it flicker between a document and an empty state as the
  * author works, and this is the preset somebody leaves open all day.
+ *
+ * **A hold is only honest where the next gesture could answer differently.** `component` holds
+ * because the author's next click may land inside one. `locale` does not: a document with no copy
+ * in that language has no copy in it until somebody writes one, and a pane silently holding the
+ * previous document under a chip saying "Same page in français" is a lie the author cannot see
+ * through. That answer is `unavailable` with the sentence, which is what makes creating the
+ * translation the obvious next move rather than a guess.
  */
 function companionTarget(
+  paneId: string,
   derived: Extract<PaneDerivation, { kind: "companion" }>,
   source: Tab,
 ): DerivedTarget {
@@ -348,6 +390,7 @@ function companionTarget(
       ? {
           ...base,
           path: null,
+          probePath: null,
           reason: "This page has no layout.",
           select: null,
           status: "unavailable",
@@ -355,6 +398,7 @@ function companionTarget(
       : {
           ...base,
           path,
+          probePath: null,
           reason: "",
           /* A SELECTION only when a click produced one. `path` IS `hit.layoutFile` whenever there
              is a hit — the line above says so — so a second `hit.layoutFile === path` guard here
@@ -365,19 +409,72 @@ function companionTarget(
           status: "ready",
         };
   }
+  if (derived.preset === "locale") {
+    /* WHERE THE TRANSLATION WOULD LIVE, which is a different question from whether it is there.
+       `translationPathFor` is the same string math the build runs, so the path this resolves to is
+       the path the site would serve; it answers null for a document no locale can address at all —
+       a layout, a component, a file at the project root — and for a tag the project stopped
+       declaring, which is the case {@link presetRefusal} cannot catch because it runs once. */
+    const i18n = getEffectiveLocales();
+    const wanted =
+      source.documentPath === null || derived.locale === null
+        ? null
+        : translationPathFor(source.documentPath, derived.locale, i18n);
+    if (wanted === null) {
+      return {
+        ...base,
+        path: null,
+        probePath: null,
+        reason: "This document has no path in that locale.",
+        select: null,
+        status: "unavailable",
+      };
+    }
+    /* AND WHETHER IT IS THERE, which this function cannot ask: it is pure and synchronous, and
+       handing back a path for a file that does not exist makes `openFileInPane` fail into a blank
+       pane — §18.4's last paragraph refuses exactly that. {@link _localeProbes} is the same shape
+       {@link _diffLoads} is, for the same reason: a terminal answer written onto `derived.status`
+       is overwritten by the next frame's resolve, so the pane would say "Loading…" forever about a
+       file nobody is reading. */
+    const probe = _localeProbes.get(paneId);
+    if (probe?.path !== wanted || probe.exists === null) {
+      return {
+        ...base,
+        path: null,
+        probePath: wanted,
+        reason: "",
+        select: null,
+        status: "loading",
+      };
+    }
+    if (!probe.exists) {
+      return {
+        ...base,
+        path: null,
+        probePath: null,
+        reason:
+          `No ${localeLabel(derived.locale)} copy of this document yet — ` +
+          "the Languages panel can create one.",
+        select: null,
+        status: "unavailable",
+      };
+    }
+    return { ...base, path: wanted, probePath: null, reason: "", select: null, status: "ready" };
+  }
   const path = componentPathUnderSelection(source);
   if (path === null) {
     return derived.resolved === null
       ? {
           ...base,
           path: null,
+          probePath: null,
           reason: "Select an element inside a component to see its definition.",
           select: null,
           status: "unavailable",
         }
-      : { ...base, path: null, reason: "", select: null, status: "ready" };
+      : { ...base, path: null, probePath: null, reason: "", select: null, status: "ready" };
   }
-  return { ...base, path, reason: "", select: null, status: "ready" };
+  return { ...base, path, probePath: null, reason: "", select: null, status: "ready" };
 }
 
 /** Every size breakpoint a document declares, plus `null` for base. */
@@ -449,7 +546,8 @@ export function setPaneDerivation(paneId: string, derivation: PaneDerivation): v
 }
 
 /**
- * Write `pane.derived` and forget the pane's in-flight diff answer. **The only writer, both ways.**
+ * Write `pane.derived` and forget the answers the previous one had in hand — its comparison and its
+ * translation probe alike. **The only writer, both ways.**
  *
  * A new derivation is a new question, so the previous one's answer is not an answer to it — and a
  * pane that has stopped deriving has no question at all. That was two `_diffLoads.delete` calls
@@ -465,6 +563,7 @@ function writeDerivation(paneId: string, derivation: PaneDerivation | null): voi
   const pane = paneById(paneId);
   if (pane) {
     _diffLoads.delete(paneId);
+    _localeProbes.delete(paneId);
     pane.derived = derivation;
   }
 }
@@ -532,6 +631,11 @@ export function applyDerivation(paneId: string, deps: DerivationDeps): void {
     loadDiffFor(paneId, target, deps);
     return;
   }
+  /* FIRST, unlike {@link loadDiffFor}, which is the last thing the lens half does. A probe that has
+     not answered yet resolves to `path: null` — the hold — and the hold returns two statements
+     below, so a call at the end of this function would never be reached by the one target that
+     needs it. */
+  probeTranslationFor(paneId, target, deps);
   /* THE MEMO IS ABOUT WHAT IS ON SCREEN, so it cannot outlive the document being on screen.
      A resolved companion owns a real tab, so `panels/tab-strip.ts` draws a real chip with a real
      ✕ — and closing it left the pane holding a derivation whose `resolved` still named the file
@@ -632,6 +736,56 @@ function loadDiffFor(paneId: string, target: DerivedTarget, deps: DerivationDeps
     })
     .catch((error: unknown) => {
       console.error("loadDiff error:", error);
+    });
+}
+
+/**
+ * Which translation each locale companion has ASKED about, and whether it is there.
+ *
+ * {@link _diffLoads}'s twin, and cleared by the same writer for the same reason. `exists` is
+ * THREE-valued on purpose: `null` is "asked, no answer yet", which is the state the pane draws
+ * "Loading…" for, and it cannot be folded into `false` — `false` is a terminal answer with a
+ * sentence naming the language and offering to create the file, and showing that sentence for the
+ * frame between the question and the answer would tell the author their translation is missing
+ * every time they open the pane.
+ */
+const _localeProbes = new Map<string, { path: string; exists: boolean | null }>();
+
+/**
+ * Ask whether the translation a locale companion wants is on disk, once per wanted path.
+ *
+ * @param {string} paneId
+ * @param {DerivedTarget} target
+ * @param {DerivationDeps} deps
+ */
+function probeTranslationFor(paneId: string, target: DerivedTarget, deps: DerivationDeps): void {
+  const path = target.probePath;
+  if (path === null || _localeProbes.get(paneId)?.path === path) {
+    return;
+  }
+  _localeProbes.set(paneId, { exists: null, path });
+  deps
+    .fileExists(path)
+    .then((exists) => {
+      const live = paneById(paneId)?.derived;
+      /* THE ANSWER TO THE QUESTION THAT IS STILL BEING ASKED. A read issued for `fr` that lands
+         after the author retargeted the pane at `de` would otherwise write `de`'s memo with `fr`'s
+         answer — the same late-landing hazard {@link loadDiffFor} carries, and the same guard. */
+      if (
+        live?.kind !== "companion" ||
+        live.preset !== "locale" ||
+        _localeProbes.get(paneId)?.path !== path
+      ) {
+        return;
+      }
+      _localeProbes.set(paneId, { exists, path });
+      /* Re-resolve rather than writing a status here, for {@link loadDiffFor}'s reason: both
+         answers are composed by {@link companionTarget} beside every other one, and neither of
+         them carries a `probePath`, so this cannot re-enter. */
+      applyDerivation(paneId, deps);
+    })
+    .catch((error: unknown) => {
+      console.error("fileExists error:", error);
     });
 }
 
@@ -737,6 +891,17 @@ export function installDerivationEffects(paneId: string, deps: DerivationDeps): 
     if (derived.kind === "companion" && derived.preset === "component") {
       void source?.session.selection;
     }
+    /* `locale` ADDS NOTHING, and the omission is the honest answer rather than a gap. The two
+       inputs above — this pane's own tab and the source pane's — are exactly what it reads: the
+       locale is fixed on the derivation, and the file it wants is a function of the source
+       document's path. Its third input, the project's declared locales, CANNOT be tracked:
+       `projectState` is a plain `let` (`store/state.ts`) that `setProjectState` replaces whole, so
+       no effect anywhere observes it. Adding a locale in Project Settings therefore does not
+       re-run this follow; the next retarget — any tab switch in either pane — picks it up, and
+       {@link companionTarget} re-reads the list every time it resolves, so the pane cannot go on
+       showing a locale the project has stopped declaring. A `void` read of a non-reactive value
+       would look like a subscription and be none, which is the shape the `layout` preset shipped
+       a release of. */
     if (derived.kind === "companion" && derived.preset === "layout") {
       /* The LAYOUT hit, which is what "Open Layout →" is a follow of. It changes only when the
          author clicks layout chrome (`iframe-host.ts` writes it) or clicks page content (which
@@ -771,15 +936,21 @@ export function installDerivationEffects(paneId: string, deps: DerivationDeps): 
  * renders each row disabled with the sentence this returns, and `run` throws a `RangeError`
  * carrying it, so the tooltip and the refusal are the same words.
  *
+ * `locale` takes a fourth argument, DEFAULTED rather than added to every call: the two callers that
+ * ask about a breakpoint have nothing to say about a language, and a required parameter would have
+ * made them pass a `null` that means nothing at those sites.
+ *
  * @param {DerivePreset} preset
  * @param {string} sourcePaneId
  * @param {string | null} media
+ * @param {string | null} locale
  * @returns {string | null}
  */
 export function presetRefusal(
   preset: DerivePreset,
   sourcePaneId: string,
   media: string | null,
+  locale: string | null = null,
 ): string | null {
   const source = tabOfPane(sourcePaneId);
   if (!source) {
@@ -826,6 +997,24 @@ export function presetRefusal(
       ? "a page with a layout — this one declares none"
       : null;
   }
+  if (preset === "locale") {
+    /* THE PROJECT'S OWN LIST, read at the moment the menu is drawn. `projectState` is a plain
+       module-level `let` replaced wholesale by `setProjectState`, so a locale added in Project
+       Settings is visible to the next call and to nothing that cached one. */
+    const i18n = getEffectiveLocales();
+    if (i18n === null || i18n.locales.length < 2) {
+      return "a project that declares more than one locale — see Project Settings › Locales";
+    }
+    /* A PATH, because a translation is a FILE (§13.3) rather than a rendering: an unsaved document
+       has nowhere for its sibling to be, and `translationPathFor` would answer null for it one
+       frame later with a sentence about locales instead of about saving. */
+    if (source.documentPath === null) {
+      return "a document that has been saved";
+    }
+    return locale !== null && i18n.locales.includes(locale)
+      ? null
+      : "a locale this project declares";
+  }
   return null;
 }
 
@@ -867,7 +1056,23 @@ function derivationFor(
   preset: DerivePreset,
   sourcePaneId: string,
   media: string | null,
+  locale: string | null = null,
 ): PaneDerivation {
+  /* A COMPANION, because the French copy of this page is a different FILE — §13.3 has no message
+     catalogue, so there is no rendering of this document that is the French one. A lens here would
+     be a second copy of the same page under a chip naming another language, which is the defect
+     this module's own header warns about: a projection that changes only the chip. */
+  if (preset === "locale") {
+    return {
+      kind: "companion",
+      locale,
+      preset,
+      reason: "",
+      resolved: null,
+      sourcePaneId,
+      status: "loading",
+    };
+  }
   if (preset === "layout" || preset === "component") {
     return {
       kind: "companion",
@@ -946,6 +1151,7 @@ export function derivationCommands(deps: DerivationDeps): AnyCommand[] {
     {
       args: argsSchema(
         {
+          locale: stringProperty('BCP 47 tag for preset "locale". Ignored by every other preset.'),
           media: stringProperty(
             'Breakpoint name for preset "breakpoint" — omit or leave empty for the base size. ' +
               "Ignored by every other preset.",
@@ -991,8 +1197,9 @@ export function derivationCommands(deps: DerivationDeps): AnyCommand[] {
            `stringArg` underneath, which REFUSES `""` — so the two operators cannot disagree here,
            and the `||` implied a blank the caller can never deliver. */
         const media = optionalStringArg("pane.derive", args, "media") ?? null;
+        const locale = optionalStringArg("pane.derive", args, "locale") ?? null;
         const source = activePane();
-        const refusal = presetRefusal(preset, source.id, media);
+        const refusal = presetRefusal(preset, source.id, media, locale);
         if (refusal) {
           throw new RangeError(
             `command "pane.derive" argument "preset": "${preset}" requires ${refusal}`,
@@ -1006,7 +1213,7 @@ export function derivationCommands(deps: DerivationDeps): AnyCommand[] {
            was no longer in the grid. `paneIsEmpty` counts a derivation as a subject; giving the
            pane one first is what makes the hand-back safe. Nothing renders between these two
            statements — `run` is synchronous to the end — so no frame observes a lens with tabs. */
-        setPaneDerivation(target.id, derivationFor(preset, source.id, media));
+        setPaneDerivation(target.id, derivationFor(preset, source.id, media, locale));
         /* NOTHING IS CLOSED. Whatever the side pane was holding goes back to the pane the author
            is in — the same promise `closePane` makes — so a derivation is a layout action rather
            than a destructive one. */

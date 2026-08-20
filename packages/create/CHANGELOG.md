@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.3.0](https://github.com/jxsuite/jx/compare/create-v1.2.2...create-v1.3.0) (2026-08-19)
+
+
+### Features
+
+* **create:** export the template version map by name ([886296e](https://github.com/jxsuite/jx/commit/886296ea5ac8bf5e4e9ee7a7ba5139a4b84b2a3d))
+
+
+### Bug Fixes
+
+* **starters:** pin template dependency ranges to the versions that released ([9ae71de](https://github.com/jxsuite/jx/commit/9ae71de8897bba2cdd626817d7271c03003bd5d7))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/starters bumped to 1.3.0
+
 ## [1.2.2](https://github.com/jxsuite/jx/compare/create-v1.2.1...create-v1.2.2) (2026-07-30)
 
 

@@ -73,6 +73,20 @@ export async function launchBrowser(opts: { headed?: boolean } = {}): Promise<Br
     env: { ...process.env, ...DETERMINISM_ENV },
     executablePath,
     headless: !opts.headed,
+    /*
+     * WebDriver BiDi (W3C) rather than CDP.
+     *
+     * CDP is Chrome's own protocol and no standard describes it; BiDi is the W3C's, and driving the
+     * pipeline over it is the difference between "we automate a browser" and "we automate a browser
+     * the way the standard says to". The capture is unchanged either way — every API this pipeline
+     * uses (`setViewport`, `emulateMediaFeatures`, `evaluateOnNewDocument`, `goto`, `evaluate`,
+     * `waitForFunction`, `frames`, `screenshot`) works over both, and `capture.lock.json` did not
+     * move when the protocol did, which is the acceptance criterion this change was held to.
+     *
+     * `JX_SHOTS_PROTOCOL=cdp` falls back, so a BiDi regression in a Chromium release is one
+     * environment variable rather than a revert.
+     */
+    protocol: process.env.JX_SHOTS_PROTOCOL === "cdp" ? "cdp" : "webDriverBiDi",
   });
 }
 

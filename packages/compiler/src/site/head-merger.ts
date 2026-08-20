@@ -59,10 +59,23 @@ export function mergeHead(
   // Add canonical URL if provided
   if (context.pageUrl && context.siteUrl) {
     const canonical = new URL(context.pageUrl, context.siteUrl).href;
-    merged.set("link:canonical", {
-      attributes: { href: canonical, rel: "canonical" },
-      tagName: "link",
-    });
+    /*
+     * An author-supplied canonical wins, like every other auto-injected entry (§8.4). This used a
+     * hand-written `link:canonical` key that `headEntryKey` never produces, so the author's entry
+     * and this one landed under different keys and the page got BOTH — which is the one thing a
+     * canonical link must not be.
+     */
+    const hasAuthored = [...merged.values()].some(
+      (e) =>
+        e && typeof e === "object" && e.tagName === "link" && e.attributes?.rel === "canonical",
+    );
+    if (!hasAuthored) {
+      const entry: JxHeadEntry = {
+        attributes: { href: canonical, rel: "canonical" },
+        tagName: "link",
+      };
+      merged.set(headEntryKey(entry), entry);
+    }
     // Auto OpenGraph identity (site-architecture §8.4) — author-supplied values win.
     if (!merged.has("meta:og:url")) {
       merged.set("meta:og:url", {
@@ -76,6 +89,26 @@ export function mergeHead(
       attributes: { content: context.siteName, property: "og:site_name" },
       tagName: "meta",
     });
+  }
+
+  /*
+   * Locale alternates (site-architecture.md §13.5). Keyed through `headEntryKey` like everything
+   * else, which is what keeps a set of them from collapsing: they share `rel="alternate"` and
+   * differ only in `hreflang`, and `x-default` conventionally shares its `href` with the default
+   * locale's entry. Before the key accounted for the qualifying attribute this whole feature was
+   * impossible — the set became one link.
+   *
+   * An author-supplied alternate for the same `hreflang` wins, like every other auto entry.
+   */
+  for (const alternate of context.alternates ?? []) {
+    const entry: JxHeadEntry = {
+      attributes: { href: alternate.href, hreflang: alternate.hreflang, rel: "alternate" },
+      tagName: "link",
+    };
+    const key = headEntryKey(entry);
+    if (!merged.has(key)) {
+      merged.set(key, entry);
+    }
   }
 
   return [...merged.values()];
@@ -116,9 +149,17 @@ function headEntryKey(entry: JxHeadEntry) {
     return `meta:${attrs.property}`;
   }
 
-  // <link rel="..." href="..."> — keyed by rel+href
+  /*
+   * <link> — keyed by rel + href + the attribute that distinguishes two links sharing both.
+   *
+   * `rel` + `href` alone is not identity, and the cases where it fails are the ones a site actually
+   * needs: `hreflang="x-default"` conventionally points at the SAME href as the default locale's
+   * alternate, and an RSS and an Atom feed are both `rel="alternate"` differing only in `type`.
+   * `icon` differs by `sizes` and `stylesheet` by `media` for the same reason.
+   */
   if (tag === "link" && attrs.rel) {
-    return `link:${attrs.rel}:${attrs.href ?? ""}`;
+    const qualifier = attrs.hreflang ?? attrs.type ?? attrs.media ?? attrs.sizes ?? "";
+    return `link:${attrs.rel}:${attrs.href ?? ""}:${String(qualifier)}`;
   }
 
   // <script src="..."> — keyed by src
@@ -128,9 +169,8 @@ function headEntryKey(entry: JxHeadEntry) {
 
   // <style> — unique per content hash
   if (tag === "style") {
-    const content = Array.isArray(entry.children)
-      ? entry.children.join("")
-      : (entry.textContent ?? "");
+    const raw = Array.isArray(entry.children) ? entry.children.join("") : entry.textContent;
+    const content = typeof raw === "object" && raw !== null ? JSON.stringify(raw) : (raw ?? "");
     return `style:${simpleHash(content)}`;
   }
 
@@ -191,10 +231,14 @@ function renderHeadEntry(entry: JxHeadEntry) {
     return open;
   }
 
-  // Elements with content
-  const content = Array.isArray(entry.children)
-    ? entry.children.join("")
-    : (entry.textContent ?? "");
+  /*
+   * Elements with content. `textContent` may be an OBJECT: that is how a JSON-LD block is authored
+   * (§8.5), and serializing it here is what the spec has always promised. Left as-is it reached the
+   * page as the string "[object Object]".
+   */
+  const raw = Array.isArray(entry.children) ? entry.children.join("") : entry.textContent;
+  const content =
+    raw !== null && typeof raw === "object" ? JSON.stringify(raw, null, 2) : (raw ?? "");
   return `${open}${content}</${tag}>`;
 }
 

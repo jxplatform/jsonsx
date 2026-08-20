@@ -12,7 +12,15 @@ import { createServer } from "node:http";
 import type { Server } from "node:http";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { extname, join, normalize, resolve, sep } from "node:path";
+import { MEDIA_TYPE_BY_EXTENSION } from "@jxsuite/schema/media-type";
 
+/*
+ * The extensions this server can be asked for. `MEDIA_TYPE_BY_EXTENSION` is spread in **last** so
+ * the registered spellings win: `.md` carries the `variant` that says which markdown it is, and
+ * `.yaml`/`.yml` are `application/yaml` rather than an `application/octet-stream` download prompt.
+ * Everything else is this table's own, because a shared table for `image/png` would be a second
+ * source of truth for something no standard is ambiguous about.
+ */
 const MIME_TYPES: Record<string, string> = {
   ".avif": "image/avif",
   ".css": "text/css; charset=utf-8",
@@ -23,13 +31,13 @@ const MIME_TYPES: Record<string, string> = {
   ".jpg": "image/jpeg",
   ".js": "text/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
-  ".md": "text/markdown; charset=utf-8",
   ".png": "image/png",
   ".svg": "image/svg+xml",
   ".txt": "text/plain; charset=utf-8",
   ".webp": "image/webp",
   ".woff2": "font/woff2",
   ".xml": "application/xml; charset=utf-8",
+  ...MEDIA_TYPE_BY_EXTENSION,
 };
 
 /**

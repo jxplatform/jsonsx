@@ -41,6 +41,8 @@ const { makeContext } = await import("../src/commands/context");
 const { activeRegistry, setActiveRegistry } = await import("../src/commands/active-registry");
 const { canvasViewCommands } = await import("../src/canvas/canvas-utils");
 const { collabState } = await import("../src/collab/collab-state");
+const { getEffectiveLocales } = await import("../src/site-context");
+const { localeLabel } = await import("@jxsuite/schema/locale");
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -151,7 +153,15 @@ function axes(): string[] {
  */
 function installRegistry(ran: string[]) {
   const registry = createCommandRegistry({
-    getContext: () => makeContext({ document: { open: true } }),
+    /* `isMultilingual` is DERIVED here, exactly as `commands/live-context.ts` derives it, rather
+       than asserted true: `i18n.switchLocale` is gated on it, and a fixture that claimed it while
+       `projectState` declared no locales would describe a state the app cannot be in — the same
+       defect the `getCanvasMode` double had. */
+    getContext: () =>
+      makeContext({
+        document: { open: true },
+        project: { isMultilingual: (getEffectiveLocales()?.locales.length ?? 0) > 1, open: true },
+      }),
     mac: true,
   });
   registry.registerAll(
@@ -168,6 +178,9 @@ function installRegistry(ran: string[]) {
         "canvas.setResolvingOpen",
         "canvas.setRouteParam",
         "canvas.setTestProp",
+        // Axis 3's fourth segment. Its id is in the `i18n.` namespace and its definition site is
+        // `canvas-utils.ts`, for the reason that record's comment gives.
+        "i18n.switchLocale",
       ].includes(c.id),
     ),
   );
@@ -615,6 +628,112 @@ describe("rendering context", () => {
     await flush();
     const groups = [...root.querySelectorAll(".pc-ctx-label")].map((el) => el.textContent?.trim());
     expect(groups).toEqual(["Size"]);
+  });
+
+  // ─── The language segment ───────────────────────────────────────────────────
+  /*
+   * A rendering context, not a translation. Jx has no message catalogue, so what these buttons
+   * change is `lang`, `dir` and `$locale` — and the group's own sentence says exactly that, which
+   * is why the tests assert it: a control that let an author believe the page had been translated
+   * would be worse than no control.
+   */
+
+  /** The popover group under `label`, or null — the groups are keyed by their own heading. */
+  function group(label: string): HTMLElement | null {
+    return (
+      ([...root.querySelectorAll(".pc-ctx-group")].find(
+        (g) => g.querySelector(".pc-ctx-label")?.textContent?.trim() === label,
+      ) as HTMLElement | undefined) ?? null
+    );
+  }
+
+  /** A project that declares `locales`, with `path` open. */
+  function multilingual(locales: string[], path = "pages/about.json"): Tab {
+    resetStudioState({ isSiteProject: true, projectConfig: { i18n: { locales } } });
+    const tab = resetWorkspaceWithTab({ children: [], tagName: "div" } as never, {
+      documentPath: path,
+      id: "locale-tab",
+    });
+    tab.capabilities.modes = ["edit", "design", "preview", "source"];
+    return tab;
+  }
+
+  test("there is no language group in a project that declares one language", async () => {
+    multilingual(["en"]);
+    paneContext.mount(root, makeCtx());
+    await flush();
+    // One declared locale is the same as none for this axis: there is nothing to switch TO.
+    expect(group("Language")).toBeNull();
+  });
+
+  test("one button per declared locale, each labelled in its own language", async () => {
+    multilingual(["en", "fr", "ar"]);
+    paneContext.mount(root, makeCtx());
+    await flush();
+
+    const offered = [...group("Language")!.querySelectorAll("sp-action-button")];
+    expect(offered.map((b) => b.textContent?.trim())).toEqual(
+      ["en", "fr", "ar"].map((tag) => localeLabel(tag)),
+    );
+    // The autonym, not the name in the site's language: a reader looking for their own language
+    // Scans for their own word for it.
+    expect(offered[2]?.textContent?.trim()).not.toBe("Arabic");
+  });
+
+  test("the group says what it does and does not do", async () => {
+    multilingual(["en", "ar"]);
+    paneContext.mount(root, makeCtx());
+    await flush();
+    expect(group("Language")!.querySelector("sp-action-group")?.getAttribute("title")).toBe(
+      "The language this pane renders as — its lang and direction only. The text is whatever file is open.",
+    );
+  });
+
+  test("a button writes through the command, onto THIS pane's tab", async () => {
+    const tab = multilingual(["en", "ar"]);
+    paneContext.mount(root, makeCtx());
+    await flush();
+
+    const arabic = [...group("Language")!.querySelectorAll("sp-action-button")].find(
+      (b) => b.textContent?.trim() === localeLabel("ar"),
+    ) as HTMLElement;
+    pointer(arabic, "click");
+    await flush();
+
+    // Through `i18n.switchLocale` — the popover is not the capability, the registry is.
+    expect(tab.session.ui.previewLocale).toBe("ar");
+    expect(
+      [...group("Language")!.querySelectorAll("sp-action-button")]
+        .find((b) => b.hasAttribute("selected"))
+        ?.textContent?.trim(),
+    ).toBe(localeLabel("ar"));
+  });
+
+  test("the document's own language is the selected one until an author says otherwise", async () => {
+    multilingual(["en", "fr"], "pages/fr/a-propos.json");
+    paneContext.mount(root, makeCtx());
+    await flush();
+
+    const offered = [...group("Language")!.querySelectorAll("sp-action-button")];
+    const french = offered.find((b) => b.textContent?.trim() === localeLabel("fr"))!;
+    expect(french.hasAttribute("selected")).toBe(true);
+    // …and it says which one it is, because "no override" is not otherwise visible.
+    expect(french.getAttribute("title")).toContain("the language of the file this pane has open");
+    expect(offered[0]?.getAttribute("title")).not.toContain("the file this pane has open");
+  });
+
+  test("the trigger names the language only when it is not the document's own", async () => {
+    const tab = multilingual(["en", "fr"], "pages/fr/a-propos.json");
+    paneContext.mount(root, makeCtx());
+    await flush();
+    // A French page in a French pane is not a rendering context worth reporting.
+    expect(root.querySelector(".pc-context-trigger")?.textContent?.trim()).toBe("Base ⌄");
+
+    tab.session.ui.previewLocale = "en";
+    await flush();
+    expect(root.querySelector(".pc-context-trigger")?.textContent?.trim()).toBe(
+      `Base · ${localeLabel("en")} ⌄`,
+    );
   });
 
   test("the layout switch shows for a site page with a layout and flips showLayout", async () => {

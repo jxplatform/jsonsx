@@ -1,0 +1,12 @@
+# Coverage is uploaded per workspace under a flag (see the `flags:` key on the codecov steps in
+# .github/workflows/test.yml). Once the test matrix is gated on what a PR actually changed, a
+# workspace the diff cannot reach uploads nothing for that commit — and without carryforward
+# Codecov reads "no upload" as "no coverage" and reports an invented drop against a package the
+# PR never touched.
+#
+# `carryforward` makes a flag with no upload on this commit reuse its last known measurement.
+# Push to main stays ungated precisely so every flag keeps a complete, current baseline for that
+# to carry from.
+flag_management:
+  default_rules:
+    carryforward: true

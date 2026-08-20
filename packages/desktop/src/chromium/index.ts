@@ -73,6 +73,12 @@ import { createProjectServer } from "@jxsuite/server/project-server";
 import { listStarters } from "@jxsuite/starters";
 import { readRecents, writeRecents } from "../recent-store";
 import { readSettings, writeSettings } from "../settings-store";
+import {
+  githubSignIn,
+  githubSignOut,
+  githubTokenStatus,
+  setAuthorizationHost,
+} from "../github-signin";
 import type { RecentProjectEntry } from "../rpc-schema";
 
 // ─── Project root ────────────────────────────────────────────────────────────
@@ -174,6 +180,9 @@ export const handlers: Record<string, (params: unknown) => Promise<unknown>> = {
   getSettings: () => readSettings(),
   saveSettings: (params) =>
     writeSettings((params as { settings: Record<string, string> }).settings),
+  githubSignIn: (params) => githubSignIn(params as { force?: boolean }),
+  githubSignOut: () => githubSignOut(),
+  githubToken: () => githubTokenStatus(),
   jxResolve: (params) => jxResolve(params as { body: string }),
   jxServerFunction: (params) => jxServerFunction(params as { body: string }),
   // Data surface + secrets (desktop twins of /__studio/data/* + /__studio/secrets)
@@ -238,7 +247,7 @@ if (!chromiumBin) {
   process.exit(1);
 }
 
-const { url: serverUrl, rpcToken } = createProjectServer({
+const projectServer = createProjectServer({
   importApi: {
     chromePath: chromiumBin,
     resolveDest: (dir) => {
@@ -251,6 +260,14 @@ const { url: serverUrl, rpcToken } = createProjectServer({
   },
   resolveSession: () => defaultSession,
   studioDir,
+});
+
+const { url: serverUrl, rpcToken } = projectServer;
+
+/* The OAuth loopback redirect lands on this server, so sign-in cannot be wired until it exists. */
+setAuthorizationHost({
+  authorizer: projectServer.authorizer,
+  port: projectServer.server.port ?? 0,
 });
 
 console.log(`[chromium] Studio server at ${serverUrl}`);

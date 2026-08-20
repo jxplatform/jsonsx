@@ -21,12 +21,14 @@ Everything Studio can do is a command, and every command is reachable by name: p
 
 ## File
 
-| Command         | Id                  | Shortcut | Level       | Requires                                             |
-| --------------- | ------------------- | -------- | ----------- | ---------------------------------------------------- |
-| Go to File…     | `palette.openFiles` | `⌘P`     | application | —                                                    |
-| New Entry       | `content.newEntry`  | —        | project     | a project with a directory-backed content collection |
-| Open Entry Form | `content.openEntry` | —        | project     | an open project                                      |
-| Save            | `file.save`         | `⌘S`     | document    | an open document                                     |
+| Command            | Id                       | Shortcut | Level       | Requires                                                          |
+| ------------------ | ------------------------ | -------- | ----------- | ----------------------------------------------------------------- |
+| Create Translation | `i18n.createTranslation` | —        | document    | a document open in a project that declares more than one language |
+| Go to File…        | `palette.openFiles`      | `⌘P`     | application | —                                                                 |
+| New Entry          | `content.newEntry`       | —        | project     | a project with a directory-backed content collection              |
+| Open Entry Form    | `content.openEntry`      | —        | project     | an open project                                                   |
+| Open Translation   | `i18n.openTranslation`   | —        | document    | a document open in a project that declares more than one language |
+| Save               | `file.save`              | `⌘S`     | document    | an open document                                                  |
 
 ## Edit
 
@@ -116,6 +118,7 @@ Everything Studio can do is a command, and every command is reachable by name: p
 | Set Color Scheme               | `canvas.setColorScheme`      | —                     | document    | an open document                                                                                                             |
 | Set Edit Zoom                  | `canvas.setEditZoom`         | —                     | document    | a document in edit mode                                                                                                      |
 | Set Fit                        | `canvas.setFit`              | —                     | document    | a document on the pan-zoom surface                                                                                           |
+| Set Rendering Language         | `i18n.switchLocale`          | —                     | document    | an open document in a project that declares more than one locale                                                             |
 | Set Route Parameter            | `canvas.setRouteParam`       | —                     | document    | an open page with a dynamic route                                                                                            |
 | Set Style Selector             | `style.setSelector`          | —                     | selection   | an element selection                                                                                                         |
 | Set Test Value                 | `canvas.setTestProp`         | —                     | document    | an open component document                                                                                                   |
@@ -133,6 +136,7 @@ Everything Studio can do is a command, and every command is reachable by name: p
 | Show Inspector Dock            | `view.setRightPanel`         | —                     | application | —                                                                                                                            |
 | Show Inspector Section         | `inspector.setSection`       | —                     | document    | an open document                                                                                                             |
 | Show Inspector Tab             | `view.setRightTab`           | —                     | document    | an open document                                                                                                             |
+| Show Languages                 | `panel.focus.i18n`           | —                     | application | an open project                                                                                                              |
 | Show Layout Elements           | `canvas.setLayoutVisible`    | —                     | document    | an open document                                                                                                             |
 | Show Logic                     | `inspector.focus.events`     | `⌘⇧3`                 | document    | an open document                                                                                                             |
 | Show Navigator Dock            | `view.setNavigator`          | —                     | application | —                                                                                                                            |
@@ -144,6 +148,7 @@ Everything Studio can do is a command, and every command is reachable by name: p
 | Show Search                    | `panel.focus.search`         | `⌘2`                  | application | an open project                                                                                                              |
 | Show Source Control            | `panel.focus.git`            | `⌘3`                  | application | an open project                                                                                                              |
 | Show Style                     | `inspector.focus.style`      | `⌘⇧2`                 | document    | an open document                                                                                                             |
+| Show Translation Parity        | `i18n.showParity`            | —                     | project     | a project that declares more than one language                                                                               |
 | Split Right                    | `pane.splitRight`            | `⌘\`                  | document    | an open document                                                                                                             |
 | Switch Layout                  | `view.setLayout`             | —                     | application | an open project                                                                                                              |
 | Toggle Bottom Dock             | `view.toggleBottomDock`      | `⌘J`                  | application | —                                                                                                                            |
@@ -155,26 +160,28 @@ Everything Studio can do is a command, and every command is reachable by name: p
 
 ## Document
 
-| Command                | Id                      | Shortcut           | Level    | Requires                                          |
-| ---------------------- | ----------------------- | ------------------ | -------- | ------------------------------------------------- |
-| Close Document         | `document.close`        | `⌘W`               | document | an open document                                  |
-| Edit Event Handler     | `formula.editEvent`     | —                  | document | an open document                                  |
-| Edit Function          | `formula.editDef`       | —                  | document | an open document that defines state               |
-| Expand Data Row        | `data.expandRow`        | —                  | document | an open document that defines data                |
-| Keep Document Open     | `document.keepOpen`     | —                  | document | a preview document — one opened by a single click |
-| Next Tab               | `document.nextTab`      | `⌃Tab` or `⌘Tab`   | document | a second open document                            |
-| Open Formula Workspace | `formula.openWorkspace` | —                  | document | a selected state entry that holds a formula       |
-| Pin / Unpin Document   | `document.togglePinned` | —                  | document | an open document                                  |
-| Previous Tab           | `document.previousTab`  | `⌃⇧Tab` or `⌘⇧Tab` | document | a second open document                            |
-| Reopen Closed Document | `document.reopenClosed` | `⌘⇧T`              | document | a document closed in this session                 |
-| Search Appearance      | `document.openSeo`      | —                  | document | an open document                                  |
-| Set Document Pinned    | `document.setPinned`    | —                  | document | an open document                                  |
-| Set Draft              | `content.setDraft`      | —                  | document | a content entry open                              |
+| Command                | Id                            | Shortcut           | Level    | Requires                                          |
+| ---------------------- | ----------------------------- | ------------------ | -------- | ------------------------------------------------- |
+| Check Accessibility    | `document.checkAccessibility` | —                  | document | an open document                                  |
+| Close Document         | `document.close`              | `⌘W`               | document | an open document                                  |
+| Edit Event Handler     | `formula.editEvent`           | —                  | document | an open document                                  |
+| Edit Function          | `formula.editDef`             | —                  | document | an open document that defines state               |
+| Expand Data Row        | `data.expandRow`              | —                  | document | an open document that defines data                |
+| Keep Document Open     | `document.keepOpen`           | —                  | document | a preview document — one opened by a single click |
+| Next Tab               | `document.nextTab`            | `⌃Tab` or `⌘Tab`   | document | a second open document                            |
+| Open Formula Workspace | `formula.openWorkspace`       | —                  | document | a selected state entry that holds a formula       |
+| Pin / Unpin Document   | `document.togglePinned`       | —                  | document | an open document                                  |
+| Previous Tab           | `document.previousTab`        | `⌃⇧Tab` or `⌘⇧Tab` | document | a second open document                            |
+| Reopen Closed Document | `document.reopenClosed`       | `⌘⇧T`              | document | a document closed in this session                 |
+| Search Appearance      | `document.openSeo`            | —                  | document | an open document                                  |
+| Set Document Pinned    | `document.setPinned`          | —                  | document | an open document                                  |
+| Set Draft              | `content.setDraft`            | —                  | document | a content entry open                              |
 
 ## Project
 
 | Command                 | Id                      | Shortcut | Level       | Requires                                    |
 | ----------------------- | ----------------------- | -------- | ----------- | ------------------------------------------- |
+| Add Language            | `i18n.addLocale`        | —        | project     | an open project                             |
 | Edit Collection in Grid | `collection.editInGrid` | —        | project     | a project that declares content collections |
 | Edit Redirects          | `redirects.open`        | —        | project     | an open project                             |
 | Import Redirects…       | `redirects.import`      | —        | project     | an open project                             |
@@ -183,6 +190,7 @@ Everything Studio can do is a command, and every command is reachable by name: p
 | Library: Rescan Files   | `library.refresh`       | —        | project     | an open project                             |
 | Library: Set Layout     | `library.setLayout`     | —        | project     | an open project                             |
 | Library: Show Category  | `library.setCategory`   | —        | project     | an open project                             |
+| Library: Show Language  | `library.setLocale`     | —        | project     | a project with more than one locale         |
 | New Project…            | `project.new`           | —        | application | —                                           |
 | Open Data Grid          | `data.openGrid`         | —        | project     | a platform that serves the data routes      |
 | Open Library            | `library.open`          | `⌘⇧E`    | project     | an open project                             |

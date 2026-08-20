@@ -14,6 +14,9 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `ai.md`
 
+- **0.1.7-draft** (2026-08-20) — The Anthropic client yields an error event with code NOT_IMPLEMENTED; it does not throw (§2).
+- **0.1.6-draft** (2026-08-16) — §2 failures are problem documents and the mid-stream frame carries one; gap:ai-problem-details closed.
+- **0.1.5-draft** (2026-08-15) — Add §5 Standards Alignment: SSE, the IANA special-purpose address registries the SSRF guard uses, and the problem+json gap.
 - **0.1.4-draft** (2026-08-12) — The assistant's six capabilities are command records, gated on ai.configured and ai.streaming.
 - **0.1.3-draft** (2026-08-04) — §3.2 the turn is accountable (per-write disk marking, Restore to here, chip outcomes, partial success) and §3.3 the batch follows the document, not the tab.
 - **0.1.2-draft** (2026-07-25) — Schema gate (§3.1): tool-level validation against the active project's entry documents, before-write for disk writes and after-apply on canvas, project.json included.
@@ -22,6 +25,9 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `collab.md`
 
+- **0.2.5-draft** (2026-08-20) — Presence that has ended must stop being published: a client leaving the code view clears its in-buffer text cursor, so peers stop drawing a caret for someone who is no longer there.
+- **0.2.4-draft** (2026-08-16) — §2.1 subprotocol negotiation: jx.collab.v1 offered from the capability probe and echoed on the handshake; §5 wire-envelope skew closed; RFC 7692 non-adoption stated in §2.
+- **0.2.3-draft** (2026-08-15) — Add §6 Standards Alignment; §5 separates wire-envelope skew from document-format skew and is marked Pending.
 - **0.2.2-draft** (2026-08-05) — §4 project.json is excluded from replication, and why.
 - **0.2.1-draft** (2026-08-04) — §4 the four session states, with failed distinguished from detached; freeze and read-only made visible; undo scoping stated in the UI.
 - **0.2.0-draft** (2026-07-28) — Store prose as Y.Text and style/attributes/$props as nested Y.Maps so concurrent edits merge per character and per property; the op bridge diffs whole-value ops onto that structure.
@@ -30,6 +36,13 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `compiler.md`
 
+- **0.3.1-draft** (2026-08-18) — §4.3: separate the emitted-JavaScript accessor form from the pointer grammar it lowers.
+- **0.3.0-draft** (2026-08-17) — §4.3: ref lowering goes through the shared tokenizer — identifier segments dot, all others bracket, so every emitted ref parses.
+- **0.2.1-draft** (2026-08-15) — §3 Implemented — the tiers' inline blocks are hash-nameable and the site build emits the policy.
+- **0.2.0-draft** (2026-08-15) — Client runtime is served from /assets/ instead of esm.sh; browser bundles resolve production export conditions under both backends (§3, §12).
+- **0.1.28-draft** (2026-08-15) — §3: node_modules URLs resolved — bare $head/$elements specifiers land in /assets/.
+- **0.1.27-draft** (2026-08-15) — Add §13 Standards Alignment; §3 marked Partial — inline scripts block a strict CSP and node_modules URLs 404 in production.
+- **0.1.26-draft** (2026-08-14) — $switch compiles on dynamic pages (§9.2); branch subtrees hoisted out of $switch and chosen-tagName constructs (§4.8); prerender treats handler-written entries and computeds reading them as runtime-only, and keeps an array any surviving reader still references (§8.1).
 - **0.1.25-draft** (2026-07-30) — Element modules: props.* attribute intake and $props template bindings, one effect registry stopped on disconnect, state.$map published for map handlers; prerender keeps a repeater whose build-time expansion is empty (§4.1, §4.2, §4.4, §4.7, §8.1).
 - **0.1.24-draft** (2026-07-30) — Element modules: $export aliasing, Request auto-fetch on connect with effect teardown, $map bound in map callbacks, tagName-based output naming; prerender leaves runtime-only reads unresolved (§4.1, §4.7, §8.1).
 - **0.1.23-draft** (2026-07-24) — §1 Overview: condition the generated Hono worker on build.adapter (per-page _server.js without one) and scope the static-build failure to active data/auth mounts; §6.3 document compileSiteServer's mounts/connectors parameters and extension mount emission.
@@ -59,7 +72,10 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `desktop.md`
 
-- **0.3.9-draft** (2026-08-14) — Electrobun 2: Hutch build CLI, .hutch/devkit SDK projection, electrobun/main namespace, explicit bun main process.
+- **0.3.12-draft** (2026-08-19) — §9.3 documents the release branch as the ref a Nix consumer pins, and the nix build that gates it; corrects the install phase, which has used cp -r plus a dangling-symlink prune and src/chromium/index.ts since before this text was written.
+- **0.3.11-draft** (2026-08-16) — §3.6 the desktop signs in with an RFC 8252 loopback redirect and PKCE; the token rests in a 0600 credential store, not localStorage. RFC 8414 and RFC 7519 recorded Rejected as vacuous. Closes gap:native-oauth and gap:oauth-pkce.
+- **0.3.10-draft** (2026-08-16) — §5 the contract's failure half is specified — one RFC 9457 registry; gap:backend-failure-contract closed.
+- **0.3.9-draft** (2026-08-15) — Add §12 Standards Alignment; §5 marked Partial — the Backend API Contract specifies no failure shape.
 - **0.3.8-draft** (2026-08-13) — Open Project asks where a project should open (§4.2a): New Window is routed through pickProject + openProjectInNewWindow, and the outcome is reported rather than the target.
 - **0.3.7-draft** (2026-08-11) — Name the pane context bar's resolving-with popover rather than the tab bar, which P8 deleted.
 - **0.3.6-draft** (2026-08-03) — §3.1/§5.1: findReferences? PAL member and the GET /__studio/references route — the read side of the rename refactor's walker.
@@ -87,6 +103,12 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `extensions.md`
 
+- **0.3.10-draft** (2026-08-20) — §5.1 records the first-party fragment $id shape, https://jxsuite.com/schema/ext/<extension>/<kind>/v<n>.
+- **0.3.9-draft** (2026-08-16) — §13.1 auth session cookies: __Host- prefix derived from the origin's scheme, rate limiting on everywhere, session lifetime stated, Partitioned never set. Closes gap:cookie-prefixes.
+- **0.3.8-draft** (2026-08-16) — §8 _meta is reserved in a resolvePaths result — it carries the source entry's facts, never a route parameter.
+- **0.3.7-draft** (2026-08-15) — mediaType is validated against RFC 6838 and carries RFC 7763 variant parameters; mediaTypeEssence for callers that key on a type (§7).
+- **0.3.6-draft** (2026-08-15) — Add §8.6 head: a section owner contributes <head> entries from configuration, before the first page is built.
+- **0.3.5-draft** (2026-08-15) — Add §16 Standards Alignment: JSON Schema composition, media-type registration, and why JSON Patch is declined for lower.
 - **0.3.4-draft** (2026-08-08) — §5.4 states first-party schema resolution — an @jxsuite/*.json ref reads from the host workspace before any project-local file at the same path, with no fallback in that direction, so a stray install inside a starter can no longer answer for the core; and a validator composes a stale entry document in memory rather than writing over the one it is checking.
 - **0.3.3-draft** (2026-07-25) — Composition is host-agnostic: one pure function with an injected loader, so the cloud session composes the same entry documents in-Worker with no filesystem (§5.5).
 - **0.3.2-draft** (2026-07-25) — $schema bindings must be satisfied by by-id registration, never fetching — an in-document $schema overrides fileMatch and an unresolvable one voids validation entirely (§5.4).
@@ -106,6 +128,8 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `imports.md`
 
+- **0.1.9-draft** (2026-08-15) — Name where the emitted import map now points (§1).
+- **0.1.8-draft** (2026-08-15) — Number the sections so they are addressable, and add §7 Standards Alignment.
 - **0.1.7-draft** (2026-08-02) — Imports panel section renamed to Imported Modules in the UI.
 - **0.1.6-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.1.5-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
@@ -117,6 +141,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `jx-markdown.md`
 
+- **0.1.8-draft** (2026-08-15) — Number the sections so they are addressable, and add §13 Standards Alignment.
 - **0.1.7-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.1.6-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
 - **0.1.5-draft** (2026-07-17) — Build-time syntax highlighting for markdown code fences (`b2e7a561`).
@@ -128,6 +153,11 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `parser.md`
 
+- **0.2.9-draft** (2026-08-16) — §3 heading slugs normalize to NFC before casing (UAX #15) and word counts segment rather than split on whitespace (UAX #29). Closes gap:heading-slug-normalization and gap:word-segmentation.
+- **0.2.8-draft** (2026-08-16) — §3 the markdown variant and YAML media type are what hosts serve, not only what the class declares; gap:markdown-variant and gap:yaml-media-type closed.
+- **0.2.7-draft** (2026-08-15) — §9.3 records _meta.mtime as the date fallback a feed uses.
+- **0.2.6-draft** (2026-08-15) — Add §9.3 date coercion: schema-declared date fields normalize to RFC 3339, ambiguous values are refused rather than guessed.
+- **0.2.5-draft** (2026-08-15) — Add §10 Standards Alignment; §3 marked Partial — heading slugs and word counts are correct only for Latin script.
 - **0.2.4-draft** (2026-07-23) — Document the Content project-section class: asset mounts and content-relative reference rewriting (§9).
 - **0.2.3-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.2.2-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
@@ -143,6 +173,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `relationships.md`
 
+- **0.1.4-draft** (2026-08-15) — Add §6 Standards Alignment: JSON Schema 2020-12 for cardinality, and the JSON Pointer shape the reference form borrows.
 - **0.1.3-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.1.2-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
 - **0.1.1-draft** (2026-07-08) — Shipped schema fragments + per-project schema emitters (`9e4a8936`).
@@ -150,6 +181,16 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `schema.md`
 
+- **0.4.8-draft** (2026-08-16) — §3.5 documents, configs and class definitions cross the parse boundary in NFC (UAX #31 §R4).
+- **0.4.7-draft** (2026-08-16) — §3.2 language-tag keys carry a BCP 47 pattern, so author-time and build-time agree; gap:bcp47-locale-validation closed.
+- **0.4.6-draft** (2026-08-16) — §3.2 and §7: BCP 47 validation exists in the build; the schema is the half that still lacks it.
+- **0.4.5-draft** (2026-08-15) — I-JSON enforced at the parse boundary: duplicate names and unrepresentable integers are parse failures (§3.4).
+- **0.4.4-draft** (2026-08-15) — The class method role enum gains head (extensions.md §8.6).
+- **0.4.3-draft** (2026-08-15) — §3.1 records the root fields the 0.4.2 entry described.
+- **0.4.2-draft** (2026-08-15) — Document $lang, $dir and the previously undeclared $sitemap; defaults.dir; HeadEntry.textContent admits an object.
+- **0.4.1-draft** (2026-08-15) — build.headers declares the response-header output (site-architecture.md §14.3).
+- **0.4.0-draft** (2026-08-15) — redirects admits the object form the compiler and Studio already write, with an RFC 9110 status enum and a distinct rewrite shape; §3.2's redirect defect is resolved.
+- **0.3.2-draft** (2026-08-15) — Add §7 Standards Alignment; §3.2 marked Partial — redirects and i18n do not describe what the rest of the platform reads.
 - **0.3.1-draft** (2026-08-10) — §3.1 ElementTagName admits a TagExpression on ElementDef alone — a closed two-branch def whose every result $refs TagName, so the pattern is kept and the candidates stay enumerable; $head items are pinned to HeadEntry so a head tag cannot become choosable.
 - **0.3.0-draft** (2026-08-09) — §3.1 TagName gains a pattern — a tag name is a name, never an expression, because no consumer evaluates one and each failed differently and silently; SwitchNode is admitted as a child under ChildrenValue (anyOf, so a switch child may still carry its container tagName); ExternalClassDef.filter widened to a union like sort, since one flat property set is shared by every $prototype and was overriding extension classes' own declared parameters.
 - **0.2.8-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
@@ -168,6 +209,14 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `server.md`
 
+- **0.2.9** (2026-08-18) — §4.2: the Studio shell's report-only Trusted Types header is removed — see spec.md §21.5.
+- **0.2.8** (2026-08-18) — §4.2: both entry points send the Studio shell a report-only Trusted Types policy, and nothing else.
+- **0.2.7** (2026-08-16) — §4.2 Fetch Metadata on every gated surface, the loopback block, a constant-time token, and the three ungated project-server routes closed; gap:fetch-metadata closed.
+- **0.2.6** (2026-08-16) — §4.3 every failure is an RFC 9457 problem document, guarded; gitPull produces the 409 the route table publishes; gap:studio-problem-details closed.
+- **0.2.5** (2026-08-16) — §5 and §8 record the source-map decision — a constant header offset is not a source map (ECMA-426, Rejected).
+- **0.2.4** (2026-08-16) — §3 static responses correct the two content types where the platform default disagrees with the registration.
+- **0.2.3** (2026-08-16) — §3.1 the SSE stream advertises retry: 500 and answers Last-Event-ID with one reload; gap:sse-reconnect closed.
+- **0.2.2** (2026-08-15) — Add §8 Standards Alignment; §4 and §4.2 marked Partial — the failure contract is unspecified and the project server does not gate uniformly.
 - **0.2.1** (2026-07-25) — Activation admits an existing project of the account's own (project.json under the home directory); a refused activation must surface as an error rather than fall back to the server root.
 - **0.2.0** (2026-07-25) — POST /__studio/create-project requires an explicit absolute destination parent — the server no longer falls back to its own root. Adds assertCreatableParent (root, allowedRoots, or home; absolute only), remembers created roots for a following activate, and returns an absolute root for projects outside the server root.
 - **0.1.9** (2026-07-23) — Serve extension asset mounts ahead of the project root in the static-file chain (§3).
@@ -183,6 +232,32 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `site-architecture.md`
 
+- **0.5.16-draft** (2026-08-19) — §13.5: a translation key may name its route's parameters, so a collection's URLs can be localized; §13.3: a ContentEntry lookup is scoped to the route's language and a locale directory is matched case-insensitively; §6.7: a localized collection publishes one feed per language.
+- **0.5.15-draft** (2026-08-18) — §13.5: a document declares its identity across languages with $translationKey, so a localized slug is a translation; two routes claiming one language are reported, as an error when declared.
+- **0.5.14-draft** (2026-08-18) — §13.5 exposes the translation set to the page as $page.alternates, with each locale's autonym; §13.7 defaults a helper's locale to the page's own; §13.6 reports a prefix-always root no static deployment can answer.
+- **0.5.13-draft** (2026-08-18) — §8.7: the subpath entry is bundled rather than externalised, and the shared core is reached through an emitted stub — a self-referential asset broke every page using a directive.
+- **0.5.12-draft** (2026-08-18) — §8.7: subpaths resolve through a prefix key and an npm $elements set bundles as one self-contained module.
+- **0.5.11-draft** (2026-08-18) — §8.7: bare specifiers resolve on page and layout too, npm-only pages get an import map, and the package-subpath gap is recorded.
+- **0.5.10-draft** (2026-08-18) — §13: correct a status marker that contradicted §13.3 and §13.6 — {locale} expansion and Accept-Language negotiation both ship.
+- **0.5.9-draft** (2026-08-16) — §13.7 blessed Intl helpers — one shared list, five new helpers, and a fixed en-US/UTC default so a build's output is a function of its input. Closes gap:locale-formatting.
+- **0.5.8-draft** (2026-08-16) — §13.3 {locale} sources expand and scope route expansion; §13.6 Accept-Language negotiation in the generated worker; prefix-always is checked; gap:locale-lookup closed.
+- **0.5.7-draft** (2026-08-16) — §8.4.1 a generated route's lastmod comes from the entry it was generated from; gap:sitemap-fields closed.
+- **0.5.6-draft** (2026-08-16) — §8.3 link relations are checked against the IANA registry, warning once per build; gap:link-relation-validation closed.
+- **0.5.5-draft** (2026-08-16) — §16: the RFC 9110 row states the five statuses B1 shipped instead of the two that predated it.
+- **0.5.4-draft** (2026-08-16) — Optional service worker with a tombstone contract: off by default, network-first HTML, precache validated against the build's own output (§14.6).
+- **0.5.3-draft** (2026-08-16) — Cascade layer 6 describes the scoping that exists — there is no shadow DOM.
+- **0.5.2-draft** (2026-08-15) — Generate manifest.webmanifest and .well-known/security.txt (§14.5).
+- **0.5.1-draft** (2026-08-15) — hreflang alternates in <head> and sitemap xhtml:link for translated pages (§13, §13.5).
+- **0.5.0-draft** (2026-08-15) — i18n: BCP 47 validation and canonicalization, route prefixes resolve to locales, per-page lang and script-derived dir, $page.locale (§13, §13.2, §13.4).
+- **0.4.1-draft** (2026-08-15) — Emit a Content-Security-Policy derived from the built pages: strict script-src from constant inline-script hashes, style-src divergence recorded (§14.3.1).
+- **0.4.0-draft** (2026-08-15) — Responsive images: <picture> per format, one owner for loading attributes, fetchpriority honoured, lazyLoad independent of optimize (§9.2, §9.2.7).
+- **0.3.3-draft** (2026-08-15) — $head bare specifiers copy into /assets/ and $elements bundle there; an unresolvable one is a build error (§8.7).
+- **0.3.2-draft** (2026-08-15) — §8.4.1 <lastmod> is a full RFC 3339 timestamp; the per-template lastmod wart is named rather than implied.
+- **0.3.1-draft** (2026-08-15) — Add §6.7 syndication feeds: Atom and JSON Feed via @jxsuite/feed, RFC 5005 archives, RSS declined.
+- **0.3.0-draft** (2026-08-15) — §8.3 link identity includes hreflang/type/media/sizes; §8.5 JSON-LD objects serialize; §8.4 lang and dir come from the page.
+- **0.2.1-draft** (2026-08-15) — Add §14.3 response headers and §14.4 .nojekyll; §14's header gap is closed and vercel.json is declined.
+- **0.2.0-draft** (2026-08-15) — §11.3 separates redirects from rewrites: an RFC 9110 status enum, a per-status HTML-fallback policy, and no file for a rewrite.
+- **0.1.45-draft** (2026-08-15) — Add §16 Standards Alignment; §8.5 marked Pending — the JSON-LD object form is unimplemented — and §14 Partial: no _headers or .nojekyll is emitted.
 - **0.1.44-draft** (2026-08-12) — Header status corrected from Pending to Partial — all seven marked sections were Implemented while the header claimed nothing was; §9.4's marker and its own Still-planned list contradicted each other (metadata and the delete warning ship; browsable usage does not); §12.3 and §13 marked Pending, having no dependency graph and no reader of the i18n config respectively.
 - **0.1.43-draft** (2026-08-11) — Studio SEO previews move from a Document Header disclosure into the Search appearance modal (document.openSeo), reachable from the card, the Page panel and the palette; fields grouped by the preview each feeds.
 - **0.1.42-draft** (2026-08-06) — §7.2 the Library and its window contract, §7.5 the CRUD table corrected — rename, delete and CSV editing already shipped and were listed Pending, §7.6 the draft pill, §8.6 merged-$head previews with no score, §9.4 usage keyed on the authored ref, §11.4 redirects as a GridSource with chain, loop and shadow validation.
@@ -231,6 +306,16 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `spec.md`
 
+- **0.5.4-draft** (2026-08-18) — §21.5: Trusted Types enforcement is declined rather than deferred — the observation run answered its question and was removed with its header; no innerHTML write remains in code Jx ships.
+- **0.5.3-draft** (2026-08-18) — §5.6: both tiers refuse a $props write against a private key, and a private entry gets no property accessor.
+- **0.5.2-draft** (2026-08-18) — §21.5: ship the Trusted Types observation stage, and correct two claims its first boot disproved.
+- **0.5.1-draft** (2026-08-18) — §7.1: state the one-separator rule without showcasing a dotted key; note that forbidding one would itself depart from RFC 6901.
+- **0.5.0-draft** (2026-08-17) — $ref is JSON Pointer: `/` is the only separator and `~0`/`~1` are implemented; one shared tokenizer replaces five disagreeing ones.
+- **0.4.33-draft** (2026-08-16) — §21.5 two CSP profiles, permanently: compiled output never needs 'unsafe-eval' and the interpreting canvas always will. A Trusted Types policy guards the shell's one injection sink and refuses to build scripts; the runtime's four innerHTML writes became replaceChildren().
+- **0.4.32-draft** (2026-08-16) — §11.2a the Cookie prototype derives Secure/Path/Domain from a name prefix and from SameSite=None; HttpOnly and Expires are absent on purpose; a cookie name is data, never pattern syntax.
+- **0.4.31-draft** (2026-08-16) — Shadow DOM opt-in: $shadow and defaults.shadow emit a declarative shadow root the element adopts; :host translation keeps one style object valid in both modes (§16.6).
+- **0.4.30-draft** (2026-08-16) — §9.1 and §16.6: style scoping is a tag-name prefix and generated classes, not data-jx attribute selectors; cite the light-DOM divergence.
+- **0.4.29-draft** (2026-08-15) — §18 becomes the machine-checked standards table; §2.5 renamed Platform Precedents to free the reserved title; §21 marked Partial — no Trusted Types policy is installed.
 - **0.4.28-draft** (2026-08-10) — §19.6 $expression gains a third position — an element's tagName, narrowed to a TagExpression whose every branch is a literal TagName so the candidate set is enumerable without evaluating; it is the one $expression position that is not live, resolved once at element creation, and the document root's and $head entries' tagNames stay literal.
 - **0.4.27-draft** (2026-07-30) — Clarify that a bare `return;` is an early-exit guard, not a value return, when classifying a Function body as a computed (§5.3 4b).
 - **0.4.26-draft** (2026-07-30) — Define the handler-side iteration context: an event handler bound inside a map reads its row via state.$map (§10.2).
@@ -277,8 +362,31 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 - **0.1.1-draft** (2026-04-04) — Rebrand as JSONsx (`0daa94f7`).
 - **0.1.0-draft** (2026-04-04) — Init (`a93852ac`).
 
+## `standards.md`
+
+- **0.1.15-draft** (2026-08-17) — §4.1: the Standards Alignment heading is matched tolerantly and a visual-editor escape is reported as heading-escaped.
+- **0.1.14-draft** (2026-08-16) — §11 WebDriver BiDi leaves the adoption backlog — the pipeline speaks it, and studio-ui-guidelines.md §15 owns it.
+- **0.1.13-draft** (2026-08-16) — §11 RFC 8414 leaves the adoption backlog — the flow it would configure now exists, and it is recorded Rejected in desktop.md for the reason that remains.
+- **0.1.12-draft** (2026-08-16) — §12 declares the BCP 14 normative keywords for the whole corpus, gated by docs:status; BCP 14 graduates off the backlog.
+- **0.1.11-draft** (2026-08-16) — §4.4 worked examples use a reserved gap:example-only slug so an illustration cannot squat on a real gap id.
+- **0.1.10-draft** (2026-08-16) — §1 is Implemented — both ratchets are empty; BCP 14 moves to the backlog, since no section declares the corpus's keyword convention.
+- **0.1.9-draft** (2026-08-16) — Service Workers graduates to a bound row in site-architecture.md §14.6.
+- **0.1.8-draft** (2026-08-16) — CSS Shadow Parts backlog entry now waits on part attributes, not on shadow roots.
+- **0.1.7-draft** (2026-08-16) — Retarget the CSS Shadow Parts backlog entry at spec.md §16.6, which now owns the shadow-DOM question.
+- **0.1.6-draft** (2026-08-15) — Web App Manifest, RFC 9116 and RFC 8615 graduate to bound rows in site-architecture.md §14.5.
+- **0.1.5-draft** (2026-08-15) — UAX #9 and UTS #35 graduate to bound rows in site-architecture.md §13.4.
+- **0.1.4-draft** (2026-08-15) — RFC 4287, JSON Feed 1.1 and RFC 5005 graduate to bound rows in site-architecture.md §6.7.
+- **0.1.3-draft** (2026-08-15) — Three backlog entries graduate to bound rows in site-architecture.md §14.3 (HSTS, Referrer-Policy, Permissions-Policy).
+- **0.1.2-draft** (2026-08-15) — Add §11 Adoption Backlog: standards whose owning section does not exist yet, each naming the spec that will own it.
+- **0.1.1-draft** (2026-08-15) — A Subset may name a gap for the half it omits; a non-standard is prose rather than a Rejected row.
+- **0.1.0-draft** (2026-08-14) — Initial specification: the conformance vocabulary, the `## N. Standards Alignment` table contract, citation and canonical-URL rules, gap tiers derived from section status, and governance for declining a standard.
+
 ## `studio-ui-guidelines.md`
 
+- **0.3.12** (2026-08-16) — §15 the documentation screenshot pipeline drives Chromium over WebDriver BiDi rather than CDP — byte-identical captures, and the one behavioural difference (a pointer move outside the viewport) fixed rather than worked around.
+- **0.3.11** (2026-08-16) — §14 ATAG is Subset: Part A is §13.1a and §8.2, Part B is studio.md §16.6.
+- **0.3.10** (2026-08-16) — §1.1 the token table's fallbacks are corrected and gated against tokens.css; §8.2 cut/paste is the stated alternative to every drag (SC 2.5.7); §13.1a one live region, called from notify() itself, so a failure that lands in the Problems panel is announced.
+- **0.3.9** (2026-08-15) — Add §14 Standards Alignment; §8 marked Partial — drag and drop has no non-dragging alternative (WCAG 2.2 SC 2.5.7).
 - **0.3.8** (2026-08-13) — A row wraps and never overflows (§4.6); the floating bar's visibility rule.
 - **0.3.7** (2026-08-12) — blockbar/format joins the level × placement matrix, with its own chrome budget.
 - **0.3.6** (2026-08-10) — §12.4 the agent counts as a surface — an assistant tool that writes what a command writes binds to the command's rule by reading the same CommandContext, not by recomputing it; the element-tree writers move to a document-tree tier gated on the registry's own editor.kind.
@@ -304,6 +412,17 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.9.35-draft** (2026-08-20) — Declare the Monaco editor feature set in monaco-setup (one register import per capability, and the measured caveat that 0.56.0's contrib graph does not yet honour the exclusions); drop the Monaco de-duplication plugin now that the first-party collab binding leaves one importer.
+- **0.9.34-draft** (2026-08-19) — A stage with no pan/zoom surface leaves the wheel to the scroll container under it, and blocks ctrl/cmd+wheel page zoom instead of handing it to the browser.
+- **0.9.33-draft** (2026-08-19) — §20.4: the parity grid keys on the document's $translationKey, so a localized slug is one row rather than two half-translated ones.
+- **0.9.32-draft** (2026-08-19) — §20 Internationalization Surfaces — the locale reader, the rendering-language axis, the locale companion, the Languages parity panel and the Locales settings section; §18.4 gains the locale preset and its probe.
+- **0.9.31-draft** (2026-08-19) — §13.5 lists the three behaviours ?automation=1 may change, and makes booting with an uninvited modal a refusal — an underlay swallows the viewport, so a dialog nobody scripted scrims the capture.
+- **0.9.30-draft** (2026-08-18) — §15: the Keyboard sheet is no longer read-only — rebinding ships, Editor and Updates/About remain pending.
+- **0.9.29-draft** (2026-08-18) — §16 and §19: the notify announcement ships — correct a marker and a WAI-ARIA note that both described the gap it closed.
+- **0.9.28-draft** (2026-08-18) — §6.8: the From data… picker addresses only what it can list — nested paths and tokens holding a dot or slash are legal pointers it cannot author.
+- **0.9.27-draft** (2026-08-16) — §16.6 reports about the author's own content — an ATAG Part B accessibility check and the SEO warnings both file Problems, each finding naming its WCAG criterion, and each run naming what it could not check. Closes gap:atag-authoring-support.
+- **0.9.26-draft** (2026-08-16) — §16 one Problem reader over every backend failure shape; gap:studio-error-reader closed.
+- **0.9.25-draft** (2026-08-15) — Add §19 Standards Alignment; six bare **Status:** lines converted to the blockquote form no tool could read, and §16 marked Partial — the one status channel has no live region for the error tier.
 - **0.9.24-draft** (2026-08-13) — Open in Browser serves the built site on its own origin; the build reports the URL.
 - **0.9.23-draft** (2026-08-13) — Open in Browser opens the page's route on a server that serves the built site there, and builds it first.
 - **0.9.22-draft** (2026-08-13) — The slash menu is recognised at the editing host and gains a named door (insert.openSlashMenu).

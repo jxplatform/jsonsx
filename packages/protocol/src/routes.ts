@@ -130,8 +130,11 @@ export const STUDIO_ROUTES = {
     "Realtime co-editing: a WebSocket upgrade speaking the @jxsuite/collab wire envelope (one " +
       "socket per project, documents multiplexed by path; y-protocols sync + project-level " +
       "awareness in lib0 binary frames — see @jxsuite/collab/envelope for the frame layout and " +
-      "the docEpoch/doc-reset lifecycle). A plain GET (no Upgrade) answers {collab: true, " +
-      "version} as the capability probe.",
+      "the docEpoch/doc-reset lifecycle). A plain GET (no Upgrade) answers {collab, protocols, " +
+      "version} as the capability probe, and `protocols` is the subprotocol negotiation: the " +
+      "client offers one of them as Sec-WebSocket-Protocol and the server echoes it, or the " +
+      "client offers none when the server advertises none, because RFC 6455 §4.1 fails a " +
+      "connection whose offer went unechoed.",
     "Realtime co-editing is unavailable; Studio edits solo with file-level saves",
   ),
 

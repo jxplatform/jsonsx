@@ -5,20 +5,11 @@
  */
 import { flush } from "./harness";
 import { describe, expect, mock, test } from "bun:test";
+import { installMonacoSetupMocks } from "./monaco-setup-mocks";
 
 const remeasureFonts = mock(() => {});
 
-void mock.module("monaco-editor/esm/vs/language/json/monaco.contribution.js", () => ({
-  jsonDefaults: { setDiagnosticsOptions: mock((_opts: unknown) => {}) },
-}));
-void mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
-  editor: { remeasureFonts },
-}));
-void mock.module("monaco-editor/esm/vs/language/typescript/monaco.contribution.js", () => ({}));
-void mock.module(
-  "monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution.js",
-  () => ({}),
-);
+installMonacoSetupMocks({ editorApi: { editor: { remeasureFonts } } });
 
 (globalThis as any).self ??= globalThis;
 

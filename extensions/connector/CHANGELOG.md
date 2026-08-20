@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.5.0](https://github.com/jxsuite/jx/compare/connector-v0.4.2...connector-v0.5.0) (2026-08-19)
+
+
+### Features
+
+* **studio:** the Named Shell — P0–P8, the full UX redesign ([b576cbb](https://github.com/jxsuite/jx/commit/b576cbb24c7e0d8d36075f6d682e9b3b6b971166))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/schema bumped to 1.6.0
+
 ## [0.4.2](https://github.com/jxsuite/jx/compare/connector-v0.4.1...connector-v0.4.2) (2026-07-30)
 
 

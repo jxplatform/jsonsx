@@ -8,6 +8,7 @@ spec:
 code:
   - extensions/connector/src/worker.ts
   - extensions/auth/src/worker.ts
+  - packages/studio/src/services/trusted-types.ts
 ---
 
 # Security
@@ -27,6 +28,34 @@ The interpreting runtime — the dev server, the Studio canvas, and `@jxsuite/ru
 :::doc-warning
 `${}` templates are **full JavaScript**, not a sandbox. A template has the component's `state` in scope, but also the entire global environment, and it can assign or call side effects. Do not render a template built from untrusted input in the interpreting runtime.
 :::
+
+**This is two settings, permanently — not one with a fix pending.** A compiled site never needs `'unsafe-eval'`; a page hosting the interpreter always will. The interpreter _is_ the code that compiles expressions as it reads them, so "remove eval from the runtime" would mean removing the interpreter. Ship compiled output to production and the requirement is simply not there.
+
+## Trusted Types
+
+Jx takes the half of [Trusted Types](https://www.w3.org/TR/trusted-types/) that applies to it and
+declines the half that cannot.
+
+**Nothing Jx ships writes `innerHTML`.** The runtime and the compiled element modules clear elements
+with `replaceChildren()` instead — identical behavior, and not a DOM injection sink. That is a
+smaller surface in every site you build, whether or not any policy is enforcing.
+
+**Studio's markdown goes through a policy that refuses.** The assistant's rendered markdown is the
+one place a string becomes markup in Studio's own window, and it passes a policy whose `createHTML`
+throws — naming what it found — if anything script-shaped survived sanitization. Its `createScript`
+and `createScriptURL` refuse outright.
+
+:::doc-note
+**Enforcement is declined, not pending.** `require-trusted-types-for 'script'` gates `eval` and
+`new Function` as well as DOM injection — and the interpreter _is_ those calls, in the canvas and in
+Studio's window alike. Enforcing would mean a policy that passes scripts through, which satisfies
+the API and defends nothing. Studio's remaining injection sinks belong to the libraries it bundles,
+which no policy of Jx's can route.
+:::
+
+This is why the canvas and the shell keep separate policies permanently — and it works only because
+the canvas is a real page with its own response: a frame loaded over `http` gets its own policy,
+while a `srcdoc` frame inherits its parent's.
 
 ## Treat documents as code
 

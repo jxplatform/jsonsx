@@ -1,0 +1,450 @@
+{
+  "$comment": "The standards LEXICON: what each identifier IS (issuing body, title, canonical URL). It is not the registry — the specs' `## N. Standards Alignment` tables say what Jx DOES about each standard, and scripts/docs/check-standards.ts joins the two. An id no spec cites fails (catalog-stale); an id no entry vouches for fails (id-unknown). That is the only offline way a typo'd RFC number can fail, since a wrong-but-well-formed rfc-editor.org URL is indistinguishable from a right one. Keep entries sorted by id (codepoint order).",
+  "standards": [
+    {
+      "id": "ATAG 2.0",
+      "org": "W3C",
+      "title": "Authoring Tool Accessibility Guidelines (ATAG) 2.0",
+      "url": "https://www.w3.org/TR/ATAG20/"
+    },
+    {
+      "id": "Accessible Name and Description Computation",
+      "org": "W3C",
+      "title": "Accessible Name and Description Computation 1.2",
+      "url": "https://www.w3.org/TR/accname-1.2/"
+    },
+    {
+      "id": "BCP 14",
+      "org": "IETF",
+      "title": "Key words for use in RFCs to Indicate Requirement Levels",
+      "url": "https://www.rfc-editor.org/info/bcp14",
+      "note": "RFC 2119 + RFC 8174."
+    },
+    {
+      "id": "BCP 47",
+      "org": "IETF",
+      "title": "Tags for Identifying Languages",
+      "url": "https://www.rfc-editor.org/info/bcp47"
+    },
+    {
+      "id": "CSP Level 3",
+      "org": "W3C",
+      "title": "Content Security Policy Level 3",
+      "url": "https://www.w3.org/TR/CSP3/"
+    },
+    {
+      "id": "CSS Cascade Layers",
+      "org": "W3C",
+      "title": "CSS Cascading and Inheritance Level 5",
+      "url": "https://www.w3.org/TR/css-cascade-5/"
+    },
+    {
+      "id": "CSS Color 4",
+      "org": "W3C",
+      "title": "CSS Color Module Level 4",
+      "url": "https://www.w3.org/TR/css-color-4/"
+    },
+    {
+      "id": "CSS Containment 3",
+      "org": "W3C",
+      "title": "CSS Containment Module Level 3",
+      "url": "https://www.w3.org/TR/css-contain-3/"
+    },
+    {
+      "id": "CSS Scoping",
+      "org": "W3C",
+      "title": "CSS Scoping Module Level 1",
+      "url": "https://www.w3.org/TR/css-scoping-1/"
+    },
+    {
+      "id": "CSS Shadow Parts",
+      "org": "W3C",
+      "title": "CSS Shadow Parts",
+      "url": "https://www.w3.org/TR/css-shadow-parts-1/"
+    },
+    {
+      "id": "CSSOM",
+      "org": "W3C",
+      "title": "CSS Object Model (CSSOM)",
+      "url": "https://www.w3.org/TR/cssom-1/"
+    },
+    {
+      "id": "CommonMark",
+      "org": "Other",
+      "title": "CommonMark Spec",
+      "url": "https://spec.commonmark.org/current/"
+    },
+    {
+      "id": "ECMA-262",
+      "org": "Ecma",
+      "title": "ECMAScript Language Specification",
+      "url": "https://ecma-international.org/publications-and-standards/standards/ecma-262/"
+    },
+    {
+      "id": "ECMA-402",
+      "org": "Ecma",
+      "title": "ECMAScript Internationalization API Specification",
+      "url": "https://ecma-international.org/publications-and-standards/standards/ecma-402/"
+    },
+    {
+      "id": "ECMA-404",
+      "org": "Ecma",
+      "title": "The JSON Data Interchange Syntax",
+      "url": "https://ecma-international.org/publications-and-standards/standards/ecma-404/"
+    },
+    {
+      "id": "ECMA-426",
+      "org": "Ecma",
+      "title": "Source Map Format Specification",
+      "url": "https://ecma-international.org/publications-and-standards/standards/ecma-426/"
+    },
+    {
+      "id": "Fetch Metadata Request Headers",
+      "org": "W3C",
+      "title": "Fetch Metadata Request Headers",
+      "url": "https://www.w3.org/TR/fetch-metadata/"
+    },
+    {
+      "id": "GFM",
+      "org": "Other",
+      "title": "GitHub Flavored Markdown Spec",
+      "url": "https://github.github.com/gfm/"
+    },
+    {
+      "id": "IANA IPv4 Special-Purpose Address Registry",
+      "org": "IANA",
+      "title": "IANA IPv4 Special-Purpose Address Registry",
+      "url": "https://www.iana.org/assignments/iana-ipv4-special-registry"
+    },
+    {
+      "id": "IANA IPv6 Special-Purpose Address Registry",
+      "org": "IANA",
+      "title": "IANA IPv6 Special-Purpose Address Registry",
+      "url": "https://www.iana.org/assignments/iana-ipv6-special-registry"
+    },
+    {
+      "id": "JSON Feed 1.1",
+      "org": "Other",
+      "title": "JSON Feed Version 1.1",
+      "url": "https://www.jsonfeed.org/version/1.1/"
+    },
+    {
+      "id": "JSON Schema 2020-12",
+      "org": "JSON Schema",
+      "title": "JSON Schema, draft 2020-12",
+      "url": "https://json-schema.org/draft/2020-12/schema"
+    },
+    {
+      "id": "JSON-LD 1.1",
+      "org": "W3C",
+      "title": "JSON-LD 1.1",
+      "url": "https://www.w3.org/TR/json-ld11/"
+    },
+    {
+      "id": "Media Queries 5",
+      "org": "W3C",
+      "title": "Media Queries Level 5",
+      "url": "https://www.w3.org/TR/mediaqueries-5/"
+    },
+    {
+      "id": "Permissions Policy",
+      "org": "W3C",
+      "title": "Permissions Policy",
+      "url": "https://www.w3.org/TR/permissions-policy/"
+    },
+    {
+      "id": "RFC 3339",
+      "org": "IETF",
+      "title": "Date and Time on the Internet: Timestamps",
+      "url": "https://www.rfc-editor.org/rfc/rfc3339"
+    },
+    {
+      "id": "RFC 3986",
+      "org": "IETF",
+      "title": "Uniform Resource Identifier (URI): Generic Syntax",
+      "url": "https://www.rfc-editor.org/rfc/rfc3986"
+    },
+    {
+      "id": "RFC 4180",
+      "org": "IETF",
+      "title": "Common Format and MIME Type for CSV Files",
+      "url": "https://www.rfc-editor.org/rfc/rfc4180"
+    },
+    {
+      "id": "RFC 4287",
+      "org": "IETF",
+      "title": "The Atom Syndication Format",
+      "url": "https://www.rfc-editor.org/rfc/rfc4287"
+    },
+    {
+      "id": "RFC 4647",
+      "org": "IETF",
+      "title": "Matching of Language Tags",
+      "url": "https://www.rfc-editor.org/rfc/rfc4647"
+    },
+    {
+      "id": "RFC 5005",
+      "org": "IETF",
+      "title": "Feed Paging and Archiving",
+      "url": "https://www.rfc-editor.org/rfc/rfc5005"
+    },
+    {
+      "id": "RFC 6265",
+      "org": "IETF",
+      "title": "HTTP State Management Mechanism",
+      "url": "https://www.rfc-editor.org/rfc/rfc6265"
+    },
+    {
+      "id": "RFC 6455",
+      "org": "IETF",
+      "title": "The WebSocket Protocol",
+      "url": "https://www.rfc-editor.org/rfc/rfc6455"
+    },
+    {
+      "id": "RFC 6797",
+      "org": "IETF",
+      "title": "HTTP Strict Transport Security (HSTS)",
+      "url": "https://www.rfc-editor.org/rfc/rfc6797"
+    },
+    {
+      "id": "RFC 6838",
+      "org": "IETF",
+      "title": "Media Type Specifications and Registration Procedures",
+      "url": "https://www.rfc-editor.org/rfc/rfc6838"
+    },
+    {
+      "id": "RFC 6901",
+      "org": "IETF",
+      "title": "JavaScript Object Notation (JSON) Pointer",
+      "url": "https://www.rfc-editor.org/rfc/rfc6901"
+    },
+    {
+      "id": "RFC 6902",
+      "org": "IETF",
+      "title": "JavaScript Object Notation (JSON) Patch",
+      "url": "https://www.rfc-editor.org/rfc/rfc6902"
+    },
+    {
+      "id": "RFC 7464",
+      "org": "IETF",
+      "title": "JavaScript Object Notation (JSON) Text Sequences",
+      "url": "https://www.rfc-editor.org/rfc/rfc7464"
+    },
+    {
+      "id": "RFC 7493",
+      "org": "IETF",
+      "title": "The I-JSON Message Format",
+      "url": "https://www.rfc-editor.org/rfc/rfc7493"
+    },
+    {
+      "id": "RFC 7519",
+      "org": "IETF",
+      "title": "JSON Web Token (JWT)",
+      "url": "https://www.rfc-editor.org/rfc/rfc7519"
+    },
+    {
+      "id": "RFC 7636",
+      "org": "IETF",
+      "title": "Proof Key for Code Exchange by OAuth Public Clients",
+      "url": "https://www.rfc-editor.org/rfc/rfc7636"
+    },
+    {
+      "id": "RFC 7692",
+      "org": "IETF",
+      "title": "Compression Extensions for WebSocket",
+      "url": "https://www.rfc-editor.org/rfc/rfc7692"
+    },
+    {
+      "id": "RFC 7763",
+      "org": "IETF",
+      "title": "The text/markdown Media Type",
+      "url": "https://www.rfc-editor.org/rfc/rfc7763"
+    },
+    {
+      "id": "RFC 7764",
+      "org": "IETF",
+      "title": "Guidance on Markdown: Design Philosophies, Stability Strategies, and Select Registrations",
+      "url": "https://www.rfc-editor.org/rfc/rfc7764"
+    },
+    {
+      "id": "RFC 8246",
+      "org": "IETF",
+      "title": "HTTP Immutable Responses",
+      "url": "https://www.rfc-editor.org/rfc/rfc8246"
+    },
+    {
+      "id": "RFC 8252",
+      "org": "IETF",
+      "title": "OAuth 2.0 for Native Apps",
+      "url": "https://www.rfc-editor.org/rfc/rfc8252"
+    },
+    {
+      "id": "RFC 8288",
+      "org": "IETF",
+      "title": "Web Linking",
+      "url": "https://www.rfc-editor.org/rfc/rfc8288"
+    },
+    {
+      "id": "RFC 8414",
+      "org": "IETF",
+      "title": "OAuth 2.0 Authorization Server Metadata",
+      "url": "https://www.rfc-editor.org/rfc/rfc8414"
+    },
+    {
+      "id": "RFC 8615",
+      "org": "IETF",
+      "title": "Well-Known Uniform Resource Identifiers",
+      "url": "https://www.rfc-editor.org/rfc/rfc8615"
+    },
+    {
+      "id": "RFC 9110",
+      "org": "IETF",
+      "title": "HTTP Semantics",
+      "url": "https://www.rfc-editor.org/rfc/rfc9110"
+    },
+    {
+      "id": "RFC 9111",
+      "org": "IETF",
+      "title": "HTTP Caching",
+      "url": "https://www.rfc-editor.org/rfc/rfc9111"
+    },
+    {
+      "id": "RFC 9116",
+      "org": "IETF",
+      "title": "A File Format to Aid in Security Vulnerability Disclosure",
+      "url": "https://www.rfc-editor.org/rfc/rfc9116"
+    },
+    {
+      "id": "RFC 9309",
+      "org": "IETF",
+      "title": "Robots Exclusion Protocol",
+      "url": "https://www.rfc-editor.org/rfc/rfc9309"
+    },
+    {
+      "id": "RFC 9457",
+      "org": "IETF",
+      "title": "Problem Details for HTTP APIs",
+      "url": "https://www.rfc-editor.org/rfc/rfc9457"
+    },
+    {
+      "id": "RFC 9512",
+      "org": "IETF",
+      "title": "YAML Media Type",
+      "url": "https://www.rfc-editor.org/rfc/rfc9512"
+    },
+    {
+      "id": "Referrer Policy",
+      "org": "W3C",
+      "title": "Referrer Policy",
+      "url": "https://www.w3.org/TR/referrer-policy/"
+    },
+    {
+      "id": "Service Workers",
+      "org": "W3C",
+      "title": "Service Workers",
+      "url": "https://www.w3.org/TR/service-workers/"
+    },
+    {
+      "id": "Sitemaps 0.9",
+      "org": "Other",
+      "title": "Sitemaps XML format",
+      "url": "https://www.sitemaps.org/protocol.html"
+    },
+    {
+      "id": "Subresource Integrity",
+      "org": "W3C",
+      "title": "Subresource Integrity",
+      "url": "https://www.w3.org/TR/SRI/"
+    },
+    {
+      "id": "Trusted Types",
+      "org": "W3C",
+      "title": "Trusted Types",
+      "url": "https://www.w3.org/TR/trusted-types/"
+    },
+    {
+      "id": "UAX #15",
+      "org": "Unicode",
+      "title": "Unicode Normalization Forms",
+      "url": "https://www.unicode.org/reports/tr15/"
+    },
+    {
+      "id": "UAX #29",
+      "org": "Unicode",
+      "title": "Unicode Text Segmentation",
+      "url": "https://www.unicode.org/reports/tr29/"
+    },
+    {
+      "id": "UAX #31",
+      "org": "Unicode",
+      "title": "Unicode Identifiers and Syntax",
+      "url": "https://www.unicode.org/reports/tr31/"
+    },
+    {
+      "id": "UAX #9",
+      "org": "Unicode",
+      "title": "Unicode Bidirectional Algorithm",
+      "url": "https://www.unicode.org/reports/tr9/"
+    },
+    {
+      "id": "UTS #35",
+      "org": "Unicode",
+      "title": "Unicode Locale Data Markup Language (LDML)",
+      "url": "https://www.unicode.org/reports/tr35/"
+    },
+    {
+      "id": "WAI-ARIA",
+      "org": "W3C",
+      "title": "Accessible Rich Internet Applications (WAI-ARIA) 1.2",
+      "url": "https://www.w3.org/TR/wai-aria-1.2/"
+    },
+    {
+      "id": "WCAG 2.2",
+      "org": "W3C",
+      "title": "Web Content Accessibility Guidelines (WCAG) 2.2",
+      "url": "https://www.w3.org/TR/WCAG22/"
+    },
+    {
+      "id": "WHATWG DOM",
+      "org": "WHATWG",
+      "title": "DOM Standard",
+      "url": "https://dom.spec.whatwg.org/"
+    },
+    {
+      "id": "WHATWG Fetch",
+      "org": "WHATWG",
+      "title": "Fetch Standard",
+      "url": "https://fetch.spec.whatwg.org/"
+    },
+    {
+      "id": "WHATWG HTML",
+      "org": "WHATWG",
+      "title": "HTML Standard",
+      "url": "https://html.spec.whatwg.org/"
+    },
+    {
+      "id": "WHATWG URLPattern",
+      "org": "WHATWG",
+      "title": "URL Pattern Standard",
+      "url": "https://urlpattern.spec.whatwg.org/"
+    },
+    {
+      "id": "Web Application Manifest",
+      "org": "W3C",
+      "title": "Web Application Manifest",
+      "url": "https://www.w3.org/TR/appmanifest/"
+    },
+    {
+      "id": "WebAuthn Level 3",
+      "org": "W3C",
+      "title": "Web Authentication Level 3",
+      "url": "https://www.w3.org/TR/webauthn-3/"
+    },
+    {
+      "id": "WebDriver BiDi",
+      "org": "W3C",
+      "title": "WebDriver BiDi",
+      "url": "https://www.w3.org/TR/webdriver-bidi/"
+    }
+  ]
+}

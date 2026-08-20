@@ -76,10 +76,16 @@ describe("compileElement", () => {
       expect(content).toContain("<a");
       expect(content).toContain("</a>");
       expect(content).toContain("<div");
-      // In both branches of the bundle the SUBTREE appears; it is written once in the DOCUMENT, which
-      // The thing that was wrong. Hoisting it into a preamble const would shrink the bundle here
-      // And in every existing `$switch` — a refactor of this emitter's return shape, tracked apart.
-      expect(content.split("<span").length - 1).toBe(2);
+      // The subtree is written once in the DOCUMENT and now once in the BUNDLE too: it is hoisted
+      // Into a `const` inside `template()` that both branches reference. Asserted as a COUNT — the
+      // Duplicating emitter passed every other assertion in this test.
+      expect(content.split("<span").length - 1).toBe(1);
+      expect(content).toMatch(/const _c0 = html`/);
+      // Declared inside template(), above the return, so it is rebuilt per render and reads `s`.
+      expect(content.indexOf("const _c0")).toBeGreaterThan(content.indexOf("const s = this.state"));
+      expect(content.indexOf("const _c0")).toBeLessThan(content.indexOf("return html`"));
+      // Both branches reference it rather than repeating the subtree.
+      expect(content.split("${_c0}").length - 1).toBe(2);
       expect(content).not.toContain("[object Object]");
     });
 
@@ -442,9 +448,9 @@ describe("compileElement — templates", () => {
     });
 
     const { content } = result.files[0]!;
-    expect(content).toContain("this.innerHTML = '';");
+    expect(content).toContain("this.replaceChildren();");
     expect(content).not.toContain("} else {");
-    expect(content).not.toContain("} else {\n      this.innerHTML = '';");
+    expect(content).not.toContain("} else {\n      this.replaceChildren();");
   });
 
   test("attributes", async () => {
@@ -943,7 +949,12 @@ describe("compileElement — refToExpr edge cases", () => {
     expect(content).toContain("item.name");
   });
 
-  test("unknown ref without #/state/ prefix uses s. prefix", async () => {
+  /*
+   * A ref with no recognized prefix is still a path. This used to paste the whole ref after `s.`
+   * and emit `s.custom/path` — which is not a parse error but a *division*, `s.custom / path`,
+   * against an undeclared identifier. The build reported success and the value was NaN.
+   */
+  test("unknown ref without #/state/ prefix is lowered as a path under s", async () => {
     const result = await compileElement({
       children: [
         {
@@ -956,7 +967,8 @@ describe("compileElement — refToExpr edge cases", () => {
     });
 
     const { content } = result.files[0]!;
-    expect(content).toContain("s.custom/path");
+    expect(content).toContain("s.custom.path");
+    expect(content).not.toContain("s.custom/path");
   });
 
   test("$map/ prefix ref resolves to dot path without s. prefix", async () => {
@@ -1739,5 +1751,37 @@ describe("compileElement — $props delivery", () => {
     expect(content).toContain("if (_k in this.state) {");
     expect(content).toContain("this.state[_k] = this.getAttribute(_n);");
     expect(content).toContain("this.removeAttribute(_n);");
+  });
+});
+
+// ─── $ref schemes other than state ──────────────────────────────────────────
+
+describe("compileElement — the non-state $ref schemes", () => {
+  /*
+   * These used to fall through to the state branch, so `parent#/user` emitted `s.parent#/user` —
+   * a syntax error that took the whole element module down with it. They mirror `compileRef` in
+   * @jxsuite/runtime, and a prop reaches an element through `state`, so `parent#/` reads from `s`
+   * exactly as `#/state/` does.
+   */
+  test("parent, window and document refs each compile to their own accessor", async () => {
+    const result = await compileElement({
+      $props: { user: { type: "string" } },
+      children: [
+        { tagName: "span", textContent: { $ref: "parent#/user" } },
+        { tagName: "em", textContent: { $ref: "window#/location/href" } },
+        { tagName: "b", textContent: { $ref: "document#/title" } },
+      ],
+      state: {},
+      tagName: "test-ref-schemes",
+    });
+
+    const { content } = result.files[0]!;
+    expect(content).toContain("s.user");
+    expect(content).toContain("window.location");
+    expect(content).toContain("document.title");
+    // The defect itself: no scheme prefix survives into the emitted expression.
+    expect(content).not.toContain("parent#/");
+    expect(content).not.toContain("window#/");
+    expect(content).not.toContain("document#/");
   });
 });

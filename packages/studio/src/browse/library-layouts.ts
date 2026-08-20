@@ -20,6 +20,7 @@ import { repeat } from "lit-html/directives/repeat.js";
 import { ref } from "lit-html/directives/ref.js";
 import { isImage } from "../files/media-upload";
 import { loopbackAssetSrc } from "../canvas/canvas-origin";
+import { localeLabel } from "@jxsuite/schema/locale";
 import { groupByCategory, groupByDate } from "./library-model";
 import type { LibraryFile, LibraryLayout } from "./library-model";
 import type { GridColumn, GridCellValue } from "../grid/grid-source";
@@ -113,6 +114,11 @@ export function cellText(file: LibraryFile, field: string): string {
   switch (field) {
     case "category": {
       return file.category;
+    }
+    case "locale": {
+      // The autonym, not the tag: the column exists so a reader can find their own language in it,
+      // And `français` is what that reader scans for. The tag is still the filter's value.
+      return file.locale ? localeLabel(file.locale) : "";
     }
     case "modified": {
       return formatModified(file.modified);

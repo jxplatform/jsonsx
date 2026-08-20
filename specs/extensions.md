@@ -2,9 +2,9 @@
 
 ## Extension Packages, Schema Composition, and the Capability Contract
 
-**Version:** 0.3.4-draft
+**Version:** 0.3.10-draft
 **Status:** Partial
-**Updated:** 2026-08-08
+**Updated:** 2026-08-20
 **License:** MIT
 
 Supersedes v1 ("Format-Extension Classes and the Capability Contract"). The
@@ -189,6 +189,14 @@ not define behavior — behavior lives in the class descriptors it points to.
 - **Each extension** ships fragments named in its manifest. A project fragment
   contributes plain `properties` for its section keys. Fragments must be
   **standalone-valid** 2020-12 schema documents with their own `$id`.
+- **First-party fragment `$id`s** follow
+  `https://jxsuite.com/schema/ext/<extension>/<kind>/v<n>`, where `<kind>` names
+  what the fragment contributes (`project`, `document`, `fields`). Nothing
+  resolves by `$id` — §5.2 embeds fragments by slug and drops the `$id` — so this
+  is a convention rather than a resolution requirement, and a third-party
+  fragment with any other `$id` composes normally. It is worth holding to because
+  the `<kind>` segment is what lets one extension ship a second fragment without
+  renaming its first.
 
 ### 5.2 Generated entry documents
 
@@ -488,7 +496,7 @@ top-level `format` object:
 | Key             | Type                                 | Default | Meaning                                                                                                                                                                           |
 | --------------- | ------------------------------------ | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `extensions`    | `string[]` (required)                | —       | File extensions claimed, with leading dot.                                                                                                                                        |
-| `mediaType`     | `string`                             | —       | MIME type; used for icons, labels, HTTP responses.                                                                                                                                |
+| `mediaType`     | `string`                             | —       | Media type (RFC 6838), **validated**: a malformed value fails the registry build. Used for icons, labels and HTTP responses.                                                      |
 | `documentKinds` | `("page"\|"component"\|"content")[]` | `[]`    | `page`/`component` admit the extension into pages/components discovery globs; `content` admits it as a content source.                                                            |
 | `exportTarget`  | `boolean`                            | `false` | When true, site builds emit a serialized sidecar per page in this format (requires a `serialize` capability).                                                                     |
 | `remote`        | `boolean`                            | `false` | When true, the `load` capability accepts `http(s)` URLs as sources. Remote content sources **must** name a remote-capable format explicitly — there is no implicit remote format. |
@@ -496,6 +504,22 @@ top-level `format` object:
 Two classes may claim the same extension **only with disjoint capabilities**;
 the registry build fails on an ambiguous `(extension, capability)` pair. A
 registry never claims `.json`.
+
+**`mediaType` is parsed, not passed through.** The value reaches an HTTP header, an editor's file
+association and a Studio label, and nothing checked it — so `text/markdown;variant GFM`, one
+missing `=`, would have been served verbatim as a malformed header value. The grammar enforced is
+RFC 6838 §4.2: `type "/" [tree "."] subtype ["+" suffix] *(";" parameter)`, both halves limited to
+127 characters of the restricted set, with the `vnd.`, `prs.` and `x.` registration trees
+recognized. The check is **grammatical, not a registry lookup** — an unregistered subtype is
+well-formed and is accepted.
+
+Parameters are part of the value and carry meaning: `@jxsuite/parser` declares
+`text/markdown; variant=GFM`, which is how RFC 7763 and RFC 7764 say _which_ markdown a format
+speaks. That is also why a consumer that **keys** on a type — a File System Access `accept` map, an
+editor language id — must use the type's **essence** (`text/markdown`) rather than the declared
+string. `mediaTypeEssence` on the registry entry is that value; two Studio call sites broke the
+moment the parameter was declared, which is the argument for the distinction existing in the type
+rather than in each caller's `split("/")`.
 
 ---
 
@@ -528,6 +552,16 @@ routes to them (parser: `contentType`). Hosts dispatch on which discriminator
 key is present in the `$paths` value. A connector `table` discriminator
 (dynamic-table-driven page paths) is **planned**; no connector descriptor
 declares one today — `contentType` is the only registered discriminator.
+
+**`_meta` is reserved in a `resolvePaths` result.** Every other key in a returned
+object is a route parameter, substituted into the URL pattern; `_meta` is not,
+and the host strips it before substitution. It carries facts about the **source
+entry** the route was generated from, which the route would otherwise have no
+way to learn — its `sourcePath` is the `[slug]` template, not the entry. The one
+the build reads today is `mtime`, which is what lets a sitemap date each post in
+a collection by the post rather than by the template
+(`site-architecture.md` §8.4.1). A capability may omit it; a route with no entry
+behind it falls back to its own file.
 
 ### 8.1 `timing`
 
@@ -651,6 +685,34 @@ runtime cannot be discovered by the build scan, so those files belong in
 `public/`.
 
 ---
+
+### 8.6 `head`
+
+> **Status: Implemented.**
+
+`head` lets a section-owner class contribute `<head>` entries to every compiled page:
+
+```
+head(sectionValue, { projectConfig, root }) → JxHeadEntry[]
+```
+
+- **Timing** is `["compiler"]`, and it runs **once, before the first page is built** — not per page.
+- **Gating** is the same as `emit` and `assets`: a class owning a project section contributes only
+  when the project declares a non-empty value for its key.
+- **Placement.** Contributions sit below the project's own `$head`, so the ordinary dedup rule
+  (§8.3 of `site-architecture.md`) lets an author override one by writing the same entry themselves.
+- **Failure** is a warning naming the class, not a build error. A missing discovery link is not
+  worth failing a build over.
+
+**Why this is not `emit`.** The two answer different questions at different times. `emit` derives
+_files_ from loaded content and runs after the last page has been written; `head` derives _entries_
+from **configuration** and must run before the first one. A feed needs both — the document from
+`emit`, the `<link rel="alternate">` from here — and a capability that ran at `emit`'s point could
+not reach any page's `<head>`, because they were all written already.
+
+It is deliberately narrow: the context carries `projectConfig` and `root` and **not** the loaded
+sections, because a contribution that depends on content is a contribution that cannot run early
+enough to be used.
 
 ## 9. The `project` block
 
@@ -854,6 +916,39 @@ object plus the connector capabilities (§8):
   dev server's loopback/token boundary. Cloud backends must gate them on
   collaboration permission.
 
+### 13.1 Auth session cookies
+
+> **Status: Implemented.**
+
+The `auth` section's Better Auth options are not left at the library's defaults, because two of
+those defaults are wrong for the platform Jx deploys to:
+
+- **Cookies default to secure, and step down only for an origin positively known to be plain HTTP.**
+  Better Auth derives `useSecureCookies` from the base URL, falling back to
+  `NODE_ENV === "production"` — which is unset on Cloudflare Workers, so the library's own default
+  produced non-`Secure`, unprefixed session cookies in exactly the place it matters. The one host
+  that genuinely serves auth over plain HTTP is the local dev server, and it pins `BETTER_AUTH_URL`
+  to its own origin so the answer is read rather than guessed.
+- **Rate limiting is on everywhere.** The library gates its own default on the same `NODE_ENV`, so
+  the limit was off in production and off in development — a limit nobody ever finds out is broken.
+  Storage is the in-memory default, which on a serverless runtime is per-isolate: a speed bump for
+  credential stuffing, not a wall.
+
+A secure deployment names its cookies **`__Host-`**, not `__Secure-`
+([RFC 6265bis](https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-rfc6265bis) §4.1.3.2).
+`__Secure-` only promises the cookie was set with `Secure`; a page on a sibling origin can still
+overwrite it by setting a `Domain`. `__Host-` forbids `Domain` and pins `Path=/`, which Better
+Auth's defaults already satisfy — so the stronger prefix costs nothing.
+
+**`Partitioned` is not set, and must not default on.** CHIPS is for cookies in a _third-party_
+context; Jx auth cookies are first-party to the site that serves them. Setting it would force
+`SameSite=None; Secure` and partition the session per top-level site, signing a visitor out whenever
+the embedding page changed.
+
+Session lifetime (7 days, extended on activity after a day) is stated in the options rather than
+inherited, so it shows up in a diff when it changes. A session lifetime that lives only in a
+dependency's default is one nobody chose.
+
 ---
 
 ## 14. Worked example: a third-party TOML format
@@ -1007,8 +1102,27 @@ db push`, and has a moderated, auth-gated guestbook — with project.json
 validation, a studio settings section, and dev-server parity, none of it
 requiring changes to any core package.
 
+## 16. Standards Alignment
+
+External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md).
+
+| Standard                                                            | Class        | Binds | Evidence                                                                              | Note                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ------------------------------------------------------------------- | ------------ | ----- | ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [JSON Schema 2020-12](https://json-schema.org/draft/2020-12/schema) | **Adopted**  | §5    | packages/schema/src/project-schemas.ts, packages/schema/tests/project-schemas.test.ts | Fragment composition, `$id` shadowing and `unevaluatedProperties: false` closure are all standard vocabulary — an extension contributes a schema, not a plugin hook.                                                                                                                                                                                                                                                                                                                     |
+| [RFC 6838](https://www.rfc-editor.org/rfc/rfc6838)                  | **Adopted**  | §7    | packages/schema/src/media-type.ts, packages/schema/tests/media-type.test.ts           | The §4.2 grammar is enforced on every declared `mediaType` and a malformed value fails the registry build; the `vnd.`, `prs.` and `x.` trees and `+suffix` are parsed out. Registration itself is out of scope — this checks the syntax, not the IANA registry.                                                                                                                                                                                                                          |
+| [RFC 7763](https://www.rfc-editor.org/rfc/rfc7763)                  | **Adopted**  | §7    | extensions/parser/src/Markdown.class.json, packages/schema/tests/media-type.test.ts   | `text/markdown` with the `variant` parameter the standard defines, so a format says _which_ markdown it speaks rather than leaving it to be guessed.                                                                                                                                                                                                                                                                                                                                     |
+| [RFC 7764](https://www.rfc-editor.org/rfc/rfc7764)                  | **Subset**   | §7    | extensions/parser/src/Markdown.class.json                                             | `variant=GFM` names the registered GitHub Flavored Markdown variant, which is what `remark-gfm` implements. The other registered variants are not offered; the parser speaks one dialect.                                                                                                                                                                                                                                                                                                |
+| [RFC 6902](https://www.rfc-editor.org/rfc/rfc6902)                  | **Rejected** | §8.3  | —                                                                                     | because: `lower` rewrites a section value into the document tree as a whole-value transform, and a patch document would describe the same result less legibly while adding a format an extension author would have to learn. The capability signature is the contract instead.                                                                                                                                                                                                           |
+| [RFC 6265](https://www.rfc-editor.org/rfc/rfc6265)                  | **Adopted**  | §13.1 | extensions/auth/src/config.ts, extensions/auth/tests/config.test.ts                   | Auth session cookies carry the `__Host-` name prefix ([6265bis](https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-rfc6265bis) §4.1.3.2) wherever the origin is not known to be plain HTTP — the stronger of the two prefixes, since `__Secure-` still lets a page on a sibling origin overwrite the cookie by setting a `Domain`. `Partitioned` is deliberately not set. The `Cookie` state prototype applies the same derivations to what an author declares (`spec.md` §11.2a). |
+
 ## Changelog
 
+- **0.3.10-draft** (2026-08-20) — §5.1 records the first-party fragment $id shape, https://jxsuite.com/schema/ext/<extension>/<kind>/v<n>.
+- **0.3.9-draft** (2026-08-16) — §13.1 auth session cookies: __Host- prefix derived from the origin's scheme, rate limiting on everywhere, session lifetime stated, Partitioned never set. Closes gap:cookie-prefixes.
+- **0.3.8-draft** (2026-08-16) — §8 _meta is reserved in a resolvePaths result — it carries the source entry's facts, never a route parameter.
+- **0.3.7-draft** (2026-08-15) — mediaType is validated against RFC 6838 and carries RFC 7763 variant parameters; mediaTypeEssence for callers that key on a type (§7).
+- **0.3.6-draft** (2026-08-15) — Add §8.6 head: a section owner contributes <head> entries from configuration, before the first page is built.
+- **0.3.5-draft** (2026-08-15) — Add §16 Standards Alignment: JSON Schema composition, media-type registration, and why JSON Patch is declined for lower.
 - **0.3.4-draft** (2026-08-08) — §5.4 states first-party schema resolution — an @jxsuite/*.json ref reads from the host workspace before any project-local file at the same path, with no fallback in that direction, so a stray install inside a starter can no longer answer for the core; and a validator composes a stale entry document in memory rather than writing over the one it is checking.
 - **0.3.3-draft** (2026-07-25) — Composition is host-agnostic: one pure function with an injected loader, so the cloud session composes the same entry documents in-Worker with no filesystem (§5.5).
 - **0.3.2-draft** (2026-07-25) — $schema bindings must be satisfied by by-id registration, never fetching — an in-document $schema overrides fileMatch and an unresolvable one voids validation entirely (§5.4).
@@ -1028,4 +1142,4 @@ requiring changes to any core package.
 
 ---
 
-_Jx Extensions Specification v0.3.4-draft_
+_Jx Extensions Specification v0.3.10-draft_

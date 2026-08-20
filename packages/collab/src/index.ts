@@ -18,8 +18,18 @@ export {
   yDocToJson,
   yValueToJson,
 } from "./schema.ts";
-// Re-exported so consumers keep a single yjs import point (avoids dual-instance hazards).
-export { Doc as YDoc, UndoManager } from "yjs";
+/* Re-exported so consumers keep a single yjs import point (avoids dual-instance hazards).
+
+   The two position helpers are here for exactly that reason. `studio/src/collab/monaco-binding.ts`
+   mints a RelativePosition for every saved caret and resolves peers' back to offsets, and a
+   RelativePosition minted by a SECOND yjs instance resolves to null against this doc — the failure
+   is a cursor that silently stops moving, not an error. One import point, one instance. */
+export {
+  createAbsolutePositionFromRelativePosition,
+  createRelativePositionFromTypeIndex,
+  Doc as YDoc,
+  UndoManager,
+} from "yjs";
 export {
   applyDocOpsToY,
   CollabPathError,

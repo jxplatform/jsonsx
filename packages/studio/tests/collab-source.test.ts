@@ -130,11 +130,12 @@ describe("the canonical source lock", () => {
   /**
    * TOGGLING CODE VIEW OFF AND ON INSIDE ONE ROUND TRIP, which stranded the lock.
    *
-   * `enter()` flips the room's canonical lock before y-monaco is even imported, and `leave()` lives
-   * in exactly one place — the cleanup `canvas-render.ts`'s `createSourceCollabBinding` returns. So
-   * two overlapping mounts meant the FIRST one's cleanup releasing a lock the SECOND one now held:
-   * a co-edited buffer bound to a `Y.Text` the room had stopped treating as canonical, with the
-   * structure mirror free to serialize over it and publish the result to every peer.
+   * `enter()` flips the room's canonical lock before the binding module is even imported, and
+   * `leave()` lives in exactly one place — the cleanup `canvas-render.ts`'s
+   * `createSourceCollabBinding` returns. So two overlapping mounts meant the FIRST one's cleanup
+   * releasing a lock the SECOND one now held: a co-edited buffer bound to a `Y.Text` the room had
+   * stopped treating as canonical, with the structure mirror free to serialize over it and publish
+   * the result to every peer.
    *
    * The release now belongs to the holder. The stale mount's `leave()` is not a smaller release —
    * it is not a release at all, and it does not reset the awareness `mode` either, because this
@@ -298,7 +299,7 @@ describe("the canonical source lock", () => {
   });
 });
 
-describe("y-monaco integration surface", () => {
+describe("Monaco binding integration surface", () => {
   test("collabSourceContext exposes the real Y.Text and the connection awareness", async () => {
     const hub = createMockCollabHub();
     const tab = await openAttached(hub);

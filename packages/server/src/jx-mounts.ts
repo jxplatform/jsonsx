@@ -59,6 +59,17 @@ export async function handleJxMounts(
   if (!runtime) {
     return null;
   }
+  /*
+   * Pin the dev server's own origin, once, unless the project already set one.
+   *
+   * This is what makes "is this deployment served over HTTPS" answerable rather than guessed. The
+   * auth mount derives its cookie prefix and `Secure` flag from the scheme and defaults to secure,
+   * because on Cloudflare Workers there is no other signal — so the plain-HTTP case has to say so,
+   * and the dev server is the only host that is one. Setting it here rather than in `buildRuntime`
+   * is deliberate: the port is not known until a request arrives. It also pins social-provider
+   * callbacks to the right origin in dev, which they were previously deriving per request.
+   */
+  runtime.env["BETTER_AUTH_URL"] ??= url.origin;
   for (const { basePath, handler } of runtime.handlers) {
     if (url.pathname === basePath || url.pathname.startsWith(`${basePath}/`)) {
       return handler(req, runtime.env);

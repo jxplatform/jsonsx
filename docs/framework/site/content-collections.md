@@ -137,11 +137,47 @@ Frontmatter and data fields live under `data` (`${state.post.data.title}`); for 
 
 Markdown headings in `$children` carry automatic anchor `id`s — the heading text lowercased, punctuation stripped, spaces hyphenated, with `-2`, `-3` suffixes deduplicating repeats in document order. The entry's table of contents (`_meta.toc`: `depth`, `text`, `id` per heading) uses the same ids, so TOC links, search results, and hand-written `#fragment` URLs all land on the rendered section.
 
+Two details of that are worth knowing if you write in anything but English. **Letters outside ASCII are kept**, so a Japanese or Russian heading gets an anchor made of its own words rather than an empty one falling back to `section`. And an accented heading gets **one** anchor whichever way it was typed: `é` can be a single character or an `e` with a combining accent, they look identical and used to produce two different links, so the text is normalized before the id is built. Anchors for plain-ASCII headings are unchanged, so existing links still work.
+
+`_meta.wordCount` and `_meta.readingTime` count **words as the language defines them**, not runs of text between spaces — a Japanese or Thai article has no spaces between its words and used to count as one word, and therefore as one minute to read however long it was. Reading time is word count at 200 words per minute; that rate is a single honest constant rather than a per-language table, so treat it as an estimate for prose in any script.
+
 Fenced code blocks in `$children` arrive syntax-highlighted: recognized languages become token spans carrying `--shiki-light`/`--shiki-dark` color variables that follow the site's [color scheme](/docs/framework/concepts/color-schemes). See [Jx Markdown](/docs/framework/site/jx-markdown) for the language set.
 
 ## Schema validation
 
 Every entry is validated against its content type's `schema` when collections load — at build time and on the dev server. Missing required fields and type mismatches are reported with the content type and entry id, so a bad frontmatter key fails loudly instead of rendering an empty spot. The same schema drives Studio's [frontmatter forms](/docs/studio/editing/frontmatter) and the content-type builder's field editor.
+
+## Dates
+
+Declare a date field with `format`, and the loader normalizes it so sorting and filtering work:
+
+```json
+{
+  "properties": {
+    "pubDate": { "type": "string", "format": "date" },
+    "updated": { "type": "string", "format": "date-time" }
+  }
+}
+```
+
+| `format`      | Stored as                           |
+| ------------- | ----------------------------------- |
+| `"date"`      | `2025-03-04`                        |
+| `"date-time"` | `2025-03-04T16:00:00Z` — always UTC |
+
+Date-times are converted to UTC because otherwise they don't sort: `2025-03-04T01:00:00+02:00` looks _later_ than `2025-03-04T00:00:00Z` as text and is actually two hours _earlier_. If you need the original offset back — an events collection that means "7pm local" — it's kept at `_meta.rawDates`.
+
+You can write a `Date` from YAML, a full RFC 3339 timestamp, or a bare `YYYY-MM-DD`. Anything else is left exactly as you wrote it and reported as a warning naming the entry and field:
+
+```
+Content dates: "blog/my-post" field "pubDate" is "03/04/2025", which is not an
+unambiguous date. Write it as YYYY-MM-DD — a form like "03/04/2025" means two
+different days depending on who reads it, so it is left as authored rather than guessed.
+```
+
+:::doc-note
+Without a `format`, a date is just a string. `MarkdownCollection`'s default sort compares text, which works for `YYYY-MM-DD` and not for timestamps with offsets — declare the field in a content type and the loader handles it.
+:::
 
 ## Relationships
 

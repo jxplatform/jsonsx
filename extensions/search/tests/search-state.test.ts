@@ -55,6 +55,19 @@ describe("Search.lower", () => {
     expect(lowered.default).toBeNull();
     expect(Search.lower({ query: "x" }).default).toBeUndefined();
   });
+
+  /*
+   * An absent `locale` is not the same as a null one, and the difference has to survive being
+   * serialized into the emitted call: absent means "the page's own language", which is the default
+   * a search box should have and the one nobody configures. Null means "every language".
+   */
+  test("locale is passed only when the def names one", () => {
+    expect(Search.lower({ query: "x" }).body as string).not.toContain("locale");
+    expect(Search.lower({ locale: "fr-CA", query: "x" }).body as string).toContain(
+      '"locale":"fr-CA"',
+    );
+    expect(Search.lower({ locale: null, query: "x" }).body as string).toContain('"locale":null');
+  });
 });
 
 describe("Search resolve", () => {
@@ -78,6 +91,19 @@ describe("Search resolve", () => {
     expect(results).toEqual([{ slug: "hit" }]);
     expect(preload).toHaveBeenCalledWith("/custom.json");
     expect(query).toHaveBeenCalledWith("docs", { group: true, limit: 5 });
+  });
+
+  test("resolve forwards a named locale, and omits the key when the def has none", async () => {
+    (globalThis as Record<string, unknown>).document = {};
+    const preload = mock(async () => {});
+    const query = mock(() => []);
+    await mock.module(CLIENT_URL, () => ({ preload, query }));
+
+    await new Search({ locale: null, query: "docs" }).resolve();
+    expect(query).toHaveBeenCalledWith("docs", { group: true, limit: 8, locale: null });
+
+    await new Search({ query: "docs" }).resolve();
+    expect(query).toHaveBeenLastCalledWith("docs", { group: true, limit: 8 });
   });
 
   test("indexUrl precedence: def, then _project.search.output, then default", () => {

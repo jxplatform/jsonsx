@@ -30,9 +30,11 @@ export interface CollabAwarenessState {
    */
   structuralSelection?: JxPath[] | null;
   /**
-   * RESERVED for y-monaco: the in-buffer text cursor as {anchor, head} Y.RelativePosition JSON.
-   * MonacoBinding owns this field via setLocalStateField("selection", …) while a code view is
-   * bound; nothing else may write it.
+   * RESERVED for the code view: the in-buffer text cursor as {anchor, head} Y.RelativePosition
+   * JSON. `studio/src/collab/monaco-binding.ts`'s bindMonacoToYText owns this field via
+   * setLocalStateField("selection", …) while a code view is bound, and sets it back to null when it
+   * unbinds; nothing else may write it. The shape is y-monaco's, deliberately — a peer on an older
+   * Studio publishes and reads exactly this.
    */
   selection?: { anchor: unknown; head: unknown } | null;
   /**

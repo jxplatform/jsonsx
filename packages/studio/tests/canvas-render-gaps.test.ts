@@ -1,8 +1,8 @@
 /**
  * Canvas render gaps — the grid-mode dispatch paths and the source-mode collab binding
  * (createSourceCollabBinding + the collabCtx branch), which canvas-render.test.ts leaves uncovered.
- * Heavy collaborators (monaco, grid panel, iframe host, y-monaco, collab session) are mocked so the
- * dispatch runs deterministically.
+ * Heavy collaborators (monaco, grid panel, iframe host, the collab binding, collab session) are
+ * mocked so the dispatch runs deterministically.
  */
 import { flush, registerPrimaryStage, resetStudioState, resetWorkspaceWithTab } from "./harness";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
@@ -67,7 +67,7 @@ function typeInto(editor: FakeEditor, text: string) {
   }
 }
 
-void mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
+void mock.module("monaco-editor/editor", () => ({
   MarkerSeverity: { Error: 8, Warning: 4 },
   Uri: { parse: (s: string) => ({ toString: () => s }) },
   editor: {
@@ -229,23 +229,32 @@ void mock.module("../src/collab/collab-session.js", () => ({
   collabSourceContext: () => collabCtx,
 }));
 
-// Y-monaco: record constructed bindings.
-const bindings: { destroyed: boolean; args: unknown[] }[] = [];
-/** Set by a test to make `new MonacoBinding(...)` throw — y-monaco loading and then failing. */
+/* The Monaco↔Y.Text binding: record what it was asked to bind, and whether it was released. The
+   binding itself is covered by `monaco-binding.test.ts`; what this file owns is the DISPATCH around
+   it — which options the call site passes, and every path on which the lock must be handed back. */
+interface RecordedBinding {
+  destroyed: boolean;
+  options: {
+    awareness?: unknown;
+    editors?: Iterable<unknown>;
+    model?: unknown;
+    origin?: unknown;
+    text?: unknown;
+  };
+}
+const bindings: RecordedBinding[] = [];
+/** Set by a test to make `bindMonacoToYText(...)` throw — the module loading and then failing. */
 let bindingShouldThrow = false;
-void mock.module("y-monaco", () => ({
-  MonacoBinding: class {
-    rec: { destroyed: boolean; args: unknown[] };
-    constructor(...args: unknown[]) {
-      if (bindingShouldThrow) {
-        throw new Error("binding unavailable");
-      }
-      this.rec = { args, destroyed: false };
-      bindings.push(this.rec);
+void mock.module("../src/collab/monaco-binding.js", () => ({
+  bindMonacoToYText: (options: RecordedBinding["options"]) => {
+    if (bindingShouldThrow) {
+      throw new Error("binding unavailable");
     }
-    destroy() {
-      this.rec.destroyed = true;
-    }
+    const record: RecordedBinding = { destroyed: false, options };
+    bindings.push(record);
+    return () => {
+      record.destroyed = true;
+    };
   },
 }));
 
@@ -372,16 +381,14 @@ describe("source-mode collab binding", () => {
 
     // The binding was constructed against the ctx text/awareness and the editor's model.
     expect(bindings).toHaveLength(1);
-    const [text, model, editors, awareness] = bindings[0]!.args as [
-      unknown,
-      FakeModel,
-      Set<FakeEditor>,
-      unknown,
-    ];
+    const { awareness, editors, model, origin, text } = bindings[0]!.options;
     expect(text).toBe(collabCtx.text);
     expect(model).toBe(createdEditors[0]!.getModel()!);
-    expect([...editors][0]).toBe(createdEditors[0]);
+    expect([...(editors as Iterable<FakeEditor>)][0]).toBe(createdEditors[0]);
     expect(awareness).toBe(collabCtx.awareness);
+    /* Local keystrokes transact under the session's own origin, not an opaque binding instance —
+       the value the collab UndoManager and the source reconciler both filter on. */
+    expect(origin).toBe(collabCtx.localOrigin);
     // Remote-cursor styles attached for the roster.
     expect(document.head.querySelector("style[data-jx-collab-cursors]")).not.toBeNull();
     // Read-only identity → the editor buffer locks.
@@ -406,7 +413,7 @@ describe("source-mode collab binding", () => {
     expect(document.head.querySelector("style[data-jx-collab-cursors]")).toBeNull();
   });
 
-  test("an editor replaced while y-monaco loads unbinds immediately", async () => {
+  test("an editor replaced while the binding module loads unbinds immediately", async () => {
     let release!: () => void;
     collabCtx = makeCollabCtx();
     collabCtx.enter = () =>
@@ -418,7 +425,7 @@ describe("source-mode collab binding", () => {
     await flush(); // The source editor mounts behind the lazy Monaco import.
     const ctx = collabCtx;
     release();
-    // Let the enter() continuation reach the dynamic y-monaco import, then yank the editor.
+    // Let the enter() continuation reach the dynamic binding import, then yank the editor.
     await Promise.resolve();
     surfaceForPane("primary").monacoEditor = null;
     await flush();
@@ -463,12 +470,12 @@ describe("source-mode collab binding", () => {
     setMode("source");
     renderCanvas();
     await flush(); // The source editor mounts behind the lazy Monaco import.
-    await flush(); // …and the y-monaco binding lands.
+    await flush(); // …and the collab binding lands.
     expect(bindings).toHaveLength(1);
 
     const editor = createdEditors[0]!;
     expect(surfaceForPane("primary").monacoEditor!._writes!.shared()).toBe(true);
-    // A peer types. y-monaco writes it straight into the model — a real keystroke, which the double
+    // A peer types. the binding writes it straight into the model — a real keystroke, which the double
     // In this file could not express until it was repaired to match `canvas-render.test.ts`'s.
     typeInto(editor, "# from a peer");
     // And it declared NOTHING: the co-edited mount installs no change handler at all, so the buffer
@@ -487,11 +494,11 @@ describe("source-mode collab binding", () => {
   /**
    * A BINDING FAILURE HOLDS A LOCK AND CARRIES NOTHING, and both halves are losses.
    *
-   * `enter()` flips the room's canonical lock to "source" before y-monaco is even imported, and
-   * `ctx.leave()` lives in exactly one place — the cleanup the binding returns. So a failure past
-   * that point left the lock held by a client with no binding, and now that the freeze includes the
-   * lock holder (`collab-session.ts`'s transact gate), nobody in the room can edit the structure
-   * and nobody can edit the source either, until someone reloads.
+   * `enter()` flips the room's canonical lock to "source" before the binding module is even
+   * imported, and `ctx.leave()` lives in exactly one place — the cleanup the binding returns. So a
+   * failure past that point left the lock held by a client with no binding, and now that the freeze
+   * includes the lock holder (`collab-session.ts`'s transact gate), nobody in the room can edit the
+   * structure and nobody can edit the source either, until someone reloads.
    *
    * The buffer is the other half. The co-edited mount returns before installing its change handler,
    * so on this path a keystroke arms no commit and marks nothing: `tabBufferUnsaved` stays false
@@ -510,7 +517,7 @@ describe("source-mode collab binding", () => {
     expect(createdEditors[0]!.updateOptions).toHaveBeenCalledWith({ readOnly: true });
   });
 
-  test("a y-monaco failure after enter() hands the lock back too", async () => {
+  test("a binding failure after enter() hands the lock back too", async () => {
     collabCtx = makeCollabCtx();
     const ctx = collabCtx;
     bindingShouldThrow = true;

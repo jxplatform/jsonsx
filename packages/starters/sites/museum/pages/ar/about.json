@@ -1,0 +1,314 @@
+{
+  "$layout": "./layouts/ar.json",
+  "title": "عن المتحف — أتريوم",
+  "description": "أتريوم هو متحف المدينة للفنّ والتاريخ: سقف من زجاج فوق دار الجمارك القديمة، الدخول إليه مجّانيّ، تديره المدينة وقرّاؤها منذ ١٨٩٧.",
+  "$head": [
+    {
+      "tagName": "meta",
+      "attributes": {
+        "name": "description",
+        "content": "أتريوم هو متحف المدينة للفنّ والتاريخ: سقف من زجاج فوق دار الجمارك القديمة، الدخول إليه مجّانيّ، تديره المدينة وقرّاؤها منذ ١٨٩٧."
+      }
+    }
+  ],
+  "state": {
+    "catalogued": {
+      "$expression": {
+        "operator": "call",
+        "target": { "$ref": "window#/Intl/formatNumber" },
+        "value": [0.94, null, { "style": "percent" }]
+      }
+    },
+    "archive": {
+      "$expression": {
+        "operator": "call",
+        "target": { "$ref": "window#/Intl/formatNumber" },
+        "value": [1240, null, { "style": "unit", "unit": "meter", "unitDisplay": "long" }]
+      }
+    },
+    "staff": {
+      "$expression": {
+        "operator": "call",
+        "target": { "$ref": "window#/Intl/formatNumber" },
+        "value": [61]
+      }
+    },
+    "languages": {
+      "$expression": {
+        "operator": "call",
+        "target": { "$ref": "window#/Intl/formatList" },
+        "value": [["الإنجليزيّة", "الفرنسيّة", "العربيّة"]]
+      }
+    }
+  },
+  "children": [
+    {
+      "tagName": "mu-pagehead",
+      "$props": {
+        "kicker": "عن المتحف",
+        "title": "متحف يختلف مع نفسه",
+        "standfirst": "أسّس أتريوم مئتان وأربعون أسرة، دفعت كلّ منها ما استطاعت، واشترطت كتابةً أن يبقى الدخول مجّانيًّا. وقد بقي كذلك مئةً وتسعًا وعشرين سنة، عبر إعادتَي بناء وحريق واحد.",
+        "metaLabel": "قاعة المطالعة",
+        "metaValue": "الطابق الثاني، بلا موعد مسبق"
+      }
+    },
+    {
+      "tagName": "mu-band",
+      "$props": { "index": "٠١", "label": "المبنى", "tone": "chalk" },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "minmax(0, 1.4fr) minmax(0, 0.8fr)",
+            "columnGap": "clamp(2rem, 5vw, 4rem)",
+            "rowGap": "1.25rem",
+            "alignItems": "start",
+            "@--md": { "gridTemplateColumns": "minmax(0, 1fr)" }
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": { "maxWidth": "var(--measure)" },
+              "children": [
+                {
+                  "tagName": "p",
+                  "style": { "margin": "0", "lineHeight": "1.9" },
+                  "textContent": "بدأ المتحف في غرفة فوق دار الجمارك، ضاقت به بعد تسع عشرة سنة. والسقف الزجاجيّ الذي حلّ محلّها عام ١٩١٦ بُني فوق دار الجمارك لا بدلًا منها: جدرانها الحجريّة ما زالت قائمة في الداخل، لا تحمل شيئًا، والجولة تبدأ بالمشي بينها."
+                },
+                {
+                  "tagName": "p",
+                  "style": { "margin": "1.1rem 0 0", "lineHeight": "1.9" },
+                  "textContent": "السقف هو سبب تصوير الناس للمبنى، وسبب نفور المرمّمين منه. كلّ قطعة في الطابق الأرضيّ موضوعة بحسب ما تحتمله من الضوء، ولهذا تقف خزانة الخرائط في أظلم زاوية، ويقف حوض الملح في الخارج تحت المطر."
+                },
+                {
+                  "tagName": "p",
+                  "style": { "margin": "1.1rem 0 0", "lineHeight": "1.9" },
+                  "textContent": "لا شيء هنا نسخة. وحيث يعرض المتحف نسخة — ثلاث من الخرائط أهشّ من أن تُعلَّق — تقول البطاقة ذلك في سطرها الأوّل، وبالحجم نفسه الذي كُتب به العنوان."
+                },
+                {
+                  "tagName": "p",
+                  "style": { "margin": "1.1rem 0 0", "lineHeight": "1.9" },
+                  "textContent": "وحيث لا يعرف المتحف شيئًا، تقول البطاقة ذلك أيضًا. قطعة من كلّ تسع تقريبًا بلا صانع معروف، والسجلّ يدوّن الفجوة بدل أن يخمّن."
+                }
+              ]
+            },
+            {
+              "tagName": "mu-oculus",
+              "$props": { "size": "20rem", "tone": "card" }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "mu-band",
+      "$props": { "index": "٠٢", "label": "ما نحفظه", "tone": "card" },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "repeat(2, minmax(0, 1fr))",
+            "columnGap": "clamp(2rem, 5vw, 4rem)",
+            "@--md": { "gridTemplateColumns": "minmax(0, 1fr)" }
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "children": [
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "المفهرَس",
+                    "value": "${state.catalogued}",
+                    "note": "من كلّ ما دخل السجلّ. والباقي في معظمه هبة الورش لعام ٢٠١٩."
+                  }
+                },
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "الأرشيف",
+                    "value": "${state.archive}",
+                    "note": "من الورق على الرفوف: سجلّات، ودفاتر مسح، ومراسلات ورش."
+                  }
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "children": [
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "العاملون",
+                    "value": "${state.staff}",
+                    "note": "أمناء ومرمّمون وموظّفو استقبال، والاثنان اللذان يُبقيان السقف نظيفًا."
+                  }
+                },
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "لغات البطاقات",
+                    "value": "${state.languages}",
+                    "note": "كلّ بطاقة جدار، في كلّ غرفة، بلا نسخة مختصرة لأيّ من الثلاث."
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "mu-band",
+      "$props": { "index": "٠٣", "label": "ثلاث لغات", "tone": "chalk" },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "minmax(0, 1fr) minmax(0, 0.85fr)",
+            "columnGap": "clamp(2rem, 5vw, 4rem)",
+            "alignItems": "start",
+            "@--md": { "gridTemplateColumns": "minmax(0, 1fr)", "rowGap": "2rem" }
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": { "maxWidth": "var(--measure)" },
+              "children": [
+                {
+                  "tagName": "p",
+                  "style": { "margin": "0", "lineHeight": "1.9" },
+                  "textContent": "ثلث هذه المدينة يقرأ الفرنسيّة في البيت، وحصّة متنامية منها تقرأ العربيّة، ولذلك يُكتب المتحف ثلاث مرّات بدل أن يُكتب مرّة وتُلحق به ترجمات. لكلّ لغة صفحاتها ونصوصها الجداريّة وقراءتها الخاصّة للمجموعة — فالمسار العربيّ في الصالة ٢ ليس المسار الإنجليزيّ معكوسًا، بل حجّة أخرى كتبها أمين آخر."
+                },
+                {
+                  "tagName": "p",
+                  "style": { "margin": "1.1rem 0 0", "lineHeight": "1.9" },
+                  "textContent": "كلّ صفحة تحمل المبدّل نفسه، وهو لا يذكر إلّا اللغات التي وُجدت فيها تلك الصفحة فعلًا. وإن غابت لغة عن المبدّل، فذلك لأنّ الصفحة لم تُكتب بها بعد — وهو التزام نفضّل إظهاره على إخفائه."
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "border": "2px solid var(--color-ink)",
+                "backgroundColor": "var(--color-card)",
+                "padding": "clamp(1.25rem, 3vw, 1.9rem)"
+              },
+              "children": [
+                {
+                  "tagName": "p",
+                  "style": {
+                    "margin": "0 0 1.1rem",
+                    "fontFamily": "var(--font-label)",
+                    "fontSize": "0.66rem",
+                    "letterSpacing": "var(--label-tracking)",
+                    "textTransform": "var(--label-case)",
+                    "color": "var(--color-muted)"
+                  },
+                  "textContent": "هذه الصفحة، بكلّ لغة توجد بها"
+                },
+                {
+                  "tagName": "ul",
+                  "style": {
+                    "listStyle": "none",
+                    "margin": "0",
+                    "padding": "0",
+                    "display": "grid",
+                    "gap": "0.55rem"
+                  },
+                  "children": {
+                    "$prototype": "Array",
+                    "items": { "$ref": "#/state/$page/alternates" },
+                    "map": {
+                      "tagName": "li",
+                      "children": [
+                        {
+                          "tagName": "a",
+                          "lang": "${item.code}",
+                          "attributes": {
+                            "dir": "${item.dir}",
+                            "href": "${item.url}",
+                            "hreflang": "${item.code}",
+                            "aria-current": "${item.current ? 'page' : 'false'}"
+                          },
+                          "style": {
+                            "display": "flex",
+                            "alignItems": "baseline",
+                            "gap": "0.7rem",
+                            "textDecoration": "none",
+                            "paddingBlock": "0.35rem",
+                            "borderBlockEnd": "1px solid var(--color-hairline)",
+                            "color": "${item.current ? 'var(--color-muted)' : 'var(--color-pigment)'}",
+                            ":hover": { "color": "var(--color-ink)" }
+                          },
+                          "children": [
+                            {
+                              "tagName": "span",
+                              "style": {
+                                "fontFamily": "var(--font-label)",
+                                "fontSize": "0.64rem",
+                                "letterSpacing": "var(--label-tracking)",
+                                "textTransform": "var(--label-case)",
+                                "opacity": "0.7"
+                              },
+                              "textContent": "${item.code}"
+                            },
+                            {
+                              "tagName": "span",
+                              "style": { "fontSize": "1.02rem" },
+                              "textContent": "${item.label}"
+                            },
+                            {
+                              "tagName": "span",
+                              "lang": "ar",
+                              "attributes": { "dir": "rtl" },
+                              "style": {
+                                "marginInlineStart": "auto",
+                                "fontFamily": "var(--font-label)",
+                                "fontSize": "0.62rem",
+                                "letterSpacing": "var(--label-tracking)",
+                                "textTransform": "var(--label-case)",
+                                "display": "${item.current ? 'inline' : 'none'}"
+                              },
+                              "textContent": "أنت هنا"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "mu-band",
+      "$props": { "index": "٠٤", "label": "بكلمات المؤسّسين", "tone": "ink" },
+      "children": [
+        {
+          "tagName": "mu-quote",
+          "$props": {
+            "quote": "ليكن الدخول إليه مجّانيًّا، وإلّا فليكن شيئًا آخر غير ملكنا.",
+            "attribution": "دفتر محاضر الاكتتاب، ٤ تشرين الثاني ١٨٩٧"
+          }
+        }
+      ]
+    },
+    {
+      "tagName": "mu-cta",
+      "$props": {
+        "kicker": "تفضّلوا بالدخول",
+        "heading": "قاعة المطالعة مفتوحة لكلّ من لديه سؤال.",
+        "text": "الطابق الثاني، فوق خزانة الخرائط. لا موعد للقراءة؛ واسأل عند المكتب للمناولة.",
+        "label": "خطّط لزيارتك",
+        "href": "/ar/visit/"
+      }
+    }
+  ]
+}

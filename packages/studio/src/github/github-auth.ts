@@ -1,9 +1,16 @@
 /// <reference lib="dom" />
 /**
- * GitHub OAuth Device Flow authentication for Jx Studio.
+ * GitHub sign-in for Jx Studio: the desktop's loopback redirect, and the browser's device flow.
  *
- * Uses the Device Flow so the user authenticates in their browser without needing a server-side
- * redirect endpoint.
+ * **Which flow runs depends on what the build has, not on preference.** A desktop launcher exposes
+ * `githubAuth` on `globalThis.__jxPlatform`, backed by an RFC 8252 loopback redirect with PKCE —
+ * the user signs in on GitHub's own page in their own browser, the authorization code comes back to
+ * a loopback server, and the token is stored in the app's config folder at `0600`. A page in a
+ * browser has no loopback server to redirect to, so it keeps the Device Flow below.
+ *
+ * The Device Flow needs no server-side redirect endpoint, which is exactly why it was chosen here
+ * and exactly why it is the wrong tool for a desktop app: RFC 8628 designed it for devices that
+ * cannot show a browser or take typed input, and it costs the user a code copied between windows.
  *
  * **This flow fails, and until now it failed silently.** `https://github.com/login/device/code`
  * sends no `Access-Control-Allow-Origin`, so a browser cannot call it: in Studio-in-a-browser the
@@ -27,9 +34,10 @@
  * here — the browser withholds the reason on purpose — so the detail names both rather than
  * guessing between them.
  *
- * The token is stored in `localStorage` and returned to callers; it is never rendered.
- * `settings/preferences-accounts.ts` lists it as _stored or not_ and is the only place it can be
- * revoked (`studio.md` §15 rule 1).
+ * The token is returned to callers and never rendered. In a browser it is stored in `localStorage`;
+ * on the desktop it is in the launcher's `0600` credential store and this module holds it only in
+ * memory for the session. `settings/preferences-accounts.ts` lists it as _stored or not_ and is the
+ * only place it can be revoked (`studio.md` §15 rule 1).
  */
 
 import { html } from "lit-html";
@@ -39,6 +47,71 @@ import { showDialog } from "../ui/layers";
 
 const CLIENT_ID = "Ov23liYVlMFpgjOEPXJH";
 const STORAGE_KEY = "jx_github_token";
+
+/**
+ * The desktop launcher's RFC 8252 sign-in, when this build is running inside one.
+ *
+ * Launcher-only, like `updater` and `windowControls`, and reached the same way — a loopback
+ * redirect needs a loopback server, which a page in a browser does not have.
+ */
+interface NativeGithubAuth {
+  signIn: (force?: boolean) => Promise<{ token: string }>;
+  signOut: () => Promise<{ ok: boolean }>;
+  status: () => Promise<{ stored: boolean }>;
+}
+
+function nativeAuth(): NativeGithubAuth | null {
+  return (
+    (globalThis as unknown as { __jxPlatform?: { githubAuth?: NativeGithubAuth } }).__jxPlatform
+      ?.githubAuth ?? null
+  );
+}
+
+/**
+ * The token the desktop store handed us this session.
+ *
+ * On the desktop the token at rest is a `0600` file in the user's config directory, **not**
+ * `localStorage` — so it is not readable by script in the webview between sessions, and it does not
+ * survive in a place a stray extension or a copied profile can reach. Holding it in a module
+ * variable is what keeps {@link getGithubToken} synchronous for its callers.
+ */
+let nativeToken: string | null = null;
+
+/** Whether the desktop store holds a token, as of the last time it was asked. */
+let nativeStored = false;
+
+/**
+ * Record that the desktop's credential store does (or does not) hold a token.
+ *
+ * The launcher calls this once at startup. It carries a **boolean, not the token**: the accounts
+ * pane only needs to know whether one exists, and handing the webview a credential it has not been
+ * asked to use is the exposure the 0600 store exists to remove. When a sign-in does happen the
+ * token arrives through {@link authenticateGithub} and lives in memory for that session.
+ *
+ * @param {boolean} stored
+ */
+export function hydrateGithubToken(stored: boolean): void {
+  nativeStored = stored;
+}
+
+/**
+ * Whether a GitHub credential exists, wherever it lives.
+ *
+ * Separate from {@link getGithubToken} because the two questions genuinely differ on the desktop: a
+ * token can be stored on disk and not yet in this session's memory, and the accounts pane asks
+ * "signed in?" while rendering — synchronously — where an API caller asks for the credential itself
+ * and can await it.
+ *
+ * @returns {boolean}
+ */
+export function githubTokenStored(): boolean {
+  return nativeToken !== null || nativeStored || localStorage.getItem(STORAGE_KEY) !== null;
+}
+
+/** Where the credential this build would use actually lives, for text that says so. */
+export function githubTokenLocation(): "desktop" | "browser" {
+  return nativeAuth() ? "desktop" : "browser";
+}
 
 /** One key for the whole sign-in, so a second attempt REPLACES the first report. */
 const NOTIFY_KEY = "github.auth";
@@ -75,11 +148,18 @@ interface TokenResponse {
 }
 
 export function getGithubToken() {
-  return localStorage.getItem(STORAGE_KEY);
+  return nativeToken ?? localStorage.getItem(STORAGE_KEY);
 }
 
 export function clearGithubToken() {
+  nativeToken = null;
+  nativeStored = false;
   localStorage.removeItem(STORAGE_KEY);
+  // Fire-and-forget: the accounts pane's revoke is synchronous, and a store that failed to forget
+  // The token is not something the user can act on from there.
+  void nativeAuth()
+    ?.signOut()
+    .catch(() => {});
 }
 
 /** The request never completed — a Problem, with the one sentence that covers both causes. */
@@ -140,6 +220,24 @@ export async function authenticateGithub() {
   const existing = getGithubToken();
   if (existing) {
     return existing;
+  }
+
+  /*
+   * The desktop takes the loopback redirect (RFC 8252): its browser opens the provider's own page,
+   * the code comes back to a loopback server, and PKCE binds the exchange. The device flow below is
+   * for the browser Studio, which has no loopback server to redirect to — and whose first request
+   * to GitHub's device endpoint is refused by CORS anyway.
+   */
+  const native = nativeAuth();
+  if (native) {
+    try {
+      const { token } = await native.signIn();
+      nativeToken = token;
+      return token;
+    } catch (error) {
+      reportRefused("GitHub sign-in was not completed.", errorMessage(error));
+      return null;
+    }
   }
 
   const codeData = await requestDeviceCode();

@@ -8,6 +8,7 @@
  */
 
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
+import type { ProjectConfig } from "@jxsuite/schema/types";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
@@ -18,9 +19,11 @@ import { FormatEntry, FormatRegistry } from "@jxsuite/schema/format-registry";
 import type { FormatHostIO } from "@jxsuite/schema/format-registry";
 import {
   Content,
+  contentAssetMounts,
   getContentTypeElements,
   loadContentConfig,
   loadContentSection,
+  localesForExpansion,
   resolveContentTypeRefs,
 } from "../src/content-loader.ts";
 import type { ContentLoaderEntry, ContentSection } from "../src/content-loader.ts";
@@ -676,6 +679,28 @@ describe("Content.resolvePaths", () => {
     expect(paths).toEqual([{ slug: "hello" }, { slug: "world" }]);
   });
 
+  /*
+   * The route's own timestamp travelling with its parameters. Without it a collection route is
+   * dated by the `[slug]` template that rendered it, so every post in an archive claims to have
+   * been edited the moment the template was — see site-architecture.md §8.4.1.
+   */
+  it("carries the entry's own _meta alongside the route parameter", async () => {
+    const dated = new Map<string, ContentLoaderEntry[]>([
+      [
+        "posts",
+        [
+          { _meta: { mtime: "2024-03-04T05:06:07Z" }, body: null, data: {}, id: "dated" },
+          { body: null, data: {}, id: "undated" },
+        ],
+      ],
+    ]);
+    const paths = await Content.resolvePaths({ contentType: "posts" }, { data: dated, root: TMP });
+    expect(paths).toEqual([
+      { _meta: { mtime: "2024-03-04T05:06:07Z" }, slug: "dated" },
+      { slug: "undated" },
+    ]);
+  });
+
   it("honors a custom param and field, falling back to the entry id", async () => {
     const paths = await Content.resolvePaths(
       { contentType: "posts", field: "title", param: "name" },
@@ -871,5 +896,244 @@ describe("content asset mounts", () => {
       expect(post.body).toContain("![hero](./images/hero.png)");
       expect(post.body).not.toContain("/content/media/");
     });
+  });
+});
+
+// ─── {locale} sources ────────────────────────────────────────────────────────
+
+describe("localesForExpansion", () => {
+  it("reads the declared locales, deduplicated", () => {
+    expect(
+      localesForExpansion({ i18n: { defaultLocale: "en", locales: ["en", "fr", "en"] } }),
+    ).toEqual(["en", "fr"]);
+  });
+
+  // A project may declare only a default; expanding over it alone is still a real expansion.
+  it("falls back to the default locale when no list is given", () => {
+    expect(localesForExpansion({ i18n: { defaultLocale: "de" } })).toEqual(["de"]);
+  });
+
+  it("a project with no i18n expands over nothing", () => {
+    expect(localesForExpansion(({} as { config?: ProjectConfig }).config)).toEqual([]);
+    expect(localesForExpansion({})).toEqual([]);
+    expect(localesForExpansion({ i18n: {} })).toEqual([]);
+  });
+
+  /*
+   * Canonical, from the resolver the compiler and Studio also run. This module read the raw list
+   * until the resolver moved out of the compiler, which left the loader as the one place a
+   * locale's spelling came from the config — and `_meta.locale` is compared against the canonical
+   * tag a route resolves to, so `fr-ca` here meant a `[slug]` route under `/fr-ca/` scoped to
+   * nothing.
+   */
+  it("canonicalizes, so a route's locale and an entry's are the same string", () => {
+    expect(
+      localesForExpansion({ i18n: { defaultLocale: "EN", locales: ["en-us", "FR-ca"] } }),
+    ).toEqual(["en", "en-US", "fr-CA"]);
+  });
+});
+
+describe("a locale directory's spelling", () => {
+  const ROOT = resolve(TMP, "spelling");
+  const section: ContentSection = {
+    notes: { format: "Markdown", source: "./notes/{locale}/" },
+  };
+  const config: ProjectConfig = { i18n: { defaultLocale: "en", locales: ["en", "fr-CA"] } };
+
+  beforeAll(() => {
+    // Studio writes the lowercase spelling, because a locale directory becomes a URL segment.
+    for (const dir of ["en", "fr-ca"]) {
+      mkdirSync(resolve(ROOT, "notes", dir), { recursive: true });
+      writeFileSync(resolve(ROOT, "notes", dir, "hello.md"), `---\ntitle: ${dir}\n---\n`);
+    }
+  });
+
+  /*
+   * Two writers name this directory and they differ: an author who declared `fr-CA` most likely
+   * typed `fr-CA/`, while Studio creates `fr-ca/`. Reading only one spelling makes a translation
+   * somebody just created invisible to the build — the directory is there, the entries are there,
+   * and the collection loads none of them, with no error.
+   */
+  it("is matched case-insensitively, so a lowercase directory is still found", () => {
+    const mounts = contentAssetMounts(section, ROOT, config);
+    expect(mounts.map((m) => m.urlPrefix)).toEqual(["/content/notes/en", "/content/notes/fr-CA"]);
+    // The URL namespace is the canonical tag; the directory behind it is whatever is on disk.
+    expect(mounts[1]?.dir).toBe(resolve(ROOT, "notes/fr-ca").split("\\").join("/"));
+  });
+
+  // A locale nobody has written yet resolves to the canonical spelling, so the miss is reported
+  // Against the name that was declared rather than against a spelling nobody typed.
+  it("falls back to the canonical spelling when the directory is absent", () => {
+    const three: ProjectConfig = { i18n: { defaultLocale: "en", locales: ["en", "fr-CA", "ar"] } };
+    expect(contentAssetMounts(section, ROOT, three).map((m) => m.urlPrefix)).toEqual([
+      "/content/notes/en",
+      "/content/notes/fr-CA",
+    ]);
+  });
+});
+
+describe("Content.resolvePaths — localized collections", () => {
+  const localized = new Map<string, ContentLoaderEntry[]>([
+    [
+      "blog",
+      [
+        { _meta: { locale: "en" }, body: null, data: {}, id: "hello" },
+        { _meta: { locale: "en" }, body: null, data: {}, id: "solo" },
+        { _meta: { locale: "fr" }, body: null, data: {}, id: "hello" },
+      ],
+    ],
+  ]);
+
+  /*
+   * Two translations of one post share an id. Expanding both under `/fr/[slug]` would emit the
+   * route twice and let the second overwrite the first — so the route's own locale is what scopes
+   * a localized collection.
+   */
+  it("expands only the entries belonging to the route's locale", async () => {
+    const fr = await Content.resolvePaths(
+      { contentType: "blog" },
+      { data: localized, locale: "fr", root: TMP },
+    );
+    expect(fr.map((p) => p.slug)).toEqual(["hello"]);
+
+    const en = await Content.resolvePaths(
+      { contentType: "blog" },
+      { data: localized, locale: "en", root: TMP },
+    );
+    expect(en.map((p) => p.slug)).toEqual(["hello", "solo"]);
+  });
+
+  // An unlocalized collection must be untouched, whatever the route's locale happens to be.
+  it("leaves a collection with no locales alone", async () => {
+    const plain = new Map<string, ContentLoaderEntry[]>([
+      [
+        "posts",
+        [
+          { body: null, data: {}, id: "a" },
+          { body: null, data: {}, id: "b" },
+        ],
+      ],
+    ]);
+    const paths = await Content.resolvePaths(
+      { contentType: "posts" },
+      { data: plain, locale: "fr", root: TMP },
+    );
+    expect(paths.map((p) => p.slug)).toEqual(["a", "b"]);
+  });
+
+  // A project without i18n gives no locale at all; the collection must not vanish.
+  it("a route with no locale expands everything", async () => {
+    const paths = await Content.resolvePaths(
+      { contentType: "blog" },
+      { data: localized, locale: null, root: TMP },
+    );
+    expect(paths).toHaveLength(3);
+  });
+});
+
+// ─── {locale} sources — expansion, mounts, and per-locale assets ──────────────
+
+describe("localized content types", () => {
+  const I18N = resolve(TMP, "content/i18n-posts");
+  const section: ContentSection = {
+    "i18n-posts": { format: "Markdown", source: "./content/i18n-posts/{locale}/" },
+  };
+  const config: ProjectConfig = { i18n: { defaultLocale: "en", locales: ["en", "fr"] } };
+
+  beforeAll(() => {
+    for (const locale of ["en", "fr"]) {
+      mkdirSync(resolve(I18N, locale), { recursive: true });
+      writeFileSync(resolve(I18N, locale, "hero.png"), "png-bytes");
+      writeFileSync(
+        resolve(I18N, locale, "hello.md"),
+        `---\ntitle: Hello ${locale}\n---\n\n![hero](./hero.png)\n`,
+      );
+    }
+  });
+
+  /*
+   * One source, N directories, N mounts. They are published per locale because a French post's
+   * `./hero.png` and its English translation's are different files that would otherwise land on
+   * one URL — the second overwriting the first.
+   */
+  it("publishes one mount per locale the source expands over", () => {
+    expect(contentAssetMounts(section, TMP, config)).toEqual([
+      {
+        dir: resolve(I18N, "en").split("\\").join("/"),
+        urlPrefix: "/content/i18n-posts/en",
+      },
+      {
+        dir: resolve(I18N, "fr").split("\\").join("/"),
+        urlPrefix: "/content/i18n-posts/fr",
+      },
+    ]);
+  });
+
+  it("skips a locale with no directory, and a locale name that is not URL-safe", () => {
+    const mounts = contentAssetMounts(section, TMP, {
+      i18n: { defaultLocale: "en", locales: ["en", "de", "../evil"] },
+    });
+    expect(mounts.map((mount) => mount.urlPrefix)).toEqual(["/content/i18n-posts/en"]);
+  });
+
+  it("loads every locale's directory and stamps where each entry came from", async () => {
+    const registry = await buildFixtureRegistry();
+    const data = await Content.projectData(section, { projectConfig: config, registry, root: TMP });
+    const entries = data.get("i18n-posts") as ContentLoaderEntry[];
+
+    expect(entries.map((entry) => [entry.id, entry._meta?.locale])).toEqual([
+      ["hello", "en"],
+      ["hello", "fr"],
+    ]);
+    // The locale is the ONLY thing telling two translations of one id apart.
+    expect(entries.map((entry) => entry.data.title)).toEqual(["Hello en", "Hello fr"]);
+  });
+
+  /*
+   * The regression that made the per-locale mounts pointless: the lookup asks for `<type>/<locale>`
+   * and the map was keyed by the last URL segment, so it always missed and a translated entry kept
+   * its authored `./hero.png`.
+   */
+  /** The `src` of every img in an entry's rendered children. */
+  const srcsOf = (entry: ContentLoaderEntry): string[] => {
+    const srcs: string[] = [];
+    const walk = (node: unknown): void => {
+      if (!node || typeof node !== "object") {
+        return;
+      }
+      const record = node as Record<string, unknown>;
+      const attributes = record.attributes as Record<string, unknown> | undefined;
+      if (record.tagName === "img" && typeof attributes?.src === "string") {
+        srcs.push(attributes.src);
+      }
+      for (const child of (record.children as unknown[]) ?? []) {
+        walk(child);
+      }
+    };
+    for (const child of entry.$children ?? []) {
+      walk(child);
+    }
+    return srcs;
+  };
+
+  it("rewrites a translated entry's assets onto its own locale's mount", async () => {
+    const registry = await buildFixtureRegistry();
+    const data = await Content.projectData(section, { projectConfig: config, registry, root: TMP });
+    const entries = data.get("i18n-posts") as ContentLoaderEntry[];
+
+    expect(entries.map((entry) => srcsOf(entry))).toEqual([
+      ["/content/i18n-posts/en/hero.png"],
+      ["/content/i18n-posts/fr/hero.png"],
+    ]);
+  });
+
+  // Nothing to expand over is a warning and an empty collection, not a crash or a literal path.
+  it("warns and loads nothing when the project declares no locales", async () => {
+    const warnings = captureWarnings();
+    const registry = await buildFixtureRegistry();
+    const data = await Content.projectData(section, { projectConfig: {}, registry, root: TMP });
+
+    expect(data.get("i18n-posts")).toEqual([]);
+    expect(warnings.some((warning) => warning.includes("declares no i18n locales"))).toBe(true);
   });
 });

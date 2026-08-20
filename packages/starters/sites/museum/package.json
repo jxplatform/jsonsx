@@ -1,0 +1,18 @@
+{
+  "name": "museum",
+  "private": true,
+  "description": "Atrium — a multilingual starter for a city museum or public gallery, in English, Canadian French and Arabic, with a per-locale exhibitions collection and a header language switcher built from $page.alternates.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "build": "jx build",
+    "dev": "jx dev"
+  },
+  "dependencies": {
+    "@jxsuite/parser": "^1.5.0"
+  },
+  "devDependencies": {
+    "@jxsuite/compiler": "^2.0.0",
+    "@jxsuite/runtime": "^2.0.0"
+  }
+}

@@ -25,6 +25,7 @@
  */
 
 import { PRIMARY_PANE, SECONDARY_PANE, focusPane, workspace } from "./workspace";
+import { isWellFormedLocale } from "@jxsuite/schema/locale";
 import type { Tab } from "../tabs/tab";
 
 /** One pane's share of a session. */
@@ -45,6 +46,8 @@ export interface PersistedTabUi {
   editZoom?: number;
   activeMedia?: string | null;
   previewColorScheme?: string;
+  /** BCP 47 tag, or `null` for "the document's own language". */
+  previewLocale?: string | null;
   showLayout?: boolean;
 }
 
@@ -69,6 +72,7 @@ function uiOf(tab: Tab): PersistedTabUi {
     editZoom: ui.editZoom,
     preview: ui.preview,
     previewColorScheme: ui.previewColorScheme,
+    previewLocale: ui.previewLocale,
     showLayout: ui.showLayout,
     zoom: ui.zoom,
   };
@@ -136,6 +140,14 @@ function readTabUi(value: unknown): PersistedTabUi {
   }
   if (typeof raw.previewColorScheme === "string" && SCHEMES.has(raw.previewColorScheme)) {
     out.previewColorScheme = raw.previewColorScheme;
+  }
+  /* `null` is a value here, not an absence: it is "the document's own language", so a pane put
+     deliberately back onto its own file's language would otherwise restore the tag it left.
+     A tag is checked for WELL-FORMEDNESS only — whether the project still declares it is a
+     question about `project.json`, which the reader cannot see and which changes between sessions;
+     the control refuses an undeclared tag on the way in and the render falls back on the way out. */
+  if (raw.previewLocale === null || isWellFormedLocale(raw.previewLocale)) {
+    out.previewLocale = raw.previewLocale as string | null;
   }
   if (typeof raw.showLayout === "boolean") {
     out.showLayout = raw.showLayout;
@@ -276,6 +288,9 @@ export async function restoreSession(
     }
     if (stored.previewColorScheme !== undefined) {
       ui.previewColorScheme = stored.previewColorScheme as "auto" | "dark" | "light";
+    }
+    if (stored.previewLocale !== undefined) {
+      ui.previewLocale = stored.previewLocale;
     }
     if (stored.showLayout !== undefined) {
       ui.showLayout = stored.showLayout;

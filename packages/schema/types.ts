@@ -200,7 +200,11 @@ export interface JxServerFnDef {
 export interface JxHeadEntry {
   tagName: string;
   attributes?: Record<string, string | boolean>;
-  textContent?: string;
+  /**
+   * Element content. An **object** is a structured data block — the compiler serializes it to JSON
+   * inside the tag, which is how JSON-LD is authored (site-architecture.md §8.5).
+   */
+  textContent?: string | Record<string, unknown>;
   children?: (JxHeadEntry | string)[];
   [key: string]: unknown;
 }
@@ -212,6 +216,8 @@ export interface ImageConfig {
   quality?: { webp?: number; avif?: number; jpeg?: number; png?: number };
   sizes?: string;
   lazyLoad?: boolean;
+  /** Wrap a multi-format image in a `<picture>` with one `<source>` per format. Default true. */
+  picture?: boolean;
   service?: "build" | "cloudflare";
   remoteDomains?: string[];
 }
@@ -314,6 +320,8 @@ export interface JxDocument extends JxElement {
   tagName?: string;
   state?: Record<string, JxStateDefinition>;
   $layout?: string | false;
+  /** This page's identity across languages, overriding the one its path implies (§13.5). */
+  $translationKey?: string;
   $paths?: JxPathsDef;
   $elements?: (JxElement | string)[];
   $head?: JxHeadEntry[];
@@ -510,6 +518,114 @@ export type AdapterId = "static" | "cloudflare-pages" | "cloudflare-workers" | "
  * Identifiers only — no secrets — so it travels with the repo and any Studio (local or cloud) can
  * tell whether publishing is set up.
  */
+/** `dist/_headers` output — the response headers only the build can know (RFC 9111, RFC 8246). */
+/**
+ * CSP Level 3, as far as a static build can go.
+ *
+ * Off by default. Every other security header the build emits is safe to turn on for a site that
+ * has never seen one; a policy is the one that can leave a page blank, because it governs code the
+ * build cannot see — a third-party script that loads a second script, a widget that opens a frame.
+ * Turning it on is one line and one look at the browser console.
+ */
+export interface CspConfig {
+  /** `"report-only"` sends `Content-Security-Policy-Report-Only`. Default `"enforce"`. */
+  mode?: "enforce" | "report-only";
+  /**
+   * Replace or remove a computed directive. `false` removes it; a string replaces it wholesale, so
+   * an addition means restating the default's sources alongside the new one.
+   */
+  directives?: Record<string, string | false>;
+  /** Where violation reports go. Emits `report-to`, `report-uri` and `Reporting-Endpoints`. */
+  reportUri?: string;
+}
+
+/**
+ * W3C Web App Manifest. Off unless declared — a manifest is a claim that a site is meant to be
+ * installed, and most are not.
+ */
+export interface ManifestConfig {
+  enabled?: boolean;
+  /** Defaults to the project `name`. */
+  name?: string;
+  shortName?: string;
+  description?: string;
+  /** Defaults to `/`. */
+  startUrl?: string;
+  scope?: string;
+  display?: "fullscreen" | "standalone" | "minimal-ui" | "browser";
+  orientation?: string;
+  themeColor?: string;
+  backgroundColor?: string;
+  lang?: string;
+  dir?: "ltr" | "rtl" | "auto";
+  categories?: string[];
+  icons?: { src: string; sizes?: string; type?: string; purpose?: string }[];
+}
+
+/**
+ * W3C Service Worker. **Off unless declared, and turning it off means `false`, not deleting the
+ * key** — a worker is sticky, so a site that once had one must keep serving something at that URL
+ * to tell previous visitors to stop.
+ */
+export interface ServiceWorkerConfig {
+  enabled?: boolean;
+  /** Registration scope. Cannot exceed the worker's own path. Default `"/"`. */
+  scope?: string;
+  /** URLs fetched and cached at install time. */
+  precache?: string[];
+  /** Page served for a failed navigation. Added to `precache` if it is not already there. */
+  offlineFallback?: string;
+}
+
+/**
+ * RFC 9116 `security.txt`. `expires` is required by §2.5.5 and an absent or past one is a build
+ * error: an expired file advertises a reporting channel while telling the reporter not to trust
+ * it.
+ */
+export interface SecurityTxtConfig {
+  enabled?: boolean;
+  /** At least one is required (§2.5.3): a `mailto:`, `https:` or `tel:` URI. */
+  contact?: string[];
+  /** RFC 3339 date-time; §2.5.5. */
+  expires?: string;
+  encryption?: string[];
+  acknowledgments?: string[];
+  /** BCP 47 tags, validated and canonicalized like `i18n.locales`. */
+  preferredLanguages?: string[];
+  canonical?: string;
+  policy?: string[];
+  hiring?: string[];
+}
+
+export interface HeadersConfig {
+  /** Emit the file at all. Default true. */
+  enabled?: boolean;
+  /**
+   * `"auto"` marks the content-addressed image variants immutable and revalidates everything else.
+   * `"off"` emits no `Cache-Control` at all, for a host that manages caching itself.
+   */
+  cache?: "auto" | "off";
+  security?: {
+    /** `X-Content-Type-Options: nosniff`. Default true. */
+    contentTypeOptions?: boolean;
+    /** `X-Frame-Options`, or false to omit. Default `"SAMEORIGIN"`. */
+    frameOptions?: "DENY" | "SAMEORIGIN" | false;
+    /** `Referrer-Policy`, or false to omit. Default `"strict-origin-when-cross-origin"`. */
+    referrerPolicy?: string | false;
+    /** `Permissions-Policy`, or false to omit. */
+    permissionsPolicy?: string | false;
+    /**
+     * RFC 6797. **Off by default**: a wrong `max-age` locks an apex domain to HTTPS for that long,
+     * and the mistake is not visible until a certificate lapses.
+     */
+    hsts?: boolean | { maxAge?: number; includeSubDomains?: boolean; preload?: boolean };
+    /** CSP Level 3. Off by default — see {@link CspConfig}. */
+    csp?: boolean | "report-only" | CspConfig;
+  };
+  /** Verbatim rules, merged after the generated block. Keys are path patterns. */
+  rules?: Record<string, Record<string, string>>;
+}
+
 export interface DeployConfig {
   provider: "cloudflare-pages";
   accountId: string;
@@ -531,6 +647,7 @@ export interface ProjectConfig {
     adapter?: AdapterId | (string & Record<never, never>);
     deploy?: DeployConfig;
     sitemap?: boolean;
+    headers?: HeadersConfig;
     [key: string]: unknown;
   };
   images?: ImageConfig;
@@ -542,11 +659,39 @@ export interface ProjectConfig {
    */
   extensions?: string[];
   /** Redirect map: source path → destination (or destination with HTTP status). */
-  redirects?: Record<string, string | { destination: string; status?: number }>;
+  redirects?: Record<
+    string,
+    string | { destination: string; status?: number } | { destination: string; rewrite: true }
+  >;
+  /** W3C Web App Manifest, emitted as `manifest.webmanifest`. */
+  manifest?: ManifestConfig;
+  /** RFC 9116, emitted as `.well-known/security.txt`. */
+  securityTxt?: SecurityTxtConfig;
+  /**
+   * W3C Service Worker, emitted as `sw.js`. Off unless declared; `false` emits a tombstone that
+   * unregisters a previously deployed worker (site-architecture.md §14.6).
+   */
+  serviceWorker?: ServiceWorkerConfig | boolean;
+  /**
+   * Locale routing. Tags are BCP 47; a malformed one is a build error, since a locale is a URL
+   * prefix, an `hreflang` value and an `<html lang>` at once.
+   */
+  i18n?: {
+    defaultLocale?: string;
+    locales?: string[];
+    routing?: "prefix-except-default" | "prefix-always";
+  };
   defaults?: {
     /** Default layout path; `null` means explicitly no layout. */
     layout?: string | null;
     lang?: string;
+    /** Base direction for `<html dir>`. A page's `$dir` overrides it. */
+    dir?: "ltr" | "rtl" | "auto";
+    /**
+     * Default shadow-DOM mode for components. `false` (light DOM) unless set; a component's own
+     * `$shadow` overrides it in both directions.
+     */
+    shadow?: "open" | "closed" | false;
     charset?: string;
     [key: string]: unknown;
   };
@@ -666,5 +811,20 @@ export interface ContentLoaderEntry {
     toc?: TocEntry[];
     readingTime?: number;
     wordCount?: number;
+    /**
+     * The source file's modification time, RFC 3339. The fallback a feed uses when an entry carries
+     * no authored date, and what lets the sitemap give a generated page its own `<lastmod>` rather
+     * than its template's.
+     */
+    mtime?: string;
+    /** Authored text of a field the date-coercion pass rewrote, keyed by field name. */
+    rawDates?: Record<string, unknown>;
+    /**
+     * The locale this entry was loaded for, set only when its content type's `source` carried a
+     * `{locale}` placeholder. It is what lets a `[slug]` route under `/fr/` expand the French
+     * entries and not the English ones — without it, two translations of one post share an id and
+     * the second silently overwrites the first's route.
+     */
+    locale?: string;
   };
 }

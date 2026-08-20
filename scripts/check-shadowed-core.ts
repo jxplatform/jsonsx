@@ -80,13 +80,19 @@ export function generatorRoots(): string[] {
   ];
 }
 
-/** One first-party package installed into a project root as a real directory. */
+/** One first-party package entry under a project root that beats this workspace on resolution. */
 export interface Shadow {
-  /** Absolute path to the offending package directory. */
+  /**
+   * `shadow` — a real directory holding a published copy. `dangling` — a symlink whose target no
+   * longer exists, usually because the package moved. The remedies differ, which is why they are
+   * distinguished: a shadow is deleted, a dangling link means the install is stale.
+   */
+  kind: "shadow" | "dangling";
+  /** Absolute path to the offending package directory or link. */
   path: string;
   /** `@jxsuite/schema` — the specifier it answers for. */
   specifier: string;
-  /** The version it would answer with, when readable. */
+  /** The version it would answer with, when readable. `unresolvable` for a dangling link. */
   version: string;
   /** Absolute path to the project root that holds it. */
   root: string;
@@ -95,8 +101,10 @@ export interface Shadow {
 /**
  * Every first-party package installed as a real directory under `root/node_modules`.
  *
- * A symlink is skipped: that is a workspace link, which resolves back into this repo and is
- * therefore the correct answer rather than a stale one.
+ * A symlink is skipped only when it RESOLVES: that is a workspace link pointing back into this
+ * repo, which is the correct answer rather than a stale one. A symlink whose target is gone is not
+ * correct — it is a stale answer that still beats the correct one on the resolution path, because a
+ * nested `node_modules` entry wins over the root link that replaced it.
  *
  * @param {string} root - Absolute project root
  * @returns {Shadow[]}
@@ -109,7 +117,13 @@ export function shadowsIn(root: string): Shadow[] {
   const found: Shadow[] = [];
   for (const name of readdirSync(scopeDir).toSorted()) {
     const path = join(scopeDir, name);
+    const specifier = `${FIRST_PARTY_SCOPE}/${name}`;
     if (lstatSync(path).isSymbolicLink()) {
+      // `existsSync` follows the link, so this is exactly "does the target still exist".
+      if (existsSync(path)) {
+        continue;
+      }
+      found.push({ kind: "dangling", path, root, specifier, version: "unresolvable" });
       continue;
     }
     let version = "unknown";
@@ -119,7 +133,7 @@ export function shadowsIn(root: string): Shadow[] {
     } catch {
       // A half-written install still shadows; report it without a version rather than skipping it.
     }
-    found.push({ path, root, specifier: `${FIRST_PARTY_SCOPE}/${name}`, version });
+    found.push({ kind: "shadow", path, root, specifier, version });
   }
   return found;
 }
@@ -145,8 +159,16 @@ export function findShadows(roots: readonly string[] = generatorRoots()): Shadow
  */
 export function removeShadow(shadow: Shadow): void {
   rmSync(shadow.path, { force: true, recursive: true });
-  rmSync(join(shadow.root, "bun.lock"), { force: true });
-  rmSync(join(shadow.root, "bun.lockb"), { force: true });
+  /*
+   * A dangling link is not the residue of an install that shipped a published copy — it is an
+   * install that has simply gone stale, so the lockfile is innocent and removing it would force a
+   * needless reinstall. Deleting the link is the whole repair: resolution then falls through to
+   * the root workspace link that superseded it.
+   */
+  if (shadow.kind === "shadow") {
+    rmSync(join(shadow.root, "bun.lock"), { force: true });
+    rmSync(join(shadow.root, "bun.lockb"), { force: true });
+  }
 
   // Prune the scope directory once it is empty, then `node_modules` itself if that emptied it. An
   // Empty `@jxsuite/` shadows nothing — resolution walks past it — but leaving skeletons behind
@@ -171,7 +193,9 @@ if (import.meta.main) {
   }
 
   const label = (shadow: Shadow) =>
-    `  ${relative(REPO_ROOT, shadow.root)} → ${shadow.specifier}@${shadow.version}`;
+    `  ${relative(REPO_ROOT, shadow.root)} → ${shadow.specifier}@${shadow.version}${
+      shadow.kind === "dangling" ? " (dangling link)" : ""
+    }`;
 
   if (fix) {
     for (const shadow of shadows) {
@@ -186,16 +210,26 @@ if (import.meta.main) {
   }
 
   console.error(
-    `\n❌ ${shadows.length} project root(s) ship a first-party package that shadows this ` +
-      `workspace:\n`,
+    `\n❌ ${shadows.length} first-party package entr(ies) beat this workspace on resolution:\n`,
   );
   for (const shadow of shadows) {
     console.error(label(shadow));
   }
+  if (shadows.some((s) => s.kind === "shadow")) {
+    console.error(
+      `\nAnything that resolves normally from those roots — jx build, jx dev, the runtime — will ` +
+        `read the published copy instead of this repo's.`,
+    );
+  }
+  if (shadows.some((s) => s.kind === "dangling")) {
+    console.error(
+      `\nA dangling link resolves to nothing at all, so the import fails outright — the package ` +
+        `it points at moved, and that root's install predates the move.`,
+    );
+  }
   console.error(
-    `\nAnything that resolves normally from those roots — jx build, jx dev, the runtime — will ` +
-      `read the published copy instead of this repo's.\nRun ` +
-      `\`bun scripts/check-shadowed-core.ts --fix\` to remove them (the rest of the install stays).`,
+    `\nRun \`bun scripts/check-shadowed-core.ts --fix\` to remove them (the rest of the install ` +
+      `stays).`,
   );
   process.exit(1);
 }

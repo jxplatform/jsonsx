@@ -61,6 +61,29 @@ You don't have to assemble everything operator by operator. The brackets button 
 - **Formulas library** lists ready-made formulas that ship with Jx — `average`, `capitalize`, and friends. The full generated list is the **[formula catalog](/docs/framework/reference/formulas)**.
 - The remaining groups are the operators themselves, plus the blessed standard-library functions (`Math.max`, `JSON.stringify`, …) callable from formulas.
 
+## Formatting for a language
+
+Eight of the blessed functions format text the way a language actually does, rather than the way English does:
+
+| Function                  | What it's for                                                                 |
+| ------------------------- | ----------------------------------------------------------------------------- |
+| `Intl/formatNumber`       | Grouping, decimals, currency, percent, units                                  |
+| `Intl/formatDate`         | Dates and times                                                               |
+| `Intl/formatRelativeTime` | "3 days ago"                                                                  |
+| `Intl/formatList`         | "a, b, and c" — the joining word and the commas differ by language            |
+| `Intl/plural`             | Which plural form a number takes; many languages have more than two           |
+| `Intl/compare`            | Comparing two strings for sorting                                             |
+| `Intl/displayName`        | The name of a language, region, script or currency                            |
+| `Intl/segment`            | Splitting text into characters, words or sentences the way a reader sees them |
+
+**`Intl/compare` is the one to reach for whenever you sort a list of names.** Plain comparison orders text by its internal character numbers, which puts every capitalised word before every lowercase one and sorts every accented word to the end — so a list of French names comes out visibly wrong, and nothing about the formula says why.
+
+:::doc-note
+**A formula that names no language uses the page's, and a date with no time zone uses `UTC`** — never the machine that happens to be building the site. That is what stops the same page rendering `1,234.5` on your laptop and `1.234,5` on a colleague's, and it matters most for dates: `02:00` on the 16th in UTC is still the 15th in New York, so a build machine's time zone could quietly move a published date by a day. Pass a language and a `timeZone` when you want a different answer.
+
+The page's locale is `$page.locale` — the tag its route implies, which is what `<html lang>` says (see [locales and languages](../../framework/site/i18n.md)). Where there is no page — inside a component, whose state is its own, or in the expression editor's preview — the fallback is `en-US`.
+:::
+
 Picking an entry replaces the current step with that operation, ready for you to fill in its operands.
 
 :::doc-note

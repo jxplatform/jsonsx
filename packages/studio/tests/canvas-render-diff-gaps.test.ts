@@ -46,7 +46,7 @@ import type { Tab } from "../src/tabs/tab";
 
 // ─── Controllable mock behavior ───────────────────────────────────────────────
 
-void mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
+void mock.module("monaco-editor/editor", () => ({
   MarkerSeverity: { Error: 8, Warning: 4 },
   Uri: { parse: (s: string) => ({ toString: () => s }) },
   editor: {

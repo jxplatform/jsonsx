@@ -121,6 +121,14 @@ A `#` prefix marks an entry as private — internal workings that are never expo
 }
 ```
 
+Private is enforced, not just conventional. A parent that names one in `$props` — or passes it as a
+`props.#cache` attribute or a JS property — has the write **ignored**, with a console warning naming
+the entry. The instance still renders: a private key in `$props` is a mistake worth pointing at, not
+a reason to blank the component. The custom element also gets no `#cache` property, so there is no
+back door around the check.
+
+Rename the entry without the `#` if you meant it to be part of the component's interface.
+
 ## How it works
 
 At load time the runtime walks `state` once, classifying each entry by inspection in a fixed order: a string containing `${` is computed; any other scalar or array is a naked value; an object is checked for `$expression`, then `$prototype`, then `default`; a plain object with no reserved keys is a naked object value. The whole scope is initialized inside a reactive proxy, computed templates become tracked computed values, and inside function bodies state is read and written directly (`state.count`, `state.items.push(...)` — no getter or setter calls).

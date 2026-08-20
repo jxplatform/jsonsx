@@ -84,6 +84,7 @@ const {
   resolveUploadDir,
   setLibraryCategory,
   setLibraryLayout,
+  setLibraryLocale,
   setLibrarySearch,
 } = await import("../src/browse/library-pane");
 const { openTab, closeAllTabs } = await import("../src/workspace/workspace");
@@ -199,6 +200,7 @@ beforeEach(() => {
   invalidateLibrary();
   setLibraryCategory("all");
   setLibraryLayout("cards");
+  setLibraryLocale("");
   setLibrarySearch("");
   setup();
 });
@@ -411,6 +413,132 @@ describe("the four states the old view called “No files found”", () => {
     await refreshLibrary();
     await flush();
     expect(host.querySelectorAll(".library-card").length).toBe(2);
+  });
+});
+
+// ─── The language facet ──────────────────────────────────────────────────────
+
+describe("the language facet", () => {
+  const I18N_TREE: Record<string, DirEntry[]> = {
+    layouts: [file("main.json", "layouts/main.json")],
+    pages: [
+      { name: "fr", path: "pages/fr", type: "directory" },
+      { name: "de", path: "pages/de", type: "directory" },
+      file("index.json", "pages/index.json"),
+    ],
+    "pages/de": [file("index.json", "pages/de/index.json")],
+    "pages/fr": [file("about.json", "pages/fr/about.json")],
+  };
+
+  /**
+   * A project that declares three locales and has files under two directories — plus
+   * `pages/index.json`, which under `prefix-except-default` is the DEFAULT locale's copy and is why
+   * `en` is an option the picker can offer.
+   */
+  function setupI18n(locales: string[] = ["en", "fr", "de"]) {
+    installMockPlatform({
+      listDirectory: (path: string) => {
+        const entries = I18N_TREE[path];
+        return entries ? Promise.resolve(entries) : Promise.reject(new Error(`HTTP 500: ${path}`));
+      },
+    });
+    resetStudioState({
+      projectConfig: { i18n: { defaultLocale: "en", locales } },
+      projectDirs: ["pages", "layouts"],
+      projectRoot: "",
+    });
+  }
+
+  function picker(): (HTMLElement & { value: string }) | null {
+    return host.querySelector(".library-locale-filter");
+  }
+
+  test("draws a picker of the locales PRESENT, labelled in each language's own words", async () => {
+    setupI18n();
+    await mount();
+    const options = [...picker()!.querySelectorAll("sp-menu-item")].map((el) => [
+      el.getAttribute("value"),
+      el.textContent?.trim(),
+    ]);
+    /*
+     * `en` has no directory of its own and is still an option, because under
+     * `prefix-except-default` the unprefixed `pages/index.json` IS its copy — and a language filter
+     * that could offer French and German but never English cannot answer the question it is most
+     * often asked. Declaration order, so the default comes first.
+     */
+    expect(options).toEqual([
+      ["all", "All languages"],
+      ["en", "English"],
+      ["fr", "français"],
+      ["de", "Deutsch"],
+    ]);
+  });
+
+  test("draws no picker at all where there is nothing to choose between", async () => {
+    /*
+     * One language present. `fr` and `de` are not declared, so those directories are ordinary path
+     * segments and everything under `pages/` is served as the only language there is — which is
+     * exactly what the build does with them, and a filter with one option is not a filter.
+     */
+    setupI18n(["en"]);
+    await mount();
+    expect(picker()).toBeNull();
+    setup();
+    await mount();
+    expect(picker()).toBeNull();
+  });
+
+  test("its options come from every scanned file, not from the filtered ones", async () => {
+    setupI18n();
+    await mount();
+    setLibraryLocale("fr");
+    await flush();
+    // A picker whose choices collapsed to the choice just made could not be used to make another.
+    expect([...picker()!.querySelectorAll("sp-menu-item")]).toHaveLength(4);
+  });
+
+  test("choosing a language filters to it, and All puts every file back", async () => {
+    setupI18n();
+    await mount();
+    const control = picker()!;
+    control.value = "fr";
+    control.dispatchEvent(new Event("change"));
+    await flush();
+    expect(text()).toContain("about.json");
+    expect(text()).not.toContain("main.json");
+    control.value = "all";
+    control.dispatchEvent(new Event("change"));
+    await flush();
+    expect(libraryView.locale).toBe("");
+    expect(text()).toContain("main.json");
+  });
+
+  test("the locale is in the render effect's dependency list, not merely in the setter's bump", async () => {
+    setupI18n();
+    await mount();
+    // Written DIRECTLY, so `bump()` never touches `revision`: the repaint below can only come from
+    // The effect having read `libraryView.locale`. A field missing from that hand-written list is a
+    // Filter the pane applies on the paint that happens to follow it and never again.
+    libraryView.locale = "de";
+    await flush();
+    expect(text()).not.toContain("about.json");
+    expect(text()).toContain("index.json");
+  });
+
+  test("a filter that matched nothing names the LANGUAGE too, and Clear filters clears it", async () => {
+    setupI18n();
+    await mount();
+    setLibraryCategory("layouts");
+    setLibraryLocale("fr");
+    await flush();
+    expect(text()).toContain("in Layouts and français");
+    const clear = [...host.querySelectorAll("sp-button")].find((b) =>
+      (b.textContent ?? "").includes("Clear filters"),
+    ) as HTMLElement;
+    clear.click();
+    await flush();
+    expect(libraryView.locale).toBe("");
+    expect(libraryView.category).toBe("all");
   });
 });
 

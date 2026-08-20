@@ -25,6 +25,7 @@
  * `shell.ts`. Three places to keep in step, none of which recorded what a panel was FOR.
  */
 
+import { resolveI18n } from "@jxsuite/schema/locale";
 import { checkPanelPlacement } from "../commands/levels";
 import { emptyContext } from "../commands/context";
 import { projectState } from "../store";
@@ -171,6 +172,12 @@ export interface PanelRecord {
  * and `projectState`. Reading it inside a rendering effect is what makes the rail repaint when the
  * working tree changes, because both reads are tracked.
  *
+ * **A key a panel gates on has to be here.** A subset is only safe while it covers every predicate
+ * actually written: `isMultilingual` was declared, computed in `live-context.ts`, and left out of
+ * this one — so the Languages panel's `when` read the `emptyContext()` default, and the Navigator
+ * answered "No Navigator panel is registered as i18n" on a project that declares three languages.
+ * Nothing failed; the panel was simply never visible.
+ *
  * It is deliberately not `createLiveContext()`: that builder needs four facts only `studio.ts` can
  * inject (the canvas mode, the caret, the modal flag, the platform), and a rail that imported the
  * bootstrap to draw a badge would be the import cycle `live-context.ts` documents avoiding. When
@@ -179,6 +186,8 @@ export interface PanelRecord {
 export function panelContext(): CommandContext {
   const ctx = emptyContext();
   ctx.project.open = projectState !== null;
+  ctx.project.isMultilingual =
+    (resolveI18n(projectState?.projectConfig ?? {}).i18n?.locales.length ?? 0) > 1;
   ctx.git.dirtyCount = shell.git.status?.files?.length ?? 0;
   ctx.document.open = activeTab.value !== null;
   return ctx;

@@ -88,6 +88,15 @@ There are no ready-made sign-in components to drop in. You build the pages yours
 
 **Session** — who is signed in, kept up to date as that changes. It gives you the signed-in user's **id**, their whole **user** record (email, name, and anything else the account carries), and their **role** when they have one — or nothing at all when no one is signed in. Bind a greeting to the email, and hide the "Sign in" link when a session exists.
 
+### What auth sets up for you
+
+Two defaults are worth knowing because you don't configure them and they're the ones that matter:
+
+- **Session cookies are locked to your site's own hostname.** On a real deployment they're marked `Secure` and named with the `__Host-` prefix, which tells the browser to refuse the cookie if anything tries to set it for a different subdomain or path. A local dev server on plain `http://` skips the prefix — a browser would reject a `__Host-` cookie there, so keeping it would break sign-in on your own machine rather than protect it. Sessions last a week, and are extended when someone uses the site.
+- **Auth routes are rate-limited**, in development as well as production: 100 requests per 10 seconds from one address. You won't reach that by hand; a script trying passwords will.
+
+If your site is reached through a different origin than the worker sees — a proxy, or a custom domain in front of it — set `BETTER_AUTH_URL` to the public origin. That's what tells auth whether it's serving over HTTPS, so it's worth setting even if your sign-in providers already work.
+
 One thing to plan around: **the session is always empty at build time.** Your pages are prerendered, and there is no visitor and no browser during a build, so the HTML that ships always shows the signed-out state; the signed-in version appears a moment later, once the page loads and asks the server who is there. That is a consequence of how Jx publishes, not a bug — so keep the signed-out state presentable, and don't put anything at the top of a page that only makes sense to someone signed in.
 
 **Auth actions** — the four handlers a form's submit event points at: **sign in with email**, **sign up with email**, **sign in with a provider**, and **sign out**. Each one reads the fields of the form that submitted it, so the **name** you give each input is the contract:

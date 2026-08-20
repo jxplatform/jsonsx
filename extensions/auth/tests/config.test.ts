@@ -9,10 +9,15 @@ import { describe, expect, test } from "bun:test";
 import {
   AUTH_BASE_PATH,
   buildAuthOptions,
+  cookiesAreSecure,
   DEFAULT_SECRET_ENV,
+  RATE_LIMIT_MAX,
+  RATE_LIMIT_WINDOW_SECONDS,
   resolveAuthConnectionName,
   resolveAuthSecret,
   resolveSocialProviders,
+  SESSION_EXPIRES_SECONDS,
+  SESSION_UPDATE_SECONDS,
   toSessionInfo,
 } from "../src/config";
 
@@ -111,6 +116,66 @@ describe("buildAuthOptions", () => {
 
     const disabled = buildAuthOptions({ methods: { emailPassword: false } }, {});
     expect(disabled.emailAndPassword).toEqual({ enabled: false });
+  });
+});
+
+describe("cookies, sessions and rate limiting", () => {
+  test("cookiesAreSecure defaults secure and steps down only for a known http origin", () => {
+    /*
+     * The default matters more than it looks: Better Auth falls back to NODE_ENV === "production",
+     * which is unset on Workers, so its default was insecure on the platform Jx deploys to.
+     */
+    expect(cookiesAreSecure({})).toBe(true);
+    expect(cookiesAreSecure({ BETTER_AUTH_URL: "https://site.test" })).toBe(true);
+    expect(cookiesAreSecure({ BETTER_AUTH_URL: "http://localhost:3000" })).toBe(false);
+    expect(cookiesAreSecure({ BETTER_AUTH_URL: "" })).toBe(true);
+  });
+
+  test("a secure deployment names its cookies __Host-", () => {
+    const advanced = buildAuthOptions({}, {}).advanced as {
+      cookies: Record<string, { name: string }>;
+      defaultCookieAttributes: Record<string, unknown>;
+      useSecureCookies: boolean;
+    };
+    expect(advanced.cookies.session_token!.name).toBe("__Host-better-auth.session_token");
+    for (const id of ["session_data", "dont_remember", "account_data"]) {
+      expect(advanced.cookies[id]!.name).toStartWith("__Host-");
+    }
+    /*
+     * `useSecureCookies: false` is not a weakening — the library prepends `__Secure-` to whatever
+     * name it is given, so leaving it on would mint `__Secure-__Host-…`, which no browser accepts.
+     * The attribute it would have set is restored explicitly.
+     */
+    expect(advanced.useSecureCookies).toBe(false);
+    expect(advanced.defaultCookieAttributes).toEqual({ secure: true });
+  });
+
+  test("a plain-http dev origin gets no prefix, because a prefixed cookie needs Secure", () => {
+    const advanced = buildAuthOptions({}, { BETTER_AUTH_URL: "http://localhost:3000" })
+      .advanced as Record<string, unknown>;
+    expect(advanced).not.toHaveProperty("cookies");
+    expect(advanced).not.toHaveProperty("defaultCookieAttributes");
+    expect(advanced.useSecureCookies).toBe(false);
+  });
+
+  test("Partitioned is never set", () => {
+    // CHIPS is for third-party contexts; setting it would force SameSite=None and partition the
+    // Session per top-level site.
+    expect(JSON.stringify(buildAuthOptions({}, {}))).not.toContain("artitioned");
+  });
+
+  test("session lifetime and rate limit are stated, not inherited", () => {
+    const options = buildAuthOptions({}, {});
+    expect(options.session).toEqual({
+      expiresIn: SESSION_EXPIRES_SECONDS,
+      updateAge: SESSION_UPDATE_SECONDS,
+    });
+    // Enabled everywhere: Better Auth gates its own default on NODE_ENV, which Workers do not set.
+    expect(options.rateLimit).toEqual({
+      enabled: true,
+      max: RATE_LIMIT_MAX,
+      window: RATE_LIMIT_WINDOW_SECONDS,
+    });
   });
 });
 

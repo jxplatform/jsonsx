@@ -21,7 +21,11 @@
  *   that is provably present.
  */
 
-import type * as monacoNs from "monaco-editor";
+/* `monaco-editor/editor`, not the package root. In 0.56 the root is an everything-barrel that also
+   exports the `css` / `html` / `json` / `typescript` / `lsp` language namespaces, none of which is
+   on the object {@link loadMonaco} resolves to — typing this as the root would make five namespaces
+   look available that are not. `./editor` is exactly the editor API surface that import returns. */
+import type * as monacoNs from "monaco-editor/editor";
 
 export type Monaco = typeof monacoNs;
 
@@ -87,7 +91,7 @@ export function loadMonaco(): Promise<Monaco> {
   // Load-once guarantee visible (and testable) rather than merely true.
   _loading ??= (async () => {
     const [monaco] = await Promise.all([
-      import("monaco-editor/esm/vs/editor/editor.api.js"),
+      import("monaco-editor/editor"),
       import("./monaco-setup.js"),
     ]);
     _monaco = monaco as unknown as Monaco;

@@ -192,6 +192,19 @@
 .file-tree-item:hover {
   background: var(--hover-bg);
 }
+/* The language chip. Deliberately declares no `block-size`, no padding and no line-height: the row
+   above is 24px by CONTRACT (see the note there), and a chip that grew the box would desynchronise
+   the window's scroll reservation from `FILE_ROW_HEIGHT`. It only ever shrinks the text. */
+.file-tree-locale {
+  margin-inline-start: auto;
+  flex-shrink: 0;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-inline-size: 6em;
+}
 /* Roving tabindex (src/files/files.ts) moves focus between rows, so the ring is
    the only thing telling a keyboard user where they are. */
 .file-tree-item:focus-visible {
@@ -1553,4 +1566,136 @@
    the formula surface spends on all three. */
 .formula-workspace--code {
   overflow: hidden;
+}
+
+/* ─── Languages (parity grid) ─────────────────────────────────────────────────
+   A grid over ABSENCE: one row per translation key, one column per declared locale, and a cell
+   that is a button whichever of the three states it is in. The glyph carries the state and the
+   colour repeats it, the way `.problem-row--*` does, because a column of squares is read by
+   scanning rather than by reading. */
+.i18n-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  min-width: 0;
+}
+.i18n-actions {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.i18n-summary {
+  margin: 0;
+  min-width: 0;
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-50, 11px);
+}
+.i18n-rescan {
+  flex: none;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--spectrum-corner-radius-75, 2px);
+  background: transparent;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: var(--spectrum-font-size-50, 11px);
+  cursor: pointer;
+}
+.i18n-rescan:hover {
+  color: var(--fg);
+  background: var(--hover-bg);
+}
+/* A directory the scan could not read makes the whole grid a partial answer, so it says so above
+   the table rather than letting an unreadable `content/` read as a project with no content. */
+.i18n-incomplete {
+  margin: 0;
+  padding: 4px 6px;
+  border-left: 3px solid var(--warning);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-50, 11px);
+}
+/* The Navigator is narrow and a key is a path, so the table scrolls sideways rather than wrapping
+   every path onto four lines. */
+.i18n-parity {
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: var(--spectrum-font-size-75, 12px);
+}
+.i18n-key-head,
+.i18n-locale-head {
+  padding: 2px 6px;
+  border-bottom: 1px solid var(--border);
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-50, 11px);
+  font-weight: 700;
+  text-align: start;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.i18n-default-mark {
+  margin-inline-start: 4px;
+  color: var(--accent);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.i18n-row:hover {
+  background: var(--hover-bg);
+}
+.i18n-key {
+  max-width: 220px;
+  overflow: hidden;
+  padding: 2px 6px;
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: var(--spectrum-font-size-50, 11px);
+  font-weight: 400;
+  text-align: start;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.i18n-cell {
+  padding: 2px 6px;
+  text-align: center;
+}
+.i18n-cell-button {
+  inline-size: 22px;
+  block-size: 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--spectrum-corner-radius-75, 2px);
+  background: transparent;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: var(--spectrum-font-size-75, 12px);
+  line-height: 1;
+  cursor: pointer;
+}
+.i18n-cell-button:hover:not(:disabled) {
+  background: var(--hover-bg);
+}
+.i18n-cell-button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+.i18n-cell-button--present {
+  color: var(--success);
+}
+.i18n-cell-button--stale {
+  color: var(--warning);
+  border-color: var(--warning);
+}
+.i18n-cell-button--missing {
+  color: var(--accent);
+  border-style: dashed;
+}
+.i18n-truncated {
+  margin: 0;
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-50, 11px);
 }

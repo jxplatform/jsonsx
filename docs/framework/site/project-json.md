@@ -134,18 +134,19 @@ The keys and query prototypes are covered in [Content collections](/docs/framewo
 
 ## Redirects
 
-`redirects` maps old paths to new ones — a plain string for a 301, or an object to pick the status:
+`redirects` maps old paths to new ones — a plain string for a 301, an object to pick the status, or an object with `rewrite: true` to serve the destination's content without redirecting:
 
 ```json
 {
   "redirects": {
     "/docs/get-studio": "/docs/start/install/",
-    "/legacy/post/:slug": { "destination": "/blog/:slug", "status": 301 }
+    "/legacy/post/:slug": { "destination": "/blog/:slug", "status": 308 },
+    "/api/*": { "destination": "https://api.example.com/*", "rewrite": true }
   }
 }
 ```
 
-Patterns and status codes are covered in [Redirects](/docs/framework/site/redirects).
+The status must be one of `301`, `302`, `303`, `307`, `308`. Patterns, rewrites and which rules get an HTML fallback are covered in [Redirects](/docs/framework/site/redirects).
 
 ## Copying extra files
 

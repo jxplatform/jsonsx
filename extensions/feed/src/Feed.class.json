@@ -1,0 +1,114 @@
+{
+  "$schema": "https://jxsuite.com/schema/class/v1",
+  "$prototype": "Class",
+  "title": "Feed",
+  "description": "Atom (RFC 4287) and JSON Feed generation from content collections, with RFC 5005 archives",
+  "$implementation": "./feed.ts",
+  "project": {
+    "key": "feed",
+    "title": "Feeds",
+    "description": "Syndication feeds generated from content collections"
+  },
+  "$studio": {
+    "settings": {
+      "label": "Feeds",
+      "description": "One entry per feed. Each names a content collection and the URL prefix its entries are served under."
+    }
+  },
+  "$defs": {
+    "returnTypes": {
+      "NormalizedFeedConfig": {
+        "type": "object",
+        "description": "The feed section with defaults applied, keyed by feed name"
+      },
+      "HeadEntries": {
+        "type": "array",
+        "description": "<head> entries — the feed auto-discovery links",
+        "items": { "type": "object" }
+      },
+      "EmitFiles": {
+        "type": "array",
+        "description": "Files to write under outDir",
+        "items": {
+          "type": "object",
+          "properties": { "path": { "type": "string" }, "content": { "type": "string" } },
+          "required": ["path", "content"]
+        }
+      }
+    },
+    "methods": {
+      "projectData": {
+        "role": "projectData",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "static",
+        "identifier": "projectData",
+        "timing": ["compiler", "server"],
+        "parameters": [
+          {
+            "identifier": "sectionValue",
+            "type": { "type": "object" },
+            "description": "The project.json `feed` section value"
+          }
+        ],
+        "returnType": { "$ref": "#/$defs/returnTypes/NormalizedFeedConfig" },
+        "description": "Normalize the feed section (defaults applied) into _project.feed"
+      },
+      "head": {
+        "role": "head",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "static",
+        "identifier": "head",
+        "timing": ["compiler"],
+        "parameters": [
+          {
+            "identifier": "sectionValue",
+            "type": { "type": "object" },
+            "description": "The project.json `feed` section value"
+          },
+          {
+            "identifier": "ctx",
+            "type": {
+              "type": "object",
+              "properties": { "projectConfig": { "type": "object" }, "root": { "type": "string" } }
+            },
+            "description": "Host context: { projectConfig, root } (extensions.md §8.6)"
+          }
+        ],
+        "returnType": { "$ref": "#/$defs/returnTypes/HeadEntries" },
+        "description": "The <link rel=\"alternate\"> auto-discovery tags, derived from configuration alone"
+      },
+      "emit": {
+        "role": "emit",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "static",
+        "identifier": "emit",
+        "timing": ["compiler"],
+        "parameters": [
+          {
+            "identifier": "sectionValue",
+            "type": { "type": "object" },
+            "description": "The project.json `feed` section value"
+          },
+          {
+            "identifier": "ctx",
+            "type": {
+              "type": "object",
+              "properties": {
+                "projectConfig": { "type": "object" },
+                "root": { "type": "string" },
+                "sections": { "type": "object" },
+                "routes": { "type": "array" }
+              }
+            },
+            "description": "Host context: { projectConfig, root, sections, routes } (extensions.md §8.4)"
+          }
+        ],
+        "returnType": { "$ref": "#/$defs/returnTypes/EmitFiles" },
+        "description": "Serialize every configured feed and its RFC 5005 archives"
+      }
+    }
+  }
+}

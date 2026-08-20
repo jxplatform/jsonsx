@@ -4,7 +4,7 @@ $head:
   - tagName: meta
     attributes:
       name: description
-      content: "Start a new Jx project from one of twelve production-ready starter sites — restaurants, shops, portfolios, SaaS landings, and more. Pick one in Studio's New Project dialog or clone it from the CLI."
+      content: "Start a new Jx project from a production-ready starter site — restaurants, shops, portfolios, SaaS landings, and more. Pick one in Studio's New Project dialog or clone it from the CLI."
   - tagName: meta
     attributes:
       property: "og:title"
@@ -12,7 +12,7 @@ $head:
   - tagName: meta
     attributes:
       property: "og:description"
-      content: "Twelve production-ready starter sites — plain JSON and Markdown you own forever."
+      content: "Thirteen production-ready starter sites — plain JSON and Markdown you own forever."
 $elements:
   - "$ref": "../components/section-label.json"
   - "$ref": "../components/cta-button.json"
@@ -29,7 +29,7 @@ Start from a template,\
 :::
 
 :::p{style.fontSize="clamp(1.0625rem, 2vw, 1.25rem)" style.color="var(--color-text-secondary)" style.lineHeight="1.7" style.margin="0 auto" style.maxWidth="620px"}
-Twelve production-ready sites across the industries people actually build for. Pick one in Studio's **New Project** dialog, or clone it from the CLI. Every template is plain JSON and Markdown — yours to keep and change forever.
+Thirteen production-ready sites across the industries people actually build for. Pick one in Studio's **New Project** dialog, or clone it from the CLI. Every template is plain JSON and Markdown — yours to keep and change forever.
 :::
 :::::
 ::::::
@@ -59,6 +59,8 @@ Twelve production-ready sites across the industries people actually build for. P
 ::starter-card{props.name="The Long Field" props.industry="Blog & Publication" props.tagline="Slow essays on design, technology, and craft." props.image="/starters/blog.jpg" props.accent="#0ea5e9" props.slug="blog"}
 
 ::starter-card{props.name="Flowlark" props.industry="SaaS & Product" props.tagline="Plan, ship, and scale in one place." props.image="/starters/saas.jpg" props.accent="#6366f1" props.slug="saas"}
+
+::starter-card{props.name="Atrium" props.industry="Museum & Culture" props.tagline="A city museum in three languages, from one set of pages." props.image="/starters/museum.jpg" props.accent="#2438c8" props.slug="museum"}
 :::::
 ::::::
 

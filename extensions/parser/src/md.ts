@@ -18,6 +18,7 @@ import remarkParseFrontmatter from "remark-parse-frontmatter";
 import remarkGfm from "remark-gfm";
 import remarkDirective from "remark-directive";
 import { readFileSync } from "node:fs";
+import { DEFAULT_FORMAT_LOCALE } from "@jxsuite/schema/intl";
 import { basename, extname, relative, resolve as resolvePath } from "node:path";
 import { globSync } from "glob";
 import { assignHeadingIds, mdastNodeToJx } from "./transpile.ts";
@@ -82,15 +83,62 @@ function mdastToString(node: MdastNode): string {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+/** Average reading speed. See {@link readingTime} for why this is one number and not a table. */
+const WORDS_PER_MINUTE = 200;
+
 /**
- * Estimate reading time based on word count (~200 wpm average).
+ * One segmenter, built once.
+ *
+ * The locale is fixed rather than the host's: word boundaries are a property of the text, and a
+ * word count that changed with the build machine's locale would be the same determinism bug the
+ * `Intl` helpers exist to avoid.
+ */
+const WORD_SEGMENTER = new Intl.Segmenter(DEFAULT_FORMAT_LOCALE, { granularity: "word" });
+
+/** A segment is a word when it carries a letter or a digit. See {@link countWords}. */
+const WORD_LIKE = /[\p{L}\p{N}]/u;
+
+/**
+ * Count the words in a string by **segmenting** it, not by splitting on whitespace (UAX #29).
+ *
+ * Splitting on `\s+` assumes a script that puts spaces between its words. Japanese, Chinese and
+ * Thai do not, so an entire article in any of them counted as **one word** — and therefore one
+ * minute to read, whatever its length. `Intl.Segmenter` applies the Unicode word-boundary rules.
+ *
+ * **A segment counts when it contains a letter or a digit, rather than when `isWordLike` says so.**
+ * That property is what `isWordLike` is defined to mean, but Bun's engine answers `false` for a
+ * mixed alphanumeric segment — `w0`, `v3`, `h1` — so trusting it would drop every token of that
+ * shape from the count, silently and only for some documents. The predicate is spelled out because
+ * it has to be correct on the runtime this actually runs on.
+ *
+ * This runs in the parser under Bun, so there is no browser-support question to weigh.
+ *
+ * @param {string} text
+ * @returns {number}
+ */
+function countWords(text: string): number {
+  let words = 0;
+  for (const { segment } of WORD_SEGMENTER.segment(text)) {
+    if (WORD_LIKE.test(segment)) {
+      words += 1;
+    }
+  }
+  return words;
+}
+
+/**
+ * Estimate reading time from the word count.
+ *
+ * **200 wpm, and the limitation is stated rather than modelled.** Real reading speed varies by
+ * script, by density and by reader — a Japanese character carries more than a Latin one, so a
+ * per-script table would be more accurate and would also be a table of guesses nobody could verify.
+ * One honest constant that the docs name beats a plausible one that they cannot.
  *
  * @param {string} text
  * @returns {number} Minutes (rounded up, minimum 1)
  */
 function readingTime(text: string) {
-  const words = text.split(/\s+/).filter(Boolean).length;
-  return Math.max(1, Math.ceil(words / 200));
+  return Math.max(1, Math.ceil(countWords(text) / WORDS_PER_MINUTE));
 }
 
 /**
@@ -199,7 +247,7 @@ export function processMarkdown(
     $excerpt: excerpt,
     $readingTime: readingTime(plainText),
     $toc: toc,
-    $wordCount: plainText.split(/\s+/).filter(Boolean).length,
+    $wordCount: countWords(plainText),
     frontmatter,
     path: filePath,
     slug,

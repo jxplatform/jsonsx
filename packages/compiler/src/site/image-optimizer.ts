@@ -33,6 +33,13 @@ export interface ImageConfig {
   quality: { webp?: number; avif?: number; jpeg?: number; png?: number };
   sizes: string;
   lazyLoad: boolean;
+  /**
+   * Wrap a multi-format image in a `<picture>` with one `<source>` per format. Default true.
+   * Setting it false restores a bare `<img srcset>` in the preferred format, at the cost of
+   * browsers that cannot decode that format: `srcset` carries no type information, so they pick an
+   * undecodable candidate rather than falling back.
+   */
+  picture?: boolean;
   service?: "build" | "cloudflare";
   /**
    * Hostnames whose remote (https) images are routed through the optimization pipeline. Cloudflare

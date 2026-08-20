@@ -10,6 +10,8 @@ import { existsSync } from "node:fs";
 import { mediaForTemplate } from "./templates";
 import type { TemplateId } from "./templates";
 
+import TEMPLATE_VERSIONS from "./template-versions.json";
+
 const __dirname = import.meta.dirname;
 const TEMPLATE_DIR = join(__dirname, "template");
 const TEMPLATE_OVERLAYS_DIR = join(__dirname, "templates");
@@ -393,14 +395,20 @@ function buildPackageJson({
 
   // Projects own their extension dependencies (specs/extensions.md §3) — the parser extension is
   // A runtime dependency, resolved project-first by every host.
+  //
+  // The ranges come from ./template-versions.json, which is GENERATED and CI-verified
+  // (`bun run templates:check`) and rewritten by release-please inside the release commit itself
+  // (release-please-config.json extra-files). Hardcoding them here is what left every scaffolded
+  // Project asking for a compiler version that was never published. Never hand-edit the
+  // Map; `bun run templates:sync` is the fixer.
   const dependencies: Record<string, string> = {
-    "@jxsuite/parser": "^0.35.1",
+    "@jxsuite/parser": TEMPLATE_VERSIONS.parser,
   };
   const devDependencies: Record<string, string> = {
-    "@jxsuite/compiler": "^0.19.0",
-    "@jxsuite/runtime": "^0.19.0",
+    "@jxsuite/compiler": TEMPLATE_VERSIONS.compiler,
+    "@jxsuite/runtime": TEMPLATE_VERSIONS.runtime,
     // The `dev` script spawns @jxsuite/server's dev entry (see jx dev in the compiler CLI)
-    "@jxsuite/server": "^1.0.0",
+    "@jxsuite/server": TEMPLATE_VERSIONS.server,
   };
 
   const scripts: Record<string, string> = {

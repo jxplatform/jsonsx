@@ -17,6 +17,8 @@ import { extname, join, relative, resolve } from "node:path";
 import type { ExtensionRegistry } from "@jxsuite/schema/extension-registry";
 import type { FormatRegistry } from "@jxsuite/schema/format-registry";
 import type { JxDocument, JxPathsDef, ProjectConfig } from "@jxsuite/schema/types";
+import { localeOfRoute } from "./i18n.ts";
+import type { ResolvedI18n } from "./i18n.ts";
 
 interface Route {
   urlPattern: string; // URL pattern (e.g. "/blog/:slug")
@@ -27,6 +29,13 @@ interface Route {
   params: string[]; // Parameter names (e.g. ["slug"])
   $layout: string | null; // Layout override from page frontmatter, if any
   _pathParams?: Record<string, string>; // Resolved path parameters
+  /**
+   * The timestamp of the thing this concrete route was generated FROM, when that is not the
+   * template file. A collection route's source is an entry; `sourcePath` still points at the
+   * `[slug].json` that rendered it, so without this every post in an archive reports the template's
+   * mtime and the whole collection looks edited whenever the template is.
+   */
+  sourceMtime?: string;
 }
 
 /**
@@ -55,6 +64,104 @@ export async function readPageDocument(
     );
   }
   return (await entry.call("parse", source)) as JxDocument;
+}
+
+/**
+ * The `$translationKey` each route's document declares, for the routes that declare one.
+ *
+ * A **pre-pass**, because a page's alternates depend on the whole route table (§13.5): the set has
+ * to be complete before the first page is compiled, so a document cannot tell the build what its
+ * key is while it is being compiled.
+ *
+ * The file is read and the **parse is skipped** unless the text mentions the key. Most pages of a
+ * multilingual site never declare one — their paths are parallel and the derivation is right — so
+ * paying a second full parse for every page to find a key that is usually absent would be a cost
+ * with nothing behind it. Documents sharing a source (a `$paths` template's expansions) are read
+ * once.
+ *
+ * A document that fails to parse is skipped rather than thrown from here. It will fail again a
+ * moment later while being compiled, where the error names the page and the rest of the site still
+ * builds; failing in a pre-pass would turn one bad page into no site at all.
+ *
+ * **A key may name its route's parameters**, as `${slug}`, and that is what makes a collection's
+ * localized URLs work: one `[slug]` template expands to one route per entry, so a key that could
+ * not vary per entry would claim a single identity for the whole collection and the build would
+ * report it as a duplicate. `pages/fr-ca/expositions/[slug].json` declaring `"exhibitions/${slug}"`
+ * pairs each French post with the English one it translates, because two translations of an entry
+ * share an id (§13.3) and the id is what the parameter carries.
+ *
+ * @param {readonly {
+ *   sourcePath: string;
+ *   urlPattern: string;
+ *   _pathParams?: Record<string, string>;
+ * }[]} routes
+ *   - Concrete routes
+ * @param {FormatRegistry} [registry]
+ * @returns {Promise<Map<string, string>>} Keyed by `urlPattern`
+ */
+export async function readTranslationKeys(
+  routes: readonly {
+    sourcePath: string;
+    urlPattern: string;
+    _pathParams?: Record<string, string> | undefined;
+  }[],
+  registry?: FormatRegistry,
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const byFile = new Map<string, string | null>();
+  for (const route of routes) {
+    if (!byFile.has(route.sourcePath)) {
+      byFile.set(route.sourcePath, await declaredTranslationKey(route.sourcePath, registry));
+    }
+    const key = byFile.get(route.sourcePath);
+    if (key !== null && key !== undefined) {
+      out.set(route.urlPattern, withRouteParams(key, route._pathParams));
+    }
+  }
+  return out;
+}
+
+/**
+ * Substitute a route's own parameters into a declared key.
+ *
+ * A parameter with no value is left as it was written rather than blanked: a key that quietly
+ * became `exhibitions/` would pair every entry in the collection with every other, which is a
+ * duplicate the build reports — and the report naming `${slug}` says what is actually wrong.
+ *
+ * @param {string} key
+ * @param {Record<string, string> | undefined} params
+ * @returns {string}
+ */
+function withRouteParams(key: string, params: Record<string, string> | undefined): string {
+  if (!key.includes("${")) {
+    return key;
+  }
+  return key.replaceAll(/\$\{(\w+)\}/g, (whole, name: string) => params?.[name] ?? whole);
+}
+
+/**
+ * One document's `$translationKey`, or null when it declares none or cannot be read.
+ *
+ * @param {string} sourcePath
+ * @param {FormatRegistry} [registry]
+ * @returns {Promise<string | null>}
+ */
+async function declaredTranslationKey(
+  sourcePath: string,
+  registry?: FormatRegistry,
+): Promise<string | null> {
+  if (!readFileSync(sourcePath, "utf8").includes("$translationKey")) {
+    return null;
+  }
+  let doc: JxDocument;
+  try {
+    doc = await readPageDocument(sourcePath, registry);
+  } catch {
+    return null;
+  }
+  return typeof doc.$translationKey === "string" && doc.$translationKey !== ""
+    ? doc.$translationKey
+    : null;
 }
 
 /**
@@ -205,6 +312,35 @@ async function fileToRoute(relativePath: string, absolutePath: string, registry?
 }
 
 /**
+ * The reserved key a `resolvePaths` result may carry alongside its route parameters.
+ *
+ * A route parameter comes from a `[bracket]` segment in a filename, so this name cannot collide
+ * with one by accident, and it matches what the content loader already calls the same data on an
+ * entry (`parser.md` §9.3) — so a fact about an entry keeps one name from the file it was read out
+ * of all the way to the sitemap.
+ */
+const PATH_ENTRY_META = "_meta";
+
+/**
+ * The entry timestamp carried on a `$paths` result, or null when there is none.
+ *
+ * Null is ordinary: the core `$paths` shapes (`values`, `$ref`, a literal array) describe route
+ * parameters and nothing else, and a route with no entry of its own correctly falls back to its
+ * template's own modification time.
+ *
+ * @param {Record<string, unknown>} pathEntry
+ * @returns {string | null}
+ */
+function entryMtime(pathEntry: Record<string, unknown>): string | null {
+  const meta = pathEntry[PATH_ENTRY_META];
+  if (meta === null || typeof meta !== "object") {
+    return null;
+  }
+  const { mtime } = meta as { mtime?: unknown };
+  return typeof mtime === "string" && mtime !== "" ? mtime : null;
+}
+
+/**
  * Expand dynamic routes by resolving $paths from each dynamic page.
  *
  * Supports these $paths shapes (per spec §4.3): 1. Explicit values: { values: ["en", "fr"], param:
@@ -226,6 +362,7 @@ export async function expandDynamicRoutes(
   sections: Record<string, unknown> = {},
   registry?: ExtensionRegistry,
   projectConfig?: ProjectConfig,
+  i18n?: ResolvedI18n | null,
 ) {
   const expanded: Route[] = [];
 
@@ -256,23 +393,33 @@ export async function expandDynamicRoutes(
       sections,
       registry,
       projectConfig,
+      // The template's OWN prefix, read before expansion: `/fr/blog/:slug` is a French route
+      // Whatever its entries turn out to be called, and that is what scopes a localized collection.
+      localeOfRoute(route.urlPattern, i18n ?? null),
     );
 
     for (const pathEntry of pathEntries) {
       let concreteUrl = route.urlPattern;
       const params: Record<string, string> = {};
       for (const [param, value] of Object.entries(pathEntry)) {
+        // `_meta` is the reserved carrier for facts about the source ENTRY (extensions.md §8).
+        // It is not a route parameter and must never reach substitution.
+        if (param === PATH_ENTRY_META) {
+          continue;
+        }
         params[param] = String(value);
         concreteUrl = concreteUrl.replace(`:${param}`, params[param]);
         concreteUrl = concreteUrl.replace("*", params[param]);
       }
 
+      const mtime = entryMtime(pathEntry);
       expanded.push({
         ...route,
         _pathParams: params,
         isCatchAll: false,
         isDynamic: false,
         params: [],
+        ...(mtime === null ? {} : { sourceMtime: mtime }),
         urlPattern: concreteUrl,
       });
     }
@@ -301,6 +448,7 @@ async function resolvePathEntries(
   sections: Record<string, unknown>,
   registry?: ExtensionRegistry,
   projectConfig?: ProjectConfig,
+  locale?: string | null,
 ): Promise<Record<string, unknown>[]> {
   // Legacy: array of param objects
   if (Array.isArray($paths)) {
@@ -345,6 +493,7 @@ async function resolvePathEntries(
     }
     return (await entry.call("resolvePaths", $paths, {
       data: sections[entry.project.key],
+      locale,
       projectConfig,
       root: projectRoot,
     })) as Record<string, unknown>[];

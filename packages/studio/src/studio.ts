@@ -76,6 +76,7 @@ import {
   getEditSnapshot,
   isCaretActive,
   postColorSchemeToLiveHosts,
+  postLocaleToLiveHosts,
   setCanvasContextMenuHandler,
   setCanvasPointerDownHandler,
   setCanvasSlashHandler,
@@ -215,6 +216,7 @@ import { openNewProjectModal, registerNewProjectCommands } from "./new-project/n
 import { invalidatePageRouteCache, registerInspectorCommands } from "./panels/properties-panel";
 import { liveElementCommands, setContextMenuNavigate } from "./editor/context-menu";
 import { registerSeoCommands, renderSeoModal } from "./panels/seo-modal";
+import { registerA11yCommands } from "./services/a11y-report";
 import { registerStyleCommands } from "./panels/style-panel";
 import { registerGridCommands } from "./grid/grid-open";
 import { registerSettingsCommands } from "./settings/settings-document";
@@ -226,6 +228,7 @@ import { registerPublishCommands } from "./publish/publish-commands";
 import { registerGridViewCommands } from "./grid/grid-panel";
 import { registerRedirectsCommands } from "./grid/redirects-grid";
 import { registerContentCommands } from "./content/entry-commands";
+import { registerI18nCommands } from "./i18n/i18n-commands";
 import { convertToComponent } from "./editor/convert-to-component";
 import type { GitDiffState } from "./types";
 import type { Tab } from "./tabs/tab";
@@ -242,7 +245,26 @@ void _swc;
  * of reads `panels/git-panel.ts` makes for a row click; an added file has no `HEAD` copy, so its
  * "original" is the empty string rather than a `gitShow` that would throw.
  */
-const derivationDeps: DerivationDeps = { loadDiff: loadDiffForLens, openFileInPane };
+const derivationDeps: DerivationDeps = {
+  /*
+   * `fileExists` answers the locale companion's one question: the resolver computes WHERE this
+   * document's copy in another language would live, and only the disk can say whether anybody has
+   * written it. A read that throws is the platform's own answer for "no such file" — every backend
+   * rejects rather than returning empty — so the catch is the negative case, not an error being
+   * swallowed. Memoised per wanted path by `probeTranslationFor`, so it costs one read per locale a
+   * pane is actually pointed at.
+   */
+  fileExists: async (path: string) => {
+    try {
+      await getPlatform().readFile(path);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  loadDiff: loadDiffForLens,
+  openFileInPane,
+};
 
 // ─── Globals ──────────────────────────────────────────────────────────────────
 // These mutable variables are local to studio.js for now. As sections are extracted
@@ -692,6 +714,15 @@ function installPaneRenderEffects(paneId: string): void {
       scheme === "light" || scheme === "dark" ? scheme : null,
       surfaceForPane(paneId).wrap,
     );
+  });
+  effect(() => {
+    /*
+     * The other half of `i18n.switchLocale`. Without this the control moves a chip and the artboard
+     * goes on drawing the same document left-to-right, which makes the verb a label rather than a
+     * rendering context. Scoped to THIS pane's stage for the reason the scheme effect above gives.
+     */
+    const locale = tabOfPane(paneId)?.session.ui.previewLocale ?? null;
+    postLocaleToLiveHosts(locale, surfaceForPane(paneId).wrap);
   });
 }
 
@@ -1383,6 +1414,7 @@ registerInspectorCommands(commandRegistry);
 /* Search appearance, behind one record with two buttons: the Document Header card's and the Page
    panel's. A surface that IS the capability is one the palette cannot reach. */
 registerSeoCommands(commandRegistry);
+registerA11yCommands(commandRegistry);
 /* The element menu's eight verbs, in the APP registry rather than only in the popover's own. They
    have always declared `menus: ["context/element", "palette"]`; the palette has never listed one,
    because the only registry holding them was the one `editor/context-menu.ts` builds for itself.
@@ -1401,6 +1433,10 @@ registerSettingsCommands(commandRegistry);
 registerPreferencesCommands(commandRegistry);
 registerLibraryCommands(commandRegistry);
 registerContentCommands(commandRegistry);
+/* The four translation verbs: open a sibling translation, create the missing one, show the
+   Languages panel, declare a language. `i18n.switchLocale` is deliberately not among them — it sets
+   a rendering context, so it lives with the other axis-3 verbs in `canvasViewCommands`. */
+registerI18nCommands(commandRegistry);
 registerNewProjectCommands(commandRegistry);
 registerStyleCommands(commandRegistry);
 registerSourceControlCommands(commandRegistry);

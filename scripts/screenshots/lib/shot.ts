@@ -362,8 +362,21 @@ async function settle(page: Page, net: RequestTracker, at: string): Promise<void
  * a panel re-rendering under a stationary cursor picked up a hover ring the shot never asked for.
  */
 async function resetPointerAndFocus(page: Page): Promise<void> {
-  // Off-canvas: no element is under the cursor, so nothing matches :hover.
-  await page.mouse.move(-1, -1);
+  /*
+   * The bottom-right corner, not `(-1, -1)`.
+   *
+   * Off-canvas coordinates were the obvious way to have nothing under the cursor, and CDP accepted
+   * them. **WebDriver BiDi does not**: `input.performActions` refuses a move beyond the viewport,
+   * with "move target out of bounds", so every shot failed the moment the pipeline spoke the
+   * standard's protocol instead of Chrome's. The corner is inside the viewport and reachable, and
+   * it is the one pixel of a full-window screenshot that no panel's interactive content occupies —
+   * the same property `(-1, -1)` was chosen for, expressed in coordinates the standard allows.
+   */
+  const viewport = page.viewport();
+  await page.mouse.move(
+    viewport ? Math.max(0, viewport.width - 1) : 0,
+    viewport ? Math.max(0, viewport.height - 1) : 0,
+  );
   await page.evaluate(() => {
     const active = document.activeElement;
     if (active instanceof HTMLElement && active !== document.body) {
@@ -843,6 +856,45 @@ export function bootUrl(ctx: ShotContext, open: ResolvedOpen): string {
  * should hold is applied after it. Docks last, because a dock change relayouts the pane the fit was
  * computed against.
  */
+/**
+ * Refuse to photograph a Studio that booted with a dialog already up.
+ *
+ * `showConfirmDialog` and friends render an `<sp-dialog-wrapper open underlay>`, and an underlay
+ * swallows every pointer event across the viewport. So a dialog raised during boot does not just
+ * sit in the corner of the frame — it silently redirects every click, caret and hover the shot goes
+ * on to dispatch into a scrim, and the shot either fails somewhere far from the cause or, worse,
+ * succeeds and photographs a 50%-black canvas.
+ *
+ * That is not a hypothetical. Studio's "Update @jxsuite packages?" prompt fired on the `?project=`
+ * boot path for every starter, and 33 committed images were captured through it — among them
+ * `docs/images/hero.png`, which is the jxsuite.com marketing hero. Four shots failed and were
+ * chased as shot-authoring bugs; the other 33 shipped, because a scrim is not something an `expect`
+ * on a region can notice.
+ *
+ * No shot legitimately boots with a modal: every dialog shot in the manifest — `new-project`,
+ * `seo-modal`, `publish-panel`, `repeat-dialog`, `convert-to-component` — raises its own from a
+ * STEP. So this needs no opt-out, and `modal.open` is an existing §13.4 context key rather than
+ * anything added for the pipeline.
+ */
+async function assertNoUninvitedModal(page: Page, shotName: string): Promise<void> {
+  const uninvited = await page.evaluate(() => {
+    if (!window.__jxAutomation?.probe.state().modal.open) {
+      return null;
+    }
+    return [...document.querySelectorAll("#layer-dialog [open], #layer-modal [open]")].map(
+      (el) => el.getAttribute("headline") ?? el.tagName.toLowerCase(),
+    );
+  });
+  if (uninvited) {
+    throw new Error(
+      `shot "${shotName}": Studio booted with a modal already open — ` +
+        `${uninvited.length > 0 ? uninvited.join(", ") : "unnamed dialog"}. Its underlay blocks ` +
+        `the whole viewport, so every step below would be dispatched into a scrim and the capture ` +
+        `would show one. Nothing in the manifest raised it; something in the app did.`,
+    );
+  }
+}
+
 async function applyOpenState(page: Page, open: ResolvedOpen, net: RequestTracker): Promise<void> {
   for (const key of ["theme", "view", "fit"] as const) {
     const value = open[key];
@@ -905,6 +957,7 @@ export async function executeShot(
   await page.waitForFunction(() => Boolean(window.__jxAutomation), { timeout: 30_000 });
 
   await settle(page, net, "boot");
+  await assertNoUninvitedModal(page, shot.name);
   await applyOpenState(page, open, net);
 
   const body: ThenSegment = {

@@ -10,6 +10,8 @@
 
 import { streamImport } from "../services/import-client";
 import { canPickDirectory, pickDirectoryPath } from "../services/directory-picker";
+import { negotiateCollab } from "@jxsuite/collab/negotiate";
+import type { CollabNegotiation } from "@jxsuite/collab/negotiate";
 import type { WsCollabConnection } from "@jxsuite/collab/client";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 import type {
@@ -35,6 +37,7 @@ import type {
   SiteBuildResult,
   StarterInfo,
 } from "../types";
+import { problemDetail, problemMessage } from "@jxsuite/protocol";
 
 /** A directory entry from the server, tolerating extra wire fields. */
 type WireDirEntry = DirEntry & Record<string, unknown>;
@@ -63,8 +66,12 @@ interface SiteEntry {
  */
 export function createDevServerPlatform() {
   let _projectRoot = "";
-  /** Lazy /__studio/collab capability probe (null = not asked yet). */
-  let _collabProbe: Promise<boolean> | null = null;
+  /**
+   * Lazy /__studio/collab capability probe (null = not asked yet). Its result is the subprotocol
+   * negotiation, not a boolean: the probe is the only place the client can learn what envelope the
+   * server speaks without risking the handshake (see `@jxsuite/collab/negotiate`).
+   */
+  let _collabProbe: Promise<CollabNegotiation | null> | null = null;
   /**
    * One multiplexed collab socket per page; per-doc handles come from openDoc. Memoized as a
    * promise so concurrent first opens share the connection instead of racing two sockets.
@@ -144,7 +151,7 @@ export function createDevServerPlatform() {
       if (!res.ok) {
         const body = (await readJson<ErrorBody>(res).catch(() => ({}))) as ErrorBody;
         throw new Error(
-          `Could not open ${r}: ${body.error || `activation failed (${res.status})`}`,
+          `Could not open ${r}: ${problemDetail(body) ?? `activation failed (${res.status})`}`,
         );
       }
     },
@@ -283,7 +290,7 @@ export function createDevServerPlatform() {
       });
       if (!res.ok) {
         const data = await readJson<ErrorBody>(res);
-        throw new Error(data.error || "Failed to create project");
+        throw new Error(problemDetail(data) ?? "Failed to create project");
       }
       return await res.json();
     },
@@ -502,6 +509,12 @@ export function createDevServerPlatform() {
      * server-root-relative path). Probes capability once — older servers without the endpoint
      * degrade to solo editing; the wire client's evaluation defers behind the dynamic import until
      * a doc opens.
+     *
+     * The same probe carries the subprotocol negotiation. A server that advertises no `protocols`
+     * predates it and gets no offer, because an offer it cannot echo would fail the handshake
+     * outright (RFC 6455 §4.1); a server that advertises an envelope this build does not speak is
+     * refused here, where the reason can be said, rather than in a room where the two would merge
+     * divergent histories.
      */
     async collab(docPath: string) {
       if (typeof WebSocket === "undefined" || typeof location === "undefined") {
@@ -509,16 +522,23 @@ export function createDevServerPlatform() {
       }
       if (_collabProbe === null) {
         _collabProbe = fetch("/__studio/collab")
-          .then((res) => res.ok)
-          .catch(() => false);
+          .then(async (res) => (res.ok ? negotiateCollab(await res.json()) : null))
+          .catch(() => null);
       }
-      if (!(await _collabProbe)) {
+      const negotiation = await _collabProbe;
+      if (negotiation === null) {
         return null;
       }
+      if (negotiation.refused !== null) {
+        console.warn(`Collaboration unavailable: ${negotiation.refused}`);
+        return null;
+      }
+      const { offer } = negotiation;
       _collabConnection ??= (async () => {
         const { createWsCollabConnection } = await import("@jxsuite/collab/client");
         const scheme = location.protocol === "https:" ? "wss" : "ws";
         return createWsCollabConnection({
+          protocols: offer,
           url: `${scheme}://${location.host}/__studio/collab`,
         });
       })();
@@ -742,7 +762,7 @@ export function createDevServerPlatform() {
       );
       if (!res.ok) {
         const data = await readJson<ErrorBody>(res);
-        throw new Error(data.error || "Failed to list connections");
+        throw new Error(problemDetail(data) ?? "Failed to list connections");
       }
       return await readJson<DataConnectionsResponse>(res);
     },
@@ -759,7 +779,7 @@ export function createDevServerPlatform() {
       );
       const data = await readJson<DataConnectionTestResult & ErrorBody>(res);
       if (!res.ok) {
-        throw new Error(data.error || "Connection test failed");
+        throw new Error(problemDetail(data) ?? "Connection test failed");
       }
       return data;
     },
@@ -773,7 +793,7 @@ export function createDevServerPlatform() {
       });
       const data = await readJson<DataPushResult & ErrorBody>(res);
       if (!res.ok) {
-        throw new Error(data.error || "Schema push failed");
+        throw new Error(problemDetail(data) ?? "Schema push failed");
       }
       return data;
     },
@@ -799,7 +819,7 @@ export function createDevServerPlatform() {
       const res = await fetch(`/__studio/data/rows?${params}`);
       const data = await readJson<DataRowsResult & ErrorBody>(res);
       if (!res.ok) {
-        throw new Error(data.error || "Failed to load rows");
+        throw new Error(problemDetail(data) ?? "Failed to load rows");
       }
       return data;
     },
@@ -812,7 +832,7 @@ export function createDevServerPlatform() {
       });
       const data = await readJson<{ row: Record<string, unknown> } & ErrorBody>(res);
       if (!res.ok) {
-        throw new Error(data.error || "Insert failed");
+        throw new Error(problemDetail(data) ?? "Insert failed");
       }
       return data;
     },
@@ -825,7 +845,7 @@ export function createDevServerPlatform() {
       });
       const data = await readJson<{ row: Record<string, unknown> } & ErrorBody>(res);
       if (!res.ok) {
-        throw new Error(data.error || "Update failed");
+        throw new Error(problemDetail(data) ?? "Update failed");
       }
       return data;
     },
@@ -842,7 +862,7 @@ export function createDevServerPlatform() {
       const res = await fetch(`/__studio/data/rows?${params}`, { method: "DELETE" });
       const data = await readJson<{ ok: boolean } & ErrorBody>(res);
       if (!res.ok) {
-        throw new Error(data.error || "Delete failed");
+        throw new Error(problemDetail(data) ?? "Delete failed");
       }
       return data;
     },
@@ -852,7 +872,7 @@ export function createDevServerPlatform() {
       const res = await fetch(`/__studio/secrets?dir=${encodeURIComponent(serverPath("."))}`);
       if (!res.ok) {
         const data = await readJson<ErrorBody>(res);
-        throw new Error(data.error || "Failed to list secrets");
+        throw new Error(problemDetail(data) ?? "Failed to list secrets");
       }
       const data = await readJson<{ names: string[] }>(res);
       return data.names;
@@ -867,7 +887,7 @@ export function createDevServerPlatform() {
       });
       const data = await readJson<SecretsSetResponse & ErrorBody>(res);
       if (!res.ok) {
-        throw new Error(data.error || "Failed to write secrets");
+        throw new Error(problemDetail(data) ?? "Failed to write secrets");
       }
       return data;
     },
@@ -885,7 +905,7 @@ export function createDevServerPlatform() {
       });
       const data = await readJson<{ error?: string; result?: unknown }>(res);
       if (!res.ok) {
-        throw new Error(data.error || "Format action failed");
+        throw new Error(problemDetail(data) ?? "Format action failed");
       }
       return data.result;
     },
@@ -965,7 +985,7 @@ export function createDevServerPlatform() {
       });
       if (!res.ok) {
         const body = await readJson<ErrorBody>(res);
-        throw new Error(body.error);
+        throw new Error(problemMessage(body));
       }
       return await res.json();
     },
@@ -979,7 +999,7 @@ export function createDevServerPlatform() {
       });
       if (!res.ok) {
         const body = await readJson<ErrorBody>(res);
-        throw new Error(body.error);
+        throw new Error(problemMessage(body));
       }
       return await res.json();
     },
@@ -993,7 +1013,7 @@ export function createDevServerPlatform() {
       });
       if (!res.ok) {
         const body = await readJson<ErrorBody>(res);
-        throw new Error(body.error);
+        throw new Error(problemMessage(body));
       }
       return await res.json();
     },
@@ -1007,7 +1027,7 @@ export function createDevServerPlatform() {
       });
       if (!res.ok) {
         const body = await readJson<ErrorBody>(res);
-        throw new Error(body.error);
+        throw new Error(problemMessage(body));
       }
       return await res.json();
     },
@@ -1016,7 +1036,7 @@ export function createDevServerPlatform() {
       const res = await fetch("/__studio/git/pull", { method: "POST" });
       if (!res.ok) {
         const body = await readJson<ErrorBody>(res);
-        throw new Error(body.error);
+        throw new Error(problemMessage(body));
       }
       return await res.json();
     },
@@ -1025,7 +1045,7 @@ export function createDevServerPlatform() {
       const res = await fetch("/__studio/git/fetch", { method: "POST" });
       if (!res.ok) {
         const body = await readJson<ErrorBody>(res);
-        throw new Error(body.error);
+        throw new Error(problemMessage(body));
       }
       return await res.json();
     },
@@ -1039,7 +1059,7 @@ export function createDevServerPlatform() {
       });
       if (!res.ok) {
         const body = await readJson<ErrorBody>(res);
-        throw new Error(body.error);
+        throw new Error(problemMessage(body));
       }
       return await res.json();
     },
@@ -1053,7 +1073,7 @@ export function createDevServerPlatform() {
       });
       if (!res.ok) {
         const body = await readJson<ErrorBody>(res);
-        throw new Error(body.error);
+        throw new Error(problemMessage(body));
       }
       return await res.json();
     },
@@ -1090,7 +1110,7 @@ export function createDevServerPlatform() {
       });
       if (!res.ok) {
         const body = await readJson<ErrorBody>(res);
-        throw new Error(body.error);
+        throw new Error(problemMessage(body));
       }
       return await res.json();
     },
@@ -1104,7 +1124,7 @@ export function createDevServerPlatform() {
       });
       if (!res.ok) {
         const body = await readJson<ErrorBody>(res);
-        throw new Error(body.error);
+        throw new Error(problemMessage(body));
       }
       return await res.json();
     },
@@ -1113,14 +1133,14 @@ export function createDevServerPlatform() {
       const res = await fetch("/__studio/git/init", { method: "POST" });
       if (!res.ok) {
         const body = await readJson<ErrorBody>(res);
-        throw new Error(body.error);
+        throw new Error(problemMessage(body));
       }
     },
     async buildSite() {
       const res = await fetch("/__studio/build", { method: "POST" });
       if (!res.ok) {
         const body = await readJson<ErrorBody>(res);
-        throw new Error(body.error || "The site could not be built.");
+        throw new Error(problemDetail(body) ?? "The site could not be built.");
       }
       return (await res.json()) as SiteBuildResult;
     },
@@ -1137,7 +1157,7 @@ export function createDevServerPlatform() {
       });
       if (!res.ok) {
         const body = await readJson<ErrorBody>(res);
-        throw new Error(body.error);
+        throw new Error(problemMessage(body));
       }
     },
 

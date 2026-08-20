@@ -82,7 +82,8 @@ export function createDesktopPlatform() {
     return ready.then(
       () =>
         new Promise((resolve, reject) => {
-          const id = (nextId += 1);
+          nextId += 1;
+          const id = nextId;
           pending.set(id, { reject, resolve });
           ws.send(JSON.stringify({ id, method, params }));
         }),
@@ -157,6 +158,16 @@ export function createDesktopPlatform() {
 
     async saveRecentProjects(projects: RecentProjectEntry[]) {
       await request("saveRecentProjects", { projects });
+    },
+
+    /*
+     * GitHub sign-in, launcher-only like the electrobun launcher's: the browser Studio has no
+     * loopback server to redirect to and keeps the device flow, so this is not a PAL member.
+     */
+    githubAuth: {
+      signIn: (force = false) => request("githubSignIn", { force }) as Promise<{ token: string }>,
+      signOut: () => request("githubSignOut") as Promise<{ ok: boolean }>,
+      status: () => request("githubToken") as Promise<{ stored: boolean }>,
     },
 
     // ─── User settings (user-level store, shared across per-project profiles) ──
@@ -478,9 +489,15 @@ export function createDesktopPlatform() {
       );
     },
 
-    // AI Assistant (Stack B: OpenAI-compatible SSE proxy on the local chromium server)
+    /*
+     * AI Assistant (Stack B: OpenAI-compatible SSE proxy on the local chromium server).
+     *
+     * Tokened, like every other surface that spends something. The route forwards to a provider on
+     * the user's own key, so an ungated one is an open relay for any process on the machine — and
+     * the project server dispatched it ahead of every gate until it was closed (server.md §4.2).
+     */
     aiChatUrl() {
-      return "/__studio__/ai/chat";
+      return `/__studio__/ai/chat?token=${encodeURIComponent(token)}`;
     },
   };
 

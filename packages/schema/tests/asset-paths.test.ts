@@ -4,6 +4,7 @@ import {
   collectAssetUrls,
   isNpmSpecifier,
   normalizeAssetPrefix,
+  npmAssetPath,
   NPM_SPECIFIER_PREFIX,
   resolveAssetUrl,
   SIDECAR_ASSET_DIR,
@@ -54,6 +55,31 @@ describe("sidecarAssetPath", () => {
 
   test("sanitizes unexpected characters into hyphens", () => {
     expect(sidecarAssetPath("npm:weird pkg!name")).toBe("/assets/weird-pkg-name.js");
+  });
+});
+
+describe("npmAssetPath", () => {
+  test("keeps the extension, because the file is copied rather than bundled", () => {
+    expect(npmAssetPath("@shoelace-style/shoelace/dist/themes/light.css")).toBe(
+      "/assets/shoelace-style-shoelace-dist-themes-light.css",
+    );
+    expect(npmAssetPath("normalize.css/normalize.css")).toBe("/assets/normalize.css-normalize.css");
+  });
+
+  test("an extensionless specifier stays extensionless", () => {
+    expect(npmAssetPath("@vue/reactivity")).toBe("/assets/vue-reactivity");
+  });
+
+  test("deterministic, and always under the asset dir", () => {
+    for (const spec of ["@a/b/c.woff2", "pkg/x.js", "@scope/pkg"]) {
+      expect(npmAssetPath(spec)).toBe(npmAssetPath(spec));
+      expect(npmAssetPath(spec).startsWith(SIDECAR_ASSET_DIR)).toBe(true);
+      expect(npmAssetPath(spec)).not.toContain("/../");
+    }
+  });
+
+  test("sanitizes unexpected characters into hyphens", () => {
+    expect(npmAssetPath("weird pkg!/a b.css")).toBe("/assets/weird-pkg-a-b.css");
   });
 });
 

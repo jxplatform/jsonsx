@@ -1,5 +1,35 @@
 # Changelog
 
+## [1.5.0](https://github.com/jxsuite/jx/compare/parser-v1.4.1...parser-v1.5.0) (2026-08-19)
+
+
+### Features
+
+* **compiler:** date a generated route by its entry, not by the template ([9bc9668](https://github.com/jxsuite/jx/commit/9bc96680634e56c150b4eeaede128f7abbf8885e))
+* **compiler:** negotiate a locale, expand {locale} sources, and check prefix-always ([72f061c](https://github.com/jxsuite/jx/commit/72f061c9fe9cec6afc0a2c9dfa169e4245db4f24))
+* **feed:** Atom and JSON Feed from content collections ([6269bce](https://github.com/jxsuite/jx/commit/6269bced4f79ca5bdf71ce97d4a404bfdd8523cc))
+* **i18n:** a collection is localized end to end, and a starter proves it ([2230a01](https://github.com/jxsuite/jx/commit/2230a011b28743988725d061b7086cc02038cfb8))
+* **i18n:** format for a language, and count what a reader sees ([fa8affd](https://github.com/jxsuite/jx/commit/fa8affdc2b1936d1ef9365379c490aa49608c552))
+* **i18n:** multilingual sites, end to end — framework, Studio, extensions and a starter ([692e50f](https://github.com/jxsuite/jx/commit/692e50f9d7132daf71a63c950fd740b103766cb0))
+* **schema,runtime,compiler,studio:** a tag can be chosen at element creation ([e31a20f](https://github.com/jxsuite/jx/commit/e31a20fb52b7e718be67ed59338d149abf3562c1))
+* **schema:** parse media types, and enforce I-JSON at the document boundary ([3e7db19](https://github.com/jxsuite/jx/commit/3e7db19e59825c200be4a337565875df4b58b5f9))
+* **studio:** the Named Shell — P0–P8, the full UX redesign ([b576cbb](https://github.com/jxsuite/jx/commit/b576cbb24c7e0d8d36075f6d682e9b3b6b971166))
+
+
+### Bug Fixes
+
+* **parser:** localized content never reached its own locale's asset mount ([179311b](https://github.com/jxsuite/jx/commit/179311b3f56d001eea37c092d73956c20056c55d))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/markup bumped to 0.4.3
+    * @jxsuite/schema bumped to 1.6.0
+  * devDependencies
+    * @jxsuite/runtime bumped to 2.0.0
+
 ## [1.4.1](https://github.com/jxsuite/jx/compare/parser-v1.4.0...parser-v1.4.1) (2026-07-30)
 
 

@@ -1121,7 +1121,8 @@ export function renderLayersTemplate(ctx: {
   }
   view.dndCleanups = [];
 
-  const collapsed = (view._layersCollapsed ||= new Set());
+  view._layersCollapsed ||= new Set();
+  const collapsed = view._layersCollapsed;
   const registry = selectionCommandRegistry();
 
   _outlineRows = buildOutlineRows(tab!.doc.document, tab?.doc.mode ?? "", collapsed);

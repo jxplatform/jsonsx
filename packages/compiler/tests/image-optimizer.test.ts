@@ -419,7 +419,10 @@ describe("image-transform", () => {
     const cache = { entries: {}, version: 1 };
 
     await transformImageNodes(doc, defaultConfig, root, cache);
-    expect(doc.innerHTML).toBe('<img src="/images/photo.jpg" srcset="already-set" alt="Photo">');
+    // The candidate list is the author's; when to fetch is still the pipeline's call.
+    expect(doc.innerHTML).toContain('srcset="already-set"');
+    expect(doc.innerHTML).not.toContain("_optimized");
+    expect(doc.innerHTML).toContain('loading="lazy"');
     teardown();
   });
 

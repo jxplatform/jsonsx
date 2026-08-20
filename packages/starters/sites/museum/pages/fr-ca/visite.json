@@ -1,0 +1,328 @@
+{
+  "$layout": "./layouts/fr-ca.json",
+  "$translationKey": "visit",
+  "title": "Préparer sa visite — Atrium",
+  "description": "Heures, admission, transport et accessibilité au musée municipal d'art et d'histoire Atrium. Entrée libre, du mardi au dimanche, de 10 h à 18 h.",
+  "$head": [
+    {
+      "tagName": "meta",
+      "attributes": {
+        "name": "description",
+        "content": "Heures, admission, transport et accessibilité au musée municipal d'art et d'histoire Atrium. Entrée libre, du mardi au dimanche, de 10 h à 18 h."
+      }
+    }
+  ],
+  "state": {
+    "tourPrice": {
+      "$expression": {
+        "operator": "call",
+        "target": { "$ref": "window#/Intl/formatNumber" },
+        "value": [12, null, { "style": "currency", "currency": "CAD" }]
+      }
+    },
+    "membership": {
+      "$expression": {
+        "operator": "call",
+        "target": { "$ref": "window#/Intl/formatNumber" },
+        "value": [45, null, { "style": "currency", "currency": "CAD" }]
+      }
+    },
+    "trams": {
+      "$expression": {
+        "operator": "call",
+        "target": { "$ref": "window#/Intl/formatList" },
+        "value": [["2", "6", "11"]]
+      }
+    },
+    "closedFrom": {
+      "$expression": {
+        "operator": "call",
+        "target": { "$ref": "window#/Intl/formatDate" },
+        "value": ["2026-12-24", null, { "day": "numeric", "month": "long" }]
+      }
+    },
+    "closedTo": {
+      "$expression": {
+        "operator": "call",
+        "target": { "$ref": "window#/Intl/formatDate" },
+        "value": ["2026-12-26", null, { "day": "numeric", "month": "long", "year": "numeric" }]
+      }
+    }
+  },
+  "children": [
+    {
+      "tagName": "mu-pagehead",
+      "$props": {
+        "kicker": "Visite",
+        "title": "De dix heures à six heures, six jours sur sept",
+        "standfirst": "Il n'y a pas de billetterie, parce qu'il n'y a pas de billet. Entrez par le côté du quai, laissez votre sac au comptoir s'il est plus gros qu'une sacoche, et commencez où vous voulez.",
+        "metaLabel": "Adresse",
+        "metaValue": "2, quai des Écluses, Vieux-Port"
+      }
+    },
+    {
+      "tagName": "mu-band",
+      "$props": { "index": "01", "label": "Heures", "tone": "chalk" },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "repeat(2, minmax(0, 1fr))",
+            "columnGap": "clamp(2rem, 5vw, 4rem)",
+            "@--md": { "gridTemplateColumns": "minmax(0, 1fr)" }
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "children": [
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "Mar. – ven.",
+                    "value": "10 h – 18 h",
+                    "note": "Dernière entrée à la salle de lecture à 17 h."
+                  }
+                },
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "Sam. – dim.",
+                    "value": "10 h – 18 h",
+                    "note": "La cour reste ouverte jusqu'à 19 h de mai à septembre."
+                  }
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "children": [
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "Lundi",
+                    "value": "Fermé",
+                    "note": "Journée de conservation. Le café côté quai reste ouvert."
+                  }
+                },
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "Fermeture d'hiver",
+                    "value": "Du ${state.closedFrom} au ${state.closedTo}",
+                    "note": "Les trois seuls jours consécutifs de fermeture de toute l'année."
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "mu-band",
+      "$props": { "index": "02", "label": "Admission", "tone": "card" },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "minmax(0, 1fr) minmax(0, 1fr)",
+            "columnGap": "clamp(2rem, 5vw, 4rem)",
+            "rowGap": "1.5rem",
+            "@--md": { "gridTemplateColumns": "minmax(0, 1fr)" }
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "border": "2px solid var(--color-ink)",
+                "backgroundColor": "var(--color-pigment)",
+                "color": "var(--color-card)",
+                "padding": "clamp(1.5rem, 3.5vw, 2.25rem)"
+              },
+              "children": [
+                {
+                  "tagName": "p",
+                  "style": {
+                    "margin": "0 0 0.9rem",
+                    "fontFamily": "var(--font-label)",
+                    "fontSize": "0.66rem",
+                    "letterSpacing": "var(--label-tracking)",
+                    "textTransform": "var(--label-case)",
+                    "opacity": "0.8"
+                  },
+                  "textContent": "Admission générale"
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "margin": "0",
+                    "fontFamily": "var(--font-display)",
+                    "fontSize": "clamp(2.4rem, 6vw, 3.6rem)",
+                    "fontWeight": "700",
+                    "lineHeight": "calc(1 * var(--leading-scale))",
+                    "letterSpacing": "var(--display-tracking)"
+                  },
+                  "textContent": "Gratuite"
+                },
+                {
+                  "tagName": "p",
+                  "style": { "margin": "1.1rem 0 0", "lineHeight": "1.65", "maxWidth": "34ch" },
+                  "textContent": "Inscrite dans la souscription fondatrice de 1897 et jamais modifiée depuis. Pas de billet, pas de réservation, pas d'heure réservée aux membres."
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "children": [
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "Visite guidée",
+                    "value": "${state.tourPrice}",
+                    "note": "Quatre-vingt-dix minutes, le samedi à 11 h et à 15 h. Réservation au comptoir."
+                  }
+                },
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "Adhésion",
+                    "value": "${state.membership}",
+                    "note": "Une année de visites guidées, la revue trimestrielle et un droit de vote à l'assemblée annuelle."
+                  }
+                },
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "Écoles",
+                    "value": "Jamais de frais",
+                    "note": "L'autobus compris. Écrivez au service éducatif six semaines à l'avance."
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "mu-band",
+      "$props": { "index": "03", "label": "S'y rendre", "tone": "chalk" },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "repeat(2, minmax(0, 1fr))",
+            "columnGap": "clamp(2rem, 5vw, 4rem)",
+            "@--md": { "gridTemplateColumns": "minmax(0, 1fr)" }
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "children": [
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "Tramway",
+                    "value": "Lignes ${state.trams}",
+                    "note": "Arrêt Écluses. La halle est le toit de verre à votre gauche en descendant."
+                  }
+                },
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "À pied",
+                    "value": "Onze minutes de la porte de la vieille ville",
+                    "note": "Suivez le quai ; le dernier tronçon est pavé et inégal."
+                  }
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "children": [
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "À vélo",
+                    "value": "Quarante supports sous l'auvent nord",
+                    "note": "Couverts, éclairés et à la vue du comptoir d'accueil."
+                  }
+                },
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "En auto",
+                    "value": "Pas de stationnement au musée",
+                    "note": "Stationnement public au Bassin Nord, à six minutes de marche par le pont de l'écluse."
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "mu-band",
+      "$props": { "index": "04", "label": "Accessibilité", "tone": "card" },
+      "children": [
+        {
+          "tagName": "div",
+          "style": { "maxWidth": "var(--measure)" },
+          "children": [
+            {
+              "tagName": "p",
+              "style": { "margin": "0 0 1.5rem", "lineHeight": "1.75" },
+              "textContent": "Toutes les salles sont accessibles sans marche depuis l'entrée côté quai, y compris la cour et la salle de lecture. Seule exception : le passage de la douane, qui compte quatre marches de pierre sans main courante ; un contournement de plain-pied est indiqué dès l'entrée."
+            },
+            {
+              "tagName": "mu-fact",
+              "$props": {
+                "term": "Sans marche",
+                "value": "Toutes les salles et la salle de lecture",
+                "note": "Deux ascenseurs, tous deux assez grands pour un fauteuil roulant et un accompagnateur."
+              }
+            },
+            {
+              "tagName": "mu-fact",
+              "$props": {
+                "term": "Places assises",
+                "value": "Un banc dans chaque salle",
+                "note": "Tabourets pliants au comptoir, prêtés gratuitement, sans dépôt."
+              }
+            },
+            {
+              "tagName": "mu-fact",
+              "$props": {
+                "term": "Heure calme",
+                "value": "Le mercredi, de 10 h à 11 h",
+                "note": "Éclairage doux, son coupé, et deux fois moins de monde qu'à l'habitude."
+              }
+            },
+            {
+              "tagName": "mu-fact",
+              "$props": {
+                "term": "Chiens d'assistance",
+                "value": "Bienvenus partout",
+                "note": "Bols d'eau aux deux entrées et dans la cour."
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "mu-cta",
+      "$props": {
+        "kicker": "Avant de venir",
+        "heading": "Voyez ce qui est accroché cette semaine.",
+        "text": "Trois expositions sont ouvertes, et la programmation indique ce qui change ensuite.",
+        "label": "À l'affiche",
+        "href": "/fr-ca/expositions/"
+      }
+    }
+  ]
+}

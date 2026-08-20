@@ -25,6 +25,10 @@ Studio has three ways of telling you something happened, and which one it uses d
 
 ## Toasts
 
+:::doc-note
+**Everything Studio reports is also spoken.** A screen reader is told about every notification the moment it is posted — errors interrupt whatever is being read, and everything else waits for a pause. That matters most for failures, which live in **Problems** rather than in a passing toast: before this, a failure was shown in a panel and announced nowhere, so a reader who was not looking at that panel had no way to know anything had gone wrong. The message is prefixed with where it came from, since a listener has none of the visual grouping the panel's own column provides.
+:::
+
 A toast is one line in the bottom-right corner of the window: an icon, the message, and a **×** to send it away early. It never covers the canvas and never takes the keyboard, so you can keep working while it's up.
 
 **It retires itself.** A success or an informational note rests for about four seconds; a warning gets about eight, because it's the one you're most likely to have looked away from. At most four are on screen at once — the oldest steps aside to make room for a new one.

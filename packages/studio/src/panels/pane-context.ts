@@ -83,7 +83,8 @@ import { editorKindOf, editorKindsOf, modeForEditorKind } from "../tabs/tab";
 import { collabState } from "../collab/collab-state";
 import { readOnlyBannerTemplate } from "../collab/presence-chips";
 import { activeRegistry } from "../commands/active-registry";
-import { getEffectiveLayoutPath, getEffectiveMedia } from "../site-context";
+import { getEffectiveLayoutPath, getEffectiveLocales, getEffectiveMedia } from "../site-context";
+import { localeLabel, localeOfPath } from "@jxsuite/schema/locale";
 import { isSchemeQuery } from "../utils/canvas-media";
 import { dynamicRouteParams, loadParamValues, pagePathsDef } from "../page-params";
 import { componentPropEntries, isComponentDoc } from "../component-props";
@@ -93,6 +94,7 @@ import { EDITOR_KIND_LABELS } from "../commands/context";
 import type { EditorKind } from "../commands/context";
 import type { ParamValues } from "../page-params";
 import type { Tab } from "../tabs/tab";
+import type { ResolvedI18n } from "@jxsuite/schema/locale";
 import type { JsonValue } from "../types";
 import type { EffectScope } from "@vue/reactivity";
 import type { TemplateResult } from "lit-html";
@@ -239,6 +241,7 @@ export function mount(host: HTMLElement, ctx: PaneContextCtx) {
         void tab.session.ui.featureToggles;
         void tab.session.ui.preview;
         void tab.session.ui.previewColorScheme;
+        void tab.session.ui.previewLocale;
         void tab.session.ui.previewParams;
         void tab.session.ui.previewProps;
         void tab.session.ui.showLayout;
@@ -475,7 +478,7 @@ export function presetRows(paneId: string): PresetRow[] {
   const deriveReason = deriveRefusal(paneId);
   const rows: PresetRow[] = [];
   for (const preset of DERIVE_PRESETS) {
-    if (preset === "breakpoint") {
+    if (preset === "breakpoint" || preset === "locale") {
       continue;
     }
     rows.push({
@@ -498,6 +501,26 @@ export function presetRows(paneId: string): PresetRow[] {
       command: "pane.derive",
       disabled: deriveReason ?? presetRefusal("breakpoint", paneId, media),
       label: `${PRESET_LABELS.breakpoint} ${media ? mediaDisplayName(media) : "Base"}`,
+      pane: paneId,
+    });
+  }
+  /* "Same page in ⟨language⟩" — one row per locale the PROJECT declares, in the same shape as the
+     breakpoint rows above and with one difference: there is no omit-the-argument row. A breakpoint
+     has a base size that is spelled by saying nothing; every locale is a real tag, including the
+     default one, whose file `translationPathFor` puts at the unprefixed path under
+     `prefix-except-default`. The label is the locale's own AUTONYM — "français", not "French" —
+     because that is what the person looking for their language scans a list for.
+     A project that declares no `i18n` block at all contributes no rows: `getEffectiveLocales()`
+     answers null, and the menu is the same menu it has always been. One that declares exactly one
+     locale gets its one row carrying {@link presetRefusal}'s sentence, which names Project
+     Settings › Locales — the author asked for languages, so the answer is where to add the second
+     one rather than silence. */
+  for (const locale of tab && !derived ? (getEffectiveLocales()?.locales ?? []) : []) {
+    rows.push({
+      args: { locale, preset: "locale" },
+      command: "pane.derive",
+      disabled: deriveReason ?? presetRefusal("locale", paneId, null, locale),
+      label: `${PRESET_LABELS.locale} ${localeLabel(locale)}`,
       pane: paneId,
     });
   }
@@ -603,10 +626,16 @@ function renderingSummaryTpl(paneId: string): TemplateResult {
      docstring above says a lens drawn under different params "would be lying about what it is a
      lens of" — and it lied about the one axis the preset is named after. */
   const media = activeMediaOfPane(paneId);
-  return axisTpl(
-    "Context",
-    html`<span class="pc-static">${media ? mediaDisplayName(media) : "Base"}</span>`,
-  );
+  /* A lens shares its TAB, so it renders under the tab's preview locale whether it asked to or not
+     — and a lens whose stage is mirrored while its own line says nothing is the same lie about the
+     rendering context this summary exists to prevent. Stated only when it differs from the
+     document's own language, for the reason the trigger beside it is: a pane drawing the file it
+     has open in the language that file is written in has nothing to report. */
+  const locale = localeOf(tabOfPane(paneId));
+  const stated = `${media ? mediaDisplayName(media) : "Base"}${
+    locale?.overridden ? ` · ${localeLabel(locale.effective)}` : ""
+  }`;
+  return axisTpl("Context", html`<span class="pc-static">${stated}</span>`);
 }
 
 // ─── Axis 1 · Editor kind ────────────────────────────────────────────────────
@@ -731,6 +760,44 @@ function isPageDoc(tab: Tab): boolean {
   );
 }
 
+/** What a pane is rendering AS, once — the trigger, the popover and the lens summary all ask this. */
+interface PaneLocale {
+  /** The project's declared locales, default first. */
+  i18n: ResolvedI18n;
+  /** The locale of the FILE this pane has open, when its directory names one — `pages/fr/…`. */
+  pathLocale: string | null;
+  /** The tag the artboard is drawn under. */
+  effective: string;
+  /** Whether that is not the document's own language, i.e. whether the bar has something to say. */
+  overridden: boolean;
+}
+
+/**
+ * The language axis for a tab, or `null` when the project has no language question to ask.
+ *
+ * Called at RENDER time and never cached: `projectState` is replaced wholesale rather than mutated,
+ * so a locale added in Settings reaches this bar on the next paint and a module-level copy would
+ * still be describing the project that was open when this file loaded.
+ *
+ * A single declared locale is the same as none for this control — there is nothing to switch TO,
+ * and "groups a document declares nothing for are absent" is the rule the whole popover follows.
+ *
+ * The fallback chain is what makes the control honest about a file it has not been told about:
+ * `previewLocale` is the author's explicit choice, the path is the file's own language (§13.3 puts
+ * a translation in its own directory), and the default locale is what an unprefixed page renders
+ * as.
+ */
+function localeOf(tab: Tab | null): PaneLocale | null {
+  const i18n = getEffectiveLocales();
+  if (!tab || i18n === null || i18n.locales.length < 2) {
+    return null;
+  }
+  const pathLocale = localeOfPath(tab.documentPath ?? "", i18n);
+  const own = pathLocale ?? i18n.defaultLocale;
+  const effective = tab.session.ui.previewLocale ?? own;
+  return { effective, i18n, overridden: effective !== own, pathLocale };
+}
+
 function renderingContextTpl(tab: Tab, paneId: string, ctx: PaneContextCtx): TemplateResult {
   const { ui } = tab.session;
   const { featureQueries, sizeBreakpoints } = ctx.parseMediaEntries(
@@ -742,7 +809,17 @@ function renderingContextTpl(tab: Tab, paneId: string, ctx: PaneContextCtx): Tem
   const activeMedia = (ui.activeMedia ?? null) as string | null;
   const sizeLabel = activeMedia ? mediaDisplayName(activeMedia) : "Base";
   const schemeLabel = SCHEMES.find(([value]) => value === scheme)?.[1] ?? "Auto";
-  const summary = schemeQueries.length > 0 ? `${sizeLabel} · ${schemeLabel}` : sizeLabel;
+  const locale = localeOf(tab);
+  /* The language joins the trigger ONLY when the pane is not drawing the document's own — a French
+     page open in a French pane is not a rendering context worth three more characters, and a bar
+     that grew a third term in every multilingual project would stop reading as a state. */
+  const summary = [
+    sizeLabel,
+    schemeQueries.length > 0 ? schemeLabel : null,
+    locale?.overridden ? localeLabel(locale.effective) : null,
+  ]
+    .filter((part) => part !== null)
+    .join(" · ");
   const hasLayout = isPageDoc(tab) && Boolean(getEffectiveLayoutPath(tab.doc.document?.$layout));
   const resolving = isPageDoc(tab) ? paramPickersTpl(tab, paneId) : propFieldsTpl(tab, paneId);
   /* How many of those fields carry a value. The trigger has to say something true at a glance, the
@@ -797,6 +874,7 @@ function renderingContextTpl(tab: Tab, paneId: string, ctx: PaneContextCtx): Tem
                   )
                 : nothing
             }
+            ${locale ? localeGroupTpl(paneId, locale) : nothing}
             ${
               plainQueries.length > 0
                 ? groupTpl(
@@ -1016,6 +1094,56 @@ function sizeGroupTpl(
               @click=${() => runContextCommand(paneId, "canvas.setBreakpoint", { media: name })}
             >
               ${mediaDisplayName(name)}
+            </sp-action-button>
+          `,
+        )}
+      </sp-action-group>
+    `,
+  );
+}
+
+/**
+ * The language segment: which of the project's locales this pane renders AS.
+ *
+ * It is one radio group and one sentence, and the sentence is the load-bearing half. Jx has no
+ * message catalogue — a translation is a different file in a different directory — so this control
+ * cannot and must not claim to translate the page. What it does change is real: the artboard's
+ * `lang` and its `dir`, and an RTL locale mirrors the layout on the stage. A control that let an
+ * author believe it had translated anything would be worse than no control — which is also why the
+ * sentence stops there: the build's `$page.locale` is not injected into the canvas render today, so
+ * a tooltip promising it would be describing the site rather than the pane.
+ *
+ * Labelled with each locale's AUTONYM, for the reason `localeLabel` gives: a reader looking for
+ * their own language scans for their own word for it.
+ *
+ * The document's own language is named in its tooltip rather than styled apart — a per-pane axis
+ * has no room for a second visual state, and the author needs to know which entry is "no override"
+ * before clicking, not after.
+ */
+function localeGroupTpl(paneId: string, locale: PaneLocale): TemplateResult {
+  return groupTpl(
+    "Language",
+    html`
+      <sp-action-group
+        compact
+        size="s"
+        title="The language this pane renders as — its lang and direction only. The text is whatever file is open."
+      >
+        ${locale.i18n.locales.map(
+          (tag) => html`
+            <sp-action-button
+              size="s"
+              role="radio"
+              aria-checked=${locale.effective === tag ? "true" : "false"}
+              title=${
+                tag === locale.pathLocale
+                  ? `${localeLabel(tag)} — the language of the file this pane has open`
+                  : `Render as ${localeLabel(tag)} (${tag})`
+              }
+              ?selected=${locale.effective === tag}
+              @click=${() => runContextCommand(paneId, "i18n.switchLocale", { locale: tag })}
+            >
+              ${localeLabel(tag)}
             </sp-action-button>
           `,
         )}

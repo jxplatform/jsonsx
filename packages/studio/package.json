@@ -1,6 +1,6 @@
 {
   "name": "@jxsuite/studio",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "Jx Studio — visual builder for Jx documents",
   "license": "MIT",
   "repository": {
@@ -29,6 +29,7 @@
     "./base64": "./src/utils/base64.ts",
     "./directory-picker": "./src/services/directory-picker.ts",
     "./import-client": "./src/services/import-client.ts",
+    "./github-auth": "./src/github/github-auth.ts",
     "./platforms/cloud": "./src/platforms/cloud.ts",
     "./preview-navigate": "./src/canvas/preview-navigate.ts"
   },
@@ -100,7 +101,6 @@
     "lit-html": "^3.3.3",
     "monaco-editor": "^0.56.0",
     "tabulator-tables": "^6.5",
-    "y-monaco": "^0.1.6",
     "yaml": "^2.9.0"
   },
   "devDependencies": {

@@ -150,7 +150,14 @@ function docPageExists(slug: string): boolean {
 const screenshotNames = manifestImageNames();
 const referencedScreenshots = new Set<string>();
 
+/*
+ * `docs/README.md` documents the directory for contributors; it is not a published page, so it
+ * carries no frontmatter and belongs in no nav entry. Excluded the same way every spec reader
+ * excludes `specs/README.md` (check-spec-release.ts, lib/spec-status.ts, lib/standards.ts). Only
+ * the top-level one — a README nested inside a published tree would still be a page.
+ */
 const docFiles = [...new Bun.Glob("**/*.md").scanSync({ cwd: DOCS_DIR })]
+  .filter((f) => f !== "README.md")
   .map((f) => join(DOCS_DIR, f))
   .toSorted();
 

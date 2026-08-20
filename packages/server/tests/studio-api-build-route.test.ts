@@ -130,7 +130,11 @@ describe("POST /__studio/build — which directory is built", () => {
     const { req, url } = buildReq();
     const res = await callApi(req, url, PLAIN, null);
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: "Not a site project" });
+    // RFC 9457: the type is what a client keys on, `detail` is what a human reads.
+    expect(res.headers.get("content-type")).toBe("application/problem+json");
+    const body = (await res.json()) as { type: string; detail: string };
+    expect(body.type).toBe("https://jxsuite.com/problems/invalid-request");
+    expect(body.detail).toBe("Not a site project");
     expect(buildCalls).toEqual([]);
     expect(previewCalls).toEqual([]);
   });
@@ -139,7 +143,11 @@ describe("POST /__studio/build — which directory is built", () => {
     const { req, url } = buildReq();
     const res = await callApi(req, url, SITE, PLAIN);
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: "Not a site project" });
+    // RFC 9457: the type is what a client keys on, `detail` is what a human reads.
+    expect(res.headers.get("content-type")).toBe("application/problem+json");
+    const body = (await res.json()) as { type: string; detail: string };
+    expect(body.type).toBe("https://jxsuite.com/problems/invalid-request");
+    expect(body.detail).toBe("Not a site project");
     expect(buildCalls).toEqual([]);
   });
 });

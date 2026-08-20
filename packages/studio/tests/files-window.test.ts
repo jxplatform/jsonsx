@@ -236,6 +236,77 @@ describe("the keyboard walks the model", () => {
   });
 });
 
+/**
+ * The language chip (`.file-tree-locale`) is drawn INSIDE the 24px row.
+ *
+ * `FILE_ROW_HEIGHT` mirrors `styles/panels.css`'s `.file-tree-item { block-size: 24px }`, and the
+ * window's scroll reservation is that number times the rows it did not draw. A chip that grew the
+ * box would desynchronise the scrollbar from the model on every multilingual project — silently,
+ * because nothing measures a row until one has been laid out.
+ */
+describe("a multilingual project", () => {
+  /** The same shape as {@link seedProject}, with the expanded directory naming a declared locale. */
+  function seedLocalizedProject(): void {
+    const root: DirEntry[] = [
+      { name: "fr", path: "fr", type: "directory" },
+      ...Array.from({ length: FILE_COUNT }, (_v, index) => ({
+        name: fileName(index),
+        path: fileName(index),
+        type: "file" as const,
+      })),
+    ];
+    setProjectState({
+      dirs: new Map<string, DirEntry[]>([
+        [".", root],
+        [
+          "fr",
+          [
+            { name: "index.json", path: "fr/index.json", type: "file" },
+            { name: "about.json", path: "fr/about.json", type: "file" },
+          ],
+        ],
+      ]),
+      expanded: new Set(["fr"]),
+      isSiteProject: true,
+      name: "Demo",
+      projectConfig: { i18n: { defaultLocale: "en", locales: ["en", "fr"] }, name: "Demo" },
+      projectDirs: [],
+      projectRoot: ".",
+      searchQuery: "",
+      selectedPath: null,
+    } as never);
+  }
+
+  beforeEach(async () => {
+    seedLocalizedProject();
+    await renderWindowed();
+  });
+
+  test("chips the rows under a declared locale, in that language's own words", () => {
+    expect(rowFor("fr/index.json")!.querySelector(".file-tree-locale")?.textContent).toBe(
+      "français",
+    );
+    // The directory names the locale, so it carries the chip too.
+    expect(rowFor("fr")!.querySelector(".file-tree-locale")?.textContent).toBe("français");
+    // A file under no locale directory gets none — inventing the default locale here would be a
+    // Claim about `routing` the path does not make.
+    expect(rowFor(fileName(0))!.querySelector(".file-tree-locale")).toBeNull();
+  });
+
+  test("leaves the window and the ARIA set sizes exactly where they were", async () => {
+    expect(rows().length).toBeLessThan(20);
+    const [padTop, padBottom] = pads();
+    expect(padTop! + rows().length * FILE_ROW_HEIGHT + padBottom!).toBe(
+      ROW_COUNT * FILE_ROW_HEIGHT,
+    );
+    expect(rowFor("fr/index.json")!.getAttribute("aria-setsize")).toBe("2");
+    expect(rowFor("fr/index.json")!.getAttribute("aria-level")).toBe("2");
+    await scrollTo(FILE_ROW_HEIGHT * 200);
+    expect(rowFor(fileName(200))!.getAttribute("aria-posinset")).toBe("202");
+    expect(rowFor(fileName(200))!.getAttribute("aria-setsize")).toBe(String(FILE_COUNT + 1));
+  });
+});
+
 describe("a drag keeps the window it started with", () => {
   test("a scroll mid-drag does not repaint the rows pragmatic-dnd is holding", async () => {
     const dragged = rows()[2]!;

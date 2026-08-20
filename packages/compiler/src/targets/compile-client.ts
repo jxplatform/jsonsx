@@ -48,6 +48,13 @@ import {
   tagNameCandidates,
 } from "@jxsuite/schema/guards";
 import type { CompileContext, ExpressionNode } from "../shared.ts";
+import {
+  escapeToken,
+  objectKey,
+  refAccessor,
+  refBindingKey,
+  refSegments,
+} from "@jxsuite/runtime/pointer";
 import type {
   JsonObject,
   JsonValue,
@@ -340,12 +347,12 @@ function buildClientNode(
     raw?.$media ?? context.media,
   );
 
-  /* REFUSED, LOUDLY. This target has no branch construct — it also drops `$switch` on the floor
-     today, compiling a switch node to `<div><div></div></div>` with no binding at all. Emitting a
-     silently wrong element here would be a second instance of the class the tagName pattern was
-     added to end, so a dynamic page that needs a chosen tag is told to put the element in a
-     component (which compiles through `compile-element`, where the construct is implemented)
-     rather than shipping markup that is quietly missing a branch. */
+  /* REFUSED, LOUDLY. A chosen tag has no implementation in this target: the element's identity is
+     fixed in the prerendered markup, so there is nothing here to re-choose at hydration the way the
+     `$switch` binding below re-chooses a subtree. Emitting a silently wrong element would be an
+     instance of the class the tagName pattern was added to end, so a dynamic page that needs a
+     chosen tag is told to put the element in a component (which compiles through `compile-element`,
+     where the construct is implemented) rather than shipping markup with the wrong tag. */
   if (isTagExpression(def.tagName)) {
     throw new Error(
       "A tag chosen at creation is not supported on a dynamic page yet (candidates: " +
@@ -499,6 +506,33 @@ function buildClientNode(
   // Inner content
   let inner = "";
   const source = raw ?? def;
+  if (source.$switch) {
+    // ─── $switch → lit-html render binding ───
+    // Without this branch the node fell through to the generic element path, which emitted a
+    // Container and then looked for `children` to recurse into — `cases` is not `children`, so the
+    // Subtree was never visited and the page shipped with the content missing, no error (#127).
+    // The container is emitted empty for the same reason the mapped-array branch below is: lit's
+    // `render` appends into the container rather than replacing its existing children, so any
+    // Prerendered branch would survive alongside the rendered one.
+    counter.needsLit = true;
+    const swKey = `_sw${counter.sw}`;
+    counter.sw += 1;
+    const discriminant = isRefObject(source.$switch)
+      ? `state.${refToBindingKey((source.$switch as { $ref: string }).$ref)}`
+      : `\`${String(source.$switch)}\``;
+    const cases = (source.cases ?? {}) as Record<string, JxMutableNode>;
+    const caseEntries = Object.entries(cases)
+      // An external `$ref` case cannot be fetched at compile time, exactly as in the static target.
+      .filter(([, caseDef]) => caseDef && !isRefObject(caseDef))
+      .map(
+        ([key, caseDef]) =>
+          `${JSON.stringify(key)}: html\`${emitChildLit(caseDef, nextContext.preformatted)}\``,
+      );
+    bindings.set(swKey, `() => ({${caseEntries.join(", ")}})[String(${discriminant})] ?? html\`\``);
+    bindAttrs.push(`:render="${swKey}"`);
+    const bindAttrStrSwitch = ` ${bindAttrs.join(" ")}`;
+    return `<${tag}${staticAttrs} data-bind${bindAttrStrSwitch}></${tag}>`;
+  }
   if (source.textContent !== undefined && !needsBind) {
     const value = resolveStaticValue(source.textContent, nextContext.scope);
     inner = value == null ? "" : escapeHtml(String(value));
@@ -852,7 +886,11 @@ function emitClientModule(
   // State — reactive state
   lines.push("", "const state = reactive({");
   for (const [key, val] of stateEntries) {
-    lines.push(`  ${key}: ${JSON.stringify(val)},`);
+    /*
+     * State keys come from the document, so `{"user.name": 1}` is legal input. Pasting one raw as
+     * an identifier emitted `user.name: 1,` — a SyntaxError the build reported as a success.
+     */
+    lines.push(`  ${objectKey(key)}: ${JSON.stringify(val)},`);
   }
   lines.push("});", "");
 
@@ -867,7 +905,7 @@ function emitClientModule(
   // Computed signals on state
   if (computedEntries.length > 0) {
     for (const [key, expr] of computedEntries) {
-      lines.push(`state.${key} = computed(${expr});`);
+      lines.push(`${refAccessor("state", escapeToken(key))} = computed(${expr});`);
     }
     lines.push("");
   }
@@ -876,7 +914,7 @@ function emitClientModule(
   if (bindEntries.length > 0) {
     lines.push("const bind = {");
     for (const [key, expr] of bindEntries) {
-      lines.push(`  ${key}: ${expr},`);
+      lines.push(`  ${objectKey(key)}: ${expr},`);
     }
     lines.push("};");
   } else {
@@ -891,7 +929,7 @@ function emitClientModule(
       const argNames = def.args ?? ["state"];
       const callArgs = argNames.map((a: string) => (a === "state" ? "state" : "e")).join(", ");
       lines.push(
-        `  ${key}: (e) => { const fn = (${argNames.join(", ")}) => { ${def.body} }; fn(${
+        `  ${objectKey(key)}: (e) => { const fn = (${argNames.join(", ")}) => { ${def.body} }; fn(${
           callArgs
         }); },`,
       );
@@ -1007,19 +1045,27 @@ function emitCookieInit(key: string, cookieName: string, defaultVal: unknown) {
  */
 function mapRefToClientExpr(ref: string) {
   if (ref.startsWith("$map/")) {
-    return ref.slice("$map/".length).replaceAll("/", ".");
+    // The loop variable is an emitted identifier, so its first segment is the base, not a member.
+    const [head, ...rest] = refSegments(ref.slice("$map/".length));
+    return refAccessor(head ?? "", rest.map((seg) => escapeToken(seg)).join("/"));
   }
   if (ref.startsWith("#/state/")) {
-    return `state.${ref.slice("#/state/".length).replaceAll("/", ".")}`;
+    return refAccessor("state", ref.slice("#/state/".length));
   }
-  return `state.${ref.replaceAll("/", ".")}`;
+  return refAccessor("state", ref);
 }
 
+/**
+ * The `bind`/`on` map key for a ref. It is emitted both as an object-literal key and as a
+ * `data-bind` attribute value, so it has to survive being a JavaScript identifier and an HTML
+ * attribute at once. Stripping the `#/state/` prefix first keeps every pure-slash ref on the key it
+ * already had — `#/state/user/name` is still `user_name` — so this fix changes no shipped output.
+ *
+ * @param {string} ref
+ * @returns {string}
+ */
 function refToBindingKey(ref: string) {
-  if (ref.startsWith("#/state/")) {
-    return ref.slice("#/state/".length).replaceAll("/", "_");
-  }
-  return ref.replaceAll("/", "_");
+  return refBindingKey(ref.startsWith("#/state/") ? ref.slice("#/state/".length) : ref);
 }
 
 /**
@@ -1031,11 +1077,8 @@ function addRefBinding(bindings: Map<string, string>, key: string, ref: string) 
   if (bindings.has(key)) {
     return;
   }
-  if (ref.startsWith("#/state/")) {
-    const path = ref.slice("#/state/".length);
-    const parts = path.split("/");
-    bindings.set(key, `() => state.${parts.join(".")}`);
-  } else {
-    bindings.set(key, `() => state.${ref}`);
-  }
+  bindings.set(
+    key,
+    `() => ${refAccessor("state", ref.startsWith("#/state/") ? ref.slice("#/state/".length) : ref)}`,
+  );
 }

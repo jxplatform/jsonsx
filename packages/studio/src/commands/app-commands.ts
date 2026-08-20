@@ -40,6 +40,7 @@ import { selectionCommands } from "../canvas/canvas-render";
 import { inspectorCommands } from "../panels/properties-panel";
 import { dataExplorerCommands } from "../panels/data-explorer";
 import { seoCommands } from "../panels/seo-modal";
+import { a11yCommands } from "../services/a11y-report";
 import { liveElementCommands } from "../editor/context-menu";
 import { signalsCommands } from "../panels/signals-panel";
 import { formulaEditorCommands } from "../panels/formula-workspace";
@@ -56,6 +57,7 @@ import { publishCommands } from "../publish/publish-commands";
 import { gridViewCommands } from "../grid/grid-panel";
 import { redirectsCommands } from "../grid/redirects-grid";
 import { contentCommands } from "../content/entry-commands";
+import { i18nCommands } from "../i18n/i18n-commands";
 import { newProjectCommands } from "../new-project/new-project-modal";
 import { canvasCommands } from "../editor/shortcuts";
 import { formatCommands, registerSelectionCommands } from "../panels/block-action-bar";
@@ -121,6 +123,7 @@ export function appCommandSet(): AnyCommand[] {
     ...selectionCommands(),
     ...inspectorCommands(),
     ...seoCommands(),
+    ...a11yCommands(),
     // The element menu's eight verbs. Every one declares `menus: ["context/element", "palette"]`
     // And none reached the palette, because they were registered ONLY into the private registry
     // `editor/context-menu.ts` builds for its popover — a registry whose own docstring said it
@@ -138,6 +141,9 @@ export function appCommandSet(): AnyCommand[] {
     ...aboutCommands(),
     ...libraryCommands(),
     ...contentCommands(),
+    // The four translation verbs. `i18n.switchLocale` is deliberately not among them: it is a
+    // Rendering context, defined in `canvas/canvas-utils.ts` beside the per-tab UI state it writes.
+    ...i18nCommands(),
     ...sourceControlCommands(),
     ...publishCommands(),
     ...gridViewCommands(),

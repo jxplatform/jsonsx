@@ -1021,6 +1021,196 @@ export function stackedClasses(css: string): Set<string> {
 
 /* ------------------------------------------------------------------------------ the run itself --- */
 
+/**
+ * The token pairs a person has to be able to read, and the ratio each one owes.
+ *
+ * WCAG 2.2 SC 1.4.3 asks 4.5:1 of body text and 3:1 of large text; SC 1.4.11 asks 3:1 of the
+ * boundary of a control or a piece of state. The pairs below are the ones the app actually paints —
+ * a table of every possible combination would be a table nobody maintains.
+ *
+ * **The fallback hex is what is checked, not the resolved Spectrum token.** Resolving a token means
+ * running a browser, and the fallback is what a reader sees whenever the theme has not loaded — and
+ * whenever the token is renamed out from under it. Checking the value that ships is the check that
+ * catches the failure.
+ */
+const CONTRAST_PAIRS: readonly { fg: string; bg: string; ratio: number; why: string }[] = [
+  { bg: "--bg", fg: "--fg", ratio: 4.5, why: "body text on the app background" },
+  { bg: "--bg-panel", fg: "--fg", ratio: 4.5, why: "body text in a panel" },
+  { bg: "--bg-input", fg: "--fg", ratio: 4.5, why: "typed text in a field" },
+  { bg: "--bg", fg: "--fg-dim", ratio: 4.5, why: "labels and hints — still body text" },
+  { bg: "--bg-panel", fg: "--fg-dim", ratio: 4.5, why: "panel labels and hints" },
+  { bg: "--accent", fg: "--accent-fg", ratio: 4.5, why: "text on an accent button" },
+  { bg: "--bg", fg: "--accent", ratio: 3, why: "the focus ring and other state boundaries" },
+  { bg: "--bg-panel", fg: "--danger", ratio: 3, why: "an error marker in a panel" },
+  { bg: "--bg-panel", fg: "--success", ratio: 3, why: "a success marker in a panel" },
+  { bg: "--bg-panel", fg: "--warning", ratio: 3, why: "a caution marker in a panel" },
+];
+
+/**
+ * Pairs that do not meet their ratio today, each with the measured value.
+ *
+ * A ratchet, like every other allowance in this file: an entry may be deleted when the colour is
+ * fixed, and adding one needs the same written justification as lowering a coverage threshold.
+ */
+const CONTRAST_DEBT: Readonly<Record<string, string>> = {
+  /*
+   * 3.68:1. White on the Jx brand blue (`--spectrum-accent-color-700`, #3b82f6) misses the 4.5:1
+   * that normal-size text owes. It clears the 3:1 that SC 1.4.3 allows large text and SC 1.4.11
+   * asks of a control's boundary, so an accent button's outline and any 18px+ label on it conform;
+   * a 14px label on one does not.
+   *
+   * Left as debt rather than fixed here because the fix is a DESIGN decision with a visible
+   * consequence — darkening the accent changes the brand colour everywhere it appears, and picking
+   * a different foreground for accent surfaces changes what a button looks like. Neither belongs in
+   * a change whose subject is the gate.
+   */
+  "--accent-fg on --accent": "3.68:1 — white on the brand blue; see the comment above.",
+};
+
+/** `--token: var(--spectrum-x, #hex)` — the fallback is the value this rule reads. */
+const TOKEN_FALLBACK_RE =
+  /^\s*(--[a-z0-9-]+):\s*var\(\s*--[a-z0-9-]+\s*,\s*(#[0-9a-fA-F]{3,8})\s*\)/gm;
+
+/** Every studio semantic token whose declaration carries a hex fallback, from tokens.css. */
+export function tokenFallbacks(css: string): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const match of css.matchAll(TOKEN_FALLBACK_RE)) {
+    out.set(match[1]!, match[2]!.toLowerCase());
+  }
+  return out;
+}
+
+/** Expand `#abc` to `#aabbcc` and drop an alpha channel — contrast is over the composited colour. */
+function normalizeHex(hex: string): string {
+  const body = hex.slice(1);
+  if (body.length === 3) {
+    return [...body].map((c) => c + c).join("");
+  }
+  return body.slice(0, 6);
+}
+
+/** Relative luminance (WCAG 2.x §relative-luminance). */
+function luminance(hex: string): number {
+  const body = normalizeHex(hex);
+  const channel = (offset: number): number => {
+    const value = Number.parseInt(body.slice(offset, offset + 2), 16) / 255;
+    return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * channel(0) + 0.7152 * channel(2) + 0.0722 * channel(4);
+}
+
+/**
+ * Contrast ratio between two hex colours (WCAG 2.x §contrast-ratio).
+ *
+ * @param {string} a
+ * @param {string} b
+ * @returns {number} 1 to 21.
+ */
+export function contrastRatio(a: string, b: string): number {
+  const [light, dark] = [luminance(a), luminance(b)].toSorted((x, y) => y - x);
+  return (light! + 0.05) / (dark! + 0.05);
+}
+
+/** Check every required pair, honouring CONTRAST_DEBT. */
+export function contrastFindings(css: string): Finding[] {
+  const tokens = tokenFallbacks(css);
+  const findings: Finding[] = [];
+  for (const pair of CONTRAST_PAIRS) {
+    const fg = tokens.get(pair.fg);
+    const bg = tokens.get(pair.bg);
+    const key = `${pair.fg} on ${pair.bg}`;
+    if (!fg || !bg) {
+      findings.push({
+        file: "styles/tokens.css",
+        line: 0,
+        text: `${key} — ${!fg ? pair.fg : pair.bg} has no hex fallback, so nothing can be checked.`,
+      });
+      continue;
+    }
+    const ratio = contrastRatio(fg, bg);
+    const debt = CONTRAST_DEBT[key];
+    if (ratio >= pair.ratio) {
+      if (debt !== undefined) {
+        findings.push({
+          file: "styles/tokens.css",
+          line: 0,
+          text: `${key} now meets ${pair.ratio}:1 (${ratio.toFixed(2)}) — delete its CONTRAST_DEBT entry.`,
+        });
+      }
+      continue;
+    }
+    if (debt === undefined) {
+      findings.push({
+        file: "styles/tokens.css",
+        line: 0,
+        text: `${key} is ${ratio.toFixed(2)}:1, below the ${pair.ratio}:1 WCAG 2.2 asks of ${pair.why} (${fg} on ${bg}).`,
+      });
+    }
+  }
+  return findings;
+}
+
+/**
+ * The token table in `specs/studio-ui-guidelines.md` §1.1, against `tokens.css`.
+ *
+ * **This is the rule that matters more than the contrast one.** The spec's table listed eight hex
+ * values that no longer existed anywhere in the app — `#1e1e1e` for `--bg` where the app ships
+ * `#111111`, `#007acc` for `--accent` where it ships `#3b82f6` — so anyone designing against the
+ * documented palette was designing against a palette that had been gone for months. Correcting them
+ * without a gate only resets the clock, which is why the correction and the check land together.
+ */
+export function guidelineTokenFindings(specMd: string, css: string): Finding[] {
+  const tokens = tokenFallbacks(css);
+  const findings: Finding[] = [];
+  const rowRe = /^\|\s*`(--[a-z0-9-]+)`\s*\|[^|]*\|\s*`([^`]+)`\s*\|/gm;
+  let rows = 0;
+  for (const match of specMd.matchAll(rowRe)) {
+    const [, token, documented] = match;
+    rows += 1;
+    const actual = tokens.get(token!);
+    if (actual === undefined) {
+      /*
+       * Not every documented token carries a hex fallback — `--radius` is a Spectrum token with a
+       * `3px` fallback and `--hover-bg` is a literal `rgba()`. The documented value is compared
+       * against the declaration OR the fallback inside it, whitespace-insensitively: a spec that
+       * writes `3px` for `var(--spectrum-corner-radius-100, 3px)` is telling the truth about what a
+       * reader gets, and holding it to the declaration's exact text would only teach people to
+       * ignore this rule.
+       */
+      const declared = new RegExp(`${token}:\\s*([^;]+);`).exec(css)?.[1]?.trim();
+      if (declared === undefined) {
+        continue;
+      }
+      const fallback = /var\(\s*--[a-z0-9-]+\s*,\s*([^)]+)\)/.exec(declared)?.[1]?.trim();
+      const squash = (value: string) => value.replaceAll(/\s+/g, "");
+      const wanted = squash(documented!);
+      if (squash(declared) !== wanted && (fallback === undefined || squash(fallback) !== wanted)) {
+        findings.push({
+          file: "specs/studio-ui-guidelines.md",
+          line: 0,
+          text: `${token} is documented as \`${documented}\` but tokens.css declares \`${declared}\`.`,
+        });
+      }
+      continue;
+    }
+    if (actual !== documented!.toLowerCase()) {
+      findings.push({
+        file: "specs/studio-ui-guidelines.md",
+        line: 0,
+        text: `${token} is documented as ${documented} but tokens.css ships ${actual}.`,
+      });
+    }
+  }
+  if (rows === 0) {
+    findings.push({
+      file: "specs/studio-ui-guidelines.md",
+      line: 0,
+      text: "§1.1's token table parsed to zero rows — the table moved, and this rule stopped checking anything.",
+    });
+  }
+  return findings;
+}
+
 export interface StyleCheckResult {
   hexErrors: Finding[];
   pxWarnings: Finding[];
@@ -1040,6 +1230,10 @@ export interface StyleCheckResult {
   staleFocusRings: string[];
   /** Modal cards opened beside an `sp-underlay` that no rule lifts above it. */
   underScrim: Finding[];
+  /** Required token pairs that miss the ratio WCAG 2.2 asks of them. */
+  contrast: Finding[];
+  /** Rows of `studio-ui-guidelines.md` §1.1 that disagree with `tokens.css`. */
+  guidelineTokens: Finding[];
 }
 
 function isVendorClass(name: string): boolean {
@@ -1194,7 +1388,19 @@ export async function collect(root: string): Promise<StyleCheckResult> {
     .map((a) => focusKey(a.file, a.selector))
     .toSorted();
 
+  const tokensCss = await Bun.file(join(root, "styles", "tokens.css"))
+    .text()
+    .catch(() => "");
+  const guidelinesMd = await Bun.file(join(root, "..", "..", "specs", "studio-ui-guidelines.md"))
+    .text()
+    .catch(() => "");
+
   return {
+    contrast: tokensCss === "" ? [] : contrastFindings(tokensCss),
+    guidelineTokens:
+      tokensCss === "" || guidelinesMd === ""
+        ? []
+        : guidelineTokenFindings(guidelinesMd, tokensCss),
     hexErrors,
     pxWarnings,
     orphans: allOrphans.filter((o) => !ALLOWED_ORPHANS.has(o.text)),
@@ -1211,7 +1417,7 @@ export async function collect(root: string): Promise<StyleCheckResult> {
 /** Print the findings and return the process exit code. */
 export function report(result: StyleCheckResult): number {
   const { hexErrors, pxWarnings, orphans, staleAllowed, banned, silentCatches } = result;
-  const { focusRings, staleFocusRings, underScrim } = result;
+  const { focusRings, staleFocusRings, underScrim, contrast, guidelineTokens } = result;
 
   if (pxWarnings.length > 0) {
     console.warn(
@@ -1319,8 +1525,33 @@ export function report(result: StyleCheckResult): number {
     }
   }
 
+  if (contrast.length > 0) {
+    console.error(
+      `\n❌ ${contrast.length} token pair(s) below the contrast WCAG 2.2 asks of them:`,
+    );
+    for (const c of contrast) {
+      console.error(`   ${c.text}`);
+    }
+    console.error(
+      `\nFix the colour, or add the pair to CONTRAST_DEBT with the measured ratio and a reason.`,
+    );
+  }
+
+  if (guidelineTokens.length > 0) {
+    console.error(
+      `\n❌ ${guidelineTokens.length} row(s) of studio-ui-guidelines.md §1.1 disagree with ` +
+        `styles/tokens.css. Anyone designing against the documented palette is designing against ` +
+        `one the app does not ship:`,
+    );
+    for (const g of guidelineTokens) {
+      console.error(`   ${g.text}`);
+    }
+  }
+
   if (
     underScrim.length > 0 ||
+    contrast.length > 0 ||
+    guidelineTokens.length > 0 ||
     hexErrors.length > 0 ||
     orphans.length > 0 ||
     staleAllowed.length > 0 ||
@@ -1339,7 +1570,10 @@ export function report(result: StyleCheckResult): number {
       `(${ALLOWED_ORPHANS.size} allow-listed orphan(s) remaining), no banned identifiers, ` +
       `${silentTotal} allow-listed silent catch(es) remaining, ` +
       `${FOCUS_RING_ALLOWANCES.length} focus-ring suppression(s) each paired with its ` +
-      `:focus-visible restore, every underlay-bearing card stacked above its scrim${pxNote}.`,
+      `:focus-visible restore, every underlay-bearing card stacked above its scrim, ` +
+      `${CONTRAST_PAIRS.length} contrast pair(s) checked ` +
+      `(${Object.keys(CONTRAST_DEBT).length} on the debt list), ` +
+      `and studio-ui-guidelines.md §1.1 agrees with tokens.css${pxNote}.`,
   );
   return 0;
 }

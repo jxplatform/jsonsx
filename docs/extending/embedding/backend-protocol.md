@@ -5,8 +5,11 @@ spec:
   - desktop.md#5 # backend API contract
 code:
   - packages/protocol/src/routes.ts
+  - packages/protocol/src/problem.ts
+  - packages/protocol/src/problems.ts
   - packages/protocol/src/types.ts
   - packages/protocol/README.md
+  - packages/ai/src/streaming-client.ts
 ---
 
 # The backend protocol
@@ -47,19 +50,36 @@ The core set is what a minimal backend must serve: project session and probing (
 
 ## The error shape
 
-Every failure is an `ErrorBody` with a meaningful HTTP status:
+Every failure is an [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) problem document, sent as `application/problem+json`:
 
-```ts
-// packages/protocol/src/types.ts
-export interface ErrorBody {
-  error: string;
-  /** Machine-readable discriminator (e.g. "remote_moved", "cf_not_connected"). */
-  code?: string;
-  detail?: unknown;
+```json
+{
+  "type": "https://jxsuite.com/problems/conflict",
+  "title": "The request conflicts with the current state",
+  "status": 409,
+  "detail": "Pull stopped: 2 file(s) changed on both sides.",
+  "conflicts": ["src/app.json", "README.md"]
 }
 ```
 
-`error` is the human-readable message; `code` is the machine-readable discriminator Studio switches on — `pull_conflict`, `remote_moved`, `cf_not_connected`, `needs_installation_access`. Return the right `code` and Studio shows its purpose-built recovery UI instead of a generic error toast.
+Four things are worth knowing before you implement one:
+
+- **`type` is what Studio keys on**, and it's an absolute URI. The full list is in [Studio routes](/docs/extending/reference/studio-routes#failures) — generated from the same table the reference backend answers from, so it can't drift.
+- **`title` describes the _type_; `detail` describes _this_ failure.** Keep `title` identical across occurrences and put the specifics in `detail`. Swapping them is the standard's most common misuse, and it's what stops Studio grouping two instances of the same problem.
+- **The status belongs to the type.** If you find yourself wanting to send one type at two statuses, it's two types.
+- **Extension members carry anything else the type documents** — `conflicts` on a pull conflict, `installUrl` on a missing GitHub App installation. Studio's recovery UI reads them.
+
+:::doc-note
+`error` is emitted alongside `detail`, with the same value, for one release. It's the pre-RFC-9457 field name, kept so a client written against the older shape keeps working while it migrates. Don't write new readers against it.
+:::
+
+Three surfaces deliberately answer **200 with an error field instead**, and a conforming backend should too:
+
+| Surface                   | Why                                                                                            |
+| ------------------------- | ---------------------------------------------------------------------------------------------- |
+| Code services (`/code/*`) | A syntax error in the author's snippet is the _result_ of a lint, not a failed request         |
+| AI model catalogue        | Degraded success — the catalogue is still delivered, from defaults                             |
+| Mid-stream SSE frames     | The response began with a 200; nothing can change the status, so the frame _carries_ a problem |
 
 ## Behaviors implementers must match
 
@@ -68,8 +88,11 @@ Route shapes alone don't capture everything. These semantics are part of the con
 - **`git/commit`** commits the staged files if any are staged, otherwise all dirty files. Cloud backends may make commit+push atomic and treat `git/push` as a sync check (`ahead` stays 0).
 - **`git/pull`** returns `409 { code: "pull_conflict", conflicts: [paths] }` when local dirty files overlap remote changes; a clean pull fast-forwards.
 - **`format`** dispatches `{ format, action: "parse" | "serialize", source? | doc?, options? }` through the project's format registry. Without it, only `.json` documents open.
-- **`ai/chat`** accepts `{ messages, tools, systemPrompt, model }` and streams the normalized `StreamEvent` SSE defined by `@jxsuite/ai/streaming-client`. `ai/models` returns `AiModelsResponse`; report `configured: true` when the backend holds credentials (Studio then unlocks the assistant without a locally stored key) and `managed: true` when the platform brokers them.
-- **`collab`** is a WebSocket upgrade speaking the `@jxsuite/collab` wire envelope — one socket per project, documents multiplexed by path. A plain GET (no Upgrade) answers `{ collab: true, version }` as the capability probe.
+- **`ai/chat`** accepts `{ messages, tools, systemPrompt, model }` and streams the normalized `StreamEvent` SSE defined by `@jxsuite/ai/streaming-client` — the union and its six members are exported, so implementers can import the type they are satisfying rather than reconstruct it. `ai/models` returns `AiModelsResponse`; report `configured: true` when the backend holds credentials (Studio then unlocks the assistant without a locally stored key) and `managed: true` when the platform brokers them.
+- **`collab`** is a WebSocket upgrade speaking the `@jxsuite/collab` wire envelope — one socket per project, documents multiplexed by path. A plain GET (no Upgrade) answers `{ collab: true, protocols, version }` as the capability probe.
+
+  `protocols` lists the WebSocket subprotocols the backend speaks, currently `["jx.collab.v1"]`, and it is also the negotiation: Studio offers one of them as `Sec-WebSocket-Protocol` and the backend must echo the one it accepts. **A backend that lists none is offered none** — [RFC 6455 §4.1](https://www.rfc-editor.org/rfc/rfc6455#section-4.1) makes a client whose offer went unechoed fail the connection, so an older backend keeps working exactly as before. A backend that lists only tokens Studio cannot parse gets no socket at all, which is the point: two peers whose envelopes disagree would merge divergent histories.
+
 - **`cf/proxy`** is an allowlisted Cloudflare API passthrough (accounts and Pages projects/deployments only). The backend injects credentials — a header-borne user token on the dev server, a vaulted OAuth token on cloud — and stateless implementations must never persist them.
 - **The data routes** (`data/connections`, `data/rows`, `data/push`, …) intentionally bypass table permission rules — they are the owner console, and the backend boundary (loopback/token locally, collaboration permission on cloud) is the gate. The secrets routes carry env-var **names only**, never values. See [connectors](/docs/extending/extensions/connectors) and the [extension security model](/docs/extending/extensions/security).
 

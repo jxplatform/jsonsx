@@ -2,9 +2,9 @@
 
 ## Platform Abstraction, Project Loading, and Component Scoping
 
-**Version:** 0.3.9-draft
+**Version:** 0.3.12-draft
 **Status:** Pending
-**Updated:** 2026-08-14
+**Updated:** 2026-08-19
 **License:** MIT
 
 ---
@@ -22,6 +22,7 @@
 9. [NixOS Chromium App-Mode](#9-nixos-chromium-app-mode)
 10. [SaaS / Cloud Mode](#10-saas--cloud-mode)
 11. [Implementation Roadmap](#11-implementation-roadmap)
+12. [Standards Alignment](#12-standards-alignment)
 
 ---
 
@@ -158,6 +159,49 @@ so a link clicked in Preview mode goes to the **user's default browser** via an 
 like the deployed thing — routing, history, devtools — and a webview with no address bar is not that;
 navigating it would also replace the editor. When the shell is unavailable or the OS refuses, the
 studio's own `window.open` default still applies.
+
+### 3.6 Signing In
+
+> **Status: Implemented.**
+
+The desktop signs in to a provider with the **loopback redirect** of
+[RFC 8252](https://www.rfc-editor.org/rfc/rfc8252) §7.3, protected by
+[PKCE](https://www.rfc-editor.org/rfc/rfc7636). The browser Studio keeps GitHub's device flow, and
+must: it has no loopback server to redirect to, and GitHub's device endpoints send no CORS headers,
+so the page cannot reach them either.
+
+**The device flow is the wrong tool for a desktop app.** RFC 8628 designed it for clients that
+cannot show a browser or take typed input. A desktop app has both, and paying that price anyway
+means the user copies a code between two windows while the app polls a token endpoint on a timer.
+
+Four properties are load-bearing, and each is a real attack or a real failure if dropped:
+
+| Property                                                          | Why                                                                                                                         |
+| ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| The redirect host is the literal `127.0.0.1`, never `localhost`   | §8.3 — a name resolves, and a `hosts` entry or a resolver answering `::1` sends the code somewhere the app is not listening |
+| `S256`, never `plain`                                             | The code is the whole credential for a client with no secret; `plain` puts the verifier in the authorization request        |
+| `state` is unguessable, single-use, and compared in constant time | Any local page can navigate a browser to the callback; without this the app adopts an attacker's account                    |
+| The provider's page opens in the **user's own browser**           | §8.12 — an embedded webview can read what the user types into the provider's login form, and carries no existing session    |
+
+**No client secret is sent.** A desktop app cannot keep one (§8.5): shipping it puts it in every
+copy of the binary, where it is a secret in name only. The PKCE verifier is what authenticates the
+exchange.
+
+**The callback route is exempt from the project server's token gate, and only from that.** The
+provider redirects the user's browser to the `redirect_uri` it was given, and a page cannot append a
+secret to a URL it does not compose — a token gate there would make the flow impossible rather than
+safe. The Host check and Fetch Metadata still apply (§4.2 of `server.md`), and an IdP redirect is
+exactly the one cross-site shape the strict policy admits: a top-level GET document navigation. The
+callback page carries `Referrer-Policy: no-referrer`, because the authorization code is in that
+request's query string until it is exchanged.
+
+**Where the token rests.** In the app's own config directory, in a file written owner-only
+(`0600`), **not** in `localStorage` and **not** in the settings store — the settings store is handed
+to the webview wholesale by `getSettings`. The RPC surface answers _whether_ a token exists and
+performs a sign-in; it never returns the store. The limitation is stated rather than hidden: the
+file is plaintext, and another process running as the same user can read it. The OS keychain is the
+right answer and a native dependency per platform; this is strictly better than a browser storage
+entry and no better than that.
 
 ---
 
@@ -338,6 +382,12 @@ A live preview under the fields shows the resolved destination (`/home/you/Sites
 ---
 
 ## 5. Backend API Contract
+
+> **Status: Implemented.** Both halves are specified. The route table is canonical and complete,
+> and the failure shape is RFC 9457 `application/problem+json` from the `PROBLEM_TYPES` registry in
+> `@jxsuite/protocol` — one table, generated into the docs beside the routes, so a backend
+> implementer reads the failure vocabulary in the same breath as the success one. `server.md` §4.3
+> holds the reasoning, including the three surfaces that deliberately stay 200.
 
 The Backend API Contract defines the operations that any Studio backend must support. The current `@jxsuite/server` endpoints map directly to these operations. Other backends (ElectroBun Bun process, cloud API) implement the same operations through their own transport.
 
@@ -766,13 +816,28 @@ The flake's `packages.default` produces a fully sandboxed NixOS package:
 - **Build dependencies** are fetched via [bun2nix](https://github.com/nix-community/bun2nix), which generates a `bun.nix` lockfile mapping all packages to fixed-output derivations — no network access needed during build
 - **`bun.nix` auto-refresh:** The root `package.json` postinstall script runs `bun2nix -o bun.nix` after every `bun install`, keeping the nix lockfile in sync with `bun.lock`
 - **Build phase** runs `bun run build` (compiler, runtime, studio, schema) and `pre-build.ts` (bundles the studio init bridge and copies assets)
-- **Install phase** copies `chromium-mode.ts`, studio assets, and dereferenced `node_modules` (via `cp -rL` to resolve workspace symlinks) into the nix store
-- **Wrapper** creates a `jx-studio` binary that runs `bun chromium-mode.ts` with `CHROMIUM_BIN` and `JX_STUDIO_ASSETS` pre-set to nix store paths
+- **Install phase** copies `packages/`, `extensions/` and `node_modules` into the nix store with plain `cp -r`, then deletes dangling symlinks (`find … -xtype l -delete`) rather than dereferencing with `cp -rL`. The prune is why `packages/desktop/tests/nix-bundle-completeness.test.ts` exists: it reads the copied directories back out of `package.nix` and asserts every `@jxsuite/*` dependency of the desktop app lands under one of them, after `extensions/parser` was once pruned out of the bundle silently
+- **Wrapper** creates a `jx-studio` binary that runs `bun run packages/desktop/src/chromium/index.ts` with `CHROMIUM_BIN` and `JX_STUDIO_ASSETS` pre-set to nix store paths. The first positional argument is the **project root**; there is no flag surface
+
+**Which ref a consumer gets.** `packages/desktop/package.nix` builds `src = lib.cleanSource ../..`
+— whatever tree was fetched — so the ref names the release. `main` is the development trunk and
+gives the tip; **`release` holds only released code**, advanced by CI to each `desktop-v*` tag once
+that tag has both produced its installers and passed a real `nix build`. A NixOS user therefore
+pins the branch, not the trunk:
 
 ```
-$ nix build
-$ ./result/bin/jx-studio [project-root]
+$ nix run github:jxsuite/jx/release
+$ nix build github:jxsuite/jx/release && ./result/bin/jx-studio [project-root]
 ```
+
+Locally, `nix build` (no ref) builds the working tree, which is what a contributor wants.
+
+`release` never advances to a commit whose flake does not build: `.github/workflows/nix.yml` builds
+`.#default` at the tag and asserts the wrapper's `CHROMIUM_BIN` and `JX_STUDIO_ASSETS` resolve, and
+the branch moves only if that succeeds. When it does not, the branch stays where it is and an issue
+is opened — a stale ref that works beats a fresh one that does not. The same workflow runs on any
+pull request touching `flake.nix`, `bun.nix`, `bun.lock` or `packages/desktop/**`, which is the
+first time the flake has been built by CI at all.
 
 ---
 
@@ -866,9 +931,24 @@ Ensure desktop app matches dev-mode capabilities:
 - [ ] Project authentication and authorization
 - [ ] Real-time collaboration via WebSocket change feed
 
+## 12. Standards Alignment
+
+External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md). ElectroBun and Chromium are implementations rather than standards, so §7–§9 cite nothing.
+
+| Standard                                           | Class        | Binds | Evidence                                                                                                                                                                                            | Note                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| -------------------------------------------------- | ------------ | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) | **Subset**   | §5    | packages/protocol/src/problem.ts, packages/protocol/src/problems.ts, packages/protocol/tests/problem.test.ts, packages/studio/src/platform-errors.ts, packages/studio/tests/platform-errors.test.ts | The contract now defines one failure shape, so the platform layer carries one reader instead of five: `problemDetail` reads a problem's `detail`, the legacy `error`, then the type's `title`. A problem's `type` **is** the structured error code the UI already branched on — `problemSlug` derives it and `installUrl` is the extension member its type documents. Absent: `instance`, and the WebSocket RPC envelope, which is a frame rather than a response body. |
+| [RFC 8252](https://www.rfc-editor.org/rfc/rfc8252) | **Adopted**  | §3.6  | packages/server/src/oauth-loopback.ts, packages/desktop/src/github-signin.ts, packages/server/tests/oauth-loopback.test.ts, packages/desktop/tests/github-signin.test.ts                            | The desktop signs in through a loopback redirect hosted on the project server: the literal `127.0.0.1` (§8.3), the provider's page in the user's own browser (§8.12), no client secret (§8.5), and a callback exempt from the token gate but not from the Host or Fetch Metadata checks. The browser Studio keeps the device flow, because a page has no loopback server to redirect to.                                                                                |
+| [RFC 7636](https://www.rfc-editor.org/rfc/rfc7636) | **Adopted**  | §3.6  | packages/server/src/oauth-loopback.ts, packages/desktop/src/github-signin.ts, packages/server/tests/oauth-loopback.test.ts, packages/desktop/tests/github-signin.test.ts                            | Every authorization-code exchange binds a verifier. `S256` only — `plain` is not implemented, and the test asserts the challenge is not the verifier rather than merely asserting the method string.                                                                                                                                                                                                                                                                    |
+| [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414) | **Rejected** | §3.6  | —                                                                                                                                                                                                   | because: the flow this would configure now exists, and the provider it talks to publishes no metadata document at either well-known URI. Discovery would be a request that always 404s, followed by the hard-coded endpoints below it. A second provider that does publish one is what would make this worth having.                                                                                                                                                    |
+| [RFC 7519](https://www.rfc-editor.org/rfc/rfc7519) | **Rejected** | §3.6  | —                                                                                                                                                                                                   | because: Jx issues and validates no JWTs. The desktop holds an opaque provider access token, and the loopback server's own gate is a random per-server token compared in constant time. The strongest posture against the JWT BCP's failure modes — `alg: none`, unverified `kid`, confused audiences — is not having a JWT, and adopting one to be conformant would create every risk it then manages.                                                                 |
+
 ## Changelog
 
-- **0.3.9-draft** (2026-08-14) — Electrobun 2: Hutch build CLI, .hutch/devkit SDK projection, electrobun/main namespace, explicit bun main process.
+- **0.3.12-draft** (2026-08-19) — §9.3 documents the release branch as the ref a Nix consumer pins, and the nix build that gates it; corrects the install phase, which has used cp -r plus a dangling-symlink prune and src/chromium/index.ts since before this text was written.
+- **0.3.11-draft** (2026-08-16) — §3.6 the desktop signs in with an RFC 8252 loopback redirect and PKCE; the token rests in a 0600 credential store, not localStorage. RFC 8414 and RFC 7519 recorded Rejected as vacuous. Closes gap:native-oauth and gap:oauth-pkce.
+- **0.3.10-draft** (2026-08-16) — §5 the contract's failure half is specified — one RFC 9457 registry; gap:backend-failure-contract closed.
+- **0.3.9-draft** (2026-08-15) — Add §12 Standards Alignment; §5 marked Partial — the Backend API Contract specifies no failure shape.
 - **0.3.8-draft** (2026-08-13) — Open Project asks where a project should open (§4.2a): New Window is routed through pickProject + openProjectInNewWindow, and the outcome is reported rather than the target.
 - **0.3.7-draft** (2026-08-11) — Name the pane context bar's resolving-with popover rather than the tab bar, which P8 deleted.
 - **0.3.6-draft** (2026-08-03) — §3.1/§5.1: findReferences? PAL member and the GET /__studio/references route — the read side of the rename refactor's walker.
@@ -896,4 +976,4 @@ Ensure desktop app matches dev-mode capabilities:
 
 ---
 
-_Jx Studio Desktop Architecture Specification v0.3.9-draft_
+_Jx Studio Desktop Architecture Specification v0.3.12-draft_

@@ -5,6 +5,10 @@ spec:
   - site-architecture.md#14
 code:
   - packages/compiler/src/site/site-build.ts
+  - packages/compiler/src/site/headers-emitter.ts
+  - packages/compiler/src/site/csp.ts
+  - packages/compiler/src/site/well-known.ts
+  - packages/compiler/src/site/service-worker.ts
   - packages/compiler/src/cli.ts
 ---
 
@@ -28,11 +32,189 @@ dist/
 ├── sitemap.xml               # When url is set in project.json
 ├── robots.txt                # From public/, with a Sitemap: line appended
 ├── _redirects                # From the redirects map
+├── _headers                  # Response headers (below)
+├── .nojekyll                 # So GitHub Pages doesn't eat the _-prefixed files above
 ├── favicon.svg               # public/ is copied in verbatim
 └── worker.js                 # Only with a server adapter (see below)
 ```
 
 Pages only load JavaScript for components that actually need it — a fully static component ships as pre-rendered HTML and CSS with no script. Files from `public/` are copied verbatim, and the `copy` map in `project.json` can place additional files at chosen output paths.
+
+## Response headers
+
+The build writes `dist/_headers` because cacheability is something only the build can decide — it chose the filenames, so it is the only party that knows which of them contain a content hash:
+
+```
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  X-Frame-Options: SAMEORIGIN
+  Cache-Control: public, max-age=0, must-revalidate
+
+/images/_optimized/*
+  Cache-Control: public, max-age=31536000, immutable
+```
+
+Only the optimized images are cached forever, because their filenames embed a hash of the source — a changed image is a changed URL. **Your component JS and CSS are not**, deliberately: `components/site-header.js` keeps the same URL when you edit the component, so caching it forever would serve stale code to everyone who visited before the edit.
+
+**Cloudflare Pages, Cloudflare Workers and Netlify** read this file. The `node` and `bun` adapters serve no static assets, so there it is a description of what the reverse proxy in front of them should send — the build says so when you use one.
+
+To add your own rules, or turn parts off:
+
+```json
+{
+  "build": {
+    "headers": {
+      "security": { "hsts": { "maxAge": 31536000, "includeSubDomains": true } },
+      "rules": { "/downloads/*": { "X-Robots-Tag": "none" } }
+    }
+  }
+}
+```
+
+Your own `public/_headers` still works: it is appended below the generated block, verbatim, and a later rule wins — so anything you write there overrides what the build set.
+
+:::doc-warning
+HSTS is off by default on purpose. `Strict-Transport-Security` tells browsers to refuse plain HTTP for your domain for `maxAge` seconds, and they remember it — so a wrong value locks the domain to HTTPS long after you notice. Turn it on once your certificate setup is settled.
+:::
+
+## Content-Security-Policy
+
+Also off by default, and also on purpose. Turn it on with one line:
+
+```json
+{ "build": { "headers": { "security": { "csp": true } } } }
+```
+
+The build then derives the policy from the pages it just produced:
+
+```
+Content-Security-Policy: base-uri 'self'; default-src 'self'; font-src 'self'; form-action 'self';
+  frame-ancestors 'self'; frame-src 'self'; img-src 'self' data:; object-src 'none';
+  script-src 'self' 'sha256-…' 'sha256-…'; style-src 'self' 'unsafe-inline'
+```
+
+`script-src` is the strict part, and it costs you nothing: compiled Jx output contains no `eval` and no `new Function`, event handlers are attached as listeners rather than written as `onclick=` attributes, and the runtime is served from your own site. The only inline scripts on a page are the import map and the colour-scheme pre-paint script — both identical on every page, so two hashes cover the whole site.
+
+If your pages load anything from another origin — an analytics script, Google Fonts, a YouTube embed — the build sees it in the finished HTML and adds that origin to the right directive. What it can't see is the second hop: a third-party script that loads _another_ script at runtime. That's the case to check.
+
+:::doc-tip
+Start with `"csp": "report-only"`. You get `Content-Security-Policy-Report-Only`, the browser reports what it _would_ have blocked in the console, and nothing on your site breaks while you look. Switch to `true` when the console is clean.
+:::
+
+### style-src is not strict
+
+`style-src` keeps `'unsafe-inline'`, and will until the style pipeline changes. Every page carries a generated `<style>` block whose content differs per page, and per-element `style=` attributes have no hash form in CSP at all. Half-measures are worse than none here: a hash and `'unsafe-inline'` in the same directive cancel each other out, so adding a few style hashes would leave your pages unstyled.
+
+### Overriding a directive
+
+```json
+{
+  "build": {
+    "headers": {
+      "security": {
+        "csp": {
+          "mode": "enforce",
+          "reportUri": "https://example.report-uri.com/r/d/csp/enforce",
+          "directives": {
+            "connect-src": "'self' https://api.example.com",
+            "frame-src": false
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+A string replaces a directive wholesale — restate the defaults you still want — and `false` removes it. `reportUri` emits `report-to`, the deprecated-but-widely-implemented `report-uri`, and the `Reporting-Endpoints` header that the first of those needs to mean anything.
+
+## Manifest and security.txt
+
+Two files a site is usually expected to publish. Both are generated from `project.json`, and both step aside if you put your own copy in `public/`.
+
+### manifest.webmanifest
+
+Declare a `manifest` section and the build writes `dist/manifest.webmanifest`, adds `<link rel="manifest">` to every page, and adds `<meta name="theme-color">` if you set one:
+
+```json
+{
+  "manifest": {
+    "shortName": "Acme",
+    "themeColor": "#0b3d91",
+    "backgroundColor": "#ffffff",
+    "icons": [
+      { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+      { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+    ]
+  }
+}
+```
+
+`name` falls back to your project name and `start_url` to `/`, so the shortest useful manifest is a `manifest` key with icons in it. There's no manifest at all unless you declare the section — it's a claim that your site is meant to be installed, and most aren't.
+
+:::doc-tip
+The 192px and 512px icons are what a browser wants before it will offer to install the site. Leave one out and the build warns; it still writes the manifest, which is useful on its own for the name and theme colour.
+:::
+
+### .well-known/security.txt
+
+```json
+{
+  "securityTxt": {
+    "contact": ["mailto:security@example.com"],
+    "expires": "2027-01-01T00:00:00Z",
+    "preferredLanguages": ["en", "fr-ca"],
+    "policy": ["https://example.com/security-policy"]
+  }
+}
+```
+
+Written to `.well-known/security.txt` and nowhere else — [RFC 9116](https://www.rfc-editor.org/rfc/rfc9116) §3 makes that the canonical spot, and a second copy at the root is a second thing to forget.
+
+:::doc-warning
+`expires` is required, and a date in the past **fails the build**. That's deliberate: an expired `security.txt` is worse than none at all, because it advertises a reporting channel while telling the reporter its information is stale. Pick a date you'll actually revisit.
+:::
+
+Want a clearsigned file? Put it at `public/.well-known/security.txt` and the build keeps yours. Signing needs a private key, which the build has no business holding.
+
+## Service worker
+
+Also off by default, and this one for a sharper reason than the rest: a service worker is **sticky**. It survives your next deploy, keeps running against a site that has moved on, and the people it breaks are the ones who came back.
+
+```json
+{
+  "serviceWorker": {
+    "precache": ["/", "/offline/"],
+    "offlineFallback": "/offline/"
+  }
+}
+```
+
+That writes `dist/sw.js` and adds a small registration script to every page. What it does:
+
+- **HTML is always network-first.** The cache is a fallback for a request that failed, never a substitute for one — otherwise a stale page outlives every attempt you make to fix it.
+- **Only `/images/_optimized/*` is cache-first**, because it's the one output whose filename contains a hash of its own contents. A cached hit there can't be wrong. Your components and assets aren't cached first for the same reason they aren't marked `immutable`: editing one reuses its URL.
+- **`offlineFallback` is served for a failed navigation.** If you forget to precache it, the build adds it and tells you — a page that was never cached can't be served offline.
+
+:::doc-warning
+Every URL in `precache` must be a page or file this build actually produces, and the build fails if one isn't. That's not pedantry: the browser's `cache.addAll()` is all-or-nothing, so a single typo'd URL stops the worker from installing **at all**, with no error anywhere you'd think to look. The symptom is "the service worker just doesn't do anything".
+:::
+
+### Turning it off
+
+```json
+{ "serviceWorker": false }
+```
+
+**Not by deleting the key.** This is the one setting where "remove the config" is the wrong move, and it's worth understanding why.
+
+Once a visitor's browser registers a worker, it keeps running it. Removing `sw.js` from your deploy doesn't help — a 404 at that URL isn't an instruction to stop, it's just a failed update check. Every previous visitor stays on the old worker, serving whatever it cached, and you have no way to reach them.
+
+So `"serviceWorker": false` writes a **tombstone** at the same URL: a worker whose only job is to unregister itself, delete its caches, and reload the tab onto your live site. The next time a returning visitor's browser checks for an update, they get it and they're free.
+
+Leave `false` in place for as long as you think old visitors might come back. Deleting the key later stops emitting the tombstone.
 
 ## Build options
 
@@ -44,6 +226,7 @@ The `build` section of `project.json`:
 | `trailingSlash` | `"always"` | URL shape: `"always"` or `"never"` (below)                         |
 | `sitemap`       | `true`     | Set `false` to skip [sitemap generation](/docs/framework/site/seo) |
 | `adapter`       | _(none)_   | `"cloudflare-workers"`, `"cloudflare-pages"`, `"node"`, or `"bun"` |
+| `headers`       | _(on)_     | Response headers written to `_headers` (below)                     |
 
 ### trailingSlash
 

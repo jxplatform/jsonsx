@@ -1093,7 +1093,15 @@ describe("call operator — named formulas and blessed globals", () => {
       target: ref("window#/Intl/formatNumber"),
       value: [ref("#/state/total"), "en-US"],
     });
-    expect(js).toBe('new Intl.NumberFormat("en-US", undefined).format(state.total)');
+    /*
+     * The fallback chain is the page's locale, then the fixed default. Both are functions of the
+     * document rather than of the machine, which is the property the default exists to protect —
+     * a formula that names no locale must never read the build host's.
+     */
+    expect(js).toBe(
+      'new Intl.NumberFormat("en-US" ?? (state?.$page?.locale ?? "en-US"), undefined)' +
+        ".format(state.total)",
+    );
     const fn = new Function("state", `return ${js}`) as (s: unknown) => string;
     expect(fn({ total: 1234.5 })).toBe("1,234.5");
 
@@ -1105,6 +1113,159 @@ describe("call operator — named formulas and blessed globals", () => {
     expect(dateJs).toContain("new Intl.DateTimeFormat(");
     const dateFn = new Function("state", `return ${dateJs}`) as (s: unknown) => string;
     expect(dateFn({ when: "2026-01-15T12:00:00Z" })).toBe("Jan 15, 2026");
+
+    // The relative helper takes its locale in the THIRD slot, after the value and the unit.
+    const relativeJs = compileExpression({
+      operator: "call",
+      target: ref("window#/Intl/formatRelativeTime"),
+      value: [ref("#/state/delta"), "day", "en-US"],
+    });
+    expect(relativeJs).toContain("new Intl.RelativeTimeFormat(");
+    const relativeFn = new Function("state", `return ${relativeJs}`) as (s: unknown) => string;
+    expect(relativeFn({ delta: -3 })).toBe("3 days ago");
+  });
+
+  test("a helper that names no locale formats in the page's language", () => {
+    /*
+     * A page under /fr/ that formats a number means French. It already said so in <html lang> and
+     * in every hreflang on it; making the author repeat it at each call site is how a translated
+     * page ends up with English number grouping, invisibly to whoever built it.
+     */
+    const node = {
+      operator: "call" as const,
+      target: ref("window#/Intl/formatNumber"),
+      value: [ref("#/state/total")],
+    };
+    const french = new Intl.NumberFormat("fr-FR").format(1234.5);
+    expect(french).not.toBe("1,234.5"); // Guards the assertion below against a stub ICU build.
+    expect(evaluateExpression(node, { $page: { locale: "fr-FR" }, total: 1234.5 }, null)).toBe(
+      french,
+    );
+    // No page in scope — a component's own state, or the runtime standalone — keeps the fixed one.
+    expect(evaluateExpression(node, { total: 1234.5 }, null)).toBe("1,234.5");
+    // An explicit locale still wins over both.
+    expect(
+      evaluateExpression(
+        { ...node, value: [ref("#/state/total"), "de-DE"] },
+        { $page: { locale: "fr-FR" }, total: 1234.5 },
+        null,
+      ),
+    ).toBe("1.234,5");
+
+    // The locale slot differs per helper, so the position is read from the helper table, not
+    // Guessed: formatRelativeTime takes it third, after the value and the unit.
+    expect(
+      evaluateExpression(
+        {
+          operator: "call",
+          target: ref("window#/Intl/formatRelativeTime"),
+          value: [-3, "day"],
+        },
+        { $page: { locale: "fr-FR" } },
+        null,
+      ),
+    ).toBe("il y a 3 jours");
+
+    // And the compiled half agrees with the interpreted one.
+    const js = compileExpression(node);
+    const fn = new Function("state", `return ${js}`) as (s: unknown) => string;
+    expect(fn({ $page: { locale: "fr-FR" }, total: 1234.5 })).toBe(french);
+    expect(fn({ total: 1234.5 })).toBe("1,234.5");
+  });
+
+  test("a component scope reads its own state prefix, and has no page to read", () => {
+    /*
+     * `compileExpression` emits under whatever name the enclosing scope gave state — `s` inside a
+     * custom element, `this.state` for its instance half. Hardcoding `state` there would emit a
+     * reference to an identifier that does not exist in that function.
+     */
+    const js = compileExpression(
+      { operator: "call", target: ref("window#/Intl/formatNumber"), value: [ref("#/state/total")] },
+      { statePrefix: "s" },
+    );
+    expect(js).toContain("s?.$page?.locale");
+    expect(js).not.toContain("state?.$page");
+    const fn = new Function("s", `return ${js}`) as (s: unknown) => string;
+    expect(fn({ total: 1234.5 })).toBe("1,234.5");
+  });
+
+  test("a helper that names no locale or time zone still renders the same everywhere", () => {
+    /*
+     * The determinism contract. Without the defaults these compile to `new Intl.NumberFormat()`,
+     * which reads the build machine's locale — and for a date, its time zone, which can move the
+     * rendered day.
+     */
+    const numberJs = compileExpression({
+      operator: "call",
+      target: ref("window#/Intl/formatNumber"),
+      value: [ref("#/state/total")],
+    });
+    expect(numberJs).toContain('"en-US"');
+    const numberFn = new Function("state", `return ${numberJs}`) as (s: unknown) => string;
+    expect(numberFn({ total: 1234.5 })).toBe("1,234.5");
+
+    const dateJs = compileExpression({
+      operator: "call",
+      target: ref("window#/Intl/formatDate"),
+      value: [ref("#/state/when")],
+    });
+    expect(dateJs).toContain('timeZone: "UTC"');
+    const dateFn = new Function("state", `return ${dateJs}`) as (s: unknown) => string;
+    // 02:00 UTC is the 15th in New York; UTC is what keeps the published HTML the same everywhere.
+    expect(dateFn({ when: "2026-01-16T02:00:00Z" })).toBe("1/16/2026");
+  });
+
+  test("the new Intl helpers evaluate and compile to the same answer", () => {
+    const cases: { node: Parameters<typeof compileExpression>[0]; expected: unknown }[] = [
+      {
+        expected: "a, b, and c",
+        node: {
+          operator: "call",
+          target: ref("window#/Intl/formatList"),
+          value: [ref("#/state/items"), "en-US"],
+        },
+      },
+      {
+        expected: "one",
+        node: { operator: "call", target: ref("window#/Intl/plural"), value: [1, "en-US"] },
+      },
+      {
+        expected: "German",
+        node: {
+          operator: "call",
+          target: ref("window#/Intl/displayName"),
+          value: ["de", "language", "en-US"],
+        },
+      },
+      {
+        expected: ["a", "b"],
+        node: {
+          operator: "call",
+          target: ref("window#/Intl/segment"),
+          value: ["ab", "grapheme", "en-US"],
+        },
+      },
+    ];
+    const scope = { items: ["a", "b", "c"] };
+    for (const { node, expected } of cases) {
+      expect(evaluateExpression(node, scope, null)).toEqual(expected);
+      const js = compileExpression(node);
+      const fn = new Function("state", `return ${js}`) as (s: unknown) => unknown;
+      expect(fn(scope)).toEqual(expected);
+    }
+  });
+
+  test("Intl/compare orders accented words the way a person would", () => {
+    // `<` and sort() compare UTF-16 code units, which puts every accented word after "z".
+    const node = {
+      operator: "call" as const,
+      target: ref("window#/Intl/compare"),
+      value: ["école", "zoo", "fr"],
+    };
+    expect(evaluateExpression(node, {}, null)).toBeLessThan(0);
+    const [accented, plain] = ["école", "zoo"];
+    expect(accented! < plain!).toBe(false);
+    expect(new Function(`return ${compileExpression(node)}`)()).toBeLessThan(0);
   });
 
   test("non-blessed globals are rejected at evaluation", () => {
@@ -1200,10 +1361,30 @@ describe("call operator — named formulas and blessed globals", () => {
 
   test("$args refs compile to _args member access", () => {
     expect(compileExpression({ operator: "+", target: ref("$args/price"), value: 1 })).toBe(
-      '(_args["price"] + 1)',
+      "(_args.price + 1)",
     );
     expect(compileExpression({ operator: "+", target: ref("$args/user/name"), value: "" })).toBe(
-      '(_args["user"]["name"] + "")',
+      '(_args.user.name + "")',
+    );
+  });
+
+  /*
+   * `$args/` used to bracket every segment while every other ref form dotted every segment, and
+   * only one of those two rules survives a segment that is not an identifier. Both branches are
+   * pinned here because the dotted branch is the one that silently emitted a SyntaxError.
+   */
+  test("a segment that is not an identifier takes the bracket branch", () => {
+    expect(compileExpression({ operator: "+", target: ref("$args/values/0"), value: 1 })).toBe(
+      '(_args.values["0"] + 1)',
+    );
+    expect(compileExpression({ operator: "+", target: ref("#/state/items/0"), value: 1 })).toBe(
+      '(state.items["0"] + 1)',
+    );
+    expect(compileExpression({ operator: "+", target: ref("#/state/user.name"), value: 1 })).toBe(
+      '(state["user.name"] + 1)',
+    );
+    expect(compileExpression({ operator: "+", target: ref("#/state/a-b"), value: 1 })).toBe(
+      '(state["a-b"] + 1)',
     );
   });
 });

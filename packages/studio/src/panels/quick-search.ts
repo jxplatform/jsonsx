@@ -274,6 +274,22 @@ export function paletteArgs(command: AnyCommand): PaletteArgs {
 
 // ─── Recently-used commands ───────────────────────────────────────────────────
 
+/**
+ * The ids the combobox relationship is built from (WAI-ARIA APG, combobox with listbox popup).
+ *
+ * The input already said `role="combobox"`, but nothing connected it to the list beneath: no
+ * `aria-controls`, so a screen reader could not find the popup, and no `aria-activedescendant`, so
+ * arrowing through the results moved a visual highlight and announced nothing. `aria-expanded` was
+ * the literal string `"true"`, which claims a popup is showing even when the query matched
+ * nothing.
+ */
+const QUICK_SEARCH_LISTBOX_ID = "quick-search-listbox";
+
+/** A stable per-row id, so `aria-activedescendant` has something to point at. */
+function optionId(index: number): string {
+  return `quick-search-option-${index}`;
+}
+
 const RECENT_COMMANDS_KEY = "jx-studio-recent-commands";
 const RECENT_COMMANDS_MAX = 6;
 
@@ -868,7 +884,10 @@ function renderOverlay() {
             class="quick-search-input"
             type="text"
             role="combobox"
-            aria-expanded="true"
+            aria-controls=${QUICK_SEARCH_LISTBOX_ID}
+            aria-expanded=${rows.length > 0}
+            aria-activedescendant=${rows.length > 0 ? optionId(_selectedIndex) : nothing}
+            aria-autocomplete="list"
             aria-label=${placeholder}
             placeholder=${placeholder}
             .value=${live(_query)}
@@ -881,7 +900,7 @@ function renderOverlay() {
             })}
           />
         </div>
-        <div class="quick-search-results" role="listbox">
+        <div class="quick-search-results" role="listbox" id=${QUICK_SEARCH_LISTBOX_ID}>
           ${
             rows.length === 0
               ? html`<div class="quick-search-empty">${emptyHint(mode, query)}</div>`
@@ -901,6 +920,7 @@ function renderOverlay() {
                   selected: i === _selectedIndex,
                 })}
                 role="option"
+                id=${optionId(i)}
                 aria-selected=${i === _selectedIndex}
                 aria-disabled=${row.kind === "command" && !row.enabled}
                 @click=${() => selectRow(row)}

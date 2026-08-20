@@ -30,7 +30,24 @@
       // codegen scripts sit outside the tsconfig project (tsc skips them), so
       // tsgolint sees error-types for their imports. The no-unsafe-* family is
       // therefore src-only; promise safety still applies everywhere.
-      "files": ["**/tests/**/*.*", "**/*.test.*", "**/scripts/**/*.*", "**/bin/**/*.*"],
+      //
+      // The repo-root entrypoints are outside it for the same reason and were
+      // simply missed: tsconfig.json sets `allowJs: false` and its `include`
+      // starts at packages/ and extensions/, so a root-level `.js` file is in
+      // no project at all and EVERY expression in it types as `error`. That is
+      // not a latent bug the rule is catching — there is no annotation or
+      // rewrite that fixes it, because the file has no program. `server.js`
+      // proved it: adding `exampleRoutes()` in 7fb3669a turned three ordinary
+      // lines (`new Bun.Glob(...)`, the `const` that takes its result, and a
+      // `.length` on that) into three errors and reddened main.
+      "files": [
+        "**/tests/**/*.*",
+        "**/*.test.*",
+        "**/scripts/**/*.*",
+        "**/bin/**/*.*",
+        "./server.js",
+        "./commitlint.config.js"
+      ],
       "rules": {
         "typescript/no-unsafe-assignment": "off",
         "typescript/no-unsafe-call": "off",

@@ -1,6 +1,6 @@
 {
   "name": "@jxsuite/protocol",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "The Studio Backend Protocol — wire types and the canonical route table every Jx Studio backend implements",
   "license": "MIT",
   "repository": {
@@ -14,8 +14,10 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./types": "./src/types.ts",
-    "./routes": "./src/routes.ts"
+    "./problem": "./src/problem.ts",
+    "./problems": "./src/problems.ts",
+    "./routes": "./src/routes.ts",
+    "./types": "./src/types.ts"
   },
   "publishConfig": {
     "provenance": true

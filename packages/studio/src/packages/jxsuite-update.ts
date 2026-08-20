@@ -24,6 +24,7 @@
 
 import { html } from "lit-html";
 import { getPlatform } from "../platform";
+import { shouldInstallAutomation } from "../services/automation";
 import { showConfirmDialog } from "../ui/layers";
 import { showProgressModal } from "../ui/progress-modal";
 import { notify } from "../services/notify";
@@ -135,6 +136,24 @@ export async function applyJxsuiteUpdate(outdated: JxsuiteUpdate[]): Promise<voi
  * exact set of versions for this project (remembered in localStorage).
  */
 export async function maybePromptJxsuiteUpdate(projectRoot: string): Promise<void> {
+  // Automation/screenshot runs open projects read-only to drive the canvas — the same rule
+  // Ensure-deps.ts states, and for the same reason: confirming here calls `setPackageVersions`,
+  // Which rewrites the opened project's package.json.
+  //
+  // It also has to hold when nobody confirms anything. `showConfirmDialog` renders an
+  // `<sp-dialog-wrapper open underlay>`, and an underlay swallows every pointer event across the
+  // Viewport — so a prompt raised at boot means every subsequent click in a shot lands in a scrim.
+  // That is not hypothetical: it put this dialog into the middle of 33 committed screenshots,
+  // Including docs/images/hero.png, which is the jxsuite.com marketing hero.
+  //
+  // Correct pins are NOT sufficient on their own. `outdatedPackages` compares the range's base
+  // Version against the registry's `latest` (packages/server/src/packages.ts: `latest ===
+  // StripRange(p.version)`), not whether the range resolves it — so a project pinned `^1.4.1` is
+  // "outdated" the moment 1.4.2 publishes, and every starter shot would be scrimmed again by the
+  // Next patch release of any @jxsuite package.
+  if (shouldInstallAutomation(location.search)) {
+    return;
+  }
   const platform = getPlatform();
   if (!platform.setPackageVersions) {
     return;

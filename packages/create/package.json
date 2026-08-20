@@ -1,6 +1,6 @@
 {
   "name": "@jxsuite/create",
-  "version": "1.2.2",
+  "version": "1.3.0",
   "description": "Scaffold a new Jx project",
   "license": "MIT",
   "repository": {
@@ -17,6 +17,7 @@
     "cli-args.ts",
     "templates.ts",
     "scaffold.ts",
+    "template-versions.json",
     "template/",
     "templates/"
   ],
@@ -25,7 +26,8 @@
     ".": "./index.ts",
     "./generate": "./generate.ts",
     "./templates": "./templates.ts",
-    "./scaffold": "./scaffold.ts"
+    "./scaffold": "./scaffold.ts",
+    "./template-versions.json": "./template-versions.json"
   },
   "publishConfig": {
     "provenance": true

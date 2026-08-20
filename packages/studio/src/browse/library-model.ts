@@ -21,6 +21,8 @@
 import { MEDIA_EXTENSIONS, extensionOf } from "../files/media-upload";
 import { projectState } from "../store";
 import { errorMessage } from "@jxsuite/schema/parse";
+import { resolveI18n, servedLocaleOfPath } from "@jxsuite/schema/locale";
+import type { ResolvedI18n } from "@jxsuite/schema/locale";
 import type { ContentSectionEntry, DirEntry, StudioPlatform } from "../types";
 
 // ─── Files ───────────────────────────────────────────────────────────────────
@@ -37,6 +39,18 @@ export interface LibraryFile {
   size?: number | undefined;
   /** ISO timestamp, when the platform reported one. Drives the Calendar layout. */
   modified?: string | undefined;
+  /**
+   * The locale this file is **served as**, from `@jxsuite/schema/locale`'s `servedLocaleOfPath` —
+   * the canonical tag, never the spelling on disk.
+   *
+   * The path answers it wherever there is a locale directory. Where there is not, `routing` does:
+   * under `prefix-except-default` an unprefixed page IS the default locale's copy, and a facet that
+   * could filter to French and Arabic but never to English cannot answer the question it is most
+   * often asked. That reading stops at `pages/` — an unlocalized collection expands under every
+   * locale's route, so calling its entries the default language would be a claim about content that
+   * is in none.
+   */
+  locale?: string | undefined;
 }
 
 /** A directory the scan could not read. Its presence means the listing is INCOMPLETE, not empty. */
@@ -156,6 +170,7 @@ async function walk(
   platform: Pick<StudioPlatform, "listDirectory">,
   out: LibraryFile[],
   failures: ScanFailure[],
+  i18n: ResolvedI18n | null,
 ): Promise<void> {
   let entries: DirEntry[];
   try {
@@ -177,6 +192,7 @@ async function walk(
     out.push({
       category,
       ext,
+      locale: servedLocaleOfPath(entry.path, i18n) ?? undefined,
       modified: entry.modified,
       name: entry.name,
       path: entry.path,
@@ -186,7 +202,7 @@ async function walk(
   }
   // Siblings in parallel, depth serialized per branch: the platform counts every call as in-flight,
   // So `probe.idle()` already knows the scan is running without the Library declaring a source.
-  await Promise.all(subdirectories.map((sub) => walk(sub, platform, out, failures)));
+  await Promise.all(subdirectories.map((sub) => walk(sub, platform, out, failures, i18n)));
 }
 
 /**
@@ -201,7 +217,10 @@ export async function scanLibrary(
 ): Promise<LibraryScan> {
   const files: LibraryFile[] = [];
   const failures: ScanFailure[] = [];
-  await Promise.all(dirs.map((dir) => walk(dir, platform, files, failures)));
+  // Resolved ONCE for the whole walk. `resolveI18n` canonicalizes every declared tag through
+  // `Intl.Locale`, and a project with 300 pages would otherwise pay for that per file.
+  const { i18n } = resolveI18n(projectState?.projectConfig ?? {});
+  await Promise.all(dirs.map((dir) => walk(dir, platform, files, failures, i18n)));
   files.sort((a, b) => a.path.localeCompare(b.path));
   return { failures, files };
 }
@@ -211,9 +230,14 @@ export async function scanLibrary(
 export interface LibraryFilter {
   category: string;
   query: string;
+  /** A canonical tag, or "" for every language. Never a label — the labels are not unique. */
+  locale?: string;
 }
 
-/** Category then text, over name and path. Returns the input array unchanged when nothing filters. */
+/**
+ * Category, then text over name and path, then language. Returns the input array unchanged when
+ * nothing filters.
+ */
 export function filterLibrary(
   files: readonly LibraryFile[],
   filter: LibraryFilter,
@@ -228,6 +252,10 @@ export function filterLibrary(
     result = result.filter(
       (f) => f.name.toLowerCase().includes(query) || f.path.toLowerCase().includes(query),
     );
+  }
+  const locale = filter.locale?.trim();
+  if (locale) {
+    result = result.filter((f) => f.locale === locale);
   }
   return result;
 }
@@ -281,6 +309,38 @@ export function libraryDate(file: LibraryFile): string | null {
     }
   }
   return null;
+}
+
+/**
+ * The locales this project DECLARES, canonical and in declaration order — the value space of the
+ * Library's language facet and of `library.setLocale`'s `enum`.
+ *
+ * Read at call time rather than cached: `projectState` is a plain binding replaced wholesale on a
+ * project switch, so a cached list would describe the project before last.
+ */
+export function projectLocales(): readonly string[] {
+  return resolveI18n(projectState?.projectConfig ?? {}).i18n?.locales ?? [];
+}
+
+/**
+ * The locales actually PRESENT among these files, in the project's declaration order.
+ *
+ * Ordered by the project and not by the scan for the reason {@link groupByCategory} orders its
+ * columns by {@link LIBRARY_CATEGORIES}: a facet whose options reshuffle when a file is added is a
+ * facet nobody can build muscle memory for. Declaration order also puts the default locale first,
+ * because {@link resolveI18n} guarantees it is `locales[0]`.
+ *
+ * Only declared tags can appear — `localeOfPath` matches nothing else — so filtering the
+ * declaration through the presence set loses no file.
+ */
+export function libraryLocales(files: readonly LibraryFile[]): string[] {
+  const present = new Set<string>();
+  for (const file of files) {
+    if (file.locale) {
+      present.add(file.locale);
+    }
+  }
+  return projectLocales().filter((tag) => present.has(tag));
 }
 
 /** Calendar buckets, newest day first, plus the files no date could be derived for. */

@@ -8,7 +8,7 @@ import { flush, installMockPlatform, resetStudioState, resetWorkspaceWithTab } f
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import type { Tab } from "../src/tabs/tab";
 
-void mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
+void mock.module("monaco-editor/editor", () => ({
   MarkerSeverity: { Error: 8, Warning: 4 },
   Uri: { parse: (url: string) => ({ toString: () => url }) },
   editor: { setModelMarkers: mock(() => {}) },

@@ -18,45 +18,13 @@
 //
 // Usage: PATHS_RELEASED='["packages/server","extensions/parser"]' bun scripts/publish-order.ts
 
-import { existsSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+// The graph itself is read by scripts/lib/workspaces.ts, which is also what the CI gate uses.
+// Publishing asks a narrower question than testing does — only RUNTIME deps decide the order in
+// Which npm must receive packages, since devDependencies never ship — so this file reads `deps`
+// And ignores `devDeps`.
+import { readWorkspaces } from "./lib/workspaces.ts";
 
-const WORKSPACE_ROOTS = ["packages", "extensions"];
-
-interface Pkg {
-  dir: string; // Full repo-relative path, e.g. "packages/server"
-  name: string;
-  publishable: boolean;
-  deps: string[]; // @jxsuite/* runtime dependency package names (deduped)
-}
-
-const pkgs: Pkg[] = [];
-for (const root of WORKSPACE_ROOTS) {
-  if (!existsSync(root)) {
-    continue;
-  }
-  for (const entry of readdirSync(root)) {
-    const file = Bun.file(join(root, entry, "package.json"));
-    if (!(await file.exists())) {
-      continue;
-    }
-    const j = await file.json();
-    const deps = new Set(
-      [
-        ...Object.keys(j.dependencies ?? {}),
-        ...Object.keys(j.peerDependencies ?? {}),
-        ...Object.keys(j.optionalDependencies ?? {}),
-      ].filter((d) => d.startsWith("@jxsuite/")),
-    );
-    pkgs.push({
-      dir: `${root}/${entry}`,
-      name: j.name,
-      publishable: j.private !== true && j.publishConfig != null,
-      deps: [...deps],
-    });
-  }
-}
-
+const pkgs = await readWorkspaces();
 const byName = new Map(pkgs.map((p) => [p.name, p]));
 const publishable = pkgs.filter((p) => p.publishable);
 const pubNames = new Set(publishable.map((p) => p.name));

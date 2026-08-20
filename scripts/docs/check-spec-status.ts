@@ -13,9 +13,11 @@
 //   - every spec has a `## Changelog` whose newest entry matches the header version and **Updated:**
 //   - changelog entries run newest-first: strictly descending versions, non-increasing dates
 //   - the `-draft` suffix is carried exactly by the specs whose status is not Implemented
+//   - if any spec uses an all-capitals BCP 14 keyword, standards.md still declares them (§12)
 //
 // Usage: bun scripts/docs/check-spec-status.ts
 
+import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   compareSpecVersion,
@@ -146,6 +148,71 @@ for (const spec of specs) {
 
   for (const bad of spec.badForms) {
     fail(spec.file, `${bad.line}: ${bad.reason} — "${bad.text.slice(0, 80)}"`);
+  }
+}
+
+// ─── BCP 14 normative keywords ────────────────────────────────────────────────
+//
+// RFC 8174's "and only when they appear in all capitals" clause is what lets the corpus write
+// "must" and "should" in their ordinary English senses on every page. That clause only holds while
+// The declaration exists: delete standards.md §12 and every capitalized MUST in the corpus quietly
+// Stops being a conformance requirement, with nothing anywhere to notice. This is that notice.
+//
+// Lowercase prose is deliberately not judged. A gate guessing at which "must" was meant normatively
+// Would be wrong on most pages, and would push authors toward capitalizing everything — the outcome
+// RFC 8174 exists to prevent.
+
+/** The BCP 14 keyword set, longest-first so `MUST NOT` is matched before `MUST`. */
+const BCP14_KEYWORDS = [
+  "MUST NOT",
+  "SHALL NOT",
+  "SHOULD NOT",
+  "NOT RECOMMENDED",
+  "RECOMMENDED",
+  "REQUIRED",
+  "OPTIONAL",
+  "MUST",
+  "SHALL",
+  "SHOULD",
+  "MAY",
+] as const;
+
+const KEYWORD_PATTERN = new RegExp(`\\b(${BCP14_KEYWORDS.join("|")})\\b`, "g");
+const DECLARING_SPEC = "standards.md";
+const DECLARING_HEADING = "## 12. Normative Keywords";
+
+const keywordUsers: string[] = [];
+let declaration = "";
+for (const file of readdirSync(SPECS_DIR).filter((f) => f.endsWith(".md"))) {
+  const text = readFileSync(resolve(SPECS_DIR, file), "utf8");
+  if (file === DECLARING_SPEC) {
+    declaration = text;
+    continue; // The declaration necessarily contains every keyword it defines.
+  }
+  if (KEYWORD_PATTERN.test(text)) {
+    keywordUsers.push(file);
+  }
+  KEYWORD_PATTERN.lastIndex = 0;
+}
+
+if (keywordUsers.length > 0) {
+  if (!declaration.includes(DECLARING_HEADING)) {
+    fail(
+      DECLARING_SPEC,
+      `${keywordUsers.join(", ")} use all-capitals BCP 14 keywords, but "${DECLARING_HEADING}" is ` +
+        `missing — those requirements are now undefined`,
+    );
+  } else {
+    // The declared set must be the whole set: a section that quietly dropped SHALL would leave a
+    // Future use of it undefined while still looking like a declaration.
+    const missing = BCP14_KEYWORDS.filter((word) => !declaration.includes(`**${word}**`));
+    if (missing.length > 0) {
+      fail(
+        DECLARING_SPEC,
+        `${DECLARING_HEADING} does not declare ${missing.join(", ")} — declare the full BCP 14 set ` +
+          `or stop using the missing keyword(s)`,
+      );
+    }
   }
 }
 

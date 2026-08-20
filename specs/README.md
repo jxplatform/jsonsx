@@ -1,6 +1,6 @@
 # Jx Specifications
 
-These specs are the source of truth for Jx behavior. User documentation (`/docs`, published at jxsuite.com/docs) tracks what actually ships; the specs define what the contract is. Each top-level `*.md` here is one spec; files under `design-notes/` are working notes, not specs, and are exempt from everything below.
+These specs are the source of truth for Jx behavior. User documentation ([`docs/`](../docs/README.md), published at jxsuite.com/docs) tracks what actually ships; the specs define what the contract is. Each top-level `*.md` here is one spec; files under `design-notes/` are working notes, not specs, and are exempt from everything below.
 
 ## Anatomy of a spec
 
@@ -59,6 +59,22 @@ That advances the header **and** footer version, restamps `**Updated:**` to toda
 | patch  | Editorial — wording, examples, non-normative clarification                                                  |
 | stable | Graduate a 0.x spec to 1.0.0 — a deliberate declaration that its contract is settled                        |
 
+### Concurrent releases
+
+The next version is computed from the **higher** of the working file and the same file on the base
+branch (`origin/main`, then `main`; `--base <ref>` overrides). That matters on a branch: fork before
+a release lands on main, and the local file still shows the old version, so bumping from it would
+mint a number main has already published. Two branches then claim the same version, and nothing says
+so until the merge — where `bun run docs:status` reports it as an ordering fault ("0.9.31-draft is
+not older than 0.9.31-draft") and the fix is renumbering the header, the footer and every entry above
+the collision by hand.
+
+`spec:bump` prints the ref and the version whenever the base moved the answer. The floor is read from
+the base's **tip**, not from the merge base — the question is "is this number taken", which only the
+tip can answer. A ref that is unfetched, shallow, or does not carry the spec yet simply means no
+floor, so a stale `origin/main` under-reports rather than blocking; fetch if the printed version
+looks behind.
+
 **Every spec is pre-1.0 today**, and while a spec is at `0.x` the release-please `bump-minor-pre-major` policy applies: `major` moves the **minor** digit, and `minor` and `patch` both move the **patch** digit. So a structural break reads `0.2.7 → 0.3.0`, and everything else reads `0.2.7 → 0.2.8`. Past `1.0.0` the levels mean exactly what they say.
 
 These version numbers were not chosen by hand — they were **reconstructed from git history**. Every commit that touched a spec was classified by what it did to that spec's numbered-section anchor space (removed an anchor → structural break; added one → additive; neither → editorial) and the versions walked forward from `0.1.0` at the commit that introduced each spec. That is why each changelog entry carries the short SHA of the commit it describes.
@@ -75,13 +91,14 @@ They are deliberately bullets rather than headings so changelog versions never c
 
 ## Gates
 
-| Command                   | Enforces                                                                                              |
-| ------------------------- | ----------------------------------------------------------------------------------------------------- |
-| bun run docs:status       | Header fields, status vocabulary, footer/header version agreement, changelog ordering and consistency |
-| bun run docs:spec-release | A spec whose body changed also advanced its version (this is what keeps versions meaningful)          |
-| bun run docs:check        | Docs spec: anchors resolve to real numbered headings                                                  |
-| bun run docs:verify       | The generated reference pages match the specs they derive from                                        |
+| Command                   | Enforces                                                                                                                                   |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| bun run docs:status       | Header fields, status vocabulary, footer/header version agreement, changelog ordering and consistency                                      |
+| bun run docs:spec-release | A spec whose body changed also advanced its version (this is what keeps versions meaningful)                                               |
+| bun run docs:standards    | The `## N. Standards Alignment` tables: vocabulary, canonical citations, resolvable bindings, committed evidence, and the tracked gap list |
+| bun run docs:check        | Docs spec: anchors resolve to real numbered headings                                                                                       |
+| bun run docs:verify       | The generated reference pages match the specs they derive from                                                                             |
 
 A spec's "body" is everything except the release metadata — the `**Version:**` and `**Updated:**` lines, the `## Changelog` section, and the footer version. Header `**Status:**` and the per-section `> **Status: …**` markers _are_ body: changing what is built is a change worth releasing.
 
-Two pages are generated from the metadata here and must never be hand-edited: [implementation status](../docs/extending/reference/implementation-status.md) and [spec changelog](../docs/extending/reference/spec-changelog.md).
+Three pages are generated from the metadata here and must never be hand-edited: [implementation status](../docs/extending/reference/implementation-status.md) from the `**Status:**` markers, [spec changelog](../docs/extending/reference/spec-changelog.md) from the `## Changelog` sections, and [standards](../docs/extending/reference/standards.md) from the `## N. Standards Alignment` tables.

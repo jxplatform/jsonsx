@@ -1,0 +1,28 @@
+{
+  "$layout": "./layouts/base.json",
+  "state": {
+    "skipLabel": "Aller au contenu",
+    "railNote": "Musée municipal d'art et d'histoire · Ouvert aujourd'hui de 10 h à 18 h",
+    "languageNavLabel": "Langue",
+    "mainNavLabel": "Principal",
+    "navExhibitions": "Expositions",
+    "navVisit": "Visite",
+    "navAbout": "À propos",
+    "homeHref": "/fr-ca/",
+    "exhibitionsHref": "/fr-ca/expositions/",
+    "visitHref": "/fr-ca/visite/",
+    "aboutHref": "/fr-ca/a-propos/",
+    "footerTagline": "Un musée municipal sous une halle de verre : quatre siècles de port, de métiers et de cartes, gardés en fiducie pour toutes celles et ceux qui vivent ici.",
+    "footerVisitLabel": "Nous trouver",
+    "footerAddress": "2, quai des Écluses, Vieux-Port",
+    "footerHours": "Du mardi au dimanche, de 10 h à 18 h. Fermé le lundi.",
+    "footerReadLabel": "À lire",
+    "footerExhibitionsLink": "Expositions",
+    "footerVisitLink": "Préparer sa visite",
+    "footerAboutLink": "À propos du musée",
+    "footerContactLabel": "Nous joindre",
+    "footerLegal": "© 2026 Atrium — Musée municipal d'art et d'histoire",
+    "footerCredit": "Un musée public, à entrée libre, en trois langues."
+  },
+  "children": [{ "tagName": "slot" }]
+}

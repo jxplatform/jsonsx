@@ -50,7 +50,12 @@ export interface SpecStatus {
  * §15's "Implemented" was being reported against §14.2, which carries no marker at all.
  * `check-doc-refs.ts:80` has always used `\b` here and resolved the same headings correctly.
  */
-const NUMBERED_HEADING = /^#{2,6}\s+(\d+(?:\.\d+)*[a-z]?)\.?\s+(.*)$/;
+/*
+ * `\\?` tolerates the backslash a WYSIWYG editor inserts before the dot (`## 18\.`). Same class of
+ * bug as the `\b` note above: a heading pattern that fails to match does not report anything, it
+ * just stops seeing sections. `check-standards.ts` reports the escape as `heading-escaped`.
+ */
+export const NUMBERED_HEADING = /^#{2,6}\s+(\d+(?:\.\d+)*[a-z]?)\\?\.?\s+(.*)$/;
 const BLOCKQUOTE_STATUS = /^>\s*\*\*Status:\s*([A-Za-z]+)/;
 const HEADER_VERSION = /^\*\*Version:\*\*\s*(.+)$/;
 const HEADER_STATUS = /^\*\*Status:\*\*\s*(.+)$/;
@@ -126,6 +131,29 @@ export function compareSpecVersion(a: string, b: string): number | null {
     return 0;
   }
   return pa.draft ? -1 : 1;
+}
+
+/**
+ * The version a bump has to clear: the higher of the working file's and the base branch's.
+ *
+ * `spec:bump` used to read only the working file, so a branch forked before a release on main saw
+ * the old version, minted the next one, and landed a number main had already used — two changelog
+ * entries claiming `0.9.31-draft`. Nothing caught it until the merge, where check-spec-status
+ * reported it as an ordering fault ("0.9.31-draft is not older than 0.9.31-draft") and unpicking it
+ * meant renumbering the header, the footer and every entry above the collision by hand.
+ *
+ * A null base means no floor: an unfetched ref, a shallow clone, or a spec that does not exist on
+ * the base yet because this branch is what adds it.
+ */
+export function versionFloor(
+  local: ParsedVersion,
+  base: ParsedVersion | null,
+): { version: ParsedVersion; raised: boolean } {
+  if (!base) {
+    return { version: local, raised: false };
+  }
+  const raised = (compareSpecVersion(base.raw, local.raw) ?? 0) > 0;
+  return { version: raised ? base : local, raised };
 }
 
 /** Parse one spec file's status markers and release metadata. */

@@ -7,6 +7,7 @@ import {
   getEffectiveElements,
   getEffectiveHead,
   getEffectiveImports,
+  getEffectiveLocales,
   getEffectiveMedia,
   getEffectiveStyle,
 } from "../src/site-context";
@@ -214,5 +215,55 @@ describe("getEffectiveHead", () => {
     } as unknown as ProjectState);
     const result = getEffectiveHead([meta]);
     expect(result).toHaveLength(1);
+  });
+});
+
+// ─── getEffectiveLocales ───────────────────────────────────────────────────
+
+/*
+ * These are NOT a restatement of the compiler's locale rules. Studio and the compiler call the
+ * same `resolveI18n` out of `@jxsuite/schema/locale`, so the two cannot disagree about what a tag
+ * means. What is asserted here is only what this wrapper adds: that it hands the resolver the LIVE
+ * project config, and that it answers a render rather than throwing on one.
+ */
+describe("getEffectiveLocales", () => {
+  test("no project, and a project that declares none, are both null", () => {
+    expect(getEffectiveLocales()).toBeNull();
+    setProjectState({ projectConfig: { name: "Demo" } } as unknown as ProjectState);
+    expect(getEffectiveLocales()).toBeNull();
+  });
+
+  test("reads the live config, resolved the way the build resolves it", () => {
+    setProjectState({
+      projectConfig: { i18n: { defaultLocale: "EN-us", locales: ["en-US", "fr-ca", "not_a_tag"] } },
+    } as unknown as ProjectState);
+    expect(getEffectiveLocales()).toEqual({
+      defaultLocale: "en-US",
+      locales: ["en-US", "fr-CA"],
+      routing: "prefix-except-default",
+    });
+  });
+
+  /*
+   * A malformed tag is a build error, and the resolver returns it as one. A render has nowhere to
+   * put a sentence, so the sentence belongs to Project Settings — what this must not do is throw
+   * on the way to drawing a menu.
+   */
+  test("a malformed tag is dropped rather than thrown, and the rest survives", () => {
+    setProjectState({
+      projectConfig: { i18n: { locales: ["en_US", "fr"] } },
+    } as unknown as ProjectState);
+    expect(getEffectiveLocales()?.locales).toEqual(["fr"]);
+  });
+
+  // `projectState` is replaced wholesale on a project switch, so a cached answer would describe a
+  // Project that is no longer open.
+  test("follows a project switch", () => {
+    setProjectState({
+      projectConfig: { i18n: { locales: ["en", "fr"] } },
+    } as unknown as ProjectState);
+    expect(getEffectiveLocales()?.locales).toHaveLength(2);
+    setProjectState({ projectConfig: { name: "Other" } } as unknown as ProjectState);
+    expect(getEffectiveLocales()).toBeNull();
   });
 });

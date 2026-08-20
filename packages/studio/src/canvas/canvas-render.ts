@@ -7,6 +7,7 @@
 import { html, render as litRender, nothing } from "lit-html";
 import { ref } from "lit-html/directives/ref.js";
 import type * as monaco from "monaco-editor";
+import type * as Y from "yjs";
 import { loadedMonaco, loadMonaco, mountStillWanted } from "../services/monaco-lazy";
 
 import { getNodeAtPath, updateCanvas } from "../store";
@@ -34,6 +35,7 @@ import {
 import { collabSourceContext } from "../collab/collab-session";
 import { attachCursorStyles } from "../collab/monaco-cursors";
 import type { AwarenessLike } from "../collab/monaco-cursors";
+import type { BindingAwareness } from "../collab/monaco-binding";
 import { shell } from "../shell";
 import { parseSourceForPath, serializeDocument } from "../files/file-ops";
 import { detachGridPanel, gridPanelMounted, renderGridMode } from "../grid/grid-panel";
@@ -105,6 +107,7 @@ import type { CanvasPanel, GitDiffState } from "../types";
 import type { AnyCommand, CommandRegistry } from "../commands/registry";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { Tab } from "../tabs/tab.js";
+import { mediaTypeEssence } from "@jxsuite/schema/media-type";
 
 interface CanvasRenderCtx {
   setCanvasMode: (tab: Tab | null, mode: string) => void;
@@ -135,7 +138,8 @@ export function initCanvasRender(ctx: CanvasRenderCtx) {
  */
 function sourceLang(tab: Tab) {
   const format = formatByName(tab.doc.sourceFormat);
-  return format ? (format.mediaType?.split("/").pop() ?? "plaintext") : "json";
+  // The essence: splitting the declared type would yield `markdown; variant=GFM` as a language id.
+  return format ? (mediaTypeEssence(format.mediaType)?.split("/").pop() ?? "plaintext") : "json";
 }
 
 /**
@@ -260,7 +264,7 @@ function docHeaderSlot(placement: "in-column" | "pinned", paneId: string): Templ
  */
 /* The source-mode collab teardown is a field of the STAGE, not of the module.
    `disposeSourceCollab()` released whichever binding was last created, so with two Code panes one
-   pane leaving source mode dropped the OTHER pane's y-monaco binding and handed back a canonical
+   pane leaving source mode dropped the OTHER pane's collab binding and handed back a canonical
    lock it did not hold. */
 
 function disposeSourceCollab(surface: CanvasSurface): void {
@@ -269,29 +273,29 @@ function disposeSourceCollab(surface: CanvasSurface): void {
 }
 
 /**
- * Bind the Monaco editor to the shared source text via y-monaco: two-way character-level sync plus
- * remote in-buffer cursors/selections (decorated per-client; colors injected from the presence
- * palette by {@link attachCursorStyles}). y-monaco/yjs evaluation defers behind the dynamic import
- * until a code view actually binds. Returns the teardown.
+ * Bind the Monaco editor to the shared source text: two-way character-level sync plus remote
+ * in-buffer cursors/selections (decorated per-client; colors injected from the presence palette by
+ * {@link attachCursorStyles}). The binding is first-party — `collab/monaco-binding.ts` — and yjs
+ * evaluation defers behind the dynamic import until a code view actually binds. Returns the
+ * teardown.
  */
 async function createSourceCollabBinding(
   model: monaco.editor.ITextModel,
   editor: monaco.editor.IStandaloneCodeEditor,
   ctx: NonNullable<ReturnType<typeof collabSourceContext>>,
 ): Promise<() => void> {
-  const { MonacoBinding } = await import("y-monaco");
-  type YText = ConstructorParameters<typeof MonacoBinding>[0];
-  type BindingAwareness = ConstructorParameters<typeof MonacoBinding>[3];
-  const binding = new MonacoBinding(
-    ctx.text as YText,
+  const { bindMonacoToYText } = await import("../collab/monaco-binding");
+  const unbind = bindMonacoToYText({
+    awareness: ctx.awareness as unknown as BindingAwareness,
+    editors: [editor],
     model,
-    new Set([editor]),
-    ctx.awareness as BindingAwareness,
-  );
+    origin: ctx.localOrigin,
+    text: ctx.text as Y.Text,
+  });
   const detachStyles = attachCursorStyles(ctx.awareness as unknown as AwarenessLike, document);
   return () => {
     detachStyles();
-    binding.destroy();
+    unbind();
     ctx.leave();
   };
 }
@@ -399,7 +403,7 @@ function resetCanvasView(surface: CanvasSurface) {
  *
  * Async because Monaco is loaded on demand (see services/monaco-lazy). The container is in the DOM
  * before this runs, and every continuation below re-checks `view.monacoEditor`, so a teardown or a
- * mode switch while the module loads is handled the same way a teardown mid-y-monaco-load already
+ * mode switch while the module loads is handled the same way a teardown mid-binding-load already
  * was.
  *
  * **The mount ITSELF owed the same re-check and did not make it.** This was the fourth Monaco mount
@@ -448,7 +452,7 @@ async function mountSourceEditor(
           return;
         }
         const cleanup = await createSourceCollabBinding(model, editor, collabCtx);
-        // The editor may have been torn down while y-monaco loaded — unbind immediately.
+        // The editor may have been torn down while the binding module loaded — unbind immediately.
         if (surface.monacoEditor !== editor || editor.getModel() !== model) {
           cleanup();
           return;
@@ -468,8 +472,8 @@ async function mountSourceEditor(
       })
       .catch(() => {
         /* A BINDING FAILURE HOLDS A LOCK AND CARRIES NOTHING, and both halves have to be said.
-           `enter()` flips the room's canonical lock to "source" before y-monaco is even imported,
-           and `ctx.leave()` lives in exactly one place — the cleanup `createSourceCollabBinding`
+           `enter()` flips the room's canonical lock to "source" before the binding module is even
+           imported, and `ctx.leave()` lives in one place — the cleanup `createSourceCollabBinding`
            returns. So a failure past that point left the lock held by a client with no binding, and
            the freeze is now honest enough to include that client too (`collab-session.ts`'s transact
            gate no longer exempts the lock holder): nobody in the room could edit the structure, and

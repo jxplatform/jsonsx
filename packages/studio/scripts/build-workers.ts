@@ -10,10 +10,14 @@
 
 import { resolve } from "node:path";
 
+/* The 0.56 export-map paths (`"./*" → ./esm/vs/*.js`), not the deep `esm/vs/...` ones. The output
+   FILENAMES are unchanged — `editor.worker.js` / `json.worker.js` / `ts.worker.js` — because three
+   consumers address them literally: `workerUrl()` in src/services/monaco-setup.ts, the desktop
+   bundle config, and the desktop asset staging. */
 const WORKERS = [
-  "monaco-editor/esm/vs/editor/editor.worker.js",
-  "monaco-editor/esm/vs/language/json/json.worker.js",
-  "monaco-editor/esm/vs/language/typescript/ts.worker.js",
+  "monaco-editor/editor/editor.worker",
+  "monaco-editor/languages/features/json/json.worker",
+  "monaco-editor/languages/features/typescript/ts.worker",
 ];
 
 /**

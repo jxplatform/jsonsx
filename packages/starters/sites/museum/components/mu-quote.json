@@ -1,0 +1,49 @@
+{
+  "tagName": "mu-quote",
+  "state": {
+    "quote": "",
+    "attribution": ""
+  },
+  "style": {
+    "display": "block",
+    "borderInlineStart": "3px solid var(--color-pigment)",
+    "paddingInlineStart": "clamp(1.1rem, 3vw, 2rem)"
+  },
+  "children": [
+    {
+      "tagName": "blockquote",
+      "style": {
+        "margin": "0"
+      },
+      "children": [
+        {
+          "tagName": "p",
+          "style": {
+            "margin": "0",
+            "fontFamily": "var(--font-display)",
+            "fontSize": "clamp(1.35rem, 2.6vw, 1.8rem)",
+            "fontWeight": "400",
+            "lineHeight": "calc(1.32 * var(--leading-scale))",
+            "letterSpacing": "-0.02em",
+            "maxWidth": "32ch"
+          },
+          "textContent": "${state.quote}"
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "display": "${state.attribution ? 'block' : 'none'}",
+            "margin": "1.2rem 0 0",
+            "fontFamily": "var(--font-label)",
+            "fontSize": "0.66rem",
+            "letterSpacing": "var(--label-tracking)",
+            "textTransform": "var(--label-case)",
+            "color": "inherit",
+            "opacity": "0.62"
+          },
+          "textContent": "${state.attribution}"
+        }
+      ]
+    }
+  ]
+}

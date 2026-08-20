@@ -10,6 +10,7 @@ import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:f
 import { createDevServer } from "../src/server.ts";
 import { createCollabRegistry } from "../src/collab.ts";
 import { createWsCollabConnection } from "@jxsuite/collab/client";
+import { COLLAB_SUBPROTOCOL, negotiateCollab } from "@jxsuite/collab/negotiate";
 import type { WsCollabConnection } from "@jxsuite/collab/client";
 import { sourceText, updateSourceText } from "@jxsuite/collab";
 
@@ -27,6 +28,18 @@ function connect(): WsCollabConnection {
   });
   connections.push(connection);
   return connection;
+}
+
+/** Resolve when the socket completes its handshake; reject if it fails. */
+function whenOpen(ws: WebSocket): Promise<void> {
+  return new Promise<void>((resolveOpen, rejectOpen) => {
+    ws.addEventListener("open", () => {
+      resolveOpen();
+    });
+    ws.addEventListener("error", () => {
+      rejectOpen(new Error("handshake failed"));
+    });
+  });
 }
 
 async function until(cond: () => boolean, timeoutMs = 5000): Promise<void> {
@@ -64,10 +77,54 @@ afterAll(() => {
 });
 
 describe("/__studio/collab", () => {
-  test("plain GET answers the capability probe", async () => {
+  test("plain GET answers the capability probe, advertising the subprotocol", async () => {
     const res = await fetch(`http://localhost:${server.port}/__studio/collab`);
     expect(res.ok).toBe(true);
-    expect(await res.json()).toEqual({ collab: true, version: 1 });
+    expect(await res.json()).toEqual({
+      collab: true,
+      protocols: [COLLAB_SUBPROTOCOL],
+      version: 1,
+    });
+  });
+
+  test("the probe body is exactly what negotiateCollab reads", async () => {
+    const res = await fetch(`http://localhost:${server.port}/__studio/collab`);
+    const probe = await res.json();
+    expect(negotiateCollab(probe)).toEqual({ offer: [COLLAB_SUBPROTOCOL], refused: null });
+  });
+
+  test("an upgrade offering the subprotocol is echoed, and the socket opens", async () => {
+    const ws = new WebSocket(`ws://localhost:${server.port}/__studio/collab`, [COLLAB_SUBPROTOCOL]);
+    await whenOpen(ws);
+    // A client only reaches `open` if the echo was one of the tokens it offered (RFC 6455 §4.1).
+    expect(ws.protocol).toBe(COLLAB_SUBPROTOCOL);
+    ws.close();
+  });
+
+  test("an upgrade offering nothing still connects, and echoes nothing", async () => {
+    const ws = new WebSocket(`ws://localhost:${server.port}/__studio/collab`);
+    await whenOpen(ws);
+    expect(ws.protocol).toBe("");
+    ws.close();
+  });
+
+  test("an upgrade offering only an envelope the server cannot speak is refused", async () => {
+    /*
+     * Refusing the handshake is the point: a peer whose frames we would mis-parse must not join a
+     * room. The refusal is a 400 with a problem body, not a 101 with no echo.
+     */
+    const res = await fetch(`http://localhost:${server.port}/__studio/collab`, {
+      headers: {
+        Connection: "Upgrade",
+        "Sec-WebSocket-Key": "dGhlIHNhbXBsZSBub25jZQ==",
+        "Sec-WebSocket-Protocol": "jx.collab.v9",
+        "Sec-WebSocket-Version": "13",
+        Upgrade: "websocket",
+      },
+    });
+    expect(res.status).toBe(400);
+    expect(res.headers.get("content-type")).toContain("application/problem+json");
+    expect(await res.text()).toContain(COLLAB_SUBPROTOCOL);
   });
 
   test("a handle syncs the file's content and a local identity", async () => {

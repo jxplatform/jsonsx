@@ -12,13 +12,18 @@ import {
   parseRedirectImport,
   parseRedirectsCsv,
   parseRedirectsFile,
+  REWRITE,
   routePattern,
   rulesFromConfig,
   validateRedirects,
 } from "../src/grid/redirects";
 import type { RedirectRule } from "../src/grid/redirects";
 
-const rule = (source: string, destination: string, status = 301): RedirectRule => ({
+const rule = (
+  source: string,
+  destination: string,
+  status: RedirectRule["status"] = 301,
+): RedirectRule => ({
   destination,
   source,
   status,
@@ -27,17 +32,17 @@ const rule = (source: string, destination: string, status = 301): RedirectRule =
 describe("project.json round-trip", () => {
   test("both spellings flatten, and only a non-301 expands again", () => {
     const rules = rulesFromConfig({
-      "/api/*": { destination: "https://api.example.com/*", status: 200 },
+      "/api/*": { destination: "https://api.example.com/*", rewrite: true },
       "/legacy": { destination: "/archive" },
       "/old": "/new",
     });
     expect(rules).toEqual([
-      rule("/api/*", "https://api.example.com/*", 200),
+      rule("/api/*", "https://api.example.com/*", REWRITE),
       rule("/legacy", "/archive"),
       rule("/old", "/new"),
     ]);
     expect(configFromRules(rules)).toEqual({
-      "/api/*": { destination: "https://api.example.com/*", status: 200 },
+      "/api/*": { destination: "https://api.example.com/*", rewrite: true },
       "/legacy": "/archive",
       "/old": "/new",
     });
@@ -200,7 +205,9 @@ describe("CSV import", () => {
   test("a bad status in a headed file is reported by row number", () => {
     const result = parseRedirectsCsv("source,destination,code\n/a,/b,nope\n");
     expect(result.rules).toEqual([]);
-    expect(result.errors).toEqual(['Row 2: "nope" is not an HTTP status.']);
+    expect(result.errors).toEqual([
+      'Row 2: "nope" is not one of 301, 302, 303, 307, 308, rewrite.',
+    ]);
   });
 });
 

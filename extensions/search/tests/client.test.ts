@@ -60,6 +60,29 @@ const ENVELOPE: SearchIndexEnvelope = {
       title: "Install",
       url: "/docs/start/install/",
     },
+    // Two translations of one entry: same slug, different locale, different URL (§13.3).
+    {
+      collection: "docs",
+      description: "",
+      heading: "",
+      id: "docs:en:greet",
+      locale: "en",
+      slug: "greet",
+      text: "Salutations everyone, from the English copy.",
+      title: "Greeting",
+      url: "/docs/greet/",
+    },
+    {
+      collection: "docs",
+      description: "",
+      heading: "",
+      id: "docs:fr-CA:greet",
+      locale: "fr-CA",
+      slug: "greet",
+      text: "Salutations tout le monde, depuis la copie francaise.",
+      title: "Salutation",
+      url: "/fr-ca/docs/greet/",
+    },
   ],
   engine: "minisearch",
   fields: ["title", "heading", "text"],
@@ -279,5 +302,65 @@ describe("$src state conventions", () => {
   test("runSearch without an event falls back to state.searchQuery", () => {
     const state: Record<string, unknown> = { searchQuery: "install" };
     expect(runSearch(state)[0]!.slug).toBe("start/install");
+  });
+});
+
+// ─── Locale scoping ─────────────────────────────────────────────────────────
+
+/*
+ * A multilingual site's index holds every translation of every post. Unscoped, a search on a French
+ * page hands the reader the English copy of the page they are already on — ranked first, because it
+ * matched the same words.
+ */
+describe("locale scoping", () => {
+  test("a search in one language returns that language's copy, and its URL", () => {
+    const french = query("salutations", { locale: "fr-CA" }) as SearchResultGroup[];
+    expect(french.map((g) => g.url)).toEqual(["/fr-ca/docs/greet/"]);
+    expect(french[0]!.title).toBe("Salutation");
+
+    const english = query("salutations", { locale: "en" }) as SearchResultGroup[];
+    expect(english.map((g) => g.url)).toEqual(["/docs/greet/"]);
+  });
+
+  // RFC 4647's truncation, at the one length that matters: a reader on /fr-ca/ wants French posts.
+  test("a region-qualified page finds the language's entries", () => {
+    expect(query("salutations", { locale: "fr" })).toHaveLength(1);
+    expect(query("salutations", { locale: "FR-ca" })).toHaveLength(1);
+  });
+
+  /*
+   * Two translations share a slug, so the group key has to carry the locale — without it these two
+   * collapse into one group titled whichever was indexed first.
+   */
+  test("searching every language keeps the two copies apart", () => {
+    const all = query("salutations", { locale: null }) as SearchResultGroup[];
+    expect(all).toHaveLength(2);
+    expect(all.map((g) => g.url).toSorted()).toEqual(["/docs/greet/", "/fr-ca/docs/greet/"]);
+  });
+
+  // An unlocalized collection is not in one language; it is outside the question.
+  test("documents with no locale answer every search", () => {
+    expect(query("install", { locale: "fr-CA" })).toHaveLength(1);
+  });
+
+  /*
+   * The default is the page's own language, read from `<html lang>` — the attribute the build wrote
+   * from the route's locale, so it is the same answer the index was built against.
+   */
+  test("with no locale option, the page's own language decides", () => {
+    const real = (globalThis as { document?: unknown }).document;
+    (globalThis as { document?: unknown }).document = { documentElement: { lang: "fr-CA" } };
+    try {
+      expect((query("salutations") as SearchResultGroup[]).map((g) => g.url)).toEqual([
+        "/fr-ca/docs/greet/",
+      ]);
+    } finally {
+      (globalThis as { document?: unknown }).document = real;
+    }
+  });
+
+  // Off a document — a worker, a test, a server render — nothing is scoped away.
+  test("no document at all searches everything", () => {
+    expect(query("salutations")).toHaveLength(2);
   });
 });

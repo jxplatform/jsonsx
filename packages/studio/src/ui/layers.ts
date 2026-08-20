@@ -200,7 +200,7 @@ function openOverlaySlot(opts: OverlaySlotOptions): { slot: HTMLElement; release
  */
 export function showDialog<T>(
   templateFn: (done: (value: T) => void) => TemplateResult,
-  opts: { region?: string } = {},
+  opts: { region?: string; label?: string } = {},
 ): Promise<T> {
   return new Promise((resolve) => {
     const { release, slot } = openOverlaySlot({
@@ -223,6 +223,17 @@ export function showDialog<T>(
       // No Tab trap: the wrapper's action buttons live in a shadow root a light-DOM cycle cannot
       // Enumerate, so trapping here would strand the caret on the body and never reach Cancel.
     });
+    /*
+     * The slot IS the dialog, so it says so.
+     *
+     * `aria-modal` is also the answer to the comment above: it tells assistive technology that
+     * everything outside this element is inert, which constrains a screen reader's virtual cursor —
+     * the thing a Tab trap cannot reach anyway, since the virtual cursor does not use Tab. So the
+     * caret still escapes into the shadow-root buttons, as it must, and a reader is no longer free
+     * to wander the page behind a modal that is covering it.
+     */
+    slot.setAttribute("role", "dialog");
+    slot.setAttribute("aria-modal", "true");
     let resolved = false;
     const done = (value: T) => {
       if (resolved) {
@@ -233,6 +244,16 @@ export function showDialog<T>(
       resolve(value);
     };
     litRender(templateFn(done), slot);
+    /*
+     * The name, after render, because the usual source of one is the wrapper's own `headline` —
+     * which does not exist until the template has run. An explicit `label` wins; a dialog with
+     * neither is nameless, which is a defect in the caller rather than something to invent here.
+     */
+    const headline =
+      opts.label ?? slot.querySelector("sp-dialog-wrapper")?.getAttribute("headline") ?? null;
+    if (headline !== null && headline !== "") {
+      slot.setAttribute("aria-label", headline);
+    }
     focusOverlay(slot);
   });
 }
@@ -718,8 +739,11 @@ function reducedMotion(): boolean {
 }
 
 /**
- * **The one listed exception to §13.3 clause 6** — the only behaviour in Studio that differs under
- * `?automation=1` beyond installing the hook, pinning the clock and selecting a profile.
+ * **One of the three listed exceptions to §13.3 clause 6** — behaviour that differs under
+ * `?automation=1` beyond installing the hook, pinning the clock and selecting a profile. The other
+ * Two are both refusals to touch the project on disk: `packages/ensure-deps.ts` declines to run
+ * `bun install`, and `packages/jxsuite-update.ts` declines to prompt for a dependency update. This
+ * One is the only exception that changes what a picture SHOWS rather than what it avoids doing.
  *
  * A toast is the single surface in the app whose lifetime is a TIMER rather than a state. Every
  * other surface a shot can photograph is there because the app is in a state, and it stays there

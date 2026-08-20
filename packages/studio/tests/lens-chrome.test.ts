@@ -76,6 +76,7 @@ let stripHost: HTMLElement;
  */
 function openingDeps() {
   return {
+    fileExists: () => Promise.resolve(true),
     loadDiff: () => Promise.resolve(null),
     openFileInPane: (paneId: string, path: string) => {
       const existing = [...workspace.tabs.values()].find((tab) => tab.documentPath === path);
@@ -429,6 +430,85 @@ describe("the preset menu's rows", () => {
     ).toBe(true);
   });
 
+  /* "Same page in ⟨language⟩" — one row per locale the PROJECT declares, which is the axis that
+     makes these rows different from every other one in this menu: the breakpoints come from the
+     document and the locales come from `project.json`, so a monolingual project has no rows here
+     at all rather than a disabled one. The label is the AUTONYM, because a menu that says "French"
+     is unreadable to precisely the person it exists for. */
+  test("a locale row per declared locale, labelled in that language, carrying its tag", () => {
+    twoPaneGrid();
+    const localeRows = () =>
+      paneContext
+        .presetRows(PRIMARY_PANE)
+        .filter((row) => (row.args as { preset?: string }).preset === "locale");
+
+    // A project with no `i18n` block: the menu is the menu it has always been.
+    expect(localeRows()).toEqual([]);
+
+    resetStudioState({
+      projectConfig: { i18n: { defaultLocale: "en", locales: ["en", "fr", "ar"] } },
+    });
+    expect(localeRows().map((row) => row.label)).toEqual([
+      "Same page in English",
+      "Same page in français",
+      "Same page in العربية",
+    ]);
+    /* Every row names a real tag. Unlike the base BREAKPOINT row there is no omit-the-argument
+       case — the default locale is a tag like any other, and `translationPathFor` is what knows
+       its file is the unprefixed one. */
+    expect(localeRows().map((row) => row.args)).toEqual([
+      { locale: "en", preset: "locale" },
+      { locale: "fr", preset: "locale" },
+      { locale: "ar", preset: "locale" },
+    ]);
+    expect(localeRows().every((row) => row.disabled === null)).toBe(true);
+  });
+
+  /* THE LOCALE ROW CARRIES ITS OWN REFUSAL, in the second loop that could drop it while every
+     projection row above kept theirs. Its left side (`deriveReason`) is null for an ordinary pane,
+     so dropping the right side puts a live row over a project that has one language and over a
+     document that has never been saved — and choosing either throws a `RangeError` out of a click
+     handler. */
+  test("a locale row states why it cannot run", () => {
+    const page = twoPaneGrid();
+    resetStudioState({ projectConfig: { i18n: { defaultLocale: "en", locales: ["en"] } } });
+    const localeRows = () =>
+      paneContext
+        .presetRows(PRIMARY_PANE)
+        .filter((row) => (row.args as { preset?: string }).preset === "locale");
+
+    expect(localeRows()).toHaveLength(1);
+    expect(localeRows()[0]?.disabled).toBe(
+      "a project that declares more than one locale — see Project Settings › Locales",
+    );
+
+    // …and a second language makes the rows live, so the refusal is not simply always there.
+    resetStudioState({ projectConfig: { i18n: { defaultLocale: "en", locales: ["en", "fr"] } } });
+    expect(localeRows().every((row) => row.disabled === null)).toBe(true);
+
+    // An unsaved document has nowhere for a sibling to be, and the row says that instead.
+    page.documentPath = null;
+    expect(localeRows().every((row) => row.disabled === "a document that has been saved")).toBe(
+      true,
+    );
+  });
+
+  /* A derived pane lists NO locale rows, for the breakpoint rows' reason: every one of them would
+     be disabled with the same sentence, and a menu that grows one dead row per language the
+     project speaks is a menu that grows to say nothing. */
+  test("a derived pane is offered no locale rows at all", () => {
+    lensGrid();
+    resetStudioState({ projectConfig: { i18n: { defaultLocale: "en", locales: ["en", "fr"] } } });
+    const localeLabels = (paneId: string) =>
+      paneContext
+        .presetRows(paneId)
+        .map((row) => row.label as string)
+        .filter((label) => label.startsWith("Same page in"));
+
+    expect(localeLabels(PRIMARY_PANE)).toEqual(["Same page in English", "Same page in français"]);
+    expect(localeLabels(SECONDARY_PANE)).toEqual([]);
+  });
+
   /* THE OTHER EXIT'S REASON. `pane.unsplit`'s enablement is a fact about the GRID rather than about
      a pane, so the menu computes it here instead of asking the registry — and a row that computes
      its own answer can compute `null` unconditionally, which is a live "Close Side Pane" on a grid
@@ -741,6 +821,40 @@ describe("the tab strip in a derived pane", () => {
     await flush();
     expect(stripHost.querySelector(".tab-derivation-preset")?.textContent?.trim()).toBe(
       "Same page at Base",
+    );
+  });
+
+  /* The same finding as the breakpoint chip, one preset along. `PRESET_LABELS.locale` is the
+     fragment "Same page in", finished by the locale's autonym — and a companion is the family whose
+     chip is NOT interchangeable with a tab chip, because the pane may be holding no tab yet. A chip
+     that dropped the tag read "Same page in" over a document in a language it never named, which is
+     the one thing the author opened the pane to be told. */
+  test("a locale companion's chip finishes its sentence with the language", async () => {
+    lensGrid();
+    setPaneDerivation(SECONDARY_PANE, {
+      kind: "companion",
+      locale: "fr",
+      preset: "locale",
+      reason: "",
+      resolved: null,
+      sourcePaneId: PRIMARY_PANE,
+      status: "loading",
+    });
+    focusPane(SECONDARY_PANE);
+    tabStrip.mount(stripHost);
+    await flush();
+
+    expect(stripHost.querySelector(".tab-derivation-preset")?.textContent?.trim()).toBe(
+      "Same page in français",
+    );
+
+    /* A record with no tag draws the em dash rather than trailing off — the same promise the "no
+       document" fallback makes one test up. `pane.derive` refuses to build one, so this is the
+       hand-built state a stale session or a bad argument could still produce. */
+    Object.assign(derivationOfPane(SECONDARY_PANE)!, { locale: null });
+    await flush();
+    expect(stripHost.querySelector(".tab-derivation-preset")?.textContent?.trim()).toBe(
+      "Same page in —",
     );
   });
 

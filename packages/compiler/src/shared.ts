@@ -34,7 +34,10 @@ import {
   paramNames,
   tagNameCandidates,
 } from "@jxsuite/schema/guards";
+import { styleScopePrefix } from "./shadow.ts";
+import type { ShadowMode } from "./shadow.ts";
 import type { ExpressionNode } from "@jxsuite/runtime/expression";
+import { readPath } from "@jxsuite/runtime/pointer";
 import type {
   JsonValue,
   JxElement,
@@ -425,6 +428,62 @@ export function createCompileContext(
 }
 
 /**
+ * `state.x = …`, `state.x += …`, `state.x++` — every form a string handler body can use to write a
+ * state entry. `===`/`!==`/`<=`/`>=` are excluded by the `(?!=)` guard and by the operator set.
+ */
+const STATE_ASSIGNMENT_RE =
+  /\bstate\.([A-Za-z_$][\w$]*)\s*(?:\+\+|--|(?:\*\*|\|\||&&|\?\?|<<|>>>|>>|[-+*/%&|^])?=(?!=))/g;
+
+/** `state.list.push(…)` and friends mutate in place without ever assigning to the entry. */
+const STATE_MUTATING_METHOD_RE =
+  /\bstate\.([A-Za-z_$][\w$]*)\s*\.\s*(?:push|pop|shift|unshift|splice|sort|reverse|fill|copyWithin)\s*\(/g;
+
+/**
+ * Collect every state key a handler writes to, across all the forms a body can take: a string body,
+ * a structured body (spec §20), and an `$expression` node with a mutating operator.
+ *
+ * Used to keep prerender from baking a binding over an entry that changes after hydration. A plain
+ * `{ "type": "string" }` entry holds a perfectly ordinary build-time value, so nothing else
+ * distinguishes it from a constant — but if a handler assigns to it, interpolating it at build time
+ * replaces the template in the emitted output and the element is dead for the life of the page.
+ *
+ * @param {unknown} node
+ * @param {Set<string>} into
+ */
+function collectAssignedStateKeys(node: unknown, into: Set<string>) {
+  if (typeof node === "string") {
+    for (const m of node.matchAll(STATE_ASSIGNMENT_RE)) {
+      into.add(m[1] as string);
+    }
+    for (const m of node.matchAll(STATE_MUTATING_METHOD_RE)) {
+      into.add(m[1] as string);
+    }
+    return;
+  }
+  if (!node || typeof node !== "object") {
+    return;
+  }
+  if (Array.isArray(node)) {
+    for (const entry of node) {
+      collectAssignedStateKeys(entry, into);
+    }
+    return;
+  }
+  const rec = node as Record<string, unknown>;
+  // A mutating expression names its destination as `target: { $ref: "#/state/x" }`.
+  const op = rec.operator;
+  if (typeof op === "string" && isMutating(op)) {
+    const target = rec.target as { $ref?: string } | undefined;
+    if (target && typeof target.$ref === "string" && target.$ref.startsWith("#/state/")) {
+      into.add(target.$ref.slice("#/state/".length).split("/")[0] as string);
+    }
+  }
+  for (const value of Object.values(rec)) {
+    collectAssignedStateKeys(value, into);
+  }
+}
+
+/**
  * @param {Record<string, JxStateDefinition>} [defs]
  * @param {Record<string, unknown> | null} [parentScope]
  * @returns {Record<string, unknown>}
@@ -447,6 +506,26 @@ export function buildInitialScope(
     writable: true,
   });
 
+  // Pass 0: every entry some handler in this document writes to is mutable, so prerender must not
+  // Bake a binding over it. Narrow on purpose — an entry nothing ever writes stays bakeable, so
+  // Prerendered content is preserved for SEO. A `$src` handler's assignments live in a JS file this
+  // Builder cannot open, so a write that only happens there is still missed (issue #125).
+  const assigned = new Set<string>();
+  for (const def of Object.values(defs)) {
+    if (def && typeof def === "object" && (isFunctionDef(def) || isExpressionDef(def))) {
+      collectAssignedStateKeys(
+        (def as { body?: unknown; $expression?: unknown }).body ??
+          (def as { $expression?: unknown }).$expression,
+        assigned,
+      );
+    }
+  }
+  for (const key of assigned) {
+    if (key in defs) {
+      runtimeOnly.add(key);
+    }
+  }
+
   for (const [key, def] of Object.entries(defs)) {
     if (typeof def !== "object" || def === null || Array.isArray(def)) {
       setOwnScopeValue(scope, key, cloneValue(def));
@@ -465,6 +544,10 @@ export function buildInitialScope(
   // Template-string entries are deferred to a third pass: whether one is resolvable depends on the
   // Runtime-only marks the loop below adds, and key order must not decide the answer.
   const templateDefs: [string, string][] = [];
+  // Computed (`bodyReturnsValue`) entries are deferred for the same reason. A computed is stored in
+  // The scope as its already-evaluated *result*, so a template reading it sees an ordinary string
+  // And prerender bakes it — destroying the binding rather than merely staling it (issue #124).
+  const computedBodies: [string, string][] = [];
 
   for (const [key, def] of Object.entries(defs)) {
     if (typeof def === "string" && isTemplateString(def)) {
@@ -523,6 +606,7 @@ export function buildInitialScope(
           fn(...params.map((name) => (name === "state" ? state : event)));
         if (bodyReturnsValue(body)) {
           defineLazyScopeValue(scope, key, () => invoke(scope));
+          computedBodies.push([key, body]);
         } else {
           setOwnScopeValue(scope, key, invoke);
         }
@@ -547,13 +631,23 @@ export function buildInitialScope(
     }
   }
 
-  for (const [key, template] of templateDefs) {
-    // A state entry that interpolates a runtime-only key cannot resolve until hydration either, so
-    // It is runtime-only in turn. Without this, prerender would bake the failed evaluation (`null`)
-    // Into every template that reads *this* entry, one step removed from the original.
-    if (readsRuntimeOnlyState(template, scope)) {
-      runtimeOnly.add(key);
+  // A state entry that reads a runtime-only key cannot resolve until hydration either, so it is
+  // Runtime-only in turn. Without this, prerender would bake the failed evaluation (`null`) into
+  // Every template that reads *this* entry, one step removed from the original. Iterated to a
+  // Fixpoint because marking one entry can qualify another, in either direction, and declaration
+  // Order must not decide the answer.
+  let marked = true;
+  while (marked) {
+    marked = false;
+    for (const [key, source] of [...computedBodies, ...templateDefs]) {
+      if (!runtimeOnly.has(key) && readsRuntimeOnlyState(source, scope)) {
+        runtimeOnly.add(key);
+        marked = true;
+      }
     }
+  }
+
+  for (const [key, template] of templateDefs) {
     defineLazyScopeValue(scope, key, () => evaluateStaticTemplate(template, scope));
   }
 
@@ -630,14 +724,15 @@ export function resolveRefValue(refValue: unknown, scope: Record<string, unknown
     return parts.length > 2 ? getPathValue(base, parts.slice(2).join("/")) : base;
   }
   if (refValue.startsWith("#/state/")) {
-    const sub = refValue.slice("#/state/".length);
-    const slash = sub.indexOf("/");
-    if (slash === -1) {
-      return scope[sub];
-    }
-    return getPathValue(scope[sub.slice(0, slash)], sub.slice(slash + 1));
+    // One call, not a hand-split leading token: slicing at the first `/` skipped unescaping it, so
+    // `#/state/a~1b/c` looked for a member called `a~1b` rather than `a/b`.
+    return getPathValue(scope, refValue.slice("#/state/".length));
   }
-  return scope[refValue] ?? null;
+  /*
+   * An unrecognized scheme is still a path, matching the runtime resolvers and the lowerer.
+   * Reading it as one key returned null for `a/b` while the emitted client module walked it.
+   */
+  return getPathValue(scope, refValue) ?? null;
 }
 
 /**
@@ -669,7 +764,15 @@ function readsRuntimeOnlyState(str: string, scope: Record<string, unknown>) {
     if (runtimeOnly instanceof Set && runtimeOnly.has(key)) {
       return true;
     }
-    if (typeof scope[key] === "function") {
+    // Reading the key can run a computed's getter, which is free to throw on partial build-time
+    // Data. A throw says nothing about whether the entry is runtime-only, so it is not a mark.
+    let value: unknown;
+    try {
+      value = scope[key];
+    } catch {
+      continue;
+    }
+    if (typeof value === "function") {
       return true;
     }
   }
@@ -685,20 +788,21 @@ export function evaluateStaticTemplate(str: string, scope: Record<string, unknow
   if (readsRuntimeOnlyState(str, scope)) {
     return null;
   }
+  /*
+   * `$site` and `$page` are bound as parameters, not just left on `state`.
+   *
+   * `injectContext` puts them on the document's state, so `${state.$site.name}` always worked — but
+   * every example in site-architecture.md §8.2 writes the bare `${$site.name}`, and that threw a
+   * ReferenceError the catch below turned into a silent null. A `$head` title referencing the site
+   * name reached the page as the literal template text.
+   */
+  const args = ["state", "$map", "$site", "$page"] as const;
+  const values = [scope, scope?.$map, scope?.$site, scope?.$page];
   try {
     const singleExprMatch = str.match(/^\$\{(.+)\}$/s);
-    if (singleExprMatch) {
-      const fn = new Function("state", "$map", `return (${singleExprMatch[1]})`) as (
-        state: Record<string, unknown>,
-        $map: unknown,
-      ) => unknown;
-      return fn(scope, scope?.$map);
-    }
-    const fn = new Function("state", "$map", `return \`${str}\``) as (
-      state: Record<string, unknown>,
-      $map: unknown,
-    ) => unknown;
-    return fn(scope, scope?.$map);
+    const body = singleExprMatch ? `return (${singleExprMatch[1]})` : `return \`${str}\``;
+    const fn = new Function(...args, body) as (...a: unknown[]) => unknown;
+    return fn(...values);
   } catch {
     return null;
   }
@@ -710,14 +814,7 @@ export function evaluateStaticTemplate(str: string, scope: Record<string, unknow
  * @returns {unknown}
  */
 export function getPathValue(base: unknown, path: string) {
-  if (!path) {
-    return base;
-  }
-  let acc: unknown = base;
-  for (const key of path.split("/")) {
-    acc = acc == null ? undefined : (acc as Record<string, unknown>)[key];
-  }
-  return acc;
+  return readPath(base, path);
 }
 
 /**
@@ -806,15 +903,6 @@ export function buildAttrs(def: JxElement | JxMutableNode, scope: Record<string,
       ) {
         out += ` ${k}="${escapeHtml(String(value))}"`;
       }
-    }
-  }
-
-  if (def.tagName === "img") {
-    if (!def.attributes?.loading) {
-      out += ` loading="lazy"`;
-    }
-    if (!def.attributes?.decoding) {
-      out += ` decoding="async"`;
     }
   }
 
@@ -1635,13 +1723,55 @@ function _isStaticNode(node: JxElement | string | (JxElement | string)[]): boole
  * @param {Record<string, string>} [mediaQueries] - Project media query definitions
  * @returns {string} CSS text, or empty string if no styles
  */
+/** `::slotted()` and `::part()` select through a shadow boundary, not the host that owns it. */
+const SHADOW_STANDALONE = /^(?:::slotted\(|::part\()/;
+
+/**
+ * Turn one nested style key into a selector, given the component's scope prefix.
+ *
+ * Three shapes, and the interesting one is `:host`. A style object should mean the same thing in
+ * both modes, so `:host` and `:host(.foo)` are **translated** rather than passed through: inside a
+ * shadow root they stand alone, and in the light DOM they become the tag name and `<tag>.foo` —
+ * which is what "the host, matching this" means when there is no shadow root. Moving a component
+ * between modes therefore does not silently break its styles.
+ *
+ * @param {string} prop - The style-object key, e.g. `":hover"`, `"& .inner"`, `":host(.wide)"`
+ * @param {string} scope - `":host"` in shadow mode, the tag name otherwise
+ * @returns {string}
+ */
+function resolveSelector(prop: string, scope: string): string {
+  if (prop.startsWith("&")) {
+    return prop.replace("&", scope);
+  }
+  if (prop.startsWith(":host")) {
+    const inner = /^:host\((.*)\)$/.exec(prop)?.[1];
+    if (scope === ":host") {
+      return prop;
+    }
+    return inner === undefined ? scope : `${scope}${inner}`;
+  }
+  // `:host::slotted(x)` matches nothing — the pseudo-element attaches to a slot, not the host.
+  if (scope === ":host" && SHADOW_STANDALONE.test(prop)) {
+    return prop;
+  }
+  return `${scope}${prop}`;
+}
+
 export function buildComponentCSS(
   tagName: string,
   styleDef?: JxStyle | null | undefined,
   doc: JxElement | null = null,
   mediaQueries: Record<string, string> = {},
+  shadow: ShadowMode | null = null,
 ) {
   const rules: string[] = [];
+  /*
+   * The scope prefix. In light DOM it is the tag name, which is what keeps `sty-card .inner` from
+   * reaching another component's `.inner`. Inside a shadow root the selector cannot see the host's
+   * tag name at all, and `:host` is the standard's way to address it — so the same style object
+   * produces different, correct CSS in each mode without the author restating it.
+   */
+  const scope = styleScopePrefix(tagName, shadow);
 
   if (styleDef && typeof styleDef === "object") {
     const decls: string[] = [];
@@ -1664,20 +1794,21 @@ export function buildComponentCSS(
       decls.push(`  ${camelToKebab(prop)}: ${value};`);
     }
     if (decls.length > 0) {
-      rules.push(`${tagName} {\n${decls.join("\n")}\n}`);
+      rules.push(`${scope} {\n${decls.join("\n")}\n}`);
     }
 
     for (const [prop, val] of Object.entries(styleDef)) {
       if (prop.startsWith("@")) {
-        pushConditionalRule(rules, prop, mediaQueries, tagName, val as Record<string, unknown>);
+        pushConditionalRule(rules, prop, mediaQueries, scope, val as Record<string, unknown>);
       } else if (
         prop.startsWith(":") ||
         prop.startsWith(".") ||
         prop.startsWith("&") ||
         prop.startsWith("[")
       ) {
-        const resolved = prop.startsWith("&") ? prop.replace("&", tagName) : `${tagName}${prop}`;
-        rules.push(`${resolved} { ${toCSSText(val as Record<string, unknown>)} }`);
+        rules.push(
+          `${resolveSelector(prop, scope)} { ${toCSSText(val as Record<string, unknown>)} }`,
+        );
       }
     }
   }

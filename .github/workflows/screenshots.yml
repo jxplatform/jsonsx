@@ -33,16 +33,45 @@ name: Screenshots
 on:
   pull_request:
     paths:
-      # The surfaces a picture is OF.
+      # The surfaces a picture is OF. `packages/starters/**` was too wide: a starters README
+      # cannot move a pixel, and the only starter inputs a shot opens are the project roots.
       - "packages/studio/src/**"
-      - "packages/starters/**"
+      # The project roots shots actually open. GENERATED, and guarded:
+      # scripts/screenshots/shot-paths.test.ts asserts this list is exactly the set of
+      # `open.project` values in the manifest that live outside `scripts/screenshots/`. Most
+      # starters are photographed by nothing, and `examples` was photographed by
+      # `data-source-request` while matching no filter at all — the derivation finds both.
+      - "examples/**"
+      - "packages/starters/sites/blog/**"
+      - "packages/starters/sites/course/**"
+      - "packages/starters/sites/event/**"
+      - "packages/starters/sites/real-estate/**"
+      - "packages/starters/sites/restaurant/**"
+      - "packages/starters/sites/shop/**"
+      # Every starter is in ONE picture regardless of `open.project`: `new-project` photographs the
+      # new-project modal, whose gallery is `listStarters()` reading this file.
+      - "packages/starters/registry.json"
       # The pipeline itself, and the lock's own definition.
       - "scripts/screenshots/**"
+      # …but NOT the lock, which is the lane's own OUTPUT. A `pull_request` filter is evaluated
+      # against the whole PR diff, not the latest push, so one re-capture armed this filter for the
+      # life of the PR and every later push re-ran all 61 shots. That is most of 65 bot commits in
+      # ten days. The `github.actor` refusal below declines only the run immediately following the
+      # push; the next human push was a full re-capture with nothing to re-capture for.
+      - "!scripts/screenshots/capture.lock.json"
       - "scripts/check-image-lock.ts"
       - "scripts/lib/png.ts"
-      - ".github/workflows/screenshots.yml"
-      # Someone hand-editing bytes: the lane is the fastest way to say so out loud.
-      - "docs/images/**"
+      # NOT this file. It listed itself, so a dependabot bump of an action version — a diff that
+      # cannot change a picture — booted the container, re-captured all 61 shots, and pushed the
+      # result onto the bot's branch. That is how PR #131, titled "bump actions/upload-artifact
+      # from 4 to 7", merged 26 re-captured PNGs. Editing the *steps* has `workflow_dispatch`.
+      #
+      # And NOT `docs/images/**`, for the same reason as the lock: it is this lane's output, so it
+      # armed the filter permanently. It was here to catch someone hand-editing bytes — but
+      # `docs:images:check` already fails on any PNG whose sha256 has no lock entry, it is chained
+      # into `docs:verify`, and `docs:verify` runs in the UNGATED `checks` job. A hand-edited
+      # image is therefore already a blocking red X with a name on it, which is strictly stronger
+      # than a bot commit.
   schedule:
     # Nightly on main. Not a push gate — it catches drift that no PR caused (a base-image rebuild,
     # A font package, a dependency bump), which is drift nobody would otherwise see until the next
@@ -70,6 +99,34 @@ concurrency:
 jobs:
   capture:
     runs-on: ubuntu-latest
+    # Two refusals, and the second one is the loop-breaker.
+    #
+    # DEPENDABOT — belt-and-braces with the `paths:` list above. This lane's failure mode is a bot
+    # commit on your branch, and a bot branch is precisely where that is never wanted: an automated
+    # dependency bump has no picture to review, and the re-capture lands as unreviewable bytes in
+    # a PR nobody opened for that purpose.
+    #
+    # ITSELF — the lane must not photograph its own output. The push below moves the PR head, which
+    # raises `pull_request: synchronize`, which queues THIS workflow again on the commit it just
+    # made. The note that used to sit on the push step said a `GITHUB_TOKEN` push cannot re-trigger
+    # a workflow. On this repository it demonstrably does: of the 30 runs on the branch that found
+    # this, SIXTEEN were headed by a `chore(screenshots)` commit of the lane's own. Fifteen sat at
+    # `action_required`, which is a repository Actions policy holding runs whose actor is a bot —
+    # an accident that has been standing in for a termination condition. Run 739a6af2 is what it
+    # looks like when the accident lapses: `actor=github-actions[bot], triggering_actor=<a human>`,
+    # somebody pressed *Approve and run*, the lane re-captured its own PNGs and pushed again. The
+    # approval button is not a circuit breaker, it is the crank handle.
+    #
+    # `github.actor` is the exact discriminator, verified against those runs: it is
+    # `github-actions[bot]` on every bot-headed run and the pushing human on every other, and it
+    # survives a re-run (which sets `triggering_actor` and leaves `actor` alone) — so approving one
+    # of the held runs now costs a skipped job instead of another turn of the crank.
+    #
+    # Scoped to `pull_request` on purpose. For `schedule`, `github.actor` is whoever last touched
+    # the cron, and a bot having touched it once must not silently retire the nightly.
+    if: >-
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
+      !(github.event_name == 'pull_request' && github.actor == 'github-actions[bot]')
     # A PINNED container, Chromium AND fontconfig. The fontset is not optional: the Spectrum UI
     # Stack resolves differently on NixOS and on Ubuntu, so a hash lock over bytes rendered with an
     # Unknown font set is a lock nobody can reproduce — which is why every lock entry records the
@@ -202,11 +259,38 @@ jobs:
           # Changes for no visible reason, this line is what says the browser moved.
           "$bin" --version
 
+      # NO `--force`. It is the re-baseline flag — UX-REDESIGN-PLAN §13.4 spends it on "one
+      # reviewable commit" when the FIXTURES change — and it works by skipping `writeIfChanged`,
+      # the pixel comparison that exists so committed screenshots do not churn. Passing it here
+      # overwrote all 63 PNGs unconditionally on every run, and Chromium does not re-encode a PNG
+      # byte-for-byte, so `git diff` then saw ~28 changed files whose own report said
+      # `0.00% of pixels` and pushed them. That is the fuel the loop above was burning: not a
+      # picture that moved, an encoder that does not repeat itself.
+      #
+      # Without it the same run keeps every image whose pixel diff is under `DIFF_THRESHOLD`
+      # (0.0001 — about 920 px of a 3840x2400 frame, sized in shot.ts against the thinnest surface
+      # this pipeline has to keep honest), so `git diff` becomes an honest proxy for "the picture
+      # moved" and a run with nothing to say pushes nothing.
+      # Which shots this diff can actually change. A shot names the project it opens, so a change
+      # confined to project roots cannot move any other picture; anything touching Studio, the
+      # runner or the manifest can move all of them and runs everything. Unknown paths FAIL OPEN.
+      # The step summary names what it skipped — a narrowed run that stays quiet about it reads
+      # exactly like a full one. See scripts/screenshots/affected.ts.
+      - name: Scope the capture
+        id: scope
+        shell: bash
+        env:
+          BASE_REF: ${{ github.base_ref || github.event.repository.default_branch }}
+        run: bun scripts/screenshots/affected.ts
+
       - name: Capture
         id: capture
+        # `none` means every shot this diff could change is quarantined. It cannot be expressed as
+        # an empty `--only`, which the runner reads as ALL shots.
+        if: steps.scope.outputs.mode != 'none'
         continue-on-error: true
         shell: bash
-        run: bun run screenshots --force
+        run: bun run screenshots ${{ steps.scope.outputs.only }}
 
       # Integrity: the runner must have written a lock that names every byte it produced. This
       # Failing means the pipeline is broken, not that a picture changed — so it is also red.
@@ -237,8 +321,11 @@ jobs:
           cat /tmp/screenshots-report.md >> "$GITHUB_STEP_SUMMARY"
 
       # ── Push (same-repo PRs only) ──────────────────────────────────────────
-      # A GITHUB_TOKEN push does not re-trigger workflows, which is deliberate here: the lane must
-      # Not chase its own commit round a loop.
+      # This push DOES raise `pull_request: synchronize` and DOES queue this workflow again on the
+      # commit it just made — see the job's `if:` above, which is what stops the lane photographing
+      # its own output. Nothing here can prevent the run being created: for a `pull_request` event
+      # the `paths:` filter matches the PR's whole diff against its base, and once one re-capture
+      # has landed that diff contains `docs/images/**` forever. The run is queued; the job declines.
       - name: Push the re-capture
         id: push
         if: >-
@@ -246,6 +333,12 @@ jobs:
           steps.target.outputs.fork != 'true' &&
           steps.target.outputs.branch != ''
         shell: bash
+        env:
+          # The repo's husky hooks ran INSIDE this commit — nano-staged, oxfmt and the site-claims
+          # check all executed in the container on a diff of PNG bytes. They are a local authoring
+          # aid; the lane already ran everything they cover, and one of them failing would abort a
+          # push whose contents CI had already accepted.
+          HUSKY: "0"
         run: |
           set -euo pipefail
           git config user.name "jx-screenshots[bot]"
@@ -253,7 +346,10 @@ jobs:
           git add docs/images scripts/screenshots/capture.lock.json
           git commit -m "chore(screenshots): re-capture for ${{ steps.target.outputs.ref }}" \
             -m "Written by .github/workflows/screenshots.yml. Review the pictures, not the bytes."
-          git push origin "HEAD:${{ steps.target.outputs.branch }}"
+          # FULLY QUALIFIED on purpose. `HEAD:<branch>` makes git guess the destination ref, and
+          # when it cannot it fails with "The destination you provided is not a full refname" —
+          # which is how the last run on feat/standards-registry died after a clean capture.
+          git push origin "HEAD:refs/heads/${{ steps.target.outputs.branch }}"
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       # The "after" thumbnails can only be addressed once the commit exists, so the report is built
@@ -275,7 +371,7 @@ jobs:
         if: >-
           steps.report.outputs.changed == 'true' &&
           (steps.target.outputs.fork == 'true' || steps.target.outputs.branch == '')
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: screenshots-recapture
           path: |
@@ -287,7 +383,7 @@ jobs:
       # ── One comment, updated in place ──────────────────────────────────────
       - name: Comment
         if: steps.target.outputs.pr != '' && steps.target.outputs.fork != 'true'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('node:fs');
@@ -319,7 +415,7 @@ jobs:
       # Changed" — is published as its own check run against the head commit.
       - name: Publish the neutral conclusion
         if: steps.report.outputs.changed == 'true' && steps.capture.outcome == 'success'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const head_sha = '${{ steps.push.outputs.sha }}' || context.sha;

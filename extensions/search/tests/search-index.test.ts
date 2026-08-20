@@ -124,3 +124,66 @@ describe("SearchIndex.emit", () => {
     expect(envelope.documents).toEqual([]);
   });
 });
+
+/*
+ * A collection spread over one directory per locale (site-architecture.md §13.3). Two translations
+ * share an id, and every one of the three facts below follows from that: the URL needs the locale
+ * prefix, the document id needs the locale to stay unique, and the document needs the locale itself
+ * so a reader is not handed the other language.
+ */
+describe("SearchIndex.emit — a localized collection", () => {
+  const ENTRIES = [
+    {
+      $children: [{ tagName: "p", textContent: "English body." }],
+      _meta: { locale: "en" },
+      body: "",
+      data: { title: "Hello" },
+      id: "hello",
+    },
+    {
+      $children: [{ tagName: "p", textContent: "Corps francais." }],
+      _meta: { locale: "fr-ca" },
+      body: "",
+      data: { title: "Bonjour" },
+      id: "hello",
+    },
+  ] as unknown as ContentLoaderEntry[];
+
+  const CONFIG = { collections: { blog: { basePath: "/blog/" } } };
+  const emit = (i18n: Record<string, unknown>) =>
+    JSON.parse(
+      SearchIndex.emit(CONFIG, {
+        projectConfig: { i18n },
+        sections: { content: new Map([["blog", ENTRIES]]) },
+      })[0]!.content,
+    ) as SearchIndexEnvelope;
+
+  test("each entry is indexed at its own locale's URL", () => {
+    const { documents } = emit({ defaultLocale: "en", locales: ["en", "fr-ca"] });
+    expect(documents.map((d) => d.url)).toEqual(["/blog/hello/", "/fr-ca/blog/hello/"]);
+    expect(documents.map((d) => d.locale)).toEqual(["en", "fr-CA"]);
+  });
+
+  test("the document id carries the locale, so one translation cannot overwrite the other", () => {
+    const { documents } = emit({ defaultLocale: "en", locales: ["en", "fr-ca"] });
+    expect(documents.map((d) => d.id)).toEqual(["blog:en:hello", "blog:fr-CA:hello"]);
+    expect(new Set(documents.map((d) => d.id)).size).toBe(documents.length);
+  });
+
+  // Under prefix-always the default locale is prefixed too — that asymmetry is routing's meaning.
+  test("the URL follows the project's routing, including for the default locale", () => {
+    const { documents } = emit({
+      defaultLocale: "en",
+      locales: ["en", "fr-ca"],
+      routing: "prefix-always",
+    });
+    expect(documents.map((d) => d.url)).toEqual(["/en/blog/hello/", "/fr-ca/blog/hello/"]);
+  });
+
+  // A project that declares nothing indexes what it always did: no prefix, no locale field.
+  test("an unlocalized project is untouched", () => {
+    const { documents } = emit({});
+    expect(documents.every((d) => d.locale === undefined)).toBe(true);
+    expect(documents[0]!.url).toBe("/blog/hello/");
+  });
+});

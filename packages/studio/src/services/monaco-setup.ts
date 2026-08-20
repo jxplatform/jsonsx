@@ -1,10 +1,81 @@
-/** Monaco editor setup — workers, language contributions, and JX schema registration. */
+/**
+ * Monaco editor setup — workers, the editor feature set, language services, and JX schema
+ * registration.
+ *
+ * **The list below is Studio's STATEMENT of what the code editor can do.** Monaco 0.55 had no way
+ * to say it: importing `language/json/monaco.contribution.js` transitively dragged in every one of
+ * the 59 editor contributions, so the editor Studio shipped was whatever the language services
+ * happened to reach. 0.56 puts a supported export map in front of them (`"./*" → ./esm/vs/*.js`)
+ * with one `register` module per capability, so adding an editor capability means adding its import
+ * here.
+ *
+ * Three things about that, and none of them is discoverable from the code:
+ *
+ * - **A missing register is SILENT.** The editor simply lacks the capability: no error, no warning,
+ *   no console line. `specs/studio.md` §11.1 makes the list normative for that reason, and the
+ *   browser pass in a Studio change set is the gate. `monaco-editor/features/register.all` restores
+ *   the whole set exactly if you ever need to bisect against it.
+ * - **`features/suggest/register` is not what makes completion work.** It registers the provider that
+ *   turns suggest items into inline (ghost) text; the suggest WIDGET is
+ *   `contrib/suggest/browser/suggestController.js`, and the only public entry that reaches it is
+ *   `features/inlineCompletions/register`. Without that line, `jsonDefaults`' schema completions
+ *   and the `state.*` completions in the Logic tab (`panels/editors.ts`) both register successfully
+ *   and then never appear.
+ * - **THE EXCLUSIONS DO NOT TAKE EFFECT YET, and it is worth knowing before you try to make them.**
+ *   In 0.56.0 the contrib modules import one another densely, and the suggest stack this file
+ *   cannot do without reaches almost all of them: every one of the 33 features named "not
+ *   registered" below is still in the bundle and still calls `registerEditorContribution` at module
+ *   scope. Measured on the built output — `register.all` 14,186,780 B, this list 14,189,667 B, this
+ *   list with a deep `suggestController` import instead of `inlineCompletions` 14,192,867 B.
+ *   Curating costs about 3 KB and currently saves nothing.
+ *
+ *   It is kept because it is the true statement of intent and it is where the saving lands the day
+ *   monaco untangles that graph. Do not cite it as evidence that a feature is off — check the
+ *   metafile. The only variant where the exclusions bite drops the suggest widget too, which takes
+ *   schema completion with it.
+ */
 
-// @ts-expect-error — Monaco ESM contribution has no type declarations for named exports
-import { jsonDefaults } from "monaco-editor/esm/vs/language/json/monaco.contribution.js";
-import "monaco-editor/esm/vs/editor/editor.api.js";
-import "monaco-editor/esm/vs/language/typescript/monaco.contribution.js";
-import "monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution.js";
+import "monaco-editor/editor";
+// Core widget, icons, tokenization.
+import "monaco-editor/features/codeEditor/register";
+import "monaco-editor/features/codicon/register";
+import "monaco-editor/features/tokenization/register";
+// Editing. `linesOperations` is also what pulls in `browser/coreCommands.js`.
+import "monaco-editor/features/clipboard/register";
+import "monaco-editor/features/comment/register";
+import "monaco-editor/features/cursorUndo/register";
+import "monaco-editor/features/dnd/register";
+import "monaco-editor/features/indentation/register";
+import "monaco-editor/features/lineSelection/register";
+import "monaco-editor/features/linesOperations/register";
+import "monaco-editor/features/multicursor/register";
+import "monaco-editor/features/smartSelect/register";
+import "monaco-editor/features/wordOperations/register";
+import "monaco-editor/features/wordPartOperations/register";
+// Navigation & search.
+import "monaco-editor/features/find/register";
+import "monaco-editor/features/folding/register";
+import "monaco-editor/features/gotoError/register"; // F8 over the oxlint markers
+import "monaco-editor/features/gotoLine/register";
+// The surfaces the JSON / TypeScript language services feed.
+import "monaco-editor/features/bracketMatching/register";
+import "monaco-editor/features/codeAction/register";
+import "monaco-editor/features/format/register";
+import "monaco-editor/features/hover/register";
+import "monaco-editor/features/links/register";
+import "monaco-editor/features/parameterHints/register";
+import "monaco-editor/features/snippet/register";
+import "monaco-editor/features/suggest/register";
+import "monaco-editor/features/inlineCompletions/register"; // Carries the suggest WIDGET — see above
+// Chrome & safety.
+import "monaco-editor/features/contextmenu/register";
+import "monaco-editor/features/readOnlyMessage/register"; // ReadOnly is set on collab failure
+import "monaco-editor/features/toggleTabFocusMode/register";
+import "monaco-editor/features/unicodeHighlighter/register";
+// Languages.
+import { jsonDefaults } from "monaco-editor/languages/features/json/register";
+import "monaco-editor/languages/features/typescript/register";
+import "monaco-editor/languages/definitions/javascript/register";
 
 import { flattenSchema } from "@jxsuite/schema/project-schemas";
 import jxSchema from "@jxsuite/schema/schema.json";
@@ -59,7 +130,7 @@ self.MonacoEnvironment = {
 if (typeof document !== "undefined" && document.fonts?.ready) {
   // oxlint-disable-next-line unicorn/prefer-top-level-await -- fire-and-forget: awaiting fonts.ready at top level would block module evaluation (and studio startup) until webfonts load
   void document.fonts.ready.then(async () => {
-    const monaco = await import("monaco-editor/esm/vs/editor/editor.api.js");
+    const monaco = await import("monaco-editor/editor");
     monaco.editor.remeasureFonts();
   });
 }
@@ -110,7 +181,6 @@ const DOCUMENT_ENTRY_SCHEMA_ID = "file:///document.schema.json";
  * went unreported behind that one diagnostic.
  */
 function applyJsonSchemas(documentSchema: unknown, projectJsonSchema: unknown) {
-  // oxlint-disable-next-line typescript/no-unsafe-call, typescript/no-unsafe-member-access -- jsonDefaults is imported from Monaco's untyped ESM contribution (see @ts-expect-error above); no type declarations exist for this named export
   jsonDefaults.setDiagnosticsOptions({
     allowComments: false,
     schemas: [

@@ -1,0 +1,7 @@
+{
+  "name": "@jxsuite/feed",
+  "title": "Feeds",
+  "description": "Atom (RFC 4287) and JSON Feed generation from content collections, with RFC 5005 archives and automatic <link rel=\"alternate\"> discovery",
+  "classes": { "Feed": "./src/Feed.class.json" },
+  "schemas": { "project": "./schemas/project.fragment.schema.json" }
+}

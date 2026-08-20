@@ -501,7 +501,8 @@ async function mountFunctionEditor(
     });
 
     writes.arm("lint", 750, () => {
-      const gen = (lintGen += 1);
+      lintGen += 1;
+      const gen = lintGen;
       const currentCode = editor.getValue();
       void codeService("lint", { args, code: currentCode }).then((result) => {
         // `lintGen` is per-MOUNT, so it can only order this editor's own requests; a remount

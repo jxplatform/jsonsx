@@ -20,16 +20,28 @@ import {
 } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { isMappedArray, isRef } from "@jxsuite/schema/guards";
-import { isNpmSpecifier, sidecarAssetPath } from "@jxsuite/schema/asset-paths";
+import { isNpmSpecifier, npmAssetPath, sidecarAssetPath } from "@jxsuite/schema/asset-paths";
 import {
   CLIENT_EXTERNALS,
   bundleEntry,
   bundleWorkerSource,
   isBundleableSrc,
+  bundleSource,
   resolveSidecarEntry,
 } from "./bundler.ts";
 import { loadProjectConfig } from "./site-loader.ts";
-import { discoverPages, expandDynamicRoutes, readPageDocument } from "./pages-discovery.ts";
+import {
+  discoverPages,
+  expandDynamicRoutes,
+  readPageDocument,
+  readTranslationKeys,
+} from "./pages-discovery.ts";
+import {
+  buildHeaderRules,
+  contentTypeRules,
+  writeHeaders,
+  writeNoJekyll,
+} from "./headers-emitter.ts";
 import { buildProjectExtensionRegistry } from "./format-host.ts";
 import { loadProjectSections } from "./project-sections.ts";
 import { collectAssetRefs, copyMountedAssets, loadAssetMounts } from "./asset-mounts.ts";
@@ -38,13 +50,12 @@ import type { FormatEntry, FormatRegistry } from "@jxsuite/schema/format-registr
 import type { ExtensionRegistry } from "@jxsuite/schema/extension-registry";
 import { resolveLayout } from "./layout-resolver.ts";
 import { mergeHead, renderHead } from "./head-merger.ts";
+import { unregisteredHeadRelations } from "./link-relations.ts";
 import { injectContext } from "./context-injection.ts";
 import { compile, compileServer, compileSiteServer } from "../compiler.ts";
 import { compileElement } from "../targets/compile-element.ts";
 import type { SiteConnectorSpec, SiteMountSpec } from "../targets/compile-server.ts";
 import {
-  DEFAULT_LIT_HTML_SRC,
-  DEFAULT_REACTIVITY_SRC,
   buildComponentCSS,
   buildInitialScope,
   collectServerEntries,
@@ -61,6 +72,37 @@ import {
 } from "../shared.ts";
 import { resolvePrototypes } from "./prototype-resolver.ts";
 import { transformImageNodes } from "./image-transform.ts";
+import { collectCspSources, emptyCspSources } from "./csp.ts";
+import { resolveShadowMode } from "../shadow.ts";
+import {
+  buildServiceWorker,
+  normalizeServiceWorker,
+  registrationScript,
+  tombstoneServiceWorker,
+} from "./service-worker.ts";
+import {
+  buildManifest,
+  buildSecurityTxt,
+  manifestHeadEntries,
+  writeWellKnown,
+} from "./well-known.ts";
+import {
+  localeAlternates,
+  localeOfRoute,
+  pageLanguage,
+  resolveI18n,
+  translationSets,
+  undeclaredLocalePrefix,
+  unprefixedRoutes,
+} from "./i18n.ts";
+import type { LocaleAlternate, PageLocaleContext } from "./i18n.ts";
+import {
+  isPrefixSpecifier,
+  renderImportMap,
+  resolveClientRuntime,
+  writeClientRuntime,
+  writeRuntimeSubpaths,
+} from "./client-runtime.ts";
 import { getImageCacheDir, loadCache, saveCache } from "./image-cache.ts";
 import type { ImageConfig } from "./image-optimizer.ts";
 import type { ImageMetaCache } from "./image-transform.ts";
@@ -121,6 +163,69 @@ export async function buildSite(
   // Hints) are rewritten to their /assets/ URL during compilation, registered here, and bundled
   // In step 6d (spec.md §12). Keyed by asset path so duplicate specifiers bundle once.
   const sidecarBundles = new Map<string, { entryPath: string; specifier: string }>();
+  /*
+   * Files a `$head` entry names by bare specifier — a package's stylesheet, most often. Copied
+   * rather than bundled.
+   *
+   * These used to be rewritten to `/node_modules/<specifier>`, which resolves in dev, where the
+   * server serves that path, and 404s in production, where nothing copies node_modules into dist.
+   */
+  const npmAssets = new Map<string, string>();
+  /*
+   * One entry per distinct SET of npm `$elements`, bundled self-contained. Keyed by the set rather
+   * than by specifier so two pages registering the same components share one file, and so a package
+   * that ships its own framework copy inlines it exactly once per page instead of once per
+   * component. See `injectNpmElementScripts` for why sharing Jx's copy is not an option.
+   */
+  const elementBundles = new Map<string, string[]>();
+  const registerElementBundle = (specifiers: string[]): string => {
+    const sorted = specifiers.toSorted();
+    const key = Bun.hash(sorted.join("\u0000")).toString(36);
+    const assetPath = `/assets/elements-${key}.js`;
+    elementBundles.set(assetPath, sorted);
+    return assetPath;
+  };
+  /*
+   * Bundles and copies land in one URL directory, so one map arbitrates it. Two different files
+   * that slug to the same name is a build error, not a silent last-writer-wins overwrite.
+   */
+  /*
+   * The two modules the import map names. Resolved up front so every page's map is identical, and
+   * written at the end only if some page actually emitted one.
+   */
+  const clientRuntime = resolveClientRuntime();
+  const runtimeImports = clientRuntime.imports;
+  const runtimeAssetsUsed = new Set<string>();
+  /*
+   * Scanned from every finished page, so the hashes name the exact bytes shipped rather than what
+   * some emission site believed it wrote.
+   */
+  const cspSources = emptyCspSources();
+
+  /*
+   * Locale routing (§13). Validated once: a malformed BCP 47 tag is a build error, because a
+   * locale is a URL prefix, an `hreflang` value and an `<html lang>` at once — a typo does not
+   * degrade, it produces a site claiming a language that does not exist.
+   */
+  const { errors: i18nErrors, i18n } = resolveI18n(projectConfig);
+  for (const error of i18nErrors) {
+    errors.push(error);
+    console.error(error);
+  }
+  for (const warning of clientRuntime.warnings) {
+    console.warn(warning);
+  }
+
+  const assetClaims = new Map<string, { entryPath: string; specifier: string }>();
+  const claimAsset = (assetPath: string, entryPath: string, specifier: string) => {
+    const existing = assetClaims.get(assetPath);
+    if (existing !== undefined && existing.entryPath !== entryPath) {
+      throw new Error(
+        `"${specifier}" and "${existing.specifier}" both map to ${assetPath} — rename one`,
+      );
+    }
+    assetClaims.set(assetPath, { entryPath, specifier });
+  };
   const rewriteSidecarSrc = (specifier: string, docDir: string | null): string => {
     if (!isBundleableSrc(specifier)) {
       return specifier;
@@ -140,16 +245,26 @@ export async function buildSite(
         ? specifier
         : `./${relative(projectRoot, entryPath)}`;
       const assetPath = sidecarAssetPath(assetKey);
-      const existing = sidecarBundles.get(assetPath);
-      if (existing && existing.entryPath !== entryPath) {
-        throw new Error(
-          `"${specifier}" and "${existing.specifier}" both bundle to ${assetPath} — rename one`,
-        );
-      }
+      claimAsset(assetPath, entryPath, specifier);
       sidecarBundles.set(assetPath, { entryPath, specifier });
       return assetPath;
     } catch (error) {
       errors.push(`Sidecar "${specifier}": ${(error as Error).message}`);
+      return specifier;
+    }
+  };
+
+  const rewriteNpmAsset = (specifier: string): string => {
+    const assetPath = npmAssetPath(specifier);
+    try {
+      const entryPath = resolveSidecarEntry(`npm:${specifier}`, projectRoot, projectRoot);
+      claimAsset(assetPath, entryPath, specifier);
+      npmAssets.set(assetPath, entryPath);
+      return assetPath;
+    } catch (error) {
+      // A missing dependency is a hard error, like an unresolvable sidecar: the alternative is a
+      // Page that looks fine in dev and loses its stylesheet on deploy.
+      errors.push(`$head specifier "${specifier}": ${(error as Error).message}`);
       return specifier;
     }
   };
@@ -231,13 +346,28 @@ export async function buildSite(
   const assetRefs = new Set<string>();
 
   // ── 4. Expand dynamic routes ────────────────────────────────────────────
+  const extensionHead = registry
+    ? await collectExtensionHead(registry, projectConfig, projectRoot)
+    : [];
+
   const routes = await expandDynamicRoutes(
     staticRoutes,
     projectRoot,
     sections,
     registry,
     projectConfig,
+    i18n,
   );
+  /*
+   * Every route carries the locale it serves, resolved once here rather than re-derived by each
+   * reader. It is what scopes a `ContentEntry` lookup on a localized collection: two translations
+   * of one entry share an id (§13.3), so a page that asked for `hello` without saying in which
+   * language got whichever translation was loaded first — the English copy under a French route,
+   * silently, on a page whose `<html lang>` said otherwise.
+   */
+  for (const route of routes) {
+    (route as { locale?: string | null }).locale = localeOfRoute(route.urlPattern, i18n);
+  }
   log(`  ${routes.length} route(s) after expansion`);
 
   let fileCount = 0;
@@ -305,9 +435,23 @@ export async function buildSite(
         const doc = await readPageDocument(componentPath, formatRegistry);
         if (doc.tagName) {
           componentDefs.set(doc.tagName, doc);
-          const css = buildComponentCSS(doc.tagName, doc.style, doc, projectConfig.$media ?? {});
+          const componentShadow = resolveShadowMode(doc, projectConfig.defaults);
+          const css = buildComponentCSS(
+            doc.tagName,
+            doc.style,
+            doc,
+            projectConfig.$media ?? {},
+            componentShadow,
+          );
           if (css) {
-            componentCSS.set(doc.tagName, css);
+            /*
+             * A shadow component's sheet is linked from inside its own declarative shadow root, so
+             * it is written to disk but kept OUT of the page-level map: a `:host`-rooted rule in
+             * the document head matches nothing, and the duplicate request is pure cost.
+             */
+            if (componentShadow === null) {
+              componentCSS.set(doc.tagName, css);
+            }
             collectAssetRefs(css, assetMounts, assetRefs);
             writeFileSync(resolve(componentOutDir, `${doc.tagName}.css`), css, "utf8");
             fileCount += 1;
@@ -356,9 +500,127 @@ export async function buildSite(
   // (absolute <loc> URLs require it) and not explicitly disabled via build.sitemap: false.
   const siteUrl = projectConfig.url;
   const sitemapEnabled = Boolean(siteUrl) && projectConfig.build.sitemap !== false;
-  const sitemapEntries: { loc: string; lastmod: Date }[] = [];
+  const sitemapEntries: SitemapEntry[] = [];
 
+  // Warned once per distinct prefix rather than once per route: one mistyped directory is one
+  // Mistake, however many pages live under it.
+  /*
+   * Translation sets, computed from the whole route table before the first page is compiled: a
+   * page's alternates include its siblings, which do not exist until every route is known.
+   * Dynamic patterns are excluded — an unexpanded `:slug` is not a URL.
+   */
+  const concreteRoutes = routes.filter(
+    (r) => !r.urlPattern.includes(":") && !r.urlPattern.includes("*"),
+  );
+  /*
+   * A localized slug shares nothing with the page it translates — `/fr-ca/a-propos/` and `/about/`
+   * reduce to different keys — so the document says so itself, and the whole annotation follows
+   * from the one key. Read only when the project has locales to group across.
+   */
+  const declaredKeys =
+    i18n === null
+      ? new Map<string, string>()
+      : await readTranslationKeys(
+          concreteRoutes as { sourcePath: string; urlPattern: string }[],
+          formatRegistry,
+        );
+  const keyedRoutes = concreteRoutes.map((r) => ({
+    translationKey: declaredKeys.get(r.urlPattern),
+    urlPattern: r.urlPattern,
+  }));
+  const alternateMap = localeAlternates(keyedRoutes, i18n, siteUrl ?? "");
+  /*
+   * The same sets, site-absolute, for `$page.alternates`. Computed from the whole table for the
+   * same reason the alternates are — and separately from them because a switcher must work in a
+   * project that has not configured `url` yet, which is every project in development.
+   */
+  const { conflicts, sets: translationMap } = translationSets(keyedRoutes, i18n);
+
+  /*
+   * Two routes claiming to be the same page in the same language. A set is single-valued, so one
+   * of them is dropped either way; what differs is whether the author asserted it.
+   *
+   * A **declared** collision fails the build: `$translationKey` is a promise written down twice,
+   * and silently advertising one of the two URLs as *the* page in that language is a wrong answer
+   * nobody can see. A derived one warns — parallel paths that happen to collide may be a deliberate
+   * alias, and failing a build over pages that work would be the compiler overruling a decision it
+   * cannot see the reason for.
+   */
+  for (const conflict of conflicts) {
+    const [kept, dropped] = conflict.urlPatterns;
+    const fix = conflict.declared
+      ? "Give one of them a different $translationKey."
+      : "Move one out of the locale tree, or give it its own $translationKey.";
+    const message =
+      `${dropped} and ${kept} are both the "${conflict.locale}" version of ` +
+      `"${conflict.key}". A translation set names one URL per language, so ${dropped} is ` +
+      `dropped from it — it carries no alternates and no switcher. ${fix}`;
+    if (conflict.declared) {
+      errors.push(message);
+      console.error(message);
+    } else {
+      console.warn(message);
+    }
+  }
+
+  /*
+   * `prefix-always` says every URL names its language, and until now nothing checked it: a page
+   * outside the locale tree built, served, and claimed the default locale, so a site that promised
+   * no unprefixed URLs shipped them silently. Reported once with the whole list, not once per
+   * page — an author who moved a directory wants to see the extent of it.
+   */
+  const unprefixed = unprefixedRoutes(routes, i18n);
+  if (unprefixed.length > 0) {
+    console.warn(
+      `i18n.routing is "prefix-always", but ${unprefixed.length} route(s) sit outside the locale ` +
+        `tree and are served as "${i18n?.defaultLocale}": ${unprefixed.slice(0, 10).join(", ")}` +
+        `${unprefixed.length > 10 ? `, and ${unprefixed.length - 10} more` : ""}. ` +
+        `Move them under a locale directory, or use "prefix-except-default".`,
+    );
+  }
+
+  /*
+   * `prefix-always` with no adapter, and no page at `/`. The mode leaves the root for negotiation
+   * to answer (§13.6), negotiation needs a request, and a static deployment never sees one — so the
+   * site's front door is a 404 and nothing else in the build says so. `unprefixedRoutes` above
+   * deliberately never reports `/`, because under an adapter it is handled; this is the one shape
+   * where it is not.
+   *
+   * A warning rather than a generated redirect: which URL the root should send a visitor to is a
+   * deployment decision, and inventing one would be the compiler overruling a choice it cannot see.
+   */
+  if (
+    i18n !== null &&
+    i18n.routing === "prefix-always" &&
+    !projectConfig.build.adapter &&
+    !routes.some((r) => r.urlPattern === "/")
+  ) {
+    console.warn(
+      `i18n.routing is "prefix-always" and no page claims "/", so the site root is a 404. ` +
+        `Locale negotiation answers "/" only when build.adapter is set — a static deployment has ` +
+        `no runtime to read Accept-Language. Add a redirect from "/" to "/${i18n.defaultLocale.toLowerCase()}/", ` +
+        `set build.adapter, or use "prefix-except-default".`,
+    );
+  }
+
+  const warnedLocalePrefixes = new Set<string>();
+  /*
+   * A mistyped `rel` is silent: the tag is still valid HTML, still renders, and simply does
+   * nothing — the stylesheet never loads, the canonical never consolidates. Warned once per
+   * distinct value across the whole build, because the one that matters lives in the layout and is
+   * therefore on every page.
+   */
+  const warnedRelations = new Set<string>();
   for (const route of routes) {
+    const mismatch = undeclaredLocalePrefix(route.urlPattern, i18n);
+    if (mismatch && !warnedLocalePrefixes.has(mismatch.segment)) {
+      warnedLocalePrefixes.add(mismatch.segment);
+      console.warn(
+        `Routes under /${mismatch.segment}/ are served as "${i18n?.defaultLocale}" — ` +
+          `i18n.locales declares "${mismatch.meant}", not "${mismatch.segment}". ` +
+          `Rename the directory to "${mismatch.meant.toLowerCase()}" or declare the shorter tag.`,
+      );
+    }
     try {
       log(`  Compiling ${route.urlPattern} ...`);
       const result = await compilePage(
@@ -373,7 +635,27 @@ export async function buildSite(
         registry,
         rewriteSidecarSrc,
         assetMounts,
+        extensionHead,
+        rewriteNpmAsset,
+        {
+          alternates: alternateMap.get(route.urlPattern) ?? [],
+          i18n,
+          translations: translationMap.get(route.urlPattern) ?? [],
+        },
+        runtimeImports,
+        registerElementBundle,
       );
+
+      for (const relation of result.unregisteredRelations) {
+        if (!warnedRelations.has(relation)) {
+          warnedRelations.add(relation);
+          console.warn(
+            `<link rel="${relation}"> — "${relation}" is not an IANA link relation, and a ` +
+              `relation nobody recognizes does nothing. Check the spelling, or use an absolute ` +
+              `URI if it is an extension relation (RFC 8288 §2.1.2).`,
+          );
+        }
+      }
 
       // Determine which component tags are fully static (for script omission)
       const staticTags = new Set<string>();
@@ -391,12 +673,15 @@ export async function buildSite(
           componentCSS,
           staticTags,
           result.files.map((f: { content: string }) => f.content).join("\n"),
+          runtimeImports,
+          runtimeAssetsUsed,
         );
       }
 
       // Mounted assets this page actually references — scanned from the finished HTML so a
       // Reference is caught wherever it came from (markdown image, hand-authored page, $head).
       collectAssetRefs(result.html, assetMounts, assetRefs);
+      collectCspSources(result.html, cspSources);
 
       // Determine output path
       const outPath = routeToOutputPath(route.urlPattern, outDir, trailingSlash);
@@ -409,9 +694,21 @@ export async function buildSite(
       // The two always agree.
       const isConcrete = !route.urlPattern.includes(":") && !route.urlPattern.includes("*");
       if (sitemapEnabled && !result.excludeFromSitemap && isConcrete) {
+        const routeAlternates = alternateMap.get(route.urlPattern) ?? [];
         sitemapEntries.push({
-          lastmod: statSync(route.sourcePath).mtime,
+          /*
+           * The route's own timestamp when it has one, and only then the template's. A concrete
+           * route expanded from a collection carries the entry it was generated from
+           * (`sourceMtime`), because `sourcePath` still points at the `[slug]` template — so
+           * without this every post in an archive claims to have been edited the moment the
+           * template was, which is precisely the signal `<lastmod>` exists to give.
+           */
+          lastmod:
+            typeof route.sourceMtime === "string" && route.sourceMtime !== ""
+              ? route.sourceMtime
+              : toRfc3339(statSync(route.sourcePath).mtime),
           loc: new URL(route.urlPattern, siteUrl).href,
+          ...(routeAlternates.length > 0 && { alternates: routeAlternates }),
         });
       }
 
@@ -510,7 +807,7 @@ export async function buildSite(
     const skipWorker = adapter === "cloudflare-pages" && deduped.size === 0 && mounts.length === 0;
     const workerSource = skipWorker
       ? null
-      : compileSiteServer([...deduped.values()], { adapter, connectors, mounts });
+      : compileSiteServer([...deduped.values()], { adapter, connectors, i18n, mounts });
 
     if (workerSource) {
       // Bundle the worker self-contained for the adapter's runtime (compiler.md §12): mount
@@ -535,7 +832,17 @@ export async function buildSite(
         // Only invoke the worker for server routes; everything else stays static.
         writeFileSync(
           resolve(outDir, "_routes.json"),
-          `${JSON.stringify({ exclude: [], include: ["/_jx/*"], version: 1 }, null, 2)}\n`,
+          // `/` joins the include list only when there is a locale to negotiate: Pages invokes
+          // The worker for included paths only, so an uninvoked middleware is an inert one.
+          `${JSON.stringify(
+            {
+              exclude: [],
+              include: i18n && i18n.locales.length > 1 ? ["/", "/_jx/*"] : ["/_jx/*"],
+              version: 1,
+            },
+            null,
+            2,
+          )}\n`,
           "utf8",
         );
         fileCount += 1;
@@ -544,6 +851,30 @@ export async function buildSite(
   }
 
   // ── 6d. Bundle client sidecar modules (spec.md §12) ─────────────────────
+  if (runtimeAssetsUsed.size > 0) {
+    log(`Bundling ${runtimeAssetsUsed.size} client runtime module(s)...`);
+    const runtime = await writeClientRuntime(
+      { ...clientRuntime, assetPaths: [...runtimeAssetsUsed] },
+      outDir,
+    );
+    fileCount += runtime.written;
+    for (const error of runtime.errors) {
+      errors.push(error);
+      console.error(error);
+    }
+  }
+
+  if (npmAssets.size > 0) {
+    log(`Copying ${npmAssets.size} package asset(s)...`);
+    for (const [assetPath, entryPath] of npmAssets) {
+      const outfile = resolve(outDir, assetPath.replace(/^\//, ""));
+      mkdirSync(dirname(outfile), { recursive: true });
+      cpSync(entryPath, outfile);
+      fileCount += 1;
+      log(`  ${entryPath} → ${assetPath}`);
+    }
+  }
+
   if (sidecarBundles.size > 0) {
     log(`Bundling ${sidecarBundles.size} client sidecar module(s)...`);
     for (const [assetPath, bundle] of sidecarBundles) {
@@ -561,6 +892,49 @@ export async function buildSite(
         errors.push(msg);
         console.error(msg);
       }
+    }
+  }
+
+  if (elementBundles.size > 0) {
+    log(`Bundling ${elementBundles.size} npm element set(s)...`);
+    for (const [assetPath, specifiers] of elementBundles) {
+      const outfile = resolve(outDir, assetPath.replace(/^\//, ""));
+      mkdirSync(dirname(outfile), { recursive: true });
+      try {
+        /*
+         * `external: []` — the whole point. A component package re-exporting its framework is
+         * exactly the shape Bun mis-compiles when that framework is external.
+         */
+        await bundleSource(
+          `${specifiers.map((sp) => `import ${JSON.stringify(sp)};`).join("\n")}\n`,
+          { outfile, resolveDir: projectRoot },
+          { target: "browser" },
+        );
+        fileCount += 1;
+        log(`  ${specifiers.length} element(s) → ${assetPath}`);
+      } catch (error) {
+        const msg = `Error bundling npm $elements [${specifiers.join(", ")}]: ${
+          (error as Error).message
+        }`;
+        errors.push(msg);
+        console.error(msg);
+      }
+    }
+  }
+
+  /*
+   * Package subpaths the emitted bundles import — run AFTER every bundle exists, because the set is
+   * discovered from their contents rather than declared anywhere (site-architecture.md §8.7).
+   */
+  if (runtimeAssetsUsed.size > 0) {
+    const subpaths = await writeRuntimeSubpaths(outDir);
+    if (subpaths.written > 0) {
+      log(`Bundling ${subpaths.written} runtime subpath module(s)...`);
+    }
+    fileCount += subpaths.written;
+    for (const error of subpaths.errors) {
+      errors.push(error);
+      console.error(error);
     }
   }
 
@@ -609,8 +983,12 @@ export async function buildSite(
   if (projectConfig.redirects && Object.keys(projectConfig.redirects).length > 0) {
     log("Generating redirects...");
     const compiledUrls = new Set(routes.map((r) => r.urlPattern));
-    const redirectFiles = generateRedirects(projectConfig.redirects, outDir, compiledUrls);
-    fileCount += redirectFiles;
+    const redirects = generateRedirects(projectConfig.redirects, outDir, {
+      compiledUrls,
+      trailingSlash: projectConfig.build.trailingSlash,
+    });
+    fileCount += redirects.files;
+    errors.push(...redirects.errors);
   }
 
   // ── 7b. Generate sitemap.xml ────────────────────────────────────────────
@@ -643,6 +1021,83 @@ export async function buildSite(
   // Runs after the public/ copy so it edits the deployed dist/robots.txt.
   if (sitemapEnabled) {
     fileCount += ensureRobotsSitemap(outDir, siteUrl);
+  }
+
+  // ── 7d.1 manifest.webmanifest and .well-known/security.txt ──────────────
+  /*
+   * After the public/ copy, and skipping anything already there. That skip is how an author ships
+   * a **clearsigned** security.txt: signing needs a private key at build time, so the build cannot
+   * do it, but `public/.well-known/security.txt` shadows this at zero cost.
+   */
+  {
+    const generated = [buildManifest(projectConfig), buildSecurityTxt(projectConfig, new Date())];
+    for (const output of generated) {
+      for (const error of output.errors) {
+        errors.push(error);
+        console.error(error);
+      }
+      for (const warning of output.warnings) {
+        console.warn(warning);
+      }
+    }
+    const { skipped, written } = writeWellKnown(
+      generated.flatMap((o) => o.files),
+      outDir,
+      existsSync,
+    );
+    fileCount += written;
+    for (const path of skipped) {
+      log(`  ${path} — kept the copy from public/`);
+    }
+  }
+
+  // ── 7d.2 The service worker, or the tombstone that removes one ──────────
+  /*
+   * `serviceWorker: false` is not the same as omitting the key, and this is the one place in the
+   * build where that distinction carries weight. A worker is sticky: deleting the file leaves
+   * every previous visitor running the old one forever, because a 404 at that URL is not an
+   * instruction to stop. `false` says "I had one" and emits the instruction.
+   */
+  {
+    const sw = normalizeServiceWorker(projectConfig.serviceWorker);
+    if (sw !== null) {
+      const output = sw === false ? tombstoneServiceWorker() : buildServiceWorker(sw, outDir);
+      for (const warning of output.warnings) {
+        console.warn(warning);
+      }
+      for (const error of output.errors) {
+        errors.push(error);
+        console.error(error);
+      }
+      writeFileSync(join(outDir, output.path as string), output.source, "utf8");
+      fileCount += 1;
+      log(sw === false ? "  sw.js — tombstone (unregisters and clears)" : "  sw.js");
+    }
+  }
+
+  // ── 7e. Response headers and the Jekyll opt-out ─────────────────────────
+  // Also after the public/ copy, for the same reason — but PREPENDING rather than appending, since
+  // A later `_headers` rule wins for a duplicate header name and the author's block must override.
+  {
+    const { errors: headerErrors, rules: securityRules } = buildHeaderRules(
+      projectConfig.build,
+      cspSources,
+    );
+    errors.push(...headerErrors);
+    // Runs here, after every emitter, so it can see which of these files the build actually wrote.
+    const rules = [...securityRules, ...contentTypeRules(outDir)];
+    if (rules.length > 0) {
+      log("Writing response headers...");
+      fileCount += writeHeaders(outDir, rules);
+      const { adapter } = projectConfig.build;
+      if (adapter === "node" || adapter === "bun") {
+        console.warn(
+          `The "${adapter}" adapter serves no static assets, so dist/_headers is documentation ` +
+            `rather than configuration — apply these headers at the reverse proxy in front of it.`,
+        );
+      }
+    }
+    fileCount += writeNoJekyll(outDir);
   }
 
   // ── 8. Copy declarative file mappings ──────────────────────────────────
@@ -683,19 +1138,28 @@ export async function buildSite(
  *   serverHandler: string | null;
  *   doc: JxDocument;
  * }>}
+ *   Every parameter is required. There is exactly one caller and it passes all fifteen, so the
+ *   defaults this list used to carry described no reachable call — and one of them, an identity
+ *   `rewriteNpmAsset`, was a function that could never run pretending to be a safety net.
  */
 async function compilePage(
   route: SiteRoute,
   projectConfig: ProjectConfig,
   projectRoot: string,
-  sections: Record<string, unknown> = {},
-  imageCache: CacheManifest | null = null,
-  componentDefs = new Map<string, JxElement>(),
-  imageMetaCache: ImageMetaCache | null = null,
-  formatRegistry?: FormatRegistry,
-  registry?: ExtensionRegistry,
-  rewriteSidecarSrc?: (specifier: string, docDir: string | null) => string,
-  assetMounts: readonly AssetMount[] = [],
+  sections: Record<string, unknown>,
+  imageCache: CacheManifest | null,
+  componentDefs: Map<string, JxElement>,
+  imageMetaCache: ImageMetaCache | null,
+  formatRegistry: FormatRegistry | undefined,
+  registry: ExtensionRegistry | undefined,
+  rewriteSidecarSrc: ((specifier: string, docDir: string | null) => string) | undefined,
+  assetMounts: readonly AssetMount[],
+  extensionHead: readonly JxHeadEntry[],
+  rewriteNpmAsset: (specifier: string) => string,
+  locale: PageLocaleContext,
+  runtimeImports: Record<string, string>,
+  /** Registers a page's npm `$elements` set as one bundle and returns its URL. */
+  registerElementBundle: (specifiers: string[]) => string,
 ) {
   // Load the raw page document (.json natively, other formats via the registry)
   const pageDoc = await readPageDocument(route.sourcePath as string, formatRegistry);
@@ -713,7 +1177,19 @@ async function compilePage(
   delete layoutDoc._pageTitle;
 
   // Inject $site and $page context
-  injectContext(layoutDoc, projectConfig, route, projectRoot);
+  injectContext(layoutDoc, projectConfig, route, projectRoot, locale.i18n, locale.translations);
+
+  /*
+   * The page's language and writing direction. `$lang` on the document wins over the locale its
+   * route implies, and `dir` is emitted only when it is `rtl` or the author asked — `ltr` is
+   * HTML's default and writing it on every page says nothing.
+   */
+  const language = pageLanguage({
+    defaults: projectConfig.defaults,
+    pageDir: typeof pageDoc.$dir === "string" ? pageDoc.$dir : undefined,
+    pageLang: typeof pageDoc.$lang === "string" ? pageDoc.$lang : undefined,
+    routeLocale: localeOfRoute(route.urlPattern, locale.i18n),
+  });
 
   // Resolve generic $prototype entries via .class.json imports (and lower registry classes)
   await resolvePrototypes(layoutDoc, route, projectRoot, {
@@ -739,8 +1215,25 @@ async function compilePage(
   }
 
   // Resolve template strings in $head entries
-  const resolvedPageHead = resolveHeadTemplates(pageHead, scope);
-  const resolvedLayoutHead = resolveHeadTemplates(layoutHead, scope);
+  /*
+   * Bare specifiers resolve on ALL THREE heads, not just the project's.
+   *
+   * A `$head` entry may name a package file — a component library's stylesheet, most often — and
+   * `rewriteNpmAsset` copies it into `/assets/` so it survives deploy. That ran only over
+   * `projectConfig.$head`, so the same link written on a PAGE shipped its bare specifier verbatim
+   * into the HTML: the browser resolved `@scope/pkg/x.css` against the page URL and 404'd, and the
+   * page rendered unstyled with nothing in the build log. `resolveHeadBareSpecifiers` leaves an
+   * entry with no bare specifier untouched, so widening the scope costs nothing where it does not
+   * apply.
+   */
+  const resolvedPageHead = resolveHeadBareSpecifiers(
+    resolveHeadTemplates(pageHead, scope),
+    rewriteNpmAsset,
+  );
+  const resolvedLayoutHead = resolveHeadBareSpecifiers(
+    resolveHeadTemplates(layoutHead, scope),
+    rewriteNpmAsset,
+  );
 
   // Resolve template strings in the document tree (innerHTML, textContent, style, attributes)
   // So that timing: "compiler" data is baked into the static HTML
@@ -754,13 +1247,19 @@ async function compilePage(
     media: { ...projectConfig.$media, ...layoutDoc.$media },
     rules: [],
   };
-  expandComponents(layoutDoc, componentDefs, slotCss);
+  expandComponents(layoutDoc, componentDefs, slotCss, projectConfig.defaults);
 
   // Strip resolved timing: "compiler" state entries — they're now baked into the tree
   // And keeping them would cause isDynamic() to misclassify the page as dynamic.
   // Also strip resolved content arrays (from ContentCollection) that have been
   // Baked into unrolled map templates.
   if (layoutDoc.state) {
+    // An array is only strippable if nothing that survives the build still reads it. A map
+    // Expansion is one consumer, not the only one: the same array is routinely also read by a
+    // Computed at runtime, and dropping it there left `state.rows` undefined in the browser while
+    // The build reported success (issue #122). `timing: "compiler"` is excluded from this rescue —
+    // That is the author declaring the entry build-time-only, so it is stripped as before.
+    const strippable = new Set<string>();
     for (const [key, def] of Object.entries(layoutDoc.state)) {
       if (key === "$site" || key === "$page") {
         continue;
@@ -773,13 +1272,54 @@ async function compilePage(
       ) {
         delete layoutDoc.state[key];
       } else if (Array.isArray(def)) {
-        delete layoutDoc.state[key];
+        strippable.add(key);
       }
+    }
+    // Iterated to a fixpoint: rescuing one array can reveal a read of another from its own def.
+    let rescued = true;
+    while (rescued) {
+      rescued = false;
+      const surviving = { ...layoutDoc.state } as Record<string, unknown>;
+      for (const key of strippable) {
+        delete surviving[key];
+      }
+      const haystack = JSON.stringify({ children: layoutDoc.children, state: surviving });
+      for (const key of strippable) {
+        if (referencesStateKey(haystack, key)) {
+          strippable.delete(key);
+          rescued = true;
+        }
+      }
+    }
+    for (const key of strippable) {
+      delete layoutDoc.state[key];
     }
   }
 
   // Resolve bare npm specifiers in $head (e.g. "@pkg/name/file.css" → "/node_modules/@pkg/name/file.css")
-  const resolvedSiteHead = resolveHeadBareSpecifiers(projectConfig.$head ?? []);
+  /*
+   * Extension `head` contributions sit BELOW the project's own `$head`, so a project that writes
+   * its own feed link keeps it — the same "author wins" rule every auto-injected entry follows.
+   */
+  /*
+   * The registration script. Byte-identical on every page, so a strict `script-src` needs exactly
+   * one hash for it (§14.3.1) — and it is only emitted when a worker actually exists, since a
+   * tombstone must not be registered by the page that is trying to get rid of it.
+   */
+  const swConfig = normalizeServiceWorker(projectConfig.serviceWorker);
+  const swHead: JxHeadEntry[] =
+    swConfig === null || swConfig === false
+      ? []
+      : [{ tagName: "script", textContent: registrationScript(swConfig.scope ?? "/") }];
+
+  const resolvedSiteHead = [
+    // The manifest link and theme colour are first-party and unconditional once declared, so they
+    // Sit with the extension contributions: below the project's own $head, which still wins.
+    ...(manifestHeadEntries(projectConfig) as JxHeadEntry[]),
+    ...swHead,
+    ...extensionHead,
+    ...resolveHeadBareSpecifiers(projectConfig.$head ?? [], rewriteNpmAsset),
+  ];
 
   // Merge $head from site + layout + page
   const mergedHead = mergeHead(resolvedSiteHead, resolvedLayoutHead, resolvedPageHead, {
@@ -787,6 +1327,7 @@ async function compilePage(
     charset: projectConfig.defaults?.charset ?? "utf8",
     ...(projectConfig.name != null && { siteName: projectConfig.name }),
     ...(projectConfig.url != null && { siteUrl: projectConfig.url }),
+    ...(locale.alternates.length > 0 && { alternates: locale.alternates }),
     pageUrl: route.urlPattern,
   });
 
@@ -802,8 +1343,12 @@ async function compilePage(
     mergedHead.splice(2, 0, { tagName: "script", textContent: colorSchemePrePaintScript() });
   }
 
-  // Transform <img> nodes for responsive image optimization
-  if (projectConfig.images?.optimize && (imageCache || imageMetaCache)) {
+  /*
+   * Responsive images. This runs whether or not `images.optimize` is on: the loading pass inside
+   * it is governed by `images.lazyLoad`, and declining to generate variants for an image says
+   * nothing about when the browser should fetch it.
+   */
+  if (projectConfig.images) {
     await transformImageNodes(
       layoutDoc,
       projectConfig.images as ImageConfig,
@@ -816,7 +1361,17 @@ async function compilePage(
 
   // Compile the document using the existing compiler
   const result = await compile(layoutDoc, {
-    lang: projectConfig.defaults?.lang ?? "en",
+    lang: language.lang,
+    /*
+     * The page-template tiers emit their own import map, and it defaulted to the CDN — so a page
+     * that reached compile-static/compile-client kept loading its runtime from esm.sh even after
+     * the self-hosting landed, because `injectComponentScripts` sees a map already present and
+     * declines to add its own. Both halves have to name the same URLs.
+     */
+    ...(runtimeImports["@vue/reactivity"] === undefined
+      ? {}
+      : { reactivitySrc: runtimeImports["@vue/reactivity"] }),
+    ...(runtimeImports["lit-html"] === undefined ? {} : { litHtmlSrc: runtimeImports["lit-html"] }),
     prePaintScheme: false, // Injected via the merged <head> above, not the target template
     projectStyle: projectConfig.style ?? null,
     ...(rewriteSidecarSrc === undefined
@@ -837,14 +1392,35 @@ async function compilePage(
   }
 
   // Post-process: inject merged <head> content into the compiled HTML
-  result.html = injectHead(result.html, mergedHead, projectConfig.defaults?.lang ?? "en");
+  result.html = injectHead(result.html, mergedHead, language);
 
-  // Inject <script type="module"> for npm $elements (cherry-picked component imports)
-  const npmElements = (layoutDoc.$elements ?? []).filter(
-    (e: JxElement | string) => typeof e === "string" && !e.startsWith("./") && !e.startsWith("../"),
-  );
+  /*
+   * Inject <script type="module"> for npm $elements (cherry-picked component imports).
+   *
+   * BOTH documents, because `$elements` is legal on either and `resolveLayout` does not merge the
+   * page's into the layout's. Reading only the layout dropped every bare specifier a PAGE declared:
+   * the page still rendered `<sl-card>` and friends into the markup, nothing imported the modules
+   * that define them, and the result was a page of inert unknown elements with no error anywhere.
+   * A local `./x.json` element never hit this, because those are registered through `componentDefs`
+   * on a different path — which is why the failure looked component-specific rather than general.
+   */
+  /*
+   * Deliberately the original predicate, not the stricter module-level `isBareSpecifier`: this fix
+   * is about WHERE entries are read from, and narrowing WHICH ones count would silently drop an
+   * absolute-URL `$element` that reaches this path today.
+   */
+  const isNpmElementEntry = (e: JxElement | string): e is string =>
+    typeof e === "string" && !e.startsWith("./") && !e.startsWith("../");
+  const npmElements = [
+    ...new Set(
+      [
+        ...((layoutDoc.$elements ?? []) as (JxElement | string)[]),
+        ...((pageDoc.$elements ?? []) as (JxElement | string)[]),
+      ].filter((e) => isNpmElementEntry(e)),
+    ),
+  ];
   if (npmElements.length > 0) {
-    result.html = injectNpmElementScripts(result.html, npmElements as string[]);
+    result.html = injectNpmElementScripts(result.html, registerElementBundle(npmElements));
   }
 
   // Compile server handler if applicable (skip when provider bundles site-wide)
@@ -867,6 +1443,12 @@ async function compilePage(
     excludeFromSitemap: pageDoc.$sitemap === false,
     files: result.files,
     html: result.html,
+    /*
+     * Reported rather than warned about here: a mistyped `rel` almost always lives in the site or
+     * layout `$head`, which means it is on every page, and the caller is the only scope that can
+     * say it once instead of four hundred times.
+     */
+    unregisteredRelations: unregisteredHeadRelations(mergedHead),
     serverHandler,
   };
 }
@@ -958,12 +1540,60 @@ function buildMountSpecs(
 }
 
 /**
+ * Gather every extension's `<head>` contribution, once, before the first page is built.
+ *
+ * Separate from `emit` because the two answer different questions at different times: `emit`
+ * derives files from loaded content long after every page was written, while this derives entries
+ * from CONFIGURATION and must run first. Gated like every other section capability — a class only
+ * contributes when the project declares a non-empty value for its section key.
+ */
+async function collectExtensionHead(
+  registry: ExtensionRegistry,
+  projectConfig: ProjectConfig,
+  projectRoot: string,
+): Promise<JxHeadEntry[]> {
+  const out: JxHeadEntry[] = [];
+  for (const entry of registry.headProviders()) {
+    const key = entry.project?.key;
+    const sectionValue = key === undefined ? null : (projectConfig as Record<string, unknown>)[key];
+    if (key !== undefined && (sectionValue === undefined || sectionValue === null)) {
+      continue;
+    }
+    try {
+      const contributed = (await entry.call("head", sectionValue ?? null, {
+        projectConfig,
+        root: projectRoot,
+      })) as JxHeadEntry[] | null;
+      out.push(...(contributed ?? []));
+    } catch (error) {
+      console.warn(`${entry.name} head capability failed: ${(error as Error).message}`);
+    }
+  }
+  return out;
+}
+
+/**
  * Resolve template strings in $head entries against the compiled scope.
  *
  * @param {JxHeadEntry[]} headEntries
  * @param {Record<string, unknown>} scope
  * @returns {JxHeadEntry[]}
  */
+function resolveTemplatesDeep(value: unknown, scope: Record<string, unknown>): unknown {
+  if (typeof value === "string") {
+    return isTemplateString(value) ? (evaluateStaticTemplate(value, scope) ?? value) : value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((v) => resolveTemplatesDeep(v, scope));
+  }
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([k, v]) => [k, resolveTemplatesDeep(v, scope)]),
+    );
+  }
+  return value;
+}
+
 function resolveHeadTemplates(headEntries: JxHeadEntry[], scope: Record<string, unknown>) {
   return headEntries.map((entry: JxHeadEntry) => {
     if (!entry || typeof entry !== "object") {
@@ -984,20 +1614,32 @@ function resolveHeadTemplates(headEntries: JxHeadEntry[], scope: Record<string, 
       resolved.textContent =
         (evaluateStaticTemplate(resolved.textContent, scope) as string | null) ??
         resolved.textContent;
+    } else if (resolved.textContent !== null && typeof resolved.textContent === "object") {
+      // A structured data block (§8.5): templates inside it resolve too, or a JSON-LD object could
+      // Never reference the page it describes.
+      resolved.textContent = resolveTemplatesDeep(resolved.textContent, scope) as Record<
+        string,
+        unknown
+      >;
     }
     return resolved;
   });
 }
 
 /**
- * Resolve bare npm specifiers in $head entry attributes (href, src). e.g.
- * "@shoelace-style/shoelace/dist/themes/light.css" →
- * "/node_modules/@shoelace-style/shoelace/dist/themes/light.css"
+ * Resolve bare npm specifiers in $head entry attributes (href, src) to their copied `/assets/` URL.
+ *
+ * `"@shoelace-style/shoelace/dist/themes/light.css"` →
+ * `"/assets/shoelace-style-shoelace-dist-themes-light.css"`.
  *
  * @param {JxHeadEntry[]} headEntries
+ * @param {(specifier: string) => string} rewrite
  * @returns {JxHeadEntry[]}
  */
-function resolveHeadBareSpecifiers(headEntries: JxHeadEntry[]) {
+function resolveHeadBareSpecifiers(
+  headEntries: JxHeadEntry[],
+  rewrite: (specifier: string) => string,
+) {
   return headEntries.map((entry: JxHeadEntry) => {
     if (!entry || typeof entry !== "object" || !entry.attributes) {
       return entry;
@@ -1006,7 +1648,7 @@ function resolveHeadBareSpecifiers(headEntries: JxHeadEntry[]) {
     for (const key of ["href", "src"]) {
       const val = resolved.attributes[key];
       if (typeof val === "string" && isBareSpecifier(val)) {
-        resolved.attributes[key] = `/node_modules/${val}`;
+        resolved.attributes[key] = rewrite(val);
       }
     }
     return resolved;
@@ -1230,6 +1872,19 @@ function resolveDocTemplates(node: JxElement | string, scope: Record<string, unk
 }
 
 /**
+ * Whether a serialized document fragment still reads a given state key — as a `${state.key}`
+ * template, a bare `state.key` inside a handler or computed body, or a `#/state/key` $ref.
+ *
+ * @param {string} haystack - JSON-serialized document fragment
+ * @param {string} key
+ * @returns {boolean}
+ */
+function referencesStateKey(haystack: string, key: string): boolean {
+  const escaped = key.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+  return new RegExp(String.raw`\bstate\.${escaped}\b|#/state/${escaped}(?=["/])`).test(haystack);
+}
+
+/**
  * Statically expand a mapped array to its resolved item nodes when `items` resolves to an array at
  * build time, or null otherwise (leave the array node for client-side rendering).
  *
@@ -1278,18 +1933,20 @@ interface SlotCssCollector {
  * @param {JxElement | string} node
  * @param {Map<string, JxElement>} componentDefs
  * @param {SlotCssCollector} [slotCss]
+ * @param {ProjectConfig["defaults"]} [defaults] - Read for `defaults.shadow` (spec.md §16.6)
  */
 function expandComponents(
   node: JxElement | string,
   componentDefs: Map<string, JxElement>,
   slotCss?: SlotCssCollector,
+  defaults?: ProjectConfig["defaults"],
 ) {
   if (!node || typeof node !== "object") {
     return;
   }
   if (Array.isArray(node)) {
     for (const n of node as (JxElement | string)[]) {
-      expandComponents(n, componentDefs, slotCss);
+      expandComponents(n, componentDefs, slotCss, defaults);
     }
     return;
   }
@@ -1297,7 +1954,7 @@ function expandComponents(
   // Recurse into children first (bottom-up expansion)
   if (Array.isArray(node.children)) {
     for (const child of node.children) {
-      expandComponents(child, componentDefs, slotCss);
+      expandComponents(child, componentDefs, slotCss, defaults);
     }
   }
 
@@ -1336,10 +1993,27 @@ function expandComponents(
             .join("\n")
         : null;
 
-    const innerHTML = preRenderComponentHtml(def, node.$props || null, slotContent);
+    /*
+     * In shadow mode the slotted children are NOT substituted into the prerendered markup: they
+     * stay in the light tree as siblings of the template, where a real `<slot>` distributes them.
+     * Passing them here instead would bake them into the shadow root, and the browser would then
+     * render them twice.
+     */
+    const shadow = resolveShadowMode(def, defaults);
+    const innerHTML = preRenderComponentHtml(def, node.$props || null, shadow ? null : slotContent);
     const isStatic = isComponentFullyStatic(def);
 
-    node.innerHTML = innerHTML;
+    /*
+     * A declarative shadow root: markup the parser materializes before any script runs, which the
+     * element then adopts rather than replaces (spec.md §16.6). The stylesheet link moves inside
+     * it because a shadow root does not inherit the document's stylesheets — and it stays an
+     * external `<link>`, so no Content-Security-Policy hash changes.
+     */
+    node.innerHTML = shadow
+      ? `<template shadowrootmode="${shadow}">` +
+        `<link rel="stylesheet" href="/components/${node.tagName}.css">` +
+        `${innerHTML}</template>${slotContent ?? ""}`
+      : innerHTML;
     delete node.children;
 
     // Resolve template-string host styles with props (per-instance values like background-image)
@@ -1383,6 +2057,8 @@ function expandComponents(
  * @param {Map<string, string>} [cssMap] - TagName → CSS text (for link injection)
  * @param {Set<string>} [staticTags] - Tags where ALL instances are fully static (skip JS)
  * @param {string} [islandSource] - Concatenated island modules emitted for this page
+ * @param {Record<string, string>} [runtimeImports] - The import map's `imports` object
+ * @param {Set<string>} [runtimeAssetsUsed] - Collects the asset paths an emitted import map names
  * @returns {string}
  */
 function injectComponentScripts(
@@ -1391,6 +2067,8 @@ function injectComponentScripts(
   cssMap = new Map<string, string>(),
   staticTags = new Set<string>(),
   islandSource = "",
+  runtimeImports: Record<string, string> = {},
+  runtimeAssetsUsed = new Set<string>(),
 ) {
   // A component reaches a page two ways: as a literal tag in the static HTML, or referenced only
   // From inside an island's client template — in which case the tag exists solely in the island's
@@ -1423,14 +2101,18 @@ function injectComponentScripts(
   }
 
   // Build import map (needed for @vue/reactivity and lit-html)
-  const importMap = `<script type="importmap">
-  {
-    "imports": {
-      "@vue/reactivity": "${DEFAULT_REACTIVITY_SRC}",
-      "lit-html": "${DEFAULT_LIT_HTML_SRC}"
+  const importMap = renderImportMap(runtimeImports);
+  for (const [specifier, url] of Object.entries(runtimeImports)) {
+    /*
+     * A prefix key's value is the DIRECTORY its subpaths are served from — `/assets/lit-html/` —
+     * not a file any build writes. `writeClientRuntime` matches this set against exact asset
+     * paths, so a directory in it bundled nothing and only inflated the count this build logged.
+     */
+    if (isPrefixSpecifier(specifier) || !url.startsWith("/")) {
+      continue;
     }
+    runtimeAssetsUsed.add(url);
   }
-  </script>`;
 
   const moduleScripts = jsTags
     .map((tag: string) => `<script type="module" src="/components/${tag}.js"></script>`)
@@ -1445,19 +2127,31 @@ function injectComponentScripts(
 
 /**
  * Inject <script type="module"> tags for npm package $elements (cherry-picked component imports).
- * Bare specifiers are resolved to /node_modules/ paths.
+ *
+ * Bare specifiers are BUNDLED to `/assets/`, not linked into node_modules. Bundling rather than
+ * copying because a component package imports its own dependencies by bare specifier too, and the
+ * import map only ever carried two entries.
  *
  * @param {string} html
  * @param {string[]} npmElements - Bare specifier strings, e.g.
  *   "@shoelace-style/shoelace/components/button/button.js"
  * @returns {string}
  */
-function injectNpmElementScripts(html: string, npmElements: string[]) {
-  const scripts = npmElements
-    .map((spec: string) => `<script type="module" src="/node_modules/${spec}"></script>`)
-    .join("\n  ");
-
-  return html.replace("</body>", `  ${scripts}\n</body>`);
+function injectNpmElementScripts(html: string, bundleUrl: string) {
+  /*
+   * ONE self-contained module for the whole set, and no import map.
+   *
+   * Each specifier used to be bundled separately with `lit-html` external, shared through the page
+   * import map. Two things were wrong with that. Bun's codegen for `export *` from an external
+   * emits a `__reExport(…, lit_html)` against a namespace it never imports, so the bundle threw
+   * `lit_html is not defined` before defining anything — measured, not inferred. And a package
+   * brings its own framework copy anyway, so sharing Jx's was a version-skew bet with no upside.
+   *
+   * Inlining per specifier would fix the codegen and cost seven copies of Lit on this page — a
+   * documented breakage, not merely 462kb. Bundling the SET as one entry gives one copy, no
+   * external, and 190kb for the seven-component demo that motivated this.
+   */
+  return html.replace("</body>", `  <script type="module" src="${bundleUrl}"></script>\n</body>`);
 }
 
 /**
@@ -1468,7 +2162,11 @@ function injectNpmElementScripts(html: string, npmElements: string[]) {
  * @param {string} lang
  * @returns {string}
  */
-function injectHead(html: string, headEntries: JxHeadEntry[], lang: string) {
+function injectHead(
+  html: string,
+  headEntries: JxHeadEntry[],
+  root: { lang: string; dir?: string },
+) {
   const headHtml = renderHead(headEntries);
 
   // Replace the existing <head>...</head> block, preserving compiler-generated <style> and <script> blocks
@@ -1490,12 +2188,18 @@ function injectHead(html: string, headEntries: JxHeadEntry[], lang: string) {
     result = result.replace(headPattern, `<head>\n  ${headHtml}${preservedBlocks}\n</head>`);
   }
 
-  // Set the lang attribute on <html>
+  // Set lang and dir on <html>. `dir` matters for the same reason `lang` does: without it, a
+  // Right-to-left page renders left-to-right, and the default is not "unset" but "ltr".
   result = result.replace(/<html\s[^>]*>/i, (match: string) => {
-    if (/lang=/.test(match)) {
-      return match.replace(/lang="[^"]*"/, `lang="${lang}"`);
+    let tag = /lang=/.test(match)
+      ? match.replace(/lang="[^"]*"/, `lang="${root.lang}"`)
+      : match.replace("<html", `<html lang="${root.lang}"`);
+    if (root.dir !== undefined) {
+      tag = /\sdir=/.test(tag)
+        ? tag.replace(/\sdir="[^"]*"/, ` dir="${root.dir}"`)
+        : tag.replace("<html", `<html dir="${root.dir}"`);
     }
-    return match.replace("<html", `<html lang="${lang}"`);
+    return tag;
   });
 
   return result;
@@ -1536,41 +2240,113 @@ function routeToOutputPath(urlPattern: string, outDir: string, trailingSlash: st
  * @param {Set<string>} [compiledUrls] - URL patterns of compiled routes, for conflict warnings
  * @returns {number} Number of files written
  */
+/**
+ * Which statuses get an HTML fallback, and why each other one does not.
+ *
+ * An HTML meta-refresh is a _client-side_ redirect: the browser fetches the source, then navigates.
+ * That is a reasonable stand-in for a 301 or a 303 on a host that ignores `_redirects`, and it is
+ * actively wrong for everything else.
+ */
+const REDIRECT_HTML_POLICY: Record<number, { html: boolean; canonical: boolean; why: string }> = {
+  // The permanent case: a canonical link is exactly the right signal.
+  301: { canonical: true, html: true, why: "" },
+  // Temporary — a canonical link would assert the permanence the status denies.
+  302: { canonical: false, html: true, why: "" },
+  // "See other, with GET" is what a meta-refresh already does.
+  303: { canonical: false, html: true, why: "" },
+  307: {
+    canonical: false,
+    html: false,
+    why: "307 preserves the request method and body; a meta-refresh silently converts POST to GET",
+  },
+  308: {
+    canonical: false,
+    html: false,
+    why: "308 preserves the request method and body; a meta-refresh silently converts POST to GET",
+  },
+};
+
+/**
+ * Emit `dist/_redirects` plus an HTML fallback for the literal sources whose status has one.
+ *
+ * @param {Record<
+ *   string,
+ *   string | { destination: string; status?: number } | { destination: string; rewrite: true }
+ * >} redirects
+ * @param {string} outDir
+ * @param {{ compiledUrls?: Set<string>; trailingSlash?: string }} [opts]
+ * @returns {{ files: number; errors: string[] }}
+ */
 function generateRedirects(
-  redirects: Record<string, string | { destination: string; status?: number }>,
+  redirects: Record<
+    string,
+    string | { destination: string; status?: number } | { destination: string; rewrite: true }
+  >,
   outDir: string,
-  compiledUrls = new Set<string>(),
+  opts: { compiledUrls?: Set<string>; trailingSlash?: string } = {},
 ) {
-  let count = 0;
+  let files = 0;
+  const errors: string[] = [];
   const redirectLines: string[] = [];
   const normalizeUrl = (u: string) => (u.length > 1 && u.endsWith("/") ? u.slice(0, -1) : u);
-  const compiled = new Set([...compiledUrls].map((u) => normalizeUrl(u)));
+  const compiled = new Set([...(opts.compiledUrls ?? [])].map((u) => normalizeUrl(u)));
+  const trailingSlash = opts.trailingSlash ?? "always";
 
   for (const [source, target] of Object.entries(redirects)) {
     const dest = typeof target === "object" ? target.destination : target;
-    const status = typeof target === "object" ? (target.status ?? 301) : 301;
+    const isRewrite = typeof target === "object" && "rewrite" in target && target.rewrite;
+    const status = isRewrite
+      ? 200
+      : typeof target === "object" && "status" in target
+        ? (target.status ?? 301)
+        : 301;
 
-    // Skip patterns with :param or * — these need platform-specific handling
+    if (!isRewrite && REDIRECT_HTML_POLICY[status] === undefined) {
+      errors.push(
+        `Redirect "${source}" has status ${status}, which is not an RFC 9110 §15.4 redirection ` +
+          `status. Use one of ${Object.keys(REDIRECT_HTML_POLICY).join(", ")}, or ` +
+          `{ destination, rewrite: true } for a proxy.`,
+      );
+      continue;
+    }
+
+    redirectLines.push(`${source} ${dest} ${status}`);
+
+    // A pattern source cannot be a file on disk, so it lives only in `_redirects`.
     if (source.includes(":") || source.includes("*")) {
-      redirectLines.push(`${source} ${dest} ${status}`);
       continue;
     }
 
     if (compiled.has(normalizeUrl(source))) {
+      const what = isRewrite ? "rewrite" : "redirect";
       console.warn(
-        `Redirect "${source}" overwrites a compiled page at the same route — ` +
-          `remove the redirect or the page.`,
+        `The ${what} "${source}" collides with a compiled page at the same route — ` +
+          `remove one or the other.`,
       );
     }
 
-    // Static redirect — emit an HTML file with meta refresh
-    const htmlPath = routeToOutputPath(source, outDir, "always");
+    /*
+     * A rewrite serves the destination's content AT the source URL. Writing an HTML file there
+     * shadows the rewrite on hosts that honour `_redirects`, and turns it into a redirect on the
+     * hosts that do not — so it is wrong in both directions. This was the bug.
+     */
+    if (isRewrite) {
+      continue;
+    }
+    const policy = REDIRECT_HTML_POLICY[status]!;
+    if (!policy.html) {
+      continue;
+    }
+
+    const htmlPath = routeToOutputPath(source, outDir, trailingSlash);
+    const canonical = policy.canonical
+      ? `\n  <link rel="canonical" href="${escapeAttr(dest)}">`
+      : `\n  <meta name="robots" content="noindex">`;
     const html = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="refresh" content="0;url=${escapeAttr(dest)}">
-  <link rel="canonical" href="${escapeAttr(dest)}">
+  <meta http-equiv="refresh" content="0;url=${escapeAttr(dest)}">${canonical}
   <title>Redirecting...</title>
 </head>
 <body>
@@ -1579,17 +2355,15 @@ function generateRedirects(
 </html>`;
     mkdirSync(dirname(htmlPath), { recursive: true });
     writeFileSync(htmlPath, html, "utf8");
-    count += 1;
-    redirectLines.push(`${source} ${dest} ${status}`);
+    files += 1;
   }
 
-  // Write _redirects file (Netlify/Cloudflare format)
   if (redirectLines.length > 0) {
     writeFileSync(join(outDir, "_redirects"), `${redirectLines.join("\n")}\n`, "utf8");
-    count += 1;
+    files += 1;
   }
 
-  return count;
+  return { errors, files };
 }
 
 /**
@@ -1626,26 +2400,60 @@ function escapeXml(str: string) {
 
 /**
  * Write a sitemap.xml from the collected page entries (sitemaps.org urlset 0.9). Each entry emits a
- * `<loc>` plus a `<lastmod>` date (W3C YYYY-MM-DD).
+ * `<loc>` plus a full RFC 3339 `<lastmod>`.
  *
- * @param {{ loc: string; lastmod: Date }[]} entries
+ * The W3C Datetime profile sitemaps.org cites admits both `YYYY-MM-DD` and a complete timestamp.
+ * The date-only form threw away the time and, with it, any way to tell two edits on one day apart.
+ *
+ * @param {{ loc: string; lastmod: string }[]} entries
  * @param {string} outDir
  * @returns {number} Number of files written
  */
-function generateSitemap(entries: { loc: string; lastmod: Date }[], outDir: string) {
+/** A `Date` to RFC 3339 in UTC, without fractional seconds. */
+function toRfc3339(d: Date): string {
+  return d.toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
+/** The namespace `xhtml:link` alternates live in, declared only when some entry has them. */
+const XHTML_NS = "http://www.w3.org/1999/xhtml";
+
+interface SitemapEntry {
+  loc: string;
+  lastmod: string;
+  alternates?: readonly LocaleAlternate[];
+}
+
+function generateSitemap(entries: SitemapEntry[], outDir: string) {
   if (entries.length === 0) {
     return 0;
   }
   const urls = entries
-    .map(
-      (e) =>
+    .map((e) => {
+      /*
+       * Every member of a translation set lists every member including itself — that reciprocity
+       * is what the annotation means, and a validator checks for it.
+       */
+      const links = (e.alternates ?? [])
+        .map(
+          (a) =>
+            `    <xhtml:link rel="alternate" hreflang="${escapeXml(a.hreflang)}" ` +
+            `href="${escapeXml(a.href)}"/>`,
+        )
+        .join("\n");
+      return (
         `  <url>\n    <loc>${escapeXml(e.loc)}</loc>\n` +
-        `    <lastmod>${e.lastmod.toISOString().slice(0, 10)}</lastmod>\n  </url>`,
-    )
+        `    <lastmod>${e.lastmod}</lastmod>\n${links === "" ? "" : `${links}\n`}  </url>`
+      );
+    })
     .join("\n");
+  // The namespace declaration is conditional: a monolingual sitemap should not carry a namespace
+  // It never uses.
+  const ns = entries.some((e) => (e.alternates?.length ?? 0) > 0)
+    ? ` xmlns:xhtml="${XHTML_NS}"`
+    : "";
   const xml =
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
-    `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
+    `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"${ns}>\n${urls}\n</urlset>\n`;
   writeFileSync(join(outDir, "sitemap.xml"), xml, "utf8");
   return 1;
 }

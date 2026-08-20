@@ -365,12 +365,54 @@ describe("wheel handler", () => {
 
   /* The grid could not be wheel-scrolled at all: the pan branch preventDefaulted over a Tabulator
      viewport that owns its own virtual scroller. Only the mode string "manage" was exempt, and it
-     is reachable from nowhere else in the codebase (plan §5.3). */
-  test.each(["grid", "manage"])("%s mode lets the surface scroll itself", (mode) => {
-    canvasMode = mode;
-    const e = wheel(wrapEl(), { deltaY: 20 });
+     is reachable from nowhere else in the codebase (plan §5.3).
+
+     `settings` and `entry` are the same defect over the two PANE FORMS: Project Settings scrolls
+     its section column (and the Raw JSON `<pre>` inside it) and the Entry editor scrolls its
+     fields, so a wheel over either was preventDefaulted for a panzoom wrap neither mode mounts —
+     the scrollbar could be dragged, and the wheel did nothing. */
+  test.each(["grid", "manage", "settings", "entry", "preview"])(
+    "%s mode lets the surface scroll itself",
+    (mode) => {
+      canvasMode = mode;
+      const e = wheel(wrapEl(), { deltaY: 20 });
+      expect(e.defaultPrevented).toBe(false);
+      expect(setPan).not.toHaveBeenCalled();
+    },
+  );
+
+  /* The OTHER half of the same gesture. Ctrl/⌘+wheel is page zoom to the browser — and a trackpad
+     pinch arrives as exactly this event — so a stage with no zoom of its own must block it like the
+     rest of the app's chrome, or a pinch over a form scales the whole of Studio. Blocked is not
+     panned: neither the stage offsets nor the tab's zoom may move. */
+  test.each(["grid", "manage", "settings", "entry", "preview"])(
+    "%s mode blocks ctrl+wheel browser zoom without panning or zooming",
+    (mode) => {
+      canvasMode = mode;
+      const before = activeTab.value!.session.ui.zoom;
+      const e = wheel(wrapEl(), { ctrlKey: true, deltaY: -100 });
+      expect(e.defaultPrevented).toBe(true);
+      expect(setPan).not.toHaveBeenCalled();
+      expect(applyTransform).not.toHaveBeenCalled();
+      expect(activeTab.value!.session.ui.zoom).toBe(before);
+    },
+  );
+
+  /* The wheel reaches the stage from a DESCENDANT — the Raw JSON `<pre>` is nested two levels
+     inside the settings document — so the exemption has to survive the bubble, not just a
+     dispatch on the wrap itself. */
+  test("a wheel over a scroller inside the settings pane is left alone", () => {
+    canvasMode = "settings";
+    const doc = document.createElement("div");
+    doc.className = "settings-doc-content";
+    const pre = document.createElement("pre");
+    pre.className = "settings-raw-json";
+    doc.append(pre);
+    wrapEl().append(doc);
+    const e = wheel(pre, { deltaY: 20 });
     expect(e.defaultPrevented).toBe(false);
     expect(setPan).not.toHaveBeenCalled();
+    doc.remove();
   });
 
   test("ctrl+wheel outside canvas is blocked (browser zoom prevention)", () => {
@@ -383,12 +425,18 @@ describe("wheel handler", () => {
     expect(e.defaultPrevented).toBe(false);
   });
 
-  test("ctrl+wheel inside canvas is not blocked by the document handler", () => {
-    canvasMode = "manage"; // Canvas handler returns early; only the doc blocker could prevent
+  /* The document-level guard exempts anything inside a stage, and that exemption is now invisible
+     from the outside: a stage either answers ctrl+wheel with a zoom of its own or blocks it, so the
+     event is prevented either way. What the exemption still decides is WHICH answer — this asserts
+     the self-scrolling one, over a DESCENDANT, since that is where the gesture actually lands.
+     (It used to assert `defaultPrevented === false` here, which was the browser-zoom hole.) */
+  test("ctrl+wheel over a descendant of a self-scrolling stage is blocked, not zoomed", () => {
+    canvasMode = "manage";
     const child = document.createElement("div");
     wrapEl().append(child);
     const e = wheel(child, { ctrlKey: true, deltaY: 10 });
-    expect(e.defaultPrevented).toBe(false);
+    expect(e.defaultPrevented).toBe(true);
+    expect(activeTab.value!.session.ui.zoom).toBe(1);
     child.remove();
   });
 

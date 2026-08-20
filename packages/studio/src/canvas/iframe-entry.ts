@@ -510,6 +510,16 @@ export function startCanvasIframe(opts: {
   // Unconditionally) made the one view whose job is fidelity the one view you could not scroll.
   const onWheel = (e: WheelEvent) => {
     if (currentMode === "preview") {
+      /* The document scrolls for real, so the plain wheel is ITS wheel and this handler takes no
+         part in it. Ctrl/⌘ — and the trackpad pinch that arrives as exactly this event — is not
+         that gesture: the browser reads it as page zoom, and the page it would scale is the whole
+         Studio window rather than the previewed document, which is neither what the author asked
+         for nor recoverable from inside the frame. The host cannot block it on this frame's behalf
+         (a cross-origin OOPIF's wheel never reaches it, and preview is the one mode that forwards
+         nothing), so the block belongs here. */
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+      }
       return;
     }
     e.preventDefault();
@@ -794,6 +804,23 @@ export function startCanvasIframe(opts: {
     if (msg.kind === "setColorScheme") {
       // Document-level attribute flip — deliberately patch-free (no render, no gen).
       applyPreviewColorScheme(container.ownerDocument, msg.scheme);
+      return;
+    }
+    if (msg.kind === "setLocale") {
+      /* The other document-level attribute flip, and the whole visible half of an axis-3 locale:
+         `dir` is what makes an RTL preview actually mirror, and `lang` is what CSS's `:lang()` and
+         the font stack select on. Patch-free like the scheme above — the TEXT is whatever file is
+         open, because a translation in Jx is a different file rather than a different rendering.
+         Cleared rather than blanked when the pane goes back to the document's own language: an
+         empty `lang=""` is a document that claims to be in no language at all. */
+      const root = container.ownerDocument.documentElement;
+      if (msg.locale === null) {
+        root.removeAttribute("lang");
+        root.removeAttribute("dir");
+      } else {
+        root.setAttribute("lang", msg.locale);
+        root.setAttribute("dir", msg.dir);
+      }
       return;
     }
     if (msg.kind === "siteStyleUpdate") {

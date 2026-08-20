@@ -95,6 +95,8 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { baselineProblemOf, MAX_OUTPUT, verdictOf } from "./mutant-verdict";
+import type { Verdict } from "./mutant-verdict";
 
 /** One source edit: a precise substring and what replaces it. Must match EXACTLY once. */
 interface Edit {
@@ -811,6 +813,21 @@ const MUTANTS: Mutant[] = [
   {
     edits: [
       {
+        find: `      disabled: deriveReason ?? presetRefusal("locale", paneId, null, locale),`,
+        replace: `      disabled: deriveReason,`,
+      },
+    ],
+    file: "src/panels/pane-context.ts",
+    id: "pane-context.ts · the locale row carries its own refusal",
+    means:
+      "every language the project names is offered over a monolingual project and over a " +
+      "document that has never been saved — and choosing one throws a `RangeError` out of a " +
+      "click handler",
+    test: "tests/lens-chrome.test.ts",
+  },
+  {
+    edits: [
+      {
         find: `      workspace.panes.length > 1 ? null : (registry?.get("pane.unsplit")?.requires ?? null),`,
         replace: `      null,`,
       },
@@ -920,13 +937,32 @@ const MUTANTS: Mutant[] = [
         find:
           `    derived.kind === "lens" && derived.preset === "breakpoint"\n` +
           '      ? `${PRESET_LABELS.breakpoint} ${derived.media ? mediaDisplayName(derived.media) : "Base"}`\n' +
-          `      : PRESET_LABELS[derived.preset];`,
+          `      : derived.kind === "companion" && derived.preset === "locale"\n` +
+          '        ? `${PRESET_LABELS.locale} ${derived.locale ? localeLabel(derived.locale) : "—"}`\n' +
+          `        : PRESET_LABELS[derived.preset];`,
         replace: `    PRESET_LABELS[derived.preset];`,
       },
     ],
     file: "src/panels/tab-strip.ts",
     id: "tab-strip.ts · the breakpoint chip names its breakpoint",
     means: 'every breakpoint lens\'s only chip reads "Same page at" and never says at WHAT',
+    test: "tests/lens-chrome.test.ts",
+  },
+  {
+    edits: [
+      {
+        find:
+          `      : derived.kind === "companion" && derived.preset === "locale"\n` +
+          '        ? `${PRESET_LABELS.locale} ${derived.locale ? localeLabel(derived.locale) : "—"}`\n' +
+          `        : PRESET_LABELS[derived.preset];`,
+        replace: `      : PRESET_LABELS[derived.preset];`,
+      },
+    ],
+    file: "src/panels/tab-strip.ts",
+    id: "tab-strip.ts · the locale chip names its locale",
+    means:
+      'every locale companion\'s chip reads "Same page in" and never says in WHAT — the one fact ' +
+      "the author opened the pane to be told",
     test: "tests/lens-chrome.test.ts",
   },
   {
@@ -1062,8 +1098,8 @@ const MUTANTS: Mutant[] = [
   {
     edits: [
       {
-        find: `const derivationDeps: DerivationDeps = { loadDiff: loadDiffForLens, openFileInPane };`,
-        replace: `const derivationDeps: DerivationDeps = { loadDiff: () => Promise.resolve(null), openFileInPane };`,
+        find: `  loadDiff: loadDiffForLens,\n  openFileInPane,\n};`,
+        replace: `  loadDiff: () => Promise.resolve(null),\n  openFileInPane,\n};`,
       },
     ],
     file: "src/studio.ts",
@@ -1236,6 +1272,23 @@ const MUTANTS: Mutant[] = [
   {
     edits: [
       {
+        find:
+          `    return locale !== null && i18n.locales.includes(locale)\n` +
+          `      ? null\n` +
+          `      : "a locale this project declares";`,
+        replace: `    return null;`,
+      },
+    ],
+    file: "src/workspace/pane-derive.ts",
+    id: "pane-derive.ts · a locale the project stopped declaring is refused",
+    means:
+      "the menu offers, and the pane opens, a language nothing builds — a companion pointed at a " +
+      "directory the router has never heard of",
+    test: "tests/pane-derive.test.ts",
+  },
+  {
+    edits: [
+      {
         find: `  if (needed && !source.capabilities.modes.includes(needed)) {`,
         replace: `  if (false as boolean) {`,
       },
@@ -1365,6 +1418,20 @@ const MUTANTS: Mutant[] = [
   {
     edits: [
       {
+        find: `  if (preset === "locale") {\n    return {\n      kind: "companion",`,
+        replace: `  if (false as boolean) {\n    return {\n      kind: "companion",`,
+      },
+    ],
+    file: "src/workspace/pane-derive.ts",
+    id: "pane-derive.ts · locale builds a COMPANION, not a lens",
+    means:
+      "the preset becomes a second copy of the page under a chip naming another language — a " +
+      "projection that changes nothing but the chip, which is what a companion exists not to be",
+    test: "tests/pane-derive.test.ts",
+  },
+  {
+    edits: [
+      {
         find: `  return pane && pane.activeTabId !== null && pane.derived === null ? null : DERIVE_REQUIRES;`,
         replace: `  return pane && pane.derived === null ? null : DERIVE_REQUIRES;`,
       },
@@ -1455,6 +1522,32 @@ const MUTANTS: Mutant[] = [
   {
     edits: [
       {
+        find:
+          `        live?.kind !== "companion" ||\n` +
+          `        live.preset !== "locale" ||\n` +
+          `        _localeProbes.get(paneId)?.path !== path`,
+        replace: `        false as boolean`,
+      },
+    ],
+    file: "src/workspace/pane-derive.ts",
+    id: "pane-derive.ts · a translation probe answers only the question still being asked",
+    means:
+      "the author picks another language while the first read is out, and that read's answer is " +
+      "written onto the new locale's memo — the pane resolves German against French's disk",
+    test: "tests/pane-derive.test.ts",
+  },
+  {
+    edits: [{ find: `    _localeProbes.delete(paneId);`, replace: `    void paneId;` }],
+    file: "src/workspace/pane-derive.ts",
+    id: "pane-derive.ts · writing a derivation FORGETS the pane's translation probe",
+    means:
+      "the author creates the missing translation and points the pane at that language again, " +
+      "and the pane still says there is no copy — the answer to a question nobody asked twice",
+    test: "tests/pane-derive.test.ts",
+  },
+  {
+    edits: [
+      {
         find: `    if (pane.tabOrder.length > 0 || pane.activeTabId !== null) {`,
         replace: `    if (false as boolean) {`,
       },
@@ -1513,6 +1606,15 @@ const MUTANTS: Mutant[] = [
     file: "src/workspace/pane-derive.ts",
     id: "pane-derive.ts · a component companion HOLDS when the click resolves to nothing",
     means: "the pane flickers between a definition and an empty state as the author works",
+    test: "tests/pane-derive.test.ts",
+  },
+  {
+    edits: [{ find: `    if (!probe.exists) {`, replace: `    if (false as boolean) {` }],
+    file: "src/workspace/pane-derive.ts",
+    id: "pane-derive.ts · a translation that does not exist is unavailable, not blank",
+    means:
+      "choosing a language nobody has written yet hands `openFileInPane` a path with no file " +
+      "behind it: an empty pane with no words, where the sentence names the language and the fix",
     test: "tests/pane-derive.test.ts",
   },
   {
@@ -1696,9 +1798,9 @@ function applyEdits(
  * Apply one mutant's edits, run its test file, and answer whether the test NOTICED.
  *
  * @param {Mutant} mutant
- * @returns {{ killed: boolean; problem: string | null; aborted: boolean }}
+ * @returns {Verdict}
  */
-function runMutant(mutant: Mutant): { killed: boolean; problem: string | null; aborted: boolean } {
+function runMutant(mutant: Mutant): Verdict {
   const path = resolve(ROOT, mutant.file);
   const original = readFileSync(path, "utf8");
   const { mutated, problem } = applyEdits(mutant, original);
@@ -1708,41 +1810,18 @@ function runMutant(mutant: Mutant): { killed: boolean; problem: string | null; a
   _originals.set(path, original);
   try {
     writeFileSync(path, mutated);
-    const run = spawnSync("bun", ["test", "--isolate", mutant.test], {
-      cwd: ROOT,
-      encoding: "utf8",
-      env: { ...process.env, FORCE_COLOR: "0", NO_COLOR: "1" },
-      /* Generous, and not arbitrary. A failing `expect` on a happy-dom element prints the element,
-         and a happy-dom element's inspection reaches its `window` — hundreds of kilobytes of class
-         table per assertion. At Node's 1MB default the child is KILLED for overflowing the pipe,
-         `status` comes back `null`, and a mutant that died loudly is reported as unapplied. */
-      maxBuffer: 64 * 1024 * 1024,
-    });
-    /* CTRL-C, noticed through the CHILD, which is the only place it can be noticed.
-       There were `process.on("SIGINT", …)` handlers here for two rounds and they could not run:
-       `main` is synchronous from the first line to `process.exit`, `spawnSync` blocks the thread,
-       and a signal handler is dispatched on an event-loop turn that never comes. So Ctrl-C was
-       absorbed — the gate reported the interrupted mutant as unapplied and carried on with the
-       next one. The signal reaches the whole foreground process group, so the CHILD dies of it and
-       says so in `run.signal`; that is a real answer, arriving on the synchronous path, and the
-       `finally` below has already restored the file by the time it is returned. */
-    if (run.signal === "SIGINT" || run.signal === "SIGTERM") {
-      return { aborted: true, killed: false, problem: null };
-    }
-    /* A test file that cannot even LOAD is not a kill — it proves the mutant is unloadable, not
-       that anything asserts on the behaviour. Bun reports the failure count either way, so the
-       count decides and the exit code only tells them apart. */
-    const out = `${run.stdout ?? ""}${run.stderr ?? ""}`;
-    const failed = /(\d+) fail/.exec(out);
-    const fails = failed ? Number(failed[1]) : 0;
-    if (run.status !== 0 && fails === 0) {
-      return {
-        aborted: false,
-        killed: false,
-        problem: `${mutant.test} did not RUN under the mutant (exit ${run.status}, 0 reported failures). A mutant that breaks the module's load is not evidence of a test:\n${out.split("\n").slice(-12).join("\n")}`,
-      };
-    }
-    return { aborted: false, killed: fails > 0, problem: null };
+    /* Reading the result is its own module, because getting it wrong is silent: a child killed for
+       outrunning `maxBuffer` comes back as a `SIGTERM`, and this gate read that as Ctrl-C and
+       stopped — red on `main` for weeks with nobody at a keyboard. See `mutant-verdict.ts`. */
+    return verdictOf(
+      spawnSync("bun", ["test", "--isolate", mutant.test], {
+        cwd: ROOT,
+        encoding: "utf8",
+        env: { ...process.env, FORCE_COLOR: "0", NO_COLOR: "1" },
+        maxBuffer: MAX_OUTPUT,
+      }),
+      mutant.test,
+    );
   } finally {
     writeFileSync(path, original);
     _originals.delete(path);
@@ -1762,17 +1841,15 @@ function runMutant(mutant: Mutant): { killed: boolean; problem: string | null; a
  * @returns {string | null} The problem, or null when the file is green.
  */
 function baselineProblem(test: string): string | null {
-  const run = spawnSync("bun", ["test", "--isolate", test], {
-    cwd: ROOT,
-    encoding: "utf8",
-    env: { ...process.env, FORCE_COLOR: "0", NO_COLOR: "1" },
-    maxBuffer: 64 * 1024 * 1024,
-  });
-  if (run.status === 0) {
-    return null;
-  }
-  const out = `${run.stdout ?? ""}${run.stderr ?? ""}`;
-  return `${test} is not green BEFORE any mutant is applied, so every "kill" it reports is that failure and not the mutant:\n${out.split("\n").slice(-8).join("\n")}`;
+  return baselineProblemOf(
+    spawnSync("bun", ["test", "--isolate", test], {
+      cwd: ROOT,
+      encoding: "utf8",
+      env: { ...process.env, FORCE_COLOR: "0", NO_COLOR: "1" },
+      maxBuffer: MAX_OUTPUT,
+    }),
+    test,
+  );
 }
 
 /**

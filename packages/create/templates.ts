@@ -29,7 +29,7 @@ export const TEMPLATES: readonly TemplateMeta[] = [
     name: "Mobile First",
   },
   {
-    description: "A mobile-first app shell with a fixed bottom navigation and scrollable content.",
+    description: "A mobile-first app shell: a scrolling content area above a bottom nav bar.",
     id: "mobile-app",
     name: "Mobile App",
   },

@@ -38,6 +38,7 @@ export function libraryColumns(): GridColumn[] {
   return [
     { editable: false, field: "name", kind: "string", pk: true, title: "Name", widthHint: 260 },
     { editable: false, field: "category", kind: "string", title: "Category", widthHint: 120 },
+    { editable: false, field: "locale", kind: "string", title: "Locale", widthHint: 90 },
     { editable: false, field: "type", kind: "string", title: "Type", widthHint: 120 },
     { editable: false, field: "size", kind: "number", title: "Size", widthHint: 90 },
     { editable: false, field: "modified", kind: "date", title: "Modified", widthHint: 160 },
@@ -50,6 +51,9 @@ export function libraryRow(file: LibraryFile): GridRow {
   return {
     cells: {
       category: file.category,
+      // Null, not "": the platform reported no locale directory for this file, and a grid cell
+      // Distinguishes "no value" from "the empty string" everywhere else in this contract.
+      locale: file.locale ?? null,
       modified: file.modified ?? null,
       name: file.name,
       path: file.path,

@@ -634,6 +634,7 @@
             "resolvePaths",
             "lower",
             "emit",
+            "head",
             "assets",
             "mount",
             "dialect",
@@ -955,9 +956,6 @@
           "type": "string"
         },
         "domain": {
-          "type": "string"
-        },
-        "expires": {
           "type": "string"
         },
         "filter": {
@@ -1558,7 +1556,7 @@
           "title": "Pure method — genuine prototype methods; receiver in target, args in value"
         },
         {
-          "description": "Invoke a callable, pure in formula position: target is the callee pointer — a named formula entry (#/state/…) or a blessed pure global via window#/ (Math.*, JSON.*, Object.keys/values/entries, and the Intl helpers Intl/formatNumber, Intl/formatDate, Intl/formatRelativeTime) — and value is the positional argument list (the splice args-in-value precedent). Argument order follows the callee's declared parameters.",
+          "description": "Invoke a callable, pure in formula position: target is the callee pointer — a named formula entry (#/state/…) or a blessed pure global via window#/ (Math.*, JSON.*, Object.keys/values/entries, and the Intl helpers Intl/formatNumber, Intl/formatDate, Intl/formatRelativeTime, Intl/formatList, Intl/plural, Intl/compare, Intl/displayName, Intl/segment) — and value is the positional argument list (the splice args-in-value precedent). Argument order follows the callee's declared parameters.",
           "not": {
             "required": [
               "initial"
@@ -7738,6 +7736,26 @@
             }
           ]
         },
+        "animation-delay-end": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            }
+          ]
+        },
+        "animation-delay-start": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            }
+          ]
+        },
         "animation-direction": {
           "oneOf": [
             {
@@ -7879,6 +7897,26 @@
           ]
         },
         "animationDelay": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            }
+          ]
+        },
+        "animationDelayEnd": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            }
+          ]
+        },
+        "animationDelayStart": {
           "oneOf": [
             {
               "type": "string"
@@ -18228,6 +18266,16 @@
             }
           ]
         },
+        "scroll-axis-lock": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            }
+          ]
+        },
         "scroll-behavior": {
           "oneOf": [
             {
@@ -18539,6 +18587,16 @@
           ]
         },
         "scroll-timeline-name": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            }
+          ]
+        },
+        "scrollAxisLock": {
           "oneOf": [
             {
               "type": "string"
@@ -23029,7 +23087,15 @@
           "type": "string"
         },
         "textContent": {
-          "type": "string"
+          "description": "Element content. An object is serialized to JSON inside the tag — that is how a JSON-LD block (`<script type=\"application/ld+json\">`) is authored.",
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object"
+            }
+          ]
         }
       },
       "required": [
@@ -23050,6 +23116,10 @@
           "type": "boolean"
         },
         "optimize": {
+          "type": "boolean"
+        },
+        "picture": {
+          "description": "Wrap a multi-format image in a <picture> with one <source> per format (default true). With it off the <img> carries a srcset in the preferred format alone, which browsers that cannot decode that format will still select from.",
           "type": "boolean"
         },
         "quality": {
@@ -23209,6 +23279,32 @@
       ],
       "type": "string"
     },
+    "$dir": {
+      "description": "Base direction for this page's <html> element, overriding `defaults.dir`. Right-to-left content renders left-to-right without it.",
+      "enum": [
+        "ltr",
+        "rtl",
+        "auto"
+      ],
+      "type": "string"
+    },
+    "$lang": {
+      "description": "Language tag for this page's <html> element, overriding `defaults.lang` (site-architecture.md §8.4).",
+      "examples": [
+        "en",
+        "fr",
+        "ar-EG"
+      ],
+      "type": "string"
+    },
+    "$translationKey": {
+      "description": "This page's identity across languages, overriding the one its path implies (site-architecture.md §13.5). Two routes are translations when their keys match; the default key is the path with the locale prefix removed, which is right whenever the paths are parallel and wrong for a localized slug — /fr-ca/a-propos/ shares nothing with /about/ until one of them says so.",
+      "examples": [
+        "about",
+        "blog/hello-world"
+      ],
+      "type": "string"
+    },
     "$layout": {
       "description": "Layout reference for pages. String path to a layout JSON file, or false to opt out of the default layout.",
       "examples": [
@@ -23223,6 +23319,26 @@
           "type": "boolean"
         }
       ]
+    },
+    "$shadow": {
+      "description": "Render this component into a shadow root instead of the light DOM (spec.md §16.6). Off unless set: a shadow root isolates the component's styles from the page and replaces the <slot> emulation with real slot distribution, so it changes how the component composes. Overrides `defaults.shadow` in both directions — `false` opts one component out of a project that opted in.",
+      "oneOf": [
+        {
+          "enum": [
+            "open",
+            "closed"
+          ],
+          "type": "string"
+        },
+        {
+          "const": false,
+          "type": "boolean"
+        }
+      ]
+    },
+    "$sitemap": {
+      "description": "Set false to exclude this page from sitemap.xml (site-architecture.md §8.4.1). Every other page with a URL is included.",
+      "type": "boolean"
     },
     "$media": {
       "additionalProperties": {

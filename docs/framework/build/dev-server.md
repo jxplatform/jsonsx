@@ -58,6 +58,12 @@ The server watches `root` (ignoring `node_modules/`, `dist/`, `.git/`, and frien
 
 Save a file and every connected page reloads. When the changed file matches a `builds` entry's `match` pattern, that bundle is rebuilt first, so the reload picks up fresh output. The one exception is the Studio editor itself: Studio pages never get the reload script, because Studio refreshes edited files in place and a full reload would discard open tabs and undo history.
 
+### Restarting the server
+
+Restart the dev server and the page reconnects in about half a second, then reloads once — so a save made during the restart still lands. Without that, the browser's own reconnection delay is measured in seconds, which is long enough for the save to look like it did nothing.
+
+You get exactly one reload no matter how many changes happened while the connection was down. That's deliberate: the page in front of you was built before the disconnect, and one full reload already covers everything you missed.
+
 ## How Studio is served
 
 Studio is a static web app plus a REST API — the dev server provides both. With `studio: true` (the default), the server mounts `/__studio/*`: project metadata, file listing, read/write/delete/rename, component discovery, content search, code formatting and linting for the function-body editor, and a realtime co-editing WebSocket at `/__studio/collab`. Every filesystem operation is validated to stay under `root`, so path traversal is rejected.
@@ -91,6 +97,8 @@ Extensions that declare server mounts (for example the data API) are served unde
 ## Static files and npm packages
 
 Anything the other routes don't claim is served from disk: files under `root` at their natural URLs, then files under the active Studio project, then the project's `public/` directory mapped to the site root — mirroring where assets live in production. Bare npm specifiers in URLs (such as `@jxsuite/parser/…`) are resolved through `node_modules`, bundled on demand with `Bun.build`, and cached for the life of the server. All responses are sent with `Cache-Control: no-cache` so a plain reload never serves a stale bundle.
+
+Content types come from Bun's own inference, with two corrections: a `.md` file is sent as `text/markdown; variant=GFM` (bare `text/markdown` doesn't say which markdown), and a `.yaml` file as `application/yaml` rather than the deprecated `text/yaml`. Every other extension keeps the inferred type.
 
 ## Related
 

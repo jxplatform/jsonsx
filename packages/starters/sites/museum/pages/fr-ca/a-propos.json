@@ -1,0 +1,313 @@
+{
+  "$layout": "./layouts/fr-ca.json",
+  "$translationKey": "about",
+  "title": "À propos du musée — Atrium",
+  "description": "Atrium est le musée d'art et d'histoire de la ville : une halle de verre posée sur l'ancienne douane, à entrée libre, tenue par la ville et ses lecteurs depuis 1897.",
+  "$head": [
+    {
+      "tagName": "meta",
+      "attributes": {
+        "name": "description",
+        "content": "Atrium est le musée d'art et d'histoire de la ville : une halle de verre posée sur l'ancienne douane, à entrée libre, tenue par la ville et ses lecteurs depuis 1897."
+      }
+    }
+  ],
+  "state": {
+    "catalogued": {
+      "$expression": {
+        "operator": "call",
+        "target": { "$ref": "window#/Intl/formatNumber" },
+        "value": [0.94, null, { "style": "percent" }]
+      }
+    },
+    "archive": {
+      "$expression": {
+        "operator": "call",
+        "target": { "$ref": "window#/Intl/formatNumber" },
+        "value": [1240, null, { "style": "unit", "unit": "meter", "unitDisplay": "long" }]
+      }
+    },
+    "staff": {
+      "$expression": {
+        "operator": "call",
+        "target": { "$ref": "window#/Intl/formatNumber" },
+        "value": [61]
+      }
+    },
+    "languages": {
+      "$expression": {
+        "operator": "call",
+        "target": { "$ref": "window#/Intl/formatList" },
+        "value": [["anglais", "français", "arabe"]]
+      }
+    }
+  },
+  "children": [
+    {
+      "tagName": "mu-pagehead",
+      "$props": {
+        "kicker": "À propos",
+        "title": "Un musée qui se contredit lui-même",
+        "standfirst": "Atrium a été fondé par 240 ménages qui ont chacun donné ce qu'ils pouvaient et exigé, par écrit, que l'entrée reste gratuite. Elle l'est restée pendant cent vingt-neuf ans, à travers deux reconstructions et un incendie.",
+        "metaLabel": "Salle de lecture",
+        "metaValue": "Deuxième étage, sans rendez-vous"
+      }
+    },
+    {
+      "tagName": "mu-band",
+      "$props": { "index": "01", "label": "Le bâtiment", "tone": "chalk" },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "minmax(0, 1.4fr) minmax(0, 0.8fr)",
+            "columnGap": "clamp(2rem, 5vw, 4rem)",
+            "rowGap": "1.25rem",
+            "@--md": { "gridTemplateColumns": "minmax(0, 1fr)" },
+            "alignItems": "start"
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": { "maxWidth": "var(--measure)" },
+              "children": [
+                {
+                  "tagName": "p",
+                  "style": { "margin": "0", "lineHeight": "1.75" },
+                  "textContent": "Le musée a commencé dans une pièce au-dessus de la douane, qu'il a débordée en dix-neuf ans. La halle de verre qui l'a remplacée en 1916 a été bâtie par-dessus la douane plutôt qu'à sa place : les vieux murs de pierre tiennent toujours debout à l'intérieur, sans plus rien porter, et la visite commence en passant entre eux."
+                },
+                {
+                  "tagName": "p",
+                  "style": { "margin": "1.1rem 0 0", "lineHeight": "1.75" },
+                  "textContent": "Le toit est la raison pour laquelle on photographie le bâtiment et celle pour laquelle les restauratrices le détestent. Chaque objet du rez-de-chaussée est placé selon la lumière qu'il peut encaisser, ce qui explique que le cabinet de cartes occupe le coin le plus sombre et que la poêle à sel reste dehors, sous la pluie."
+                },
+                {
+                  "tagName": "p",
+                  "style": { "margin": "1.1rem 0 0", "lineHeight": "1.75" },
+                  "textContent": "Rien ici n'est une copie. Là où le musée présente une reproduction — trois des cartes sont trop fragiles pour être accrochées — le cartel le dit dès la première ligne, dans le même corps que le titre."
+                },
+                {
+                  "tagName": "p",
+                  "style": { "margin": "1.1rem 0 0", "lineHeight": "1.75" },
+                  "textContent": "Là où le musée ignore quelque chose, le cartel le dit aussi. Environ un objet sur neuf n'a pas d'auteur attribué, et le catalogue consigne le trou plutôt qu'une supposition."
+                }
+              ]
+            },
+            {
+              "tagName": "mu-oculus",
+              "$props": { "size": "20rem", "tone": "card" }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "mu-band",
+      "$props": { "index": "02", "label": "Ce que nous conservons", "tone": "card" },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "repeat(2, minmax(0, 1fr))",
+            "columnGap": "clamp(2rem, 5vw, 4rem)",
+            "@--md": { "gridTemplateColumns": "minmax(0, 1fr)" }
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "children": [
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "Catalogué",
+                    "value": "${state.catalogued}",
+                    "note": "De tout ce qui est inscrit à l'inventaire. Le reste est surtout le legs d'atelier de 2019."
+                  }
+                },
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "Archives",
+                    "value": "${state.archive}",
+                    "note": "De papier sur rayons : registres, carnets d'arpentage et correspondance d'atelier."
+                  }
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "children": [
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "Personnel",
+                    "value": "${state.staff}",
+                    "note": "Conservation, restauration, accueil, et les deux personnes qui gardent le toit propre."
+                  }
+                },
+                {
+                  "tagName": "mu-fact",
+                  "$props": {
+                    "term": "Cartels en",
+                    "value": "${state.languages}",
+                    "note": "Chaque cartel, dans chaque salle, sans version abrégée pour aucune des trois."
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "mu-band",
+      "$props": { "index": "03", "label": "Trois langues", "tone": "chalk" },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "minmax(0, 1fr) minmax(0, 0.85fr)",
+            "columnGap": "clamp(2rem, 5vw, 4rem)",
+            "alignItems": "start",
+            "@--md": { "gridTemplateColumns": "minmax(0, 1fr)", "rowGap": "2rem" }
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": { "maxWidth": "var(--measure)" },
+              "children": [
+                {
+                  "tagName": "p",
+                  "style": { "margin": "0", "lineHeight": "1.75" },
+                  "textContent": "Un tiers de cette ville lit le français à la maison et une part grandissante lit l'arabe : le musée est donc écrit trois fois plutôt qu'une seule avec des traductions greffées par-dessus. Chaque langue a ses pages, ses textes de salle et sa lecture de la collection — le parcours arabe de la salle 2 n'est pas le parcours anglais inversé, c'est une autre thèse, signée par une autre conservatrice."
+                },
+                {
+                  "tagName": "p",
+                  "style": { "margin": "1.1rem 0 0", "lineHeight": "1.75" },
+                  "textContent": "Chaque page porte le même sélecteur, et il ne liste que les langues dans lesquelles cette page existe vraiment. Si une langue manque au sélecteur, c'est que la page n'y a pas encore été écrite — un engagement que nous préférons montrer plutôt que cacher."
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "border": "2px solid var(--color-ink)",
+                "backgroundColor": "var(--color-card)",
+                "padding": "clamp(1.25rem, 3vw, 1.9rem)"
+              },
+              "children": [
+                {
+                  "tagName": "p",
+                  "style": {
+                    "margin": "0 0 1.1rem",
+                    "fontFamily": "var(--font-label)",
+                    "fontSize": "0.66rem",
+                    "letterSpacing": "var(--label-tracking)",
+                    "textTransform": "var(--label-case)",
+                    "color": "var(--color-muted)"
+                  },
+                  "textContent": "Cette page, dans toutes les langues où elle existe"
+                },
+                {
+                  "tagName": "ul",
+                  "style": {
+                    "listStyle": "none",
+                    "margin": "0",
+                    "padding": "0",
+                    "display": "grid",
+                    "gap": "0.55rem"
+                  },
+                  "children": {
+                    "$prototype": "Array",
+                    "items": { "$ref": "#/state/$page/alternates" },
+                    "map": {
+                      "tagName": "li",
+                      "children": [
+                        {
+                          "tagName": "a",
+                          "lang": "${item.code}",
+                          "attributes": {
+                            "dir": "${item.dir}",
+                            "href": "${item.url}",
+                            "hreflang": "${item.code}",
+                            "aria-current": "${item.current ? 'page' : 'false'}"
+                          },
+                          "style": {
+                            "display": "flex",
+                            "alignItems": "baseline",
+                            "gap": "0.7rem",
+                            "textDecoration": "none",
+                            "paddingBlock": "0.35rem",
+                            "borderBlockEnd": "1px solid var(--color-hairline)",
+                            "color": "${item.current ? 'var(--color-muted)' : 'var(--color-pigment)'}",
+                            ":hover": { "color": "var(--color-ink)" }
+                          },
+                          "children": [
+                            {
+                              "tagName": "span",
+                              "style": {
+                                "fontFamily": "var(--font-label)",
+                                "fontSize": "0.64rem",
+                                "letterSpacing": "var(--label-tracking)",
+                                "textTransform": "var(--label-case)",
+                                "opacity": "0.7"
+                              },
+                              "textContent": "${item.code}"
+                            },
+                            {
+                              "tagName": "span",
+                              "style": { "fontSize": "1.02rem" },
+                              "textContent": "${item.label}"
+                            },
+                            {
+                              "tagName": "span",
+                              "style": {
+                                "marginInlineStart": "auto",
+                                "fontFamily": "var(--font-label)",
+                                "fontSize": "0.62rem",
+                                "letterSpacing": "var(--label-tracking)",
+                                "textTransform": "var(--label-case)",
+                                "display": "${item.current ? 'inline' : 'none'}"
+                              },
+                              "textContent": "Vous êtes ici"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "mu-band",
+      "$props": { "index": "04", "label": "Dans les mots des fondateurs", "tone": "ink" },
+      "children": [
+        {
+          "tagName": "mu-quote",
+          "$props": {
+            "quote": "Que l'entrée soit libre, ou que ce musée soit autre chose que le nôtre.",
+            "attribution": "Livre des procès-verbaux de la souscription, 4 novembre 1897"
+          }
+        }
+      ]
+    },
+    {
+      "tagName": "mu-cta",
+      "$props": {
+        "kicker": "Entrez",
+        "heading": "La salle de lecture est ouverte à quiconque a une question.",
+        "text": "Deuxième étage, au-dessus du cabinet de cartes. Sans rendez-vous pour lire ; demandez au comptoir pour manipuler.",
+        "label": "Préparer sa visite",
+        "href": "/fr-ca/visite/"
+      }
+    }
+  ]
+}
