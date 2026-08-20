@@ -48,7 +48,7 @@ import {
 } from "../scripts/check-pane-singletons";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 const { happyDOM } = globalThis as unknown as { happyDOM: { setURL: (u: string) => void } };
 happyDOM.setURL("http://localhost:3000/");
@@ -666,7 +666,13 @@ describe("the singleton guard", () => {
     /* `focusPane` and `closePane` both take a `paneId` and both WRITE `workspace.activePaneId` —
        that is the definition of moving focus. Putting the one legitimate writer in a table of
        things that must not come back would be a lie about what the table is. */
-    const seen = await analyzeFocusScope([join(process.cwd(), "src/workspace/workspace.ts")]);
+    /* Anchored to this file, not to `process.cwd()`. The checker itself resolves against its own
+       location (`ROOT = join(import.meta.dir, "..")`), so borrowing the working directory here made
+       the one absolute path in the test the only cwd-bound thing in the pair — green from
+       `packages/studio`, and a miss from the repo root, where it names a file that does not exist. */
+    const seen = await analyzeFocusScope([
+      resolve(import.meta.dir, "../src/workspace/workspace.ts"),
+    ]);
     expect([...seen.values()][0]!.length).toBeGreaterThan(0);
     const counted = await countFocusInPaneScope(["src/workspace/workspace.ts"]);
     expect(counted.size).toBe(0);

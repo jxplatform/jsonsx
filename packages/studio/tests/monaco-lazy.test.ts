@@ -90,15 +90,15 @@ describe("loadedMonaco", () => {
    a code view. Applying them there used to mean importing monaco-setup right then, which fetched all
    of Monaco on every cold load — the exact cost the lazy path exists to avoid. */
 describe("setProjectSchemasForMonaco", () => {
-  test("holding schemas does not load Monaco", () => {
-    setProjectSchemasForMonaco({ document: { $id: "doc" }, project: { $id: "proj" } });
+  test("holding schemas does not load Monaco", async () => {
+    await setProjectSchemasForMonaco({ document: { $id: "doc" }, project: { $id: "proj" } });
     expect(isMonacoLoaded()).toBe(false);
     expect(applyProjectSchemas).not.toHaveBeenCalled();
   });
 
   test("pending schemas are applied when Monaco finally loads", async () => {
     const schemas = { document: { $id: "doc" }, project: { $id: "proj" } };
-    setProjectSchemasForMonaco(schemas);
+    await setProjectSchemasForMonaco(schemas);
     await loadMonaco();
     expect(applyProjectSchemas).toHaveBeenCalledWith(schemas);
   });
@@ -107,17 +107,18 @@ describe("setProjectSchemasForMonaco", () => {
     await loadMonaco();
     applyProjectSchemas.mockClear();
     const schemas = { document: { $id: "later" } };
-    setProjectSchemasForMonaco(schemas);
-    await Promise.resolve();
-    await Promise.resolve();
+    /* Awaited, not counted in microtasks. This used to drain two `Promise.resolve()`s and hope,
+       which is a guess about how many ticks a dynamic import of an already-evaluated module takes
+       — a number that is not part of any contract and does not hold. */
+    await setProjectSchemasForMonaco(schemas);
     expect(applyProjectSchemas).toHaveBeenCalledWith(schemas);
   });
 
   /* Only the LATEST set matters — reactivation and project.json writes both call this — so a second
      hand-off overwrites rather than queueing a second apply. */
   test("only the latest pending set is applied", async () => {
-    setProjectSchemasForMonaco({ project: { $id: "first" } });
-    setProjectSchemasForMonaco({ project: { $id: "second" } });
+    await setProjectSchemasForMonaco({ project: { $id: "first" } });
+    await setProjectSchemasForMonaco({ project: { $id: "second" } });
     await loadMonaco();
     expect(applyProjectSchemas).toHaveBeenCalledTimes(1);
     expect(applyProjectSchemas).toHaveBeenCalledWith({ project: { $id: "second" } });

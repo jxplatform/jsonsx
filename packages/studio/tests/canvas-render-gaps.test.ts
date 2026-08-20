@@ -371,13 +371,32 @@ describe("grid mode", () => {
 
 // ─── Source mode with a live collab session ───────────────────────────────────
 
+/**
+ * Flush turns until `ready()` holds, then stop.
+ *
+ * The source editor mounts behind one dynamic import and its collab binding behind a second, so a
+ * fixed count of flushes is a guess about how long a module loader takes — one that holds on a warm
+ * run and misses on a cold one. That is how every test below failed together, once in six runs of
+ * this file, and passed the other five. Waiting for the state each test is about removes the guess
+ * without softening it: a real regression still runs out of turns and still fails.
+ */
+async function settle(ready: () => boolean, turns = 100): Promise<void> {
+  for (let i = 0; i < turns && !ready(); i += 1) {
+    await flush(1);
+  }
+}
+
+/** The source editor has mounted — the first of the two imports has landed. */
+const editorMounted = () => createdEditors.length > 0;
+/** …and the collab binding has been constructed — the second. */
+const bindingLanded = () => bindings.length > 0;
+
 describe("source-mode collab binding", () => {
   test("binds the buffer to the shared Y.Text and applies read-only for observers", async () => {
     collabCtx = makeCollabCtx({ readOnly: true });
     setMode("source");
     renderCanvas();
-    await flush(); // The source editor mounts behind the lazy Monaco import.
-    await flush();
+    await settle(bindingLanded);
 
     // The binding was constructed against the ctx text/awareness and the editor's model.
     expect(bindings).toHaveLength(1);
@@ -399,15 +418,14 @@ describe("source-mode collab binding", () => {
     collabCtx = makeCollabCtx();
     setMode("source");
     renderCanvas();
-    await flush(); // The source editor mounts behind the lazy Monaco import.
-    await flush();
+    await settle(bindingLanded);
     expect(bindings).toHaveLength(1);
     expect(createdEditors[0]!.updateOptions).not.toHaveBeenCalled();
 
     const ctx = collabCtx;
     setMode("design");
     renderCanvas();
-    await flush(); // The source editor mounts behind the lazy Monaco import.
+    await settle(() => bindings[0]?.destroyed === true);
     expect(bindings[0]!.destroyed).toBe(true);
     expect(ctx.leave).toHaveBeenCalledTimes(1);
     expect(document.head.querySelector("style[data-jx-collab-cursors]")).toBeNull();
@@ -422,7 +440,7 @@ describe("source-mode collab binding", () => {
       });
     setMode("source");
     renderCanvas();
-    await flush(); // The source editor mounts behind the lazy Monaco import.
+    await settle(editorMounted);
     const ctx = collabCtx;
     release();
     // Let the enter() continuation reach the dynamic binding import, then yank the editor.
@@ -447,7 +465,7 @@ describe("source-mode collab binding", () => {
     collabCtx = null;
     setMode("source");
     renderCanvas();
-    await flush(); // The source editor mounts behind the lazy Monaco import.
+    await settle(editorMounted);
     await flush(); // …and the initial serialization lands, consuming `_ignoreNextChange`.
     expect(surfaceForPane("primary").monacoEditor!._writes!.typed()).toBe(false);
 
@@ -469,8 +487,7 @@ describe("source-mode collab binding", () => {
     collabCtx = makeCollabCtx();
     setMode("source");
     renderCanvas();
-    await flush(); // The source editor mounts behind the lazy Monaco import.
-    await flush(); // …and the collab binding lands.
+    await settle(bindingLanded);
     expect(bindings).toHaveLength(1);
 
     const editor = createdEditors[0]!;
@@ -510,7 +527,7 @@ describe("source-mode collab binding", () => {
     const ctx = collabCtx;
     setMode("source");
     expect(() => renderCanvas()).not.toThrow();
-    await flush();
+    await settle(() => ctx.leave.mock.calls.length > 0);
     expect(bindings).toHaveLength(0);
     expect(surfaceForPane("primary").monacoEditor).toBe(createdEditors[0] as never);
     expect(ctx.leave).toHaveBeenCalledTimes(1);
@@ -523,8 +540,7 @@ describe("source-mode collab binding", () => {
     bindingShouldThrow = true;
     setMode("source");
     renderCanvas();
-    await flush();
-    await flush();
+    await settle(() => ctx.leave.mock.calls.length > 0);
     expect(bindings).toHaveLength(0);
     expect(ctx.leave).toHaveBeenCalledTimes(1);
     expect(createdEditors[0]!.updateOptions).toHaveBeenCalledWith({ readOnly: true });
@@ -543,10 +559,10 @@ describe("source-mode collab binding", () => {
     const ctx = collabCtx;
     setMode("source");
     renderCanvas();
-    await flush();
+    await settle(editorMounted);
     surfaceForPane("primary").monacoEditor = null;
     release();
-    await flush();
+    await settle(() => ctx.leave.mock.calls.length > 0);
     expect(bindings).toHaveLength(0);
     expect(ctx.leave).toHaveBeenCalledTimes(1);
   });
