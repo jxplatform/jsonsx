@@ -12,11 +12,20 @@ import { join, resolve } from "node:path";
 import { findShadows, removeShadow, shadowsIn } from "./check-shadowed-core";
 
 /** A project root with the given packages installed under `node_modules`. */
-function projectWith(packages: { name: string; version?: string; symlink?: boolean }[]): string {
+function projectWith(
+  packages: { name: string; version?: string; symlink?: boolean; dangling?: boolean }[],
+): string {
   const root = mkdtempSync(resolve(tmpdir(), "jx-shadow-"));
   writeFileSync(join(root, "project.json"), JSON.stringify({ name: "fixture" }));
   for (const pkg of packages) {
     const dir = join(root, "node_modules", pkg.name);
+    if (pkg.dangling) {
+      // A link to a target that is deliberately never created — the package moved out from under
+      // An install that predates the move.
+      mkdirSync(resolve(dir, ".."), { recursive: true });
+      symlinkSync(join(root, "moved-away"), dir);
+      continue;
+    }
     if (pkg.symlink) {
       const target = join(root, "workspace-target");
       mkdirSync(target, { recursive: true });
@@ -157,6 +166,56 @@ describe("findShadows across roots", () => {
     } finally {
       rmSync(clean, { force: true, recursive: true });
       rmSync(dirty, { force: true, recursive: true });
+    }
+  });
+});
+
+describe("a dangling first-party symlink", () => {
+  test("is reported, because a link to nothing still beats the link that replaced it", () => {
+    /*
+     * The skip used to be "is it a symlink", which is right only while the target exists. When
+     * @jxsuite/parser moved from packages/ to extensions/, examples/node_modules kept a link to
+     * the old path — and a nested node_modules entry wins over the root link, so the import failed
+     * outright while the checker reported the tree clean.
+     */
+    const root = projectWith([{ dangling: true, name: "@jxsuite/parser" }]);
+    try {
+      const found = shadowsIn(root);
+      expect(found).toHaveLength(1);
+      expect(found[0]!.kind).toBe("dangling");
+      expect(found[0]!.specifier).toBe("@jxsuite/parser");
+      expect(found[0]!.version).toBe("unresolvable");
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  test("is distinguished from a resolving workspace link, which stays skipped", () => {
+    const root = projectWith([
+      { dangling: true, name: "@jxsuite/parser" },
+      { name: "@jxsuite/schema", symlink: true },
+    ]);
+    try {
+      expect(shadowsIn(root).map((s) => s.specifier)).toEqual(["@jxsuite/parser"]);
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  test("--fix removes the link and leaves the lockfile alone", () => {
+    /*
+     * The lockfile is innocent here. A shadow's lockfile would faithfully reproduce the published
+     * copy on the next install, which is why removeShadow deletes it — but a stale link is not
+     * something the lockfile describes, and removing it would force a needless reinstall.
+     */
+    const root = projectWith([{ dangling: true, name: "@jxsuite/parser" }]);
+    try {
+      writeFileSync(join(root, "bun.lock"), "{}");
+      removeShadow(shadowsIn(root)[0]!);
+      expect(existsSync(join(root, "bun.lock"))).toBe(true);
+      expect(shadowsIn(root)).toEqual([]);
+    } finally {
+      rmSync(root, { force: true, recursive: true });
     }
   });
 });
