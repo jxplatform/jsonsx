@@ -2,16 +2,12 @@ import "./with-dom.ts";
 import { describe, expect, test } from "bun:test";
 import { createChatState, createToolRegistry } from "@jxsuite/ai";
 import type { ToolRegistry } from "@jxsuite/ai/tools";
-import type { StreamingClient } from "@jxsuite/ai/streaming-client";
+import type { StreamEvent, StreamingClient } from "@jxsuite/ai/streaming-client";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import { createTab, disposeTab } from "../src/tabs/tab";
 import type { Tab } from "../src/tabs/tab";
 import { registerAiTools } from "../src/services/ai-tools";
 import { runAgentLoop } from "../src/services/tool-executor";
-
-/** The normalized stream event the StreamingClient emits (not exported, so derived here). */
-type StreamEvent =
-  ReturnType<StreamingClient["streamChat"]> extends AsyncGenerator<infer E> ? E : never;
 
 /**
  * A scripted streaming client: each entry in `rounds` is the sequence of StreamEvents to yield on

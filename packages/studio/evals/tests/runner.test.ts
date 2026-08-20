@@ -1,12 +1,8 @@
 import "../../tests/with-dom.ts";
 import { describe, expect, test } from "bun:test";
-import type { StreamingClient } from "@jxsuite/ai/streaming-client";
+import type { StreamEvent, StreamingClient } from "@jxsuite/ai/streaming-client";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import { runTrial, runTask } from "../runner.js";
-
-/** The normalized stream event the StreamingClient emits (not exported, so derived here). */
-type StreamEvent =
-  ReturnType<StreamingClient["streamChat"]> extends AsyncGenerator<infer E> ? E : never;
 
 /**
  * Scripted streaming client — drives the real agent loop without a network call (same shape as the
