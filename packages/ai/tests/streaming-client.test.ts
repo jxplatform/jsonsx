@@ -14,13 +14,9 @@ import {
   createAnthropicStreamingClient,
   createProxyStreamingClient,
 } from "../src/streaming-client.js";
+import type { StreamErrorEvent, StreamEvent } from "../src/streaming-client.js";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-interface AnyEvent {
-  type: string;
-  [key: string]: unknown;
-}
 
 const realFetch = globalThis.fetch;
 
@@ -50,11 +46,11 @@ function mockFetch(impl: (url: string, init: RequestInit) => Promise<Response> |
   return { calls };
 }
 
-/** Drains an async generator into an array of loosely-typed events. */
-async function collect(gen: AsyncGenerator<unknown>): Promise<AnyEvent[]> {
-  const events: AnyEvent[] = [];
+/** Drains an async generator into an array of the union every client is contracted to yield. */
+async function collect(gen: AsyncGenerator<unknown>): Promise<StreamEvent[]> {
+  const events: StreamEvent[] = [];
   for await (const event of gen) {
-    events.push(event as AnyEvent);
+    events.push(event as StreamEvent);
   }
   return events;
 }
@@ -364,7 +360,7 @@ describe("createOpenAIStreamingClient", () => {
     const client = createOpenAIStreamingClient({ baseUrl: "https://x", apiKey: "k" });
     const events = await collect(client.streamChat([], [], "", new AbortController().signal));
     expect(events).toHaveLength(1);
-    const event = events[0]!;
+    const event = events[0] as StreamErrorEvent;
     expect(event.type).toBe("error");
     expect(event.message).toBe("API error 503: Service Unavailable");
     expect(event.code).toBe("503");
@@ -446,11 +442,9 @@ describe("createAnthropicStreamingClient", () => {
       baseUrl: "https://api.anthropic.com",
       apiKey: "k",
     });
-    const events = await collect(
-      client.streamChat([], [], "", new AbortController().signal) as AsyncGenerator<AnyEvent>,
-    );
+    const events = await collect(client.streamChat([], [], "", new AbortController().signal));
     expect(events).toHaveLength(1);
-    const event = events[0]!;
+    const event = events[0] as StreamErrorEvent;
     expect(event.type).toBe("error");
     expect(event.code).toBe("NOT_IMPLEMENTED");
     expect(event.message).toContain("not yet implemented");
@@ -611,7 +605,7 @@ describe("createProxyStreamingClient", () => {
     mockFetch(() => streamingResponse(JSON.stringify({ error: { type: "x" } }), { status: 500 }));
     const client = createProxyStreamingClient({ chatUrl: "https://proxy/chat" });
     const events = await collect(client.streamChat([], [], "", new AbortController().signal));
-    const event = events[0]!;
+    const event = events[0] as StreamErrorEvent;
     expect(event.type).toBe("error");
     expect(event.message).toBe(JSON.stringify({ error: { type: "x" } }));
     expect(event.code).toBe("500");
