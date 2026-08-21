@@ -1,16 +1,48 @@
+# jxsuite.com publishes the RELEASED tree, never the trunk, so the docs a visitor reads always
+# describe the app they can actually download. That splits this workflow in two:
+#
+#   * `build` runs on pull requests and on `main`, and proves the site still compiles at the moment
+#     someone breaks it rather than weeks later on release day. It publishes nothing.
+#   * `deploy` runs only when a ref was handed in — i.e. from release-please.yml at the desktop tag
+#     it just advanced `release` to, or from a deliberate manual dispatch.
+#
+# It has to be INVOKED rather than triggered. `advance-release-branch` moves `release` with a plain
+# GITHUB_TOKEN push, and pushes made with that token do not start workflows — the same reason the
+# publish and desktop-bundler jobs are `uses:` calls instead of `on: push: tags`. An
+# `on: push: branches: [release]` trigger here would look right and simply never fire.
+#
+# The cost, accepted deliberately: a docs change on `main` reaches the site only when the desktop
+# component next releases. `workflow_dispatch` with `ref: main` is the escape hatch.
 name: Deploy jxsuite.com
 
 on:
-  push:
-    branches: [main]
-    # Only auto-deploy when the site's own files change. A schema/compiler/runtime
-    # change that alters the rendered output won't trigger this — redeploy manually
-    # via workflow_dispatch when a core-package change needs to reach the site.
+  # Build-only. Same paths as before — a schema/compiler/runtime change that alters the rendered
+  # output won't trigger this, and doesn't need to, because nothing here publishes.
+  pull_request:
     paths:
       - "sites/jxsuite.com/**"
       - "docs/**"
       - "scripts/docs/**"
+  push:
+    branches: [main]
+    paths:
+      - "sites/jxsuite.com/**"
+      - "docs/**"
+      - "scripts/docs/**"
+  workflow_call:
+    inputs:
+      ref:
+        description: "Tree to publish. The release pipeline passes the desktop tag it just shipped."
+        required: false
+        default: release
+        type: string
   workflow_dispatch:
+    inputs:
+      ref:
+        description: "Tree to publish. `release` is the last shipped tree; `main` publishes unreleased work."
+        required: false
+        default: release
+        type: string
 
 permissions:
   contents: read
@@ -18,17 +50,20 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  # Every publish shares one group, so a newer release supersedes an older deploy. Build-only runs
+  # are keyed per ref instead — otherwise a pull request would cancel a release's deploy.
+  group: pages-${{ inputs.ref && 'publish' || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      # An empty `ref` is exactly what actions/checkout does by default (the triggering ref), so
+      # this one line covers the release call and the pull request alike.
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -66,11 +101,21 @@ jobs:
 
       - run: bun run --cwd sites/jxsuite.com build
 
-      - uses: actions/configure-pages@v6
+      - if: inputs.ref
+        uses: actions/configure-pages@v6
 
-      - uses: actions/upload-pages-artifact@v5
+      - if: inputs.ref
+        uses: actions/upload-pages-artifact@v5
         with:
           path: sites/jxsuite.com/dist
 
+  deploy:
+    needs: build
+    if: inputs.ref
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - id: deployment
         uses: actions/deploy-pages@v5

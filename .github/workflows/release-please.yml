@@ -347,6 +347,27 @@ jobs:
             echo "Cache serves $TAG on both architectures."
           fi
 
+  # The site ships WITH the release rather than with the merge to `main`, so the docs a visitor
+  # reads describe the app they can download. deploy-site.yml's header explains why this is a
+  # `uses:` call and not an `on: push: branches: [release]` trigger.
+  #
+  # Gated on `nix-build`, not on `advance-release-branch`, for the same reason `verify-cache` is:
+  # that job exits 0 even when it declines to move the branch. Publishing on its success alone
+  # would put documentation for a tree that `release` refused to ship.
+  #
+  # It names the TAG, not the branch. They are the same commit here, and naming the tag keeps the
+  # deploy pinned to the release it belongs to even if something else moves `release` meanwhile.
+  deploy-site:
+    needs: [release-please, nix-build, advance-release-branch]
+    if: always() && needs.nix-build.result == 'success' && needs.release-please.outputs.desktop_released == 'true'
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/deploy-site.yml
+    with:
+      ref: ${{ needs.release-please.outputs.desktop_tag }}
+
   pin-desktop-latest:
     needs:
       [

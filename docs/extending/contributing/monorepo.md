@@ -72,6 +72,20 @@ Two branches:
   `advance-release-branch`'s `needs`, and it should happen once arm has been green for a few
   releases.
 
+  **`release` is also what jxsuite.com serves.** The site deploys from the released tree rather than
+  from the trunk, so the documentation a visitor reads always describes the app they can actually
+  download. The trade is deliberate and worth knowing before you write docs: a page merged to
+  `main` is not public until the desktop component next releases. Pull requests and `main` still
+  build the site — breakage surfaces when you cause it, not on release day — they just publish
+  nothing. To ship documentation ahead of a release, dispatch **Deploy jxsuite.com** manually with
+  `ref: main`.
+
+  Neither the release deploy nor the `release` push is triggered by watching the branch. CI moves
+  `release` with a plain `GITHUB_TOKEN` push, and pushes made with that token do not start
+  workflows — so `deploy-site.yml` is a `workflow_call` that release-please invokes, exactly like
+  the npm publish and the desktop bundlers. An `on: push: branches: [release]` trigger would look
+  correct and never fire once.
+
 ### Template dependency ranges are generated
 
 Two places ship `@jxsuite/*` version ranges to people outside this repo, and neither is a workspace,
