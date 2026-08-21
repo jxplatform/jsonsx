@@ -72,6 +72,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `desktop.md`
 
+- **0.3.15-draft** (2026-08-21) — §9.3: released builds are published to jxsuite.cachix.org and the flake names it, so a consumer substitutes jx-studio instead of building it; verify-cache proves that after each release. The release also builds aarch64-linux as an advisory leg beside the x86_64 gate, and nix.yml runs on pushes to main so pull requests inherit a warm Actions cache for the npm tarball derivations cache.nixos.org cannot serve.
 - **0.3.14-draft** (2026-08-20) — §9.3: the desktop entry ships under a stable id and claims the app_id Chromium actually gives an --app window, so the taskbar/dock can resolve the brand icon.
 - **0.3.13-draft** (2026-08-20) — Chromium launcher reaches PAL parity: its own adapter over createProjectServer (§9.1), multi-window through a cross-process window registry (§9.4), a server-to-client push channel behind live sidebar sync and focus, buildSite behind View: Open in Browser, appInfo for the About screen, and an OS-opener fallback so preview links and sign-in leave the app at all (§3.5, §9.5). New Window becomes the `view.newWindow` command rather than a native-menu-only item, and the native menu drops its duplicate accelerators (§4.2a).
 - **0.3.12-draft** (2026-08-19) — §9.3 documents the release branch as the ref a Nix consumer pins, and the nix build that gates it; corrects the install phase, which has used cp -r plus a dangling-symlink prune and src/chromium/index.ts since before this text was written.

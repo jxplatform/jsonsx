@@ -200,6 +200,28 @@ jobs:
     uses: ./.github/workflows/nix.yml
     with:
       ref: ${{ needs.release-please.outputs.desktop_tag }}
+      publish: true
+    secrets:
+      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+  # aarch64-linux has never been built by anything. `packages/desktop/package.nix` claims it in
+  # `meta.platforms` and CI has only ever run x86_64, so the first person to find out whether the
+  # host-filtered tarball set resolves on arm should be us, at a release, and not a user.
+  #
+  # It is deliberately absent from `advance-release-branch`'s `needs`. That job gates the branch
+  # NixOS users pin on `nix-build.result`; letting a first-ever aarch64 failure freeze `release`
+  # would strand every x86 user over an architecture nobody has received yet. Promote it to a gate
+  # once it has been green across a few releases.
+  nix-build-arm:
+    needs: release-please
+    if: needs.release-please.outputs.desktop_released == 'true'
+    uses: ./.github/workflows/nix.yml
+    with:
+      ref: ${{ needs.release-please.outputs.desktop_tag }}
+      runner: ubuntu-24.04-arm
+      publish: true
+    secrets:
+      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
   # Advance `release` to the commit that just released and built. A plain (fast-forward) push, never
   # A force: `release` only ever moves forward along main's history, so a non-fast-forward here means
@@ -246,6 +268,84 @@ jobs:
           fi
           git push origin "$(git rev-parse HEAD):refs/heads/release"
           echo "release -> $TAG ($(git rev-parse --short HEAD))"
+
+  # Prove a NixOS user gets a DOWNLOAD rather than a build. Nothing else in this pipeline can:
+  # `nix-build` proves the tree builds, and the Cachix push is best-effort by design, so without
+  # this job a cache that silently holds the wrong store path looks exactly like one that works.
+  #
+  # Two assertions, so a failure says which half broke:
+  #
+  #   1. Does the cache hold the path? `nix path-info --store` asks Cachix and downloads nothing.
+  #   2. Does the user's own command find it? `nix build --max-jobs 0` means SUBSTITUTE OR FAIL,
+  #      run against `github:jxsuite/jx/release` exactly as docs/start/install.md tells people to,
+  #      with --accept-flake-config so the flake's own nixConfig does the wiring.
+  #
+  # (2) is also the only thing that proves the store path CI published is the one a `github:` flake
+  # fetch evaluates to. CI builds a git checkout and a user builds a tarball; if those ever stop
+  # agreeing, every consumer quietly goes back to building from source and nothing else notices.
+  #
+  # It gates on `nix-build`, not on `advance-release-branch`, because that job exits 0 even when it
+  # declines to move the branch — so its success does not mean `release` advanced, and `nix-build`
+  # is the condition it actually tests.
+  verify-cache:
+    needs: [release-please, nix-build, nix-build-arm, advance-release-branch]
+    if: always() && needs.nix-build.result == 'success' && needs.release-please.outputs.desktop_released == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: DeterminateSystems/nix-installer-action@33c9ab3ef95cd57c164d9d6eb1f9a46338538d41 # main @ 2026-08-21
+        with:
+          extra-conf: |
+            accept-flake-config = true
+
+      - name: A consumer substitutes instead of building
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.release-please.outputs.desktop_tag }}
+          ARM_RESULT: ${{ needs.nix-build-arm.result }}
+        run: |
+          set -euo pipefail
+          ref="github:${GITHUB_REPOSITORY}/release"
+          cache="https://jxsuite.cachix.org"
+          problems=""
+
+          # Evaluation only — this is the path a user's Nix will ask for.
+          for system in x86_64-linux aarch64-linux; do
+            # Not `out=$(...)` bare: under `set -e` a failed eval would kill the script before it
+            # could report anything, turning "the cache is broken" into a silent red X.
+            if ! out="$(nix eval --raw "${ref}#packages.${system}.default.outPath" 2>&1)"; then
+              problems="${problems}- evaluating the $system package failed: \`$out\`"$'\n'
+              continue
+            fi
+            echo "$system -> $out"
+            if nix path-info --store "$cache" "$out" >/dev/null 2>&1; then
+              echo "::notice::$cache holds $out"
+            elif [ "$system" = "aarch64-linux" ] && [ "$ARM_RESULT" != "success" ]; then
+              echo "::notice::aarch64 leg was $ARM_RESULT; its absence from the cache is expected"
+            else
+              problems="${problems}- \`$cache\` does not hold the $system path \`$out\`"$'\n'
+            fi
+          done
+
+          # Substitute or fail: --max-jobs 0 refuses to build anything at all.
+          if nix build "$ref" --accept-flake-config --max-jobs 0 --no-link -L; then
+            echo "::notice::a consumer substitutes the entire closure"
+          else
+            problems="${problems}- \`nix build $ref --max-jobs 0\` failed, so a consumer still builds from source"$'\n'
+          fi
+
+          if [ -n "$problems" ]; then
+            echo "::warning::the binary cache does not serve $TAG"
+            gh issue create \
+              --title "Binary cache does not serve $TAG" \
+              --label release-incomplete \
+              --body "$(printf '%s\n%s\n' "A NixOS user on \`github:jxsuite/jx/release\` builds Jx Studio from source instead of downloading it. The release itself is fine; only the cache is." "$problems")" || true
+          else
+            echo "Cache serves $TAG on both architectures."
+          fi
 
   pin-desktop-latest:
     needs:
