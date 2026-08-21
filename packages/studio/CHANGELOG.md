@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.2.1](https://github.com/jxsuite/jx/compare/studio-v2.2.0...studio-v2.2.1) (2026-08-21)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/ai bumped to 0.36.1
+    * @jxsuite/collab bumped to 0.8.1
+    * @jxsuite/create bumped to 1.3.2
+    * @jxsuite/formulas bumped to 0.0.9
+    * @jxsuite/markup bumped to 0.4.5
+    * @jxsuite/protocol bumped to 1.1.2
+    * @jxsuite/runtime bumped to 2.0.2
+    * @jxsuite/schema bumped to 1.8.0
+
 ## [2.2.0](https://github.com/jxsuite/jx/compare/studio-v2.1.0...studio-v2.2.0) (2026-08-21)
 
 
