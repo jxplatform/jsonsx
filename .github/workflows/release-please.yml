@@ -411,7 +411,12 @@ jobs:
       issues: write
     steps:
       - uses: actions/checkout@v7
+      # `install: false` — the script reads package.json files with node builtins and shells out to
+      # `gh` and `npm`. It has no dependency to install, and a job whose whole purpose is to report
+      # A broken release must not be able to fail on `--frozen-lockfile` instead.
       - uses: ./.github/actions/setup-bun
+        with:
+          install: false
       - name: Every version in the manifest must have a release and be on npm
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
