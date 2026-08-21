@@ -4,16 +4,23 @@
 # static unit test (packages/desktop/tests/nix-bundle-completeness.test.ts, which parses `cp -r`
 # lines out of package.nix) and otherwise ran only on whoever happened to type `nix build`.
 #
-# Four callers, one definition:
+# Five callers, one definition:
 #
-#   * `pull_request`, path-filtered to the inputs that can break it. Measured at ~90s of build on a
-#     warm store, so a PR that touches the packaging finds out in the PR.
-#   * `push` to `main`, the same path filter. This one exists for the CACHE, not the check: GitHub
+#   * `workflow_call` from test.yml, which owns the PULL-REQUEST leg. It used to be an
+#     `on: pull_request` trigger here, and that is precisely what made it unusable as a required
+#     status check: a path-filtered workflow that does not fire leaves a required check pending
+#     forever. test.yml has no `paths:` filter and its `changes` job decides instead
+#     (scripts/ci/affected.ts, `NIX_INPUTS`), so the Nix build now reports into the single `ci`
+#     aggregate that branch protection names — which is what lets a dependency bump that breaks
+#     packaging block its own auto-merge.
+#   * `push` to `main`, path-filtered. This one exists for the CACHE, not the check: GitHub
 #     Actions caches are branch-scoped, and a PR may read the default branch's cache but never
 #     another PR's. Without a run on `main` there is no base cache for any PR to inherit, and every
 #     PR would refetch the ~1000 npm tarball derivations bun.nix pins from scratch.
 #   * `workflow_call` from release-please.yml at the desktop release tag, where it is the gate the
 #     `release` branch advances behind. `runner` picks the architecture.
+#   * `schedule`, nightly, which is what keeps that cache warm now that most merges to `main` are
+#     auto-merges and raise no `push` event at all.
 #   * `workflow_dispatch`, to measure what a release would cost a binary cache (see `measure`).
 #
 # A release-PR merge touches packages/desktop/** (the version bump), so it fires the `push` trigger
@@ -23,24 +30,12 @@
 name: Nix
 
 on:
-  pull_request:
-    # GitHub Actions does not expand YAML anchors, so this list is duplicated under `push`
-    # below rather than shared. The two must stay identical.
-    paths:
-      # The derivation, the generated dependency set, and the lockfile it is generated from.
-      - "flake.nix"
-      - "flake.lock"
-      - "bun.nix"
-      - "bun.lock"
-      # `src` is the whole tree, but only the desktop app's own sources and manifest change what the
-      # Derivation produces in a way the build can notice. Everything else is caught by the release
-      # Path and the nightly-equivalent: a red `release` that refuses to advance.
-      - "packages/desktop/**"
-      - ".github/workflows/nix.yml"
   push:
     branches:
       - main
-    # Keep identical to the `pull_request` filter above.
+    # The same inputs scripts/ci/affected.ts uses to decide the pull-request leg (its NIX_INPUTS
+    # list). Keep the two in step: affected.ts's own test asserts this file has no `pull_request`
+    # trigger, but nothing can assert that two path lists agree with each other.
     paths:
       # The derivation, the generated dependency set, and the lockfile it is generated from.
       - "flake.nix"
@@ -52,6 +47,14 @@ on:
       # Path and the nightly-equivalent: a red `release` that refuses to advance.
       - "packages/desktop/**"
       - ".github/workflows/nix.yml"
+  schedule:
+    # Nightly, and NOT a nicety. This workflow's `push` leg exists to keep `main`'s Actions cache
+    # warm for the next pull request — and a Dependabot merge never raises `push`, because GitHub
+    # suppresses the events its own token causes and auto-merge merges as `GITHUB_TOKEN`. Under
+    # the dependency-autopilot policy most merges to `main` are exactly those, so without a cron
+    # the cache would go cold precisely on the branch that feeds every pull request. It also
+    # catches drift no commit caused: nixpkgs-unstable moving under a lockfile that did not.
+    - cron: "0 4 * * *"
   workflow_call:
     inputs:
       ref:
@@ -105,9 +108,51 @@ jobs:
         with:
           ref: ${{ inputs.ref || github.ref }}
 
+      # `install: false` — and this is load-bearing, not an economy. `packages/desktop/package.nix`
+      # builds `src = lib.cleanSource ../..`, and `lib.cleanSource` filters `.git` and editor
+      # droppings but NOT `node_modules`. A `bun install` here would fold the entire dependency
+      # tree into the derivation's inputs: a different store path on every run, a cache that never
+      # hits, and a `nix build` measured in gigabytes. `bun scripts/check-bun-nix.ts` needs no
+      # install — it shells out to `bunx bun2nix@<the version package.json pins>`, which writes
+      # only to bun's own global cache.
+      - uses: ./.github/actions/setup-bun
+        with:
+          install: "false"
+
+      # bun.nix is a pure function of bun.lock, and under the dependency-autopilot policy it is
+      # allowed to lag: a Dependabot pull request moves the lockfile and cannot regenerate this
+      # file, because a GITHUB_TOKEN push to a bot branch produces no check runs on the new head.
+      # See CLAUDE.md, Dependency Autopilot.
+      #
+      # So the two legs ask different questions, and the difference is the whole point.
+      #
+      #   * On a pull request or a `main` build, regenerate IN THE WORKING TREE and build that.
+      #     The question worth answering there is "does this dependency set build?", not "did a bot
+      #     remember to run a generator?" — and answering the first one is what makes this a
+      #     meaningful required check on a Dependabot bump rather than a guaranteed red X.
+      #   * On the release leg (`publish`), a drift is a FAILURE. That tree is the tag, and
+      #     `nix run github:jxsuite/jx/release` reads the bun.nix that was committed — not one CI
+      #     invented after the fact. release-bun-nix.yml is what puts it there, on the release
+      #     pull request; this is the assertion that it did.
+      - name: bun.nix must describe the lockfile in this tree
+        env:
+          STRICT: ${{ inputs.publish && 'true' || 'false' }}
+        run: |
+          set -euo pipefail
+          if [ "$STRICT" = "true" ]; then
+            bun scripts/check-bun-nix.ts
+          else
+            bun scripts/check-bun-nix.ts --fix
+            if ! git diff --quiet -- bun.nix; then
+              echo "::notice::bun.nix was stale for this tree and has been regenerated for the"\
+                   "build only — nothing is committed. It is brought into agreement on the release"\
+                   "pull request (.github/workflows/release-bun-nix.yml)."
+            fi
+          fi
+
       # Pinned by SHA: both of these are published only on a moving `main`, which dependabot cannot
       # track, so the alternative to a pin is an unreviewed third party in the release gate.
-      - uses: DeterminateSystems/nix-installer-action@33c9ab3ef95cd57c164d9d6eb1f9a46338538d41 # main @ 2026-08-21
+      - uses: DeterminateSystems/nix-installer-action@v22
         with:
           # The flake declares the nix-community substituter in `nixConfig`. Without accepting it,
           # Every dependency is built from source instead of fetched, and a 90-second build becomes
@@ -119,7 +164,7 @@ jobs:
       # half of the closure; what it can never serve is the ~1000 fixed-output npm tarball
       # derivations bun.nix pins, and those are what this recovers between runs. Fork PRs get a
       # read-only token and degrade to pull-only on their own, so no fork guard is needed.
-      - uses: DeterminateSystems/magic-nix-cache-action@55718cd9ebf1737a061487d5ada21abf31e99a98 # main @ 2026-07-15
+      - uses: DeterminateSystems/magic-nix-cache-action@v14
         with:
           # Perf/diagnostic telemetry to Determinate Systems is on by default; "" disables it.
           diagnostic-endpoint: ""
@@ -130,7 +175,7 @@ jobs:
       # build-time only — a consumer whose `$out` substitutes never realises them — so publishing
       # them would spend a 5 GB public budget on bytes no user downloads. The explicit push below
       # sends exactly the runtime closure instead.
-      - uses: cachix/cachix-action@5f2d7c5294214f71b873db4b969586b980625e71 # v17
+      - uses: cachix/cachix-action@v17
         with:
           name: jxsuite
           skipPush: true

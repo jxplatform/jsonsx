@@ -130,9 +130,13 @@
                 # bun2nix derives every dependency hash from bun.lock, so the
                 # only thing to regenerate is bun.nix — there is no aggregate
                 # node_modules hash to chase with a fake-hash rebuild anymore.
-                echo "Regenerating bun.nix from bun.lock..."
-                bun2nix -o bun.nix
-                echo "Done — bun.nix is in sync with bun.lock."
+                #
+                # Delegated to `bun run nix:sync` rather than calling bun2nix
+                # directly, so this shell, the CI workflows and the release
+                # sync all invoke ONE definition of "regenerate bun.nix"
+                # (scripts/check-bun-nix.ts). It also reports which packages
+                # moved instead of leaving a 289 KB diff to read.
+                bun run nix:sync
               '')
             ];
 

@@ -43,13 +43,41 @@ const GLOBAL = [
   ".oxlintrc.json",
   ".oxlintrc.typecheck.json",
   ".oxlintignore",
-  "flake.nix",
-  "flake.lock",
-  "bun.nix",
   ".github/workflows/test.yml",
   ".github/actions/**",
   "scripts/ci/**",
   "scripts/lib/workspaces.ts",
+];
+
+/**
+ * The inputs to the Nix build, and the reason the `nix` job in test.yml exists at all.
+ *
+ * This is a translation of the `paths:` filter nix.yml carries on its `push` leg — which is where
+ * the pull-request leg used to live. It moved because a required status check must come from a
+ * workflow that ALWAYS runs: a path-filtered workflow that does not fire leaves the check pending
+ * forever, so the Nix build could never be required while it gated itself. Now test.yml (no
+ * `paths:`) always runs, this decides, and the Nix build reports into the one `ci` aggregate that
+ * branch protection names. Which is the point: a dependency bump that breaks packaging has to be
+ * able to block its own auto-merge.
+ *
+ * `flake.nix`, `flake.lock` and `bun.nix` are here rather than in GLOBAL, which is where the first
+ * two lived. GLOBAL means "runs the entire test matrix", and these three cannot change the outcome
+ * of a single test: no suite reads them (scripts/check-bun-nix.test.ts is the one file that does,
+ * and it runs unconditionally in the `changes` job, not in the matrix). Leaving them in GLOBAL made
+ * a Dependabot flake-input bump — four commits' worth of nixpkgs, weekly — spend the whole ~22-job
+ * matrix to answer a question only `nix build` can answer.
+ *
+ * `bun.lock` and `package.json` stay in GLOBAL AND appear here: they genuinely move both.
+ */
+const NIX_INPUTS = [
+  "flake.nix",
+  "flake.lock",
+  "bun.nix",
+  "bun.lock",
+  "package.json",
+  "packages/desktop/**",
+  ".github/workflows/nix.yml",
+  "scripts/check-bun-nix.ts",
 ];
 
 /**
@@ -135,6 +163,11 @@ const EXTRA_EDGES: ExtraEdge[] = [
  * workspace prefix, nor an extra edge, nor GLOBAL, turns everything on (see FAIL OPEN above).
  */
 const NO_TESTS = [
+  // The Nix derivation's inputs. They gate the `nix` job (NIX_INPUTS above) and no test suite
+  // Reads them, so they must not also FAIL OPEN into the whole matrix.
+  "flake.nix",
+  "flake.lock",
+  "bun.nix",
   "docs/**",
   "specs/**",
   "scripts/docs/**",
@@ -234,15 +267,24 @@ interface Decision {
   reason: string;
   testDirs: string[];
   lensMutants: boolean;
+  nixBuild: boolean;
   bundles: string[];
 }
 
 export function decide(changed: string[], workspaces: Workspace[]): Decision {
+  // The Nix build is decided over the whole diff, independently of everything below, because it
+  // Is not a function of the workspace graph — `src` is the tree, and what can break the build is
+  // The derivation's own inputs. Computing it here also means it survives the early returns.
+  const nixBuild = changed.some((p) => matches(p, NIX_INPUTS));
+
   const all = (reason: string): Decision => ({
     mode: "all",
     reason,
     testDirs: workspaces.map((w) => w.dir),
     lensMutants: true,
+    // FAIL OPEN, the same way the test matrix does: a path nobody classified may well be one the
+    // Derivation notices, and `src = lib.cleanSource ../..` means almost any file can be.
+    nixBuild: true,
     bundles: [...BUNDLES],
   });
 
@@ -252,6 +294,7 @@ export function decide(changed: string[], workspaces: Workspace[]): Decision {
       reason: "no files changed",
       testDirs: [],
       lensMutants: false,
+      nixBuild: false,
       bundles: [],
     };
   }
@@ -326,6 +369,7 @@ export function decide(changed: string[], workspaces: Workspace[]): Decision {
     // Would not have survived before. Gating on the test set instead would fire this 87s job on
     // Most PRs in the repo, since studio sits downstream of nearly everything.
     lensMutants: changedWorkspaces.has("packages/studio") || edgeTargets.has("packages/studio"),
+    nixBuild,
     bundles,
   };
 }
@@ -380,6 +424,7 @@ async function main(): Promise<void> {
       reason: `${event} is never gated`,
       testDirs: workspaces.map((w) => w.dir),
       lensMutants: true,
+      nixBuild: true,
       bundles: [...BUNDLES],
     };
   } else {
@@ -391,6 +436,7 @@ async function main(): Promise<void> {
             reason: "could not determine the diff",
             testDirs: workspaces.map((w) => w.dir),
             lensMutants: true,
+            nixBuild: true,
             bundles: [...BUNDLES],
           }
         : decide(changed, workspaces);
@@ -406,6 +452,7 @@ async function main(): Promise<void> {
     has_tests: String(include.length > 0),
     all_workspaces: JSON.stringify(workspaces.map((w) => w.flag)),
     gate_lens_mutants: String(decision.lensMutants),
+    gate_nix: String(decision.nixBuild),
     gate_bundle: JSON.stringify(decision.bundles),
     has_bundle: String(decision.bundles.length > 0),
   };
@@ -439,6 +486,7 @@ async function main(): Promise<void> {
     ...workspaces.map((w) => `| \`${w.flag}\` | ${ran.has(w.dir) ? "ran" : "not affected"} |`),
     "",
     `lens-mutants: ${decision.lensMutants ? "ran" : "not affected"} · ` +
+      `nix build: ${decision.nixBuild ? "ran" : "not affected"} · ` +
       `bundles: ${decision.bundles.length > 0 ? decision.bundles.join(", ") : "none"}`,
   ].join("\n");
 
