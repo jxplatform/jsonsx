@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.0.3](https://github.com/jxsuite/jx/compare/compiler-v2.0.2...compiler-v2.0.3) (2026-08-21)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/create bumped to 1.3.3
+
 ## [2.0.2](https://github.com/jxsuite/jx/compare/compiler-v2.0.1...compiler-v2.0.2) (2026-08-21)
 
 
