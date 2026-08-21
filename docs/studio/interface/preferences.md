@@ -20,7 +20,9 @@ Preferences opens over the workspace rather than replacing it, and :kbd[Escape] 
 
 ## Appearance
 
-Choose the **Light** or **Dark** chrome theme. The choice applies immediately and is remembered for the next session. This is the editor's own theme — it has no effect on the site you're building, whose colors come from your project's styles.
+Choose the **Light** or **Dark** chrome theme. The choice applies immediately — the whole window, including any open [code editor](/docs/studio/logic/code) and anything showing over it — and is remembered for the next session.
+
+This is the editor's own theme. It has no effect on the site you're building, whose colors come from your project's styles, and the canvas stays a light document page in either theme so that what you see is what you ship. To preview your own site in a dark colour scheme, use the light/dark control on the canvas instead — see **[Contexts](/docs/studio/projects/settings)**.
 
 ## Assistant
 

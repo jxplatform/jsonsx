@@ -1,37 +1,41 @@
 # Jx Studio UI/UX Interface Guidelines
 
-**Version:** 0.3.12
+**Version:** 0.3.13
 **Status:** Implemented
-**Updated:** 2026-08-16
+**Updated:** 2026-08-21
 **Applies to:** `packages/studio/`
 
 ---
 
 ## 1. Design System Foundation
 
-Jx Studio builds on **Adobe Spectrum Web Components** (`@spectrum-web-components/*`) with a dark theme (`color="dark"`, `scale="medium"`). All UI chrome uses Spectrum components; the canvas renders content via the Jx runtime on a light background.
+Jx Studio builds on **Adobe Spectrum Web Components** (`@spectrum-web-components/*`) at `scale="medium"`. All UI chrome uses Spectrum components; the canvas renders content via the Jx runtime on a light background in **both** chrome themes — a document is a document, and does not follow the chrome.
+
+The chrome ships two themes, `color="dark"` (the default the app boots in) and `color="light"`, chosen in Preferences → Appearance. Each is a Spectrum colour fragment, and **a theme named in `CHROME_THEMES` must have its fragment registered in `src/ui/spectrum.ts`**: `<sp-theme>` adopts the fragment registered under the `color` it is given and silently adopts none for a name it does not know, which leaves every `--spectrum-*` colour token undefined and the chrome unchanged. That is not a hypothetical — it is how Light shipped as a setting that did nothing.
 
 ### 1.1 Theme Tokens
 
 Use CSS custom properties from `:root` — never hardcode color values.
 
 > The **Fallback** column is checked against `styles/tokens.css` by `packages/studio/scripts/check-styles.ts`, and the check is why the values below are right. Seven of them had been wrong for months — this table named `#1e1e1e` for `--bg` where the app had shipped `#111111` since the brand ramp landed — so anyone designing against the documented palette was designing against one that no longer existed. A correction without a gate only resets the clock.
+>
+> Every token below is a reference to a Spectrum token, so it is the **declaration** that is the contract and the fallback that is merely checkable. The fallbacks are the dark ramp because dark is what the app boots in; under `color="light"` the same declarations resolve to the light ramp in `src/ui/jx-theme.ts` (`--bg` `#f4f4f5`, `--bg-panel` `#ffffff`, `--fg` `#27272a`, `--accent` `#2563eb`) with nothing in `tokens.css` branching on the theme. A token that has to be spelled twice, once per theme, is a token that belongs in the brand fragment instead.
 
-| Token         | Purpose                           | Fallback                 |
-| ------------- | --------------------------------- | ------------------------ |
-| `--bg`        | App background                    | `#111111`                |
-| `--bg-panel`  | Panel background                  | `#1a1a1a`                |
-| `--bg-input`  | Input field background            | `#1a1a1a`                |
-| `--border`    | Borders and separators            | `#222222`                |
-| `--fg`        | Primary text                      | `#e4e4e7`                |
-| `--fg-dim`    | Secondary text (labels, hints)    | `#a1a1aa`                |
-| `--accent`    | Interactive elements, focus rings | `#3b82f6`                |
-| `--accent-fg` | Text on accent backgrounds        | `#ffffff`                |
-| `--danger`    | Destructive actions, errors       | `#f44747`                |
-| `--success`   | Positive states                   | `#89d185`                |
-| `--warning`   | Caution states                    | `#c5a332`                |
-| `--radius`    | Standard border radius            | `3px`                    |
-| `--hover-bg`  | Hover overlay                     | `rgba(255,255,255,0.04)` |
+| Token         | Purpose                           | Fallback                                                                |
+| ------------- | --------------------------------- | ----------------------------------------------------------------------- |
+| `--bg`        | App background                    | `#111111`                                                               |
+| `--bg-panel`  | Panel background                  | `#1a1a1a`                                                               |
+| `--bg-input`  | Input field background            | `#1a1a1a`                                                               |
+| `--border`    | Borders and separators            | `#222222`                                                               |
+| `--fg`        | Primary text                      | `#e4e4e7`                                                               |
+| `--fg-dim`    | Secondary text (labels, hints)    | `#a1a1aa`                                                               |
+| `--accent`    | Interactive elements, focus rings | `#3b82f6`                                                               |
+| `--accent-fg` | Text on accent backgrounds        | `#ffffff`                                                               |
+| `--danger`    | Destructive actions, errors       | `#f44747`                                                               |
+| `--success`   | Positive states                   | `#89d185`                                                               |
+| `--warning`   | Caution states                    | `#c5a332`                                                               |
+| `--radius`    | Standard border radius            | `3px`                                                                   |
+| `--hover-bg`  | Hover overlay                     | `color-mix(in srgb, var(--spectrum-gray-900, #fafafa) 5%, transparent)` |
 
 **Accent opacity variants** for backgrounds:
 
@@ -984,6 +988,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.3.13** (2026-08-21) — Chrome ships two themes; a theme in CHROME_THEMES must have its Spectrum colour fragment registered, and the semantic token table documents the dark fallbacks with the light ramp resolved from the brand fragment.
 - **0.3.12** (2026-08-16) — §15 the documentation screenshot pipeline drives Chromium over WebDriver BiDi rather than CDP — byte-identical captures, and the one behavioural difference (a pointer move outside the viewport) fixed rather than worked around.
 - **0.3.11** (2026-08-16) — §14 ATAG is Subset: Part A is §13.1a and §8.2, Part B is studio.md §16.6.
 - **0.3.10** (2026-08-16) — §1.1 the token table's fallbacks are corrected and gated against tokens.css; §8.2 cut/paste is the stated alternative to every drag (SC 2.5.7); §13.1a one live region, called from notify() itself, so a failure that lands in the Problems panel is announced.

@@ -22,6 +22,7 @@
  */
 
 import { effect, effectScope, reactive } from "./reactivity";
+import { loadedMonaco } from "./services/monaco-lazy";
 import { applyStartupProfile } from "./services/profile";
 import { stampShellRegions } from "./ui/regions";
 import { workspace } from "./workspace/workspace";
@@ -943,14 +944,40 @@ export function resetLayout(deps: LayoutDeps): void {
 }
 
 /**
- * Project the theme record onto `<sp-theme>`.
+ * The Monaco theme that goes with a chrome theme.
+ *
+ * Monaco paints its own chrome from its own registry and cannot read a CSS custom property, so it
+ * is the one surface in the app the Spectrum theme does not reach. Both editors used to be created
+ * with a literal `"vs-dark"`, which is how a light Studio kept a black code view in the middle of
+ * it. `"vs"` is Monaco's stock light theme — the counterpart of the `"vs-dark"` already in use, not
+ * a new palette to maintain.
+ */
+export function monacoTheme(theme: ChromeTheme = shell.theme): string {
+  return theme === "light" ? "vs" : "vs-dark";
+}
+
+/**
+ * Project the theme record onto `<sp-theme>` and onto Monaco.
  *
  * The predecessor was a raw `document.querySelector("sp-theme")?.setAttribute(...)` inside the
  * automation hook — a presentation poke no user could make and no surface could read back. It is a
  * shell input like the docks, so it lives on the record and is applied by the same effect.
+ *
+ * `setTheme` is global to Monaco and repaints every live editor, so an open code view follows the
+ * switch rather than waiting to be remounted. It goes through {@link loadedMonaco} — never
+ * `loadMonaco()` — because a theme change must not be the thing that pulls 12.6 MB of editor into a
+ * session that has not opened one. With no editor loaded there is nothing to repaint, and the
+ * `theme:` option each mount passes reads the record when it eventually happens.
+ *
+ * The `data-theme` stamp on `<html>` exists for ONE rule, and only because `<html>` is an ancestor
+ * of `<sp-theme>`: the backdrop in `styles/tokens.css` cannot read a `--spectrum-*` token from up
+ * there (see that file's note on why the semantic layer is not on `:root`), so it painted a fixed
+ * near-black behind every theme. An attribute is the only channel that reaches it.
  */
 export function applyChromeTheme(): void {
   document.querySelector("sp-theme")?.setAttribute("color", shell.theme);
+  document.documentElement.dataset.theme = shell.theme;
+  loadedMonaco()?.editor.setTheme(monacoTheme());
 }
 
 /** Project the dock record onto the shell grid: collapse classes on #app, sizes as CSS vars. */

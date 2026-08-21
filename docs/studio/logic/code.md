@@ -19,6 +19,8 @@ Everything in the Logic pages so far works without writing code. But Studio does
 The editor loads the first time you open a code surface, not when Studio starts — it is the single largest piece of the app, and most sessions never need it. Expect a brief pause the first time, and none after that.
 :::
 
+Both surfaces below follow the chrome theme you chose in **[Preferences → Appearance](/docs/studio/interface/preferences#appearance)**, and switching it repaints an open editor where it stands.
+
 There are two distinct code surfaces, for two different jobs.
 
 ## The function editor
