@@ -121,9 +121,9 @@
       "width": 3840
     },
     "docs/images/blog-grid.png": {
-      "bytes": 230198,
-      "capturedAt": "2026-08-20T20:39:46Z",
-      "capturedBy": "screenshots@ci/32414989528",
+      "bytes": 230715,
+      "capturedAt": "2026-08-21T13:28:37Z",
+      "capturedBy": "screenshots@ci/32486767913",
       "definition": "0e8a0d9df9c3c6cc71eff7f71406b315871323a5e311e73d87d4d3b8a00c4e0f",
       "height": 2000,
       "runtime": {
@@ -131,7 +131,7 @@
         "fontset": "fc:cac8f480b341",
         "os": "debian-12"
       },
-      "sha256": "c4bc594378f4701deea4aee79a912a3a2e8486b009c71e7012beff1665133620",
+      "sha256": "7af9f128345356c443c877fb88e765b3f7e7872ccdbfa65aa7311f66f4fb8ac1",
       "shot": "blog-grid",
       "width": 3840
     },
@@ -391,9 +391,9 @@
       "width": 480
     },
     "docs/images/data-grid.png": {
-      "bytes": 778950,
-      "capturedAt": "2026-08-19T16:28:35Z",
-      "capturedBy": "screenshots@ci/32275613958",
+      "bytes": 779548,
+      "capturedAt": "2026-08-21T13:29:14Z",
+      "capturedBy": "screenshots@ci/32486767913",
       "definition": "7733baf1d19aff069527b88fefd317f30bb3a8b2ec780f65ed6f5dfbb25d08ea",
       "height": 2000,
       "runtime": {
@@ -401,7 +401,7 @@
         "fontset": "fc:cac8f480b341",
         "os": "debian-12"
       },
-      "sha256": "381ed03d220dc4aff3bcaae5fe82247787d4df552c1a11166efb13df601d8f1f",
+      "sha256": "6f916fc822549394ca880db6a31c12af1881d94e337e0bfe0196bfe85e4c276a",
       "shot": "data-grid",
       "width": 3840
     },
@@ -856,9 +856,9 @@
       "width": 1536
     },
     "docs/images/settings-document.png": {
-      "bytes": 286546,
-      "capturedAt": "2026-08-19T18:09:50Z",
-      "capturedBy": "screenshots@ci/32285597997",
+      "bytes": 285858,
+      "capturedAt": "2026-08-21T13:27:13Z",
+      "capturedBy": "screenshots@ci/32486767913",
       "definition": "590d21c316ecb634d2eaa6e978a541fe15a4414c765de4595e5f0704de335fe6",
       "height": 2000,
       "runtime": {
@@ -866,7 +866,7 @@
         "fontset": "fc:cac8f480b341",
         "os": "debian-12"
       },
-      "sha256": "10aacf931502ae46926fe765abf267a83e9f98d3f6439817de9294f9f29b91a0",
+      "sha256": "04a5faa0f45f7052375e60581f7b11dff749687d0e134a330150e12cd248d4ba",
       "shot": "settings-document",
       "width": 3840
     },
