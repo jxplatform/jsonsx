@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   # Which of the jobs below this diff can actually fail. See scripts/ci/affected.ts for the rules
-  # and for why only three things here are gated at all.
+  # and for why only four things here are gated at all.
   #
   # This workflow must NEVER grow an `on:`-level `paths:` filter. A path-filtered workflow that
   # does not trigger leaves a required status check pending forever; the `ci` job at the bottom is
@@ -30,6 +30,7 @@ jobs:
       has_tests: ${{ steps.affected.outputs.has_tests }}
       all_workspaces: ${{ steps.affected.outputs.all_workspaces }}
       lens_mutants: ${{ steps.affected.outputs.gate_lens_mutants }}
+      nix: ${{ steps.affected.outputs.gate_nix }}
       mode: ${{ steps.affected.outputs.mode }}
     steps:
       - uses: actions/checkout@v7
@@ -347,6 +348,26 @@ jobs:
       - uses: ./.github/actions/setup-bun
       - run: bun --cwd packages/studio scripts/check-lens-mutants.ts
 
+  # The Nix build, as a job of THIS workflow rather than a workflow of its own.
+  #
+  # It used to be `on: pull_request` in nix.yml with a `paths:` filter, and that is exactly why it
+  # could never be required: a path-filtered workflow that does not fire leaves a required status
+  # check pending forever — the same trap the `ci` job below is written to avoid. Moving the
+  # pull-request leg here puts it behind a gate that always runs and always reports, so `nix / build`
+  # becomes part of the one `ci` aggregate branch protection names.
+  #
+  # That matters most for the thing that motivated it: a dependency bump auto-merges on a green
+  # `ci`, and the Nix package is the ONLY consumer of bun.nix and the flake inputs. Without this,
+  # a bump that breaks packaging would land on main and first be noticed by a release refusing to
+  # advance. The gate is scripts/ci/affected.ts's NIX_INPUTS.
+  nix:
+    needs: changes
+    if: needs.changes.outputs.nix == 'true'
+    # No `with:` — the defaults are the pull-request shape (ubuntu-latest, the checked-out ref, no
+    # publish). No `secrets:` either: CACHIX_AUTH_TOKEN is only needed on the release leg, and a
+    # pull request must not be able to write to the public cache.
+    uses: ./.github/workflows/nix.yml
+
   # The ONE stable name to make a required status check on `main`. It lives in a workflow with no
   # `paths:` filter, so it always runs and always reports — a required check on a path-filtered
   # workflow hangs pending forever instead.
@@ -355,7 +376,7 @@ jobs:
   # of this design: a job the diff cannot reach must leave this green.
   ci:
     if: always()
-    needs: [changes, test, checks, lens-mutants, coverage-comment]
+    needs: [changes, test, checks, lens-mutants, nix, coverage-comment]
     runs-on: ubuntu-latest
     steps:
       - name: Gate

@@ -26,6 +26,54 @@ Conventions:
 - `mock.module()` before importing the module under test; `await import()` afterwards for modules with import-time side effects. sharp and `electrobun/bun` must always be mocked (sharp is unloadable on NixOS).
 - Check per-file coverage with `bun test --isolate --coverage` from the workspace directory (`packages/<pkg>` or `extensions/<ext>`); the table prints to stderr.
 
+## Dependency Autopilot
+
+Dependencies update themselves and merge themselves. `.github/dependabot.yml` opens the pull requests, `.github/workflows/dependabot-auto-merge.yml` hands each one to GitHub's auto-merge, and the `ci` required status check on `main` is the only thing that decides. Nothing in the chain relaxes a check — the design is "let the suite be the reviewer", so a broken update is a red X and a stalled pull request, and the answer to one is more test coverage rather than a carve-out.
+
+Three ecosystems, deliberately NOT consolidated into one pull request. `multi-ecosystem-groups` exists and is the wrong trade here: `.github/**` reaches no test workspace while `bun.lock` is in `affected.ts`'s GLOBAL list, so merging them would make every action version bump pay for a full run of the test suite.
+
+| Ecosystem        | Cadence          | Grouping                   | What one pull request costs       |
+| ---------------- | ---------------- | -------------------------- | --------------------------------- |
+| `github-actions` | daily (weekdays) | one group, everything      | `checks` only                     |
+| `bun`            | daily (weekdays) | minor+patch / major, split | the full ~22-job matrix, plus Nix |
+| `nix`            | weekly           | one group, all four inputs | the Nix build only                |
+
+The `bun` entry is a SINGLE root entry and covers all 21 workspace manifests — Dependabot expands the root `workspaces` globs itself and rewrites every member's `package.json`. `directories: ["/packages/*"]` would be wrong: a sub-directory bun job resolves the same root `bun.lock` upward, which is the "overlap in directories" the documentation forbids, and produces duplicate pull requests.
+
+### bun.nix lags between releases, on purpose
+
+`bun.nix` is a pure function of `bun.lock`, so every bun update makes it stale by construction — and **no bot can fix it on the Dependabot branch**. A push made with `GITHUB_TOKEN` raises no `pull_request` event, so the new head gets zero check runs and could never satisfy a required check. That is measured, not assumed: PR #131 carries a `github-actions[bot]` commit whose head still reports `state=pending` with no checks at all.
+
+So the invariant moved. `bun.nix` matches `bun.lock` **at every release**, not at every commit:
+
+- `bun run nix:check` / `bun run nix:sync` (`scripts/check-bun-nix.ts`) is the ONE definition of "regenerate bun.nix" — shared by the devShell's `update-nix-hashes`, both workflows below, and the root `postinstall`. It names the packages that moved instead of leaving a 289 KB diff to read.
+- `nix.yml` regenerates it **in the working tree** before every build, so the Nix check on a dependency pull request answers _does this dependency set build?_ rather than going red on a generator nobody could have run.
+- `.github/workflows/release-bun-nix.yml` commits the regenerated file to the **release pull request** — the branch that becomes the tag, and one a human is already watching.
+- `nix.yml`'s release leg (`publish: true`) runs the check BARE. A drift there is a failure, not a fixup: if the sync ever fails to land, the release build fails, `release` does not advance, and release-please opens an issue. A stale `bun.nix` cannot reach a user.
+
+### The Nix build is part of `ci`
+
+`nix.yml` no longer has an `on: pull_request` trigger. A path-filtered workflow can never be a required check — it leaves the check pending forever when it does not fire — so test.yml (which has no `paths:` filter, and must never grow one) owns the pull-request leg via `workflow_call`, gated on `affected.ts`'s `NIX_INPUTS`, and the `ci` aggregate requires it. That is what lets a dependency bump which breaks packaging block its own auto-merge.
+
+`flake.nix`, `flake.lock` and `bun.nix` moved OUT of `affected.ts`'s GLOBAL list in the same change: no test suite reads them, so a weekly flake-input bump now runs the Nix build and nothing else instead of spending the whole matrix.
+
+### Settings, not code
+
+Two things live in repository settings and cannot be asserted from the tree:
+
+1.  **Allow auto-merge** (Settings → General → Pull requests). Without it the mutation errors out.
+2.  **A ruleset on `main`** requiring a pull request and the `ci` status check, enforced for everyone. This is load-bearing, not hygiene: `gh pr merge --auto` FAILS OPEN — with no required check it performs an ordinary merge instead, and it treats `UNSTABLE` (non-required checks red) as immediately mergeable. That is why the workflow calls the `enablePullRequestAutoMerge` mutation, which errors rather than merging, and asserts the ruleset exists before delegating to it.
+
+No secret is involved. On a Dependabot event `secrets.*` resolves against the separate Dependabot store, so a secret referenced in that workflow would arrive as an empty string — a failure that reads like a malformed value rather than a missing one.
+
+### Traps that are quiet rather than loud
+
+- **`bun.lock` must stay at `lockfileVersion: 1`.** Dependabot's updater image pins Bun 1.3.14, which refuses version 2 — Bun 1.4's default for a lockfile written from scratch. The failure is `DependencyFileNotSupported`, i.e. bun updates simply stop arriving. `scripts/dependabot-config.test.ts` asserts this, along with everything else in this section that can be asserted from the tree.
+- **A `GITHUB_TOKEN` merge starts no `push` workflows.** release-please and the Nix cache-warming build are both `push: main`, and auto-merge merges as `GITHUB_TOKEN` — so both now also run on a schedule. Without that the release pull request would silently stop picking up commits and the Actions cache on `main` would go cold.
+- **A three-day cooldown applies to every version update** whether or not it is configured, and the days keys cannot be set to zero. `cooldown: { exclude: ["*"] }` is the documented lever for zero delay; it trades away the supply-chain quarantine, so it is not the default here.
+- **Release-only workflows are unexercised.** `bundle-desktop-*`, `build-msix` and `publish` are `workflow_call`-only, so an action bump inside them is first executed during a real release. Accepted deliberately — that pipeline already fails loudly and opens issues — but it is the one place where a green `ci` does not mean "tested".
+- **`@jxsuite/*` is ignored** for the bun ecosystem. release-please owns those ranges (it rewrites them inside the release commit via `extra-files`, and `bun run templates:check` gates them), so a Dependabot bump would be a second writer on the same line.
+
 ## Starter Roots and the Shadowed Core
 
 Iterating a starter inside Studio runs `bun install` in that starter's root, and a starter pins

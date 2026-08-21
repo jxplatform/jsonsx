@@ -4,6 +4,19 @@ on:
   push:
     branches:
       - main
+  # …and on a schedule, because `push` is no longer reliable on this branch.
+  #
+  # Under the dependency-autopilot policy (CLAUDE.md) most merges to `main` are auto-merges, and
+  # GitHub suppresses the events raised by its own `GITHUB_TOKEN` — so a Dependabot merge produces
+  # no `push` event and this workflow would simply never see it. The visible symptom would be a
+  # release pull request that silently stops picking up commits.
+  #
+  # Everything here is idempotent: with nothing new to release, release-please refreshes (or
+  # declines to open) its pull request and every downstream job stays gated behind
+  # `releases_created`.
+  schedule:
+    - cron: "0 5 * * *"
+  workflow_dispatch:
 
 permissions:
   contents: write
