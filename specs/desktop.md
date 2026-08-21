@@ -2,9 +2,9 @@
 
 ## Platform Abstraction, Project Loading, and Component Scoping
 
-**Version:** 0.3.14-draft
+**Version:** 0.3.15-draft
 **Status:** Pending
-**Updated:** 2026-08-20
+**Updated:** 2026-08-21
 **License:** MIT
 
 ---
@@ -879,12 +879,53 @@ $ nix build github:jxsuite/jx/release && ./result/bin/jx-studio [project-root]
 
 Locally, `nix build` (no ref) builds the working tree, which is what a contributor wants.
 
+**And the consumer downloads it.** The release publishes `packages.<system>.default` to
+`https://jxsuite.cachix.org`, and the flake's own `nixConfig` names that cache, so
+`nix run github:jxsuite/jx/release` fetches the app rather than producing it. What is published is
+essentially one store path. Everything else in the runtime closure — Chromium, Bun, glibc — is
+already on `cache.nixos.org`, and any path carrying a cache's signature is filtered out of the
+push, so what remains is precisely the `bun install` plus `bun run build` a user would otherwise
+run. Their build-time inputs are never fetched either: Nix does not realise the inputs of a
+derivation whose output it can substitute, which is why the ~1000 npm tarball derivations `bun.nix`
+pins do not have to be published for the substitution to be complete.
+
+The push is best-effort by design — a cache is an optimisation, and failing it must not fail the
+job `release` advances behind, whose worst case is the behaviour that preceded the cache. What is
+not best-effort is **noticing**. `verify-cache` runs after the branch moves and asks two things of
+the released ref: does the cache hold the path evaluation produces, and does `nix build
+--max-jobs 0` — substitute or fail — succeed against `github:jxsuite/jx/release`. Either answering
+no opens an issue. The second question is also the only check anywhere that the store path CI
+published is the one a consumer's flake fetch evaluates to; CI builds a git checkout and a user
+builds a GitHub tarball, and nothing else in the pipeline would notice if those stopped agreeing.
+
+Nix honours a flake's `nixConfig` substituters only for a user in `trusted-users`, so an
+unprivileged NixOS account ignores the cache and builds from source anyway. That is a property of
+Nix rather than of this packaging, and the install page carries the `nix.settings` form that
+survives it.
+
 `release` never advances to a commit whose flake does not build: `.github/workflows/nix.yml` builds
 `.#default` at the tag and asserts the wrapper's `CHROMIUM_BIN` and `JX_STUDIO_ASSETS` resolve, and
 the branch moves only if that succeeds. When it does not, the branch stays where it is and an issue
 is opened — a stale ref that works beats a fresh one that does not. The same workflow runs on any
 pull request touching `flake.nix`, `bun.nix`, `bun.lock` or `packages/desktop/**`, which is the
 first time the flake has been built by CI at all.
+
+**Both architectures are built; only one is a gate.** `meta.platforms` has always claimed
+`aarch64-linux`, and nothing had ever built it — the `forThisHost` filter that trims `bun.nix` to
+the host's `os`/`cpu` had only been exercised on x86_64. The release therefore runs a second leg on
+an arm runner, and that leg is **advisory**: it is absent from `advance-release-branch`'s `needs`,
+because a first-ever aarch64 failure freezing `release` would strand every x86 user over an
+architecture nobody has received yet. It becomes a gate once it has been green across several
+releases.
+
+**The workflow also runs on pushes to `main`, and that trigger is about the cache rather than the
+check.** A GitHub Actions cache is branch-scoped: a pull request may read the default branch's
+cache, never another pull request's. With no run on `main` there is no base cache to inherit, so
+each PR would refetch from scratch the roughly one thousand fixed-output npm tarball derivations
+`bun.nix` pins — the half of the closure `cache.nixos.org` does not carry and never will, because
+those derivations exist only here. A release-PR merge consequently builds twice, once through the
+`push` trigger and once through release-please's `workflow_call`; they sit in different concurrency
+groups, and the `push` leg is what leaves `main` warm for the next PR.
 
 ### 9.4 Windows Are Processes
 
@@ -1061,6 +1102,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.3.15-draft** (2026-08-21) — §9.3: released builds are published to jxsuite.cachix.org and the flake names it, so a consumer substitutes jx-studio instead of building it; verify-cache proves that after each release. The release also builds aarch64-linux as an advisory leg beside the x86_64 gate, and nix.yml runs on pushes to main so pull requests inherit a warm Actions cache for the npm tarball derivations cache.nixos.org cannot serve.
 - **0.3.14-draft** (2026-08-20) — §9.3: the desktop entry ships under a stable id and claims the app_id Chromium actually gives an --app window, so the taskbar/dock can resolve the brand icon.
 - **0.3.13-draft** (2026-08-20) — Chromium launcher reaches PAL parity: its own adapter over createProjectServer (§9.1), multi-window through a cross-process window registry (§9.4), a server-to-client push channel behind live sidebar sync and focus, buildSite behind View: Open in Browser, appInfo for the About screen, and an OS-opener fallback so preview links and sign-in leave the app at all (§3.5, §9.5). New Window becomes the `view.newWindow` command rather than a native-menu-only item, and the native menu drops its duplicate accelerators (§4.2a).
 - **0.3.12-draft** (2026-08-19) — §9.3 documents the release branch as the ref a Nix consumer pins, and the nix build that gates it; corrects the install phase, which has used cp -r plus a dangling-symlink prune and src/chromium/index.ts since before this text was written.
@@ -1094,4 +1136,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx Studio Desktop Architecture Specification v0.3.14-draft_
+_Jx Studio Desktop Architecture Specification v0.3.15-draft_
