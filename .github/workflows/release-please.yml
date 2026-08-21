@@ -192,6 +192,11 @@ jobs:
           if [ -n "$missing" ]; then
             echo "::warning::Release $TAG is missing expected desktop assets:$missing"
             gh release edit "$TAG" --prerelease
+            # The label must exist or `gh issue create` errors and the `|| true` below eats it —
+            # Which is how every guard in this workflow was quietly unable to file its report.
+            gh label create release-incomplete --color B60205 \
+              --description "A release shipped incomplete: a missing asset, publish, tag or cache entry" \
+              2>/dev/null || true
             gh issue create \
               --title "Release $TAG is missing desktop assets" \
               --label release-incomplete \
@@ -273,6 +278,11 @@ jobs:
           set -euo pipefail
           if [ "$NIX_RESULT" != "success" ]; then
             echo "::warning::nix-build was $NIX_RESULT for $TAG; leaving \`release\` where it is"
+            # The label must exist or `gh issue create` errors and the `|| true` below eats it —
+            # Which is how every guard in this workflow was quietly unable to file its report.
+            gh label create release-incomplete --color B60205 \
+              --description "A release shipped incomplete: a missing asset, publish, tag or cache entry" \
+              2>/dev/null || true
             gh issue create \
               --title "\`release\` did not advance to $TAG" \
               --label release-incomplete \
@@ -352,6 +362,11 @@ jobs:
 
           if [ -n "$problems" ]; then
             echo "::warning::the binary cache does not serve $TAG"
+            # The label must exist or `gh issue create` errors and the `|| true` below eats it —
+            # Which is how every guard in this workflow was quietly unable to file its report.
+            gh label create release-incomplete --color B60205 \
+              --description "A release shipped incomplete: a missing asset, publish, tag or cache entry" \
+              2>/dev/null || true
             gh issue create \
               --title "Binary cache does not serve $TAG" \
               --label release-incomplete \
@@ -434,6 +449,9 @@ jobs:
           open="$(gh issue list --state open --label release-incomplete \
                     --search "$title in:title" --json number --jq '.[0].number // empty')"
           if [ -z "$open" ]; then
+            gh label create release-incomplete --color B60205 \
+              --description "A release shipped incomplete: a missing asset, publish, tag or cache entry" \
+              2>/dev/null || true
             gh issue create --title "$title" --label release-incomplete --body "$(
               printf '%s\n\n```\n%s\n```\n' \
                 "\`bun run release:integrity\` on \`main\`, from [this run]($GITHUB_SERVER_URL/$GH_REPO/actions/runs/$GITHUB_RUN_ID)." \
