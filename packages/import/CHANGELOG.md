@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.39.1](https://github.com/jxsuite/jx/compare/import-v0.39.0...import-v0.39.1) (2026-08-21)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/markup bumped to 0.4.4
+    * @jxsuite/schema bumped to 1.7.0
+  * optionalDependencies
+    * @jxsuite/compiler bumped to 2.0.1
+
 ## [0.39.0](https://github.com/jxsuite/jx/compare/import-v0.38.2...import-v0.39.0) (2026-08-19)
 
 
