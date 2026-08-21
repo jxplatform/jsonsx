@@ -126,22 +126,41 @@ const createdEditors: FakeEditor[] = [];
 /**
  * Wait until the source editor's floating mount has actually landed.
  *
- * `mountSourceEditor` is `void mountSourceEditor(…)` around a dynamic import, so the number of
- * turns it takes is a property of the machine, not of the code under test. A bare `await flush()`
- * is two turns and is usually enough — until it is not, and then the assertion reads
- * `createdEditors` while it is still short.
+ * `mountSourceEditor` is `void mountSourceEditor(…)` around a dynamic import, so how long it takes
+ * is a property of the machine, not of the code under test. A bare `await flush()` is two turns and
+ * is usually enough — until it is not, and then the assertion reads `createdEditors` while it is
+ * still short.
  *
  * That flake is worth removing rather than tolerating, because `scripts/check-lens-mutants.ts`
  * treats a red baseline file as a killed mutant: one flake here reports nineteen false kills, and
  * on a CI runner it did exactly that. Waiting on the condition costs nothing when the mount has
  * already landed.
  *
+ * **The bound is a DEADLINE, not a turn count, and the difference is the whole of this fix.** The
+ * previous version spun twenty `flush()`es — forty `setTimeout(0)` turns, which a warm machine
+ * burns through in about a millisecond. That is not a wait, it is a formality: whatever the mount
+ * is actually waiting on, forty immediate turns do not give it time to finish, so the loop only
+ * ever helped when the mount was already all but done. A wall-clock deadline waits for the thing
+ * the mount waits for and costs nothing when it has already landed.
+ *
  * @param {number} count - How many editors must exist before the caller may assert.
  */
 async function waitForEditors(count: number): Promise<void> {
-  for (let turns = 0; createdEditors.length < count && turns < 20; turns++) {
-    await flush();
+  const deadline = performance.now() + 10_000;
+  while (createdEditors.length < count) {
+    if (performance.now() > deadline) {
+      throw new Error(
+        `waitForEditors(${String(count)}): only ${String(createdEditors.length)} editor(s) mounted`,
+      );
+    }
+    await flush(1);
   }
+  /* And then the ordinary settle, so this is strictly MORE waiting than the `await flush()` it
+     replaces at each call site. `create` is the first thing the mount does, not the last — the
+     initial `setValue`, the flag it consumes and the `_writes` bookkeeping all land after it — so a
+     helper that returned the instant the editor existed could hand back a half-built one and would
+     be a downgrade at every site that asserts on what the mount finished doing. */
+  await flush();
 }
 
 void mock.module("monaco-editor/editor", () => ({
@@ -207,6 +226,18 @@ void mock.module("monaco-editor/editor", () => ({
     },
     setModelMarkers: () => {},
   },
+}));
+
+/* Monaco's SETUP module, doubled to nothing — the other half of the mount that this suite never
+   wanted. `loadMonaco()` awaits `monaco-editor/editor` (mocked above) and `./monaco-setup.js`
+   TOGETHER, and only the first of those was being intercepted: the second statically imports some
+   sixty real `monaco-editor` entrypoints, so every run of this file loaded 14 MB of the real editor
+   to reach a fake one. That is half a second of module evaluation on a warm machine, and the mount
+   the tests then wait on is on the far side of it — which is precisely how a suite that asserts on
+   `createdEditors` came to depend on how fast the disk is. The mount is what this file tests; what
+   `monaco-setup` registers is `monaco-setup.test.ts`'s subject, doubled there the same way. */
+void mock.module("../src/services/monaco-setup.js", () => ({
+  applyProjectSchemas: () => {},
 }));
 
 void mock.module("../src/canvas/canvas-live-render.js", () => ({
@@ -722,7 +753,7 @@ describe("source mode", () => {
     // The container renders synchronously; the editor itself mounts once Monaco has loaded.
     expect(stageEl().querySelector(".source-wrap")).not.toBeNull();
     expect(stageEl().querySelector(".source-editor")).not.toBeNull();
-    await flush();
+    await waitForEditors(1);
     expect(surfaceForPane("primary").monacoEditor).toBe(createdEditors[0] as never);
     expect(createdModels[0]!._value).toBe(JSON.stringify(tab.doc.document, null, 2));
     expect(createdModels[0]!.lang).toBe("json");
@@ -745,7 +776,7 @@ describe("source mode", () => {
     setMode("source");
     await withFastTimers(async (runPending) => {
       renderCanvas();
-      await flush();
+      await waitForEditors(1);
       const [editor] = createdEditors;
       editor!._ignoreNextChange = false;
       editor!._model!._value = JSON.stringify({ children: [], tagName: "main" });
@@ -761,7 +792,7 @@ describe("source mode", () => {
     setMode("source");
     await withFastTimers(async (runPending) => {
       renderCanvas();
-      await flush();
+      await waitForEditors(1);
       const [editor] = createdEditors;
       editor!._ignoreNextChange = false;
       editor!._model!._value = "{ not json";
@@ -777,7 +808,7 @@ describe("source mode", () => {
     setMode("source");
     await withFastTimers(async (runPending) => {
       renderCanvas();
-      await flush();
+      await waitForEditors(1);
       const [editor] = createdEditors;
       editor!._ignoreNextChange = true;
       editor!._model!._value = JSON.stringify({ tagName: "main" });
@@ -800,7 +831,7 @@ describe("source mode", () => {
     const tab = openSyncedTab(undefined, { documentPath: "/project/handlers.js" });
     setMode("source");
     renderCanvas();
-    await flush();
+    await waitForEditors(1);
     expect(createdModels[0]!.lang).toBe("json");
     expect(createdModels[0]!._value).toBe(JSON.stringify(tab.doc.document, null, 2));
   });
@@ -839,7 +870,7 @@ describe("source mode", () => {
     openSyncedTab(undefined, { documentPath: "project.schema.json" });
     setMode("source");
     renderCanvas();
-    await flush();
+    await waitForEditors(1);
     expect(String(createdModels[0]!.uri)).toBe("file:///.jx/generated/project.schema.json");
   });
 
@@ -847,7 +878,7 @@ describe("source mode", () => {
     openSyncedTab(undefined, { documentPath: "pages/index.json" });
     setMode("source");
     renderCanvas();
-    await flush();
+    await waitForEditors(1);
     renderCanvas();
     await flush();
     expect(createdModels).toHaveLength(1);
@@ -862,7 +893,7 @@ describe("source mode", () => {
     setMode("source");
     await withFastTimers(async (runPending) => {
       renderCanvas();
-      await flush();
+      await waitForEditors(1);
       expect(createdModels[0]!.lang).toBe("markdown");
       expect(serializeDocumentMock).toHaveBeenCalled();
       expect(createdModels[0]!._value).toBe("# markdown source");
@@ -895,7 +926,7 @@ describe("source mode", () => {
     setMode("source");
     await withFastTimers(async () => {
       renderCanvas();
-      await flush();
+      await waitForEditors(1);
       const [editor] = createdEditors;
       editor!._model!._value = "# Never saved";
       fireModelChange(editor!);
@@ -931,7 +962,7 @@ describe("source mode", () => {
     setMode("source");
     await withFastTimers(async () => {
       renderCanvas();
-      await flush();
+      await waitForEditors(1);
       const [editor] = createdEditors;
       editor!._model!._value = "# Never saved";
       fireModelChange(editor!);
@@ -965,7 +996,7 @@ describe("source mode", () => {
     });
     await withFastTimers(async (runPending) => {
       renderCanvas();
-      await flush();
+      await waitForEditors(1);
       const [editor] = createdEditors;
       editor!._ignoreNextChange = false;
       fireModelChange(editor!);
@@ -979,7 +1010,7 @@ describe("source mode", () => {
     const tab = openSyncedTab();
     setMode("source");
     renderCanvas();
-    await flush();
+    await waitForEditors(1);
     expect(createdEditors.length).toBe(1);
     const [editor] = createdEditors;
 
@@ -999,7 +1030,7 @@ describe("source mode", () => {
     const tab = openSyncedTab();
     setMode("source");
     renderCanvas();
-    await flush();
+    await waitForEditors(1);
     const [editor] = createdEditors;
     editor!._focused = true;
     editor!._model!._value = "user-typing";
@@ -1013,7 +1044,7 @@ describe("source mode", () => {
     const tab = openSyncedTab();
     setMode("source");
     renderCanvas();
-    await flush();
+    await waitForEditors(1);
     const [editor] = createdEditors;
     editor!._ignoreNextChange = false;
     editor!._model!._value = "stale-buffer";
@@ -1030,7 +1061,7 @@ describe("source mode", () => {
     setMode("source");
     await withFastTimers(async (runPending) => {
       renderCanvas();
-      await flush();
+      await waitForEditors(1);
       const [editor] = createdEditors;
       editor!._ignoreNextChange = false;
       editor!._model!._value = JSON.stringify({ tagName: "main" });
@@ -1068,7 +1099,7 @@ describe("source mode", () => {
     setMode("source");
     await withFastTimers(async (runPending) => {
       renderCanvas();
-      await flush();
+      await waitForEditors(1);
       const [editor] = createdEditors;
       editor!._ignoreNextChange = false;
       editor!._model!._value = "# Edited";
@@ -1118,7 +1149,7 @@ describe("source mode", () => {
     setMode("source");
     await withFastTimers(async (runPending) => {
       renderCanvas();
-      await flush();
+      await waitForEditors(1);
       const [editor] = createdEditors;
       editor!._ignoreNextChange = false;
       editor!._model!._value = "# Half a headi";
@@ -1174,7 +1205,7 @@ describe("source mode", () => {
 
     await withFastTimers(async (runPending) => {
       renderCanvas();
-      await flush();
+      await waitForEditors(1);
       const [editor] = createdEditors;
       editor!._ignoreNextChange = false;
       editor!._model!._value = JSON.stringify({ tagName: "main" });
@@ -1208,7 +1239,8 @@ describe("source mode", () => {
 
     renderCanvas();
     renderCanvas(); // Same turn, still inside the awaited load
-    await flush();
+    await waitForEditors(1);
+    await flush(); // …and a second mount, had there been one, has had its turn to land
 
     expect(createdEditors).toHaveLength(1);
     expect(createdModels).toHaveLength(1);
@@ -1239,7 +1271,7 @@ describe("source mode", () => {
     tab.doc.sourceFormat = "Markdown";
     setMode("source");
     renderCanvas();
-    await flush();
+    await waitForEditors(1);
     const [editor] = createdEditors;
     expect(editor!.getValue()).toBe("");
 
@@ -1258,7 +1290,7 @@ describe("source mode", () => {
     setMode("source");
     await withFastTimers(async (runPending) => {
       renderCanvas();
-      await flush();
+      await waitForEditors(1);
       const [editor] = createdEditors;
       editor!._ignoreNextChange = false;
       editor!._model!._value = JSON.stringify({ tagName: "main" });
@@ -1279,7 +1311,7 @@ describe("source mode", () => {
       throw new Error("format service unreachable");
     });
     renderCanvas();
-    await flush();
+    await waitForEditors(1);
     expect(createdModels[0]!._value).toBe("");
   });
 
@@ -1290,7 +1322,7 @@ describe("source mode", () => {
     tab.doc.sourceFormat = "Markdown";
     setMode("source");
     renderCanvas();
-    await flush();
+    await waitForEditors(1);
     expect(createdModels[0]!._value).toBe("# markdown source");
 
     serializeDocumentMock.mockImplementationOnce(async () => {
@@ -1305,7 +1337,7 @@ describe("source mode", () => {
     openSyncedTab();
     setMode("source");
     renderCanvas();
-    await flush();
+    await waitForEditors(1);
     const [editor] = createdEditors;
     const [model] = createdModels;
 
