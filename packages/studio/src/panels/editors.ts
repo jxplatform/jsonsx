@@ -30,6 +30,7 @@
 
 import type * as monaco from "monaco-editor";
 import { loadMonaco, mountStillWanted } from "../services/monaco-lazy";
+import { monacoTheme } from "../shell";
 import { isJsonObject } from "@jxsuite/schema/guards";
 import { html } from "lit-html";
 
@@ -424,7 +425,7 @@ async function mountFunctionEditor(
     minimap: { enabled: false },
     scrollBeyondLastLine: false,
     tabSize: 2,
-    theme: "vs-dark",
+    theme: monacoTheme(),
     value: body,
     wordWrap: "on",
   });

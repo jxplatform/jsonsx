@@ -386,6 +386,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio-ui-guidelines.md`
 
+- **0.3.13** (2026-08-21) — Chrome ships two themes; a theme in CHROME_THEMES must have its Spectrum colour fragment registered, and the semantic token table documents the dark fallbacks with the light ramp resolved from the brand fragment.
 - **0.3.12** (2026-08-16) — §15 the documentation screenshot pipeline drives Chromium over WebDriver BiDi rather than CDP — byte-identical captures, and the one behavioural difference (a pointer move outside the viewport) fixed rather than worked around.
 - **0.3.11** (2026-08-16) — §14 ATAG is Subset: Part A is §13.1a and §8.2, Part B is studio.md §16.6.
 - **0.3.10** (2026-08-16) — §1.1 the token table's fallbacks are corrected and gated against tokens.css; §8.2 cut/paste is the stated alternative to every drag (SC 2.5.7); §13.1a one live region, called from notify() itself, so a failure that lands in the Problems panel is announced.
@@ -415,6 +416,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.9.36-draft** (2026-08-21) — Preferences → Appearance states what the theme repaints: the chrome, the overlays and an open code view, with the canvas a light document in both.
 - **0.9.35-draft** (2026-08-20) — Declare the Monaco editor feature set in monaco-setup (one register import per capability, and the measured caveat that 0.56.0's contrib graph does not yet honour the exclusions); drop the Monaco de-duplication plugin now that the first-party collab binding leaves one importer.
 - **0.9.34-draft** (2026-08-19) — A stage with no pan/zoom surface leaves the wheel to the scroll container under it, and blocks ctrl/cmd+wheel page zoom instead of handing it to the browser.
 - **0.9.33-draft** (2026-08-19) — §20.4: the parity grid keys on the document's $translationKey, so a localized slug is one row rather than two half-translated ones.

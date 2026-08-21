@@ -2,9 +2,9 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.35-draft
+**Version:** 0.9.36-draft
 **Status:** Partial
-**Updated:** 2026-08-20
+**Updated:** 2026-08-21
 **License:** MIT
 
 ---
@@ -1811,12 +1811,12 @@ It does not suspend the app, and it is reachable with **no project open** — a 
 exactly there. Re-opening it while it is up selects the named section rather than stacking a second
 sheet.
 
-| Section    | Contents                                                                                                   |
-| ---------- | ---------------------------------------------------------------------------------------------------------- |
-| Appearance | The chrome theme (`shell.theme`, also settable by `view.setTheme`)                                         |
-| Assistant  | The AI provider key, model and endpoint, plus the keyless managed-connect path where a platform offers one |
-| Accounts   | Every credential Studio holds — GitHub, the AI provider, Cloudflare — listed with a Disconnect each        |
-| Keyboard   | Read-only, **generated** from the command registry                                                         |
+| Section    | Contents                                                                                                                                                                                       |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Appearance | The chrome theme — Dark or Light (`shell.theme`, also settable by `view.setTheme`); it repaints the chrome, the overlays and any open code view, and the canvas stays a light document in both |
+| Assistant  | The AI provider key, model and endpoint, plus the keyless managed-connect path where a platform offers one                                                                                     |
+| Accounts   | Every credential Studio holds — GitHub, the AI provider, Cloudflare — listed with a Disconnect each                                                                                            |
+| Keyboard   | Read-only, **generated** from the command registry                                                                                                                                             |
 
 Two rules the sections must keep:
 
@@ -2313,6 +2313,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.9.36-draft** (2026-08-21) — Preferences → Appearance states what the theme repaints: the chrome, the overlays and an open code view, with the canvas a light document in both.
 - **0.9.35-draft** (2026-08-20) — Declare the Monaco editor feature set in monaco-setup (one register import per capability, and the measured caveat that 0.56.0's contrib graph does not yet honour the exclusions); drop the Monaco de-duplication plugin now that the first-party collab binding leaves one importer.
 - **0.9.34-draft** (2026-08-19) — A stage with no pan/zoom surface leaves the wheel to the scroll container under it, and blocks ctrl/cmd+wheel page zoom instead of handing it to the browser.
 - **0.9.33-draft** (2026-08-19) — §20.4: the parity grid keys on the document's $translationKey, so a localized slug is one row rather than two half-translated ones.
@@ -2403,4 +2404,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.35-draft_
+_`@jxsuite/studio` Specification v0.9.36-draft_
