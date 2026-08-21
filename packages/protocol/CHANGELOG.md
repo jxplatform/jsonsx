@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.2](https://github.com/jxsuite/jx/compare/protocol-v1.1.1...protocol-v1.1.2) (2026-08-21)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/schema bumped to 1.8.0
+
 ## [1.1.1](https://github.com/jxsuite/jx/compare/protocol-v1.1.0...protocol-v1.1.1) (2026-08-21)
 
 
