@@ -326,6 +326,20 @@ jobs:
       # core, and one starter whose entry document was composed against a published @jxsuite/schema
       # left in a stray node_modules, so it was NARROWER than its own content required.
       - run: bun run schema:verify
+      # Changelog safety: a commit SUBJECT (or BREAKING CHANGE note) carrying a raw `<tag>` makes
+      # release-please DROP that package from its own release — silently, exit 0. That is how
+      # `schema` and `starters` fell out of three consecutive releases and `npm i @jxsuite/create`
+      # became unresolvable. `.husky/commit-msg` runs the same rule, but a hook is skippable with
+      # `--no-verify`, which is how the offending subject reached main. See commitlint.config.js.
+      #
+      # Pull-request-only, and it names the two shas explicitly rather than using HEAD: `checks`
+      # runs on the merge commit, whose own subject is not a conventional commit.
+      - name: Commit subjects must be changelog-safe
+        if: github.event_name == 'pull_request'
+        run: |
+          bun scripts/check-changelog-safety.ts \
+            --from ${{ github.event.pull_request.base.sha }} \
+            --to ${{ github.event.pull_request.head.sha }}
 
   # Its own job because it is 87 of the 159 seconds `checks` used to take, and everything else
   # in there is 0-4s. It is gated on studio's OWN tree — not on studio merely being retested —

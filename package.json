@@ -54,6 +54,8 @@
     "pack": "bun run --workspaces bun pm pack",
     "postinstall": "node -e \"if(!process.env.CI)require('child_process').execSync('bun2nix -o bun.nix',{stdio:'ignore'})\" || true",
     "prepare": "husky",
+    "release:integrity": "bun scripts/check-release-integrity.ts",
+    "release:changelog-safe": "bun scripts/check-changelog-safety.ts",
     "screenshots": "bun scripts/screenshots/run.ts",
     "screenshots:thumbnails": "bun scripts/screenshots/thumbnails.ts",
     "spec:bump": "bun scripts/docs/spec-bump.ts",
