@@ -1,5 +1,31 @@
 # Changelog
 
+## [2.2.0](https://github.com/jxsuite/jx/compare/server-v2.1.0...server-v2.2.0) (2026-08-21)
+
+
+### Features
+
+* **desktop:** bring the chromium launcher to PAL parity with electrobun ([9a94240](https://github.com/jxsuite/jx/commit/9a9424048403e48faf333e3ce788502ede4d2ce9))
+* **desktop:** bring the chromium launcher to PAL parity with electrobun ([9846e1d](https://github.com/jxsuite/jx/commit/9846e1dcf8d94bb68082fa79f40d38c139689a91))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/collab bumped to 0.8.0
+    * @jxsuite/compiler bumped to 2.0.1
+    * @jxsuite/create bumped to 1.3.1
+    * @jxsuite/import bumped to 0.39.1
+    * @jxsuite/protocol bumped to 1.1.1
+    * @jxsuite/runtime bumped to 2.0.1
+    * @jxsuite/schema bumped to 1.7.0
+    * @jxsuite/starters bumped to 1.4.0
+  * devDependencies
+    * @jxsuite/auth bumped to 0.5.1
+    * @jxsuite/connector bumped to 0.5.1
+    * @jxsuite/parser bumped to 1.5.1
+
 ## [2.1.0](https://github.com/jxsuite/jx/compare/server-v2.0.0...server-v2.1.0) (2026-08-19)
 
 

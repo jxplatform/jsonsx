@@ -1,5 +1,36 @@
 # Changelog
 
+## [2.2.0](https://github.com/jxsuite/jx/compare/desktop-v2.1.0...desktop-v2.2.0) (2026-08-21)
+
+
+### Features
+
+* **desktop:** bring the chromium launcher to PAL parity with electrobun ([9a94240](https://github.com/jxsuite/jx/commit/9a9424048403e48faf333e3ce788502ede4d2ce9))
+* **desktop:** bring the chromium launcher to PAL parity with electrobun ([9846e1d](https://github.com/jxsuite/jx/commit/9846e1dcf8d94bb68082fa79f40d38c139689a91))
+
+
+### Bug Fixes
+
+* **desktop:** give the chromium window an identity the taskbar can resolve ([e816dfa](https://github.com/jxsuite/jx/commit/e816dfabb9de69b0a56d03cfa3f254e6841111f8))
+* **desktop:** type two test mocks to the contracts they stand in for ([bc82556](https://github.com/jxsuite/jx/commit/bc82556185720f76c3fa45383db066cbd2f56001))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/compiler bumped to 2.0.1
+    * @jxsuite/create bumped to 1.3.1
+    * @jxsuite/parser bumped to 1.5.1
+    * @jxsuite/protocol bumped to 1.1.1
+    * @jxsuite/schema bumped to 1.7.0
+    * @jxsuite/server bumped to 2.2.0
+    * @jxsuite/starters bumped to 1.4.0
+    * @jxsuite/studio bumped to 2.2.0
+  * devDependencies
+    * @jxsuite/connector bumped to 0.5.1
+    * @jxsuite/server bumped to 2.2.0
+
 ## [2.1.0](https://github.com/jxsuite/jx/compare/desktop-v2.0.1...desktop-v2.1.0) (2026-08-19)
 
 

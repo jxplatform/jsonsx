@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.5.1](https://github.com/jxsuite/jx/compare/auth-v0.5.0...auth-v0.5.1) (2026-08-21)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/connector bumped to 0.5.1
+    * @jxsuite/schema bumped to 1.7.0
+
 ## [0.5.0](https://github.com/jxsuite/jx/compare/auth-v0.4.2...auth-v0.5.0) (2026-08-19)
 
 
