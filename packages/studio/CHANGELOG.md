@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.2.2](https://github.com/jxsuite/jx/compare/studio-v2.2.1...studio-v2.2.2) (2026-08-21)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/create bumped to 1.3.3
+
 ## [2.2.1](https://github.com/jxsuite/jx/compare/studio-v2.2.0...studio-v2.2.1) (2026-08-21)
 
 
