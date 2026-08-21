@@ -74,6 +74,53 @@ No secret is involved. On a Dependabot event `secrets.*` resolves against the se
 - **Release-only workflows are unexercised.** `bundle-desktop-*`, `build-msix` and `publish` are `workflow_call`-only, so an action bump inside them is first executed during a real release. Accepted deliberately — that pipeline already fails loudly and opens issues — but it is the one place where a green `ci` does not mean "tested".
 - **`@jxsuite/*` is ignored** for the bun ecosystem. release-please owns those ranges (it rewrites them inside the release commit via `extra-files`, and `bun run templates:check` gates them), so a Dependabot bump would be a second writer on the same line.
 
+## Releases, and the two ways one silently does not happen
+
+release-please owns every version, tag, changelog and npm publish (`release-please-config.json`,
+`.release-please-manifest.json`, `.github/workflows/release-please.yml`). Both of its failure modes
+exit 0, which is why each now has a gate.
+
+### A raw `<tag>` in a commit subject deletes that package from its own release
+
+release-please writes the release pull request body with changelog text HTML-escaped, then on merge
+parses that body and **re-serialises it** (`PullRequestBody.parse(...).toString()`) before parsing
+it a second time in `buildRelease()`. The round trip DECODES the entities, so `&lt;picture&gt;`
+comes back as a live `<picture>` element; node-html-parser then swallows the `</details>` that
+should have closed the section, the component is no longer found in the parsed release data, and
+release-please logs `Pull request contains releases, but not for component: <name>` and skips it —
+no tag, no GitHub release, no npm publish, green run.
+
+`feat(compiler): responsive images — <picture> per format…` did exactly that: `schema` and
+`starters` fell out of three consecutive releases, and `@jxsuite/starters` sat at 1.2.2 on npm while
+`@jxsuite/create@1.3.2` shipped depending on `^1.5.0`, so `npm install @jxsuite/create` was
+unresolvable. The bug is upstream and still present in release-please 17.11.1, so the defence is to
+keep the text out of the changelog. **Backticks do not help** — the escaping happens on raw text.
+
+- The rule and the full write-up live in `commitlint.config.js` (`changelog-safe-angle-brackets`).
+- `.husky/commit-msg` applies it as you commit; `checks` runs
+  `bun scripts/check-changelog-safety.ts` over the pull request's commits, because a hook is
+  skippable with `--no-verify` and that is how the subject landed.
+- Only the **subject** and `BREAKING CHANGE:` notes are judged — nothing else reaches a changelog,
+  so a commit body may still contain markup.
+
+### A crashed `release-please` job disables the whole pipeline on the re-run
+
+The job creates the GitHub releases first and builds the next pull request second. If it dies in
+between — a GitHub 5xx during its commit-history walk, which an un-tagged component provokes by
+forcing a 500-commit backfill — the releases exist but the run failed. **Re-running it is not
+idempotent in the way that matters**: the pull request is already labelled `autorelease: tagged`, so
+`releases_created` comes back `false` and `publish`, all four desktop bundlers, `nix-build` and
+`deploy-site` all skip. That is how `desktop-v2.2.0` shipped with no installers.
+
+`verify-release-integrity` is the answer: `if: always()`, gated on nothing, it asserts every version
+in `.release-please-manifest.json` has a GitHub release at its tag and — for publishable
+workspaces — that exact version on npm (`bun run release:integrity`, `--no-npm` to skip the
+registry). It fails the run and opens ONE `release-incomplete` issue. Nothing `needs:` it, so a red
+X there blocks nothing else. The daily schedule on the workflow makes it a standing sweep.
+
+To backfill npm after a skip, `publish.yml` has a `workflow_dispatch` entry point and is
+idempotent — the failure report prints the exact `gh workflow run` invocation.
+
 ## Starter Roots and the Shadowed Core
 
 Iterating a starter inside Studio runs `bun install` in that starter's root, and a starter pins
