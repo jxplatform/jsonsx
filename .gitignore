@@ -1,8 +1,10 @@
+.cache/
 .devenv
 .direnv
 .DS_Store
 .env
 .npmrc
+.obsidian/
 *.local
 codecov-debug.mjs
 coverage/
@@ -11,7 +13,6 @@ junit.xml
 metafile.json
 node_modules/
 result
-.cache/
 
 # Windows reserved device names (confuse git's directory walker)
 nul
