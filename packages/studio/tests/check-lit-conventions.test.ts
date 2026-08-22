@@ -15,6 +15,8 @@ import {
   analyze,
   emittedClasses,
   EXCLUDED,
+  report,
+  reportLines,
   SELF_QUERY_DEBT,
   SPECTRUM_DEBT,
   selfQueries,
@@ -219,5 +221,55 @@ describe("the lists stay honest about the real tree", () => {
     expect(r.selfQuery).toEqual([]);
     expect(r.staleSpectrum).toEqual([]);
     expect(r.staleSelfQuery).toEqual([]);
+  });
+});
+
+describe("report", () => {
+  test("a clean tree names the backlog size and the excluded modules", () => {
+    const { failed, lines } = report({
+      selfQuery: [],
+      spectrum: [],
+      staleSelfQuery: [],
+      staleSpectrum: [],
+      unknownExclusions: [],
+    });
+    expect(failed).toBe(false);
+    expect(lines.join("\n")).toContain("allow-listed site(s) remaining");
+  });
+
+  test("each finding names its file, its line and what to do", () => {
+    const { failed, lines } = report({
+      selfQuery: [{ detail: "queries .own", file: "a.ts", line: 7 }],
+      spectrum: [{ detail: "binds value as an attribute", file: "b.ts", line: 3 }],
+      staleSelfQuery: [],
+      staleSpectrum: [],
+      unknownExclusions: [],
+    });
+    expect(failed).toBe(true);
+    const text = lines.join("\n");
+    expect(text).toContain("src/b.ts:3");
+    expect(text).toContain("src/a.ts:7");
+    expect(text).toContain("ref()");
+  });
+
+  /* Both ratchet directions, and a stale exclusion, reach the report rather than only the analysis. */
+  test("stale entries and unknown exclusions are reported too", () => {
+    const { failed, lines } = report({
+      selfQuery: [],
+      spectrum: [],
+      staleSelfQuery: ["x.ts (allows 1, found 0)"],
+      staleSpectrum: ["y.ts (allows 2, found 0)"],
+      unknownExclusions: ["gone.ts"],
+    });
+    expect(failed).toBe(true);
+    const text = lines.join("\n");
+    expect(text).toContain("only ratchets down");
+    expect(text).toContain("y.ts (allows 2, found 0)");
+    expect(text).toContain("gone.ts");
+  });
+
+  test("a finding with no line number omits the colon", () => {
+    const lines = reportLines([{ detail: "3 sites, 1 allowed", file: "z.ts", line: 0 }], "H", "A");
+    expect(lines.join("\n")).toContain("src/z.ts —");
   });
 });

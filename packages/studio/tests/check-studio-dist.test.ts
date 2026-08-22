@@ -14,6 +14,7 @@ import { dirname, join } from "node:path";
 import {
   accountedFor,
   analyze,
+  report,
   cssUrls,
   danglingUrls,
   emittedFiles,
@@ -210,5 +211,19 @@ describe("emittedFiles", () => {
   test("an absent dist is empty rather than a throw", () => {
     const root = tree({ "x.txt": "" });
     expect(emittedFiles(join(root, "dist"), "/tmp")).toEqual([]);
+  });
+});
+
+describe("report", () => {
+  test("a clean build reports what it measured", () => {
+    const lines = report([], tree(completeBuild())).join("\n");
+    expect(lines).toContain("emitted file(s)");
+    expect(lines).toContain("every css url() resolves");
+  });
+
+  test("findings are listed by rule", () => {
+    const lines = report([{ detail: "dist/x.ttf is emitted", rule: "unaccounted" }]).join("\n");
+    expect(lines).toContain("[unaccounted]");
+    expect(lines).toContain("dist/x.ttf");
   });
 });

@@ -190,21 +190,29 @@ export function analyze(root = PKG_DIR): Problem[] {
   ];
 }
 
+/** The report, as lines. Pure, so the runner is one call and the test does not spy on a console. */
+export function report(problems: readonly Problem[]): string[] {
+  if (problems.length === 0) {
+    return [
+      `✓ check-studio-package: ${STUDIO_STYLESHEETS.length} stylesheet(s) declared and present, ` +
+        `${STUDIO_ASSETS.length} manifest entr(ies) publishable, no backend dependency, ` +
+        `node: confined to the stager.`,
+    ];
+  }
+  return [
+    "",
+    "@jxsuite/studio does not keep its own promises:",
+    "",
+    ...problems
+      .toSorted((a, b) => a.rule.localeCompare(b.rule))
+      .map((p) => `  [${p.rule}] ${p.detail}`),
+    "",
+    "  See the header of scripts/check-studio-package.ts for what each rule is for.",
+  ];
+}
+
 if (import.meta.main) {
   const problems = analyze();
-  if (problems.length > 0) {
-    console.error("\n@jxsuite/studio does not keep its own promises:\n");
-    for (const p of problems.toSorted((a, b) => a.rule.localeCompare(b.rule))) {
-      console.error(`  [${p.rule}] ${p.detail}`);
-    }
-    console.error(
-      "\n  See the header of scripts/check-studio-package.ts for what each rule is for.",
-    );
-    process.exit(1);
-  }
-  console.log(
-    `✓ check-studio-package: ${STUDIO_STYLESHEETS.length} stylesheet(s) declared and present, ` +
-      `${STUDIO_ASSETS.length} manifest entr(ies) publishable, no backend dependency, ` +
-      `node: confined to the stager.`,
-  );
+  console.log(report(problems).join("\n"));
+  process.exit(problems.length > 0 ? 1 : 0);
 }

@@ -409,72 +409,87 @@ export function analyze(root = SRC): Report {
   };
 }
 
-function report(findings: Finding[], heading: string, advice: string): boolean {
+/** One rule's report, as lines. Pure, so the runner is a join and the tests need no console spy. */
+export function reportLines(
+  findings: readonly Finding[],
+  heading: string,
+  advice: string,
+): string[] {
   if (findings.length === 0) {
-    return false;
+    return [];
   }
-  console.error(`\n${heading}\n`);
-  for (const f of findings.toSorted((a, b) => a.file.localeCompare(b.file) || a.line - b.line)) {
-    console.error(`  src/${f.file}${f.line > 0 ? `:${f.line}` : ""} — ${f.detail}`);
-  }
-  console.error(`\n  ${advice}`);
-  return true;
+  return [
+    "",
+    heading,
+    "",
+    ...findings
+      .toSorted((a, b) => a.file.localeCompare(b.file) || a.line - b.line)
+      .map((f) => `  src/${f.file}${f.line > 0 ? `:${f.line}` : ""} — ${f.detail}`),
+    "",
+    `  ${advice}`,
+  ];
 }
 
-if (import.meta.main) {
-  const r = analyze();
-  let failed = false;
-
-  failed =
-    report(
+/** The whole report, and whether it is a failure. */
+export function report(r: Report): { lines: string[]; failed: boolean } {
+  const lines = [
+    ...reportLines(
       r.spectrum,
       "Spectrum controls bound so that lit cannot re-commit them:",
       "These components move `value` / `checked` / `open` themselves and do not reflect them, so " +
         "an attribute binding — or a property binding without live() — is dirty-checked away " +
         "exactly when it was needed. Bind `.prop=${live(expr)}`, or add the file to SPECTRUM_DEBT " +
         "with the reason it cannot be.",
-    ) || failed;
-
-  failed =
-    report(
+    ),
+    ...reportLines(
       r.selfQuery,
       "Modules reaching their own rendered nodes by selector:",
       "The node is only real until the next render, and with a second pane the query can find " +
         "someone else's. Take a handle with ref(), as src/panels/target-line.ts describes, or add " +
         "the file to SELF_QUERY_DEBT with the reason.",
-    ) || failed;
-
+    ),
+  ];
   for (const [label, stale] of [
     ["SPECTRUM_DEBT", r.staleSpectrum],
     ["SELF_QUERY_DEBT", r.staleSelfQuery],
   ] as const) {
     if (stale.length > 0) {
-      console.error(`\nStale ${label} entr(ies) — the list only ratchets down:\n`);
-      for (const s of stale) {
-        console.error(`  ${s}`);
-      }
-      console.error("\n  Lower the count, or delete the entry.");
-      failed = true;
+      lines.push(
+        "",
+        `Stale ${label} entr(ies) — the list only ratchets down:`,
+        "",
+        ...stale.map((s) => `  ${s}`),
+        "",
+        "  Lower the count, or delete the entry.",
+      );
     }
   }
-
   if (r.unknownExclusions.length > 0) {
-    console.error(`\nEXCLUDED names files that no longer exist:\n`);
-    for (const f of r.unknownExclusions) {
-      console.error(`  ${f}`);
-    }
-    failed = true;
+    lines.push(
+      "",
+      "EXCLUDED names files that no longer exist:",
+      "",
+      ...r.unknownExclusions.map((f) => `  ${f}`),
+    );
   }
-
-  if (failed) {
-    process.exit(1);
+  if (lines.length > 0) {
+    return { failed: true, lines };
   }
   const debt =
     Object.values(SPECTRUM_DEBT).reduce((a, n) => a + n, 0) +
     Object.values(SELF_QUERY_DEBT).reduce((a, n) => a + n, 0);
-  console.log(
-    `✓ check-lit-conventions: Spectrum state binds live, no module queries its own nodes ` +
-      `(${debt} allow-listed site(s) remaining, ${Object.keys(EXCLUDED).length} module(s) excluded ` +
-      `by design).`,
-  );
+  return {
+    failed: false,
+    lines: [
+      `✓ check-lit-conventions: Spectrum state binds live, no module queries its own nodes ` +
+        `(${debt} allow-listed site(s) remaining, ${Object.keys(EXCLUDED).length} module(s) excluded ` +
+        `by design).`,
+    ],
+  };
+}
+
+if (import.meta.main) {
+  const { failed, lines } = report(analyze());
+  console.log(lines.join("\n"));
+  process.exit(failed ? 1 : 0);
 }

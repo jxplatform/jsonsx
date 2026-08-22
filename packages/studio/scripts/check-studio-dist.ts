@@ -26,7 +26,7 @@
 
 import { Glob } from "bun";
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { dirname, join, posix, relative, resolve } from "node:path";
+import { join, posix, relative, resolve } from "node:path";
 import { STUDIO_ASSETS, STUDIO_WORKERS } from "../src/hosting/layout";
 
 const PKG_DIR = resolve(import.meta.dir, "..");
@@ -162,21 +162,29 @@ export function analyze(pkgDir = PKG_DIR): Finding[] {
   ];
 }
 
+/** The report, as lines. Pure, so the runner is one call. */
+export function report(findings: readonly Finding[], pkgDir = PKG_DIR): string[] {
+  if (findings.length === 0) {
+    const dist = emittedFiles(join(pkgDir, "dist"), pkgDir);
+    const bytes = dist.reduce((n, p) => n + statSync(join(pkgDir, p)).size, 0);
+    return [
+      `✓ check-studio-dist: ${dist.length} emitted file(s), ${(bytes / 1e6).toFixed(1)} MB, all ` +
+        `accounted for; every css url() resolves; ${UNREACHABLE_CSS.length} unreachable stylesheet ` +
+        `pattern(s) on the backlog.`,
+    ];
+  }
+  return [
+    "",
+    "The studio build and the manifest disagree:",
+    "",
+    ...findings
+      .toSorted((a, b) => a.rule.localeCompare(b.rule))
+      .map((f) => `  [${f.rule}] ${f.detail}`),
+  ];
+}
+
 if (import.meta.main) {
   const findings = analyze();
-  if (findings.length > 0) {
-    console.error("\nThe studio build and the manifest disagree:\n");
-    for (const f of findings.toSorted((a, b) => a.rule.localeCompare(b.rule))) {
-      console.error(`  [${f.rule}] ${f.detail}`);
-    }
-    process.exit(1);
-  }
-  const dist = emittedFiles(join(PKG_DIR, "dist"), PKG_DIR);
-  const bytes = dist.reduce((n, p) => n + statSync(join(PKG_DIR, p)).size, 0);
-  console.log(
-    `✓ check-studio-dist: ${dist.length} emitted file(s), ${(bytes / 1e6).toFixed(1)} MB, all ` +
-      `accounted for; every css url() resolves; ${UNREACHABLE_CSS.length} unreachable stylesheet ` +
-      `pattern(s) on the backlog.`,
-  );
-  void dirname;
+  console.log(report(findings).join("\n"));
+  process.exit(findings.length > 0 ? 1 : 0);
 }
