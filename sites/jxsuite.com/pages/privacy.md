@@ -34,7 +34,7 @@ This policy explains what personal data Avunu LLC handles when you use Jx Suite,
 
 Jx Suite spans three quite different things, and the honest answer to "what do you collect?" is different for each. Section 2 tells you which one you are using; sections 4 to 6 cover each in turn.
 
-## 1\. Who we are
+## 1. Who we are
 
 **Avunu LLC** ("Avunu", "we", "us") is a Pennsylvania limited liability company and the owner and operator of Jx Suite, which comprises the jxsuite.com website, the Jx Studio desktop application and `jx` command-line tools, the open-source `@jxsuite/*` packages, and the hosted Jx Publishing Platform at studio.jxsuite.com.
 
@@ -45,7 +45,7 @@ Avunu LLC is the **data controller** for the processing described in this policy
 
 If you are in the European Economic Area or the United Kingdom, see section 14 for the rights that apply to you and how to exercise them.
 
-## 2\. Which part of Jx Suite are you using?
+## 2. Which part of Jx Suite are you using?
 
 | What you are using                                             | Who runs it                       | What reaches Avunu                                                                                              |
 | -------------------------------------------------------------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------- |
@@ -54,7 +54,7 @@ If you are in the European Economic Area or the United Kingdom, see section 14 f
 | Jx Publishing Platform — studio.jxsuite.com                    | Us                                | Your GitHub identity, your project working files while you edit them, and the operational records in section 6. |
 | A website you built with Jx and its visitors                   | You                               | Nothing. See section 9.                                                                                         |
 
-## 3\. Things we do not do
+## 3. Things we do not do
 
 These are commitments, not omissions:
 
@@ -65,7 +65,7 @@ These are commitments, not omissions:
 - We do **not** use your project content, your prompts, or your AI conversations to train any model, our own or anyone else's.
 - We do **not** make decisions about you by automated means that produce legal or similarly significant effects.
 
-## 4\. The jxsuite.com website
+## 4. The jxsuite.com website
 
 jxsuite.com is a static site. It sets **no cookies**, uses no local storage, and runs no analytics.
 
@@ -75,7 +75,7 @@ jxsuite.com is a static site. It sets **no cookies**, uses no local storage, and
 
 **Outbound links.** Pages link to GitHub, npm, and other third-party sites. Following such a link takes you to a service with its own privacy policy, which we do not control.
 
-## 5\. Jx Studio, the `jx` CLI, and the `@jxsuite/*` packages
+## 5. Jx Studio, the `jx` CLI, and the `@jxsuite/*` packages
 
 This is open-source software you download and run yourself. **It sends nothing to Avunu.** There is no account, no licence check, no activation, no usage measurement. Your projects are plain files on your own disk.
 
@@ -101,7 +101,7 @@ Jx Studio talks to third parties only when you ask it to, and always directly �
 - **AI providers.** If you configure an AI provider in the desktop or CLI tools, your prompts and project context go from your machine straight to the endpoint you named, under your own API key and your own agreement with that provider.
 - **Package installs.** Installing packages contacts the npm registry, as any package manager does.
 
-## 6\. Jx Publishing Platform (studio.jxsuite.com)
+## 6. Jx Publishing Platform (studio.jxsuite.com)
 
 The Publishing Platform is our hosted service. It is the part of Jx Suite where we do process personal data about you, and it is deliberately narrow: GitHub holds your code and decides your permissions, your own Cloudflare account performs your deployments and your AI inference, and our service brokers between them.
 
@@ -194,7 +194,7 @@ Application request logging is **disabled** in our production service configurat
 
 **Legal basis:** our legitimate interest in operating a secure and abuse-resistant service (Article 6(1)(f)), and in the case of records we must keep, compliance with a legal obligation (Article 6(1)(c)).
 
-## 7\. Cookies and similar technologies, in summary
+## 7. Cookies and similar technologies, in summary
 
 | Surface                   | Cookies                             | Local storage                                                   | Third-party trackers |
 | ------------------------- | ----------------------------------- | --------------------------------------------------------------- | -------------------- |
@@ -204,7 +204,7 @@ Application request logging is **disabled** in our production service configurat
 
 Because we set no non-essential cookies and run no trackers, there is nothing here to consent to or withdraw. Global Privacy Control and Do Not Track signals require no action from us, as we already do not engage in the tracking or selling they are designed to stop.
 
-## 8\. Who we share data with
+## 8. Who we share data with
 
 We disclose personal data to a small set of service providers, each acting on our instructions or under your own direct relationship with them. We do not disclose personal data to anyone for money or for advertising.
 
@@ -217,19 +217,19 @@ We disclose personal data to a small set of service providers, each acting on ou
 
 We may also disclose personal data where we are legally required to — to comply with a valid legal process, to enforce our terms, or to protect the rights, safety, or property of Avunu, our users, or the public. If Avunu is involved in a merger, acquisition, or sale of assets, personal data may transfer as part of that transaction; we will give notice before your data becomes subject to a different privacy policy.
 
-## 9\. Websites you build with Jx (you are the controller)
+## 9. Websites you build with Jx (you are the controller)
 
 If you use `@jxsuite/auth`, `@jxsuite/connector`, or any other extension to collect data from your own site's visitors — sign-ups, comments, form submissions, orders — that data flows to **your** database on **your** infrastructure, under **your** database credentials. It does not pass through Avunu and we never see it.
 
 For that data you are the controller. You are responsible for your own privacy notice, your own lawful basis, your own consent mechanics, and your own responses to the requests your visitors make of you. We provide the software; we do not process the data it moves.
 
-## 10\. International transfers
+## 10. International transfers
 
 Avunu LLC is based in the United States, and our infrastructure providers operate global networks, so personal data may be processed in the United States and in other countries.
 
 Where we transfer personal data out of the EEA, the United Kingdom, or Switzerland, we rely on the European Commission's Standard Contractual Clauses (and the UK International Data Transfer Addendum where applicable), incorporated into our agreements with the providers named in section 8. You may request a copy of the relevant safeguards by writing to [privacy@jxsuite.com](mailto:privacy@jxsuite.com).
 
-## 11\. How long we keep things
+## 11. How long we keep things
 
 | Data                                               | Retention                                                                           |
 | -------------------------------------------------- | ----------------------------------------------------------------------------------- |
@@ -246,7 +246,7 @@ Where we transfer personal data out of the EEA, the United Kingdom, or Switzerla
 
 Deleting a repository on GitHub causes us to purge its cached project record and its working-tree sessions.
 
-## 12\. Security
+## 12. Security
 
 - Third-party tokens are encrypted at rest with AES-256-GCM under a key held in our secret store and versioned for rotation, never in our database or source code.
 - The session cookie is `HttpOnly`, `Secure`, and `SameSite=Lax`, and mutating requests are checked against the expected origin.
@@ -257,11 +257,11 @@ Deleting a repository on GitHub causes us to purge its cached project record and
 
 No system is perfectly secure. If we become aware of a breach affecting your personal data, we will notify you and the relevant supervisory authorities as the law requires.
 
-## 13\. Children
+## 13. Children
 
 Jx Suite is not directed to children. We do not knowingly collect personal data from anyone under 16, and using the Publishing Platform requires a GitHub account, which GitHub restricts by age. If you believe a child has provided us personal data, write to [privacy@jxsuite.com](mailto:privacy@jxsuite.com) and we will delete it.
 
-## 14\. Your rights in the EEA, the UK, and Switzerland
+## 14. Your rights in the EEA, the UK, and Switzerland
 
 If the GDPR or UK GDPR applies to you, you have the right to:
 
@@ -278,7 +278,7 @@ Much of this you can do yourself and immediately: your project content lives in 
 
 For anything else, write to [privacy@jxsuite.com](mailto:privacy@jxsuite.com). We respond within one month, extendable by two further months for complex requests, and we will tell you if we need the extension. We verify requests through the GitHub account they concern. We do not charge for these requests and we will not treat you differently for making one.
 
-## 15\. Your California rights
+## 15. Your California rights
 
 If you are a California resident, the CCPA as amended by the CPRA gives you the rights below.
 
@@ -292,19 +292,19 @@ If you are a California resident, the CCPA as amended by the CPRA gives you the 
 
 To exercise a right, write to [privacy@jxsuite.com](mailto:privacy@jxsuite.com). We verify your identity through the GitHub account the request concerns. You may use an authorised agent; we will ask for written proof of their authority.
 
-## 16\. Other United States privacy laws
+## 16. Other United States privacy laws
 
 Residents of Colorado, Connecticut, Virginia, Utah, Texas, Oregon, Montana, and other states with comprehensive privacy statutes have comparable rights of access, correction, deletion, and portability, together with the right to opt out of targeted advertising, sale, and profiling that produces legal or similarly significant effects. We conduct none of those three activities. Use the same contact address, and where your state provides an appeal process for a refused request, we will tell you how to use it.
 
-## 17\. Automated decision-making
+## 17. Automated decision-making
 
 We do not carry out automated decision-making that produces legal or similarly significant effects about you. The AI features in Jx Suite generate and edit website content at your request; they make no decisions about you.
 
-## 18\. Changes to this policy
+## 18. Changes to this policy
 
 We will update this policy when Jx Suite changes. When a change materially affects how we handle your personal data, we will revise the effective date at the top, note what changed, and — for Publishing Platform users — give notice in the application before the change takes effect. The current version always lives at jxsuite.com/privacy.
 
-## 19\. Contact us
+## 19. Contact us
 
 **Avunu LLC** 948 E Philadelphia St, York Pennsylvania 17403, United States
 
