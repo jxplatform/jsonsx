@@ -240,6 +240,18 @@
                 ":hover": { "color": "var(--color-text-primary)" }
               },
               "children": ["Releases"]
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/privacy" },
+              "style": {
+                "display": "block",
+                "color": "var(--color-text-muted)",
+                "textDecoration": "none",
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-text-primary)" }
+              },
+              "children": ["Privacy"]
             }
           ]
         }
