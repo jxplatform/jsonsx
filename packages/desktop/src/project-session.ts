@@ -472,12 +472,40 @@ export function createProjectSession(initialRoot: string | null) {
     }
   }
 
+  /** The last root refused below — so the refusal is logged once, not once per re-arm. */
+  let unwatchableRoot: string | null = null;
+
+  /**
+   * Start watching the active project, or refuse and say so once.
+   *
+   * This asks exactly what the shell asks: `probeRootProject` reads `project.json` and, without
+   * one, reports "no project" and the window shows the welcome screen. A recursive watch of that
+   * root is then a scan of someone's directory tree on behalf of a project that is not open — and a
+   * root is not always small. `jx-studio ~` is the case that matters: the launcher no longer ADOPTS
+   * a non-project working directory, but a root named on the command line is still taken at its
+   * word, and this is where taking it at its word stops being expensive.
+   *
+   * Nothing is lost by waiting. Every way a project can arrive — `openProject`, `createProject`,
+   * `setWindowProject` — re-roots the session and calls back here, and by then the `project.json`
+   * exists. A directory that becomes a project some other way is not watched until the window is
+   * pointed at it, which is also when the sidebar would first have anything to show.
+   */
   function startWatching(): void {
     stopWatching();
-    if (projectRoot && fileEventSink) {
-      const sink = fileEventSink;
-      watcherHandle = createFsWatcher(projectRoot, (events) => sink(events));
+    if (!projectRoot || !fileEventSink) {
+      return;
     }
+    if (!existsSync(resolve(projectRoot, "project.json"))) {
+      // Once per root: startWatching runs again on every re-root and every sink registration.
+      if (unwatchableRoot !== projectRoot) {
+        unwatchableRoot = projectRoot;
+        console.log(`[desktop] not watching ${projectRoot} — no project.json, so no project here`);
+      }
+      return;
+    }
+    unwatchableRoot = null;
+    const sink = fileEventSink;
+    watcherHandle = createFsWatcher(projectRoot, (events) => sink(events));
   }
 
   /** Register (or clear) the sink that receives batched filesystem events for the active project. */

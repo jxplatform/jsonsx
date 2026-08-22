@@ -4,6 +4,7 @@ import { watch as chokidarWatch } from "chokidar";
 import { relative } from "node:path";
 import { rebuild } from "./build.ts";
 import { coalesceFsEvents, toFsEvent } from "./refactor/fs-events.ts";
+import { createWatchIgnore } from "./watch-policy.ts";
 import { invalidateReferenceCache } from "./refactor/find-refs.ts";
 import type { BuildEntry } from "./types.ts";
 import type { FsEventPayload } from "./refactor/fs-events.ts";
@@ -201,9 +202,12 @@ export function createWatcher(
       pollInterval: 10,
       stabilityThreshold: debounceMs,
     },
+    /* See watch-policy.ts: `ignore` is a name rule and cannot see that an entry is a unix socket
+       (ENXIO from fs.watch) or a symlink pointing out of the project (a walk of the filesystem). */
+    followSymlinks: true,
     ignoreInitial: true,
     ignorePermissionErrors: true,
-    ignored: (watchedPath) => shouldIgnore(watchedPath, ignore),
+    ignored: createWatchIgnore(root, (watchedPath) => shouldIgnore(watchedPath, ignore)),
   });
 
   watcher.on("all", (eventType, changedPath) => {

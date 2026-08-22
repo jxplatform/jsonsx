@@ -10,6 +10,7 @@ spec:
 code:
   - packages/server/src/server.ts
   - packages/server/src/watch.ts
+  - packages/server/src/watch-policy.ts
   - packages/server/src/resolve.ts
 ---
 
@@ -57,6 +58,17 @@ The server watches `root` (ignoring `node_modules/`, `dist/`, `.git/`, and frien
 ```
 
 Save a file and every connected page reloads. When the changed file matches a `builds` entry's `match` pattern, that bundle is rebuilt first, so the reload picks up fresh output. The one exception is the Studio editor itself: Studio pages never get the reload script, because Studio refreshes edited files in place and a full reload would discard open tabs and undo history.
+
+### What the watcher skips
+
+Beyond the ignored directory names, two kinds of entry are skipped whatever they are called:
+
+- **Anything that is not a directory or a regular file** — unix sockets, FIFOs and device nodes. The operating system refuses to watch them, and a project directory that happens to hold one (a running agent's socket, say) would otherwise take the watcher down with it.
+- **Symlinks pointing outside the project.** A link that resolves back inside `root` is ordinary project content and its changes reload the page as usual. One that resolves outside is left alone, so the watcher stays inside the directory you pointed it at instead of following a link into the rest of the disk.
+
+:::doc-tip
+Set `watch.ignore` for names you want skipped — `node_modules/`, `dist/`, build caches. The two rules above are not configurable; they are what keeps a watch of one directory a watch of one directory.
+:::
 
 ### Restarting the server
 
