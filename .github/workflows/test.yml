@@ -282,6 +282,11 @@ jobs:
       # Neither is expressible in the type system — `ViewState` has an index signature and a
       # module-level `let active` is well-typed — so the guard is a ratcheting allow-list.
       - run: bun --cwd packages/studio scripts/check-pane-singletons.ts
+      # The template layer's two rules: a Spectrum control binds the state it moves ITSELF as a
+      # live property (an attribute binding is dirty-checked away exactly when it mattered), and a
+      # module holds its own rendered nodes with ref() rather than re-finding them by selector.
+      # Both carry a ratcheting backlog; source-only, about a second.
+      - run: bun --cwd packages/studio scripts/check-lit-conventions.ts
       - run: bun --cwd packages/studio scripts/check-icons.ts
       - run: bun run typecheck
       # packages/desktop is EXCLUDED from the root tsconfig (electrobun ships raw .ts in its dist,
