@@ -25,7 +25,7 @@ export const IN_PLACE: AssetBase = { mode: "nested", prefix: "./" };
 
 export interface DocumentOptions {
   /** Where the asset tree is mounted. Defaults to {@link IN_PLACE}. */
-  readonly base?: AssetBase;
+  readonly base?: AssetBase | undefined;
   /**
    * Module urls evaluated BEFORE the studio entry — the host's PAL registration, in order.
    *
@@ -39,9 +39,9 @@ export interface DocumentOptions {
    * so SYNCHRONOUSLY — a module script with top-level await does not block a later script tag, and
    * the entry reads the global as it evaluates.
    */
-  readonly boot?: readonly string[];
+  readonly boot?: readonly string[] | undefined;
   /** Document title. Defaults to "Jx Studio". */
-  readonly title?: string;
+  readonly title?: string | undefined;
 }
 
 function scriptTag(url: string): string {

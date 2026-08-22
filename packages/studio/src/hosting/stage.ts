@@ -25,11 +25,11 @@ export const STUDIO_PACKAGE_DIR = resolve(import.meta.dir, "..", "..");
 
 export interface StageOptions {
   /** Package root to read from — an installed copy, or a `--link` checkout. */
-  readonly from?: string;
+  readonly from?: string | undefined;
   /** Kinds to leave out. The cloud passes `["document"]`; see the note on {@link stageStudioAssets}. */
-  readonly exclude?: readonly StudioAssetKind[];
+  readonly exclude?: readonly StudioAssetKind[] | undefined;
   /** Copy `*.map` too. Default false: the chunk maps alone are about 24 MB. */
-  readonly sourceMaps?: boolean;
+  readonly sourceMaps?: boolean | undefined;
   /**
    * Remove the manifest's own paths under `destDir` first. Default true.
    *
@@ -38,11 +38,11 @@ export interface StageOptions {
    * deletes it and the packaged app boots with no platform registered. Not cleaning at all is
    * equally wrong: content-hashed chunks would accumulate in a staged tree forever.
    */
-  readonly clean?: boolean;
+  readonly clean?: boolean | undefined;
   /** Layout to report in {@link StageResult.base}. Default `"nested"`. */
-  readonly layout?: StudioLayoutMode;
+  readonly layout?: StudioLayoutMode | undefined;
   /** Url prefix to report in {@link StageResult.base}. Default `"./"`. */
-  readonly prefix?: string;
+  readonly prefix?: string | undefined;
 }
 
 export interface StageResult {
@@ -138,7 +138,7 @@ export async function stageStudioAssets(
 
 export interface ReadDocumentOptions extends DocumentOptions {
   /** Package root to read `canvas.html` from. */
-  readonly from?: string;
+  readonly from?: string | undefined;
 }
 
 /* There is no shellDocument() here. The editor document needs no file read, so it would be a

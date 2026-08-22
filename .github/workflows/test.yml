@@ -292,6 +292,11 @@ jobs:
       # manifest path and every import that escapes src/, the abstraction declares no backend
       # package, and node: stays confined to the stager. Source-only, about a second.
       - run: bun --cwd packages/studio scripts/check-studio-package.ts
+      # The hosting contract, compiled under a CONSUMER's flags rather than this repo's.
+      # jx-platform sets exactOptionalPropertyTypes, verbatimModuleSyntax and isolatedModules, none
+      # of which the root tsconfig sets — and two type errors in the contract were found by
+      # consuming it rather than by building it. See the note in that tsconfig.
+      - run: bunx tsc -p packages/studio/src/hosting/tsconfig.json
       - run: bun --cwd packages/studio scripts/check-icons.ts
       - run: bun run typecheck
       # packages/desktop is EXCLUDED from the root tsconfig (electrobun ships raw .ts in its dist,
