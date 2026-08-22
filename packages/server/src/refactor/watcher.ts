@@ -9,6 +9,7 @@
 import { watch as chokidarWatch } from "chokidar";
 import { coalesceFsEvents, toFsEvent } from "./fs-events.ts";
 import { invalidateReferenceCache } from "./find-refs.ts";
+import { createWatchIgnore } from "../watch-policy.ts";
 import type { FsEventPayload } from "./fs-events.ts";
 
 const IGNORE_SEGMENTS = ["node_modules", ".git", "dist", ".jx", ".direnv", ".devenv"];
@@ -36,9 +37,14 @@ export function createFsWatcher(
   let timer: ReturnType<typeof setTimeout> | null = null;
 
   const watcher = chokidarWatch(root, {
+    /* Left on deliberately: a symlink inside a project is project content, and its events belong
+       in the sidebar. It is the link pointing OUT of the root that walks the watcher off into the
+       rest of the filesystem, and createWatchIgnore drops exactly those — along with the sockets
+       and device nodes fs.watch answers with ENXIO. */
+    followSymlinks: true,
     ignoreInitial: true,
     ignorePermissionErrors: true,
-    ignored: (path) => isIgnored(path),
+    ignored: createWatchIgnore(root, isIgnored),
   });
 
   watcher.on("all", (eventType, changedPath) => {
@@ -59,6 +65,15 @@ export function createFsWatcher(
         buffer = [];
       }
     }, debounceMs);
+  });
+
+  /* An `error` with no listener is not logged by an EventEmitter, it is THROWN — which is how a
+     directory holding a few unix sockets took the whole launcher down rather than losing a few
+     watches. The filter above means these should now be rare; the listener means they are never
+     fatal when they are not. */
+  watcher.on("error", (err) => {
+    const error = err as NodeJS.ErrnoException;
+    console.error(`[fs-watch] ${error.message ?? String(error)}`);
   });
 
   return {

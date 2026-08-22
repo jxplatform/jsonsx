@@ -2,9 +2,9 @@
 
 ## Development Server with Live Reload, Proxy Resolution, and Studio API
 
-**Version:** 0.2.10
+**Version:** 0.2.11
 **Status:** Implemented
-**Updated:** 2026-08-20
+**Updated:** 2026-08-22
 **License:** MIT
 
 ---
@@ -81,6 +81,13 @@ SSE (Server-Sent Events) endpoint backed by `src/watch.ts`. A chokidar watcher o
 1. Runs the `preReload` hook, if configured (e.g. `jx dev`'s site rebuild)
 2. Selectively rebuilds any `builds` entries whose `match` covers the changed file, broadcasting a reload on success
 3. Otherwise broadcasts a reload only when `reloadOnAnyChange` is set
+
+**What a watcher will not watch (`src/watch-policy.ts`).** `watch.ignore` is a rule about names, and two things that break a watcher cannot be recognised by name. Both watchers — this one and the desktop session's (`refactor/watcher.ts`) — therefore compose it with an entry-kind rule:
+
+- **Only directories and regular files are watched.** A unix socket, FIFO or device node answers `fs.watch` with `ENXIO`, which chokidar raises as an `error` event; a watcher without an `error` listener does not log that, it throws. Both watchers listen.
+- **Symlinks are contained, not banned.** A link resolving back inside the root is project content and keeps its events; one resolving outside it, or dangling, is dropped. Following a link out of the root turns a project watcher into a walk of the filesystem — `~/.wine/dosdevices/z:` points at `/`, and a launcher that had adopted the home directory as its project root found it.
+
+The second rule is a containment invariant, not a convenience: **a watcher never emits an event for a path outside the root it was given.**
 
 Two event streams share the connection: the default (unnamed) `reload` message that the injected client (`injectSSE`) turns into `location.reload()`, and named `fs` events — coalesced structured filesystem events that the Studio shell subscribes to for its sidebar while the preview iframe ignores them. Heartbeats every 15 s keep connections alive.
 
@@ -323,6 +330,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.2.11** (2026-08-22) — §3.1: watch-policy.ts — watchers watch only directories and regular files, and contain symlinks to the root, so a socket cannot throw and a link out cannot walk the filesystem.
 - **0.2.10** (2026-08-20) — The loopback project server's RPC socket carries server-initiated frames (ProjectServerHandle.push) — the loopback twin of the dev server's named fs SSE event, and the channel a desktop launcher raises a window over (§4.2).
 - **0.2.9** (2026-08-18) — §4.2: the Studio shell's report-only Trusted Types header is removed — see spec.md §21.5.
 - **0.2.8** (2026-08-18) — §4.2: both entry points send the Studio shell a report-only Trusted Types policy, and nothing else.
@@ -347,4 +355,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/server` Specification v0.2.10_
+_`@jxsuite/server` Specification v0.2.11_

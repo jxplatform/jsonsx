@@ -1,6 +1,6 @@
 // oxlint-disable unicorn/no-process-exit -- standalone launcher CLI; exit codes are its interface
 import { basename, isAbsolute, resolve } from "node:path";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import {
   codeService,
@@ -104,9 +104,29 @@ import type { RecentProjectEntry } from "../rpc-schema";
    it the child would adopt the parent's cwd, and a New Window opened from a project directory would
    silently re-open that project. */
 const welcomeWindow = process.env.JX_STUDIO_NO_PROJECT === "1";
+
+/**
+ * The working directory, but only when it is a project — otherwise null.
+ *
+ * A bare `jx-studio` adopting its cwd is what makes "run it inside a project" open that project,
+ * and that stays. What it must not do is adopt a directory that is not one. Launched from a desktop
+ * entry or a shell sitting in `$HOME`, the unconditional fallback made the home directory the
+ * project root, and the session then watched all of it: every unix socket underneath raised a watch
+ * error, and `~/.wine/dosdevices/z:` (a link to `/`) took the walk out of the home directory
+ * altogether. The window showed the welcome screen throughout — `probeRootProject` had already
+ * decided a directory with no project.json is not a project — so the entire scan was work for a
+ * project that was never opened.
+ *
+ * A root named on the command line or in `JSONSX_PROJECT_ROOT` is still taken at its word; only the
+ * one nobody typed has to prove itself.
+ */
+export function implicitProjectRoot(cwd: string): string | null {
+  return existsSync(resolve(cwd, "project.json")) ? cwd : null;
+}
+
 const projectRoot = welcomeWindow
   ? null
-  : process.argv[2] || process.env.JSONSX_PROJECT_ROOT || process.cwd();
+  : process.argv[2] || process.env.JSONSX_PROJECT_ROOT || implicitProjectRoot(process.cwd());
 
 /**
  * Ask an existing window for this project to come forward; report whether there was one.

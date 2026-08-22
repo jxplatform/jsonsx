@@ -23,6 +23,10 @@ function toUrlPath(absPath: string): string {
 mkdirSync(join(FIXTURES, "public"), { recursive: true });
 mkdirSync(STUDIO_ASSETS, { recursive: true });
 writeFileSync(join(FIXTURES, "hello.txt"), "Hello Index");
+// A directory that is a project, and one that merely is a directory (what `$HOME` looks like).
+mkdirSync(join(FIXTURES, "implicit-project"), { recursive: true });
+mkdirSync(join(FIXTURES, "implicit-not-a-project"), { recursive: true });
+writeFileSync(join(FIXTURES, "implicit-project", "project.json"), '{"name":"implicit"}');
 writeFileSync(join(FIXTURES, "public", "pub.css"), "body { margin: 0 }");
 writeFileSync(join(STUDIO_ASSETS, "index.html"), "<html>studio-shell</html>");
 // The iframe canvas assets the launcher must serve (staged by scripts/stage-studio-assets.ts).
@@ -1099,6 +1103,24 @@ describe("appInfo", () => {
     const info = (await rpc("appInfo")) as { channel: string; updateStatus?: string };
     expect(info.channel).toBe("system");
     expect(info.updateStatus).toBeUndefined();
+  });
+});
+
+// ─── The working directory as a project root ────────────────────────────────
+
+describe("implicitProjectRoot", () => {
+  test("adopts the working directory when it holds a project.json", () => {
+    // The workflow the fallback exists for: `jx-studio` typed inside a project opens it.
+    expect(chromiumIndex.implicitProjectRoot(join(FIXTURES, "implicit-project"))).toBe(
+      join(FIXTURES, "implicit-project"),
+    );
+  });
+
+  test("refuses a working directory that is not a project", () => {
+    // The regression: launched from a desktop entry or a shell sitting in $HOME, the old
+    // Unconditional fallback made the home directory the project root and the session watched all
+    // Of it — while the window showed the welcome screen, because nothing there was a project.
+    expect(chromiumIndex.implicitProjectRoot(join(FIXTURES, "implicit-not-a-project"))).toBeNull();
   });
 });
 

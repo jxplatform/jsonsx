@@ -2,9 +2,9 @@
 
 ## Platform Abstraction, Project Loading, and Component Scoping
 
-**Version:** 0.3.15-draft
+**Version:** 0.3.17-draft
 **Status:** Pending
-**Updated:** 2026-08-21
+**Updated:** 2026-08-22
 **License:** MIT
 
 ---
@@ -821,12 +821,24 @@ which is how filesystem events reach the sidebar and how a focus request reaches
 The entry point performs, in order:
 
 1. Resolves the project root: the first positional argument, else `JSONSX_PROJECT_ROOT`, else the
-   working directory — unless `JX_STUDIO_NO_PROJECT` marks it a welcome window (§9.4)
+   working directory **but only when it holds a `project.json`** — unless `JX_STUDIO_NO_PROJECT`
+   marks it a welcome window (§9.4). A root that was named is taken at its word; the one nobody
+   typed has to prove itself, because the launcher is also started from a desktop entry and from a
+   shell sitting anywhere. Adopting a directory that is not a project bought nothing — the shell
+   shows the welcome screen either way, since `probeRootProject` reads the same `project.json` —
+   and cost a recursive filesystem watch of, in the reported case, the whole home directory
+   (what such a watcher will and will not descend into is `server.md` §3.1)
 2. **Raises an existing window instead of opening a second one** for a project already open (§9.4)
 3. Locates a Chromium binary via `CHROMIUM_BIN` or PATH (`chromium`, `chromium-browser`,
    `google-chrome`, `google-chrome-stable`); this binary is also the import pipeline's browser
 4. Starts `createProjectServer()` on an ephemeral loopback port, and hosts the sign-in redirect on it
-5. Points the session's filesystem-event sink at the server's push channel, so the sidebar is live
+5. Points the session's filesystem-event sink at the server's push channel, so the sidebar is live.
+   **Registering the sink is what starts the watcher, and the session watches a project or nothing
+   at all:** with no `project.json` at the root it logs one line and declines, because that is the
+   same root `probeRootProject` reports as "no project" — a recursive watch of it would be a scan
+   of a user's directory tree on behalf of a project the window is not showing. Nothing is lost by
+   waiting, since every way a project can arrive (`openProject`, `createProject`,
+   `setWindowProject`) re-roots the session and arms the watcher then
 6. Publishes itself in the window registry and starts watching for focus requests
 7. Launches Chromium with app-mode flags:
    - `--app=<serverUrl>/__studio__/index.html?token=<rpcToken>` — frameless window, gated surface
@@ -1102,6 +1114,8 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.3.17-draft** (2026-08-22) — §9.2: the session watches a project or nothing — a root with no project.json is declined rather than scanned recursively.
+- **0.3.16-draft** (2026-08-22) — §9.2: the launcher adopts its working directory as a project root only when that directory holds a project.json — a named root is still taken at its word.
 - **0.3.15-draft** (2026-08-21) — §9.3: released builds are published to jxsuite.cachix.org and the flake names it, so a consumer substitutes jx-studio instead of building it; verify-cache proves that after each release. The release also builds aarch64-linux as an advisory leg beside the x86_64 gate, and nix.yml runs on pushes to main so pull requests inherit a warm Actions cache for the npm tarball derivations cache.nixos.org cannot serve.
 - **0.3.14-draft** (2026-08-20) — §9.3: the desktop entry ships under a stable id and claims the app_id Chromium actually gives an --app window, so the taskbar/dock can resolve the brand icon.
 - **0.3.13-draft** (2026-08-20) — Chromium launcher reaches PAL parity: its own adapter over createProjectServer (§9.1), multi-window through a cross-process window registry (§9.4), a server-to-client push channel behind live sidebar sync and focus, buildSite behind View: Open in Browser, appInfo for the About screen, and an OS-opener fallback so preview links and sign-in leave the app at all (§3.5, §9.5). New Window becomes the `view.newWindow` command rather than a native-menu-only item, and the native menu drops its duplicate accelerators (§4.2a).
@@ -1136,4 +1150,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx Studio Desktop Architecture Specification v0.3.15-draft_
+_Jx Studio Desktop Architecture Specification v0.3.17-draft_

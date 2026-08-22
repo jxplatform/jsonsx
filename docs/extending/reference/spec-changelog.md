@@ -72,6 +72,8 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `desktop.md`
 
+- **0.3.17-draft** (2026-08-22) — §9.2: the session watches a project or nothing — a root with no project.json is declined rather than scanned recursively.
+- **0.3.16-draft** (2026-08-22) — §9.2: the launcher adopts its working directory as a project root only when that directory holds a project.json — a named root is still taken at its word.
 - **0.3.15-draft** (2026-08-21) — §9.3: released builds are published to jxsuite.cachix.org and the flake names it, so a consumer substitutes jx-studio instead of building it; verify-cache proves that after each release. The release also builds aarch64-linux as an advisory leg beside the x86_64 gate, and nix.yml runs on pushes to main so pull requests inherit a warm Actions cache for the npm tarball derivations cache.nixos.org cannot serve.
 - **0.3.14-draft** (2026-08-20) — §9.3: the desktop entry ships under a stable id and claims the app_id Chromium actually gives an --app window, so the taskbar/dock can resolve the brand icon.
 - **0.3.13-draft** (2026-08-20) — Chromium launcher reaches PAL parity: its own adapter over createProjectServer (§9.1), multi-window through a cross-process window registry (§9.4), a server-to-client push channel behind live sidebar sync and focus, buildSite behind View: Open in Browser, appInfo for the About screen, and an OS-opener fallback so preview links and sign-in leave the app at all (§3.5, §9.5). New Window becomes the `view.newWindow` command rather than a native-menu-only item, and the native menu drops its duplicate accelerators (§4.2a).
@@ -212,6 +214,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `server.md`
 
+- **0.2.11** (2026-08-22) — §3.1: watch-policy.ts — watchers watch only directories and regular files, and contain symlinks to the root, so a socket cannot throw and a link out cannot walk the filesystem.
 - **0.2.10** (2026-08-20) — The loopback project server's RPC socket carries server-initiated frames (ProjectServerHandle.push) — the loopback twin of the dev server's named fs SSE event, and the channel a desktop launcher raises a window over (§4.2).
 - **0.2.9** (2026-08-18) — §4.2: the Studio shell's report-only Trusted Types header is removed — see spec.md §21.5.
 - **0.2.8** (2026-08-18) — §4.2: both entry points send the Studio shell a report-only Trusted Types policy, and nothing else.
