@@ -2,9 +2,9 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.36-draft
+**Version:** 0.9.37-draft
 **Status:** Partial
-**Updated:** 2026-08-21
+**Updated:** 2026-08-22
 **License:** MIT
 
 ---
@@ -95,11 +95,11 @@ Immutable state with undo/redo history (100 entries). All mutations produce a ne
 
 ### 3.4 Platform Abstraction Layer (PAL)
 
-Studio uses a platform abstraction (`platform.js`) to decouple UI from backend:
+Studio uses a platform abstraction (`src/platform.ts`) to decouple UI from backend. The table below is a sketch; `src/types.ts`'s `StudioPlatform` is the interface, and it is considerably wider:
 
 | Method                   | Description                                                                                                |
 | ------------------------ | ---------------------------------------------------------------------------------------------------------- |
-| `listFiles(dir)`         | List directory contents                                                                                    |
+| `listDirectory(dir)`     | List directory contents                                                                                    |
 | `readFile(path)`         | Read file content                                                                                          |
 | `writeFile(path, c)`     | Write file content                                                                                         |
 | `deleteFile(path)`       | Delete file                                                                                                |
@@ -111,12 +111,14 @@ Studio uses a platform abstraction (`platform.js`) to decouple UI from backend:
 | `createProject(opts)`    | Scaffold a project at the user-chosen `opts.destination`; never defaults a location                        |
 | `pickDirectory?()`       | Native folder picker behind the modal's **Browse…** button (desktop only)                                  |
 | `fetchProjectSchemas?()` | The active project's generated entry documents, PRE-BUNDLED (extensions.md §5.2) — drives §4.2.1           |
+| `canvasUrl?`             | The canvas iframe document. Absent means the bundle-relative default (§11.2)                               |
+| `canvasUrlDeferred?`     | This platform resolves `canvasUrl` asynchronously; the host waits rather than mounting the default (§11.2) |
 
 Three platform targets:
 
-- **DevServer** (`platforms/devserver.js`) — Wraps `/__studio/*` fetch calls for Chrome-based development.
+- **DevServer** (`platforms/devserver.ts`) — Wraps `/__studio/*` fetch calls for Chrome-based development.
 - **Desktop** (`@jxsuite/desktop`) — ElectroBun app with RPC to Bun process for native file I/O.
-- **Cloud** (`platforms/cloud.js`) — Hosted sessions over the platform's session API; the backend
+- **Cloud** (`platforms/cloud.ts`) — Hosted sessions over the platform's session API; the backend
   composes per-project schemas in-Worker (extensions.md §5.5), so §4.2.1 holds there too.
 
 Registration: `registerPlatform(impl)` at startup, `getPlatform()` for access.
@@ -1342,9 +1344,11 @@ Invoked by chord while blocked, the reason goes to the status bar instead of ope
 
 ### 11.1 Bundle Layout
 
-The studio ships **two entry bundles** — the editor shell (`dist/studio.js`) and the slim canvas-iframe bundle (`dist/iframe-entry.js`) — built in separate single-entry passes so each lands flat at `dist/<name>.js`. Four consumers address those paths literally (`index.html`, `canvas.html`, the desktop asset staging, and the cloud platform's asset build), so entry names are a contract and are never hashed.
+The studio ships **two entry bundles** — the editor shell (`dist/studio.js`) and the slim canvas-iframe bundle (`dist/iframe-entry.js`) — built in separate single-entry passes so each lands flat at `dist/<name>.js`. Entry names are a contract and are never hashed, because everything else in the tree is addressed **relative to an entry**: they are the only two paths a host can rely on.
 
 The build **code-splits**. Everything reached only through a dynamic `import()` — Monaco and its language contributions, the Yjs collab stack, the JSON-Schema validator, drag-and-drop adapters — lands in content-hashed files under `dist/chunks/`, addressed by the entry relative to its own URL. That directory therefore ships and is copied wholesale, with its emitted names intact.
+
+**Only an entry may resolve against its own URL.** `import.meta.url` in any other module is the url of whatever chunk that module was hoisted into, which is a different directory and not a stable one. Both entries call `setBundleBase(import.meta.url)` as their first statement and everything else reads it through `bundleUrl()` (`services/bundle-base`). This is not a style rule: `services/monaco-setup` resolved Monaco's three web workers with a bare `import.meta.url`, the code split moved it into `dist/chunks/`, and the workers 404'd in every distribution for months — silently, because a worker that fails to start takes the JSON language service with it and reports nothing. `tests/entry-anchors.test.ts` holds the line in both directions.
 
 **Monaco is never on the startup path.** It is roughly two thirds of the editor's code and most sessions never open a code view, so `services/monaco-lazy` loads the editor API and its worker/language registration together, memoized, on first use by source mode, the function editor, or the formula workspace. Nothing in the eager import graph may reference `monaco-editor` — including indirectly, via a module whose own top-level imports pull it in (the reason the model-URI helper lives apart from the Monaco setup module).
 
@@ -1375,6 +1379,62 @@ metafile, which must show exactly one physical `monaco-editor` root in the input
 not payload: an `import()` that RUNS during activation still puts the editor on the critical path.
 Per-project JSON schemas arrive at project activation and used to be applied that way; they are now
 held (`services/monaco-lazy`) and registered when an editor is first created.
+
+---
+
+### 11.2 Hosting the Studio
+
+> **Status:** Implemented
+
+A host serves the tree and supplies a platform. Both halves are the package's to describe, and
+before they were, four hosts described them instead — the desktop's staging, its bundler's copy
+block, its bundle verifier, and the cloud's asset build all carried the same list, and every one of
+them was missing `dist/codicon.ttf`.
+
+**The manifest is the list.** `@jxsuite/studio/hosting/layout` exports `STUDIO_ASSETS`: what ships,
+whether it is a directory copied wholesale, whether absence is fatal, and _why_ — the `why` is what
+a staging failure prints, because "a file is missing" and "the code view will silently have no
+schema validation" are different things to be told. `dist/manifest.json` carries the same data for
+a host that cannot import TypeScript.
+
+**Two layouts, one rule.** `assetUrl(base, path)` maps a package path to a host URL. `nested` keeps
+the package's shape; `flat` strips exactly one leading `dist/` segment and nothing else. That single
+rule is what makes flattening a contract rather than a rewrite: every reference inside `dist/` is
+dist-relative, so stripping one segment moves all of them together. `styles/` and `fonts/` are
+untouched in both modes, which is why `tokens.css`'s `url("../fonts/…")` holds either way.
+
+**The documents are generated, not rewritten.** `studioShellHtml({ base, boot })` emits the editor
+document for a given mount point, with the chrome stylesheets linked in `STUDIO_STYLESHEETS` order —
+`forced-colors.css` last, because it redraws what Windows High Contrast deletes. `canvasShellHtml`
+rebases the canvas document's single entry reference; that document stays hand-authored, because its
+`<style>` block establishes the query container the runtime transposes viewport units against and
+has to apply before the first paint. Hosts used to rewrite the shipped HTML with a prefix list, and
+when 2.1.0 split the chrome into `./styles/*.css` the cloud's list missed it: seven dead stylesheet
+links, an unstyled editor, and a build that exited 0.
+
+**`boot` is the PAL seam.** Module URLs evaluated before the studio entry, in order. The runtime
+half is unchanged (§3.3 of `desktop.md`): a boot module sets `globalThis.__jxPlatform`, or publishes
+the `__jxCloud` signal for the entry to build the adapter from, and must do so **synchronously** —
+a module script with top-level await does not block a later script tag. Both hosts previously
+obtained this seam by string-replacing the entry's script tag, and only one of them checked that the
+replace had matched.
+
+**The package names no backend.** `@jxsuite/studio` may contain PAL adapters — `platforms/cloud.ts`
+ships inside the bundle because it owns the collab client's `Y.Doc`, and a second bundled `yjs`
+breaks cross-module `instanceof` — but it must not depend on a backend _package_. A dependency on
+`@jxsuite/server` would make the abstraction depend on one of its implementations, and would put the
+compiler, the scaffolder and the starters into every studio install, the cloud's included.
+`scripts/check-dep-rules.ts` cannot see this (it forbids only core-to-extension edges, and both are
+core), so `scripts/check-studio-package.ts` enforces it, along with the rule that only the staging
+module may import `node:` — the manifest and the document generators are pure so a Worker build, a
+Vite plugin or a Deno host can read them.
+
+**`canvasUrl` may be deferred.** A platform that resolves it asynchronously — electrobun fetches
+this window's loopback port over RPC inside `activate()` — declares `canvasUrlDeferred`, and the
+iframe host shows `about:blank` until the real URL lands. Without it the bundle-relative fallback
+resolves to a `canvas.html` the packaged app really stages, and an early frame would boot the canvas
+inside the shell's app-privileged origin, which is what the cross-origin loopback canvas exists to
+prevent.
 
 ---
 
@@ -2313,6 +2373,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.9.37-draft** (2026-08-22) — 11.2 Hosting the Studio: the asset manifest, the two layout modes, generated documents, the boot slot and the layering rule; 11.1 states the entry-rooted asset rule; 3.4's stale member names and file extensions corrected.
 - **0.9.36-draft** (2026-08-21) — Preferences → Appearance states what the theme repaints: the chrome, the overlays and an open code view, with the canvas a light document in both.
 - **0.9.35-draft** (2026-08-20) — Declare the Monaco editor feature set in monaco-setup (one register import per capability, and the measured caveat that 0.56.0's contrib graph does not yet honour the exclusions); drop the Monaco de-duplication plugin now that the first-party collab binding leaves one importer.
 - **0.9.34-draft** (2026-08-19) — A stage with no pan/zoom surface leaves the wheel to the scroll container under it, and blocks ctrl/cmd+wheel page zoom instead of handing it to the browser.
@@ -2404,4 +2465,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.36-draft_
+_`@jxsuite/studio` Specification v0.9.37-draft_

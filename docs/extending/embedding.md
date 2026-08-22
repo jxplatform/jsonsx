@@ -45,6 +45,7 @@ You don't have to implement everything. Optional protocol routes back optional `
 
 ## Related
 
+- [Hosting the Studio assets](/docs/extending/embedding/hosting) — the other half of embedding: serving the bundle, the asset manifest, and where a boot module plugs in
 - [Writing a platform adapter](/docs/extending/embedding/platform-adapter) — the `StudioPlatform` interface, registration, and the two real adapters
 - [The backend protocol](/docs/extending/embedding/backend-protocol) — contract semantics, versioning, errors, and required behaviors
 - [Dev server internals](/docs/extending/embedding/dev-server) — how the reference implementation is put together

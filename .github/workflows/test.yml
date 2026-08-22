@@ -383,6 +383,31 @@ jobs:
       - uses: ./.github/actions/setup-bun
       - run: bun --cwd packages/studio scripts/check-lens-mutants.ts
 
+  # What the BUILD emitted, against what the package says it ships.
+  #
+  # A job of its own because it needs a real `bun run build`, and the `checks` job deliberately
+  # builds nothing (its own comment budgets it at 22 seconds). It answers the question that let
+  # dist/codicon.ttf go missing for months: the build emitted a 140 KB font, the shipped CSS
+  # referenced it, and nothing compared the two — so the tarball, the desktop bundle and the cloud
+  # all drew tofu where Monaco draws icons, with no error anywhere.
+  #
+  # Gated on `gate_bundle` containing studio, which affected.ts already computes and which nothing
+  # else consumed. Part of the `ci` aggregate below, so a build that emits something nobody ships
+  # cannot merge.
+  studio-dist:
+    needs: changes
+    if: contains(fromJSON(needs.changes.outputs.gate_bundle), 'studio')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-bun
+      - run: bun run --cwd packages/studio build
+      - run: bun --cwd packages/studio scripts/check-studio-dist.ts
+      - run: bun packages/studio/scripts/check-bundle-budget.ts
+      # The generated document must match what the build writes — the same diff discipline
+      # docs:verify and schema:verify use.
+      - run: git diff --exit-code -- packages/studio/index.html
+
   # The Nix build, as a job of THIS workflow rather than a workflow of its own.
   #
   # It used to be `on: pull_request` in nix.yml with a `paths:` filter, and that is exactly why it
@@ -411,7 +436,7 @@ jobs:
   # of this design: a job the diff cannot reach must leave this green.
   ci:
     if: always()
-    needs: [changes, test, checks, lens-mutants, nix, coverage-comment]
+    needs: [changes, test, checks, lens-mutants, studio-dist, nix, coverage-comment]
     runs-on: ubuntu-latest
     steps:
       - name: Gate

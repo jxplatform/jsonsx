@@ -249,6 +249,13 @@ export function createDesktopPlatform() {
      * against it, and the asset observer rewrites relative panel asset srcs to this origin.
      */
     canvasUrl: undefined as string | undefined,
+    /* This window's loopback port, so the url is not known until activate() has asked for it over
+       RPC. Declared so the iframe host waits rather than mounting the bundle-relative fallback —
+       which under views:// now RESOLVES, to a canvas.html this app really stages, and would boot
+       the canvas inside the shell's app-privileged origin in a CEF instance running
+       disable-site-isolation-trials. The cross-origin loopback canvas exists so that cannot
+       happen. Chromium sets canvasUrl synchronously and needs none of this. */
+    canvasUrlDeferred: true,
 
     async activate() {
       // Request this window's loopback canvas URL over RPC (kills the preload/executeJavascript

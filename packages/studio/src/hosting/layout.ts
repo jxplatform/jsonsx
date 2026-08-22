@@ -95,6 +95,13 @@ export const STUDIO_ASSETS: readonly StudioAsset[] = [
     why: "Monaco's icon font, referenced by dist/studio.css and by three chunk stylesheets. It shipped in no tarball and no copy list for months, so every host drew tofu where Monaco draws icons.",
   },
   {
+    dir: false,
+    kind: "asset",
+    path: "dist/manifest.json",
+    required: false,
+    why: "this manifest as data, for a host that cannot import TypeScript — a Nix derivation, a shell script, a build in another language. Not required: a host that CAN import it has the same facts with types on them.",
+  },
+  {
     dir: true,
     kind: "chunk",
     path: "dist/chunks",

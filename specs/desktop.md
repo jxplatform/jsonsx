@@ -2,7 +2,7 @@
 
 ## Platform Abstraction, Project Loading, and Component Scoping
 
-**Version:** 0.3.17-draft
+**Version:** 0.3.18-draft
 **Status:** Pending
 **Updated:** 2026-08-22
 **License:** MIT
@@ -123,7 +123,9 @@ export function hasPlatform() {
 }
 ```
 
-Each deployment target either pre-registers its adapter before Studio initializes, or hands Studio a signal to build one itself. The desktop init bundle pre-registers the RPC-backed adapter on `__jxPlatform`. The cloud shell (the platform repo's `edit-init`) instead publishes a `window.__jxCloud` signal — the bound project, or `null` for the project-less hub — and lets the studio entry construct the adapter, so the cloud adapter (and the collab WebSocket client's `yjs` instance) lives **inside** the studio bundle rather than the shell; a second bundled `yjs` in the shell would break collab's cross-module `instanceof` checks. When nothing pre-registered, the studio entry resolves the default adapter — cloud when `__jxCloud` was signalled, else the dev server:
+Each deployment target either pre-registers its adapter before Studio initializes, or hands Studio a signal to build one itself. The desktop init bundle pre-registers the RPC-backed adapter on `__jxPlatform`.
+
+**Where the init bundle is loaded from is a declared slot, not a string replace.** `studioShellHtml({ boot })` (studio.md §11.2) emits the module tags ahead of the studio entry. Both hosts used to obtain this by an exact-string `replace()` on the shipped `index.html`'s script tag; only the cloud's checked that the replace had matched, so a whitespace change upstream would have produced a packaged desktop app with no platform registered at all — which then self-registers the dev-server adapter and fetches `/__studio/*` against a `views://` origin. The ordering constraint below is unchanged and is why `boot` is a list rather than a single hook. The cloud shell (the platform repo's `edit-init`) instead publishes a `window.__jxCloud` signal — the bound project, or `null` for the project-less hub — and lets the studio entry construct the adapter, so the cloud adapter (and the collab WebSocket client's `yjs` instance) lives **inside** the studio bundle rather than the shell; a second bundled `yjs` in the shell would break collab's cross-module `instanceof` checks. When nothing pre-registered, the studio entry resolves the default adapter — cloud when `__jxCloud` was signalled, else the dev server:
 
 ```javascript
 // Desktop (init bundle, loaded before studio.js) — pre-registers its adapter
@@ -1114,6 +1116,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.3.18-draft** (2026-08-22) — 3.3 the init bundle loads through a declared boot slot rather than an exact-string replace on the shipped document.
 - **0.3.17-draft** (2026-08-22) — §9.2: the session watches a project or nothing — a root with no project.json is declined rather than scanned recursively.
 - **0.3.16-draft** (2026-08-22) — §9.2: the launcher adopts its working directory as a project root only when that directory holds a project.json — a named root is still taken at its word.
 - **0.3.15-draft** (2026-08-21) — §9.3: released builds are published to jxsuite.cachix.org and the flake names it, so a consumer substitutes jx-studio instead of building it; verify-cache proves that after each release. The release also builds aarch64-linux as an advisory leg beside the x86_64 gate, and nix.yml runs on pushes to main so pull requests inherit a warm Actions cache for the npm tarball derivations cache.nixos.org cannot serve.
@@ -1150,4 +1153,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx Studio Desktop Architecture Specification v0.3.17-draft_
+_Jx Studio Desktop Architecture Specification v0.3.18-draft_

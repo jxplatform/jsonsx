@@ -5,40 +5,44 @@
  * missed the iframe canvas assets and the packaged iframe 404'd at `/__studio__/canvas.html`.
  */
 import { afterAll, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { STUDIO_ASSETS, STUDIO_STYLESHEETS, STUDIO_WORKERS } from "@jxsuite/studio/hosting/layout";
 import { stageStudioAssets } from "../scripts/stage-studio-assets";
 
 const root = mkdtempSync(join(tmpdir(), "jx-stage-assets-"));
 const studioDir = join(root, "studio");
 const desktopDir = join(root, "desktop");
-
-mkdirSync(join(studioDir, "dist", "workers"), { recursive: true });
-mkdirSync(join(studioDir, "dist", "chunks"), { recursive: true });
-mkdirSync(join(studioDir, "fonts"), { recursive: true });
-mkdirSync(join(studioDir, "styles"), { recursive: true });
 mkdirSync(desktopDir, { recursive: true });
-/** The studio chrome stylesheet, in the order index.html links it. */
-const STYLESHEETS = [
-  "tokens.css",
-  "shell.css",
-  "canvas.css",
-  "panels.css",
-  "inspector.css",
-  "overlays.css",
-  "forced-colors.css",
-];
-for (const sheet of STYLESHEETS) {
-  writeFileSync(join(studioDir, "styles", sheet), `/* ${sheet} */`);
+
+/**
+ * A studio package tree, built FROM THE MANIFEST rather than from a list written here.
+ *
+ * The list written here was itself an incomplete copy list — it had no `dist/codicon.ttf`, the same
+ * omission that shipped tofu instead of Monaco's icons in every distribution. A fixture that
+ * enumerates what the staging should copy cannot catch the staging missing something, because both
+ * sides are the same guess. Deriving it means a manifest entry added upstream appears here too.
+ */
+function write(rel: string, body: string): void {
+  mkdirSync(dirname(join(studioDir, rel)), { recursive: true });
+  writeFileSync(join(studioDir, rel), body);
 }
-writeFileSync(join(studioDir, "dist", "studio.css"), "/* css */");
-writeFileSync(join(studioDir, "dist", "studio.js"), "// studio");
-writeFileSync(join(studioDir, "dist", "iframe-entry.js"), "// canvas entry");
-writeFileSync(join(studioDir, "dist", "chunks", "studio-abc123.js"), "// split chunk");
-for (const worker of ["editor.worker.js", "json.worker.js", "ts.worker.js"]) {
-  writeFileSync(join(studioDir, "dist", "workers", worker), `// ${worker}`);
+for (const asset of STUDIO_ASSETS) {
+  if (asset.dir) {
+    mkdirSync(join(studioDir, asset.path), { recursive: true });
+  } else {
+    write(asset.path, `/* ${asset.path} */`);
+  }
+}
+/* The contents of the wholesale directories, and the two documents' real shapes. */
+write("dist/chunks/studio-abc123.js", "// split chunk");
+for (const worker of STUDIO_WORKERS) {
+  write(`dist/workers/${worker}`, `// ${worker}`);
+}
+for (const sheet of STUDIO_STYLESHEETS) {
+  write(sheet, `/* ${sheet} */`);
 }
 for (const font of [
   "jetbrains-mono-400.woff2",
@@ -46,12 +50,14 @@ for (const font of [
   "jetbrains-mono-700.woff2",
   "OFL.txt",
 ]) {
-  writeFileSync(join(studioDir, "fonts", font), `font:${font}`);
+  write(`fonts/${font}`, `font:${font}`);
 }
-writeFileSync(join(studioDir, "canvas.html"), '<div id="jx-canvas-root"></div>');
-writeFileSync(
-  join(studioDir, "index.html"),
-  '<html><script type="module" src="./dist/studio.js"></script></html>',
+write("dist/studio.css", "/* css */");
+write("dist/studio.js", "// studio");
+write("dist/iframe-entry.js", "// canvas entry");
+write(
+  "canvas.html",
+  '<div id="jx-canvas-root"></div>\n<script type="module">import(`./dist/iframe-entry.js`);</script>',
 );
 
 afterAll(() => {
@@ -92,25 +98,33 @@ describe("stageStudioAssets", () => {
     await stageStudioAssets(desktopDir);
     const out = join(desktopDir, "assets", "studio");
 
-    for (const sheet of STYLESHEETS) {
-      expect(await readFile(join(out, "styles", sheet), "utf8")).toBe(`/* ${sheet} */`);
+    for (const sheet of STUDIO_STYLESHEETS) {
+      expect(await readFile(join(out, sheet), "utf8")).toBe(`/* ${sheet} */`);
     }
   });
 
-  /* Same reasoning as the missing-chunks refusal: an app with no chrome CSS is worse than a build
-     that stops and says so. */
-  test("refuses to stage when styles/ is missing", async () => {
-    const bare = mkdtempSync(join(tmpdir(), "jx-stage-nostyles-"));
-    const bareStudio = join(bare, "studio");
-    const bareDesktop = join(bare, "desktop");
-    mkdirSync(join(bareStudio, "dist", "chunks"), { recursive: true });
-    mkdirSync(bareDesktop, { recursive: true });
-    writeFileSync(join(bareStudio, "dist", "studio.js"), "// studio");
-    writeFileSync(join(bareStudio, "dist", "studio.css"), "/* css */");
-    try {
-      await expect(stageStudioAssets(bareDesktop)).rejects.toThrow("no styles/ directory");
-    } finally {
-      rmSync(bare, { force: true, recursive: true });
+  /* Refusing beats shipping, and the refusal is now the manifest's rather than two hand-written
+     guards. It used to cover exactly the two omissions someone had already been bitten by —
+     `styles/` and `dist/chunks` — which is why `dist/codicon.ttf` went missing for months with
+     nothing to say so. Every required entry is guarded, and the message names what the reader
+     loses rather than only which file was absent. */
+  test("refuses to stage when a required asset is missing, naming what it costs", async () => {
+    for (const [missing, cost] of [
+      ["styles", "no tokens, no grid and no panel chrome"],
+      ["dist/chunks", "bare module-resolution error"],
+      ["dist/codicon.ttf", "Monaco's icon font"],
+      ["dist/workers", "no JSON language service"],
+    ] as const) {
+      const bare = mkdtempSync(join(tmpdir(), "jx-stage-missing-"));
+      try {
+        cpSync(studioDir, join(bare, "studio"), { recursive: true });
+        mkdirSync(join(bare, "desktop"), { recursive: true });
+        rmSync(join(bare, "studio", missing), { force: true, recursive: true });
+        await expect(stageStudioAssets(join(bare, "desktop"))).rejects.toThrow(missing);
+        await expect(stageStudioAssets(join(bare, "desktop"))).rejects.toThrow(cost);
+      } finally {
+        rmSync(bare, { force: true, recursive: true });
+      }
     }
   });
 
@@ -130,29 +144,13 @@ describe("stageStudioAssets", () => {
     expect(await readFile(join(out, "fonts", "OFL.txt"), "utf8")).toBe("font:OFL.txt");
   });
 
-  /* Refusing beats shipping: a staged app whose studio.js imports chunks that are not there dies at
-     boot with a bare module-resolution error and no hint about the missing build step. */
-  test("refuses to stage when the studio build has no chunks", async () => {
-    const bare = mkdtempSync(join(tmpdir(), "jx-stage-nochunks-"));
-    const bareStudio = join(bare, "studio");
-    const bareDesktop = join(bare, "desktop");
-    mkdirSync(join(bareStudio, "dist"), { recursive: true });
-    mkdirSync(bareDesktop, { recursive: true });
-    writeFileSync(join(bareStudio, "dist", "studio.js"), "// studio");
-    writeFileSync(join(bareStudio, "dist", "studio.css"), "/* css */");
-    try {
-      await expect(stageStudioAssets(bareDesktop)).rejects.toThrow("no dist/chunks");
-    } finally {
-      rmSync(bare, { force: true, recursive: true });
-    }
-  });
-
-  test("a missing optional sourcemap is tolerated; a present one is copied", async () => {
-    // First run above had no map and succeeded. Add one and re-stage.
-    writeFileSync(join(studioDir, "dist", "iframe-entry.js.map"), "{}");
+  /* Source maps are left behind by default. The chunk maps alone are about 24 MB, and the entries
+     ship without their own map anyway, so a chunk map could not resolve a stack frame on its own. */
+  test("does not carry source maps into the app bundle", async () => {
+    writeFileSync(join(studioDir, "dist", "chunks", "studio-abc123.js.map"), "{}");
     await stageStudioAssets(desktopDir);
-    expect(
-      await readFile(join(desktopDir, "assets", "studio", "dist", "iframe-entry.js.map"), "utf8"),
-    ).toBe("{}");
+    const out = join(desktopDir, "assets", "studio");
+    expect(existsSync(join(out, "dist", "chunks", "studio-abc123.js.map"))).toBe(false);
+    expect(existsSync(join(out, "dist", "chunks", "studio-abc123.js"))).toBe(true);
   });
 });

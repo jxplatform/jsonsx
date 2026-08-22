@@ -166,6 +166,21 @@ export interface StudioPlatform {
    * "desktop"`, but only chromium sets this.
    */
   canvasUrl?: string;
+  /**
+   * True when this platform resolves {@link canvasUrl} ASYNCHRONOUSLY.
+   *
+   * Electrobun does: the url is this window's loopback port, fetched over RPC inside `activate()`.
+   * Until the canvas fallback was anchored to the bundle it did not matter — the old literal
+   * `/packages/studio/canvas.html` resolved to nothing servable under `views://`, so an early frame
+   * simply failed and the host rebuilt when the real url landed. Now the fallback RESOLVES:
+   * `views://studio/canvas.html` is a document electrobun really stages. An early frame would boot
+   * the whole canvas bundle inside the SHELL's app-privileged origin, in a CEF instance running
+   * `disable-site-isolation-trials` — and the cross-origin loopback canvas exists precisely so that
+   * cannot happen. Declaring it makes the host wait instead.
+   *
+   * Not keyed on `id`: chromium and electrobun both report `"desktop"`, and only electrobun defers.
+   */
+  canvasUrlDeferred?: boolean;
   activate: (root?: string) => Promise<void>;
   openProject: () => Promise<{
     config: ProjectConfig;

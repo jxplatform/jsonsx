@@ -7,6 +7,8 @@
  * jx-platform's `public/` build — do not each write the same copier, and it is the ONLY module
  * under `src/` that imports `node:`. A host in another runtime reads the manifest and moves the
  * bytes however it likes.
+ *
+ * @docs extending/embedding/hosting
  */
 
 import { cp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";

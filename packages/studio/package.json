@@ -45,7 +45,7 @@
   },
   "scripts": {
     "build": "bun run scripts/build.ts",
-    "build:metafile": "bun build ./src/studio.ts --outdir dist --target browser --sourcemap=linked --metafile=metafile.json",
+    "build:metafile": "bun build ./src/studio.ts --outdir dist-metafile --target browser --sourcemap=linked --metafile=metafile.json",
     "gen:webdata": "bun run scripts/gen-webdata.js",
     "eval": "bun run evals/cli.ts",
     "eval:headless": "bun run tests/harness/run-eval.ts",

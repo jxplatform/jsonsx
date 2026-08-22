@@ -69,17 +69,18 @@ jobs:
       - name: Build with metafile
         run: bun run build:metafile
         working-directory: packages/${{ matrix.package }}
-      # Studio's bundle is otherwise unmonitored (the Codecov path below is a documented no-op on
-      # main). This enforces a committed size ceiling; it skips gracefully if dist isn't present.
-      - name: Check bundle budget
-        if: matrix.package == 'studio'
-        run: bun packages/studio/scripts/check-bundle-budget.ts
+      # The budget check is NOT here any more. It used to run on this lane and measure the wrong
+      # artifact: `build:metafile` is a single unsplit `bun build` that inlines Monaco, so the
+      # studio.js it produced was about 14.5 MB while the studio.js the release build writes — at
+      # the same path, until now — is 2.9 MB. A ceiling set from one is meaningless for the other.
+      # It runs in test.yml's `studio-dist` job, after a real `bun run build`, where it can also be
+      # part of the `ci` aggregate. This lane writes to dist-metafile/ so the two no longer collide.
       - name: Upload bundle stats to Codecov
         run: >-
           bunx metafile-codecov
           -f metafile.json
           -n ${{ matrix.package }}
-          --output-dir dist
+          --output-dir dist-metafile
           --bundler-name bun
           --bundler-version "$(bun --version)"
           --upload
