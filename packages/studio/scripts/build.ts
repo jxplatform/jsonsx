@@ -60,3 +60,24 @@ for (const entry of STUDIO_ENTRYPOINTS) {
 // Bundle Monaco's web workers into dist/workers.
 const { buildMonacoWorkers } = await import("./build-workers.ts");
 await buildMonacoWorkers();
+
+/*
+ * The two package-root documents, and the manifest.
+ *
+ * index.html is GENERATED, not authored. It was authored, and so was a copy of it in every host
+ * that served the shell — jx-platform rewrote three prefixes and surgically replaced the entry's
+ * script tag, and when studio 2.1.0 split the chrome into ./styles/*.css the rewrite list missed it
+ * and the cloud shipped seven dead stylesheet links under a green build. The document is now one
+ * function of one list, so a stylesheet added to `styles/` and to STUDIO_STYLESHEETS reaches every
+ * host at once, and one added to only the first is caught by check-studio-package.ts.
+ *
+ * canvas.html stays hand-authored: its <style> block establishes the fixed-size query container the
+ * runtime transposes viewport units against, and that has to apply before the iframe's first paint.
+ *
+ * The committed index.html is what the repo dev server serves and what `git diff --exit-code` in
+ * the checks job compares against, so writing it here is what keeps the two honest.
+ */
+const { studioShellHtml } = await import("../src/hosting/document.ts");
+const { writeAssetManifest } = await import("../src/hosting/stage.ts");
+await Bun.write(join(STUDIO_DIR, "index.html"), studioShellHtml());
+await writeAssetManifest(STUDIO_DIR);

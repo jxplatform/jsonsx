@@ -287,6 +287,11 @@ jobs:
       # module holds its own rendered nodes with ref() rather than re-finding them by selector.
       # Both carry a ratcheting backlog; source-only, about a second.
       - run: bun --cwd packages/studio scripts/check-lit-conventions.ts
+      # What the package promises about itself: the stylesheet list IS the stylesheets (a sheet the
+      # list omits is one no document links — the 2.1.0 dead-links outage), `files` covers every
+      # manifest path and every import that escapes src/, the abstraction declares no backend
+      # package, and node: stays confined to the stager. Source-only, about a second.
+      - run: bun --cwd packages/studio scripts/check-studio-package.ts
       - run: bun --cwd packages/studio scripts/check-icons.ts
       - run: bun run typecheck
       # packages/desktop is EXCLUDED from the root tsconfig (electrobun ships raw .ts in its dist,

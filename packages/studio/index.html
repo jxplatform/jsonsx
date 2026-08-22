@@ -11,14 +11,9 @@
     <link rel="stylesheet" href="./styles/panels.css" />
     <link rel="stylesheet" href="./styles/inspector.css" />
     <link rel="stylesheet" href="./styles/overlays.css" />
-    <!-- Last: forced colours redraws what Windows High Contrast deletes. -->
     <link rel="stylesheet" href="./styles/forced-colors.css" />
   </head>
   <body>
-    <!-- The frame is rendered by src/shell/tree.ts, not written here.
-         It was written here, and in twenty-three test files that each described their own version
-         of it; one of those had quietly lost the bottom dock and the toast host. A body element is
-         not a place two dozen files can agree. -->
     <script type="module" src="./dist/studio.js"></script>
   </body>
 </html>
