@@ -4,7 +4,7 @@
  * not_jx_project failure staying inline, dismissal, and the Open Project mode (write-access
  * filtering, Jx-first ordering, install-App empty state).
  */
-import { flush, installMockPlatform } from "./harness";
+import { flush, installMockPlatform, mountOverlayLayers } from "./harness";
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import type { RepoInfo } from "../src/types";
 
@@ -18,11 +18,7 @@ const {
 const { hydrateAccountStatus, resetAccountStatus } = await import("../src/account-status");
 const { initLayers } = await import("../src/ui/layers");
 
-document.body.innerHTML = `
-  <div id="layer-popover"></div>
-  <div id="layer-modal"></div>
-  <div id="layer-dialog"></div>
-`;
+mountOverlayLayers(document.body);
 initLayers();
 
 const REPOS: RepoInfo[] = [

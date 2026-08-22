@@ -2702,3 +2702,38 @@
 .settings-locale-routing {
   max-width: 320px;
 }
+
+/* ─── Overlay layers ───────────────────────────────────────────────────────
+   The four full-viewport hosts `ui/layers.ts` renders into, in stacking order.
+   Their z-indices were inline `style` attributes on four divs in index.html,
+   which put the one piece of ordering the whole overlay system depends on
+   outside `check-styles.ts`'s stacking rule — the rule that exists because a
+   blocking progress modal shipped above its own scrim with no reachable exit.
+   `src/shell/tree.ts` emits these classes; the ordering is reviewable here.
+
+   Each layer is inert until something is rendered into it: `pointer-events`
+   is none on the host, and each slot `ui/layers.ts` appends turns it back on
+   for itself. */
+.jx-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.jx-layer--popover {
+  z-index: 1000;
+}
+
+.jx-layer--modal {
+  z-index: 2000;
+}
+
+.jx-layer--dialog {
+  z-index: 3000;
+}
+
+/* Above the dialog layer, deliberately: an operation started from a dialog
+   reports its outcome to the person who is still looking at the dialog. */
+.jx-layer--toast {
+  z-index: 4000;
+}

@@ -12,6 +12,7 @@ import {
   npPreview,
   npSlug,
   npType,
+  mountOverlayLayers,
 } from "./harness";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { invalidateModelCache } from "../src/services/ai-models";
@@ -23,11 +24,7 @@ const { closeNewProjectModal, openNewProjectModal } =
 const { importButtonLabel, startImport } = await import("../src/new-project/import-tab");
 const { initLayers } = await import("../src/ui/layers");
 
-document.body.innerHTML = `
-  <div id="layer-popover"></div>
-  <div id="layer-modal"></div>
-  <div id="layer-dialog"></div>
-`;
+mountOverlayLayers(document.body);
 initLayers();
 
 function modal(): HTMLElement | null {

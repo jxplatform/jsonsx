@@ -234,6 +234,7 @@ import type { GitDiffState } from "./types";
 import type { Tab } from "./tabs/tab";
 import type { JxMutableNode, ProjectConfig } from "@jxsuite/schema/types";
 import { setBundleBase } from "./services/bundle-base";
+import { mountShellTree } from "./shell/tree";
 
 /**
  * Anchor every shipped-asset URL to THIS module's directory.
@@ -435,6 +436,10 @@ if (!hasPlatform()) {
 mountResizeEdges();
 
 // ─── Render loop ──────────────────────────────────────────────────────────────
+
+/* The application frame, before anything adopts a host out of it. index.html carries an empty body
+   and this is the only definition — see src/shell/tree.ts for what that fixed. */
+mountShellTree();
 
 initShellRefs();
 // One effect projects the dock record onto the shell grid — collapse classes and column widths.

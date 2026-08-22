@@ -24,7 +24,6 @@
 import { effect, effectScope, reactive } from "./reactivity";
 import { loadedMonaco } from "./services/monaco-lazy";
 import { applyStartupProfile } from "./services/profile";
-import { stampShellRegions } from "./ui/regions";
 import { workspace } from "./workspace/workspace";
 import { captureSession, readSession } from "./workspace/session";
 import type { PersistedSession } from "./workspace/session";
@@ -1044,7 +1043,6 @@ export function mountShell(): void {
   }
   // The six shell hosts are bare `<div id>`s in index.html, so they cannot stamp their own region
   // The way a panel or an overlay slot does. One table, applied once the tree exists.
-  stampShellRegions();
   // The Bottom dock mounts from here rather than from the bootstrap because it is a DOCK: it is
   // Projected onto the grid by the same record and the same effect as the other two, and a second
   // Mounting site would be a second place the shell's own layout is decided. Every surface's own

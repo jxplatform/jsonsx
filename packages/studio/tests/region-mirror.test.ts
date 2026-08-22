@@ -14,9 +14,11 @@
  */
 import "./with-dom.js";
 import { describe, expect, test } from "bun:test";
+import { html, render as litRender } from "lit-html";
+import { mountShellTree } from "../src/shell/tree";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { resolveRegion, stampShellRegions } from "../src/ui/regions";
+import { resolveRegion } from "../src/ui/regions";
 
 /** The mirror, lifted out of `shot.ts` by reading its source — so the test cannot drift from it. */
 function mirrorResolver(): (id: string) => HTMLElement | null {
@@ -36,24 +38,23 @@ function mirrorResolver(): (id: string) => HTMLElement | null {
 }
 
 function build(): void {
-  document.body.innerHTML = `
-    <div id="app">
-      <div id="toolbar"></div>
-      <div id="pane-grid"></div>
-      <div id="activity-bar"></div>
-      <div id="left-panel"></div>
-      <div id="right-panel">
-        <div class="kv-row" data-prop="image">
-          <sp-action-button class="media-picker-browse"></sp-action-button>
-        </div>
-        <div class="kv-row" data-prop="og:image">
-          <sp-action-button class="media-picker-browse"></sp-action-button>
-        </div>
-        <div class="kv-row" data-prop="href"></div>
+  /* The real frame, plus the inspector rows this file is actually about. The frame used to be
+     pasted here too; it stamps its own region ids now (src/shell/tree.ts), which is what the
+     `stampShellRegions()` call under this used to be for. */
+  mountShellTree();
+  const inspector = document.querySelector("#right-panel")!;
+  litRender(
+    html`
+      <div class="kv-row" data-prop="image">
+        <sp-action-button class="media-picker-browse"></sp-action-button>
       </div>
-      <div id="statusbar"></div>
-    </div>`;
-  stampShellRegions();
+      <div class="kv-row" data-prop="og:image">
+        <sp-action-button class="media-picker-browse"></sp-action-button>
+      </div>
+      <div class="kv-row" data-prop="href"></div>
+    `,
+    inspector as HTMLElement,
+  );
 }
 
 /** Every id shape the two copies both claim to answer, including the ones that must answer null. */

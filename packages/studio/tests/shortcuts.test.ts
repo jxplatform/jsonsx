@@ -21,6 +21,7 @@ import {
   stubRect,
 } from "./harness";
 import { beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
+import { mountShellTree } from "../src/shell/tree";
 import { notifyModule } from "./notify-mock";
 import type { CommandContext } from "../src/commands/context";
 import type { InspectorTabId } from "../src/shell";
@@ -105,7 +106,6 @@ const {
   REGION_CYCLE,
   registerStudioCommands,
 } = await import("../src/editor/shortcuts");
-const { stampShellRegions } = await import("../src/ui/regions");
 const { createCommandRegistry } = await import("../src/commands/registry");
 const { createLiveContext } = await import("../src/commands/live-context");
 const store = await import("../src/store");
@@ -185,20 +185,10 @@ let registry: ReturnType<typeof createCommandRegistry>;
 
 beforeAll(() => {
   document.body.innerHTML = "";
-  for (const id of [
-    "activity-bar",
-    "left-panel",
-    "right-panel",
-    "toolbar",
-    "statusbar",
-    "layer-popover",
-    "layer-modal",
-    "layer-dialog",
-  ]) {
-    const el = document.createElement("div");
-    el.id = id;
-    document.body.append(el);
-  }
+  /* The real frame. This used to be eight hand-listed divs — no bottom dock, no pane grid, no toast
+     host — plus stampShellRegions() to add the region ids the divs could not carry. The template
+     stamps its own, so both halves are gone. */
+  mountShellTree();
   initShellRefs();
   registerPrimaryStage();
   initLayers();
@@ -1143,7 +1133,6 @@ describe("dispatcher", () => {
 
 describe("direct keys", () => {
   beforeEach(() => {
-    stampShellRegions();
     shell.focusRegion = "pane";
     setDockCollapsed("left", false);
     setDockCollapsed("right", true);
@@ -1255,7 +1244,6 @@ describe("nextRegion", () => {
 
 describe("focusShellRegion", () => {
   test("focuses the first focusable inside the region", () => {
-    stampShellRegions();
     const button = document.createElement("button");
     document.querySelector("#left-panel")!.append(button);
     try {
@@ -1268,7 +1256,6 @@ describe("focusShellRegion", () => {
   });
 
   test("a bare host is made programmatically focusable rather than skipped", () => {
-    stampShellRegions();
     const host = document.querySelector("#statusbar") as HTMLElement;
     expect(focusShellRegion("status")).toBe(true);
     expect(host.tabIndex).toBe(-1);

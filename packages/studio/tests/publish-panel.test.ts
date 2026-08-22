@@ -3,7 +3,13 @@
  * collection (token form vs hosted connect), the create-and-connect form with validation, the
  * connected status view with refresh/disconnect, and the Pages-GitHub-App error hint.
  */
-import { flush, installMockPlatform, pointer, resetStudioState } from "./harness";
+import {
+  flush,
+  installMockPlatform,
+  pointer,
+  resetStudioState,
+  mountOverlayLayers,
+} from "./harness";
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import type { DeployConfig } from "@jxsuite/schema/types";
 
@@ -11,11 +17,7 @@ const { openPublishPanel, seedPublishConnected } = await import("../src/publish/
 const { initLayers } = await import("../src/ui/layers");
 const { setCfToken } = await import("../src/services/cf-settings");
 
-document.body.innerHTML = `
-  <div id="layer-popover"></div>
-  <div id="layer-modal"></div>
-  <div id="layer-dialog"></div>
-`;
+mountOverlayLayers(document.body);
 initLayers();
 
 const DEPLOY: DeployConfig = {

@@ -8,7 +8,13 @@
  * left. Each test therefore asserts what did NOT happen, and pairs it with the neighbouring call
  * that DOES happen, so "nothing" is the guard talking rather than a dead fixture.
  */
-import { flush, installMockPlatform, pointer, resetStudioState } from "./harness";
+import {
+  flush,
+  installMockPlatform,
+  pointer,
+  resetStudioState,
+  mountOverlayLayers,
+} from "./harness";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { html, nothing, render } from "lit-html";
 import { notifyModule } from "./notify-mock";
@@ -34,11 +40,7 @@ import type { EditorKind } from "../src/commands/context";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { StudioPlatform } from "../src/types";
 
-document.body.innerHTML = `
-  <div id="layer-popover"></div>
-  <div id="layer-modal"></div>
-  <div id="layer-dialog"></div>
-`;
+mountOverlayLayers(document.body);
 initLayers();
 
 // ─── commands/context.ts — the pane no engine owns ───────────────────────────

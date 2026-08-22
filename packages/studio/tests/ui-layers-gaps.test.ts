@@ -2,7 +2,7 @@
  * Ui/layers — showDialog/showConfirmDialog resolution, openModal handle, renderPopover dismissal
  * (outside click, layer targeting), and named layer slots.
  */
-import { flush } from "./harness";
+import { flush, mountOverlayLayers } from "./harness";
 import { beforeAll, describe, expect, mock, test } from "bun:test";
 import { html } from "lit-html";
 import {
@@ -34,11 +34,7 @@ describe("getLayerSlot before initLayers", () => {
 
 describe("layers after init", () => {
   beforeAll(() => {
-    document.body.innerHTML = `
-      <div id="layer-popover"></div>
-      <div id="layer-modal"></div>
-      <div id="layer-dialog"></div>
-    `;
+    mountOverlayLayers(document.body);
     initLayers();
   });
 

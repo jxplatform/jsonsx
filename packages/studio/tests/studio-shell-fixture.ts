@@ -7,6 +7,7 @@
  * requested URL and platform behavior.
  */
 import { flush, installMockPlatform } from "./harness";
+import { mountShellTree } from "../src/shell/tree";
 import { mock } from "bun:test";
 import { notifyModule } from "./notify-mock";
 import { nothing } from "lit-html";
@@ -78,21 +79,13 @@ export async function bootStudio(opts: {
     async () => new Response("{}", { status: 404 }),
   ) as unknown as typeof fetch;
 
-  document.body.innerHTML = `
-    <div id="app">
-      <div id="toolbar"></div>
-      <div id="pane-grid"></div>
-      <div id="activity-bar"></div>
-      <div id="left-panel"></div>
-      <div id="resize-left" class="resize-handle"></div>
-      <div id="resize-right" class="resize-handle"></div>
-      <div id="right-panel"></div>
-      <div id="statusbar"></div>
-    </div>
-    <div id="layer-popover"></div>
-    <div id="layer-modal"></div>
-    <div id="layer-dialog"></div>
-  `;
+  /* The real frame, not a description of one. This fixture used to paste its own copy, and that
+     copy had lost `#resize-bottom`, `#bottom-dock` and `#layer-toast` — so every shell-boot test
+     that shares this file ran against a shell with no bottom dock and no toast host, and no test
+     could report it because the fixture WAS the thing under test.
+     src/studio.ts mounts the frame itself at boot, so this is belt and braces for the assertions
+     that run before the import; both go through the one definition. */
+  mountShellTree();
 
   void mock.module("../src/services/monaco-setup.js", () => ({}));
 

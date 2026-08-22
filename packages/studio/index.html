@@ -15,55 +15,10 @@
     <link rel="stylesheet" href="./styles/forced-colors.css" />
   </head>
   <body>
-    <sp-theme color="dark" scale="medium" system="spectrum">
-      <div id="app">
-        <div id="toolbar"></div>
-        <!-- The PANE GRID (spec §18.1). One cell per pane, each holding that pane's own strip,
-             jump bar, chrome layer and stage — the four surfaces that used to be flat siblings of
-             THIS grid, which is to say application rows that only ever described one pane. There
-             is nothing to see here in markup: `panels/pane-grid.ts` reconciles the cells against
-             `workspace.panes`, because how many there are is a fact about the workspace and a
-             `<div id>` can only ever be one of them. -->
-        <div id="pane-grid"></div>
-        <div id="activity-bar"></div>
-        <div id="left-panel"></div>
-        <div id="resize-left" class="resize-handle"></div>
-        <!-- ⑪ The Bottom dock (⌘J). It sits in the PANE's column, under the stage and above the
-             status bar, so opening it never narrows the Navigator or the Inspector (spec §12
-             region ⑪). Its handle resizes on the other axis; `panels/bottom-dock.ts` stamps
-             `dock.bottom` on this host while it is open, and nothing while it is closed. -->
-        <div id="resize-bottom" class="resize-handle resize-handle-row"></div>
-        <div id="bottom-dock"></div>
-        <div id="resize-right" class="resize-handle"></div>
-        <!-- The Inspector dock. Four tabs — Content · Style · Logic · Assistant (spec §12 region
-             ⑨) — all inside this one host. The assistant's fifth grid column is gone. -->
-        <div id="right-panel"></div>
-        <!-- The app's only status channel: announce what lands in it (spec §12 region ⑫). -->
-        <div id="statusbar" role="status" aria-live="polite"></div>
-      </div>
-      <div
-        id="layer-popover"
-        style="position: fixed; inset: 0; pointer-events: none; z-index: 1000"
-      ></div>
-      <div
-        id="layer-modal"
-        style="position: fixed; inset: 0; pointer-events: none; z-index: 2000"
-      ></div>
-      <div
-        id="layer-dialog"
-        style="position: fixed; inset: 0; pointer-events: none; z-index: 3000"
-      ></div>
-      <!-- The toast host: the fourth overlay layer (spec §12 region ④, §7.1). Above the dialog
-           layer, because an operation started from a dialog reports its outcome to the person
-           still looking at the dialog. `role="status"` sits on the HOST, so a stack of toasts is
-           announced as one live region rather than as one region per notification. -->
-      <div
-        id="layer-toast"
-        role="status"
-        aria-live="polite"
-        style="position: fixed; inset: 0; pointer-events: none; z-index: 4000"
-      ></div>
-    </sp-theme>
+    <!-- The frame is rendered by src/shell/tree.ts, not written here.
+         It was written here, and in twenty-three test files that each described their own version
+         of it; one of those had quietly lost the bottom dock and the toast host. A body element is
+         not a place two dozen files can agree. -->
     <script type="module" src="./dist/studio.js"></script>
   </body>
 </html>

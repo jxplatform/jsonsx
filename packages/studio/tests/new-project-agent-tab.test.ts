@@ -6,7 +6,15 @@
  * The Agent submit runs the same destination validation as a normal create, so a project is only
  * ever scaffolded under the Location the user chose.
  */
-import { flush, installMockPlatform, npFillLocation, npName, npPreview, npType } from "./harness";
+import {
+  flush,
+  installMockPlatform,
+  npFillLocation,
+  npName,
+  npPreview,
+  npType,
+  mountOverlayLayers,
+} from "./harness";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { invalidateModelCache } from "../src/services/ai-models";
 
@@ -14,11 +22,7 @@ const { closeNewProjectModal, openNewProjectModal } =
   await import("../src/new-project/new-project-modal");
 const { initLayers } = await import("../src/ui/layers");
 
-document.body.innerHTML = `
-  <div id="layer-popover"></div>
-  <div id="layer-modal"></div>
-  <div id="layer-dialog"></div>
-`;
+mountOverlayLayers(document.body);
 initLayers();
 
 /** The multiline prompt field on the Agent source step. */

@@ -10,7 +10,7 @@
  *   activity is an idle blocker (`services/idle.ts`), so an operation that forgets to finish hangs
  *   `probe.idle()` and every screenshot after it.
  */
-import { flush, installMockPlatform, resetStudioState } from "./harness";
+import { flush, installMockPlatform, resetStudioState, mountOverlayLayers } from "./harness";
 import { beforeEach, describe, expect, test } from "bun:test";
 
 const { activities, resetActivities } = await import("../src/panels/activity-panel");
@@ -161,11 +161,7 @@ describe("the records", () => {
     const { openModal } = await import("../src/ui/layers");
     expect(typeof openModal).toBe("function");
     resetStudioState({ projectConfig: { name: "My Site" } });
-    document.body.innerHTML = `
-      <div id="layer-popover"></div>
-      <div id="layer-modal"></div>
-      <div id="layer-dialog"></div>
-    `;
+    mountOverlayLayers(document.body);
     const { initLayers } = await import("../src/ui/layers");
     initLayers();
     await command("publish.setUp").run(emptyContext(), undefined as never);

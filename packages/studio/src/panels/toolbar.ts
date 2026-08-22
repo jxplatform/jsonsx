@@ -644,7 +644,7 @@ function dockTogglesTpl(registry: CommandRegistry) {
 /**
  * Mount the Command Bar.
  *
- * @param rootEl The `#toolbar` host, stamped `commandbar` by `stampShellRegions()`.
+ * @param rootEl The `#toolbar` host, stamped `commandbar` by the frame (`shell/tree.ts`).
  * @param _ctx Ignored — see {@link ToolbarCtx}.
  */
 export function mount(rootEl: HTMLElement, _ctx: ToolbarCtx = {}) {

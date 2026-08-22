@@ -4,17 +4,14 @@
  */
 import "./with-dom.js";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { mountOverlayLayers } from "./harness";
 import { initLayers } from "../src/ui/layers";
 import { closeFormulaPalette, openFormulaPalette } from "../src/ui/formula-palette";
 import type { FormulaCatalogEntry } from "../src/ui/formula-catalog";
 
 // Layer DOM is set up once — getLayerSlot caches its slot element, so the body must not be
 // Replaced between tests (the cached slot would keep pointing into a detached subtree).
-document.body.innerHTML = `
-  <div id="layer-popover"></div>
-  <div id="layer-modal"></div>
-  <div id="layer-dialog"></div>
-`;
+mountOverlayLayers(document.body);
 initLayers();
 
 // Happy-dom may not provide requestAnimationFrame in all versions.

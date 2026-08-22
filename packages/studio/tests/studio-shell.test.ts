@@ -116,6 +116,25 @@ void mock.module("monaco-editor/editor", () => ({
 
 const renderStatusbarMock = mock(() => {});
 
+/* The bottom dock, mocked for the same reason as the statusbar and the toolbar below: this file
+   tests the SHELL BOOTSTRAP, and the dock is a leaf panel with a Monaco instance behind it.
+   It became necessary when the frame moved into src/shell/tree.ts — the fixture this file used to
+   paste had no `#bottom-dock` in it, so the dock silently never rendered here, and its afterRender
+   hook now finds the stub editors these tests hand to `view.functionEditor` and disposes it. The
+   dock's own behaviour is tests/bottom-dock.test.ts's subject, not this file's. */
+void mock.module("../src/panels/bottom-dock.ts", () => ({
+  BOTTOM_DOCK_SELECTOR: "#bottom-dock",
+  activeBottomPanel: mock(() => null),
+  bottomDockTemplate: mock(() => nothing),
+  bottomPanelSet: mock(() => []),
+  bottomTabLabel: mock(() => ""),
+  mountBottomDock: mock(() => {}),
+  registerBottomPanels: mock(() => {}),
+  renderBottomDock: mock(() => {}),
+  unmountBottomDock: mock(() => {}),
+  visibleBottomPanels: mock(() => []),
+}));
+
 void mock.module("../src/panels/statusbar.ts", () => ({
   forgetSavedTimes: mock(() => {}),
   mountStatusbar: mock(() => {}),

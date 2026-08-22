@@ -14,7 +14,7 @@
  * question would be right by accident.
  */
 
-import { resetStudioState } from "./harness";
+import { resetStudioState, mountOverlayLayers } from "./harness";
 import { beforeEach, describe, expect, test } from "bun:test";
 import { render } from "lit-html";
 import { registerPlatform } from "../src/platform";
@@ -25,12 +25,7 @@ import type { ReferenceHit, ReferencesResult, StudioPlatform } from "../src/type
 
 // The overlay layers are part of index.html and bound ONCE by initLayers(); re-creating the nodes
 // Per test would leave the module holding detached ones.
-document.body.innerHTML = `
-  <div id="layer-popover"></div>
-  <div id="layer-modal"></div>
-  <div id="layer-dialog"></div>
-  <div id="layer-toast"></div>
-`;
+mountOverlayLayers(document.body);
 initLayers();
 
 function usageResult(files: number, refs: number): ReferencesResult {
