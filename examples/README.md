@@ -53,8 +53,10 @@ on a fresh checkout it says the directory is empty rather than advertising route
 - **The two `*.schema.json` files are generated — never hand-edit them.** `examples` is the first project
   root [`scripts/generate-schemas.ts`](../scripts/generate-schemas.ts) and
   [`scripts/validate-schemas.ts`](../scripts/validate-schemas.ts) walk. A change to `project.json`, to the
-  schema emitters, or to an extension fragment means `bun run schema:generate-all` in the same PR;
-  `bun run schema:verify` and `bun run schema:validate-all` both block in CI.
+  schema emitters, or to an extension fragment means `bun run schema:generate-all` in the same PR
+  (or just `bun run schema:sync`); `bun run schema:verify` and `bun run schema:validate-all` both
+  block in CI, and `.github/workflows/schemas.yml` pushes the regeneration to your branch if you
+  forget.
 - **There is no coverage lane here.** The `bunfig.toml` coverage ratchet applies to the CI workspace graph,
   which is `packages/*` and `extensions/*` only. Do not add one expecting a gate.
 

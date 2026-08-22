@@ -140,9 +140,48 @@ schema narrower than the starter's own content for six weeks.
 - `packages/compiler`'s schema loader is independently hermetic — a first-party `*.json` schema
   resolves from the host or throws — so schema composition is safe regardless. The cleanup defends
   everything else that resolves normally.
-- `bun run schema:verify` proves the committed core **and** all 50 per-project entry documents match
+- `bun run schema:verify` proves the committed core **and** all 52 per-project entry documents match
   their generators. `schema:validate-all` answers a different question (documents against schemas)
   and cannot see a stale schema.
+
+## Stale schemas fix themselves
+
+Every committed schema in this repository is a build output — the seven core artifacts
+`bun run generate:schema` writes under `packages/schema/`, and the `project.schema.json` /
+`document.schema.json` pair `bun run schema:generate-all` composes into each of the 26 project
+roots. They are committed because editors, `jx validate` and every published `@jxsuite/schema`
+consumer read them off disk, not because anybody authors them. So the policy is the screenshot
+policy: **a generator produces the bytes, and you review the meaning.**
+
+- **`bun run schema:verify` is the gate** (`scripts/check-schema-freshness.ts`), and
+  **`bun run schema:sync` is the fixer.** The gate regenerates, reports drift as the JSON Pointers
+  that moved, and puts the working tree back exactly as it found it; `--fix` leaves the result on
+  disk. Never hand-edit a committed schema — the fix belongs in the generator or the source it
+  reads.
+- **The file set is DERIVED, not listed.** It is every tracked `*schema.json`. The gate this
+  replaced was a shell one-liner whose two `git diff` pathspecs were each narrower than the
+  generator they followed: it regenerated all seven core artifacts and looked at ONE, so a stale
+  `class-schema.json`, `project-schema.json` or `schemas/project.core.schema.json` passed green.
+  Verified by stamping a marker into `class-schema.json` and watching the old `schema:verify`
+  exit 0.
+- **`.github/workflows/schemas.yml` backfills it**, exactly as `screenshots.yml` does for pictures:
+  it regenerates on every pull request, pushes the result to the branch, and posts one comment
+  saying which pointers moved. Four things differ from that lane deliberately — no `paths:` filter
+  (the whole job is under 30 seconds), Dependabot is **not** excluded (a `@webref/*` bump rewrites
+  the core schema by construction, and there is no human on that branch), no `github.actor` refusal
+  (the generators are deterministic, so the run its own push triggers pushes nothing — termination
+  is a fixed point, not a guard), and a changed schema is **not** neutral, because a contract change
+  is exactly the kind of thing a reviewer must read.
+- **The trunk leg is not decoration.** Two branches can each be green alone and stale together: one
+  moves the core, the other adds or regenerates a project root before it lands. Git merges that
+  without a conflict, no per-branch check can see it, and `main` is stale from the second merge
+  onward. `main` requires a pull request, so the lane opens one on a single reused
+  `chore/schema-drift` branch. When the report says _nothing in this diff explains it_, that is
+  what happened.
+- **`schema:verify` stays a hard red X in `checks`** even though the lane fixes the same drift. The
+  lane cannot push to a fork, and a required check is what keeps a stale schema off `main` when it
+  cannot. The red X naming the problem and the lane fixing it is the intended sequence, not a
+  duplicate.
 
 ## Specs & User-Documentation Policy
 
