@@ -80,6 +80,7 @@ import "monaco-editor/languages/definitions/javascript/register";
 import { flattenSchema } from "@jxsuite/schema/project-schemas";
 import jxSchema from "@jxsuite/schema/schema.json";
 import projectSchema from "@jxsuite/schema/project-schema.json";
+import { bundleUrl } from "./bundle-base";
 
 /* Re-exported for the modules that already imported it from here. New callers should reach for
    `./model-uri` directly — it is Monaco-free, and importing this module loads the editor. */
@@ -93,28 +94,33 @@ const WORKER_FILES: Record<string, string> = {
 };
 
 /**
- * Resolve a Monaco worker to the PRE-BUNDLED copy that ships NEXT TO this bundle — `workers/`
+ * Resolve a Monaco worker to the PRE-BUNDLED copy that ships NEXT TO THE ENTRY — `dist/workers/`
  * beside `dist/studio.js`, written by scripts/build-workers.ts.
  *
- * Self-location via `import.meta.url` (Bun emits it verbatim for browser targets) is what makes one
- * expression correct on every host, because none of them agree on a prefix and two of them cannot
- * be served by one: the repo dev server mounts the shell at `/packages/studio/index.html`, the
- * packaged desktop app at `views://studio/index.html`, the desktop loopback server under
- * `/__studio__/`, and the cloud at `/edit/:owner/:repo@:branch` — a DEEP path, so even a
- * document-relative URL would resolve into the wrong directory there. The only invariant is the
- * bundle's own location.
+ * Self-location is what makes one expression correct on every host, because none of them agree on a
+ * prefix and two of them cannot be served by one: the repo dev server mounts the shell at
+ * `/packages/studio/index.html`, the packaged desktop app at `views://studio/index.html`, the
+ * desktop loopback server under `/__studio__/`, and a cloud host under whatever prefix it staged
+ * the tree at. The only invariant is the bundle's own location.
  *
- * A root-absolute `/monaco-editor/esm/vs/...` (what this used to emit) resolved on exactly one of
- * them, the repo dev server, which serves bare specifiers out of the monorepo's `node_modules`.
- * Everywhere else it 404s — and a Monaco worker that fails to start takes the whole JSON language
- * service with it: no schema validation, no completion, no hover, and no error the user can see.
+ * **But `import.meta.url` is not that location, and this function used to think it was.** It is
+ * THIS MODULE's url, and since the code-split (78d85ba2) this module is emitted into
+ * `dist/chunks/monaco-setup-<hash>.js` — so the expression resolved to `chunks/workers/<name>`, a
+ * directory that has never existed in any distribution. Only the two entries have a contractual
+ * emitted path (studio.md §11.1), which is exactly what `services/bundle-base` records.
+ *
+ * The bug this closes is invisible by construction, which is why it survived: a Monaco worker that
+ * 404s takes the whole JSON language service with it — no schema validation, no completion, no
+ * hover — and surfaces no error at all. The same silence covered the predecessor of the
+ * `import.meta.url` form, a root-absolute `/monaco-editor/esm/vs/...` that resolved on the repo dev
+ * server alone.
  *
  * @param {string} label - Monaco worker label ("json", "typescript", …)
  * @returns {string} Absolute URL of the worker bundle
  */
 export function workerUrl(label: string): string {
   const file = WORKER_FILES[label] || WORKER_FILES.editorWorkerService!;
-  return new URL(`workers/${file}`, import.meta.url).href;
+  return bundleUrl(`workers/${file}`);
 }
 
 self.MonacoEnvironment = {
