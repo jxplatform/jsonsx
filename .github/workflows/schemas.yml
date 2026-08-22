@@ -1,0 +1,319 @@
+# The schema backfill lane — the sibling of screenshots.yml, for artifacts nobody hand-writes.
+#
+# Every committed schema in this repository is a build output: `bun run generate:schema` writes the
+# seven core artifacts under `packages/schema/`, and `bun run schema:generate-all` composes those
+# into a `project.schema.json` and a `document.schema.json` in each of the 26 project roots. They
+# are committed because editors, `jx validate` and every published `@jxsuite/schema` consumer read
+# them off disk — not because a human authors them.
+#
+# `checks` has always run `bun run schema:verify` as a hard red X, and that stays. What it could
+# never do is FIX anything, and the three most common ways these go stale all arrive with no human
+# to run the generator:
+#
+#   * A DEPENDENCY BUMP. The core schema injects web-standards data read at generation time —
+#     `@webref/css`, `@webref/elements`, `@webref/idl`. A bump to any of them rewrites
+#     `packages/schema/schema.json` by construction. `chore(schema): regenerate after the csstype
+#     dep bump` is that commit, made by hand, after a Dependabot pull request went red and stalled.
+#   * A MERGE RACE. Branch A adds a CSS property to the core; branch B adds a project root whose
+#     entry documents were composed before A landed. Each is green alone. Git merges both without a
+#     conflict and `main` is stale from the second merge onward — a state no per-branch check can
+#     see, and one nothing on a pull request can fix.
+#   * PLAIN FORGETFULNESS. `bun run schema:sync` is one command, and it is one command people miss.
+#
+# So this lane regenerates and pushes, exactly as screenshots.yml does for pictures. Four things
+# are deliberately UNLIKE that lane, each for a reason:
+#
+#   1. NO `paths:` FILTER. The whole job — checkout, install, both generators — is under 30 seconds,
+#      and the generators themselves are under two. A filter would cost more to maintain than to
+#      omit, and every filter this repository has hand-maintained has eventually been wrong.
+#   2. DEPENDABOT IS NOT EXCLUDED. screenshots.yml refuses a Dependabot branch because a dependency
+#      bump has no picture to review. Here it is the PRIMARY case: the bump is precisely what
+#      rewrote the schema, and there is no human on that branch to notice.
+#   3. NO `github.actor` REFUSAL, because termination is a FIXED POINT rather than a guard. The
+#      generators are deterministic — same tree in, same bytes out — so the run this lane's own push
+#      triggers regenerates to identical bytes and pushes nothing. screenshots.yml needs the refusal
+#      because Chromium does not re-encode a PNG byte-for-byte; `JSON.stringify` does.
+#   4. A CHANGED SCHEMA IS NOT NEUTRAL. A picture that moved is an aesthetic judgement CI cannot
+#      make; a schema that moved is a CONTRACT change, and the pointers that moved say exactly what
+#      it now admits or refuses. The comment reports it as meaning — `+18
+#      /$defs/ClassMethodDef/properties/role/enum/…` — not as 500 KB of JSON.
+#
+# `checks` staying red on the pre-push head is the intended sequence, not a duplicate: it names the
+# problem on the commit that caused it, this lane fixes it, and the pushed head re-runs green. On a
+# FORK the push is impossible (the token is read-only by design), so the red X is the whole answer
+# and a maintainer lands the fix — with `workflow_dispatch`, or by running `bun run schema:sync`.
+#
+# THE ONE THING THAT IS A SETTING, NOT CODE: `contents: write` must be permitted for the Actions
+# token (Settings → Actions → General → Workflow permissions). Without it the push 403s and every
+# same-repo pull request degrades to the fork path.
+#
+# KNOWN LIMITATION, measured on this repository and written up in release-bun-nix.yml: a push made
+# with `GITHUB_TOKEN` does not reliably queue checks on the new head — PR #131 carries a bot commit
+# whose status is `pending` with zero check runs, and screenshots.yml found fifteen of its own runs
+# held at `action_required`. When that happens the fix is already in the tree and the required `ci`
+# check simply needs a run: approve the held one, re-run the workflow, or push an empty commit. That
+# is strictly less work than the alternative this lane replaces, which was to clone, install,
+# regenerate and push by hand.
+
+name: Schemas
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      pr:
+        # A pull request from a FORK gets the patch as an artifact, never a push: `GITHUB_TOKEN`
+        # has no write access to somebody else's repository, and "allow edits by maintainers"
+        # grants that to a person, not to a workflow.
+        description: "Pull request number to regenerate on (a fork's gets the patch as an artifact)"
+        required: false
+        type: string
+
+# `contents: write` pushes the regeneration and, on `main`, opens the drift pull request;
+# `pull-requests: write` posts the one comment and creates that pull request; `checks: write`
+# publishes the NEUTRAL conclusion a fixup deserves and that a job conclusion cannot express.
+permissions:
+  contents: write
+  pull-requests: write
+  checks: write
+
+concurrency:
+  group: schemas-${{ github.event.pull_request.number || github.event.inputs.pr || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    # A liveness bound, not a performance budget. The work is seconds; anything approaching this
+    # means a generator hung, and a hung job must report while someone is still looking.
+    timeout-minutes: 10
+    steps:
+      - name: Resolve what to regenerate, and where it can go
+        id: target
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          # Via env, never interpolated into the script body: a head ref is attacker-controllable
+          # text on a public repository, and `${{ … }}` substitution happens before bash sees the
+          # line. Same rule release-bun-nix.yml documents.
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          IS_FORK: ${{ github.event.pull_request.head.repo.fork }}
+          INPUT_PR: ${{ github.event.inputs.pr }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = "pull_request" ]; then
+            # The head SHA, not the branch name. A fork's branch does not exist in this repository,
+            # so checking out `${HEAD_REF}` fails outright with "couldn't find remote ref" — and it
+            # fails on the fork pull requests this lane most needs to still produce a patch for.
+            # A sha resolves for both, because GitHub publishes the head commit here as
+            # refs/pull/N/head. The push below is unaffected: it names a FULLY QUALIFIED refspec,
+            # which works from a detached HEAD.
+            {
+              echo "mode=pr"
+              echo "ref=${HEAD_SHA}"
+              echo "branch=${HEAD_REF}"
+              echo "pr=${PR_NUMBER}"
+              echo "fork=${IS_FORK}"
+            } >> "$GITHUB_OUTPUT"
+          elif [ -n "${INPUT_PR:-}" ]; then
+            # `isCrossRepository` is the same question `head.repo.fork` answers on the event, and
+            # It has to be asked: `git push origin` from here writes to THIS repository, so
+            # dispatching against a fork's pull request without it would create a same-named branch
+            # on the base repo and report success for a push that reached nobody.
+            # `$(...)` rather than `read < <(...)`: a process substitution's exit status is not
+            # Checked, so a failing `gh` would leave both empty and silently skip the push under
+            # `set -e`. This way the step dies where the problem is.
+            info="$(gh pr view "$INPUT_PR" --json headRefName,isCrossRepository \
+              --jq '"\(.headRefName) \(.isCrossRepository)"')"
+            branch="${info%% *}"
+            cross="${info##* }"
+            {
+              echo "mode=pr"
+              echo "ref=refs/pull/${INPUT_PR}/head"
+              echo "branch=${branch}"
+              echo "pr=${INPUT_PR}"
+              echo "fork=${cross}"
+            } >> "$GITHUB_OUTPUT"
+          else
+            # `main`, or a dispatch with no pull request. Nothing may push here — the ruleset
+            # requires a pull request — so drift on the trunk becomes one.
+            {
+              echo "mode=trunk"
+              echo "ref=${GITHUB_SHA}"
+              echo "branch="
+              echo "pr="
+              echo "fork=false"
+            } >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.target.outputs.ref }}
+          # The report attributes drift to the inputs that caused it (BASE_REF below), which needs
+          # a merge base. `blob:none` keeps commits and trees local — enough for merge-base and
+          # `diff --name-only` — while deferring the file content nobody here reads.
+          fetch-depth: 0
+          filter: blob:none
+          persist-credentials: true
+
+      - uses: ./.github/actions/setup-bun
+
+      # `--fix` LEAVES the regenerated files on disk; the bare gate restores the tree. Everything
+      # below reads `git status`, so the fixer is the only correct mode here even on the trunk.
+      # It exits non-zero only when a GENERATOR fails — a broken schema build, which is a red X
+      # rather than something to commit.
+      - name: Regenerate every committed schema
+        id: sync
+        shell: bash
+        env:
+          # Turns the report's "Why" section on: which input in this diff explains the drift, and —
+          # the case worth having — that nothing in it does, which is what a merge race looks like.
+          BASE_REF: ${{ github.base_ref || github.event.repository.default_branch }}
+        run: bun run schema:sync --report /tmp/schema-report.md
+
+      # ── Same-repo pull request: push the regeneration ──────────────────────
+      - name: Push the regenerated schemas
+        id: push
+        if: >-
+          steps.sync.outputs.changed == 'true' &&
+          steps.target.outputs.mode == 'pr' &&
+          steps.target.outputs.fork != 'true' &&
+          steps.target.outputs.branch != ''
+        shell: bash
+        env:
+          BRANCH: ${{ steps.target.outputs.branch }}
+          # The repository's husky hooks would otherwise run INSIDE this commit — nano-staged,
+          # oxfmt and the site-claims check, executing in the runner against generated JSON. They
+          # are a local authoring aid, this lane has already run what they cover, and one of them
+          # failing would abort a push whose contents CI has accepted.
+          HUSKY: "0"
+        run: |
+          set -euo pipefail
+          git config user.name "jx-schemas[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Only what the generators write. `git add -A` would sweep up `schema:clean-roots`'s
+          # removals of a starter's stray `node_modules/@jxsuite/*` — untracked either way, but a
+          # lane that stages "everything dirty" is one commit away from committing something nobody
+          # meant to.
+          git add -- '*schema.json'
+          # `chore(schema)`, deliberately: release-please bumps no version for a `chore`, so
+          # landing this on a release pull request cannot change what that pull request releases.
+          # And no `<tag>` in the subject — a raw angle bracket there deletes a package from its
+          # own release (CLAUDE.md, and scripts/check-changelog-safety.ts blocks it anyway).
+          git commit -m "chore(schema): regenerate stale schema builds" \
+            -m "Written by .github/workflows/schemas.yml. Review the pointers in the comment, not the bytes."
+          # FULLY QUALIFIED. `HEAD:<branch>` makes git guess the destination ref and fail with
+          # "The destination you provided is not a full refname" when it cannot — the way the last
+          # screenshots run on feat/standards-registry died after a clean capture.
+          git push origin "HEAD:refs/heads/${BRANCH}"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Comment on the pull request
+        if: >-
+          steps.sync.outputs.changed == 'true' &&
+          steps.target.outputs.pr != '' &&
+          steps.target.outputs.fork != 'true'
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const fs = require('node:fs');
+            const marker = '<!-- jx-schema-drift -->';
+            let body = fs.readFileSync('/tmp/schema-report.md', 'utf8');
+            body += '\n_Regenerated and pushed to this branch by ' +
+              '`.github/workflows/schemas.yml`. These files are build outputs — ' +
+              '`bun run schema:sync` produces the same bytes locally. If a pointer above is not a ' +
+              'change you meant to make, the fix belongs in the generator or the source it reads, ' +
+              'never in the committed JSON._\n';
+            const { owner, repo } = context.repo;
+            const issue_number = Number('${{ steps.target.outputs.pr }}');
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number, per_page: 100,
+            });
+            const existing = comments.find(
+              (c) => c.user.type === 'Bot' && c.body.startsWith(marker),
+            );
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
+
+      # ── Fork pull requests: no credentials, so no push ─────────────────────
+      # `GITHUB_TOKEN` is read-only on a `pull_request` from a fork, by design. The regeneration is
+      # still worth producing: `checks` is red with the file names, and this artifact is the patch
+      # a maintainer applies without reproducing the environment.
+      - name: Upload the regeneration (fork pull requests)
+        if: steps.sync.outputs.changed == 'true' && steps.target.outputs.fork == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: schema-regeneration
+          path: |
+            /tmp/schema-report.md
+            packages/schema/*.json
+            packages/schema/schemas/*.json
+            **/project.schema.json
+            **/document.schema.json
+          retention-days: 14
+
+      # ── The trunk: drift here cannot be pushed, so it becomes a pull request ──
+      # This is the merge-race case, and the only path that can ever fix it. `main` requires a pull
+      # request (the ruleset the dependency autopilot depends on), so the lane opens one and lets
+      # the same `ci` that guards everything else decide.
+      #
+      # ONE branch name, reused. A fixed ref means a second run updates the existing pull request
+      # instead of opening a second one, and a lane that opens a pull request per commit is a lane
+      # people mute.
+      - name: Open (or update) the drift pull request
+        if: steps.sync.outputs.changed == 'true' && steps.target.outputs.mode == 'trunk'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          HUSKY: "0"
+        run: |
+          set -euo pipefail
+          branch="chore/schema-drift"
+          git config user.name "jx-schemas[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$branch"
+          git add -- '*schema.json'
+          git commit -m "chore(schema): regenerate stale schema builds on main" \
+            -m "Opened by .github/workflows/schemas.yml. Committed schemas had fallen behind their generators on the trunk — see the body for which pointers moved."
+          # `--force`: the branch is a scratch ref this lane owns outright, and its previous
+          # contents are a regeneration of an older trunk. Nothing but this job writes it.
+          git push --force origin "HEAD:refs/heads/${branch}"
+          if [ -z "$(gh pr list --head "$branch" --state open --json number --jq '.[0].number // empty')" ]; then
+            gh pr create --base main --head "$branch" \
+              --title "chore(schema): regenerate stale schema builds" \
+              --body-file /tmp/schema-report.md
+          else
+            gh pr edit "$branch" --body-file /tmp/schema-report.md
+          fi
+
+      # A schema that moved is a contract that moved, so it is announced rather than left to the
+      # commit list. `neutral` because the lane has already fixed it: the run must not fail, and
+      # `success` would say "nothing happened here", which is the opposite of true.
+      - name: Publish the conclusion
+        if: steps.sync.outputs.changed == 'true' && steps.target.outputs.fork != 'true'
+        uses: actions/github-script@v9
+        with:
+          script: |
+            await github.rest.checks.create({
+              ...context.repo,
+              name: 'schemas / contract change',
+              head_sha: '${{ steps.push.outputs.sha }}' || context.sha,
+              status: 'completed',
+              conclusion: 'neutral',
+              output: {
+                title: '${{ steps.sync.outputs.count }} committed schema(s) were stale',
+                summary: 'They have been regenerated. A committed schema is a build output, so ' +
+                  'this is a fixup rather than a failure — but the pointers that moved are a ' +
+                  'contract change, and those are worth reading.',
+              },
+            });
