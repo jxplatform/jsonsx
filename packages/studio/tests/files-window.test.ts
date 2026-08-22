@@ -19,8 +19,7 @@ void mock.module("@atlaskit/pragmatic-drag-and-drop/element/adapter", () => ({
   monitorForElements: () => () => {},
 }));
 
-const { FILE_ROW_HEIGHT, renderFilesTemplate, setupTreeKeyboard } =
-  await import("../src/files/files");
+const { FILE_ROW_HEIGHT, renderFilesTemplate } = await import("../src/files/files");
 
 /** Files in the project root — enough that a window is a small fraction of the tree. */
 const FILE_COUNT = 300;
@@ -218,9 +217,9 @@ describe("the window", () => {
 });
 
 describe("the keyboard walks the model", () => {
+  /* No setupTreeKeyboard call: the keydown is a `@keydown` binding in the tree's own template, so
+     rendering it is all the wiring there is. The event still bubbles from the focused row. */
   test("↓ steps past the last DRAWN row instead of stopping at it", async () => {
-    const tree = host.querySelector(".file-tree") as HTMLElement;
-    setupTreeKeyboard(tree);
     const last = rows().at(-1)!;
     last.focus();
 

@@ -314,18 +314,16 @@ export const SPECTRUM_DEBT: Record<string, number> = {
  */
 export const SELF_QUERY_DEBT: Record<string, number> = {
   "browse/library-pane.ts": 1,
-  /* Includes the WeakSet-guarded keydown binding, which exists only because the unguarded version
-     accumulated a listener per render — "after ten repaints a single Down keystroke walked ten
-     rows". An @keydown on the tree deletes the workaround along with the query. */
-  "files/files.ts": 5,
+  /* Four windowed-row lookups and drag guards. The fifth was the WeakSet-guarded keydown, which
+     existed only because the unguarded version accumulated a listener per render — "after ten
+     repaints a single Down keystroke walked ten rows". `@keydown` on the tree deleted the
+     workaround, the deps entry that carried it, and the query, all at once. */
+  "files/files.ts": 4,
   "new-project/import-tab.ts": 1,
   "new-project/new-project-modal.ts": 1,
   "panels/block-action-bar.ts": 3,
   "panels/bottom-dock.ts": 1,
   "panels/editors.ts": 1,
-  "panels/git-panel.ts": 1,
-  "panels/head-panel.ts": 3,
-  "panels/imports-panel.ts": 2,
   /* The per-row `.layer-actions` sub-root is a deliberate second render tree so hovering does not
      repaint the whole outline; the others are drag guards and windowed-row lookups. */
   "panels/layers-panel.ts": 4,

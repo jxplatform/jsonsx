@@ -83,7 +83,6 @@ export interface NavigatorPanelDeps {
   registerLayersDnD: () => void;
   registerElementsDnD: () => void;
   registerComponentsDnD: () => void;
-  setupTreeKeyboard: (tree: HTMLElement) => void;
   registerFileTreeDnD: (ctx: { renderLeftPanel: () => void }) => void;
   setGitDiffState: (state: GitDiffState | null) => void;
   cloneRepository?: () => void;

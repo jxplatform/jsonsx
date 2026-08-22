@@ -112,7 +112,6 @@ import {
   openLastSessionOrHome,
   registerFileTreeDnD,
   reloadCleanTab,
-  setupTreeKeyboard,
 } from "./files/files";
 import { startFsSync } from "./files/fs-events";
 import { invalidateParamValues } from "./page-params";
@@ -837,7 +836,6 @@ leftPanelMod.mount({
   setGitDiffState: (state: GitDiffState | null) => {
     shell.git.diffState = state;
   },
-  setupTreeKeyboard,
   webdata,
 });
 

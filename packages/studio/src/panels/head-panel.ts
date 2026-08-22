@@ -7,6 +7,7 @@
  */
 
 import { html, nothing } from "lit-html";
+import { createRef, ref } from "lit-html/directives/ref.js";
 import { renderFieldRow } from "../ui/field-row";
 import { spTextArea, spTextField } from "../ui/field-input";
 import { renderMediaPicker } from "../ui/media-picker";
@@ -27,6 +28,18 @@ import { pageRoute } from "./tab-strip";
 import type { JxHeadEntry, JxMutableNode } from "@jxsuite/schema/types";
 import type { Tab } from "../tabs/tab";
 import type { TemplateResult } from "lit-html";
+
+/**
+ * The add-a-tag draft fields.
+ *
+ * Uncontrolled by design — the draft is not state anything else reads, and rendering it back on
+ * every keystroke would fight the typist. Held as refs rather than re-found by selector: the row is
+ * rebuilt on every Head repaint, so a node resolved once is detached by the time it is used, and
+ * with a second pane open a document-wide query can return the other pane's field.
+ */
+const _addTag = createRef<HTMLInputElement>();
+const _addAttr = createRef<HTMLInputElement>();
+const _addVal = createRef<HTMLInputElement>();
 
 interface MetaField {
   label: string;
@@ -982,7 +995,7 @@ export function renderHeadTemplate({
 
         <!-- Add custom tag form -->
         <div class="head-add-form">
-          <sp-picker size="s" label="Tag" class="head-add-tag" value="meta">
+          <sp-picker size="s" label="Tag" class="head-add-tag" ${ref(_addTag)}>
             <sp-menu-item value="meta">meta</sp-menu-item>
             <sp-menu-item value="link">link</sp-menu-item>
             <sp-menu-item value="script">script</sp-menu-item>
@@ -991,28 +1004,33 @@ export function renderHeadTemplate({
             placeholder="Attribute (e.g. name)"
             size="s"
             class="head-add-attr"
+            ${ref(_addAttr)}
           ></sp-textfield>
-          <sp-textfield placeholder="Value" size="s" class="head-add-val"></sp-textfield>
+          <sp-textfield
+            placeholder="Value"
+            size="s"
+            class="head-add-val"
+            ${ref(_addVal)}
+          ></sp-textfield>
           <sp-action-button
             quiet
             size="xs"
             title="Add tag"
-            @click=${(e: Event) => {
-              const form = (e.target as HTMLElement).closest(".head-add-form");
-              const tagPicker = form?.querySelector(".head-add-tag") as HTMLInputElement | null;
-              const attrField = form?.querySelector(".head-add-attr") as HTMLInputElement | null;
-              const valField = form?.querySelector(".head-add-val") as HTMLInputElement | null;
-              const tagName = tagPicker?.value || "meta";
-              const attrKey = attrField?.value?.trim();
-              const attrVal = valField?.value?.trim();
+            @click=${() => {
+              /* Handles, not a closest() walk back up to a form this same template drew three lines
+                 above. The fields are uncontrolled on purpose — the draft is not state anything
+                 else reads — so a ref is exactly what reading and clearing them needs. */
+              const tagName = _addTag.value?.value || "meta";
+              const attrKey = _addAttr.value?.value?.trim();
+              const attrVal = _addVal.value?.value?.trim();
               if (!attrKey || !attrVal) {
                 return;
               }
-              if (attrField) {
-                attrField.value = "";
+              if (_addAttr.value) {
+                _addAttr.value.value = "";
               }
-              if (valField) {
-                valField.value = "";
+              if (_addVal.value) {
+                _addVal.value.value = "";
               }
 
               const entry: JxHeadEntry = { attributes: {}, tagName };

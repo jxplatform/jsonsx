@@ -47,8 +47,7 @@ void mock.module("@atlaskit/pragmatic-drag-and-drop/element/adapter", () => ({
   },
 }));
 
-const { registerFileTreeDnD, renderFilesTemplate, setupTreeKeyboard } =
-  await import("../src/files/files");
+const { registerFileTreeDnD, renderFilesTemplate } = await import("../src/files/files");
 const { createCommandRegistry } = await import("../src/commands/registry");
 const { emptyContext } = await import("../src/commands/context");
 const { setActiveRegistry } = await import("../src/commands/active-registry");
@@ -1017,7 +1016,7 @@ describe("delete flow", () => {
 
 // ─── Keyboard navigation ──────────────────────────────────────────────────────
 
-describe("setupTreeKeyboard", () => {
+describe("the tree's keyboard", () => {
   /**
    * The keyboard is driven against the REAL rendered tree, not a hand-built one.
    *
@@ -1040,7 +1039,6 @@ describe("setupTreeKeyboard", () => {
     const tree = makeTreeCtx();
     const out = await renderInto(renderFilesTemplate(tree.ctx), host);
     const el = out.querySelector(".file-tree") as HTMLElement;
-    setupTreeKeyboard(el);
     const items = [...el.querySelectorAll(".file-tree-item")] as HTMLElement[];
     return { ...tree, handle, items, tree: el };
   }
@@ -1108,16 +1106,25 @@ describe("setupTreeKeyboard", () => {
     expect(document.activeElement).not.toBe(items[1]);
   });
 
+  /* One handler, however many times the panel repaints — and now by construction rather than by a
+     WeakSet of trees that already had one. The keydown is `@keydown` on the element the template
+     renders, so lit swaps the binding on each pass instead of a call site stacking another
+     listener. Three registrations used to walk three rows for one keystroke, which is what
+     `afterRender` calling a bare addEventListener on every repaint built up to. */
   test("one listener per tree, however many times the panel re-renders", async () => {
-    const { items, tree } = await renderTree();
-    setupTreeKeyboard(tree);
-    setupTreeKeyboard(tree);
-    items[0]!.focus();
-
-    key(tree, "ArrowDown");
-    // Three registrations of the same handler would walk three rows for one keystroke — which is
-    // What `afterRender` calling this on every repaint used to build up to.
-    expect(document.activeElement).toBe(items[1]!);
+    const { handle, items, tree } = await renderTree();
+    for (let i = 0; i < 3; i++) {
+      await renderInto(renderFilesTemplate(makeTreeCtx().ctx), host);
+    }
+    void handle;
+    const rows = [
+      ...(host.querySelector(".file-tree") as HTMLElement).querySelectorAll(".file-tree-item"),
+    ] as HTMLElement[];
+    rows[0]!.focus();
+    key(host.querySelector(".file-tree") as HTMLElement, "ArrowDown");
+    expect(document.activeElement).toBe(rows[1]!);
+    void items;
+    void tree;
   });
 
   test("ArrowRight expands a collapsed directory and repaints the panel", async () => {
