@@ -1135,7 +1135,11 @@ describe("link-target control", () => {
     const field = linkField(c)!;
     expect(field).not.toBeNull();
     const kind = field.querySelector("sp-picker.link-target-kind") as HTMLInputElement;
-    expect(kind.getAttribute("value")).toBe("internal");
+    /* The PROPERTY, not the attribute. `commit()` can re-classify an href into a kind the
+       author did not pick, so the picker is bound `.value=${live(kind)}`: sp-picker does not
+       reflect `value`, and an attribute binding would be dirty-checked away whenever the
+       classification round-tripped back to something lit had already committed. */
+    expect(kind.value).toBe("internal");
     const kindOpts = [...kind.querySelectorAll("sp-menu-item")].map((m) => m.getAttribute("value"));
     expect(kindOpts).toEqual(["internal", "external", "anchor", "mailto", "tel"]);
     // Internal kind → route picker (not a textfield)
@@ -1156,9 +1160,9 @@ describe("link-target control", () => {
     const c = await renderPanel();
     const field = linkField(c)!;
     const input = field.querySelector("sp-textfield.link-target-value") as HTMLInputElement;
-    expect(
-      (field.querySelector("sp-picker.link-target-kind") as HTMLInputElement).getAttribute("value"),
-    ).toBe("external");
+    expect((field.querySelector("sp-picker.link-target-kind") as HTMLInputElement).value).toBe(
+      "external",
+    );
     input.value = "https://new.com";
     input.dispatchEvent(new Event("input", { bubbles: true }));
     await sleep(460);
@@ -1244,7 +1248,7 @@ describe("link-target control", () => {
       '[data-prop="target"] sp-picker.link-target-window',
     ) as HTMLInputElement;
     expect(picker).not.toBeNull();
-    expect(picker.getAttribute("value")).toBe("_blank");
+    expect(picker.value).toBe("_blank");
     const opts = [...picker.querySelectorAll("sp-menu-item")].map((m) => m.getAttribute("value"));
     expect(opts).toEqual(["_self", "_blank", "_parent", "_top"]);
   });

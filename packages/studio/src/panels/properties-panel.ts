@@ -544,7 +544,7 @@ function renderLinkTargetField(node: JxMutableNode, path: JxPath) {
     <sp-picker
       class="link-target-kind"
       size="s"
-      value=${kind}
+      .value=${live(kind)}
       @change=${(e: Event) => {
         const nextKind = (e.target as HTMLInputElement).value as LinkKind;
         // Switching kind reinterprets the current value under the new kind.
@@ -566,7 +566,7 @@ function renderLinkTargetField(node: JxMutableNode, path: JxPath) {
       <sp-picker
         class="link-target-value"
         size="s"
-        value=${value}
+        .value=${live(value)}
         @change=${(e: Event) => commit("internal", (e.target as HTMLInputElement).value)}
       >
         ${knownValue ? html`<sp-menu-item value=${value}>${value}</sp-menu-item>` : nothing}
@@ -624,7 +624,7 @@ function renderTargetField(node: JxMutableNode, path: JxPath, entry: HtmlMetaEnt
       <sp-picker
         class="link-target-window"
         size="s"
-        value=${current}
+        .value=${live(current)}
         @change=${(e: Event) =>
           transactDoc(activeTab.value!, (t) =>
             mutateUpdateAttribute(

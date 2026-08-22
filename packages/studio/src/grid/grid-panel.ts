@@ -17,6 +17,8 @@
  * controls that each half-remember what the others did.
  */
 import { html, render as litRender, nothing } from "lit-html";
+import { guard } from "lit-html/directives/guard.js";
+import { live } from "lit-html/directives/live.js";
 import { ref } from "lit-html/directives/ref.js";
 import { effect, effectScope, reactive } from "../reactivity";
 import { renderPopover, showConfirmDialog, showPromptDialog } from "../ui/layers";
@@ -193,7 +195,7 @@ function toolbarTpl(controller: GridController, panel: ActiveGridPanel) {
         size="s"
         quiet
         placeholder="Filter rows"
-        .value=${layout?.filter ?? ""}
+        .value=${live(layout?.filter ?? "")}
         @input=${(e: Event) => {
           const term = (e.target as HTMLInputElement).value;
           // The filter is part of the view, so it persists with the rest of it rather than
@@ -575,7 +577,23 @@ function shellTpl(
   return html`
     <div class="jx-grid">
       ${toolbarTpl(controller, panel)}
-      <div class="jx-grid-host" ${ref((el) => onHost(el as HTMLElement | undefined))}></div>
+      ${guard(
+        [controller.source.id],
+        /* Tabulator OWNS this node's children once createGridView hands it over, so a toolbar tick
+           must not re-render it. Today that holds by ACCIDENT: shellTpl returns the same template
+           shape every pass, so lit keeps the element and patches only the toolbar above it. Put
+           this div behind a conditional, or inside a map, and the next tick silently destroys the
+           whole table. The guard says the guarantee out loud.
+           Keyed on the SOURCE, not on nothing: an empty dependency list also suppresses the
+           re-commit a tab switch needs. `hostEl` lives in the panel closure, so switching tabs
+           builds a fresh one and relies on `ref` firing again with the new callback to hand the
+           node over; memoising past that leaves the new panel with a null host and no engine. */
+        () =>
+          html`<div
+            class="jx-grid-host"
+            ${ref((el) => onHost(el as HTMLElement | undefined))}
+          ></div>`,
+      )}
     </div>
   `;
 }
@@ -610,13 +628,16 @@ export function renderGridMode(surface: CanvasSurface, tab: Tab) {
   // `localStorage` is not reactive and neither is the engine, so the toolbar needs something that
   // Is: a saved-view edit bumps this and the panel's one effect re-renders like any other change.
   const local = reactive({ views: 0 });
-  const live = controller;
+  /* Named `controller` everywhere else in this file; this alias exists so the closures below
+     capture it by a short name. NOT `live` — that is lit's directive, imported above and used
+     in shellTpl, and a local of the same name shadows it. */
+  const engine = controller;
   let hostEl: HTMLElement | null = null;
 
   const panel: ActiveGridPanel = {
     applyLayout(layout) {
-      void live.setSort(layout?.sort ?? null);
-      live.setGrouping(layout?.groupBy ?? null);
+      void engine.setSort(layout?.sort ?? null);
+      engine.setGrouping(layout?.groupBy ?? null);
       panel.remount();
       panel.view?.setSearch(layout?.filter ?? "");
       panel.bump();
@@ -626,7 +647,7 @@ export function renderGridMode(surface: CanvasSurface, tab: Tab) {
     },
     remount() {
       panel.view?.destroy();
-      panel.view = hostEl ? createGridView(hostEl, live) : null;
+      panel.view = hostEl ? createGridView(hostEl, engine) : null;
     },
     paneId,
     scope,

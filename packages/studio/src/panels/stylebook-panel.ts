@@ -14,6 +14,7 @@
  */
 
 import { html, render as litRender } from "lit-html";
+import { repeat } from "lit-html/directives/repeat.js";
 import { ref } from "lit-html/directives/ref.js";
 import { classMap } from "lit-html/directives/class-map.js";
 import { live } from "lit-html/directives/live.js";
@@ -169,7 +170,15 @@ export function renderStylebookMode(surface: CanvasSurface, ctx: StylebookCtx) {
           }
         })}
       >
-        ${panelEntries.map((e) => e.tpl)}
+        ${repeat(
+          panelEntries,
+          /* Keyed on mediaName. Each entry owns a canvas IFRAME, and the breakpoint set changes
+             with the project's media definitions — so position-based reuse hands one breakpoint's
+             iframe to another's width. That is a live document rendered at the wrong viewport,
+             not a cosmetic diff. */
+          (e) => e.panel.mediaName,
+          (e) => e.tpl,
+        )}
       </div>
     `,
     /** @type {HTMLElement} */ canvasWrap,
