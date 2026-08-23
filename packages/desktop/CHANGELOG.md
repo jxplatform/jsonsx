@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.1](https://github.com/jxsuite/jx/compare/desktop-v2.3.0...desktop-v2.3.1) (2026-08-23)
+
+
+### Bug Fixes
+
+* **desktop:** the electrobun config is one the CLI can actually load ([#170](https://github.com/jxsuite/jx/issues/170)) ([f04baa8](https://github.com/jxsuite/jx/commit/f04baa87d245c1b1879c8213318372b86e1d04dd))
+
 ## [2.3.0](https://github.com/jxsuite/jx/compare/desktop-v2.2.2...desktop-v2.3.0) (2026-08-23)
 
 
