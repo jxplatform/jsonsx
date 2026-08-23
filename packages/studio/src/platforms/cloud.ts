@@ -223,6 +223,15 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
     id: "cloud",
     projectRoot: root,
     canvasUrl: "/canvas.html",
+    /* The projectRoot here is the IDENTIFIER "owner/repo@branch", not a served path, so the canvas's
+       default base — <origin>/<projectRoot>/ — addressed nothing. Every component $ref fetch landed
+       on the SPA fallback, which answers the marketing page at HTTP 200, so res.ok passed and the
+       runtime's res.json() died on "Unexpected token '<'". Images failed the same way, silently.
+       The session serves the project tree at /raw.
+
+       Conditional because `base` is "" until a project is bound, and "/raw/" would be a confident
+       wrong answer — worse than the default, which at least fails visibly. */
+    ...(base ? { documentBaseUrl: `${base}/raw/` } : {}),
     /* Open Project routes through Studio's repo picker (write-access repos via listRepos +
        importProject) — sessions are URL-bound, so openProject() below never opens a dialog. */
     openProjectPicker: "repo-list",

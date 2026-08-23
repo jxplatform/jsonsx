@@ -2,9 +2,9 @@
 
 ## Platform Abstraction, Project Loading, and Component Scoping
 
-**Version:** 0.3.19-draft
+**Version:** 0.3.20-draft
 **Status:** Pending
-**Updated:** 2026-08-22
+**Updated:** 2026-08-23
 **License:** MIT
 
 ---
@@ -90,6 +90,16 @@ The canonical `StudioPlatform` interface is `packages/studio/src/types.ts` — r
 | **Publish / identity**   | `getUser?`, `getAccountStatus?`, `listRepos?`, `importProject?`, `cfConnection?`, `cfConnect?`, `cfApi?`                                                                                                                       |
 | **Code services / AI**   | `codeService` (§5.3), `resolveClass?`, `aiChatUrl`                                                                                                                                                                             |
 | **Multi-window / shell** | `openProjectInNewWindow?`, `pickProject?`, `newWindow?`, `setWindowProject?`, `getProjectRoot?`, `getAppInfo?`, backend-persisted settings                                                                                     |
+| **Canvas**               | `canvasUrl?`, `canvasUrlDeferred?`, `documentBaseUrl?`                                                                                                                                                                         |
+
+**The canvas needs project files at a URL, not behind `readFile`.** It renders in an iframe, and the
+renderer resolves a component `$ref` by fetching it, so a platform must be able to say where the
+project tree is served. `documentBaseUrl` is that declaration. It defaults to
+`<canvas origin>/<projectRoot>/`, which is already right for any backend serving the tree from its
+web root — the dev server and the desktop loopback both do — and **MUST** be set by a platform whose
+`projectRoot` is an identifier rather than a served path. A host that answers a missing file with a
+single-page fallback compounds a wrong base rather than exposing it: the shell arrives at HTTP 200,
+so the fetch succeeds and the failure surfaces from the JSON parser instead.
 
 **Core vs. optional, and degradation.** Required members are the minimal backend every platform implements. Optional members (marked `?` in the interface) each back an optional protocol route; Studio feature-detects them and degrades gracefully when they are absent — hiding the corresponding UI or falling back to a client-side path. Each optional route's `degradation` note in `STUDIO_ROUTES` records exactly what turns off (e.g. no `collab` → Studio edits solo with file-level saves; no `importSite` → the New Project modal hides its Import tab).
 
@@ -1154,6 +1164,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.3.20-draft** (2026-08-23) — 3.1 adds the Canvas member family and states that the canvas needs project files at a URL rather than behind readFile: documentBaseUrl defaults to the canvas origin plus projectRoot and must be set by a platform whose root is an identifier rather than a served path.
 - **0.3.19-draft** (2026-08-22) — 10 SaaS/Cloud is Partial rather than Future: the adapter shipped and is deployed (10.1 Implemented, with what it implements and what it deliberately omits), collaboration shipped as a CRDT rather than the sketched lock model (10.3), and 10.2's storage table is marked Pending because the deployed backend is git-backed.
 - **0.3.18-draft** (2026-08-22) — 3.3 the init bundle loads through a declared boot slot rather than an exact-string replace on the shipped document.
 - **0.3.17-draft** (2026-08-22) — §9.2: the session watches a project or nothing — a root with no project.json is declined rather than scanned recursively.
@@ -1192,4 +1203,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx Studio Desktop Architecture Specification v0.3.19-draft_
+_Jx Studio Desktop Architecture Specification v0.3.20-draft_
