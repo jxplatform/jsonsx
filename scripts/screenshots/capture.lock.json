@@ -571,9 +571,9 @@
       "width": 480
     },
     "docs/images/grid-mode.png": {
-      "bytes": 276294,
-      "capturedAt": "2026-08-19T16:04:24Z",
-      "capturedBy": "screenshots@ci/32273537346",
+      "bytes": 275321,
+      "capturedAt": "2026-08-23T00:23:06Z",
+      "capturedBy": "screenshots@ci/32607607745",
       "definition": "fe8772d3e21af28d303c67f656233f511914d0b52ba84c5b4764ea72f6f006cb",
       "height": 2000,
       "runtime": {
@@ -581,7 +581,7 @@
         "fontset": "fc:cac8f480b341",
         "os": "debian-12"
       },
-      "sha256": "43c7304ab609a8a0534c7b462e452be02411c655a89081a2527f38184f34180d",
+      "sha256": "d2b497b797a3923106af17e025295e7146c07c683fa31b6e70889e8a7c2e74a2",
       "shot": "grid-mode",
       "width": 3840
     },
