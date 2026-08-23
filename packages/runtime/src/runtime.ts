@@ -139,12 +139,31 @@ export async function resolve(source: string | JxDocument): Promise<JxDocument> 
   if (_resolveCache.has(source)) {
     return _resolveCache.get(source)!;
   }
-  const p = fetch(source).then((res) => {
+  const p = fetch(source).then(async (res) => {
     if (!res.ok) {
       throw new Error(`Jx: failed to fetch ${source} (${res.status})`);
     }
+    /*
+     * `res.ok` is not enough on a single-page host. A static host configured with an SPA fallback
+     * answers a path it does not have with the APPLICATION SHELL at HTTP 200, so a missing document
+     * arrives looking like a successful fetch and dies inside `res.json()` as
+     * `Unexpected token '<', "<!doctype "... is not valid JSON` — a parser error for what is
+     * actually a 404. Jx Cloud did this to every component `$ref` in the canvas.
+     *
+     * Checked on the content type rather than by sniffing the body: a host that says `text/html`
+     * has told us plainly, and saying so costs nothing.
+     */
+    // Optional-chained: a response that carries no headers at all is one we have no EVIDENCE
+    // About, and guessing is worse than proceeding. Every real `Response` has them.
+    const contentType = res.headers?.get("Content-Type") ?? "";
+    if (contentType.includes("text/html")) {
+      throw new Error(
+        `Jx: ${source} returned HTML, not a document — the host answered a missing file with its ` +
+          `app shell (a single-page fallback), so this path is not served.`,
+      );
+    }
     // Trust boundary: fetched sources are Jx documents by contract.
-    return res.json() as Promise<JxDocument>;
+    return (await res.json()) as JxDocument;
   });
   _resolveCache.set(source, p);
   return p;

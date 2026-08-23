@@ -26,6 +26,31 @@ export function canvasBaseOrigin(): string {
 }
 
 /**
+ * The base the canvas fetches PROJECT FILES against — component `$ref`s, `$src` modules, images.
+ *
+ * Two shapes, and the platform chooses. Most hosts serve the project tree from their web root, so
+ * `<canvas origin>/<projectRoot>/` is a real URL: the dev server serves by path (absolute
+ * filesystem paths included) and the desktop loopback does the same. Those set nothing.
+ *
+ * A host whose `projectRoot` is an IDENTIFIER rather than a served path sets `documentBaseUrl`. Jx
+ * Cloud is one — its root is `owner/repo@branch`, and the default produced a URL nothing answered,
+ * so every `$ref` fetch fell through to the SPA fallback. That fallback returns the marketing page
+ * at **HTTP 200**, so `res.ok` passed and the runtime's `res.json()` died on `Unexpected token
+ * '<'`; images failed the same way and reported nothing.
+ *
+ * @param {string | undefined} projectRoot - The active project root, for the default shape.
+ * @returns {string} A base URL ending in `/`, safe to pass to `new URL(relativePath, base)`.
+ */
+export function documentBase(projectRoot?: string): string {
+  const declared = hasPlatform() ? getPlatform().documentBaseUrl : undefined;
+  if (declared) {
+    return declared.endsWith("/") ? declared : `${declared}/`;
+  }
+  const root = projectRoot || "";
+  return `${canvasBaseOrigin()}/${root ? `${root}/` : ""}`;
+}
+
+/**
  * Build an absolute loopback-origin src for a PROJECT asset path referenced by a PARENT-realm
  * (shell) preview <img>. On the views:// shell a relative "/images/foo.png" resolves to
  * views://studio/images/foo.png, which the browser fetches immediately on paint — a stray request

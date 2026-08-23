@@ -19,7 +19,7 @@ import {
   getEffectiveMedia,
   resolveLayoutDoc,
 } from "../site-context";
-import { canvasBaseOrigin } from "./canvas-origin";
+import { documentBase } from "./canvas-origin";
 import { componentRegistry, computeRelativePath } from "../files/components";
 import { prepareForEditMode } from "../utils/edit-display";
 import {
@@ -179,10 +179,8 @@ export async function resolveCanvasDocument(
     }
   }
 
-  const root = projectState?.projectRoot || "";
-  const docPrefix = root ? `${root}/` : "";
   const docBase = S.documentPath
-    ? `${canvasBaseOrigin()}/${docPrefix}${S.documentPath}`
+    ? new URL(S.documentPath, documentBase(projectState?.projectRoot)).href
     : undefined;
 
   // Substitute chosen dynamic route params ({$ref: "#/$params/x"} → literal), inject state.$page,

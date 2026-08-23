@@ -73,6 +73,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `desktop.md`
 
+- **0.3.20-draft** (2026-08-23) — 3.1 adds the Canvas member family and states that the canvas needs project files at a URL rather than behind readFile: documentBaseUrl defaults to the canvas origin plus projectRoot and must be set by a platform whose root is an identifier rather than a served path.
 - **0.3.19-draft** (2026-08-22) — 10 SaaS/Cloud is Partial rather than Future: the adapter shipped and is deployed (10.1 Implemented, with what it implements and what it deliberately omits), collaboration shipped as a CRDT rather than the sketched lock model (10.3), and 10.2's storage table is marked Pending because the deployed backend is git-backed.
 - **0.3.18-draft** (2026-08-22) — 3.3 the init bundle loads through a declared boot slot rather than an exact-string replace on the shipped document.
 - **0.3.17-draft** (2026-08-22) — §9.2: the session watches a project or nothing — a root with no project.json is declined rather than scanned recursively.
