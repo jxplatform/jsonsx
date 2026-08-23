@@ -31,6 +31,7 @@ jobs:
       all_workspaces: ${{ steps.affected.outputs.all_workspaces }}
       lens_mutants: ${{ steps.affected.outputs.gate_lens_mutants }}
       nix: ${{ steps.affected.outputs.gate_nix }}
+      bundles: ${{ steps.affected.outputs.gate_bundle }}
       mode: ${{ steps.affected.outputs.mode }}
     steps:
       - uses: actions/checkout@v7
@@ -401,7 +402,7 @@ jobs:
   # cannot merge.
   studio-dist:
     needs: changes
-    if: contains(fromJSON(needs.changes.outputs.gate_bundle), 'studio')
+    if: contains(fromJSON(needs.changes.outputs.bundles), 'studio')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
