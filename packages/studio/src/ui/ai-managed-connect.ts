@@ -24,6 +24,7 @@ import {
   fetchAvailableModels,
   isManagedProxy,
   isProxyConfigured,
+  proxyStateCode,
 } from "../services/ai-models";
 
 export interface ManagedConnectOptions {
@@ -91,17 +92,31 @@ export function createManagedConnect(opts: ManagedConnectOptions): ManagedConnec
     if (!canOffer()) {
       return nothing;
     }
+    /*
+     * A lapsed grant and a fresh one get different words. The backend distinguishes them because
+     * "connect" is an invitation and "reconnect" is an explanation — and on a managed platform the
+     * lapsed case is the common one: a Cloudflare access token lives an hour.
+     */
+    const lapsed = proxyStateCode() === "cf_reconnect_required";
+    const busyLabel = lapsed ? "Reconnecting…" : "Connecting…";
     return html`
-      <div class="ai-managed-connect">
-        <div>Use Workers AI on your own Cloudflare account — no API key needed.</div>
+      <div class="ai-managed-connect" data-jx-recommended="cloudflare">
+        <div class="ai-managed-connect-lede">
+          ${
+            lapsed
+              ? "Your Cloudflare connection has expired. Reconnect to keep using the assistant."
+              : "Recommended — run the assistant on Workers AI in your own Cloudflare account. No API key to create, copy or rotate."
+          }
+        </div>
         <sp-button
           size="s"
+          variant="accent"
           ?disabled=${busy}
           @click=${() => {
             void connect();
           }}
         >
-          ${busy ? "Connecting…" : "Connect Cloudflare"}
+          ${busy ? busyLabel : lapsed ? "Reconnect Cloudflare" : "Connect Cloudflare"}
         </sp-button>
         ${connectError ? html`<div class="ai-managed-connect-error">${connectError}</div>` : nothing}
         <div class="ai-managed-connect-divider">— or bring your own key —</div>

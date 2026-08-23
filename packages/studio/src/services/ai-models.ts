@@ -24,6 +24,7 @@ let cache: AiModel[] | null = null;
 let proxyConfigured = false;
 let proxyManaged = false;
 let proxyDefaultModel = "";
+let proxyCode: AiModelsResponse["code"];
 
 /**
  * One-shot capability probe shared by every credentials gate, plus the hosts to repaint when it
@@ -39,7 +40,8 @@ export function invalidateModelCache() {
   proxyConfigured = false;
   proxyManaged = false;
   proxyDefaultModel = "";
-  /* The probe's result IS the three flags above. Clearing them while keeping the settled promise
+  proxyCode = undefined;
+  /* The probe's result IS the flags above. Clearing them while keeping the settled promise
      would strand every gate on a permanent "unconfigured, unmanaged" reading — ensureProxyProbe
      would no-op forever and the managed option would vanish until a full reload. */
   proxyProbe = null;
@@ -89,6 +91,16 @@ export function isProxyConfigured(): boolean {
 /** Whether the platform manages AI credentials itself (cloud Workers AI). */
 export function isManagedProxy(): boolean {
   return proxyManaged;
+}
+
+/**
+ * Why the proxy reported itself unconfigured, when it said so.
+ *
+ * Undefined on any backend that does not send one — every gate must treat that as "no reason given"
+ * and fall back to the plain connect wording.
+ */
+export function proxyStateCode(): AiModelsResponse["code"] {
+  return proxyCode;
 }
 
 /** The proxy's preferred model id ("" when it does not declare one). */
@@ -161,6 +173,7 @@ export async function fetchAvailableModels(
   proxyConfigured = data.configured === true;
   proxyManaged = data.managed === true;
   proxyDefaultModel = data.defaultModel ?? "";
+  proxyCode = data.code;
   cache = (data.models || []).map((m) => ({ id: m.id, name: m.name || m.id }));
   return cache;
 }

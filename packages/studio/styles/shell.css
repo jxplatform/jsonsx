@@ -753,6 +753,13 @@
   gap: 10px;
   width: 100%;
 }
+/* The lede reads as the recommendation, so it carries weight the divider beneath it does not. */
+.ai-managed-connect-lede {
+  color: var(--fg);
+  font-size: var(--spectrum-font-size-75, 12px);
+  max-width: 280px;
+  text-align: center;
+}
 .ai-managed-connect-error {
   color: var(--danger);
   font-size: var(--spectrum-font-size-50, 11px);
