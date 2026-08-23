@@ -139,7 +139,19 @@ describe("the nix build", () => {
     // The `ci` aggregate is the ONE name branch protection points at; a nix job it does not
     // Depend on is a nix job that cannot block an auto-merge.
     expect(workflow).toContain(
-      "needs: [changes, test, checks, lens-mutants, nix, coverage-comment]",
+      "needs: [changes, test, checks, lens-mutants, studio-dist, nix, coverage-comment]",
+    );
+  });
+
+  test("test.yml requires studio-dist, and gates it on this script's output", async () => {
+    // The dist gate needs a real build, so it cannot live in `checks`. That makes it a job of its
+    // Own, and a job of its own is only load-bearing if the `ci` aggregate depends on it — the
+    // Assertion above pins that. This one pins the other half: it runs when, and only when, the
+    // Diff can reach studio's bundle. It consumes `gate_bundle`, which affected.ts already computes
+    // For bundle-analysis, so there is no second gate to keep in step.
+    const workflow = await Bun.file(".github/workflows/test.yml").text();
+    expect(workflow).toContain(
+      "if: contains(fromJSON(needs.changes.outputs.gate_bundle), 'studio')",
     );
   });
 });
