@@ -299,6 +299,13 @@ jobs:
       # consuming it rather than by building it. See the note in that tsconfig.
       - run: bunx tsc -p packages/studio/src/hosting/tsconfig.json
       - run: bun --cwd packages/studio scripts/check-icons.ts
+      # The desktop's electrobun config, judged WITHOUT building the app. The CLI is a compiled Bun
+      # binary whose resolver takes node: builtins and relative paths and NOT bare specifiers — and
+      # a config it cannot load is answered by silently using a different one, so the build dies
+      # later on an entrypoint this package never declared. Nothing was red until a release. Also
+      # checks that the studio copy rows still cover the manifest: a config can load perfectly and
+      # derive an EMPTY list, which packages an app with no studio in it.
+      - run: bun --cwd packages/desktop scripts/check-electrobun-config.ts
       - run: bun run typecheck
       # packages/desktop is EXCLUDED from the root tsconfig (electrobun ships raw .ts in its dist,
       # which the root's two strictest flags reject 165 times) so it needs its own pass — without
