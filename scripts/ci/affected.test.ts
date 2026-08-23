@@ -150,9 +150,23 @@ describe("the nix build", () => {
     // Diff can reach studio's bundle. It consumes `gate_bundle`, which affected.ts already computes
     // For bundle-analysis, so there is no second gate to keep in step.
     const workflow = await Bun.file(".github/workflows/test.yml").text();
-    expect(workflow).toContain(
-      "if: contains(fromJSON(needs.changes.outputs.gate_bundle), 'studio')",
+    expect(workflow).toContain("if: contains(fromJSON(needs.changes.outputs.bundles), 'studio')");
+  });
+
+  test("every needs.changes output a job reads is one the changes job declares", async () => {
+    // A `needs.<job>.outputs.<name>` that the producing job never declares is not an error in
+    // Actions — it resolves to the empty string. So `contains(fromJSON(""), 'studio')` is simply
+    // False, forever, and the job it guards silently never runs. That is exactly how studio-dist
+    // Shipped dead: affected.ts sets the STEP output `gate_bundle`, the changes job forwarded
+    // Five other outputs and not that one, and nothing anywhere said so.
+    const workflow = await Bun.file(".github/workflows/test.yml").text();
+    const block = workflow.slice(workflow.indexOf("    outputs:"), workflow.indexOf("    steps:"));
+    const declared = new Set([...block.matchAll(/^ {6}(\w+):/gm)].map((m) => m[1]));
+    const read = new Set(
+      [...workflow.matchAll(/needs\.changes\.outputs\.(\w+)/g)].map((m) => m[1]),
     );
+    expect(declared.size).toBeGreaterThan(0);
+    expect([...read].filter((name) => !declared.has(name))).toEqual([]);
   });
 });
 
