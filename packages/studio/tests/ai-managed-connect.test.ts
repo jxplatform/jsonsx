@@ -199,3 +199,80 @@ describe("ensureProbe", () => {
     expect(container.querySelector(".ai-managed-connect")).toBeTruthy();
   });
 });
+
+/**
+ * The Cloudflare option is the RECOMMENDATION on a managed platform, and it has two moods.
+ *
+ * Both matter to the same outage. studio.jxsuite.com showed the BYOK key form alone, because
+ * /ai/models answered 500, the probe threw, and `managed` stayed false — so the block below never
+ * rendered at all. With the backend answering 200 and a reason, the block renders, and a lapsed
+ * grant has to say so: "Connect Cloudflare" is an invitation, and this user already accepted it.
+ */
+describe("the recommendation, and its two moods", () => {
+  /** Answer the probe exactly as the backend now does for a given state. */
+  function probeAnswers(body: Record<string, unknown>) {
+    fetchImpl = async () => Response.json(body, { status: 200 });
+  }
+
+  async function renderFresh() {
+    /* The PAL half of canOffer(): a host that cannot run the hosted OAuth flow must not be offered
+       it. Set in every case here, including the two that expect the block to stay hidden, so those
+       prove the PROBE hid it rather than a missing platform method. */
+    platform.cfConnect = async () => ({ connected: true });
+    invalidateModelCache();
+    const { container, mc } = makeConnect();
+    mc.ensureProbe();
+    await flush();
+    return { container, mc };
+  }
+
+  test("a never-connected user is invited, with the Cloudflare button as the accent action", async () => {
+    probeAnswers({ code: "cf_not_connected", configured: false, managed: true, models: [] });
+    const { container, mc } = await renderFresh();
+    expect(mc.canOffer()).toBe(true);
+    const button = container.querySelector("sp-button");
+    expect(button?.textContent?.trim()).toBe("Connect Cloudflare");
+    // Accent is what makes it read as the recommendation rather than one of two equal choices.
+    expect(button?.getAttribute("variant")).toBe("accent");
+    expect(container.querySelector(".ai-managed-connect-lede")?.textContent).toContain(
+      "Recommended",
+    );
+    // BYOK stays reachable — prioritised is not the same as exclusive.
+    expect(container.querySelector(".ai-managed-connect-divider")?.textContent).toContain(
+      "bring your own key",
+    );
+  });
+
+  test("a lapsed grant is asked to RECONNECT, and told why", async () => {
+    probeAnswers({ code: "cf_reconnect_required", configured: false, managed: true, models: [] });
+    const { container } = await renderFresh();
+    expect(container.querySelector("sp-button")?.textContent?.trim()).toBe("Reconnect Cloudflare");
+    expect(container.querySelector(".ai-managed-connect-lede")?.textContent).toContain("expired");
+  });
+
+  test("a transient upstream error does NOT send the user round the OAuth flow", async () => {
+    /* `cf_upstream_error` arrives with configured:true precisely so this block stays hidden —
+       reconnecting fixes nothing when the fault is Cloudflare's, and offering it would teach the
+       user that the button does not work. */
+    probeAnswers({ code: "cf_upstream_error", configured: true, managed: true, models: [] });
+    const { container, mc } = await renderFresh();
+    expect(mc.canOffer()).toBe(false);
+    expect(container.querySelector(".ai-managed-connect")).toBeNull();
+  });
+
+  test("a backend that sends no code still renders the plain invitation", async () => {
+    // Older backends, and the dev server. No reason given is not an error state.
+    probeAnswers({ configured: false, managed: true, models: [] });
+    const { container } = await renderFresh();
+    expect(container.querySelector("sp-button")?.textContent?.trim()).toBe("Connect Cloudflare");
+  });
+
+  test("a probe that fails outright leaves the option hidden — the shape of the outage", async () => {
+    /* Pinned as the CONTRAST to the cases above: this is what the product actually did, and the
+       reason the fix had to be a 200 with a code rather than a tidier error status. */
+    fetchImpl = async () => Response.json({ error: "boom" }, { status: 500 });
+    const { container, mc } = await renderFresh();
+    expect(mc.canOffer()).toBe(false);
+    expect(container.querySelector(".ai-managed-connect")).toBeNull();
+  });
+});

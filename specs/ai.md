@@ -2,9 +2,9 @@
 
 ## AI Assistant for Jx Studio
 
-**Version:** 0.1.7-draft
+**Version:** 0.1.8-draft
 **Status:** Partial
-**Updated:** 2026-08-20
+**Updated:** 2026-08-23
 **License:** MIT
 
 ---
@@ -31,6 +31,37 @@ built on `@vue/reactivity`.
   URL, and blocks cloud-metadata/link-local hosts (see `@jxsuite/server` §4.2).
 - Local and self-hosted OpenAI-compatible endpoints (e.g. LM Studio, Ollama's OpenAI shim) are
   supported by pointing the base URL at them.
+- A **managed** platform may broker credentials instead, so a user-supplied key is required only
+  where nothing else supplies one (§2.1).
+
+### 2.1 Managed providers
+
+> **Status: Implemented.** Jx Cloud brokers Cloudflare Workers AI on the user's own Cloudflare
+> account (`packages/studio/src/ui/ai-managed-connect.ts`, jx-platform `/api/v1/ai/*`).
+
+A platform that can obtain credentials on the user's behalf declares it, and Studio offers that path
+**before** the key form rather than beside it: on such a platform, connecting an account is the
+recommended route and bring-your-own-key remains available beneath it.
+
+The models endpoint is a **capability probe**, not merely a listing. Studio decides which paths to
+offer from its answer, so:
+
+- It **MUST** answer `200` for every credential state, including "no credentials" and "credentials
+  lapsed". A non-2xx makes the probe throw, and a client that cannot read the probe falls back to
+  offering the key form alone — which withdraws the connect affordance from precisely the users who
+  need it.
+- `managed: true` declares that the backend can obtain credentials itself. `configured` reports
+  whether it currently holds working ones.
+- `code` explains a `configured: false`, and distinguishes the two states that need different words
+  on screen: `cf_not_connected` (never connected — invite) and `cf_reconnect_required` (the grant
+  lapsed — explain, and offer reconnection).
+- `cf_upstream_error` is reported **with `configured: true`**. A provider that is briefly
+  unreachable is not a credential problem, and prompting for re-authorization would send the user
+  through a flow that cannot fix it.
+
+Brokered credentials are the platform's to hold and refresh; the client never sees them. A backend
+that cannot refresh a lapsed grant **MUST** report `cf_reconnect_required` rather than continuing to
+present the expired credential to the provider.
 
 > **Status: Partial.** The **Anthropic provider is not yet implemented** (planned). Its client
 > **yields** a single `error` event carrying `code: "NOT_IMPLEMENTED"` and a "use OpenAI" message —
@@ -120,6 +151,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.1.8-draft** (2026-08-23) — 2.1 Managed providers: a platform may broker credentials, Studio offers that path before the key form, and the models endpoint is specified as a capability probe that must answer 200 for every credential state — with cf_not_connected, cf_reconnect_required and cf_upstream_error distinguished.
 - **0.1.7-draft** (2026-08-20) — The Anthropic client yields an error event with code NOT_IMPLEMENTED; it does not throw (§2).
 - **0.1.6-draft** (2026-08-16) — §2 failures are problem documents and the mid-stream frame carries one; gap:ai-problem-details closed.
 - **0.1.5-draft** (2026-08-15) — Add §5 Standards Alignment: SSE, the IANA special-purpose address registries the SSRF guard uses, and the problem+json gap.
@@ -131,4 +163,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx `@jxsuite/ai` Specification v0.1.7-draft — a stub, subject to expansion._
+_Jx `@jxsuite/ai` Specification v0.1.8-draft — a stub, subject to expansion._

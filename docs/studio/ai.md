@@ -41,6 +41,14 @@ On Jx Cloud that section leads with **Connect Cloudflare**: Studio brokers **Wor
 
 This option appears only where a platform can run that hosted flow. The desktop app and the dev server show the key form alone.
 
+#### When the connection expires
+
+A Cloudflare authorization does not last forever. When yours lapses, the same place in Preferences says so and the button reads **Reconnect Cloudflare** — one click through the same approval screen and the assistant works again. Nothing else about the project changes, and your model choice is remembered.
+
+:::doc-note
+If Cloudflare itself is briefly unreachable, Studio does **not** ask you to reconnect — reconnecting would not help. The assistant reports the provider as unavailable and keeps the connection you already have.
+:::
+
 ### Bring your own key
 
 Below the Cloudflare option (or on its own, everywhere else) is the **AI provider key** form:

@@ -14,7 +14,7 @@ This page is generated from the `> **Status: …**` markers in the specification
 
 | Spec                      | Version      | Status      | Updated    |
 | ------------------------- | ------------ | ----------- | ---------- |
-| `ai.md`                   | 0.1.7-draft  | Partial     | 2026-08-20 |
+| `ai.md`                   | 0.1.8-draft  | Partial     | 2026-08-23 |
 | `collab.md`               | 0.2.5-draft  | Partial     | 2026-08-20 |
 | `compiler.md`             | 0.3.1-draft  | Partial     | 2026-08-18 |
 | `desktop.md`              | 0.3.19-draft | Pending     | 2026-08-22 |
@@ -35,7 +35,6 @@ This page is generated from the `> **Status: …**` markers in the specification
 
 ### Partial
 
-- `ai.md` §2 — Provider Contract
 - `collab.md` §5 — Version Skew
 - `compiler.md` §3 — Output Tiers
 - `desktop.md` §10 — SaaS / Cloud Mode

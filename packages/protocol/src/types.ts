@@ -518,6 +518,16 @@ export interface AiModelsResponse {
   defaultModel?: string;
   /** Set when the upstream provider was unreachable and defaults were returned. */
   upstreamError?: number | string;
+  /**
+   * Why the backend holds no working credentials, when it holds none.
+   *
+   * `configured: false` alone cannot tell "this user has never connected" from "this user's grant
+   * lapsed", and those are different sentences on screen — the second one explains a thing that
+   * used to work. `cf_upstream_error` is the third case and deliberately arrives WITH `configured:
+   * true`: Cloudflare being briefly unreachable is not a reason to send someone round an OAuth flow
+   * that fixes nothing.
+   */
+  code?: "cf_not_connected" | "cf_reconnect_required" | "cf_upstream_error";
 }
 
 // ─── Cloudflare publish surface ──────────────────────────────────────────────
