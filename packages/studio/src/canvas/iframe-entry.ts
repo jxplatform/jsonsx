@@ -56,6 +56,11 @@ import type {
 } from "./iframe-protocol";
 import type { JxDocument, JxMutableNode, JxStyle } from "@jxsuite/schema/types";
 import type { IframeRenderCtx, RenderHandle } from "./iframe-render";
+import { setBundleBase } from "../services/bundle-base";
+
+/* Anchor shipped-asset URLs to this ENTRY's directory — see src/studio.ts for why only an
+   entry may, and tests/entry-anchors.test.ts for the guard. */
+setBundleBase(import.meta.url);
 
 /**
  * Resolve the drop placement for a forwarded cursor: point hit-test → nearest `[data-jx-path]` →

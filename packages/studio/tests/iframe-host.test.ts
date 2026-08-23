@@ -565,6 +565,67 @@ describe("mountIframeCanvas", () => {
     }
   });
 
+  /* The fallback, which for most of its life was a literal `/packages/studio/canvas.html` — the
+     repo dev server's path, baked into a browser bundle, correct on one host out of four. It
+     resolves against the ENTRY's directory now, so it is right everywhere rather than accidentally
+     unused because every other host overrode it. tests/with-dom.ts anchors the entry at the url the
+     dev server really serves it from, so the answer here is byte-identical to the old literal. */
+  test("with no canvasUrl the default resolves beside the bundle", async () => {
+    const g = globalThis as unknown as { __jxPlatform?: unknown };
+    const saved = g.__jxPlatform;
+    g.__jxPlatform = { id: "devserver" } as never;
+    try {
+      const canvasEl = document.createElement("div");
+      document.body.append(canvasEl);
+      await mountIframeCanvas(41, { tagName: "div" } as never, canvasEl);
+      const src = canvasEl.querySelector("iframe")!.getAttribute("src")!;
+      expect(src.startsWith("/packages/studio/canvas.html?")).toBe(true);
+    } finally {
+      g.__jxPlatform = saved;
+    }
+  });
+
+  /* Electrobun resolves its canvasUrl over RPC inside activate(), and the fallback must NOT be
+     mounted while it waits. Before the fallback was anchored it did not matter — the old literal
+     resolved to nothing servable under views://, so an early frame just failed. Now it resolves,
+     to a canvas.html electrobun really stages, and an early frame would boot the canvas bundle
+     inside the shell's app-privileged origin in a CEF instance running
+     disable-site-isolation-trials. The cross-origin loopback canvas exists so that cannot happen. */
+  test("a platform that defers its canvasUrl gets about:blank, not the bundle-relative default", async () => {
+    const g = globalThis as unknown as { __jxPlatform?: unknown };
+    const saved = g.__jxPlatform;
+    g.__jxPlatform = { canvasUrlDeferred: true, id: "desktop" } as never;
+    try {
+      const canvasEl = document.createElement("div");
+      document.body.append(canvasEl);
+      await mountIframeCanvas(42, { tagName: "div" } as never, canvasEl);
+      const src = canvasEl.querySelector("iframe")!.getAttribute("src")!;
+      expect(src.startsWith("about:blank")).toBe(true);
+      expect(src).not.toContain("canvas.html");
+    } finally {
+      g.__jxPlatform = saved;
+    }
+  });
+
+  test("a deferred platform that has since resolved its url uses it", async () => {
+    const g = globalThis as unknown as { __jxPlatform?: unknown };
+    const saved = g.__jxPlatform;
+    g.__jxPlatform = {
+      canvasUrl: "http://127.0.0.1:5111/__studio__/canvas.html",
+      canvasUrlDeferred: true,
+      id: "desktop",
+    } as never;
+    try {
+      const canvasEl = document.createElement("div");
+      document.body.append(canvasEl);
+      await mountIframeCanvas(43, { tagName: "div" } as never, canvasEl);
+      const src = canvasEl.querySelector("iframe")!.getAttribute("src")!;
+      expect(src.startsWith("http://127.0.0.1:5111/__studio__/canvas.html?")).toBe(true);
+    } finally {
+      g.__jxPlatform = saved;
+    }
+  });
+
   test("a relative canvasUrl keeps the iframe same-origin (channel origin === location.origin)", async () => {
     const canvasEl = document.createElement("div");
     document.body.append(canvasEl);

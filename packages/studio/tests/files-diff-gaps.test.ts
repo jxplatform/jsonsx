@@ -53,7 +53,7 @@ void mock.module("../src/grid/grid-controller", () => ({
   getGridController: (tab: object | null) => (tab === null ? null : (gridTabs.get(tab) ?? null)),
 }));
 
-const { openFileInTab, openLastSessionOrHome, renderFilesTemplate, setupTreeKeyboard } =
+const { openFileInTab, openLastSessionOrHome, renderFilesTemplate } =
   await import("../src/files/files");
 const { saveFile } = await import("../src/files/file-ops");
 
@@ -267,7 +267,6 @@ describe("the ↓ walk and the Loading… placeholder", () => {
     await flush();
 
     const tree = host.querySelector(".file-tree") as HTMLElement;
-    setupTreeKeyboard(tree);
     // Model: assets · Loading… · one.json · two.json
     expect(
       [...tree.querySelectorAll(".file-tree-item")].map((el) => el.textContent?.trim()),

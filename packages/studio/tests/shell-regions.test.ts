@@ -8,6 +8,7 @@
  */
 import { flush, resetStudioState, resetWorkspaceWithTab } from "./harness";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { mountShellTree } from "../src/shell/tree";
 import { html } from "lit-html";
 import * as leftPanelModule from "../src/panels/left-panel";
 import * as rightPanelModule from "../src/panels/right-panel";
@@ -16,30 +17,20 @@ import { initShellRefs, leftPanel, rightPanel } from "../src/store";
 import { closeAllTabs } from "../src/workspace/workspace";
 import { view } from "../src/view";
 import { shell } from "../src/shell";
-import { listRegions, resolveRegion, stampShellRegions } from "../src/ui/regions";
+import { listRegions, resolveRegion } from "../src/ui/regions";
 /* Imported for its side effect: the grid registers itself as a shell surface at import time, the
    same bargain `ui/panel-resize.ts` makes, so `mountShell()` below draws the pane cells. `studio.ts`
    gets this for free by importing `cellForPane`; a test that mounts the shell without the
    bootstrap has to say so. */
 import "../src/panels/pane-grid";
 
-/* `#pane-grid` stands where `#tab-strip` and `#canvas-wrap` used to. Both were flat siblings of
-   the application grid that only ever described the PRIMARY pane; `panels/pane-grid.ts` builds a
-   cell per `workspace.panes` entry inside this host, and the cell is what carries the ids. */
-const SHELL_HTML = `
-  <div id="toolbar"></div>
-  <div id="activity-bar"></div>
-  <div id="left-panel"></div>
-  <div id="pane-grid"></div>
-  <div id="right-panel"></div>
-  <div id="statusbar"></div>
-  <div id="layer-popover"></div>
-  <div id="layer-modal"></div>
-  <div id="layer-dialog"></div>
-`;
+/* The real frame. This used to be nine hand-listed divs plus `stampShellRegions()` to give them the
+   region ids they could not carry themselves — and it was missing the bottom dock and the toast
+   host, like every other hand-written copy. `src/shell/tree.ts` is the one definition and stamps its
+   own ids, which is what most of this file is about. */
 
 beforeEach(() => {
-  document.body.innerHTML = SHELL_HTML;
+  mountShellTree();
   initShellRefs();
   if (!Element.prototype.scrollIntoView) {
     Element.prototype.scrollIntoView = () => {};
@@ -59,7 +50,7 @@ afterEach(() => {
 
 // ─── The shell hosts ──────────────────────────────────────────────────────────
 
-describe("stampShellRegions, through mountShell", () => {
+describe("the frame's own regions, through mountShell", () => {
   test("the five fixed surfaces resolve from the table after boot", async () => {
     const { mountShell, unmountShell } = await import("../src/shell");
     mountShell();
@@ -213,7 +204,6 @@ describe("inspector/tab:<value>", () => {
 describe("statusbar/selection", () => {
   test("the selection field is its own region, and absent when nothing is selected", () => {
     const tab = resetWorkspaceWithTab();
-    stampShellRegions();
     mountStatusbar();
     renderStatusbar();
     expect(resolveRegion("statusbar/selection")).toBeNull();
@@ -233,7 +223,6 @@ describe("statusbar/selection", () => {
 
   test("the three fields are separate regions, and PROJECT is not inside SELECTION", () => {
     resetWorkspaceWithTab();
-    stampShellRegions();
     mountStatusbar();
     renderStatusbar();
     // Transient messages left the bar entirely for the toast host, so the only thing that can

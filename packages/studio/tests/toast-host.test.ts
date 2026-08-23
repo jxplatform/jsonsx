@@ -7,7 +7,7 @@
  * automation-gated infinite lifetime, and a settling toast that shows up in the idle account and
  * then stops.
  */
-import { flush } from "./harness";
+import { flush, mountOverlayLayers } from "./harness";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import {
   initLayers,
@@ -20,10 +20,8 @@ import { notify, resetNotifications, toasts } from "../src/services/notify";
 import { setActiveRegistry } from "../src/commands/active-registry";
 import { createCommandRegistry } from "../src/commands/registry";
 import { emptyContext, makeContext } from "../src/commands/context";
-import { resolveRegion, stampShellRegions } from "../src/ui/regions";
+import { resolveRegion } from "../src/ui/regions";
 import type { CommandContext } from "../src/commands/context";
-
-const HOSTS = ["layer-popover", "layer-modal", "layer-dialog", "layer-toast"];
 
 let ctx: CommandContext = emptyContext();
 const ran: { id: string; args: unknown }[] = [];
@@ -49,12 +47,10 @@ function buildRegistry() {
 
 beforeEach(() => {
   document.body.innerHTML = "";
-  for (const id of HOSTS) {
-    const el = document.createElement("div");
-    el.id = id;
-    document.body.append(el);
-  }
-  stampShellRegions();
+  /* The REAL layers, not four bare divs with the right ids. That fixture could not carry the
+     live-region attributes or the region stamp, which is exactly what the first test below is
+     about — it used to read them out of index.html's text instead. */
+  mountOverlayLayers();
   resetNotifications();
   ran.length = 0;
   ctx = makeContext({ document: { open: true, canUndo: true } });
@@ -78,13 +74,14 @@ describe("the fourth layer", () => {
     expect(resolveRegion("overlay.toasts")).toBe(host());
   });
 
-  test("carries the live-region attributes on the HOST, not per toast", async () => {
-    // Declared in index.html rather than stamped by JS: the layer must be a live region before the
-    // First toast, and a stack of them is announced once rather than once per notification.
-    const markup = await Bun.file(new URL("../index.html", import.meta.url)).text();
-    const layer = markup.slice(markup.indexOf('id="layer-toast"'));
-    expect(layer.slice(0, layer.indexOf(">"))).toContain('role="status"');
-    expect(layer.slice(0, layer.indexOf(">"))).toContain('aria-live="polite"');
+  test("carries the live-region attributes on the HOST, not per toast", () => {
+    /* Part of the frame rather than stamped when a toast arrives: the layer has to BE a live region
+       before the first notification, and a stack of them is announced once rather than once per
+       toast. Asserted on the rendered element, not on index.html's text — the frame is
+       src/shell/tree.ts now, and the document carries an empty body. */
+    const layer = host();
+    expect(layer.getAttribute("role")).toBe("status");
+    expect(layer.getAttribute("aria-live")).toBe("polite");
   });
 });
 

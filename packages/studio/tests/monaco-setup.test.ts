@@ -104,9 +104,16 @@ describe("monaco-setup — MonacoEnvironment workers", () => {
   const getWorker = (label: string): FakeWorker =>
     (self as any).MonacoEnvironment.getWorker(undefined, label);
 
-  /** Workers resolve against the MODULE, so the expected base is monaco-setup.ts's own directory. */
-  const expected = (file: string) =>
-    new URL(`../src/services/workers/${file}`, import.meta.url).href;
+  /**
+   * Workers resolve against the ENTRY, which `tests/with-dom.ts` anchors at the url the repo dev
+   * server really serves it from. So the expected base is `dist/`, exactly as in a browser.
+   *
+   * This helper used to read `../src/services/workers/${file}` — module-relative — and that was the
+   * bug rather than the contract: after the code-split `services/monaco-setup` is emitted into
+   * `dist/chunks/`, so the shipped url pointed at `dist/chunks/workers/`, which no distribution has
+   * ever staged.
+   */
+  const expected = (file: string) => `http://localhost:3000/packages/studio/dist/workers/${file}`;
 
   test("maps known labels to their worker bundles as module workers", () => {
     const json = getWorker("json");
@@ -123,18 +130,24 @@ describe("monaco-setup — MonacoEnvironment workers", () => {
     expect(getWorker("made-up-label").url).toBe(expected("editor.worker.js"));
   });
 
-  /* Regression guard for every packaged host. The old root-absolute /monaco-editor/… path resolved
-     on the repo dev server alone; on desktop (views://studio/, /__studio__/) and in the cloud it
-     404s, and a worker that never starts takes the whole JSON language service — schema validation
-     included — down silently. Self-location is the only rule that holds for all of them, and it is
-     the ONLY one that survives the cloud's deep /edit/:owner/:repo@:branch shell path, where a
-     document-relative URL would resolve into /edit/:owner/. */
-  test("worker urls are absolute and module-relative, never root-absolute", () => {
+  /* Regression guard for every packaged host, and it has caught two distinct bugs now.
+     The root-absolute /monaco-editor/… path this started as resolved on the repo dev server alone,
+     because that server serves bare specifiers out of the monorepo's node_modules. Its replacement,
+     `new URL("workers/…", import.meta.url)`, then broke everywhere the moment `splitting: true`
+     hoisted this module into dist/chunks/ — it began naming chunks/workers/, a directory nothing
+     stages. Both failures are silent: a worker that never starts takes the whole JSON language
+     service with it, schema validation included, and reports nothing.
+     So the rule asserted here is the surviving one — resolve against the ENTRY, whose emitted path
+     is a contract (studio.md §11.1) — and it is the only rule that holds for the repo dev server,
+     views://studio/, the loopback /__studio__/ mount, AND the cloud's deep
+     /edit/:owner/:repo@:branch shell path, where a document-relative url lands in /edit/:owner/. */
+  test("worker urls are absolute, entry-relative, and never root-absolute or in chunks/", () => {
     for (const label of ["json", "typescript", "editorWorkerService", "made-up-label"]) {
       const { url } = getWorker(label);
       expect(url.startsWith("/monaco-editor/")).toBe(false);
       expect(new URL(url).href).toBe(url);
-      // Sibling of the bundle, NOT of the HTML document that happens to load it.
+      expect(url).not.toContain("/chunks/");
+      // Sibling of the ENTRY, not of this module and not of the document that loads it.
       const file = url.slice(url.lastIndexOf("/") + 1);
       expect(url).toBe(expected(file));
     }

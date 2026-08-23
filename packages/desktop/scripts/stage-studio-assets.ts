@@ -1,106 +1,57 @@
 /**
- * Shared studio-asset staging for the desktop launchers. Both pre-build scripts (electrobun's
- * `pre-build.ts` and the chromium launcher's `pre-build-rpc.ts`) stage the SAME asset set — only
- * the init bundle they build beforehand differs. Keeping the copy list here means a new studio
- * asset (like the iframe canvas doc + bundle) can never ship to one launcher and 404 in the other
- * again.
+ * Stage the studio assets into `<desktopDir>/assets/studio` for both launchers.
+ *
+ * This used to be a hand-maintained copy list: two named files, a chunks tree, a styles tree, three
+ * worker filenames, four font filenames, the canvas pair, an optional sourcemap, and an
+ * exact-string replace on `index.html` to inject the launcher's init bundle. Every one of those was
+ * a fact about a package this one does not own, restated here — and the list was already wrong:
+ * `dist/codicon.ttf` appeared in it nowhere, so the packaged app drew tofu where Monaco draws
+ * icons.
+ *
+ * `@jxsuite/studio/hosting` owns those facts now. What is left is the two things that are genuinely
+ * the DESKTOP's: where the tree goes, and that the launcher's own `dist/init.js` loads before the
+ * studio entry.
  */
+import { writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { copyFile, cp, mkdir, readFile, writeFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { canvasDocument, stageStudioAssets as stageAssets } from "@jxsuite/studio/hosting";
+import { studioShellHtml } from "@jxsuite/studio/hosting/document";
 
 /**
- * Monaco's pre-bundled web workers (packages/studio/scripts/build-workers.ts). Without them the
- * packaged shell has no JSON language service at all — schema validation, completion and hover in
- * the code view silently stop working, because `new Worker()` 404s and Monaco surfaces nothing.
- */
-const WORKER_BUNDLES = ["editor.worker.js", "json.worker.js", "ts.worker.js"];
-
-/** The vendored JetBrains Mono faces styles/tokens.css declares via @font-face. */
-const FONT_FILES = [
-  "jetbrains-mono-400.woff2",
-  "jetbrains-mono-500.woff2",
-  "jetbrains-mono-700.woff2",
-  "OFL.txt",
-];
-
-/**
- * Copy the built studio assets into `<desktopDir>/assets/studio` and patch index.html to load the
- * launcher init bundle (dist/init.js, built by the caller) before studio.js.
+ * Copy the built studio assets and write the launcher's own editor document.
+ *
+ * @param {string} desktopDir Absolute path to `packages/desktop`.
+ * @returns {Promise<void>}
  */
 export async function stageStudioAssets(desktopDir: string): Promise<void> {
-  const studioDir = resolve(desktopDir, "../studio");
   const outDir = join(desktopDir, "assets", "studio");
-  await mkdir(join(outDir, "dist"), { recursive: true });
+  const from = resolve(desktopDir, "../studio");
 
-  await copyFile(join(studioDir, "dist", "studio.css"), join(outDir, "dist", "studio.css"));
-  await copyFile(join(studioDir, "dist", "studio.js"), join(outDir, "dist", "studio.js"));
+  /*
+   * `exclude: ["document"]` because both documents are written below rather than copied — the
+   * editor's carries the launcher's boot module, and the canvas's is rebased for this layout.
+   *
+   * `clean` stays on (the default), and that is what makes this safe to run repeatedly: it removes
+   * only the manifest's own paths, so `dist/init.js` — which the pre-build scripts write into this
+   * very tree BEFORE calling us — survives, while a chunk the previous build emitted and this one
+   * does not is gone rather than accumulating forever.
+   */
+  const { base } = await stageAssets(outDir, { exclude: ["document"], from });
 
-  // Split chunks. The studio build emits content-hashed chunks into dist/chunks/ (Monaco, yjs, ajv
-  // And every other on-demand import live there rather than in the entry), and studio.js reaches them
-  // By relative URL — so the whole directory has to ship, and its names cannot be rewritten.
-  const chunksSrc = join(studioDir, "dist", "chunks");
-  if (!existsSync(chunksSrc)) {
-    throw new Error(
-      `Studio build has no dist/chunks — run \`bun run build\` in packages/studio first. ` +
-        `Staging without them produces an app whose editor fails at boot with a bare ` +
-        `module-resolution error, so this refuses rather than shipping it.`,
-    );
-  }
-  await cp(chunksSrc, join(outDir, "dist", "chunks"), { recursive: true });
+  await writeFile(join(outDir, "canvas.html"), await canvasDocument({ base, from }), "utf8");
 
-  // Studio chrome CSS. The entire design system — tokens, shell, canvas, panels, inspector,
-  // Overlays — is a set of plain stylesheets under packages/studio/styles that index.html <link>s
-  // Directly; no bundler ever sees them, so the directory has to ship verbatim and keep its names.
-  // Missing it is not a subtle regression: the packaged app boots with no tokens, no grid and no
-  // Panel chrome, so this refuses rather than shipping it.
-  const stylesSrc = join(studioDir, "styles");
-  if (!existsSync(stylesSrc)) {
-    throw new Error(
-      `Studio has no styles/ directory at ${stylesSrc} — the chrome stylesheet index.html links ` +
-        `is missing. Staging without it produces an app with no tokens, layout or panel chrome ` +
-        `at all, so this refuses rather than shipping it.`,
-    );
-  }
-  await cp(stylesSrc, join(outDir, "styles"), { recursive: true });
-
-  // Monaco workers + webfonts. Both are addressed relatively — the workers against the BUNDLE's own
-  // Url (monaco-setup.ts), the fonts against the stylesheet (styles/tokens.css @font-face, which
-  // Resolves ../fonts) — so the staged tree has to mirror packages/studio's layout exactly for
-  // Either to resolve.
-  await mkdir(join(outDir, "dist", "workers"), { recursive: true });
-  for (const worker of WORKER_BUNDLES) {
-    await copyFile(
-      join(studioDir, "dist", "workers", worker),
-      join(outDir, "dist", "workers", worker),
-    );
-  }
-  await mkdir(join(outDir, "fonts"), { recursive: true });
-  for (const font of FONT_FILES) {
-    await copyFile(join(studioDir, "fonts", font), join(outDir, "fonts", font));
-  }
-
-  // Iframe canvas: the project server serves the canvas doc + its bundle from assets/studio.
-  // Without these, the packaged iframe 404s at boot (/__studio__/canvas.html and its entry).
-  await copyFile(join(studioDir, "canvas.html"), join(outDir, "canvas.html"));
-  await copyFile(
-    join(studioDir, "dist", "iframe-entry.js"),
-    join(outDir, "dist", "iframe-entry.js"),
+  /*
+   * The editor document, with the launcher's PAL init in the boot slot.
+   *
+   * This was an exact-string `html.replace()` on the package's own index.html, and it did not check
+   * that the replace had matched — so a whitespace change upstream would have produced a packaged
+   * app with no platform registered, which then self-registers the dev-server adapter and fetches
+   * `/__studio/*` against a `views://` origin. `boot` is an argument now, and generating the
+   * document means there is nothing left to miss.
+   */
+  await writeFile(
+    join(outDir, "index.html"),
+    studioShellHtml({ base, boot: [`${base.prefix}dist/init.js`] }),
+    "utf8",
   );
-  // The sourcemap is optional (dev convenience); copy it when present.
-  try {
-    await copyFile(
-      join(studioDir, "dist", "iframe-entry.js.map"),
-      join(outDir, "dist", "iframe-entry.js.map"),
-    );
-  } catch {
-    // No sourcemap in this build — fine.
-  }
-
-  const html = await readFile(join(studioDir, "index.html"), "utf8");
-  const patched = html.replace(
-    '<script type="module" src="./dist/studio.js"></script>',
-    '<script type="module" src="./dist/init.js"></script>\n  <script type="module" src="./dist/studio.js"></script>',
-  );
-  await writeFile(join(outDir, "index.html"), patched, "utf8");
 }

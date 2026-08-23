@@ -628,16 +628,23 @@ describe("commit form", () => {
     expect(git.loading).toBe(false);
   });
 
+  /* The menu's visibility is module STATE now, projected by `?hidden`, rather than an attribute the
+     click handler set on a node it found by selector. The two were fighting: the template declared
+     the menu `hidden` unconditionally, so lit had committed that attribute and every repaint — the
+     30-second git poll among them — left whatever the handler last did to it standing, with no way
+     for the template to take it back. So the assertions repaint: the click changes the state, and
+     the next render is what shows it. In the app that render is `renderOnly("leftPanel")`, which
+     the handler calls; here the panel is rendered standalone. */
   test("split menu toggles and commit-only item commits without pushing", async () => {
     seedRepoUi({ commitMessage: "menu msg" });
-    const div = renderPanel();
-    const menu = div.querySelector(".git-split-menu")!;
-    expect(menu.hasAttribute("hidden")).toBe(true);
-    click(div.querySelector(".git-split-trigger"));
-    expect(menu.hasAttribute("hidden")).toBe(false);
-    click(div.querySelector(".git-split-menu-item"));
+    expect(renderPanel().querySelector(".git-split-menu")!.hasAttribute("hidden")).toBe(true);
+
+    click(renderPanel().querySelector(".git-split-trigger"));
+    expect(renderPanel().querySelector(".git-split-menu")!.hasAttribute("hidden")).toBe(false);
+
+    click(renderPanel().querySelector(".git-split-menu-item"));
     await flush();
-    expect(menu.hasAttribute("hidden")).toBe(true);
+    expect(renderPanel().querySelector(".git-split-menu")!.hasAttribute("hidden")).toBe(true);
     expect(calls).toContainEqual(["gitCommit", "menu msg"]);
     expect(callNames()).not.toContain("gitPush");
   });

@@ -481,7 +481,13 @@ async function run(api: API): Promise<ReachabilityReport> {
   const manifest = JSON.parse(readFileSync(join(STUDIO_DIR, "package.json"), "utf8")) as {
     exports: Record<string, string>;
   };
-  const published = Object.values(manifest.exports).map((p) => join(STUDIO_DIR, p));
+  /* TypeScript exports only. The map may legitimately name non-source files — `./package.json` is
+     the npm convention for letting a consumer resolve the package root — and those are not
+     modules this analysis can walk. Filtered by extension rather than by name, so a future asset
+     export does not have to be added here. */
+  const published = Object.values(manifest.exports)
+    .filter((p) => p.endsWith(".ts"))
+    .map((p) => join(STUDIO_DIR, p));
   const bundleSource = readFileSync(join(STUDIO_DIR, "scripts", "build-config.ts"), "utf8");
   const bundled = [...bundleSource.matchAll(/"(\.\/src\/[\w./-]+\.ts)"/g)].map((m) =>
     join(STUDIO_DIR, m[1]!),

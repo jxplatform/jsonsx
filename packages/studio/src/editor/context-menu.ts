@@ -849,7 +849,17 @@ function itemElements(): HTMLElement[] {
     : [];
 }
 
-/** Move the roving tabindex (and the caret) to `index`, wrapping at both ends. */
+/**
+ * Move the roving tabindex (and the caret) to `index`, wrapping at both ends.
+ *
+ * Still imperative, deliberately and not happily. The menu's template is inline in the
+ * `renderPopover` call and its `ref` closure MUTATES the `x`/`y` it was rendered with to clamp the
+ * popover into the viewport, so re-rendering to move focus would also re-run the placement from
+ * stale coordinates. The template's own `tabindex`/`?focused` now read `_activeIdx` rather than
+ * hard-coding row 0, so first paint and this function at least agree on where focus starts; making
+ * the binding the only writer needs the template hoisted out and the placement state with it.
+ * Carried in check-lit-conventions' allow-list with that reason.
+ */
 function focusItem(index: number): void {
   const items = itemElements();
   if (items.length === 0) {
@@ -978,7 +988,8 @@ function rowTemplate(row: MenuRow, index: number) {
     }<sp-menu-item
       role="menuitem"
       data-command-id=${row.command.id}
-      tabindex=${index === 0 ? 0 : -1}
+      tabindex=${index === _activeIdx ? 0 : -1}
+      ?focused=${index === _activeIdx}
       ?disabled=${!row.enabled}
       aria-disabled=${row.enabled ? "false" : "true"}
       style=${row.command.destructive && row.enabled ? "color: var(--danger)" : ""}

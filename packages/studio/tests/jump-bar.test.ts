@@ -9,6 +9,7 @@
 import { flush, resetStudioState, resetWorkspaceWithTab } from "./harness";
 import { nothing, render as litRender } from "lit-html";
 import { afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import { mountShellTree } from "../src/shell/tree";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import {
@@ -643,8 +644,12 @@ describe("the bar is wired to the app, not to a stub", () => {
     // Handed the element by the `ref()` beside it rather than by a `createElement` + `append`.
     expect(grid).toContain('<div class="pane-jump"');
     expect(grid).toContain("attachJumpBarHost(paneId,");
-    const shellHtml = readFileSync(resolve(import.meta.dir, "..", "index.html"), "utf8");
-    expect(shellHtml).not.toContain('id="jump-bar"');
-    expect(shellHtml).toContain('id="pane-grid"');
+    /* And the FRAME really has a pane grid and no bar of its own. Asserted against the rendered
+       tree rather than index.html's text: the frame is src/shell/tree.ts now, and the document
+       carries an empty body. */
+    const frame = document.createElement("div");
+    mountShellTree(frame);
+    expect(frame.querySelector("#pane-grid")).not.toBeNull();
+    expect(frame.querySelector("#jump-bar")).toBeNull();
   });
 });

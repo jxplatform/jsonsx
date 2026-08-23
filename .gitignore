@@ -9,6 +9,9 @@
 codecov-debug.mjs
 coverage/
 dist/
+# The metafile lane's own output. It writes an UNSPLIT bundle, which used to land on dist/ and
+# overwrite the release build's studio.js at the same path.
+dist-metafile/
 junit.xml
 metafile.json
 node_modules/

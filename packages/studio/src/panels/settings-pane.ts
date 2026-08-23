@@ -18,7 +18,7 @@
  * `settings/settings-document.ts`, which the app loads when it registers its commands.
  *
  * Nothing here is stamped with a region of its own. `#canvas-wrap` already carries `pane.primary`
- * (`ui/regions.ts`'s `SHELL_REGION_HOSTS`), the entry rows and the entry editor are stamped by
+ * (the frame, `shell/tree.ts`), the entry rows and the entry editor are stamped by
  * `settings/contributed-section.ts` as `pane.primary/entry:<key>` and `pane.primary/editor`, and a
  * third id for "the settings body" would be a hand-stamped region with nothing to say.
  *

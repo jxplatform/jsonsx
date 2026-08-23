@@ -289,6 +289,7 @@ const KNOWN_UNREACHABLE: Record<string, Record<string, string>> = {
       "skip is a Publish decision",
   },
   "services/announce.ts": { resetAnnouncer: TEST_RESET },
+  "services/bundle-base.ts": { resetBundleBase: TEST_RESET },
   "services/trusted-types.ts": { resetStudioPolicy: TEST_RESET },
   "services/ai-models.ts": {
     getProxyDefaultModel:

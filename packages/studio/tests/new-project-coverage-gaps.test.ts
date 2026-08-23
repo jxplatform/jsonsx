@@ -16,6 +16,7 @@ import {
   npPreview,
   npSlug,
   npType,
+  mountOverlayLayers,
 } from "./harness";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { RepoInfo, StarterInfo } from "../src/types";
@@ -25,11 +26,7 @@ const { closeNewProjectModal, openNewProjectModal } =
 const { closeAddRepoModal, openAddRepoModal } = await import("../src/new-project/add-repo-modal");
 const { initLayers } = await import("../src/ui/layers");
 
-document.body.innerHTML = `
-  <div id="layer-popover"></div>
-  <div id="layer-modal"></div>
-  <div id="layer-dialog"></div>
-`;
+mountOverlayLayers(document.body);
 initLayers();
 
 type AnyEl = HTMLElement & { value?: string; selected?: string };

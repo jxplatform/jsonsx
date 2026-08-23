@@ -742,7 +742,15 @@ export function onTreeKeydown(
  */
 export function startLayerTitleEdit(path: JxPath, rerender: () => void) {
   const key = pathKey(path);
-  const row = document.querySelector(`.layer-row[data-path="${key}"]`);
+  /* Scoped to THIS panel's tree, and escaped, through the same helper every other row lookup in
+     this file uses. The predecessor was a bare `document.querySelector` with the key interpolated
+     raw, which is wrong twice over: a second pane — or the stylebook, which draws a layer tree of
+     its own — puts more than one `.layer-row[data-path=…]` in the document, and the first match
+     wins rather than the right one; and an unescaped key containing a quote or a bracket is not a
+     selector the parser accepts, so a legitimately-named node throws instead of renaming.
+     `_outlineList` is null before the first render, which is the same "row the window does not
+     hold" case the reveal-and-repaint path below already handles. */
+  const row = _outlineList ? rowElementFor(_outlineList, key) : null;
   if (!row) {
     // Renaming through a command (⌘↵, the palette, the block bar) can name a row the window does
     // Not hold. Scroll to it and repaint; the row exists on the next pass, and the caller's own

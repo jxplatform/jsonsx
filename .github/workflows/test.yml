@@ -282,6 +282,21 @@ jobs:
       # Neither is expressible in the type system — `ViewState` has an index signature and a
       # module-level `let active` is well-typed — so the guard is a ratcheting allow-list.
       - run: bun --cwd packages/studio scripts/check-pane-singletons.ts
+      # The template layer's two rules: a Spectrum control binds the state it moves ITSELF as a
+      # live property (an attribute binding is dirty-checked away exactly when it mattered), and a
+      # module holds its own rendered nodes with ref() rather than re-finding them by selector.
+      # Both carry a ratcheting backlog; source-only, about a second.
+      - run: bun --cwd packages/studio scripts/check-lit-conventions.ts
+      # What the package promises about itself: the stylesheet list IS the stylesheets (a sheet the
+      # list omits is one no document links — the 2.1.0 dead-links outage), `files` covers every
+      # manifest path and every import that escapes src/, the abstraction declares no backend
+      # package, and node: stays confined to the stager. Source-only, about a second.
+      - run: bun --cwd packages/studio scripts/check-studio-package.ts
+      # The hosting contract, compiled under a CONSUMER's flags rather than this repo's.
+      # jx-platform sets exactOptionalPropertyTypes, verbatimModuleSyntax and isolatedModules, none
+      # of which the root tsconfig sets — and two type errors in the contract were found by
+      # consuming it rather than by building it. See the note in that tsconfig.
+      - run: bunx tsc -p packages/studio/src/hosting/tsconfig.json
       - run: bun --cwd packages/studio scripts/check-icons.ts
       - run: bun run typecheck
       # packages/desktop is EXCLUDED from the root tsconfig (electrobun ships raw .ts in its dist,
@@ -373,6 +388,31 @@ jobs:
       - uses: ./.github/actions/setup-bun
       - run: bun --cwd packages/studio scripts/check-lens-mutants.ts
 
+  # What the BUILD emitted, against what the package says it ships.
+  #
+  # A job of its own because it needs a real `bun run build`, and the `checks` job deliberately
+  # builds nothing (its own comment budgets it at 22 seconds). It answers the question that let
+  # dist/codicon.ttf go missing for months: the build emitted a 140 KB font, the shipped CSS
+  # referenced it, and nothing compared the two — so the tarball, the desktop bundle and the cloud
+  # all drew tofu where Monaco draws icons, with no error anywhere.
+  #
+  # Gated on `gate_bundle` containing studio, which affected.ts already computes and which nothing
+  # else consumed. Part of the `ci` aggregate below, so a build that emits something nobody ships
+  # cannot merge.
+  studio-dist:
+    needs: changes
+    if: contains(fromJSON(needs.changes.outputs.gate_bundle), 'studio')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-bun
+      - run: bun run --cwd packages/studio build
+      - run: bun --cwd packages/studio scripts/check-studio-dist.ts
+      - run: bun packages/studio/scripts/check-bundle-budget.ts
+      # The generated document must match what the build writes — the same diff discipline
+      # docs:verify and schema:verify use.
+      - run: git diff --exit-code -- packages/studio/index.html
+
   # The Nix build, as a job of THIS workflow rather than a workflow of its own.
   #
   # It used to be `on: pull_request` in nix.yml with a `paths:` filter, and that is exactly why it
@@ -401,7 +441,7 @@ jobs:
   # of this design: a job the diff cannot reach must leave this green.
   ci:
     if: always()
-    needs: [changes, test, checks, lens-mutants, nix, coverage-comment]
+    needs: [changes, test, checks, lens-mutants, studio-dist, nix, coverage-comment]
     runs-on: ubuntu-latest
     steps:
       - name: Gate

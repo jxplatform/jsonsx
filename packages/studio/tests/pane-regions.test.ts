@@ -1,15 +1,14 @@
 import { flush, installMockPlatform, resetStudioState } from "./harness";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { mountShellTree } from "../src/shell/tree";
 import { render as litRender } from "lit-html";
 import {
   REGION_ATTR,
-  SHELL_REGION_HOSTS,
   listRegions,
   paneRegion,
   paneStripRegion,
   resolveAllRegions,
   resolveRegion,
-  stampShellRegions,
 } from "../src/ui/regions";
 import { allCanvasSurfaces, unregisterCanvasSurface } from "../src/canvas/surface-registry";
 import {
@@ -110,12 +109,22 @@ describe("paneRegion", () => {
   });
 });
 
-describe("the shell host table", () => {
-  test("no longer claims the stage or the strip — a pane cannot be an application row", () => {
-    expect(Object.values(SHELL_REGION_HOSTS)).not.toContain("pane.primary");
-    expect(Object.values(SHELL_REGION_HOSTS)).not.toContain("pane.primary/tabs");
-    expect(Object.keys(SHELL_REGION_HOSTS)).not.toContain("#canvas-wrap");
-    expect(Object.keys(SHELL_REGION_HOSTS)).not.toContain("#tab-strip");
+describe("the frame", () => {
+  /* It does not claim the stage or the strip — a pane cannot be an application row. This used to be
+     asserted against `SHELL_REGION_HOSTS`, a selector-to-id map that existed only because the frame
+     was markup in index.html and "cannot stamp itself". The frame is a template now and stamps its
+     own, so the claim is checked where it is made. */
+  test("claims no pane region of its own — a pane cannot be an application row", () => {
+    const host = document.createElement("div");
+    mountShellTree(host);
+    const stamped = [...host.querySelectorAll<HTMLElement>("[data-jx-region]")].map(
+      (el) => el.dataset.jxRegion!,
+    );
+    expect(stamped).not.toContain("pane.primary");
+    expect(stamped).not.toContain("pane.primary/tabs");
+    expect(stamped.some((id) => id.startsWith("pane."))).toBe(false);
+    expect(host.querySelector("#canvas-wrap")).toBeNull();
+    expect(host.querySelector("#tab-strip")).toBeNull();
   });
 });
 
@@ -160,8 +169,7 @@ describe("uniqueness with two stages standing", () => {
 
   /** The whole shell, both panes, every renderer that stamps a pane-scoped id. */
   async function twoRealPanes() {
-    document.body.innerHTML = `<div id="app"><div id="pane-grid"></div><div id="right-panel"></div></div>`;
-    stampShellRegions();
+    mountShellTree();
     paneGrid.mount();
     openDocTab("regions-left", "pages/left.json");
     openDocTab("regions-right", "pages/right.json");

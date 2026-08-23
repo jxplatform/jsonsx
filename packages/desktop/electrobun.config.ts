@@ -1,4 +1,5 @@
 import type { ElectrobunConfig } from "electrobun";
+import { STUDIO_ASSETS } from "@jxsuite/studio/hosting/layout";
 import { readFileSync } from "node:fs";
 
 const pkg = JSON.parse(readFileSync("./package.json", "utf8")) as { version: string };
@@ -87,26 +88,22 @@ export default {
       "../create/templates": "bun/templates",
       "../starters/registry.json": "bun/registry.json",
       "../starters/sites": "bun/sites",
-      "assets/studio/canvas.html": "views/studio/canvas.html",
-      // Content-hashed split chunks (Monaco, yjs, ajv and every on-demand import). studio.js reaches
-      // Them by relative URL, so the whole directory has to arrive under views/studio/dist/chunks or
-      // The editor dies at boot with a bare module-resolution error.
-      "assets/studio/dist/chunks": "views/studio/dist/chunks",
-      "assets/studio/dist/iframe-entry.js": "views/studio/dist/iframe-entry.js",
-      "assets/studio/dist/iframe-entry.js.map": "views/studio/dist/iframe-entry.js.map",
+      /*
+       * The studio tree, DERIVED from its own manifest rather than listed here.
+       *
+       * Per-entry rather than one directory copy, deliberately: electrobun's copy step only LOGS a
+       * missing source and continues, so a single `assets/studio` row would ship a silently
+       * incomplete bundle whenever anything under it was absent. Listing them by hand is what this
+       * block used to do, and it was the second of three copies of the same list — the manifest is
+       * the one place a new asset has to be added now.
+       *
+       * `dist/init.js` is the launcher's own PAL-init bundle and is the one studio-tree file the
+       * manifest does not know about, because the desktop builds it.
+       */
+      ...Object.fromEntries(
+        STUDIO_ASSETS.map((asset) => [`assets/studio/${asset.path}`, `views/studio/${asset.path}`]),
+      ),
       "assets/studio/dist/init.js": "views/studio/dist/init.js",
-      "assets/studio/dist/studio.css": "views/studio/dist/studio.css",
-      "assets/studio/dist/studio.js": "views/studio/dist/studio.js",
-      // Monaco's web workers and the vendored webfonts. monaco-setup.ts resolves the workers
-      // Relative to the studio document (views://studio/index.html), so a missing entry here does
-      // Not 404 loudly — it just leaves the code view with no JSON language service, and therefore
-      // No schema validation, completion or hover.
-      "assets/studio/dist/workers": "views/studio/dist/workers",
-      "assets/studio/fonts": "views/studio/fonts",
-      "assets/studio/index.html": "views/studio/index.html",
-      // The chrome stylesheet, six files index.html <link>s by relative URL. Missing here, the
-      // Packaged app renders the whole shell unstyled.
-      "assets/studio/styles": "views/studio/styles",
     },
   },
 

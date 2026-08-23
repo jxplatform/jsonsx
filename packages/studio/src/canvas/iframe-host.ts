@@ -67,6 +67,7 @@ import type { OverlayLayer, OverlayPlacement } from "./iframe-overlay";
 import type { SlashCommand } from "../editor/inline-edit";
 import type { Tab } from "../tabs/tab";
 import type { JxExpressionNode, JxMutableNode } from "@jxsuite/schema/types";
+import { bundleUrl } from "../services/bundle-base";
 
 /** A rect in PARENT coordinates (overlay-local from {@link canvasRectToParent}, same field shape). */
 type ParentRect = OverlayPlacement;
@@ -1473,10 +1474,27 @@ function requestStylebookSelection(host: HostState): void {
 }
 
 /**
- * The default iframe document URL (a static shell that boots the slim canvas bundle). Used when the
- * platform does not provide its own canvasUrl — i.e. the dev server and electrobun keep this path.
+ * The canvas document, beside the bundle that asked for it.
+ *
+ * This was the literal `/packages/studio/canvas.html` — a repo dev-server path baked into a browser
+ * bundle, correct on exactly one host out of four. It happened to work because every other host
+ * overrides `canvasUrl`: the chromium launcher builds one from its token, electrobun fetches one
+ * over RPC, and the cloud adapter hard-codes its own. So the default was never the default; it was
+ * the dev server's URL with nothing saying so.
+ *
+ * `bundleUrl` resolves it against the ENTRY's directory, which is the one fact every host agrees on
+ * (see services/bundle-base.ts), so the fallback is now correct everywhere rather than accidentally
+ * unused.
  */
-const DEFAULT_CANVAS_URL = "/packages/studio/canvas.html";
+function defaultCanvasUrl(): string {
+  return bundleUrl("../canvas.html");
+}
+
+/**
+ * Loads nothing, deliberately: what a platform that resolves its canvasUrl LATER gets in the
+ * meantime. See {@link StudioPlatform.canvasUrlDeferred}.
+ */
+const DEFERRED_CANVAS_URL = "about:blank";
 
 /**
  * Release one host: its channel, its overlay, its frame, and everything awaiting a reply from it.
@@ -1524,6 +1542,29 @@ function releaseHost(host: HostState): void {
 }
 
 /**
+ * Which document this pane's canvas iframe should load.
+ *
+ * The `canvasUrlDeferred` branch is the one that needs saying. Electrobun resolves its canvasUrl
+ * asynchronously — it is this window's loopback port, fetched over RPC inside `activate()` — and
+ * until the fix above, the bundle-relative default resolved to nothing servable under `views://`,
+ * so an early frame simply failed and `ensureHost` rebuilt against the real URL when it landed. Now
+ * that default RESOLVES: `views://studio/canvas.html` is a document electrobun really does stage.
+ * An early frame would therefore boot the whole canvas bundle inside the SHELL's app-privileged
+ * origin, in a CEF instance running `disable-site-isolation-trials` — and the cross-origin loopback
+ * canvas exists precisely so that never happens.
+ */
+function resolveCanvasUrl(): string {
+  if (!hasPlatform()) {
+    return defaultCanvasUrl();
+  }
+  const platform = getPlatform();
+  if (platform.canvasUrl) {
+    return platform.canvasUrl;
+  }
+  return platform.canvasUrlDeferred ? DEFERRED_CANVAS_URL : defaultCanvasUrl();
+}
+
+/**
  * Release every canvas host mounted under `root`, and say how many there were.
  *
  * The one NON-lazy path out of {@link liveHosts}. Eleven sites prune a disconnected host when they
@@ -1554,7 +1595,7 @@ export function releaseCanvasHosts(root: HTMLElement): number {
 function ensureHost(canvasEl: HTMLElement): HostState {
   // Read the platform's canvasUrl when one is registered; otherwise fall back to the default. The
   // Dev server leaves it unset, and some tests mount without a platform registered.
-  const canvasUrl = (hasPlatform() ? getPlatform().canvasUrl : undefined) ?? DEFAULT_CANVAS_URL;
+  const canvasUrl = resolveCanvasUrl();
   const existing = hosts.get(canvasEl);
   if (existing) {
     if (existing.canvasUrl === canvasUrl) {
