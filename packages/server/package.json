@@ -1,6 +1,6 @@
 {
   "name": "@jxsuite/server",
-  "version": "2.2.2",
+  "version": "2.2.3",
   "description": "Jx development server with live reload, server-side proxy, and studio integration",
   "license": "MIT",
   "repository": {

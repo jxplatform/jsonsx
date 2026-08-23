@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.2.3](https://github.com/jxsuite/jx/compare/server-v2.2.2...server-v2.2.3) (2026-08-23)
+
+
+### Bug Fixes
+
+* **desktop:** a bare jx-studio watched the whole home directory ([b9d78d7](https://github.com/jxsuite/jx/commit/b9d78d74484c54ec6b983ab81bb19364d3a4a779))
+* **desktop:** a bare jx-studio watched the whole home directory ([f60059b](https://github.com/jxsuite/jx/commit/f60059b86ba92341fe62f8280c24ae250fc891bc))
+
 ## [2.2.2](https://github.com/jxsuite/jx/compare/server-v2.2.1...server-v2.2.2) (2026-08-21)
 
 

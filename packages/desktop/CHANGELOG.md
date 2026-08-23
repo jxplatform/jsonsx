@@ -1,5 +1,28 @@
 # Changelog
 
+## [2.3.0](https://github.com/jxsuite/jx/compare/desktop-v2.2.2...desktop-v2.3.0) (2026-08-23)
+
+
+### Features
+
+* **studio:** the package states its own layout, and hosts itself ([17ed4bc](https://github.com/jxsuite/jx/commit/17ed4bcfce451a21adb5729054a4934f2ef032f4))
+
+
+### Bug Fixes
+
+* **desktop:** a bare jx-studio watched the whole home directory ([b9d78d7](https://github.com/jxsuite/jx/commit/b9d78d74484c54ec6b983ab81bb19364d3a4a779))
+* **desktop:** a bare jx-studio watched the whole home directory ([f60059b](https://github.com/jxsuite/jx/commit/f60059b86ba92341fe62f8280c24ae250fc891bc))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/server bumped to 2.2.3
+    * @jxsuite/studio bumped to 2.3.0
+  * devDependencies
+    * @jxsuite/server bumped to 2.2.3
+
 ## [2.2.2](https://github.com/jxsuite/jx/compare/desktop-v2.2.1...desktop-v2.2.2) (2026-08-21)
 
 
