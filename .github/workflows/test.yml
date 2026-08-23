@@ -30,7 +30,6 @@ jobs:
       has_tests: ${{ steps.affected.outputs.has_tests }}
       all_workspaces: ${{ steps.affected.outputs.all_workspaces }}
       lens_mutants: ${{ steps.affected.outputs.gate_lens_mutants }}
-      nix: ${{ steps.affected.outputs.gate_nix }}
       bundles: ${{ steps.affected.outputs.gate_bundle }}
       mode: ${{ steps.affected.outputs.mode }}
     steps:
@@ -433,9 +432,16 @@ jobs:
   # `ci`, and the Nix package is the ONLY consumer of bun.nix and the flake inputs. Without this,
   # a bump that breaks packaging would land on main and first be noticed by a release refusing to
   # advance. The gate is scripts/ci/affected.ts's NIX_INPUTS.
+  # THE RELEASE PULL REQUEST ONLY. It used to run on any diff touching the derivation's inputs —
+  # `bun.lock`, `package.json`, `packages/desktop/**` — which is most Dependabot pull requests, and
+  # it is by far the slowest job here. The trade taken deliberately: a dependency bump that breaks
+  # packaging no longer blocks its own auto-merge, and is caught on the release pull request
+  # instead, where `ci` still requires this job and a human is already reading the diff. The two
+  # legs that were never about pull requests are untouched — nix.yml still builds on `push: main`
+  # and nightly to keep the cache warm, and release-please.yml still gates the `release` branch on
+  # it, BARE, so a broken derivation can never reach a `nix run github:jxsuite/jx/release` user.
   nix:
-    needs: changes
-    if: needs.changes.outputs.nix == 'true'
+    if: startsWith(github.head_ref, 'release-please--')
     # No `with:` — the defaults are the pull-request shape (ubuntu-latest, the checked-out ref, no
     # publish). No `secrets:` either: CACHIX_AUTH_TOKEN is only needed on the release leg, and a
     # pull request must not be able to write to the public cache.
