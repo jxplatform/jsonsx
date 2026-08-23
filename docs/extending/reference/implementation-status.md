@@ -17,7 +17,7 @@ This page is generated from the `> **Status: …**` markers in the specification
 | `ai.md`                   | 0.1.7-draft  | Partial     | 2026-08-20 |
 | `collab.md`               | 0.2.5-draft  | Partial     | 2026-08-20 |
 | `compiler.md`             | 0.3.1-draft  | Partial     | 2026-08-18 |
-| `desktop.md`              | 0.3.18-draft | Pending     | 2026-08-22 |
+| `desktop.md`              | 0.3.19-draft | Pending     | 2026-08-22 |
 | `extensions.md`           | 0.3.10-draft | Partial     | 2026-08-20 |
 | `imports.md`              | 0.1.9-draft  | Partial     | 2026-08-15 |
 | `jx-markdown.md`          | 0.1.8-draft  | Partial     | 2026-08-15 |
@@ -38,6 +38,7 @@ This page is generated from the `> **Status: …**` markers in the specification
 - `ai.md` §2 — Provider Contract
 - `collab.md` §5 — Version Skew
 - `compiler.md` §3 — Output Tiers
+- `desktop.md` §10 — SaaS / Cloud Mode
 - `parser.md` §3 — `Markdown` — the markdown format class
 - `site-architecture.md` §9.4 — Studio Media Browser
 - `site-architecture.md` §13 — Internationalization
@@ -58,11 +59,8 @@ This page is generated from the `> **Status: …**` markers in the specification
 ### Pending
 
 - `desktop.md` §4.3 — Single File Mode
+- `desktop.md` §10.2 — Storage Backend
 - `site-architecture.md` §12.3 — Incremental Builds
-
-### Future
-
-- `desktop.md` §10 — SaaS / Cloud Mode
 
 ### Removed
 

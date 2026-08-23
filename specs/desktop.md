@@ -2,7 +2,7 @@
 
 ## Platform Abstraction, Project Loading, and Component Scoping
 
-**Version:** 0.3.18-draft
+**Version:** 0.3.19-draft
 **Status:** Pending
 **Updated:** 2026-08-22
 **License:** MIT
@@ -35,7 +35,7 @@ Jx Studio is designed for three deployment targets that share a single core code
 | **Desktop app**   | ElectroBun (Bun + native webview) | Bun process (local)           | Filesystem                | All platforms except NixOS   |
 | **NixOS desktop** | Chromium `--app` + Bun            | `@jxsuite/server` (localhost) | Filesystem via dev server | NixOS only (via `nix build`) |
 | **Dev mode**      | Chrome                            | `@jxsuite/server` (localhost) | Filesystem via dev server | Active (Studio development)  |
-| **SaaS/PaaS**     | Browser                           | Cloud API server              | Database / object storage | Future                       |
+| **SaaS/PaaS**     | Browser                           | Session gateway over git      | Git repository            | Shipped (see §10)            |
 
 ### 1.1a Platform Strategy
 
@@ -1010,15 +1010,37 @@ desktop portal, §8.2.1), and sign-in (§3.6).
 
 ## 10. SaaS / Cloud Mode
 
-> **Status: Future.** This section describes the target architecture for a hosted Studio deployment.
+> **Status: Partial.** The adapter shipped and is deployed; §10.2's storage model is not what it was
+> built on. This section said **Future** for as long as the cloud editor had been live, which is the
+> failure mode a status marker exists to prevent — so what follows separates what runs from what is
+> still a sketch.
 
 ### 10.1 Cloud Platform Adapter
 
+> **Status: Implemented.** `packages/studio/src/platforms/cloud.ts`, registered by the studio entry
+> rather than by the shell — see §3.3 and the `yjs` singleton note there.
+
 A cloud adapter replaces filesystem operations with API calls to a remote service. The project root becomes a project ID rather than a filesystem path. All PAL methods translate to REST or WebSocket calls to the cloud API.
+
+Concretely, the shipped adapter is session-bound: every call goes to
+`/api/v1/p/:owner/:repo/:branch/studio/*` with cookie auth, so the "project id" is the triple in the
+path. It reports `id: "cloud"`, `canvasUrl: "/canvas.html"` and `openProjectPicker: "repo-list"` —
+that last one routes New Project through Studio's own repository picker over `listRepos` +
+`importProject`, so `openProject()` is never called (§3.4). It implements the full git family, the
+identity and publish members, `subscribeFileEvents` over SSE, and `collab`. It deliberately omits
+`pickDirectory`, `importSite`, the package install family, `gitClone`, `resolveClass`,
+`discoverComponents` and `codeService`; each degrades exactly as its protocol route's `degradation`
+field describes, which is what makes an omission a documented state rather than a break.
 
 Because a cloud project _is_ a repository, the adapter sets `createDestination: "repo"` and the New Project modal collects a repository location — owner (personal account or organization), repository name, and visibility — instead of a folder (§4.5). The adapter forwards all three to the API, which resolves the owner against the session login to choose between the personal and organization creation endpoints. Nothing about the destination is defaulted server-side.
 
 ### 10.2 Storage Backend
+
+> **Status: Pending.** One possible mapping, and not the one that shipped. The deployed backend is
+> **git-backed** — a cloud project IS a repository, which is why the adapter sets
+> `createDestination: "repo"` and carries the whole git family. The table below is kept because the
+> equivalence it draws is the useful part: whatever a backend stores projects in, the PAL is what
+> Studio sees.
 
 The cloud backend stores projects in a database with an abstraction equivalent to the filesystem:
 
@@ -1031,9 +1053,13 @@ The cloud backend stores projects in a database with an abstraction equivalent t
 
 The same PAL interface means Studio code doesn't change — only the adapter implementation.
 
-### 10.3 Collaboration (Future)
+### 10.3 Collaboration
 
-A cloud backend can extend the PAL with collaboration features:
+> **Status: Implemented**, and not as sketched. The interface below is what this section proposed;
+> the paragraph after it is what shipped. Kept side by side because the difference is the design
+> decision: locks were replaced by convergence.
+
+The sketch was a lock-and-notify model:
 
 ```typescript
 interface CollaborativePlatform extends StudioPlatform {
@@ -1043,7 +1069,16 @@ interface CollaborativePlatform extends StudioPlatform {
 }
 ```
 
-These are additive — Studio checks for their presence and enables collaboration UI when available.
+What shipped is one optional PAL member — `collab?: (docPath) => Promise<CollabHandle | null>` — over
+a CRDT (`@jxsuite/collab`, Yjs). There are no locks: two authors edit the same document and the
+document converges, rather than one of them being refused. The adapter probes `/collab` once and
+passes the `protocols` the backend lists to the wire client, which offers one as
+`Sec-WebSocket-Protocol`; a client that offers a subprotocol the server does not echo fails the
+connection outright ([RFC 6455 §4.1](https://www.rfc-editor.org/rfc/rfc6455#section-4.1)), so an
+unconditional offer would break co-editing against every backend that predates negotiation.
+
+The member is still additive in the way this section intended: Studio checks for its presence and
+falls back to solo, file-level saves without it.
 
 ---
 
@@ -1095,12 +1130,15 @@ Ensure desktop app matches dev-mode capabilities:
 - [ ] Build / SSG pipeline accessible from Studio toolbar
 - [ ] Drag-and-drop component insertion from sidebar
 
-### Phase 4: Cloud Adapter (Future)
+### Phase 4: Cloud Adapter ✅
 
-- [ ] Define cloud API specification (REST endpoints mirroring PAL)
-- [ ] Implement `CloudPlatform` adapter
-- [ ] Project authentication and authorization
-- [ ] Real-time collaboration via WebSocket change feed
+- [x] Define cloud API specification (REST endpoints mirroring PAL) — `@jxsuite/protocol`'s route
+      table, one contract for every adapter rather than a cloud-specific one
+- [x] Implement `CloudPlatform` adapter — `packages/studio/src/platforms/cloud.ts`
+- [x] Project authentication and authorization — GitHub OAuth, cookie-bound sessions per
+      `owner/repo@branch`
+- [x] Real-time collaboration via WebSocket change feed — a CRDT rather than a change feed; see
+      §10.3
 
 ## 12. Standards Alignment
 
@@ -1116,6 +1154,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.3.19-draft** (2026-08-22) — 10 SaaS/Cloud is Partial rather than Future: the adapter shipped and is deployed (10.1 Implemented, with what it implements and what it deliberately omits), collaboration shipped as a CRDT rather than the sketched lock model (10.3), and 10.2's storage table is marked Pending because the deployed backend is git-backed.
 - **0.3.18-draft** (2026-08-22) — 3.3 the init bundle loads through a declared boot slot rather than an exact-string replace on the shipped document.
 - **0.3.17-draft** (2026-08-22) — §9.2: the session watches a project or nothing — a root with no project.json is declined rather than scanned recursively.
 - **0.3.16-draft** (2026-08-22) — §9.2: the launcher adopts its working directory as a project root only when that directory holds a project.json — a named root is still taken at its word.
@@ -1153,4 +1192,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx Studio Desktop Architecture Specification v0.3.18-draft_
+_Jx Studio Desktop Architecture Specification v0.3.19-draft_
