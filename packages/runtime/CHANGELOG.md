@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.3](https://github.com/jxsuite/jx/compare/runtime-v2.0.2...runtime-v2.0.3) (2026-08-23)
+
+
+### Bug Fixes
+
+* **canvas:** project files load on a host that does not serve them at its root ([#176](https://github.com/jxsuite/jx/issues/176)) ([eba67a9](https://github.com/jxsuite/jx/commit/eba67a9206eec389090a9fd4e0b77b29891ed32a))
+
 ## [2.0.2](https://github.com/jxsuite/jx/compare/runtime-v2.0.1...runtime-v2.0.2) (2026-08-21)
 
 
