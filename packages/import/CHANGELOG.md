@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.39.4](https://github.com/jxsuite/jx/compare/import-v0.39.3...import-v0.39.4) (2026-08-23)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * optionalDependencies
+    * @jxsuite/compiler bumped to 2.0.4
+
 ## [0.39.3](https://github.com/jxsuite/jx/compare/import-v0.39.2...import-v0.39.3) (2026-08-21)
 
 

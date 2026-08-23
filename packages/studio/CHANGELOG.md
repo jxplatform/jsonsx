@@ -1,5 +1,28 @@
 # Changelog
 
+## [2.4.0](https://github.com/jxsuite/jx/compare/studio-v2.3.0...studio-v2.4.0) (2026-08-23)
+
+
+### Features
+
+* **studio:** Cloudflare is the lead AI recommendation, and can be reconnected ([#174](https://github.com/jxsuite/jx/issues/174)) ([aa13308](https://github.com/jxsuite/jx/commit/aa1330859b995e2c0b4a658cc04cf4525cb3ff79))
+
+
+### Bug Fixes
+
+* **canvas:** project files load on a host that does not serve them at its root ([#176](https://github.com/jxsuite/jx/issues/176)) ([eba67a9](https://github.com/jxsuite/jx/commit/eba67a9206eec389090a9fd4e0b77b29891ed32a))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/ai bumped to 0.36.2
+    * @jxsuite/create bumped to 1.3.4
+    * @jxsuite/formulas bumped to 0.0.10
+    * @jxsuite/protocol bumped to 1.2.0
+    * @jxsuite/runtime bumped to 2.0.3
+
 ## [2.3.0](https://github.com/jxsuite/jx/compare/studio-v2.2.2...studio-v2.3.0) (2026-08-23)
 
 
