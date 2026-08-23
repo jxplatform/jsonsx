@@ -51,11 +51,18 @@ So the invariant moved. `bun.nix` matches `bun.lock` **at every release**, not a
 - `.github/workflows/release-bun-nix.yml` commits the regenerated file to the **release pull request** — the branch that becomes the tag, and one a human is already watching.
 - `nix.yml`'s release leg (`publish: true`) runs the check BARE. A drift there is a failure, not a fixup: if the sync ever fails to land, the release build fails, `release` does not advance, and release-please opens an issue. A stale `bun.nix` cannot reach a user.
 
-### The Nix build is part of `ci`
+### The Nix build runs on the release pull request, and nowhere else in `ci`
 
-`nix.yml` no longer has an `on: pull_request` trigger. A path-filtered workflow can never be a required check — it leaves the check pending forever when it does not fire — so test.yml (which has no `paths:` filter, and must never grow one) owns the pull-request leg via `workflow_call`, gated on `affected.ts`'s `NIX_INPUTS`, and the `ci` aggregate requires it. That is what lets a dependency bump which breaks packaging block its own auto-merge.
+`nix.yml` has no `on: pull_request` trigger. A path-filtered workflow can never be a required check — it leaves the check pending forever when it does not fire — so test.yml (which has no `paths:` filter, and must never grow one) owns the pull-request leg via `workflow_call`, and the `ci` aggregate requires it.
 
-`flake.nix`, `flake.lock` and `bun.nix` moved OUT of `affected.ts`'s GLOBAL list in the same change: no test suite reads them, so a weekly flake-input bump now runs the Nix build and nothing else instead of spending the whole matrix.
+**It is gated on the branch, not on the diff**: `startsWith(github.head_ref, 'release-please--')`. It was gated on the derivation's inputs (`bun.lock`, `package.json`, `packages/desktop/**`), which is most Dependabot pull requests, and it is by far the slowest job in the workflow.
+
+The cost of that is explicit and was accepted: **a dependency bump which breaks packaging no longer blocks its own auto-merge.** It surfaces one step later, on the release pull request, where `ci` still requires the job and a human is already reading the diff — and behind that, `nix.yml`'s release leg runs BARE, so a broken derivation still cannot reach a `nix run github:jxsuite/jx/release` user. `skipped` is green and `failure` is not, which is what makes a branch gate enough.
+
+Consequences for agents:
+
+- **`affected.ts` no longer decides anything about Nix.** `NIX_INPUTS`, `Decision.nixBuild` and the `gate_nix` output are gone; do not reintroduce a path list for it. The only path list left is `nix.yml`'s own `push: main` filter, and that one is a **cache** trigger, not a check — it keeps `main`'s cache warm for every PR to inherit.
+- `flake.nix`, `flake.lock` and `bun.nix` stay in `affected.ts`'s `NO_TESTS`: no test suite reads them, so they must not fail open into the whole matrix either.
 
 ### Settings, not code
 

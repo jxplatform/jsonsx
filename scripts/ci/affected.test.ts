@@ -72,75 +72,67 @@ describe("nothing at all", () => {
     const d = decide([".github/workflows/publish.yml", ".github/dependabot.yml"], workspaces);
     expect(d.testDirs).toEqual([]);
     expect(d.bundles).toEqual([]);
-    expect(d.nixBuild).toBe(false);
   });
 
   test("an empty diff runs nothing", () => {
     const d = decide([], workspaces);
     expect(d.testDirs).toEqual([]);
-    expect(d.nixBuild).toBe(false);
+    expect(d.bundles).toEqual([]);
   });
 });
 
 describe("the nix build", () => {
-  // The gate that lets `nix / build` be part of the required `ci` check. Before it, the Nix
-  // Workflow carried its own path-filtered `on: pull_request`, which can never be required: a
-  // Path-filtered workflow that does not fire leaves the check pending forever.
-  test("the flake and its lockfile run the nix build and NOTHING else", () => {
-    // This is the shape of a Dependabot flake-input bump. It used to be in GLOBAL, which spent
-    // The entire ~22-job matrix to answer a question only `nix build` can answer — no test suite
-    // Reads flake.nix, flake.lock or bun.nix.
+  /*
+   * It runs on the RELEASE pull request alone. It used to be gated on the derivation's own inputs
+   * — bun.lock, package.json, packages/desktop/** — which is most Dependabot pull requests, and it
+   * is by far the slowest job in this workflow. The trade is deliberate and it is a real one: a
+   * dependency bump that breaks packaging no longer blocks its own auto-merge. It is caught one
+   * step later instead, on the release pull request, where `ci` still requires this job.
+   */
+  test("nix is gated on the release branch, not on a diff", async () => {
+    const workflow = await Bun.file(".github/workflows/test.yml").text();
+    expect(workflow).toContain("if: startsWith(github.head_ref, 'release-please--')");
+    expect(workflow).toContain("uses: ./.github/workflows/nix.yml");
+    // `head_ref` is empty on `push`, so the push-to-main run of THIS workflow does not build nix.
+    // Nix.yml's own `push: main` trigger owns that leg, and it exists for the cache, not the check.
+    expect(workflow).not.toContain("needs.changes.outputs.nix");
+  });
+
+  test("the branch prefix is the one release-please actually opens", () => {
+    // Not derivable from release-please-config.json: the branch name is release-please's default,
+    // `release-please--branches--<target>`. Pinned from the merged pull requests in this repo
+    // (#171, #164, #159 … all `release-please--branches--main`), and asserted here so a change to
+    // `separate-pull-requests` or a branch-prefix setting has to come past this line.
+    expect("release-please--branches--main".startsWith("release-please--")).toBe(true);
+  });
+
+  test("ci still depends on nix, so a red derivation blocks the RELEASE pull request", async () => {
+    // The whole value of moving it: skipped is green, failed is not. `ci` is the one name branch
+    // Protection points at, and a nix job it does not depend on could not block anything.
+    const workflow = await Bun.file(".github/workflows/test.yml").text();
+    expect(workflow).toContain(
+      "needs: [changes, test, checks, lens-mutants, studio-dist, nix, coverage-comment]",
+    );
+  });
+
+  test("the derivation's inputs still cost NOTHING in the test matrix", () => {
+    // This is what kept flake.nix out of GLOBAL, and it outlives the gate: no test suite reads
+    // These, so they must not fail open into the whole ~22-job fan-out either.
     for (const path of ["flake.nix", "flake.lock", "bun.nix"]) {
       const d = decide([path], workspaces);
-      expect(d.nixBuild).toBe(true);
       expect(d.mode).toBe("affected");
       expect(d.testDirs).toEqual([]);
       expect(d.bundles).toEqual([]);
     }
   });
 
-  test("the lockfile runs both — it moves the dependency set the tests AND the derivation use", () => {
-    const d = decide(["bun.lock"], workspaces);
-    expect(d.nixBuild).toBe(true);
-    expect(d.mode).toBe("all");
-  });
-
-  test("the desktop app, the workflow, and the generator's own source are inputs", () => {
-    expect(decide(["packages/desktop/package.nix"], workspaces).nixBuild).toBe(true);
-    expect(decide([".github/workflows/nix.yml"], workspaces).nixBuild).toBe(true);
-    expect(decide(["scripts/check-bun-nix.ts"], workspaces).nixBuild).toBe(true);
-  });
-
-  test("a change the derivation cannot notice does not pay for a nix build", () => {
-    expect(decide(["docs/start/install.md"], workspaces).nixBuild).toBe(false);
-    expect(decide(["packages/studio/src/studio.ts"], workspaces).nixBuild).toBe(false);
-    expect(decide([".github/workflows/publish.yml"], workspaces).nixBuild).toBe(false);
-  });
-
-  test("an unclassified path fails OPEN into the nix build too", () => {
-    // `src = lib.cleanSource ../..` — the derivation's input IS the tree, so a path nobody has
-    // Classified is a path that may well change what it builds.
-    expect(decide(["some-new-toplevel-dir/thing.ts"], workspaces).nixBuild).toBe(true);
-  });
-
   test("nix.yml must not ALSO carry its own pull_request trigger", async () => {
-    // Two triggers would mean two builds of the same commit on every pull request, in different
-    // Concurrency groups, neither cancelling the other. test.yml owns this leg now.
+    // Two triggers would mean two builds of the same commit on the release pull request, in
+    // Different concurrency groups, neither cancelling the other. test.yml owns this leg.
     const workflow = await Bun.file(".github/workflows/nix.yml").text();
     const triggers = workflow.slice(workflow.indexOf("\non:"), workflow.indexOf("\npermissions:"));
     expect(triggers).not.toContain("pull_request:");
     expect(triggers).toContain("workflow_call:");
-  });
-
-  test("test.yml requires the nix job, and gates it on this script's output", async () => {
-    const workflow = await Bun.file(".github/workflows/test.yml").text();
-    expect(workflow).toContain("gate_nix");
-    expect(workflow).toContain("uses: ./.github/workflows/nix.yml");
-    // The `ci` aggregate is the ONE name branch protection points at; a nix job it does not
-    // Depend on is a nix job that cannot block an auto-merge.
-    expect(workflow).toContain(
-      "needs: [changes, test, checks, lens-mutants, studio-dist, nix, coverage-comment]",
-    );
   });
 
   test("test.yml requires studio-dist, and gates it on this script's output", async () => {
@@ -151,6 +143,22 @@ describe("the nix build", () => {
     // For bundle-analysis, so there is no second gate to keep in step.
     const workflow = await Bun.file(".github/workflows/test.yml").text();
     expect(workflow).toContain("if: contains(fromJSON(needs.changes.outputs.bundles), 'studio')");
+  });
+
+  test("every output the changes job forwards is one this script actually writes", async () => {
+    /*
+     * The mirror of the rule below, and the same silent failure from the other end: a job output
+     * Wired to `steps.affected.outputs.<name>` that the script never writes resolves to the empty
+     * String, so every consumer of it quietly reads false. `gate_nix` became exactly that the
+     * Moment the nix gate was deleted, and only this assertion would have said so.
+     */
+    const workflow = await Bun.file(".github/workflows/test.yml").text();
+    const script = await Bun.file("scripts/ci/affected.ts").text();
+    const block = workflow.slice(workflow.indexOf("    outputs:"), workflow.indexOf("    steps:"));
+    const wired = [...block.matchAll(/steps\.affected\.outputs\.(\w+)/g)].map((m) => m[1]);
+    const written = new Set([...script.matchAll(/^ {4}(\w+):/gm)].map((m) => m[1]));
+    expect(wired.length).toBeGreaterThan(0);
+    expect(wired.filter((name) => !written.has(name))).toEqual([]);
   });
 
   test("every needs.changes output a job reads is one the changes job declares", async () => {

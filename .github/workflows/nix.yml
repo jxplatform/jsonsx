@@ -6,13 +6,16 @@
 #
 # Five callers, one definition:
 #
-#   * `workflow_call` from test.yml, which owns the PULL-REQUEST leg. It used to be an
-#     `on: pull_request` trigger here, and that is precisely what made it unusable as a required
-#     status check: a path-filtered workflow that does not fire leaves a required check pending
-#     forever. test.yml has no `paths:` filter and its `changes` job decides instead
-#     (scripts/ci/affected.ts, `NIX_INPUTS`), so the Nix build now reports into the single `ci`
-#     aggregate that branch protection names — which is what lets a dependency bump that breaks
-#     packaging block its own auto-merge.
+#   * `workflow_call` from test.yml, which owns the PULL-REQUEST leg — on the RELEASE pull request
+#     alone (`startsWith(github.head_ref, 'release-please--')`). It used to be an `on: pull_request`
+#     trigger here, and that is precisely what made it unusable as a required status check: a
+#     path-filtered workflow that does not fire leaves a required check pending forever. test.yml
+#     has no `paths:` filter, so the Nix build reports into the single `ci` aggregate that branch
+#     protection names. It was then gated on the derivation's inputs, which is most Dependabot pull
+#     requests and by far the slowest job in that workflow; it is now gated on the release branch
+#     instead. The cost of that is explicit: a dependency bump which breaks packaging no longer
+#     blocks its own auto-merge, and surfaces on the release pull request, where `ci` still requires
+#     this job and a human is already reading the diff.
 #   * `push` to `main`, path-filtered. This one exists for the CACHE, not the check: GitHub
 #     Actions caches are branch-scoped, and a PR may read the default branch's cache but never
 #     another PR's. Without a run on `main` there is no base cache for any PR to inherit, and every
@@ -33,9 +36,10 @@ on:
   push:
     branches:
       - main
-    # The same inputs scripts/ci/affected.ts uses to decide the pull-request leg (its NIX_INPUTS
-    # list). Keep the two in step: affected.ts's own test asserts this file has no `pull_request`
-    # trigger, but nothing can assert that two path lists agree with each other.
+    # This filter is now the ONLY path list for the Nix build; affected.ts no longer carries a
+    # Counterpart (`NIX_INPUTS` is gone, along with the gate it fed). It is a CACHE trigger, not a
+    # Check: it decides when `main` refreshes the cache every pull request inherits, so being a
+    # Little generous here is cheap and being narrow is what leaves a PR refetching ~1000 tarballs.
     paths:
       # The derivation, the generated dependency set, and the lockfile it is generated from.
       - "flake.nix"
