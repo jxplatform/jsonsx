@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.3.0](https://github.com/jxsuite/jx/compare/studio-v2.2.2...studio-v2.3.0) (2026-08-23)
+
+
+### Features
+
+* **studio:** gate the two rules that make a template the only writer ([d9a6947](https://github.com/jxsuite/jx/commit/d9a6947faf098f90aa017148f8073be63cf28525))
+* **studio:** the package states its own layout, and generates its documents ([ca3e327](https://github.com/jxsuite/jx/commit/ca3e3276b36cf1a9caedfbeaa2eefd5bcbdd52ff))
+* **studio:** the package states its own layout, and hosts itself ([17ed4bc](https://github.com/jxsuite/jx/commit/17ed4bcfce451a21adb5729054a4934f2ef032f4))
+
+
+### Bug Fixes
+
+* **studio:** make the template the only writer where two writers diverged ([fd77a06](https://github.com/jxsuite/jx/commit/fd77a0663f8a259673cf3e405d40f64a0b08869d))
+* **studio:** resolve Monaco workers against the entry, not the chunk ([495cd4b](https://github.com/jxsuite/jx/commit/495cd4b96fc3d290ab2fe945d9bb24b1362a5402))
+* **studio:** the hosting contract compiles under a consumer's flags ([eb44339](https://github.com/jxsuite/jx/commit/eb443391f70bb11369d809fa3fa47ad0dd23cffe))
+
 ## [2.2.2](https://github.com/jxsuite/jx/compare/studio-v2.2.1...studio-v2.2.2) (2026-08-21)
 
 
