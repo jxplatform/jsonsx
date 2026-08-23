@@ -1,5 +1,17 @@
 import type { ElectrobunConfig } from "electrobun";
-import { STUDIO_ASSETS } from "@jxsuite/studio/hosting/layout";
+/*
+ * RELATIVE, and it has to be. This file is loaded by the `electrobun` CLI — a compiled single-file
+ * Bun binary — whose resolver handles `node:` builtins and relative paths but NOT bare specifiers:
+ * `@jxsuite/studio/hosting/layout` fails with "Cannot find module", on Linux exactly as on Windows.
+ *
+ * The dangerous part is what happens next. The CLI catches the error, prints "using default config
+ * instead", and CARRIES ON with a config that is not this one — so the build dies further down on
+ * `src/bun/index.ts doesn't exist`, naming an entrypoint no file here has ever declared. Every
+ * desktop build broke that way, on all three platforms, and nothing went red until a release.
+ *
+ * `scripts/check-electrobun-config.ts` holds the rule so it cannot come back.
+ */
+import { STUDIO_ASSETS } from "../studio/src/hosting/layout";
 import { readFileSync } from "node:fs";
 
 const pkg = JSON.parse(readFileSync("./package.json", "utf8")) as { version: string };

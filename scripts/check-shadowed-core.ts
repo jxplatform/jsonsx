@@ -38,7 +38,7 @@
  * scripts/check-shadowed-core.ts --fix # remove them, then exit 0
  */
 
-import { existsSync, lstatSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, readFileSync, readlinkSync, rmSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
 const REPO_ROOT = resolve(import.meta.dir, "..");
@@ -149,6 +149,56 @@ export function findShadows(roots: readonly string[] = generatorRoots()): Shadow
 }
 
 /**
+ * Delete `.bin` entries that symlink into this `node_modules`'s first-party scope.
+ *
+ * @param {string} nodeModules - The `node_modules` directory to clean
+ * @returns {string[]} Repo-relative paths removed, for the caller to report
+ */
+export function danglingScopeBinLinks(nodeModules: string): string[] {
+  const binDir = join(nodeModules, ".bin");
+  if (!existsSync(binDir)) {
+    return [];
+  }
+  const found: string[] = [];
+  for (const entry of readdirSync(binDir)) {
+    const link = join(binDir, entry);
+    if (!lstatSync(link).isSymbolicLink()) {
+      continue;
+    }
+    /*
+     * Judged on the LINK TEXT, and on whether it still resolves. Two reasons for each half: the
+     * Target is already gone so there is nothing on disk left to ask which package owned it, and
+     * `existsSync` FOLLOWS a symlink — which is what makes it the dangling test rather than an
+     * Existence one. A first-party link that still resolves is a working link and is left alone.
+     */
+    const target = readlinkSync(link).replaceAll("\\", "/");
+    if (target.includes(`${FIRST_PARTY_SCOPE}/`) && !existsSync(link)) {
+      found.push(link);
+    }
+  }
+  return found;
+}
+
+/**
+ * Delete the dangling first-party `.bin` links in this `node_modules`, and the directory if that
+ * empties it.
+ *
+ * @param {string} nodeModules - The `node_modules` directory to clean
+ * @returns {string[]} Repo-relative paths removed, for the caller to report
+ */
+export function removeScopeBinLinks(nodeModules: string): string[] {
+  const removed = danglingScopeBinLinks(nodeModules).map((link) => {
+    rmSync(link, { force: true });
+    return relative(REPO_ROOT, link);
+  });
+  const binDir = join(nodeModules, ".bin");
+  if (existsSync(binDir) && readdirSync(binDir).length === 0) {
+    rmSync(binDir, { recursive: true });
+  }
+  return removed;
+}
+
+/**
  * Remove a shadow, and the stray lockfile the same install dropped beside it.
  *
  * The lockfile goes too because leaving it means the next `bun install` in that root faithfully
@@ -170,6 +220,19 @@ export function removeShadow(shadow: Shadow): void {
     rmSync(join(shadow.root, "bun.lockb"), { force: true });
   }
 
+  /*
+   * The bin links the removed package installed point at it and are now DANGLING, and a dangling
+   * link is not inert: anything that walks the tree with a recursive copy explodes on it rather
+   * than skipping it. `bun install` in a starter writes `node_modules/.bin/jx ->
+   * ../@jxsuite/compiler/src/cli.js`; removing the shadow above leaves that link behind, and the
+   * desktop build — which copies `packages/starters/sites` wholesale into the app — died on
+   * `ENOENT: statx .../node_modules/.bin/jx` months later.
+   *
+   * Only links INTO the scope just deleted are removed. A dangling `js-yaml` beside it is somebody
+   * else's business, and guessing at it would make this cleaner an unpredictable neighbour.
+   */
+  removeScopeBinLinks(join(shadow.root, "node_modules"));
+
   // Prune the scope directory once it is empty, then `node_modules` itself if that emptied it. An
   // Empty `@jxsuite/` shadows nothing — resolution walks past it — but leaving skeletons behind
   // Makes the next person wonder what is in them.
@@ -186,8 +249,16 @@ export function removeShadow(shadow: Shadow): void {
 if (import.meta.main) {
   const fix = process.argv.includes("--fix");
   const shadows = findShadows();
+  /*
+   * Swept independently of the shadows, because an orphan OUTLIVES the shadow that justified it:
+   * removing `node_modules/@jxsuite/compiler` leaves `.bin/jx` pointing into the hole, and on the
+   * next run there is no shadow left to hang the cleanup off. Every such link found in this repo
+   * was in exactly that state.
+   */
+  const roots = generatorRoots();
+  const orphans = roots.flatMap((root) => danglingScopeBinLinks(join(root, "node_modules")));
 
-  if (shadows.length === 0) {
+  if (shadows.length === 0 && orphans.length === 0) {
     console.log("shadowed-core OK: no project root ships its own copy of a first-party package.");
     process.exit(0);
   }
@@ -202,18 +273,24 @@ if (import.meta.main) {
       removeShadow(shadow);
       console.log(`removed${label(shadow).slice(1)}`);
     }
+    const binsRemoved = roots.flatMap((root) => removeScopeBinLinks(join(root, "node_modules")));
+    for (const link of binsRemoved) {
+      console.log(`removed  ${link} (dangling bin link)`);
+    }
     console.log(
-      `shadowed-core: removed ${shadows.length} shadowing package(s). ` +
-        `The install itself is fine — only the first-party copies are gone.`,
+      `shadowed-core: removed ${shadows.length} shadowing package(s) and ${binsRemoved.length} ` +
+        `dangling bin link(s). The install itself is fine — only the first-party copies are gone.`,
     );
     process.exit(0);
   }
 
-  console.error(
-    `\n❌ ${shadows.length} first-party package entr(ies) beat this workspace on resolution:\n`,
-  );
-  for (const shadow of shadows) {
-    console.error(label(shadow));
+  if (shadows.length > 0) {
+    console.error(
+      `\n❌ ${shadows.length} first-party package entr(ies) beat this workspace on resolution:\n`,
+    );
+    for (const shadow of shadows) {
+      console.error(label(shadow));
+    }
   }
   if (shadows.some((s) => s.kind === "shadow")) {
     console.error(
@@ -225,6 +302,17 @@ if (import.meta.main) {
     console.error(
       `\nA dangling link resolves to nothing at all, so the import fails outright — the package ` +
         `it points at moved, and that root's install predates the move.`,
+    );
+  }
+  if (orphans.length > 0) {
+    console.error(`\n${orphans.length} dangling first-party bin link(s):\n`);
+    for (const link of orphans) {
+      console.error(`  ${relative(REPO_ROOT, link)}`);
+    }
+    console.error(
+      `\nA dangling link is not inert. Anything that walks the tree with a recursive copy THROWS ` +
+        `on it rather than skipping it — the desktop build copies packages/starters/sites wholesale ` +
+        `into the app, and died on ENOENT statx for one of these.`,
     );
   }
   console.error(
