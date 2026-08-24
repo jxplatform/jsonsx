@@ -23,7 +23,8 @@ export interface BunSqliteStatementLike {
 /** The subset of `bun:sqlite`'s Database the driver uses. */
 export interface BunSqliteDatabaseLike {
   prepare: (sql: string) => BunSqliteStatementLike;
-  close?: () => void;
+  /** `throwOnError` forces the close instead of deferring it — see {@link createDriver}'s destroy. */
+  close?: (throwOnError?: boolean) => void;
 }
 
 export interface BunSqliteDialectConfig {
@@ -113,7 +114,14 @@ function createDriver(config: BunSqliteDialectConfig): Driver {
     },
     destroy: async () => {
       if (owned) {
-        db?.close?.();
+        /* `close(true)`, not `close()`. bun:sqlite defers a bare close while prepared statements
+           are outstanding, and `executeQuery` above prepares one per query and finalizes none, so
+           the bare form returns without releasing the file. Measured directly: open a database,
+           prepare three statements, then `close()` — the file cannot be deleted (EBUSY on
+           Windows); `close(true)`, or finalizing each statement first, releases it. POSIX hides
+           the difference because a file can be unlinked while open, but the handle leaks on every
+           platform, once per connection the driver believes it has closed. */
+        db?.close?.(true);
       }
       db = null;
     },

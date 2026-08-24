@@ -68,3 +68,28 @@ describe("createBunSqliteDialect", () => {
     await driver.destroy();
   });
 });
+
+describe("destroy releases the database file", () => {
+  /*
+   * A driver that reports itself destroyed while still holding the file is the failure this pins.
+   * `executeQuery` prepares a statement per query and finalizes none, and bun:sqlite DEFERS a bare
+   * `close()` while statements are outstanding — so the obvious spelling returns without releasing
+   * anything. POSIX cannot see it (an open file still unlinks); Windows answers EBUSY, which is
+   * where it surfaced. Deleting the directory is the assertion because that is the consequence
+   * anyone actually meets: a temp fixture that will not clean up, or a project directory a desktop
+   * window has quietly pinned.
+   */
+  test("the file can be deleted after destroy, having been queried through", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "bun-sqlite-release-"));
+    const db = new Kysely<DynamicDatabase>({
+      dialect: createBunSqliteDialect({ url: join(dir, "held.sqlite") }),
+    });
+    await sql`create table t (a integer)`.execute(db);
+    await sql`insert into t (a) values (1)`.execute(db);
+    await sql`select * from t`.execute(db);
+    await db.destroy();
+
+    expect(() => rmSync(dir, { recursive: true })).not.toThrow();
+    expect(existsSync(dir)).toBe(false);
+  });
+});
