@@ -38,6 +38,7 @@ import { adjacentBlock, blocksInOrder } from "./iframe-position";
 import { isTagActiveInSelection, toggleInlineFormat } from "../editor/inline-format";
 import { applyLink, insertTemplateToken, linkStateForSelection } from "../editor/inline-link";
 import { restoreTemplateExpressions } from "../utils/edit-display";
+import { RESERVED_KEYS, camelToKebab } from "@jxsuite/runtime";
 import { rectOfRange } from "../utils/geometry";
 import { getNodeAtPath } from "../state";
 import { parseJxPath, serializeJxPath } from "./path-mapping";
@@ -84,6 +85,77 @@ function ownerInstanceOf(el: HTMLElement): HTMLElement | null {
     cur = cur.parentElement;
   }
   return null;
+}
+
+/**
+ * Whether the instance node delivers `prop` by some route OTHER than `$props` — in which case
+ * "absent from `$props`" does not mean "unset", and a `$props` write would add a SECOND source for
+ * one rendered value.
+ *
+ * The routes are the property bridge's own, in the order `connectedCallback` reads them
+ * (`compiler.md` §4.4) — a `data-jx-props` payload, literal `props.*` attributes, then JS
+ * properties set before connection — plus the one that reaches that third source without going
+ * through `$props`. Each was reproduced against the real runtime:
+ *
+ * 1. `attributes: { "data-jx-props": "{…}" }` — the compiler's pre-rendered payload, parsed into state
+ *    before anything else. Studio edits source documents rather than build output, so this is the
+ *    rare one; it is here because the bridge reads it.
+ * 2. The JSON shorthand `attributes: { "props.text": "…" }`. `connectedCallback` collects `props.*`
+ *    attributes into state, so the marker renders that text while `$props` is empty. This repo's
+ *    own site carries 95 of them.
+ * 3. A prop whose name collides with a REFLECTED HTMLElement property — `title`, `role`, `id`, `lang`,
+ *    `dir`, `slot`, `hidden`. `setAttribute("title", …)` writes the JS property as a side effect,
+ *    and the merge `key in this && this[key] !== undefined` picks it up. 41 shipped starter
+ *    components declare `title` or `role` as state. Matched the way `instanceSupplies` matches:
+ *    attribute names are case-insensitive, and an ARIA-style reflection carries a kebab attribute
+ *    for a camelCase property (`ariaLabel` → `aria-label`).
+ * 4. A TOP-LEVEL key on the instance node — `{ "tagName": "x-card", "heading": "Local" }`. This is the
+ *    property-first interface written straight onto the node: `applyProperties` sets every
+ *    non-reserved key as a JS property, which is exactly what the merge then reads back off `this`.
+ *    Reserved keys (`name`, `items`, `children`, …) are skipped there and so are skipped here —
+ *    refusing on one would block a prop that the key never delivered.
+ *
+ * Editing any of them writes `$props[prop]` and leaves the other value standing. For case 3 the
+ * attribute WINS (applyAttributes runs after the $props assignment) so the edit is simply
+ * invisible; for the rest `$props` wins and the stale value waits — clearing the prop later
+ * resurrects it. Refusing keeps the properties panel, which edits the real source, as the one way
+ * in.
+ */
+function deliveredOutsideProps(node: JxMutableNode | undefined, prop: string): boolean {
+  if (!node) {
+    return false;
+  }
+  const attrs = node.attributes as Record<string, unknown> | undefined;
+  if (attrs) {
+    if (attrs[`props.${prop}`] !== undefined) {
+      return true;
+    }
+    const reflected = new Set([prop.toLowerCase(), camelToKebab(prop).toLowerCase()]);
+    for (const [name, val] of Object.entries(attrs)) {
+      if (val !== undefined && reflected.has(name.toLowerCase())) {
+        return true;
+      }
+    }
+    const payload = attrs["data-jx-props"];
+    if (typeof payload === "string" && payloadNames(payload, prop)) {
+      return true;
+    }
+  }
+  // `$`-prefixed keys are scope bindings, never DOM properties — `applyProperties` skips them too.
+  if (RESERVED_KEYS.has(prop) || prop.startsWith("$")) {
+    return false;
+  }
+  return (node as Record<string, unknown>)[prop] !== undefined;
+}
+
+/** Whether a `data-jx-props` JSON payload carries `prop`. Unparseable payloads deliver nothing. */
+function payloadNames(payload: string, prop: string): boolean {
+  try {
+    const parsed: unknown = JSON.parse(payload);
+    return typeof parsed === "object" && parsed !== null && prop in parsed;
+  } catch {
+    return false;
+  }
 }
 
 /** Locate the rendered element for a document path via its stamped `data-jx-path`. */
@@ -267,10 +339,12 @@ export function startIframeInlineEdit(
   };
 
   /**
-   * Whether the instance's RAW `$props[prop]` value (from the pre-edit-display shadow doc) is
-   * plain-text editable. Template-valued (`"${...}"`) and `$ref`-valued props render display sugar,
-   * not the value — committing typed text would silently destroy the binding, so they're blocked.
-   * An absent getShadowDoc is permissive (tests, same contract as getMode).
+   * Whether the instance's prop (read from the pre-edit-display shadow doc) is plain-text editable
+   * AND `$props` is the place it lives — a value the instance delivers by another route belongs to
+   * that route, and `deliveredOutsideProps` refuses it. Template-valued (`"${...}"`) and
+   * `$ref`-valued props render display sugar, not the value — committing typed text would silently
+   * destroy the binding, so they're blocked. An absent getShadowDoc is permissive (tests, same
+   * contract as getMode).
    */
   const propEditableAt = (hostPath: JxPath, prop: string): boolean => {
     const shadowDoc = opts?.getShadowDoc?.();
@@ -278,27 +352,7 @@ export function startIframeInlineEdit(
       return true;
     }
     const node = getNodeAtPath(shadowDoc, hostPath) as JxMutableNode | undefined;
-    /*
-     * `$props` IS NOT THE ONLY PLACE A PROP VALUE LIVES, and "absent from $props" is therefore not
-     * the same question as "unset". Two shapes deliver one through `attributes` instead, and both
-     * were reproduced against the real runtime:
-     *
-     *   1. The JSON shorthand `attributes: { "props.text": "…" }`. `connectedCallback` collects
-     *      `props.*` attributes into state, so the marker renders that text while `$props` is
-     *      empty. This repo's own site carries 95 of them.
-     *   2. A prop whose name collides with a REFLECTED HTMLElement property — `title`, `role`,
-     *      `id`, `lang`, `dir`, `slot`, `hidden`. `setAttribute("title", …)` writes the JS property
-     *      as a side effect, and the merge `key in this && this[key] !== undefined` picks it up.
-     *      41 shipped starter components declare `title` or `role` as state.
-     *
-     * Editing either would write `$props[prop]` and leave the attribute standing — two sources for
-     * one rendered value. In case 2 the attribute WINS (applyAttributes runs after the $props
-     * assignment), so the edit is simply invisible; in case 1 clearing the prop later resurrects
-     * the old text. Refusing keeps the properties panel, which edits the attribute itself, as the
-     * one way in.
-     */
-    const attrs = node?.attributes as Record<string, unknown> | undefined;
-    if (attrs?.[`props.${prop}`] !== undefined || attrs?.[prop] !== undefined) {
+    if (deliveredOutsideProps(node, prop)) {
       return false;
     }
     const raw = (node?.$props as Record<string, unknown> | undefined)?.[prop];

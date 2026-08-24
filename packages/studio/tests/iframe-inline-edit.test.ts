@@ -737,13 +737,17 @@ describe("selection snapshot + applyFormat", () => {
 function propBoundContainer(
   rawProps?: Record<string, unknown>,
   rawAttrs?: Record<string, unknown>,
+  // Keys written at the TOP LEVEL of the instance node — the property-first interface addressed
+  // Straight at the element, which `applyProperties` turns into the JS properties the bridge reads.
+  rawTop?: Record<string, unknown>,
+  prop = "title",
 ) {
   const container = document.createElement("div");
   const host = document.createElement("x-card");
   host.dataset.jxPath = serializeJxPath(["children", 1]);
   const wrap = document.createElement("div");
   const h3 = document.createElement("h3");
-  h3.dataset.jxBoundProp = "title";
+  h3.dataset.jxBoundProp = prop;
   h3.textContent = "Local";
   wrap.append(h3);
   host.append(wrap);
@@ -754,6 +758,7 @@ function propBoundContainer(
       { tagName: "p" },
       {
         tagName: "x-card",
+        ...rawTop,
         ...(rawProps ? { $props: rawProps } : {}),
         ...(rawAttrs ? { attributes: rawAttrs } : {}),
       },
@@ -925,6 +930,143 @@ describe("prop-bound inline editing", () => {
     clickInto(h3);
     expect(posts.filter((p) => p.kind === "editStart")).toEqual([]);
     stop();
+  });
+
+  test("a prop delivered as a TOP-LEVEL node key is refused", () => {
+    /* `{ "tagName": "x-card", "heading": "Local" }` — the property-first interface written straight
+       onto the node. `applyProperties` sets every non-reserved key as a JS property, and the
+       bridge's `key in this` merge reads it back: the marker renders "Local" while $props is empty.
+       Reproduced against the real runtime, as is the harm — after an edit the document carries both
+       `heading` and `$props.heading`, $props wins, and clearing the prop resurrects the stale one.
+       Nothing about this route touches `attributes`, so the attribute guard could not see it. */
+    const { channel, posts } = fakeChannel();
+    const { container, h3, shadowDoc } = propBoundContainer(
+      undefined,
+      undefined,
+      { heading: "Local" },
+      "heading",
+    );
+    const stop = boot(channel, container, { getShadowDoc: () => shadowDoc });
+
+    clickInto(h3);
+    expect(posts.filter((p) => p.kind === "editStart")).toEqual([]);
+    stop();
+  });
+
+  test("a top-level key is refused for a REFLECTED name too", () => {
+    // The same route with `title`, where the property assignment also writes the attribute — but
+    // The DOCUMENT carries no `attributes` entry, so only the top-level read finds it.
+    const { channel, posts } = fakeChannel();
+    const { container, h3, shadowDoc } = propBoundContainer(undefined, undefined, {
+      title: "Local",
+    });
+    const stop = boot(channel, container, { getShadowDoc: () => shadowDoc });
+
+    clickInto(h3);
+    expect(posts.filter((p) => p.kind === "editStart")).toEqual([]);
+    stop();
+  });
+
+  test("a RESERVED top-level key does not block a prop of that name", () => {
+    /* The mirror of the rule above, and the reason it is name-matched against RESERVED_KEYS rather
+       than "any top-level key". `applyProperties` skips reserved keys, so `name` at the top level
+       is NOT a prop delivery — verified against the runtime, where the marker still renders the
+       definition's default. Refusing here would make an ordinary `name` prop uneditable. */
+    const { channel, posts } = fakeChannel();
+    const { container, h3, shadowDoc } = propBoundContainer(
+      { name: "Local" },
+      undefined,
+      { name: "Local" },
+      "name",
+    );
+    const stop = boot(channel, container, { getShadowDoc: () => shadowDoc });
+
+    clickInto(h3);
+    expect(posts).toContainEqual({ kind: "editStart", path: ["children", 1], prop: "name" });
+    stop();
+  });
+
+  test("an unrelated top-level key does not block an ordinary prop", () => {
+    // Name-matched, not "has any top-level keys": a className beside a `title` prop is not a
+    // Second source for the title.
+    const { channel, posts } = fakeChannel();
+    const { container, h3, shadowDoc } = propBoundContainer({ title: "Local" }, undefined, {
+      className: "hero",
+    });
+    const stop = boot(channel, container, { getShadowDoc: () => shadowDoc });
+
+    clickInto(h3);
+    expect(posts).toContainEqual({ kind: "editStart", path: ["children", 1], prop: "title" });
+    stop();
+  });
+
+  test("a host path the shadow doc does not resolve blocks nothing", () => {
+    // The stamp can outlive the node it names (a doc swapped under a stale render). No node is no
+    // Evidence of a second source, so the guard stays out of the way — the same permissive contract
+    // An absent getShadowDoc has.
+    const { channel, posts } = fakeChannel();
+    const { container, h3, host, shadowDoc } = propBoundContainer({ title: "Local" });
+    host.dataset.jxPath = serializeJxPath(["children", 9]);
+    const stop = boot(channel, container, { getShadowDoc: () => shadowDoc });
+
+    clickInto(h3);
+    expect(posts).toContainEqual({ kind: "editStart", path: ["children", 9], prop: "title" });
+    stop();
+  });
+
+  test("a prop delivered through a `data-jx-props` payload is refused", () => {
+    /* The bridge's FIRST source (compiler.md §4.4): the compiler stamps pre-rendered instances with
+       a JSON payload, and connectedCallback parses it into state before reading anything else.
+       Studio edits source documents rather than build output, so this is the rare one — it is
+       refused because the bridge reads it, not because a starter writes it. */
+    const { channel, posts } = fakeChannel();
+    const { container, h3, shadowDoc } = propBoundContainer(undefined, {
+      "data-jx-props": JSON.stringify({ title: "Local" }),
+    });
+    const stop = boot(channel, container, { getShadowDoc: () => shadowDoc });
+
+    clickInto(h3);
+    expect(posts.filter((p) => p.kind === "editStart")).toEqual([]);
+    stop();
+  });
+
+  test("an unparseable `data-jx-props` payload delivers nothing and blocks nothing", () => {
+    // The runtime swallows a malformed payload, so no value reaches state and the prop really is
+    // Unset. A refusal here would be a guard reading garbage as evidence.
+    const { channel, posts } = fakeChannel();
+    const { container, h3, shadowDoc } = propBoundContainer(undefined, {
+      "data-jx-props": "{not json",
+    });
+    const stop = boot(channel, container, { getShadowDoc: () => shadowDoc });
+
+    clickInto(h3);
+    expect(posts).toContainEqual({ kind: "editStart", path: ["children", 1], prop: "title" });
+    stop();
+  });
+
+  test("a reflected attribute is matched case-insensitively and in its kebab form", () => {
+    /* `instanceSupplies` accepts both, so both are evidence: HTML lowercases attribute names, and
+       an ARIA-style reflection carries `aria-label` for the `ariaLabel` property. (happy-dom
+       implements no ARIA reflection, so the runtime half of the kebab case is a browser fact, not
+       one this suite can reproduce — the studio half is what is asserted here.) */
+    for (const [attr, prop] of [
+      ["TITLE", "title"],
+      ["aria-label", "ariaLabel"],
+    ] as const) {
+      const { channel, posts } = fakeChannel();
+      const { container, h3, shadowDoc } = propBoundContainer(
+        undefined,
+        { [attr]: "Local" },
+        undefined,
+        prop,
+      );
+      const stop = boot(channel, container, { getShadowDoc: () => shadowDoc });
+
+      clickInto(h3);
+      expect(posts.filter((p) => p.kind === "editStart")).toEqual([]);
+      stop();
+      document.body.innerHTML = "";
+    }
   });
 
   test("an unrelated attribute does not block an ordinary prop", () => {

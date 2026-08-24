@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.41-draft
+**Version:** 0.9.42-draft
 **Status:** Partial
 **Updated:** 2026-08-24
 **License:** MIT
@@ -1089,12 +1089,22 @@ would read as editable, but the session commits `textContent` — so editing it 
 `${count * 2}` becomes string concatenation. Those props are refused here and edited in the
 properties panel, which knows their type. An expression (`${…}`) and an object were already refused.
 
-**`$props` is not the only place a value lives.** A prop delivered through `attributes` — either the
-JSON shorthand `"props.<name>"` or a name that collides with a reflected DOM property such as
-`title` or `role` — renders through the marker while `$props` holds nothing, so reading `$props`
-alone reports it as unset and offers to edit it. Committing would write `$props` and leave the
-attribute standing: two sources for one rendered value, and for a reflected name the attribute wins,
-so the edit is invisible. Both are refused; the properties panel edits the attribute itself.
+**`$props` is not the only place a value lives.** An instance may deliver a prop by any route the
+property bridge reads (`compiler.md` §4.4), and each of them renders through the marker while
+`$props` holds nothing — so reading `$props` alone reports the prop as unset and offers to edit it.
+Four routes do this: a `data-jx-props` payload; the JSON shorthand `attributes: {"props.<name>"}`; an
+`attributes` name that collides with a reflected DOM property such as `title` or `role`; and a
+**top-level key on the instance node** (`{"tagName": "x-card", "heading": "Local"}`), which is the
+property-first interface addressed straight at the element and which touches `attributes` not at
+all. Committing would write `$props` and leave the other value standing: two sources for one
+rendered value. For a reflected attribute name the attribute wins, so the edit is invisible;
+otherwise `$props` wins and the stale value waits until the prop is cleared, when it resurrects. All
+four are refused, and the properties panel edits the real source.
+
+The match is by name against that one prop, so an unrelated `class` or `className` beside it changes
+nothing — and a **reserved** key (`spec.md` §3: `name`, `items`, `children`, …) at the top level is
+not a delivery at all, because the runtime never lowers one to a DOM property. Refusing on a
+reserved name would block a prop the key never supplied.
 
 **A session that changes nothing writes nothing.** The commit is compared against the text the
 session opened with, not only against the stored prop: an _unset_ prop's stored value is `undefined`
@@ -2410,6 +2420,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.9.42-draft** (2026-08-24) — 8.2.6 refuses a prop delivered by any route the property bridge reads — a data-jx-props payload or a top-level key on the instance node, alongside the two attribute shapes — because $props is not the only place a value lives.
 - **0.9.41-draft** (2026-08-24) — 8.2.6 refuses a prop delivered through attributes — the props.* JSON shorthand or a name colliding with a reflected DOM property — because reading $props alone reports it unset, and committing would leave two sources for one rendered value; and 8.2 re-enters a prop host after a $props patch rebuilds the instance.
 - **0.9.40-draft** (2026-08-24) — 8.2.6 refuses a non-string prop for inline editing (the session commits textContent, so a number or boolean would be retyped) and states that a session which changes nothing writes nothing, with Escape a real cancel that also undoes an idle commit made during the session.
 - **0.9.39-draft** (2026-08-24) — 8.2.1 records that a prop-bound host is classified before positions are resolved: it has no document path, so the unresolvable-position rule would otherwise reject every keystroke in it, and only the paragraph split and line break are prevented there.
@@ -2506,4 +2517,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.41-draft_
+_`@jxsuite/studio` Specification v0.9.42-draft_
