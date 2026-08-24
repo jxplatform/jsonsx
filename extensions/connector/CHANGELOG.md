@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.3](https://github.com/jxsuite/jx/compare/connector-v0.5.2...connector-v0.5.3) (2026-08-24)
+
+
+### Bug Fixes
+
+* **connector:** release the SQLite file when the driver says it has ([76fc273](https://github.com/jxsuite/jx/commit/76fc273087b3699e50d584d5e863ebcf84927423))
+* the last two Windows-only test failures ([1dad5bc](https://github.com/jxsuite/jx/commit/1dad5bcb65a6e8058881d75222b9c21a8b732c9a))
+
 ## [0.5.2](https://github.com/jxsuite/jx/compare/connector-v0.5.1...connector-v0.5.2) (2026-08-21)
 
 

@@ -1,5 +1,25 @@
 # Changelog
 
+## [2.4.2](https://github.com/jxsuite/jx/compare/studio-v2.4.1...studio-v2.4.2) (2026-08-24)
+
+
+### Bug Fixes
+
+* **canvas:** a prop slot refuses a value the node delivers another way ([a3fe838](https://github.com/jxsuite/jx/commit/a3fe8386db37dea2c4b7b0ab35fca6eb58cf7323))
+* **canvas:** a prop slot refuses a value the node delivers another way ([af6fa6b](https://github.com/jxsuite/jx/commit/af6fa6bbab158f55dc6d51ad98630ae8ca6d54d2))
+* **canvas:** the document base is absolute, so the canvas mounts ([#189](https://github.com/jxsuite/jx/issues/189)) ([6e820a4](https://github.com/jxsuite/jx/commit/6e820a4d87157fa5985a257e0ed536feb7854793))
+* **ci:** keep bun.lock at lockfileVersion 1 and declare the bun types ([19ea116](https://github.com/jxsuite/jx/commit/19ea1161ddb0f0a402b61000841ac0436af225ac))
+* **studio:** make the reachability harness agree with TypeScript about paths ([f0374f4](https://github.com/jxsuite/jx/commit/f0374f4e8cce1ff4ffd4ed5e1d51a4249d451b51))
+* **tests:** make the Windows suites runnable ([1c23891](https://github.com/jxsuite/jx/commit/1c23891ec56dce22e1e900ae151a49cb1ecdbe25))
+* the last two Windows-only test failures ([1dad5bc](https://github.com/jxsuite/jx/commit/1dad5bcb65a6e8058881d75222b9c21a8b732c9a))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/formulas bumped to 0.0.12
+
 ## [2.4.1](https://github.com/jxsuite/jx/compare/studio-v2.4.0...studio-v2.4.1) (2026-08-24)
 
 
