@@ -182,11 +182,19 @@ let endFn: (() => void) | null = null; // Function() called when editing stops
 /**
  * Plain (plaintext-only) session state — used for prop-bound text, where the committed value is a
  * plain string (a directive attribute), so rich formatting, Enter-split, and the slash menu are all
- * disabled: Enter commits, Escape restores `_plainOriginal` and commits unchanged (the host no-ops
- * an unchanged prop value).
+ * disabled: Enter commits, Escape restores `_plainOriginal`.
+ *
+ * Escape is a genuine cancel, and `_plainPosted` is what makes it one. Restoring the text is not
+ * enough on its own: if an idle tick already wrote during the session, the document holds the typed
+ * value and the restored text must be written back over it. Conversely a session that never posted
+ * and ends matching its original must write NOTHING — the host's "unchanged value" guard cannot be
+ * relied on for that, because it compares against the STORED prop and an unset prop's stored value
+ * is `undefined` while the marker renders the definition's default.
  */
 let _plainMode = false;
 let _plainOriginal = "";
+/** Whether this plain session has posted a commit — see the note above on Escape. */
+let _plainPosted = false;
 
 /**
  * The live document's format overrides for which tags hold a caret. Injected per render (the same
@@ -286,6 +294,7 @@ export function startEditing(
   endFn = callbacks.onEnd;
   _plainMode = opts?.plainText === true;
   _plainOriginal = _plainMode ? (el.textContent ?? "") : "";
+  _plainPosted = false;
 
   // Mark the caret's block so the empty-block slash hint can target it. The editing host itself is
   // The canvas container (see syncEditableRoot) — activating a block does NOT make it a separate
@@ -345,6 +354,7 @@ export function stopEditing(silent = false) {
   insertFn = null;
   _plainMode = false;
   _plainOriginal = "";
+  _plainPosted = false;
 
   if (silent) {
     endFn = null;
@@ -368,6 +378,19 @@ export function stopEditing(silent = false) {
  */
 export function commitActiveBlock(): void {
   commitChanges(true);
+}
+
+/**
+ * Whether the live session is PLAIN — a prop value rather than a block of the document.
+ *
+ * Exported because the format bridge is in another module and `_plainMode` is file-local, so
+ * `applyFormatIntent` could not even ask: a ⌘B forwarded out to the parent came back as an
+ * `applyFormat` intent and ran `toggleInlineFormat` on a `plaintext-only` host, wrapping the prop's
+ * text in a `<strong>` that its next commit then flattened away — losing nothing visible, but
+ * mutating the DOM under a session whose whole contract is that it holds one plain string.
+ */
+export function isPlainSession(): boolean {
+  return _plainMode && activeEl !== null;
 }
 
 /**
@@ -416,7 +439,9 @@ function handleKeydown(e: KeyboardEvent) {
       e.preventDefault();
       e.stopPropagation();
       if (activeEl) {
-        // Cancel: restore the original text; the commit posts the unchanged value (host no-ops).
+        /* Cancel: restore the original text. `commitChanges` then posts it ONLY if this session had
+           already written (an idle tick), which is what makes Escape undo the tick instead of
+           leaving it standing — and what stops a bare Escape from writing anything at all. */
         activeEl.textContent = _plainOriginal;
       }
       stopEditing();
@@ -532,6 +557,7 @@ function releaseWithoutCommit(): void {
   insertFn = null;
   _plainMode = false;
   _plainOriginal = "";
+  _plainPosted = false;
 
   if (endFn) {
     const fn = endFn;
@@ -557,7 +583,26 @@ function commitChanges(inPlace: boolean) {
   if (_plainMode) {
     // A prop value is a plain single-line string (a directive attribute) — flatten any newline
     // That survived plaintext editing and skip the rich DOM→Jx serialization entirely.
-    commitFn(activePath, null, (activeEl.textContent ?? "").replaceAll("\n", " "), inPlace);
+    const text = (activeEl.textContent ?? "").replaceAll("\n", " ");
+    /*
+     * A SESSION THAT CHANGED NOTHING MUST WRITE NOTHING.
+     *
+     * This branch used to post unconditionally, and the only guard was the host's
+     * "same value, do nothing" check against the STORED prop — which does not fire when the prop is
+     * unset, because the marker renders the DEFINITION's default and the stored value is
+     * `undefined`. So merely clicking a component's text and clicking away wrote
+     * `$props.<name> = "<the default>"`: the tab went dirty, an undo entry appeared, and that
+     * instance was silently detached from its definition forever. Escape did the same thing, which
+     * made "cancel" a way to modify the document.
+     *
+     * `_plainPosted` is what keeps Escape honest AFTER an idle tick has already written: the
+     * restored text equals the original, but something WAS written, so it must be written back.
+     */
+    if (text === _plainOriginal.replaceAll("\n", " ") && !_plainPosted) {
+      return;
+    }
+    _plainPosted = true;
+    commitFn(activePath, null, text, inPlace);
     return;
   }
 
@@ -773,6 +818,19 @@ let _slashAnchored = true;
  */
 export function openSlashMenu(opts?: { anchored?: boolean }): void {
   if (!activeEl || !insertFn || !activePath) {
+    return;
+  }
+  /*
+   * Never in a plain session. A prop value is one string — there is nowhere to insert a block, and
+   * `enterPropEditAt` says so by passing `onInsert: () => {}`. That no-op is TRUTHY, so the
+   * precondition above let the menu open anyway, and choosing an item then ran the rich select
+   * path: it deleted the typed "/…" run and called `releaseWithoutCommit`, so the edit was
+   * discarded and no block was inserted either. The menu also captures Enter and Escape
+   * document-wide, so it took the two keys the docs promise for this session.
+   *
+   * Guarded here rather than at the trigger so a programmatic `openSlashMenu()` is covered too.
+   */
+  if (_plainMode) {
     return;
   }
 

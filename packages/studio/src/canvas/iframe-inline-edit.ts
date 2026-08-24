@@ -25,6 +25,7 @@ import {
   handleSlashTrigger,
   isEditableBlock,
   isEditing,
+  isPlainSession,
   isSlashActive,
   openSlashMenu,
   refreshSlashMenu,
@@ -281,10 +282,17 @@ export function startIframeInlineEdit(
     if (raw == null) {
       return true; // Unset — editing ADDS the prop, overriding the definition default.
     }
-    if (typeof raw === "object") {
+    /*
+     * Only a STRING is text. A number or a boolean renders as text and reads as editable, but this
+     * session commits `textContent` — so editing `count: 3` wrote the string `"3"` and silently
+     * retyped the prop, after which `${count * 2}` is `"33"` and `${enabled ? …}` is always truthy.
+     * Objects were already excluded; the scalar cases were not, and are the ones a component
+     * actually declares. They stay editable in the properties panel, which knows their type.
+     */
+    if (typeof raw !== "string") {
       return false;
     }
-    return !(typeof raw === "string" && raw.includes("${"));
+    return !raw.includes("${");
   };
 
   /**
@@ -324,6 +332,15 @@ export function startIframeInlineEdit(
     const el = getActiveElement();
     if (!el) {
       return; // Session not active → no-op.
+    }
+    /*
+     * A prop value carries no formatting — "formatting is off" is the documented rule for this
+     * session. The chord is inertified inside the frame, but a caret-scoped ⌘B is ALSO forwarded to
+     * the parent, matched by the shortcut registry, and posted straight back as an intent that
+     * lands here. This is the one chokepoint both routes pass through.
+     */
+    if (isPlainSession()) {
+      return;
     }
     // Restore the cached range ONLY if it's still usable (the DOM may have re-rendered).
     if (

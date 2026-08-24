@@ -95,6 +95,10 @@ Click text inside a component instance — a card title, a button label — and 
 
 Text that a component fills from data can't be edited this way — typing over it would break its connection to the data. Change the source data instead, or click **Edit Component** in the toolbar to open the component itself.
 
+The same goes for an option that holds a **number or a yes/no value** rather than text: it shows as text on the page, but editing it here would turn it into text and break anything that counts or compares it. Use the properties sidebar, which knows what kind of value the option takes.
+
+Clicking a component's text and clicking away again changes nothing — an option only gets set on that instance when you actually edit it. :kbd[Esc] is a real cancel, including after Studio has already saved a pause mid-edit.
+
 :::doc-note
 Behind the scenes, Studio keeps the markup tidy as you type — adjacent formats merge, empty leftovers are removed — and saves the result as plain Markdown in the page's file, so bold is just `**bold**` on disk.
 :::

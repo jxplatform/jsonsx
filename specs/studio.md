@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.39-draft
+**Version:** 0.9.40-draft
 **Status:** Partial
 **Updated:** 2026-08-24
 **License:** MIT
@@ -1083,6 +1083,19 @@ suppressed.
 Text inside a component instance that is an invertible prop binding opens a nested, plaintext-only
 editing host on press. It commits to the instance's `$props`, and takes no rich formatting, split or
 slash menu.
+
+**Only a string is text.** A prop whose stored value is a number or a boolean renders as text and
+would read as editable, but the session commits `textContent` — so editing it retypes the value, and
+`${count * 2}` becomes string concatenation. Those props are refused here and edited in the
+properties panel, which knows their type. An expression (`${…}`) and an object were already refused.
+
+**A session that changes nothing writes nothing.** The commit is compared against the text the
+session opened with, not only against the stored prop: an _unset_ prop's stored value is `undefined`
+while the marker renders the definition's default, so a comparison against storage alone treats a
+bare click as a change and writes the default onto the instance — dirtying the document and
+detaching that instance from its definition. Escape is a real cancel on the same rule, and when an
+idle commit has already written during the session it writes the original back rather than leaving
+the tick standing.
 
 #### 8.2.7 Serialization
 
@@ -2390,6 +2403,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.9.40-draft** (2026-08-24) — 8.2.6 refuses a non-string prop for inline editing (the session commits textContent, so a number or boolean would be retyped) and states that a session which changes nothing writes nothing, with Escape a real cancel that also undoes an idle commit made during the session.
 - **0.9.39-draft** (2026-08-24) — 8.2.1 records that a prop-bound host is classified before positions are resolved: it has no document path, so the unresolvable-position rule would otherwise reject every keystroke in it, and only the paragraph split and line break are prevented there.
 - **0.9.38-draft** (2026-08-24) — 8.2 states that a component island covers the component's internals and never the document slotted into it: a child with a stamped path is re-opened, a nested instance stays frozen, and connectedCallback internals are never re-opened.
 - **0.9.37-draft** (2026-08-22) — 11.2 Hosting the Studio: the asset manifest, the two layout modes, generated documents, the boot slot and the layering rule; 11.1 states the entry-rooted asset rule; 3.4's stale member names and file extensions corrected.
@@ -2484,4 +2498,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.39-draft_
+_`@jxsuite/studio` Specification v0.9.40-draft_
