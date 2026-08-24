@@ -278,6 +278,29 @@ export function startIframeInlineEdit(
       return true;
     }
     const node = getNodeAtPath(shadowDoc, hostPath) as JxMutableNode | undefined;
+    /*
+     * `$props` IS NOT THE ONLY PLACE A PROP VALUE LIVES, and "absent from $props" is therefore not
+     * the same question as "unset". Two shapes deliver one through `attributes` instead, and both
+     * were reproduced against the real runtime:
+     *
+     *   1. The JSON shorthand `attributes: { "props.text": "…" }`. `connectedCallback` collects
+     *      `props.*` attributes into state, so the marker renders that text while `$props` is
+     *      empty. This repo's own site carries 95 of them.
+     *   2. A prop whose name collides with a REFLECTED HTMLElement property — `title`, `role`,
+     *      `id`, `lang`, `dir`, `slot`, `hidden`. `setAttribute("title", …)` writes the JS property
+     *      as a side effect, and the merge `key in this && this[key] !== undefined` picks it up.
+     *      41 shipped starter components declare `title` or `role` as state.
+     *
+     * Editing either would write `$props[prop]` and leave the attribute standing — two sources for
+     * one rendered value. In case 2 the attribute WINS (applyAttributes runs after the $props
+     * assignment), so the edit is simply invisible; in case 1 clearing the prop later resurrects
+     * the old text. Refusing keeps the properties panel, which edits the attribute itself, as the
+     * one way in.
+     */
+    const attrs = node?.attributes as Record<string, unknown> | undefined;
+    if (attrs?.[`props.${prop}`] !== undefined || attrs?.[prop] !== undefined) {
+      return false;
+    }
     const raw = (node?.$props as Record<string, unknown> | undefined)?.[prop];
     if (raw == null) {
       return true; // Unset — editing ADDS the prop, overriding the definition default.
@@ -533,6 +556,21 @@ export function startIframeInlineEdit(
       return;
     }
     if (!editingAllowed()) {
+      return;
+    }
+    if (msg.prop !== undefined) {
+      /*
+       * A prop host cannot be re-entered by placing a caret: the marker has no path, and the
+       * `$props` patch that prompted this REPLACED the instance element, so the node the old
+       * session held is detached. Find the marker again inside the fresh instance and open it.
+       */
+      const instance = elementForPath(container, msg.path);
+      const marker = instance?.querySelector<HTMLElement>(
+        `[data-jx-bound-prop="${CSS.escape(msg.prop)}"]`,
+      );
+      if (marker) {
+        activateProp(marker);
+      }
       return;
     }
     // Follow-the-caret after a split or slash-insert: the parent re-renders and then names the path

@@ -1681,6 +1681,46 @@ describe("iframe canvas inline-edit bridge", () => {
     });
   });
 
+  describe("clicking from one prop slot to another in the same instance", () => {
+    /* The first slot's release commit transacts, which rebuilds the WHOLE instance
+       (`set-key $props` → replaceSubtree). The frame has already adopted a marker inside the
+       subtree about to be replaced, so the session it just opened is dead on arrival — the click
+       did nothing and the user had to click again. The host defers a re-entry so it survives. */
+    async function twoSlots(secondPath: (string | number)[], value = "Regional") {
+      resetWorkspaceWithTab({
+        children: [{ $props: { subtitle: "S", title: "Local" }, tagName: "x-card" }],
+        tagName: "div",
+      });
+      await mountReady();
+      channels[0]!.deliver({ kind: "editCommitProp", path: ["children", 0], prop: "title", value });
+      channels[0]!.posts.length = 0;
+      channels[0]!.deliver({ kind: "editStart", path: secondPath, prop: "subtitle" });
+      return channels[0]!;
+    }
+
+    test("the second session is re-entered after the rebuild", async () => {
+      const ch = await twoSlots(["children", 0]);
+      // The deferral drains when the host acks a render at or past the gen it recorded.
+      ch.deliver({ gen: 99, kind: "renderComplete" });
+      const enter = ch.posts.find((m) => m.kind === "enterEdit");
+      expect(enter).toMatchObject({ path: ["children", 0], prop: "subtitle" });
+    });
+
+    test("a slot in a DIFFERENT instance is left alone — that rebuild does not touch it", async () => {
+      // Deferring there would re-enter a session the patch never disturbed, stealing the caret.
+      const ch = await twoSlots(["children", 1]);
+      ch.deliver({ gen: 99, kind: "renderComplete" });
+      expect(ch.posts.find((m) => m.kind === "enterEdit")).toBeUndefined();
+    });
+
+    test("a release that did NOT transact defers nothing — there is no rebuild to survive", async () => {
+      // Unchanged text commits nothing (see #182), so the instance is never replaced.
+      const ch = await twoSlots(["children", 0], "Local");
+      ch.deliver({ gen: 99, kind: "renderComplete" });
+      expect(ch.posts.find((m) => m.kind === "enterEdit")).toBeUndefined();
+    });
+  });
+
   test("editCommitProp routes to the ORIGINATING tab when it races a tab switch", async () => {
     const { openTab } = await import("../src/workspace/workspace");
     resetWorkspaceWithTab({

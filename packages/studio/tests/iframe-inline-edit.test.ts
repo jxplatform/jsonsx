@@ -734,7 +734,10 @@ describe("selection snapshot + applyFormat", () => {
  * A rendered component instance: stamped host (`data-jx-path`) whose UNSTAMPED internals contain a
  * runtime-marked prop-bound h3 (`data-jx-bound-prop`), plus the matching raw shadow doc.
  */
-function propBoundContainer(rawProps?: Record<string, unknown>) {
+function propBoundContainer(
+  rawProps?: Record<string, unknown>,
+  rawAttrs?: Record<string, unknown>,
+) {
   const container = document.createElement("div");
   const host = document.createElement("x-card");
   host.dataset.jxPath = serializeJxPath(["children", 1]);
@@ -747,7 +750,14 @@ function propBoundContainer(rawProps?: Record<string, unknown>) {
   container.append(host);
   document.body.append(container);
   const shadowDoc = {
-    children: [{ tagName: "p" }, { tagName: "x-card", ...(rawProps ? { $props: rawProps } : {}) }],
+    children: [
+      { tagName: "p" },
+      {
+        tagName: "x-card",
+        ...(rawProps ? { $props: rawProps } : {}),
+        ...(rawAttrs ? { attributes: rawAttrs } : {}),
+      },
+    ],
     tagName: "main",
   } as never;
   return { container, h3, host, shadowDoc };
@@ -827,6 +837,46 @@ describe("prop-bound inline editing", () => {
     stop();
   });
 
+  test("enterEdit with a prop re-opens the marker inside the fresh instance", () => {
+    /* The frame end of the re-entry. A prop host cannot be re-entered by placing a caret — the
+       marker has no path of its own, and the $props patch that prompted this REPLACED the instance
+       element, so the node the old session held is detached. It has to be found again by prop name
+       inside the new instance. */
+    const { channel, deliver, posts } = fakeChannel();
+    const { container, shadowDoc } = propBoundContainer({ title: "Local" });
+    const stop = boot(channel, container, { getShadowDoc: () => shadowDoc });
+
+    posts.length = 0;
+    deliver({ kind: "enterEdit", path: ["children", 1], prop: "title" });
+
+    expect(posts).toContainEqual({ kind: "editStart", path: ["children", 1], prop: "title" });
+    stop();
+  });
+
+  test("enterEdit for a prop the instance does not carry is a no-op, not a throw", () => {
+    // The instance may have been rebuilt without that marker (the prop was cleared).
+    const { channel, deliver, posts } = fakeChannel();
+    const { container, shadowDoc } = propBoundContainer({ title: "Local" });
+    const stop = boot(channel, container, { getShadowDoc: () => shadowDoc });
+
+    posts.length = 0;
+    expect(() => deliver({ kind: "enterEdit", path: ["children", 1], prop: "nope" })).not.toThrow();
+    expect(posts.filter((p) => p.kind === "editStart")).toEqual([]);
+    stop();
+  });
+
+  test("enterEdit WITHOUT a prop still places a caret in a block", () => {
+    // The block path must be untouched by the prop branch sitting in front of it.
+    const { channel, deliver } = fakeChannel();
+    const { container, el } = editableContainer();
+    const stop = boot(channel, container);
+
+    deliver({ kind: "enterEdit", offset: 2, path: ["children", 0] });
+    // The caret lands in the block; activation follows from where the caret is.
+    expect(el.dataset.jxActiveBlock).toBeDefined();
+    stop();
+  });
+
   test("a forwarded format chord is refused in a prop session", () => {
     /* "Formatting is off" is the documented rule here, and inertifying the chord inside the frame
        is only half of it: a caret-scoped ⌘B is ALSO forwarded to the parent, matched by the
@@ -844,6 +894,48 @@ describe("prop-bound inline editing", () => {
 
     expect(h3.querySelector("strong")).toBeNull();
     expect(h3.textContent).toBe("Local");
+    stop();
+  });
+
+  test("a prop delivered as a `props.*` ATTRIBUTE is refused", () => {
+    /* The JSON shorthand: `attributes: { "props.title": "…" }`. connectedCallback collects props.*
+       attributes into state, so the marker renders that text while $props is empty — and reading
+       $props alone calls it "unset, the definition default is showing", which is false on both
+       halves. Editing would write $props and leave the attribute standing; clearing the prop later
+       would resurrect the old text. This repo's own site carries 95 of these. */
+    const { channel, posts } = fakeChannel();
+    const { container, h3, shadowDoc } = propBoundContainer(undefined, { "props.title": "Local" });
+    const stop = boot(channel, container, { getShadowDoc: () => shadowDoc });
+
+    clickInto(h3);
+    expect(posts.filter((p) => p.kind === "editStart")).toEqual([]);
+    stop();
+  });
+
+  test("a prop colliding with a REFLECTED attribute is refused", () => {
+    /* `title`, `role`, `id`, `lang`, `dir`, `slot`, `hidden`: setAttribute writes the JS property
+       as a side effect, and the runtime's `key in this` merge picks it up into state. The edit
+       would be INVISIBLE — applyAttributes runs after the $props assignment and overwrites the
+       reflected property — and the document would round-trip to two values on one directive.
+       41 shipped starter components declare `title` or `role` as state. */
+    const { channel, posts } = fakeChannel();
+    const { container, h3, shadowDoc } = propBoundContainer(undefined, { title: "Local" });
+    const stop = boot(channel, container, { getShadowDoc: () => shadowDoc });
+
+    clickInto(h3);
+    expect(posts.filter((p) => p.kind === "editStart")).toEqual([]);
+    stop();
+  });
+
+  test("an unrelated attribute does not block an ordinary prop", () => {
+    // The guard is name-matched, not "has any attributes" — a class or id alongside a `title` prop
+    // Must not make the slot uneditable.
+    const { channel, posts } = fakeChannel();
+    const { container, h3, shadowDoc } = propBoundContainer({ title: "Local" }, { class: "hero" });
+    const stop = boot(channel, container, { getShadowDoc: () => shadowDoc });
+
+    clickInto(h3);
+    expect(posts).toContainEqual({ kind: "editStart", path: ["children", 1], prop: "title" });
     stop();
   });
 
