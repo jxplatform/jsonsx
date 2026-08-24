@@ -16,6 +16,8 @@
  * matrix.
  */
 
+import { readFileSync } from "node:fs";
+
 import { describe, expect, test } from "bun:test";
 
 import { readWorkspaces } from "./lib/workspaces.ts";
@@ -217,5 +219,73 @@ describe("release-please config", () => {
     }
 
     expect(cycles).toEqual([]);
+  });
+});
+
+/**
+ * The binary-cache verifier in .github/workflows/release-please.yml.
+ *
+ * It filed "Binary cache does not serve <tag>" against five consecutive releases — #161, #169,
+ * #172, #178, #190 — while https://jxsuite.cachix.org was serving every single one of those store
+ * paths on both architectures. The cause was one redirection: `out="$(nix eval --raw … 2>&1)"`.
+ * `nix eval` writes its fetch progress and its evaluation warnings to stderr, so `$out` held eight
+ * lines of `copying path '/nix/store/…' from 'https://nix-community.cachix.org'` and a
+ * `stdenv.isLinux is deprecated` warning with the real path on the end.
+ *
+ * What made it invisible for five releases is that `nix path-info` answers a malformed argument and
+ * a genuinely absent path with the SAME message — `getting status of "…": No such file or
+ * directory`, exit 1 — so the job's own logs looked exactly like a cache that was empty.
+ *
+ * Neither assertion below can be made from the YAML's meaning, only from its text; that is the
+ * price of a check that lives in a shell script inside a workflow. They are cheap and they name the
+ * failure, which is more than the five issues managed between them.
+ */
+describe("the release workflow's binary-cache verifier", () => {
+  const workflow = readFileSync(".github/workflows/release-please.yml", "utf8");
+
+  /** Every `nix eval` invocation captured into a shell variable. */
+  const captures = [...workflow.matchAll(/^\s*(?:if !\s*)?\w+="\$\(nix eval[^\n]*$/gm)].map((m) =>
+    m[0].trim(),
+  );
+
+  test("captures a `nix eval` result at all — the anchor these tests depend on", () => {
+    expect(captures.length).toBeGreaterThan(0);
+  });
+
+  test("never merges stderr into the value it captures", () => {
+    // `2>&1` here is not a style question. It puts progress output inside a store path, and the
+    // Resulting lookup fails in a way indistinguishable from an empty cache.
+    for (const line of captures) {
+      expect(
+        line,
+        `${line}\n  -> redirect stderr to a file, not into the captured value`,
+      ).not.toContain("2>&1");
+    }
+  });
+
+  test("keeps stderr, because the diagnostic is the reason it was captured", () => {
+    // The original `2>&1` existed so a failed evaluation could be reported rather than vanishing.
+    // Dropping stderr entirely would fix the bug and lose that, so the fix must redirect it
+    // Somewhere the failure branch can still read.
+    for (const line of captures) {
+      expect(
+        line,
+        `${line}\n  -> send stderr to a file so the failure branch can quote it`,
+      ).toMatch(/2>"?\$/);
+    }
+  });
+
+  test("checks that what it got is a store path before asking the cache", () => {
+    // Without this the job reports "the cache does not hold X" both when the cache is empty and
+    // When it never understood X in the first place. Those need different words.
+    //
+    // Asserted against the extracted guard rather than the whole file, so a failure prints four
+    // Lines instead of the entire workflow.
+    const guard = /case\s+"\$out"\s+in\b([\s\S]*?)esac/.exec(workflow)?.[1];
+    expect(guard, 'no `case "$out"` guard in the cache verifier').toBeDefined();
+    expect(
+      guard,
+      "the guard must require a /nix/store path, not merely something under /nix",
+    ).toContain("/nix/store/?*)");
   });
 });
