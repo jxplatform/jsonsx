@@ -61,6 +61,16 @@ function lockOf(images: Record<string, LockImage>): CaptureLock {
 
 // ─── detectFontFamilies ───────────────────────────────────────────────────────
 
+/**
+ * Whether a `#!/bin/sh` stub dropped on PATH is executable here.
+ *
+ * False on Windows, which runs neither a shebang nor an extensionless file — and where the tool
+ * being stubbed, fontconfig's `fc-list`, does not exist at all. The two tests that DRIVE the stub
+ * are skipped there rather than left to fail, and the one that asserts the empty answer is skipped
+ * too: on Windows it passes for the wrong reason, which is worse than not running.
+ */
+const canRunShellStub = process.platform !== "win32";
+
 /** A stand-in `fc-list` on `PATH`, so the real fontconfig on this host is never the subject. */
 function stubFcList(body: string): string {
   const dir = scratch("fc");
@@ -77,7 +87,7 @@ describe("detectFontFamilies", () => {
     process.env.PATH = realPath;
   });
 
-  test("reads the families fc-list prints", () => {
+  test.skipIf(!canRunShellStub)("reads the families fc-list prints", () => {
     process.env.PATH = stubFcList("#!/bin/sh\nprintf 'Stub Sans\\nStub Serif\\n'\n");
     expect(detectFontFamilies()).toEqual(["Stub Sans", "Stub Serif", ""]);
   });
@@ -87,10 +97,13 @@ describe("detectFontFamilies", () => {
     expect(detectFontFamilies()).toEqual([]);
   });
 
-  test("is empty when fc-list fails, rather than recording whatever it managed to print", () => {
-    process.env.PATH = stubFcList("#!/bin/sh\nprintf 'Half A Family\\n'\nexit 1\n");
-    expect(detectFontFamilies()).toEqual([]);
-  });
+  test.skipIf(!canRunShellStub)(
+    "is empty when fc-list fails, rather than recording whatever it managed to print",
+    () => {
+      process.env.PATH = stubFcList("#!/bin/sh\nprintf 'Half A Family\\n'\nexit 1\n");
+      expect(detectFontFamilies()).toEqual([]);
+    },
+  );
 });
 
 // ─── A lock entry with no runtime block ───────────────────────────────────────

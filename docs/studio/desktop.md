@@ -67,7 +67,7 @@ The AI assistant, publishing, and everything on the canvas behave the same in bo
 
 ## Platform notes
 
-Installers are provided for macOS (Apple Silicon and Intel), Windows (x64), and Linux (x64) — see the **[install page](/docs/start/install)** for downloads. On NixOS the app is packaged differently: `nix build` produces it, and it runs Studio in a Chromium app window rather than a native one.
+Installers are provided for macOS (Apple Silicon), Windows (x64), and Linux (x64 and ARM64) — see the **[install page](/docs/start/install)** for downloads. Intel Macs are no longer among the builds. On NixOS the app is packaged differently: `nix build` produces it, and it runs Studio in a Chromium app window rather than a native one.
 
 Everything on this page applies to it. Projects open the same way, through the same native dialogs; each project gets a window of its own, and opening one that is already open brings that window forward. Two things differ, and both follow from who packaged it:
 

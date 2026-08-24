@@ -7,7 +7,7 @@ import type { StudioSchema } from "../src/handlers";
 
 const mockOpenExternal = mock((url: string) => url.startsWith("https://"));
 
-void mock.module("electrobun/bun", () => ({
+void mock.module("electrobun/main", () => ({
   BrowserWindow: class {},
   Electrobun: { start: () => {} },
   Utils: { openExternal: mockOpenExternal, openFileDialog: async () => [] },

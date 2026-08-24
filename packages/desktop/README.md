@@ -14,6 +14,19 @@
 | NixOS                             | Chromium `--app` + `@jxsuite/server` | Via `nix build`             |
 | Dev mode                          | Chrome + `@jxsuite/server`           | Active (Studio development) |
 
+## Prerequisites
+
+Just `bun install` at the repo root. Electrobun 2 builds through **Hutch**, its native build CLI,
+but nothing needs installing by hand: the `electrobun` devDependency is a dependency-free bootstrap
+whose version selects the whole toolchain. Its first command downloads the paired Hutch, verifies it
+against the release's published digest, and caches it under `~/.hutch` — so the Hutch, Cottontail
+and Electrobun versions all ride the workspace lockfile instead of a machine-wide install.
+
+The Electrobun SDK is not on npm either. It is projected out of the release archive into a
+generated, gitignored `.hutch/devkit` directory, which is where every `electrobun/*` import
+resolves from — and why there is no `electrobun` entry under `dependencies`. Builds project it
+implicitly; a fresh clone needs `bun run sync` once before `bun run typecheck` will pass.
+
 ## Development
 
 ```bash
@@ -26,7 +39,7 @@ bun run chromium     # Launch in Chrome app-mode (NixOS / dev mode)
 ```bash
 bun run build           # Debug build
 bun run build:release   # Canary release build
-bun run build:stable    # Stable release build
+bun run build:stable    # Production release build (+ Windows MSI)
 ```
 
 ## Architecture
@@ -50,11 +63,13 @@ The Bun backend registers all RPC handlers at startup. Studio communicates with 
 
 ## Dependencies
 
-| Package           | Purpose                           |
-| ----------------- | --------------------------------- |
-| `electrobun`      | Native webview + Bun process host |
-| `@jxsuite/studio` | Studio UI                         |
-| `dbus-ts`         | D-Bus integration (Linux)         |
+| Package           | Purpose                   |
+| ----------------- | ------------------------- |
+| `@jxsuite/studio` | Studio UI                 |
+| `dbus-ts`         | D-Bus integration (Linux) |
+
+Electrobun itself is deliberately absent: it is not an npm package here but a Hutch-managed product
+pinned in `hutch.config.ts` — see [Prerequisites](#prerequisites).
 
 ## License
 

@@ -33,11 +33,12 @@
  * glyph rendered while the shipped panel pointed at a key nothing handled.
  */
 
+import { fileURLToPath } from "node:url";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Glob } from "bun";
 
-const STUDIO = new URL("..", import.meta.url).pathname;
+const STUDIO = fileURLToPath(new URL("..", import.meta.url));
 const MODULES = join(STUDIO, "../../node_modules");
 
 /**

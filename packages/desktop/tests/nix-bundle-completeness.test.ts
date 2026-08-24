@@ -23,7 +23,7 @@
  */
 import { describe, expect, test } from "bun:test";
 import { readFileSync, readlinkSync, statSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, relative, resolve } from "node:path";
 
 const REPO = resolve(import.meta.dir, "../../..");
 
@@ -70,8 +70,11 @@ describe("the Nix bundle ships what the desktop app depends on", () => {
       if (!target) {
         continue;
       }
-      // `../../extensions/parser` → `extensions`.
-      const [top] = target.replaceAll("../", "").split("/");
+      /* `../../extensions/parser` → `extensions`. Resolved against the link's own directory
+         first, because the link target is only relative on POSIX: Bun makes workspace links as
+         JUNCTIONS on Windows, and `readlinkSync` hands those back ABSOLUTE, so trimming `../`
+         left a whole `C:\…` path and every workspace dependency was reported an orphan. */
+      const [top] = relative(REPO, resolve(dirname(link), target)).split(/[/\\]/);
       if (top && !copied.has(top)) {
         orphans.push(`${name} → ${target} (installPhase never copies "${top}/")`);
       }

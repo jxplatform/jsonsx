@@ -465,11 +465,18 @@ export function createProjectSession(initialRoot: string | null) {
   let fileEventSink: ((events: FsEventPayload[]) => void) | null = null;
   let watcherHandle: FsWatcherHandle | null = null;
 
-  function stopWatching(): void {
-    if (watcherHandle) {
-      void watcherHandle.close();
-      watcherHandle = null;
-    }
+  /**
+   * Stop watching, and RESOLVE when the watcher has actually let go.
+   *
+   * The close is awaited rather than fired and forgotten. chokidar's close is asynchronous, and on
+   * Windows the directory keeps an open handle until it finishes — so a caller that tore a session
+   * down and immediately deleted the project tree got EBUSY, which is what the data-session suite
+   * did on every Windows run. POSIX releases eagerly enough that nothing noticed.
+   */
+  async function stopWatching(): Promise<void> {
+    const handle = watcherHandle;
+    watcherHandle = null;
+    await handle?.close();
   }
 
   /** The last root refused below — so the refusal is logged once, not once per re-arm. */
@@ -491,7 +498,7 @@ export function createProjectSession(initialRoot: string | null) {
    * pointed at it, which is also when the sidebar would first have anything to show.
    */
   function startWatching(): void {
-    stopWatching();
+    void stopWatching();
     if (!projectRoot || !fileEventSink) {
       return;
     }

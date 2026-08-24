@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { rpcParity } from "./_rpc-parity";
 
-// ─── Mock electrobun/bun ────────────────────────────────────────────────────
+// ─── Mock electrobun/main ───────────────────────────────────────────────────
 
 /*
  * The window's RPC handler map, typed as the handlers actually are.
@@ -49,7 +49,7 @@ class MockWindow {
   }
 }
 
-void mock.module("electrobun/bun", () => ({
+void mock.module("electrobun/main", () => ({
   BrowserView: {
     defineRPC: (config: RpcConfig) => {
       rpcConfigs.push(config);

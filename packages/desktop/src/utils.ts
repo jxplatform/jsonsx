@@ -17,7 +17,7 @@ let Utils: ElectrobunUtils | null = null;
 
 export async function init() {
   try {
-    ({ Utils } = await import("electrobun/bun"));
+    ({ Utils } = await import("electrobun/main"));
   } catch {}
 }
 

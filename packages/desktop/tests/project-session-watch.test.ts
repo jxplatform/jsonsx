@@ -62,13 +62,13 @@ describe("the session watches a project", () => {
     const logs = capturingLogs(() => session.setFileEventSink(() => {}));
     expect(watched).toEqual([PROJECT]);
     expect(logs.filter((line) => line.includes("not watching"))).toEqual([]);
-    session.dispose();
+    void session.dispose();
   });
 
   test("a sink is what starts it — a root alone watches nothing", () => {
     const session = createProjectSession(PROJECT);
     expect(watched).toEqual([]);
-    session.dispose();
+    void session.dispose();
   });
 });
 
@@ -78,7 +78,7 @@ describe("the session refuses a root that is not a project", () => {
     const logs = capturingLogs(() => session.setFileEventSink(() => {}));
     expect(watched).toEqual([]);
     expect(logs.some((line) => line.includes("not watching") && line.includes(BARE))).toBe(true);
-    session.dispose();
+    void session.dispose();
   });
 
   test("the refusal is logged once per root, not once per attempt to arm", () => {
@@ -90,7 +90,7 @@ describe("the session refuses a root that is not a project", () => {
       session.setProjectRoot(BARE);
     });
     expect(logs.filter((line) => line.includes("not watching"))).toHaveLength(1);
-    session.dispose();
+    void session.dispose();
   });
 
   test("re-rooting onto a real project arms the watcher that the bare root did not", () => {
@@ -101,7 +101,7 @@ describe("the session refuses a root that is not a project", () => {
       session.setProjectRoot(PROJECT);
     });
     expect(watched).toEqual([PROJECT]);
-    session.dispose();
+    void session.dispose();
   });
 
   test("leaving a project for a bare root closes the watcher it had", () => {
@@ -112,6 +112,6 @@ describe("the session refuses a root that is not a project", () => {
       session.setProjectRoot(BARE);
     });
     expect(closed).toHaveBeenCalled();
-    session.dispose();
+    void session.dispose();
   });
 });

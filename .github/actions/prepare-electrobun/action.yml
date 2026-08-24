@@ -1,0 +1,36 @@
+name: Prepare Electrobun
+description: >-
+  Cache Hutch's shared store and project the Electrobun SDK into
+  packages/desktop/.hutch/devkit. Electrobun 2 publishes no SDK on npm, so `bun install` alone
+  cannot typecheck or build packages/desktop — but it does install the `electrobun` bootstrap, whose
+  version selects the paired Hutch. There is deliberately no machine-wide Hutch install here: a
+  globally installed launcher is only a fallback, and a stale one is worse than none.
+
+inputs:
+  sync:
+    description: >-
+      Run `electrobun prepare`, materialising .hutch/devkit. Needed by anything that resolves
+      `electrobun/*` for real — typecheck. Builds prepare implicitly, so they only need the cache.
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    # The Hutch launcher, the Electrobun core and CEF are hundreds of MB and identical for every job
+    # on a given dependency set, so they are cached on the lockfile rather than re-downloaded per
+    # lane. Correctness never depends on a hit: everything here is verified by digest and re-fetched
+    # when the cache does not supply it.
+    - name: Cache the Hutch store
+      uses: actions/cache@v4
+      with:
+        path: ~/.hutch
+        key: hutch-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
+        restore-keys: |
+          hutch-${{ runner.os }}-${{ runner.arch }}-
+
+    - name: Project the Electrobun SDK into packages/desktop/.hutch/devkit
+      if: inputs.sync == 'true'
+      shell: bash
+      working-directory: packages/desktop
+      run: bunx electrobun prepare

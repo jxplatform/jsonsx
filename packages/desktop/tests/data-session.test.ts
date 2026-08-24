@@ -5,11 +5,19 @@
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
+import { tmpdir } from "node:os";
 import { createProjectSession } from "../src/project-session";
 import type { ProjectSession } from "../src/project-session";
 
-const TMP = resolve(import.meta.dir, "__test-data-session__");
+/*
+ * In the OS temp dir, not beside this file. These tests open a real SQLite database under the
+ * fixture, and nothing closes it: the data surface delegates to @jxsuite/server/data free
+ * functions that cache the connection by root, so the session has no handle to release. Windows
+ * locks an open database file, so the teardown below cannot remove the directory while the test
+ * process lives — and beside this file, that leftover dirtied the repo and tripped docs:verify.
+ */
+const TMP = join(tmpdir(), `jx-data-session-${process.pid}`);
 
 let session: ProjectSession;
 
@@ -39,9 +47,18 @@ beforeAll(() => {
   session = createProjectSession(TMP);
 });
 
-afterAll(() => {
-  session.dispose();
-  rmSync(TMP, { force: true, recursive: true });
+afterAll(async () => {
+  await session.dispose();
+  /* Best-effort, and deliberately not an assertion. POSIX unlinks the tree happily; Windows holds
+     the open SQLite file and answers EBUSY, which as a throw in afterAll failed the whole file
+     under a name no reader could place ("(unnamed)"). The directory is in the OS temp dir for
+     exactly this reason — see TMP. Closing the database is the real fix, and it belongs to
+     @jxsuite/server/data rather than here. */
+  try {
+    rmSync(TMP, { force: true, maxRetries: 5, recursive: true, retryDelay: 50 });
+  } catch {
+    // The OS still holds the database; the temp dir is the OS's to reap.
+  }
 });
 
 describe("without a project root", () => {
@@ -56,7 +73,7 @@ describe("without a project root", () => {
     expect(() => bare.dataDeleteRow({ pk: 1, table: "notes" })).toThrow("No project open");
     expect(() => bare.listSecrets()).toThrow("No project open");
     expect(() => bare.setSecrets({ set: { A: "1" } })).toThrow("No project open");
-    bare.dispose();
+    void bare.dispose();
   });
 });
 

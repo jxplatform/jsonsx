@@ -18,7 +18,7 @@ const mockSpawn = mock((command: string, args: string[]) => {
 });
 void mock.module("node:child_process", () => ({ spawn: mockSpawn }));
 
-void mock.module("electrobun/bun", () => ({
+void mock.module("electrobun/main", () => ({
   BrowserWindow: class {},
   Electrobun: { start: () => {} },
   Updater: {

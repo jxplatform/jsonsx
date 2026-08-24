@@ -8,8 +8,8 @@
  * a macOS user looks for them; it does not keep a second claim on the keyboard.
  */
 
-import { ApplicationMenu } from "electrobun/bun";
-import type { ApplicationMenuItemConfig } from "electrobun/bun";
+import { ApplicationMenu } from "electrobun/main";
+import type { ApplicationMenuItemConfig } from "electrobun/main";
 import { dirname } from "node:path";
 import { openFileDialog } from "./utils";
 import { openProjectWindow } from "./window-manager";

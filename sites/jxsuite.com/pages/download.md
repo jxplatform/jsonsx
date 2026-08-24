@@ -46,12 +46,10 @@ macOS
 :::
 
 :::p{style.fontSize="0.875rem" style.color="var(--color-text-secondary)" style.margin="0" style.lineHeight="1.6"}
-Signed &amp; notarized. macOS 12 or later.
+Signed &amp; notarized. Apple Silicon, macOS 12 or later.
 :::
 
-::cta-button{props.href="https://github.com/jxsuite/jx/releases/latest/download/stable-macos-arm64-JxStudio.dmg" props.label="Apple Silicon" props.variant="primary" props.newTab="true"}
-
-::cta-button{props.href="https://github.com/jxsuite/jx/releases/latest/download/stable-macos-x64-JxStudio.dmg" props.label="Intel" props.variant="secondary" props.newTab="true"}
+::cta-button{props.href="https://github.com/jxsuite/jx/releases/latest/download/macos-arm64-JxStudio.dmg" props.label="Apple Silicon" props.variant="primary" props.newTab="true"}
 ::::
 
 ::::div{style.display="flex" style.flexDirection="column" style.gap="1rem" style.padding="2rem" style.borderRadius="var(--radius-lg)" style.border="1px solid var(--color-border)" style.backgroundColor="var(--color-bg-surface)" style.textAlign="center"}
@@ -80,10 +78,12 @@ Linux
 :::
 
 :::p{style.fontSize="0.875rem" style.color="var(--color-text-secondary)" style.margin="0" style.lineHeight="1.6"}
-Portable archive, x64. Runs on most modern distros.
+Portable archive. Runs on most modern distros.
 :::
 
-::cta-button{props.href="https://github.com/jxsuite/jx/releases/latest/download/stable-linux-x64-JxStudio-Setup.tar.gz" props.label="Download .tar.gz" props.variant="primary" props.newTab="true"}
+::cta-button{props.href="https://github.com/jxsuite/jx/releases/latest/download/linux-x64-JxStudio-Setup.tar.gz" props.label="x64" props.variant="primary" props.newTab="true"}
+
+::cta-button{props.href="https://github.com/jxsuite/jx/releases/latest/download/linux-arm64-JxStudio-Setup.tar.gz" props.label="ARM64" props.variant="secondary" props.newTab="true"}
 ::::
 
 :::::

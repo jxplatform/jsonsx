@@ -1,4 +1,4 @@
-import { Updater } from "electrobun/bun";
+import { Updater } from "electrobun/main";
 import type { AppInfo } from "@jxsuite/protocol";
 
 export interface UpdateStatus {

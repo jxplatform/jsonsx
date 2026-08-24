@@ -59,6 +59,17 @@ import { SyntaxKind } from "typescript/unstable/ast";
 const ROOT = join(import.meta.dir, "..");
 
 /**
+ * A file's repo-relative key, always forward-slashed.
+ *
+ * The allow-lists below are written with `/`, but `relative()` yields `src\panels\x.ts` on Windows
+ * — so every entry both failed as an unlisted key and was reported stale as a listed one, and the
+ * whole guard was unreadable there while staying green on CI's Linux.
+ */
+function key(file: string): string {
+  return relative(ROOT, file).replaceAll("\\", "/");
+}
+
+/**
  * The `view` fields that moved onto `CanvasSurface`. Reading one back is the regression.
  *
  * They are listed by NAME rather than by absence from `view.ts`, because the index signature means
@@ -781,7 +792,7 @@ export async function countPerFile(
 ): Promise<Map<string, number>> {
   const counts = new Map<string, number>();
   for (const file of await filesFor(patterns)) {
-    if (skip !== undefined && relative(ROOT, file) === skip) {
+    if (skip !== undefined && key(file) === skip) {
       continue;
     }
     const text = await Bun.file(file)
@@ -789,7 +800,7 @@ export async function countPerFile(
       .catch(() => "");
     const found = code(text).match(new RegExp(re.source, re.flags))?.length ?? 0;
     if (found > 0) {
-      counts.set(relative(ROOT, file), found);
+      counts.set(key(file), found);
     }
   }
   return counts;
@@ -827,13 +838,13 @@ export function diffAgainstAllowed(
 /** Rule 4's sites, per repo-relative file. {@link FOCUS_OWNER} is dropped rather than allow-listed. */
 export async function focusSitesInPaneScope(patterns: string[]): Promise<Map<string, FocusSite[]>> {
   const scanned = await filesFor(patterns);
-  const files = scanned.filter((file) => relative(ROOT, file) !== FOCUS_OWNER);
+  const files = scanned.filter((file) => key(file) !== FOCUS_OWNER);
   const sites = new Map<string, FocusSite[]>();
   if (files.length === 0) {
     return sites;
   }
   for (const [file, found] of await analyzeFocusScope(files)) {
-    sites.set(relative(ROOT, file), found);
+    sites.set(key(file), found);
   }
   return sites;
 }

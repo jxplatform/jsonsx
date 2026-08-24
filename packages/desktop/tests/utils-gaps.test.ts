@@ -3,7 +3,7 @@ import { describe, expect, mock, test } from "bun:test";
 
 // Make the electrobun import fail so init() exercises its catch path.
 // The real electrobun module starts a server on import; it must never load in tests.
-void mock.module("electrobun/bun", () => {
+void mock.module("electrobun/main", () => {
   throw new Error("electrobun unavailable in test env");
 });
 

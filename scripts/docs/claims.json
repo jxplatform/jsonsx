@@ -48,7 +48,7 @@
     {
       "id": "signed",
       "file": "sites/jxsuite.com/pages/download.md",
-      "text": "Signed &amp; notarized. macOS 12 or later.",
+      "text": "Signed &amp; notarized. Apple Silicon, macOS 12 or later.",
       "evidence": ".github/workflows/bundle-desktop-macos.yml"
     },
     {

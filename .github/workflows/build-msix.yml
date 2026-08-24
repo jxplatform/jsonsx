@@ -38,6 +38,14 @@ jobs:
       - name: Install dependencies
         run: bun install
 
+      # Electrobun 2 builds through Hutch, which the `electrobun` devDependency downloads and
+      # verifies on first use — no machine-wide install. The build prepares the SDK implicitly; this
+      # only warms the shared store so every lane is not re-downloading the core and CEF.
+      - name: Prepare Electrobun
+        uses: ./.github/actions/prepare-electrobun
+        with:
+          sync: "false"
+
       - name: Install Windows SDK
         uses: ChristopheLav/windows-sdk-install@v1
         with:

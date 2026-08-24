@@ -13,7 +13,7 @@ import { rmSync } from "node:fs";
 import { join } from "node:path";
 import type { StudioSchema } from "../src/handlers";
 
-void mock.module("electrobun/bun", () => ({
+void mock.module("electrobun/main", () => ({
   BrowserWindow: class {},
   Electrobun: { start: () => {} },
   Utils: { openFileDialog: async () => [] },

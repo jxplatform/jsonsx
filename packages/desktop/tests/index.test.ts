@@ -4,10 +4,10 @@ import { describe, expect, mock, test } from "bun:test";
 // And opens the initial window via the window-manager. Per-window RPC + window controls live in
 // Window-manager.ts (see window-manager.test.ts).
 
-// ─── Mock electrobun/bun (default export: events) ────────────────────────────
+// ─── Mock electrobun/main (default export: events) ───────────────────────────
 
 const eventHandlers = new Map<string, (e: { data: { url: string } }) => void>();
-void mock.module("electrobun/bun", () => ({
+void mock.module("electrobun/main", () => ({
   default: {
     events: {
       on: (name: string, handler: (e: { data: { url: string } }) => void) => {

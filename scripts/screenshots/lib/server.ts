@@ -104,7 +104,10 @@ export async function assertBundleFresh(repoRoot: string): Promise<void> {
   if (newest.mtimeMs > built.mtimeMs) {
     const behind = Math.round((newest.mtimeMs - built.mtimeMs) / 1000);
     throw new Error(
-      `packages/studio/dist/studio.js is ${behind}s older than ${newest.file.slice(repoRoot.length + 1)} — ` +
+      // Forward-slashed: the rest of the sentence names repo paths that way, and on Windows the
+      // Slice hands back `packagesstudiosrc…`, which reads as a different repo.
+      `packages/studio/dist/studio.js is ${behind}s older than ` +
+        `${newest.file.slice(repoRoot.length + 1).replaceAll("\\", "/")} — ` +
         `the server is serving a stale bundle. Restart it (drop --reuse-server, or run \`bun run build\` in packages/studio).`,
     );
   }
@@ -230,7 +233,11 @@ async function materialiseCopy(source: string, dest: string): Promise<void> {
   });
   const modules = join(source, "node_modules");
   if (existsSync(modules)) {
-    await symlink(modules, join(dest, "node_modules"), "dir");
+    /* A junction, not a "dir" symlink. Windows refuses the latter with EPERM unless the process is
+       elevated or Developer Mode is on, so every overlay — and therefore every screenshot run —
+       failed there; a junction needs neither privilege and is what Bun makes for workspace links.
+       The type argument is ignored on POSIX. */
+    await symlink(modules, join(dest, "node_modules"), "junction");
   }
 }
 

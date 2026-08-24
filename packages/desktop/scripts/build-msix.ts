@@ -8,6 +8,12 @@ import {
   renderAppxManifest,
   toQuadVersion,
 } from "./msix-identity.ts";
+import {
+  WINDOWS_RUNTIME_FILES,
+  describeRuntimeSearch,
+  electrobunVersion,
+  resolveWindowsRuntime,
+} from "./electrobun-runtime.ts";
 
 if (process.platform !== "win32") {
   console.log("[build-msix] Skipping MSIX build (not Windows)");
@@ -26,17 +32,17 @@ await mkdir(artifactsDir, { recursive: true });
 const buildDir = join(desktopDir, "build", "stable-win-x64", "JxStudio");
 if (!existsSync(buildDir)) {
   console.error(
-    "[build-msix] Build dir not found. Run 'bunx electrobun build --env=stable' first.",
+    "[build-msix] Build dir not found. Run 'bun run build:stable' (electrobun build --env=stable) first.",
   );
   process.exit(1);
 }
 
-// Resolve electrobun dist (may be hoisted to workspace root in monorepos)
-const localDist = join(desktopDir, "node_modules", "electrobun", "dist-win-x64");
-const rootDist = join(desktopDir, "..", "..", "node_modules", "electrobun", "dist-win-x64");
-const electrobunDist = existsSync(localDist) ? localDist : rootDist;
-if (!existsSync(electrobunDist)) {
-  console.error("[build-msix] Cannot find electrobun/dist-win-x64.");
+// Electrobun 2 keeps no runtime in node_modules; Hutch caches it per release. The version is
+// Read from the installed electrobun package, which is what selected the toolchain. See
+// Scripts/electrobun-runtime.ts for the cache layout and the fallback search.
+const { dir: electrobunDist, searched } = resolveWindowsRuntime(electrobunVersion());
+if (!electrobunDist) {
+  console.error(`[build-msix] ${describeRuntimeSearch(searched)}`);
   process.exit(1);
 }
 
@@ -57,17 +63,10 @@ if (existsSync(resourcesDir) && !existsSync(join(resourcesDir, "app"))) {
   }
 }
 
-// --- Step 2: Place runtime files from electrobun dist ---
+// --- Step 2: Place runtime files from the Hutch release cache ---
 const binDir = join(buildDir, "bin");
-const runtimeFiles = [
-  "launcher.exe",
-  "libNativeWrapper.dll",
-  "WebView2Loader.dll",
-  "d3dcompiler_47.dll",
-  "webgpu_dawn.dll",
-  "process_helper.exe",
-];
-for (const file of runtimeFiles) {
+// No bun.exe here: step 3 compiles the patched launcher into one instead.
+for (const file of WINDOWS_RUNTIME_FILES) {
   const src = join(electrobunDist, file);
   if (existsSync(src)) {
     await copyFile(src, join(binDir, file));

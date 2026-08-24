@@ -3,6 +3,12 @@ import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { copyFileSync, existsSync, mkdirSync, readdirSync, unlinkSync } from "node:fs";
 import { createHash } from "node:crypto";
+import {
+  WINDOWS_RUNTIME_FILES,
+  describeRuntimeSearch,
+  electrobunVersion,
+  resolveWindowsRuntime,
+} from "./electrobun-runtime.ts";
 
 if (process.platform !== "win32") {
   console.log("[build-msi] Skipping MSI build (not Windows)");
@@ -17,16 +23,18 @@ await mkdir(artifactsDir, { recursive: true });
 
 const buildDir = join(desktopDir, "build", "stable-win-x64", "JxStudio");
 if (!existsSync(buildDir)) {
-  console.error("[build-msi] Build dir not found. Run 'bunx electrobun build --env=stable' first.");
+  console.error(
+    "[build-msi] Build dir not found. Run 'bun run build:stable' (electrobun build --env=stable) first.",
+  );
   process.exit(1);
 }
 
-// Resolve electrobun dist
-const localDist = join(desktopDir, "node_modules", "electrobun", "dist-win-x64");
-const rootDist = join(desktopDir, "..", "..", "node_modules", "electrobun", "dist-win-x64");
-const electrobunDist = existsSync(localDist) ? localDist : rootDist;
-if (!existsSync(electrobunDist)) {
-  console.error("[build-msi] Cannot find electrobun/dist-win-x64.");
+// Electrobun 2 keeps no runtime in node_modules; Hutch caches it per release. The version is
+// Read from the installed electrobun package, which is what selected the toolchain. See
+// Scripts/electrobun-runtime.ts for the cache layout and the fallback search.
+const { dir: electrobunDist, searched } = resolveWindowsRuntime(electrobunVersion());
+if (!electrobunDist) {
+  console.error(`[build-msi] ${describeRuntimeSearch(searched)}`);
   process.exit(1);
 }
 
@@ -53,15 +61,9 @@ if (!existsSync(binDir)) {
   mkdirSync(binDir, { recursive: true });
 }
 
-const filesToCopy = [
-  "launcher.exe",
-  "bun.exe",
-  "libNativeWrapper.dll",
-  "WebView2Loader.dll",
-  "d3dcompiler_47.dll",
-  "webgpu_dawn.dll",
-  "process_helper.exe",
-];
+// The MSI installs the app's own Bun runtime alongside the shared set; the MSIX build instead
+// Compiles a patched launcher into its own bun.exe, which is why that name is not shared.
+const filesToCopy = [...WINDOWS_RUNTIME_FILES, "bun.exe"];
 for (const file of filesToCopy) {
   const src = join(electrobunDist, file);
   const dest = join(binDir, file);

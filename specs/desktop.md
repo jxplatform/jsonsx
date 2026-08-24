@@ -2,7 +2,7 @@
 
 ## Platform Abstraction, Project Loading, and Component Scoping
 
-**Version:** 0.3.21-draft
+**Version:** 0.3.22-draft
 **Status:** Pending
 **Updated:** 2026-08-24
 **License:** MIT
@@ -566,6 +566,10 @@ When the user navigates into a sub-component (via `pushDocument()` in the state 
 
 The Bun process owns all filesystem and OS operations. The webview contains Studio's UI. Communication happens via ElectroBun's RPC bridge.
 
+**Toolchain boundary (ElectroBun 2).** Build orchestration belongs to **Hutch**, ElectroBun's build CLI, but nothing installs it by hand: the `electrobun` devDependency is a dependency-free bootstrap whose version selects the whole toolchain — it downloads the paired Hutch, verifies it against the release's published digest, and caches it. Hutch, Cottontail and ElectroBun therefore all ride the workspace lockfile, and a machine-wide Hutch is only a fallback. `electrobun.config.ts` describes the application and the build Hutch produces; `hutch.config.ts` only names tasks. ElectroBun 2 publishes no SDK to npm — `electrobun prepare` copies the release's SDK out of its platform core archive into a generated, gitignored `.hutch/devkit` sysroot, which is where every `electrobun/*` import resolves from. `electrobun/main` is the runtime-neutral main-process namespace (`electrobun/bun` remains a deprecated alias); `electrobun/view` is unchanged.
+
+ElectroBun 2 defaults its main process to Cottontail. Jx Studio selects `build.mainProcess: "bun"` explicitly, because the main-process module graph is Bun-native throughout — `Bun.serve`, `Bun.$`, `Bun.spawn`, `Bun.Glob`. Hutch itself runs project TypeScript with Cottontail regardless, so the `preBuild` and `postBuild` hook scripts stay on portable APIs rather than Bun's shell.
+
 ### 7.2 Desktop Platform Adapter
 
 The desktop platform adapter runs in the **webview** and translates PAL calls into RPC calls to the Bun process:
@@ -606,7 +610,7 @@ The Bun process implements the actual operations:
 
 ```javascript
 // src/bun/studio-handlers.js (runs in Bun process)
-import { Utils } from "electrobun/bun";
+import { Utils } from "electrobun/main";
 import { readdir, readFile, writeFile, unlink, rename, stat } from "fs/promises";
 import { resolve, relative, join, basename } from "path";
 
@@ -658,7 +662,8 @@ export async function handleListDirectory(dir) {
 
 ```
 jx-studio-app/
-├── electrobun.config.js         # ElectroBun build config
+├── hutch.config.ts              # Project task names only (the npm dep selects the toolchain)
+├── electrobun.config.ts         # App identity, main process, views, copy, signing, release
 ├── src/
 │   ├── bun/
 │   │   ├── main.js              # App entry: create window, register RPC handlers
@@ -669,11 +674,15 @@ jx-studio-app/
 │           ├── index.html        # Studio HTML shell
 │           └── init.js           # registerPlatform(createDesktopPlatform())
 ├── package.json
+├── .hutch/devkit/               # Generated: the pinned release's SDK, where electrobun/* resolves
 └── node_modules/
     ├── @jxsuite/studio/           # UI package (the studio itself)
-    ├── @jxsuite/runtime/          # Canvas rendering
-    └── electrobun/               # Framework
+    └── @jxsuite/runtime/          # Canvas rendering
 ```
+
+`.hutch/devkit` is written by Hutch and gitignored — never edited or committed. The `electrobun` package under `node_modules` carries neither runtime nor SDK: it is the bootstrap that resolves and invokes the paired Hutch, which is why it belongs in `devDependencies` rather than `dependencies`.
+
+**Distribution names.** A stable build's INSTALLER carries no channel prefix (`macos-arm64-JxStudio.dmg`), while its updater metadata and update archive keep one (`stable-macos-arm64-update.json`) — the same feed name ElectroBun 1.x used, so an installed 1.x app still finds its updates. ElectroBun 2 publishes no macOS x64 core archive, so that target is not built.
 
 **Packaged static data.** In a packaged build, ElectroBun inlines the whole bun-side JS graph into `app/bun/index.js`, so `import.meta.dirname` in every inlined module resolves to `app/bun/` at runtime. Static data directories read relative to it — `@jxsuite/create`'s `template/` and `templates/`, and `@jxsuite/starters`' `registry.json` and `sites/` — must therefore be staged to those exact paths by `build.copy` in `electrobun.config.ts`. The `postBuild` hook verifies the staged bundle (including the studio view assets) and fails the build on any omission.
 
@@ -1167,6 +1176,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.3.22-draft** (2026-08-24) — §7 records the ElectroBun 2 toolchain boundary: the electrobun npm devDependency selects Hutch, Cottontail and ElectroBun together (no machine-wide install and no release pin in hutch.config.ts), the SDK is projected into .hutch/devkit, the main process is pinned to bun explicitly, and stable installers drop the channel prefix that the updater feed keeps.
 - **0.3.21-draft** (2026-08-24) — 3.1 states that documentBaseUrl may be absolute or root-relative, and that a root-relative value is resolved against the canvas origin because the canvas composes it as new URL(path, base) — a relative base throws and fails the whole canvas mount.
 - **0.3.20-draft** (2026-08-23) — 3.1 adds the Canvas member family and states that the canvas needs project files at a URL rather than behind readFile: documentBaseUrl defaults to the canvas origin plus projectRoot and must be set by a platform whose root is an identifier rather than a served path.
 - **0.3.19-draft** (2026-08-22) — 10 SaaS/Cloud is Partial rather than Future: the adapter shipped and is deployed (10.1 Implemented, with what it implements and what it deliberately omits), collaboration shipped as a CRDT rather than the sketched lock model (10.3), and 10.2's storage table is marked Pending because the deployed backend is git-backed.
@@ -1207,4 +1217,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx Studio Desktop Architecture Specification v0.3.21-draft_
+_Jx Studio Desktop Architecture Specification v0.3.22-draft_

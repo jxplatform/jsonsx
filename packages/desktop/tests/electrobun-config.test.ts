@@ -12,6 +12,15 @@ import config from "../electrobun.config";
 const desktopDir = resolve(import.meta.dir, "..");
 
 describe("electrobun config", () => {
+  /* Electrobun 2 defaults `mainProcess` to Cottontail. Dropping this key does not fail the build —
+     it silently ignores `build.bun` and packages a runtime this app's Bun.serve / Bun.$ / Bun.Glob
+     graph was never validated against, which would only surface as a runtime failure in a packaged
+     bundle. It also moves the entrypoint the copy paths below are keyed to. */
+  test("selects the Bun main process explicitly", () => {
+    expect(config.build.mainProcess).toBe("bun");
+    expect(config.build.bun.entrypoint).toBe("src/index.ts");
+  });
+
   test("stages create/starters static data next to the bundled module (app/bun/)", () => {
     expect(config.build.copy).toMatchObject({
       "../create/template": "bun/template",
@@ -39,8 +48,9 @@ describe("electrobun config", () => {
 
 /*
  * The root tsconfig excludes `packages/desktop`, and that carve-out is owned by this dependency:
- * electrobun's `exports` map points at raw TypeScript rather than declarations, so importing it
- * pulls its SOURCE into whichever program imports it. `exclude` cannot stop that (it only filters
+ * the Electrobun SDK is raw TypeScript rather than declarations — Hutch projects `.ts` sources into
+ * `.hutch/devkit/api` and this package's `paths` point straight at them — so importing it pulls its
+ * SOURCE into whichever program imports it. `exclude` cannot stop that (it only filters
  * which files become program roots, never what an import reaches) and `skipLibCheck` cannot either
  * (it covers `.d.ts` only) — so the root's `exactOptionalPropertyTypes` lands on a dependency's
  * code and this package needs a looser config.
@@ -49,13 +59,29 @@ describe("electrobun config", () => {
  * go, and nothing else would ever tell us. When this fails: try deleting `packages/desktop` from
  * the root `exclude` and this package's tsconfig with it.
  */
-describe("the electrobun package's shipped types", () => {
-  test("still resolves to raw .ts, which is what forces this package's own tsconfig", () => {
-    /* Read, not imported: electrobun's own `exports` map declares no `./package.json` entry, so it
-       is not importable — the very narrowness this test is about. */
-    const manifest = resolve(desktopDir, "../../node_modules/electrobun/package.json");
-    expect(existsSync(manifest)).toBe(true);
-    const pkg = JSON.parse(readFileSync(manifest, "utf8")) as { exports: Record<string, string> };
+describe("the electrobun SDK's shipped types", () => {
+  /* The committed half, which always runs: these paths ARE the import, so a `.d.ts` target here
+     would be the end of the carve-out even if the devkit still shipped sources. */
+  test("this package's own paths point at raw .ts", () => {
+    const tsconfig = readFileSync(resolve(desktopDir, "tsconfig.json"), "utf8");
+    /* Read as text, not JSON.parse: this tsconfig carries comments. Each paths entry is one
+       line of the form `"electrobun/main": ["./.hutch/devkit/..."],`. */
+    const targets = tsconfig
+      .split(/\r?\n/)
+      .filter((line) => line.trimStart().startsWith('"electrobun'))
+      .map((line) => line.slice(line.indexOf("./"), line.lastIndexOf('"')));
+    expect(targets.length).toBeGreaterThan(0);
+    for (const target of targets) {
+      expect({ source: target.endsWith(".ts"), target }).toEqual({ source: true, target });
+    }
+  });
+
+  /* The upstream half. Skipped without a devkit — `bun test` never resolves `electrobun/*` (every
+     suite mocks it by specifier), so CI's desktop test job deliberately does not run
+     `electrobun prepare`. It runs wherever the SDK has actually been projected. */
+  const devkit = resolve(desktopDir, ".hutch/devkit/package.json");
+  test.skipIf(!existsSync(devkit))("the projected SDK is still raw .ts, not declarations", () => {
+    const pkg = JSON.parse(readFileSync(devkit, "utf8")) as { exports: Record<string, string> };
     const entries = Object.values(pkg.exports);
     expect(entries.length).toBeGreaterThan(0);
     for (const target of entries) {
