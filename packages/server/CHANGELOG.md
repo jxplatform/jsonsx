@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.2.6](https://github.com/jxsuite/jx/compare/server-v2.2.5...server-v2.2.6) (2026-08-24)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/compiler bumped to 2.0.6
+    * @jxsuite/import bumped to 0.39.6
+  * devDependencies
+    * @jxsuite/auth bumped to 0.5.3
+    * @jxsuite/connector bumped to 0.5.3
+
 ## [2.2.5](https://github.com/jxsuite/jx/compare/server-v2.2.4...server-v2.2.5) (2026-08-24)
 
 

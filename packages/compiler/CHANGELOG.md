@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.0.6](https://github.com/jxsuite/jx/compare/compiler-v2.0.5...compiler-v2.0.6) (2026-08-24)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * devDependencies
+    * @jxsuite/connector bumped to 0.5.3
+
 ## [2.0.5](https://github.com/jxsuite/jx/compare/compiler-v2.0.4...compiler-v2.0.5) (2026-08-24)
 
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.12](https://github.com/jxsuite/jx/compare/formulas-v0.0.11...formulas-v0.0.12) (2026-08-24)
+
+
+### Bug Fixes
+
+* **tests:** make the Windows suites runnable ([1c23891](https://github.com/jxsuite/jx/commit/1c23891ec56dce22e1e900ae151a49cb1ecdbe25))
+
 ## [0.0.11](https://github.com/jxsuite/jx/compare/formulas-v0.0.10...formulas-v0.0.11) (2026-08-24)
 
 

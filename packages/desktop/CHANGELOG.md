@@ -1,5 +1,33 @@
 # Changelog
 
+## [3.0.0](https://github.com/jxsuite/jx/compare/desktop-v2.3.3...desktop-v3.0.0) (2026-08-24)
+
+
+### ⚠ BREAKING CHANGES
+
+* **desktop:** move to Electrobun 2.0.1 stable and the npm-managed toolchain
+
+### Features
+
+* **desktop:** move to Electrobun 2.0.1 stable and the npm-managed toolchain ([2c8a202](https://github.com/jxsuite/jx/commit/2c8a2022dddc1f80854dc16bce09c18ee7e5a734))
+
+
+### Bug Fixes
+
+* **tests:** make the Windows suites runnable ([1c23891](https://github.com/jxsuite/jx/commit/1c23891ec56dce22e1e900ae151a49cb1ecdbe25))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/compiler bumped to 2.0.6
+    * @jxsuite/server bumped to 2.2.6
+    * @jxsuite/studio bumped to 2.4.2
+  * devDependencies
+    * @jxsuite/connector bumped to 0.5.3
+    * @jxsuite/server bumped to 2.2.6
+
 ## [2.3.3](https://github.com/jxsuite/jx/compare/desktop-v2.3.2...desktop-v2.3.3) (2026-08-24)
 
 
