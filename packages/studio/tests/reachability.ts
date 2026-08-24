@@ -85,16 +85,38 @@ export interface ReachabilityReport {
 }
 
 /**
- * A path in TypeScript's spelling: absolute, forward-slashed.
+ * A path in this harness's one spelling: absolute, forward-slashed, drive letter upper-cased.
  *
- * Every path this harness compares comes from the TS API — `configFileName`, the program's file
- * names — and TypeScript normalises those to `/` on every platform. `resolve`/`join` do not: on
- * Windows they yield `C:\\…`, so `p.configFileName === TSCONFIG` was never true, `configured` was
- * silently undefined behind its `!`, and the run died on `p.program` — while the `SRC`-prefixed
- * filters quietly matched nothing.
+ * Two normalisations, because Windows offers the same file under several names and this harness
+ * keys maps by it.
+ *
+ * Separators: every path it compares against comes from the TS API, which uses `/` on every
+ * platform. `resolve`/`join` do not — they yield `C:\\…`, so `p.configFileName === TSCONFIG` was
+ * never true, `configured` was silently undefined behind its `!`, and the run died on `p.program`,
+ * while the `SRC`-prefixed filters quietly matched nothing.
+ *
+ * Drive-letter case: TypeScript is not self-consistent here. A file inside the configured program
+ * comes back `C:/…`; the same file opened by name comes back `c:/…`. Windows means one file by
+ * either, so an `owner` lookup keyed on one spelling missed the entry stored under the other and
+ * the walk died on a second `!` that had never been true.
  */
+function canonical(file: string): string {
+  const slashed = file.replaceAll("\\", "/");
+  return /^[a-z]:\//.test(slashed) ? slashed[0]!.toUpperCase() + slashed.slice(1) : slashed;
+}
+
+/**
+ * A path relative to `src/`, forward-slashed — the spelling every reported key and allow-list entry
+ * uses. `relative()` alone yields `canvas\iframe-position.ts` on Windows, so no allow-list entry
+ * matched and all 1322 declarations were reported dead.
+ */
+function srcRelative(file: string): string {
+  return relative(SRC, file).replaceAll("\\", "/");
+}
+
+/** {@link canonical}, applied to path parts this harness resolves for itself. */
 function tsPath(...parts: string[]): string {
-  return resolve(...parts).replaceAll("\\", "/");
+  return canonical(resolve(...parts));
 }
 
 const STUDIO_DIR = tsPath(import.meta.dir, "..");
@@ -227,7 +249,8 @@ async function run(api: API): Promise<ReachabilityReport> {
   // `packages/desktop` are outside it, and they hold real callers, so they are opened alongside.
   const first = await api.updateSnapshot({ openProjects: [TSCONFIG] });
   const main = first.getProjects()[0]!;
-  const inProgram = new Set(await main.program.getSourceFileNames());
+  const programFiles = await main.program.getSourceFileNames();
+  const inProgram = new Set(programFiles.map((file) => canonical(file)));
   const extra = callerFiles(REPO).filter((f) => !inProgram.has(f) && namesStudio(f));
 
   const snapshot = await api.updateSnapshot({ openProjects: [TSCONFIG], openFiles: extra });
@@ -280,7 +303,7 @@ async function run(api: API): Promise<ReachabilityReport> {
     decls.set(id, {
       id,
       name,
-      file: sf.fileName,
+      file: canonical(sf.fileName),
       line: sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1,
       isFunction: fn,
       isExported: exported,
@@ -422,7 +445,9 @@ async function run(api: API): Promise<ReachabilityReport> {
 
   const shorthandValues = await Promise.all(
     shorthands.map((h) =>
-      owner.get(h.node.getSourceFile().fileName)!.checker.getShorthandAssignmentValueSymbol(h.node),
+      owner
+        .get(canonical(h.node.getSourceFile().fileName))!
+        .checker.getShorthandAssignmentValueSymbol(h.node),
     ),
   );
   const shorthandTargets = await followAliases(configured, shorthandValues);
@@ -432,7 +457,7 @@ async function run(api: API): Promise<ReachabilityReport> {
 
   const patternTypes = await Promise.all(
     patterns.map((p) =>
-      owner.get(p.node.getSourceFile().fileName)!.checker.getTypeAtLocation(p.node),
+      owner.get(canonical(p.node.getSourceFile().fileName))!.checker.getTypeAtLocation(p.node),
     ),
   );
   const wanted: {
@@ -446,7 +471,7 @@ async function run(api: API): Promise<ReachabilityReport> {
     if (!type) {
       continue;
     }
-    const project = owner.get(p.node.getSourceFile().fileName)!;
+    const project = owner.get(canonical(p.node.getSourceFile().fileName))!;
     for (const element of p.node.elements as AnyNode[]) {
       const name: string | undefined = element.propertyName?.text ?? element.name?.text;
       if (name !== undefined) {
@@ -467,7 +492,10 @@ async function run(api: API): Promise<ReachabilityReport> {
     if (!spec.startsWith(".")) {
       return undefined;
     }
-    const base = join(dirname(from), spec.replace(/\.js$/, ""));
+    /* The canonical spelling, not join: `sources` is keyed that way and join() hands back
+       `C:\…\x` on Windows, so no relative import resolved at all — `importsOf` was empty for every
+       file and 289 of 308 modules were reported unreachable. */
+    const base = tsPath(dirname(from), spec.replace(/\.js$/, ""));
     for (const candidate of [base, `${base}.ts`, `${base}/index.ts`]) {
       if (sources.has(candidate)) {
         return candidate;
@@ -500,10 +528,10 @@ async function run(api: API): Promise<ReachabilityReport> {
      export does not have to be added here. */
   const published = Object.values(manifest.exports)
     .filter((p) => p.endsWith(".ts"))
-    .map((p) => join(STUDIO_DIR, p));
+    .map((p) => tsPath(STUDIO_DIR, p));
   const bundleSource = readFileSync(join(STUDIO_DIR, "scripts", "build-config.ts"), "utf8");
   const bundled = [...bundleSource.matchAll(/"(\.\/src\/[\w./-]+\.ts)"/g)].map((m) =>
-    join(STUDIO_DIR, m[1]!),
+    tsPath(STUDIO_DIR, m[1]!),
   );
   if (bundled.length === 0) {
     throw new Error("no STUDIO_ENTRYPOINTS found in scripts/build-config.ts — the roots moved");
@@ -554,19 +582,19 @@ async function run(api: API): Promise<ReachabilityReport> {
   }
 
   const functions = [...decls.values()].filter((d) => d.isFunction);
-  const key = (d: Decl) => `${relative(SRC, d.file)}:${d.name}`;
+  const key = (d: Decl) => `${srcRelative(d.file)}:${d.name}`;
   const dead = functions
     .filter((d) => !live.has(d.id))
     .map((d) => ({
       name: d.name,
-      file: relative(SRC, d.file),
+      file: srcRelative(d.file),
       line: d.line,
       key: key(d),
     }));
 
   return {
     dead,
-    deadModules: studioFiles.filter((f) => !liveModules.has(f)).map((f) => relative(SRC, f)),
+    deadModules: studioFiles.filter((f) => !liveModules.has(f)).map((f) => srcRelative(f)),
     allFunctions: new Set(functions.map((d) => key(d))),
     functionCount: functions.length,
     moduleCount: studioFiles.length,
