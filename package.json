@@ -78,7 +78,7 @@
   "devDependencies": {
     "@commitlint/cli": "^21.2.2",
     "@commitlint/config-conventional": "^21.2.2",
-    "@ttsc/graph": "^0.28.1",
+    "@ttsc/graph": "^0.28.2",
     "bun-types": "^1.4.0",
     "bun2nix": "^2.1.2",
     "chrome-devtools-mcp": "^1.7.0",
@@ -92,7 +92,7 @@
     "release-please": "^17.11.1",
     "ts-migrate": "^0.1.35",
     "ts-migrate-plugins": "^0.1.35",
-    "ttsc": "^0.28.1",
+    "ttsc": "^0.28.2",
     "typescript": "^7.0.2"
   },
   "nano-staged": {
