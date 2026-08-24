@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.4.1](https://github.com/jxsuite/jx/compare/studio-v2.4.0...studio-v2.4.1) (2026-08-24)
+
+
+### Bug Fixes
+
+* **canvas:** a component-slot session writes only what you typed, and hands the host back ([#182](https://github.com/jxsuite/jx/issues/182)) ([3e33330](https://github.com/jxsuite/jx/commit/3e333301fc59c77e3d522b853dac9f5207ca8c90))
+* **canvas:** a prop slot survives the rebuild, and refuses a value it does not own ([#187](https://github.com/jxsuite/jx/issues/187)) ([d8310be](https://github.com/jxsuite/jx/commit/d8310be7fe906cccbee852d9c4a8b640c778e968))
+* **canvas:** keystrokes land in a component slot, not just the caret ([#181](https://github.com/jxsuite/jx/issues/181)) ([833ae19](https://github.com/jxsuite/jx/commit/833ae199e7e1977fb14cca048b12dcd4d454eb60))
+* **canvas:** prose slotted into a component is editable again ([#179](https://github.com/jxsuite/jx/issues/179)) ([8cf9641](https://github.com/jxsuite/jx/commit/8cf964194b4ace6c32dd144be2a52aca85c1f35e))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/create bumped to 1.3.5
+    * @jxsuite/formulas bumped to 0.0.11
+    * @jxsuite/runtime bumped to 2.0.4
+
 ## [2.4.0](https://github.com/jxsuite/jx/compare/studio-v2.3.0...studio-v2.4.0) (2026-08-23)
 
 

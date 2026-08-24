@@ -1,6 +1,6 @@
 {
   "name": "@jxsuite/runtime",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "description": "JSON-native reactive web component runtime",
   "license": "MIT",
   "repository": {

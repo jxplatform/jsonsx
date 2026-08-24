@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.6.2](https://github.com/jxsuite/jx/compare/starters-v1.6.1...starters-v1.6.2) (2026-08-24)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * devDependencies
+    * @jxsuite/parser bumped to 1.5.4
+    * @jxsuite/runtime bumped to 2.0.4
+
 ## [1.6.1](https://github.com/jxsuite/jx/compare/starters-v1.6.0...starters-v1.6.1) (2026-08-23)
 
 
