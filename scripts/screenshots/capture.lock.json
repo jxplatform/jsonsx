@@ -286,9 +286,9 @@
       "width": 3840
     },
     "docs/images/counter-finished.png": {
-      "bytes": 169781,
-      "capturedAt": "2026-08-17T00:44:37Z",
-      "capturedBy": "screenshots@ci/31982773241",
+      "bytes": 168952,
+      "capturedAt": "2026-08-24T14:37:00Z",
+      "capturedBy": "screenshots@ci/32739428704",
       "definition": "924c47b00983ec63af954d7e1d093842d572b747a8f355f12503fadf3affedfc",
       "height": 2400,
       "runtime": {
@@ -296,7 +296,7 @@
         "fontset": "fc:cac8f480b341",
         "os": "debian-12"
       },
-      "sha256": "8396c45988bbfbcf7edad7d92e2a7762e0fc08d919ac2df8001be2d3a4e84ac1",
+      "sha256": "028d24c31fb1ebd2d69f8373ed458ce7e35ce876134cab475e1441e94b1e3140",
       "shot": "counter-finished",
       "width": 3840
     },
