@@ -10,6 +10,7 @@
 import { Theme } from "@spectrum-web-components/theme/src/Theme.js";
 import themeSpectrumCSS from "@spectrum-web-components/theme/src/theme.css.js";
 import themeDarkCSS from "@spectrum-web-components/theme/src/theme-dark.css.js";
+import themeLightCSS from "@spectrum-web-components/theme/src/theme-light.css.js";
 import scaleMediumCSS from "@spectrum-web-components/theme/src/scale-medium.css.js";
 import { jxTheme } from "./jx-theme";
 import { Tabs } from "@spectrum-web-components/tabs/src/Tabs.js";
@@ -317,9 +318,19 @@ for (const [tag, ctor] of components as [string, CustomElementConstructor][]) {
   }
 }
 
-// Register theme fragments (these are also side-effect-only in the original modules)
+/* Register theme fragments (these are also side-effect-only in the original modules).
+
+   BOTH colour fragments, because `<sp-theme color>` adopts the fragment REGISTERED UNDER THAT NAME
+   and silently adopts none when the name is unknown. Only "dark" was registered here, so
+   Preferences → Appearance → Light set a valid attribute onto a theme that had no light stops:
+   every `--spectrum-*` colour token went undefined at once, the studio semantic layer in
+   `styles/tokens.css` collapsed to its dark hex fallbacks, and the chrome did not change. Spectrum
+   itself said so — "you have set color='light' but the associated system fragment has not been
+   loaded" — into a console nobody was reading. A colour declared in `CHROME_THEMES` must have its
+   fragment registered here. */
 Theme.registerThemeFragment("spectrum", "system", themeSpectrumCSS);
 Theme.registerThemeFragment("dark", "color", themeDarkCSS);
+Theme.registerThemeFragment("light", "color", themeLightCSS);
 Theme.registerThemeFragment("medium", "scale", scaleMediumCSS);
 /* Jx brand overrides. The 'app' kind must be registered under the literal
    name "app" and, registered last, is adopted after the fragments above so

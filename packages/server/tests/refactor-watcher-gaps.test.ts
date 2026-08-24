@@ -9,19 +9,35 @@ import { join } from "node:path";
 import type { FsEventPayload } from "../src/refactor/fs-events";
 
 type AllListener = (eventType: string, changedPath: string) => void;
+type ErrorListener = (error: unknown) => void;
 
 class FakeWatcher {
   closed = false;
   private listeners: AllListener[] = [];
+  private errorListeners: ErrorListener[] = [];
 
-  on(_event: "all", listener: AllListener): this {
-    this.listeners.push(listener);
+  on(event: "all" | "error", listener: AllListener | ErrorListener): this {
+    if (event === "error") {
+      this.errorListeners.push(listener as ErrorListener);
+    } else {
+      this.listeners.push(listener as AllListener);
+    }
     return this;
   }
 
   emit(eventType: string, changedPath: string): void {
     for (const listener of this.listeners) {
       listener(eventType, changedPath);
+    }
+  }
+
+  /** Chokidar's `error` event. An EventEmitter with no listener for it THROWS instead of logging. */
+  emitError(error: unknown): void {
+    if (this.errorListeners.length === 0) {
+      throw error;
+    }
+    for (const listener of this.errorListeners) {
+      listener(error);
     }
   }
 
@@ -74,6 +90,33 @@ describe("createFsWatcher — event filtering and debounce", () => {
       ]);
     } finally {
       await handle.close();
+    }
+  });
+});
+
+describe("createFsWatcher — watch errors", () => {
+  test("logs a watch error instead of letting it throw", () => {
+    const handle = createFsWatcher(ROOT, () => {});
+    const watcher = lastWatcher!;
+    const logged: string[] = [];
+    const original = console.error;
+    console.error = (...args: unknown[]) => logged.push(args.join(" "));
+    try {
+      // What a unix socket under the watched root produces. Before the listener existed, one of
+      // These ended the launcher; a home directory holds a dozen.
+      const enxio = Object.assign(new Error("ENXIO: no such device or address, watch 'a.sock'"), {
+        code: "ENXIO",
+      });
+      expect(() => watcher.emitError(enxio)).not.toThrow();
+      expect(logged.some((line) => line.includes("ENXIO"))).toBe(true);
+
+      // A thrown non-Error still has to produce a line rather than "undefined".
+      logged.length = 0;
+      watcher.emitError("plain string failure");
+      expect(logged.some((line) => line.includes("plain string failure"))).toBe(true);
+    } finally {
+      console.error = original;
+      void handle.close();
     }
   });
 });

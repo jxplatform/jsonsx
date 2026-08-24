@@ -1,6 +1,9 @@
 ---
 title: "Working in the monorepo"
 description: "Repo layout, running Studio from source, tests, and the conventions the Jx monorepo enforces in CI."
+code:
+  - scripts/ci/affected.ts
+  - scripts/check-schema-freshness.ts
 ---
 
 # Working in the monorepo
@@ -50,6 +53,30 @@ Pushes to `main`, the nightly cron, and manual dispatch are never gated: they al
 `ci` is the aggregate job. It passes when every other job either succeeded or was skipped, and fails if any failed or was cancelled — so a job your diff never reached leaves the run green.
 :::
 
+## Generated files are fixed for you, not failed at you
+
+Two things in this repository are build outputs that happen to be committed: the screenshots under `docs/images/`, and every `*schema.json` — the core schemas under `packages/schema/`, and the `project.schema.json` / `document.schema.json` pair in each project root. They are committed because editors, `jx validate` and published npm packages read them off disk, not because anybody writes them by hand.
+
+Both have a CI lane that **regenerates and pushes the result to your branch** rather than turning red and waiting for you:
+
+- **Screenshots** — `.github/workflows/screenshots.yml` re-captures and comments with before/after thumbnails and the docs pages each changed image appears on.
+- **Schemas** — `.github/workflows/schemas.yml` runs the generators and comments with the JSON Pointers that moved: `+ /$defs/ClassMethodDef/properties/role/enum/mount` rather than 500 KB of diff.
+
+Locally the same two commands do the same work:
+
+```bash
+bun run schema:verify   # is every committed schema what its generator produces?
+bun run schema:sync     # regenerate the stale ones
+```
+
+:::doc-warning
+Never hand-edit a committed schema or a committed screenshot. The next run of either generator overwrites it, and CI will notice. If a pointer in the comment is not a change you meant to make, the fix belongs in the generator or in the source it reads.
+:::
+
+Three things make a schema go stale, and only one of them is forgetting to run the generator. The commonest is a **dependency bump**: the core schema injects web-standards data read at generation time from `@webref/css`, `@webref/elements` and `@webref/idl`, so bumping one rewrites the committed core by construction — which is why this lane, unlike the screenshot one, runs on Dependabot's branches too. The third is a **merge race**: two branches can each be green alone and stale together when one moves the core and the other regenerates a project root before it lands. Git merges that without a conflict and no per-branch check can see it, so the lane also watches `main` and opens a pull request when it finds drift there.
+
+`bun run schema:verify` still blocks in CI. The lane cannot push to a fork, and a required check is what keeps a stale schema off `main` when it cannot.
+
 ## Releases, branches, and template versions
 
 Versions are release-please's job. Every publishable workspace is a component in
@@ -65,6 +92,26 @@ Two branches:
   but only after that release's installers are attached and `nix build` succeeds at the tag. It is
   what a NixOS user pins (`nix run github:jxsuite/jx/release`), so it must never point at a tree
   that does not build. Nothing pushes to it by hand.
+
+  The release builds the flake on **two** architectures. Only the x86_64 leg gates the branch; the
+  aarch64 leg is advisory, because it had never been built before and a failure there must not
+  strand the users who do have a working architecture. Promoting it is a one-line change to
+  `advance-release-branch`'s `needs`, and it should happen once arm has been green for a few
+  releases.
+
+  **`release` is also what jxsuite.com serves.** The site deploys from the released tree rather than
+  from the trunk, so the documentation a visitor reads always describes the app they can actually
+  download. The trade is deliberate and worth knowing before you write docs: a page merged to
+  `main` is not public until the desktop component next releases. Pull requests and `main` still
+  build the site — breakage surfaces when you cause it, not on release day — they just publish
+  nothing. To ship documentation ahead of a release, dispatch **Deploy jxsuite.com** manually with
+  `ref: main`.
+
+  Neither the release deploy nor the `release` push is triggered by watching the branch. CI moves
+  `release` with a plain `GITHUB_TOKEN` push, and pushes made with that token do not start
+  workflows — so `deploy-site.yml` is a `workflow_call` that release-please invokes, exactly like
+  the npm publish and the desktop bundlers. An `on: push: branches: [release]` trigger would look
+  correct and never fire once.
 
 ### Template dependency ranges are generated
 

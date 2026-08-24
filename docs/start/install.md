@@ -26,7 +26,7 @@ Jx Studio is Apple Silicon only. Intel Macs can still run the last release built
 
 ## NixOS
 
-On NixOS the same desktop app is built from source instead of downloaded, because its bundler cannot run in a Nix sandbox. It runs Studio in a Chromium app window and presents the identical editor.
+On NixOS the same desktop app is packaged as a Nix derivation rather than an installer, because its bundler cannot run in a Nix sandbox. It runs Studio in a Chromium app window and presents the identical editor.
 
 ```
 nix run github:jxsuite/jx/release
@@ -41,6 +41,33 @@ nix profile install github:jxsuite/jx/release
 ```
 
 Either form takes an optional project directory — `nix run github:jxsuite/jx/release -- ~/sites/my-site` — and opens the project picker without one.
+
+### Fetch it instead of building it
+
+Released builds are published to a public [Cachix](https://cachix.org) cache, so the commands above can download Studio rather than compile the monorepo on your machine. The rest of the closure — Chromium, Bun — already comes from `cache.nixos.org`.
+
+The flake names the cache itself, so Nix offers to use it the first time you run one of the commands above. Answer `y`, or pass `--accept-flake-config` to skip the prompt:
+
+```
+nix run github:jxsuite/jx/release --accept-flake-config
+```
+
+:::doc-warning
+Nix honours a flake's own substituter settings only for users listed in `trusted-users`, which on a stock NixOS install is `root` alone. If you see `ignoring untrusted substituter`, the prompt was accepted but the cache was not used, and Studio is being built from source.
+:::
+
+To make it stick regardless, add the cache to your system configuration:
+
+```nix
+nix.settings = {
+  extra-substituters = [ "https://jxsuite.cachix.org" ];
+  extra-trusted-public-keys = [
+    "jxsuite.cachix.org-1:kwYafZ+qeKSsR7F9dxC2zLJjsJtGaBk012QoLhe4zMM="
+  ];
+};
+```
+
+Off NixOS, the same two keys go in `/etc/nix/nix.conf`, or run `cachix use jxsuite` to write them for you.
 
 Once installed, open Studio and either **create a new project**, **open an existing folder**, or **clone a repository** — see [Your first project](/docs/start/first-project).
 

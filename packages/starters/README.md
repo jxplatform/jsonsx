@@ -117,8 +117,10 @@ both its Electrobun and Chromium window layers.
 1. Add the `sites/<id>/` tree and a `registry.json` entry with all eight fields.
 2. `bun run schema:generate-all` — regenerates every `project.schema.json` and
    `document.schema.json`. **Always via this script**, never by hand: it runs
-   `schema:clean-roots` first (see below). `bun run schema:verify` git-diffs the
-   result in CI, so a stale entry schema is a red build.
+   `schema:clean-roots` first (see below). `bun run schema:verify` proves the
+   result in CI, so a stale entry schema is a red build — and
+   `.github/workflows/schemas.yml` regenerates it and pushes the fix to your
+   branch, with a comment naming the JSON Pointers that moved.
 3. `bun run docs:generate` — `docs/studio/projects/starters.md` is rendered from
    `registry.json` by `scripts/docs/generators/starters.ts`. Hand-editing it is
    a bug; CI diffs the page.

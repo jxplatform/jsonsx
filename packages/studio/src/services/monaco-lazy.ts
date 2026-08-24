@@ -50,15 +50,21 @@ let _pendingSchemasDirty = false;
  * Applied immediately when Monaco is already loaded, otherwise on the next {@link loadMonaco}. Only
  * the LATEST set matters — reactivation and `project.json` writes both call this — so it overwrites
  * rather than queues.
+ *
+ * @returns Settles once the schemas are in force. Fire-and-forget is a valid use — say so with
+ *   `void` at the call site rather than having this hide it.
  */
 export function setProjectSchemasForMonaco(
   schemas: { project?: unknown; document?: unknown } | null,
-): void {
+): Promise<void> {
   _pendingSchemas = schemas;
   _pendingSchemasDirty = true;
-  if (_monaco) {
-    void applyPendingSchemas();
-  }
+  /* Resolves when the schemas have REACHED Monaco, not when they were queued. With Monaco already
+     loaded that is a dynamic import away, and discarding the promise here left no caller — the
+     app's or a test's — able to tell "applied" from "about to be": the only way to observe it was
+     to guess a number of microtasks. `loadMonaco()` already awaits the same call on its own path,
+     so this makes the two doors symmetric rather than adding a new contract. */
+  return _monaco ? applyPendingSchemas() : Promise.resolve();
 }
 
 /** Push any pending schemas into Monaco's JSON diagnostics. No-op when nothing changed. */

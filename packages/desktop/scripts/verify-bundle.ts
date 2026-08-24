@@ -9,8 +9,26 @@
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { STUDIO_ASSETS, STUDIO_WORKERS } from "@jxsuite/studio/hosting/layout";
 
-/** Paths every packaged app-code dir must contain (relative to the bundle's app/ dir). */
+/**
+ * Paths every packaged app-code dir must contain, relative to the bundle's `app/` dir.
+ *
+ * The studio half is DERIVED from `@jxsuite/studio`'s manifest rather than listed here. It used to
+ * be listed, and it was the third copy of the same list — after `stage-studio-assets.ts` and
+ * `electrobun.config.ts`'s copy block — so it could only ever assert what someone had remembered to
+ * write in all three. `dist/codicon.ttf` was in none of them.
+ *
+ * `dist/workers` is expanded to its three filenames rather than collapsed to a directory check, and
+ * that granularity is load-bearing: a worker that is absent does not 404 loudly, it leaves the
+ * packaged code view with no JSON language service at all.
+ */
+const STUDIO_REQUIRED = STUDIO_ASSETS.filter((a) => a.required).flatMap((a) =>
+  a.path === "dist/workers"
+    ? STUDIO_WORKERS.map((w) => `views/studio/dist/workers/${w}`)
+    : [`views/studio/${a.path}`],
+);
+
 export const REQUIRED = [
   "bun/index.js",
   // @jxsuite/create resolves these next to its bundled module (app/bun/).
@@ -20,20 +38,11 @@ export const REQUIRED = [
   "bun/templates/mobile-app/layouts/base.json",
   // @jxsuite/starters reads the registry the same way; per-starter trees are checked against it.
   "bun/registry.json",
-  // Staged studio assets — a missing one 404s the packaged shell or canvas iframe at boot.
-  "views/studio/index.html",
-  "views/studio/canvas.html",
-  "views/studio/dist/iframe-entry.js",
+  ...STUDIO_REQUIRED,
+  /* The launcher's own PAL-init bundle, which is the one studio-tree file the manifest does NOT
+     know about: the desktop builds it and stages it into studio's dist/. Without it the packaged
+     app boots with no platform registered. */
   "views/studio/dist/init.js",
-  "views/studio/dist/studio.js",
-  "views/studio/dist/studio.css",
-  /* Monaco's workers and the vendored webfonts. studio.js resolves the workers relative to its own
-     url, so an omission here does not 404 loudly — it leaves the packaged code view with no JSON
-     language service at all: no schema validation, no completion, no hover. */
-  "views/studio/dist/workers/editor.worker.js",
-  "views/studio/dist/workers/json.worker.js",
-  "views/studio/dist/workers/ts.worker.js",
-  "views/studio/fonts/jetbrains-mono-400.woff2",
 ];
 
 /** @returns Missing required paths (relative to appDir); empty array means the bundle is complete. */

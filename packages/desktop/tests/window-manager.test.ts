@@ -213,6 +213,12 @@ void mock.module("../src/settings-store", () => ({
 void mock.module("../src/updater", () => ({
   applyUpdate: mock(() => "apply"),
   checkForUpdate: mock(() => "check"),
+  composeAppInfo: mock(() => ({
+    channel: "stable",
+    hash: "abc",
+    updateStatus: "Up to date",
+    version: "1.2.3",
+  })),
   downloadUpdate: mock(() => "download"),
   getLocalInfo: mock(() => "local"),
   getStatus: mock(() => "status"),

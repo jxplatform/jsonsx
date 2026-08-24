@@ -309,6 +309,28 @@ describe("zoom verbs with no open document", () => {
   });
 });
 
+// ─── New Window ───────────────────────────────────────────────────────────────
+
+/*
+ * `view.newWindow` is the record; this is the wiring behind it. It reaches the platform member and
+ * has to tolerate a host that has none, because the record is what a launcher WITHOUT multi-window
+ * would otherwise offer and fail to run — Studio hides it there, but the dependency is built either
+ * way.
+ */
+describe("newWindow", () => {
+  test("asks the platform for another window", async () => {
+    const newWindow = mock(async () => {});
+    installMockPlatform({ newWindow });
+    await studioDeps!.newWindow();
+    expect(newWindow).toHaveBeenCalledTimes(1);
+  });
+
+  test("a host with one window is a no-op, not a crash", () => {
+    installMockPlatform();
+    expect(() => studioDeps!.newWindow()).not.toThrow();
+  });
+});
+
 // ─── ⌘J's legacy Assistant branch ─────────────────────────────────────────────
 
 describe("toggleDock's dock ids", () => {

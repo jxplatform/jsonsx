@@ -2,9 +2,9 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.35-draft
+**Version:** 0.9.41-draft
 **Status:** Partial
-**Updated:** 2026-08-20
+**Updated:** 2026-08-24
 **License:** MIT
 
 ---
@@ -95,11 +95,11 @@ Immutable state with undo/redo history (100 entries). All mutations produce a ne
 
 ### 3.4 Platform Abstraction Layer (PAL)
 
-Studio uses a platform abstraction (`platform.js`) to decouple UI from backend:
+Studio uses a platform abstraction (`src/platform.ts`) to decouple UI from backend. The table below is a sketch; `src/types.ts`'s `StudioPlatform` is the interface, and it is considerably wider:
 
 | Method                   | Description                                                                                                |
 | ------------------------ | ---------------------------------------------------------------------------------------------------------- |
-| `listFiles(dir)`         | List directory contents                                                                                    |
+| `listDirectory(dir)`     | List directory contents                                                                                    |
 | `readFile(path)`         | Read file content                                                                                          |
 | `writeFile(path, c)`     | Write file content                                                                                         |
 | `deleteFile(path)`       | Delete file                                                                                                |
@@ -111,12 +111,14 @@ Studio uses a platform abstraction (`platform.js`) to decouple UI from backend:
 | `createProject(opts)`    | Scaffold a project at the user-chosen `opts.destination`; never defaults a location                        |
 | `pickDirectory?()`       | Native folder picker behind the modal's **Browse…** button (desktop only)                                  |
 | `fetchProjectSchemas?()` | The active project's generated entry documents, PRE-BUNDLED (extensions.md §5.2) — drives §4.2.1           |
+| `canvasUrl?`             | The canvas iframe document. Absent means the bundle-relative default (§11.2)                               |
+| `canvasUrlDeferred?`     | This platform resolves `canvasUrl` asynchronously; the host waits rather than mounting the default (§11.2) |
 
 Three platform targets:
 
-- **DevServer** (`platforms/devserver.js`) — Wraps `/__studio/*` fetch calls for Chrome-based development.
+- **DevServer** (`platforms/devserver.ts`) — Wraps `/__studio/*` fetch calls for Chrome-based development.
 - **Desktop** (`@jxsuite/desktop`) — ElectroBun app with RPC to Bun process for native file I/O.
-- **Cloud** (`platforms/cloud.js`) — Hosted sessions over the platform's session API; the backend
+- **Cloud** (`platforms/cloud.ts`) — Hosted sessions over the platform's session API; the backend
   composes per-project schemas in-Worker (extensions.md §5.5), so §4.2.1 holds there too.
 
 Registration: `registerPlatform(impl)` at startup, `getPlatform()` for access.
@@ -963,6 +965,14 @@ none of which the studio implements.
 Component instances are `contenteditable="false"` islands: the caret treats each as one atomic unit
 and never enters its internals. Prop-bound text inside a component (§8.2.5) is the exception.
 
+**An island covers a component's internals, never the document slotted into it.** A component's
+children are page content — in a markdown class-directive page they are the author's own prose, and
+as §4.1 notes those pages place _every_ editable block inside a component. Each such block is
+stamped with its own `data-jx-path` and re-opened with `contenteditable="true"`, so the island
+freezes only what the component renders for itself. A **nested** component instance is an island in
+its own right and stays frozen, even though it is also a child of one; internals rendered by a
+component's own `connectedCallback` never carry a stamped path, so they are never re-opened.
+
 Text reaches the document on a **~500 ms typing pause** and whenever the caret leaves a block. Any
 operation that reads the document as authoritative — chiefly saving — first flushes what the caret
 has typed but not yet committed.
@@ -979,6 +989,15 @@ The browser may edit text; it may not restructure the document. Every `beforeinp
 | Backspace at a block start, Delete at a block end | Prevented; block merge (§8.2.3)      |
 | Any edit spanning two blocks                      | Prevented; range collapse (§8.2.3)   |
 | Native formatting, native history, text drag      | Prevented; the studio owns these     |
+| Any edit in a prop-bound host (§8.2.5)            | Applied natively; splits prevented   |
+
+**A prop-bound host is classified before positions are resolved.** It is editable text with no
+document path of its own — it commits as a prop VALUE, not as a block — so its position always
+resolves to nothing, and the rule that suppresses an unresolvable position would otherwise reject
+every keystroke in it. That is not hypothetical: it is what made a component slot show a caret and
+silently swallow everything typed into it. Nothing in such a host is structural, so nothing is
+re-expressed; the only intents prevented are the paragraph split and the line break, because a prop
+is one plain string.
 
 A structural intent with no handler is **suppressed**, never delegated back to the browser: an
 unimplemented operation must leave the document untouched rather than let the engine restructure the
@@ -1064,6 +1083,26 @@ suppressed.
 Text inside a component instance that is an invertible prop binding opens a nested, plaintext-only
 editing host on press. It commits to the instance's `$props`, and takes no rich formatting, split or
 slash menu.
+
+**Only a string is text.** A prop whose stored value is a number or a boolean renders as text and
+would read as editable, but the session commits `textContent` — so editing it retypes the value, and
+`${count * 2}` becomes string concatenation. Those props are refused here and edited in the
+properties panel, which knows their type. An expression (`${…}`) and an object were already refused.
+
+**`$props` is not the only place a value lives.** A prop delivered through `attributes` — either the
+JSON shorthand `"props.<name>"` or a name that collides with a reflected DOM property such as
+`title` or `role` — renders through the marker while `$props` holds nothing, so reading `$props`
+alone reports it as unset and offers to edit it. Committing would write `$props` and leave the
+attribute standing: two sources for one rendered value, and for a reflected name the attribute wins,
+so the edit is invisible. Both are refused; the properties panel edits the attribute itself.
+
+**A session that changes nothing writes nothing.** The commit is compared against the text the
+session opened with, not only against the stored prop: an _unset_ prop's stored value is `undefined`
+while the marker renders the definition's default, so a comparison against storage alone treats a
+bare click as a change and writes the default onto the instance — dirtying the document and
+detaching that instance from its definition. Escape is a real cancel on the same rule, and when an
+idle commit has already written during the session it writes the original back rather than leaving
+the tick standing.
 
 #### 8.2.7 Serialization
 
@@ -1342,9 +1381,11 @@ Invoked by chord while blocked, the reason goes to the status bar instead of ope
 
 ### 11.1 Bundle Layout
 
-The studio ships **two entry bundles** — the editor shell (`dist/studio.js`) and the slim canvas-iframe bundle (`dist/iframe-entry.js`) — built in separate single-entry passes so each lands flat at `dist/<name>.js`. Four consumers address those paths literally (`index.html`, `canvas.html`, the desktop asset staging, and the cloud platform's asset build), so entry names are a contract and are never hashed.
+The studio ships **two entry bundles** — the editor shell (`dist/studio.js`) and the slim canvas-iframe bundle (`dist/iframe-entry.js`) — built in separate single-entry passes so each lands flat at `dist/<name>.js`. Entry names are a contract and are never hashed, because everything else in the tree is addressed **relative to an entry**: they are the only two paths a host can rely on.
 
 The build **code-splits**. Everything reached only through a dynamic `import()` — Monaco and its language contributions, the Yjs collab stack, the JSON-Schema validator, drag-and-drop adapters — lands in content-hashed files under `dist/chunks/`, addressed by the entry relative to its own URL. That directory therefore ships and is copied wholesale, with its emitted names intact.
+
+**Only an entry may resolve against its own URL.** `import.meta.url` in any other module is the url of whatever chunk that module was hoisted into, which is a different directory and not a stable one. Both entries call `setBundleBase(import.meta.url)` as their first statement and everything else reads it through `bundleUrl()` (`services/bundle-base`). This is not a style rule: `services/monaco-setup` resolved Monaco's three web workers with a bare `import.meta.url`, the code split moved it into `dist/chunks/`, and the workers 404'd in every distribution for months — silently, because a worker that fails to start takes the JSON language service with it and reports nothing. `tests/entry-anchors.test.ts` holds the line in both directions.
 
 **Monaco is never on the startup path.** It is roughly two thirds of the editor's code and most sessions never open a code view, so `services/monaco-lazy` loads the editor API and its worker/language registration together, memoized, on first use by source mode, the function editor, or the formula workspace. Nothing in the eager import graph may reference `monaco-editor` — including indirectly, via a module whose own top-level imports pull it in (the reason the model-URI helper lives apart from the Monaco setup module).
 
@@ -1375,6 +1416,62 @@ metafile, which must show exactly one physical `monaco-editor` root in the input
 not payload: an `import()` that RUNS during activation still puts the editor on the critical path.
 Per-project JSON schemas arrive at project activation and used to be applied that way; they are now
 held (`services/monaco-lazy`) and registered when an editor is first created.
+
+---
+
+### 11.2 Hosting the Studio
+
+> **Status:** Implemented
+
+A host serves the tree and supplies a platform. Both halves are the package's to describe, and
+before they were, four hosts described them instead — the desktop's staging, its bundler's copy
+block, its bundle verifier, and the cloud's asset build all carried the same list, and every one of
+them was missing `dist/codicon.ttf`.
+
+**The manifest is the list.** `@jxsuite/studio/hosting/layout` exports `STUDIO_ASSETS`: what ships,
+whether it is a directory copied wholesale, whether absence is fatal, and _why_ — the `why` is what
+a staging failure prints, because "a file is missing" and "the code view will silently have no
+schema validation" are different things to be told. `dist/manifest.json` carries the same data for
+a host that cannot import TypeScript.
+
+**Two layouts, one rule.** `assetUrl(base, path)` maps a package path to a host URL. `nested` keeps
+the package's shape; `flat` strips exactly one leading `dist/` segment and nothing else. That single
+rule is what makes flattening a contract rather than a rewrite: every reference inside `dist/` is
+dist-relative, so stripping one segment moves all of them together. `styles/` and `fonts/` are
+untouched in both modes, which is why `tokens.css`'s `url("../fonts/…")` holds either way.
+
+**The documents are generated, not rewritten.** `studioShellHtml({ base, boot })` emits the editor
+document for a given mount point, with the chrome stylesheets linked in `STUDIO_STYLESHEETS` order —
+`forced-colors.css` last, because it redraws what Windows High Contrast deletes. `canvasShellHtml`
+rebases the canvas document's single entry reference; that document stays hand-authored, because its
+`<style>` block establishes the query container the runtime transposes viewport units against and
+has to apply before the first paint. Hosts used to rewrite the shipped HTML with a prefix list, and
+when 2.1.0 split the chrome into `./styles/*.css` the cloud's list missed it: seven dead stylesheet
+links, an unstyled editor, and a build that exited 0.
+
+**`boot` is the PAL seam.** Module URLs evaluated before the studio entry, in order. The runtime
+half is unchanged (§3.3 of `desktop.md`): a boot module sets `globalThis.__jxPlatform`, or publishes
+the `__jxCloud` signal for the entry to build the adapter from, and must do so **synchronously** —
+a module script with top-level await does not block a later script tag. Both hosts previously
+obtained this seam by string-replacing the entry's script tag, and only one of them checked that the
+replace had matched.
+
+**The package names no backend.** `@jxsuite/studio` may contain PAL adapters — `platforms/cloud.ts`
+ships inside the bundle because it owns the collab client's `Y.Doc`, and a second bundled `yjs`
+breaks cross-module `instanceof` — but it must not depend on a backend _package_. A dependency on
+`@jxsuite/server` would make the abstraction depend on one of its implementations, and would put the
+compiler, the scaffolder and the starters into every studio install, the cloud's included.
+`scripts/check-dep-rules.ts` cannot see this (it forbids only core-to-extension edges, and both are
+core), so `scripts/check-studio-package.ts` enforces it, along with the rule that only the staging
+module may import `node:` — the manifest and the document generators are pure so a Worker build, a
+Vite plugin or a Deno host can read them.
+
+**`canvasUrl` may be deferred.** A platform that resolves it asynchronously — electrobun fetches
+this window's loopback port over RPC inside `activate()` — declares `canvasUrlDeferred`, and the
+iframe host shows `about:blank` until the real URL lands. Without it the bundle-relative fallback
+resolves to a `canvas.html` the packaged app really stages, and an early frame would boot the canvas
+inside the shell's app-privileged origin, which is what the cross-origin loopback canvas exists to
+prevent.
 
 ---
 
@@ -1811,12 +1908,12 @@ It does not suspend the app, and it is reachable with **no project open** — a 
 exactly there. Re-opening it while it is up selects the named section rather than stacking a second
 sheet.
 
-| Section    | Contents                                                                                                   |
-| ---------- | ---------------------------------------------------------------------------------------------------------- |
-| Appearance | The chrome theme (`shell.theme`, also settable by `view.setTheme`)                                         |
-| Assistant  | The AI provider key, model and endpoint, plus the keyless managed-connect path where a platform offers one |
-| Accounts   | Every credential Studio holds — GitHub, the AI provider, Cloudflare — listed with a Disconnect each        |
-| Keyboard   | Read-only, **generated** from the command registry                                                         |
+| Section    | Contents                                                                                                                                                                                       |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Appearance | The chrome theme — Dark or Light (`shell.theme`, also settable by `view.setTheme`); it repaints the chrome, the overlays and any open code view, and the canvas stays a light document in both |
+| Assistant  | The AI provider key, model and endpoint, plus the keyless managed-connect path where a platform offers one                                                                                     |
+| Accounts   | Every credential Studio holds — GitHub, the AI provider, Cloudflare — listed with a Disconnect each                                                                                            |
+| Keyboard   | Read-only, **generated** from the command registry                                                                                                                                             |
 
 Two rules the sections must keep:
 
@@ -2313,6 +2410,12 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.9.41-draft** (2026-08-24) — 8.2.6 refuses a prop delivered through attributes — the props.* JSON shorthand or a name colliding with a reflected DOM property — because reading $props alone reports it unset, and committing would leave two sources for one rendered value; and 8.2 re-enters a prop host after a $props patch rebuilds the instance.
+- **0.9.40-draft** (2026-08-24) — 8.2.6 refuses a non-string prop for inline editing (the session commits textContent, so a number or boolean would be retyped) and states that a session which changes nothing writes nothing, with Escape a real cancel that also undoes an idle commit made during the session.
+- **0.9.39-draft** (2026-08-24) — 8.2.1 records that a prop-bound host is classified before positions are resolved: it has no document path, so the unresolvable-position rule would otherwise reject every keystroke in it, and only the paragraph split and line break are prevented there.
+- **0.9.38-draft** (2026-08-24) — 8.2 states that a component island covers the component's internals and never the document slotted into it: a child with a stamped path is re-opened, a nested instance stays frozen, and connectedCallback internals are never re-opened.
+- **0.9.37-draft** (2026-08-22) — 11.2 Hosting the Studio: the asset manifest, the two layout modes, generated documents, the boot slot and the layering rule; 11.1 states the entry-rooted asset rule; 3.4's stale member names and file extensions corrected.
+- **0.9.36-draft** (2026-08-21) — Preferences → Appearance states what the theme repaints: the chrome, the overlays and an open code view, with the canvas a light document in both.
 - **0.9.35-draft** (2026-08-20) — Declare the Monaco editor feature set in monaco-setup (one register import per capability, and the measured caveat that 0.56.0's contrib graph does not yet honour the exclusions); drop the Monaco de-duplication plugin now that the first-party collab binding leaves one importer.
 - **0.9.34-draft** (2026-08-19) — A stage with no pan/zoom surface leaves the wheel to the scroll container under it, and blocks ctrl/cmd+wheel page zoom instead of handing it to the browser.
 - **0.9.33-draft** (2026-08-19) — §20.4: the parity grid keys on the document's $translationKey, so a localized slug is one row rather than two half-translated ones.
@@ -2403,4 +2506,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.35-draft_
+_`@jxsuite/studio` Specification v0.9.41-draft_

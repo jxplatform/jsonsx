@@ -1,7 +1,11 @@
 /**
- * Application menu — process-shared. Provides the multi-window entry points: File → New Window
- * (Cmd/Ctrl+Shift+N) → opens a welcome window File → Open Project… (Cmd/Ctrl+O) → picks a
- * project.json, opens/focuses its window
+ * Application menu — process-shared. Provides the multi-window entry points: File → New Window →
+ * opens a welcome window; File → Open Project… → picks a project.json, opens/focuses its window.
+ *
+ * **No accelerators.** Both chords are the command records' `keybinding` — `view.newWindow` and
+ * `project.open` — which every launcher's shell dispatches, and a chord with two owners fires
+ * twice: two welcome windows from one ⌘⇧N. The menu keeps the items, because a native menu is where
+ * a macOS user looks for them; it does not keep a second claim on the keyboard.
  */
 
 import { ApplicationMenu } from "electrobun/main";
@@ -15,8 +19,8 @@ export function installApplicationMenu() {
     {
       label: "File",
       submenu: [
-        { accelerator: "CmdOrCtrl+Shift+N", action: "new-window", label: "New Window" },
-        { accelerator: "CmdOrCtrl+O", action: "open-project", label: "Open Project…" },
+        { action: "new-window", label: "New Window" },
+        { action: "open-project", label: "Open Project…" },
         { type: "divider" },
         { label: "Close Window", role: "close" },
       ],

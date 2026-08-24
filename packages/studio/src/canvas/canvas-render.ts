@@ -36,7 +36,7 @@ import { collabSourceContext } from "../collab/collab-session";
 import { attachCursorStyles } from "../collab/monaco-cursors";
 import type { AwarenessLike } from "../collab/monaco-cursors";
 import type { BindingAwareness } from "../collab/monaco-binding";
-import { shell } from "../shell";
+import { monacoTheme, shell } from "../shell";
 import { parseSourceForPath, serializeDocument } from "../files/file-ops";
 import { detachGridPanel, gridPanelMounted, renderGridMode } from "../grid/grid-panel";
 import { detachLibraryPane, libraryPaneMounted, renderLibraryMode } from "../browse/library-pane";
@@ -522,7 +522,7 @@ async function mountSourceEditor(
       model,
       scrollBeyondLastLine: false,
       tabSize: 2,
-      theme: "vs-dark",
+      theme: monacoTheme(),
       wordWrap: "on",
     },
   );

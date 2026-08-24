@@ -1,0 +1,138 @@
+# Turns every Dependabot pull request over to GitHub's auto-merge, so a green `ci` merges it and a
+# red one leaves it sitting there. See .github/dependabot.yml for what opens these in the first
+# place, and CLAUDE.md ("Dependency Autopilot") for the policy this implements.
+#
+# THIS WORKFLOW DOES NOT MERGE ANYTHING. It asks GitHub to merge later, once the branch protection
+# on `main` is satisfied. That distinction is the entire safety property, and it is easy to lose:
+#
+#   * `gh pr merge --auto` FAILS OPEN. Its own source decides `autoMerge: enable && !isImmediately-
+#     Mergeable(state)`, and CLEAN, HAS_HOOKS and UNSTABLE all count as immediately mergeable — so
+#     on a branch with no required check it quietly performs a normal merge instead, and on a
+#     branch where only NON-required checks are red (UNSTABLE) it merges through them. That is the
+#     opposite of what the flag looks like it does (cli/cli#13880, still open).
+#   * So this calls `enablePullRequestAutoMerge` directly. The mutation errors rather than merging
+#     when auto-merge is unavailable, which is the failure direction worth having.
+#   * And before that, it ASSERTS that `ci` is a required status check on the default branch. If
+#     someone deletes the ruleset, every Dependabot pull request stops merging and says why —
+#     rather than every Dependabot pull request merging instantly and saying nothing.
+#
+# Two consequences of merging as GITHUB_TOKEN, both accepted deliberately:
+#
+#   1. The merge commit does not start `on: push` workflows (GitHub suppresses events its own token
+#      raises). release-please.yml is push-triggered, so a dependency merge would not refresh the
+#      release pull request — which is why that workflow also runs on a schedule now.
+#   2. Nothing here approves the pull request. `main` requires zero reviews and one green check, so
+#      an approval would be theatre; if a review rule is ever added, use a GitHub App token rather
+#      than a `github-actions[bot]` self-approval, whose standing under branch protection depends
+#      on a repository setting that is easy to change by accident.
+name: Dependabot auto-merge
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+
+# Dependabot-triggered runs get a read-only GITHUB_TOKEN by DEFAULT; this block is what lifts it,
+# and it has done since 2021-10-11. (`secrets.*`, in contrast, resolves against the separate
+# Dependabot secret store on these events — which is why nothing here reads a secret.)
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: dependabot-auto-merge-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  enable:
+    # `pull_request.user.login`, NOT `github.actor`: the actor is whoever triggered the run and
+    # changes on a manual re-run, while the author of a Dependabot branch never does. The
+    # repository pin keeps a fork from inheriting the automation.
+    if: >-
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.repository == 'jxsuite/jx'
+    runs-on: ubuntu-latest
+    steps:
+      # Parses the pull request body into structured facts. Nothing below branches on them yet —
+      # everything is auto-merged, majors included — but it is what a future "hold majors of X"
+      # rule would read, and its own failure is a useful signal: it refuses to emit anything for a
+      # pull request that is not wholly Dependabot's work.
+      - id: metadata
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: The gate this delegates to must actually exist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          # Ruleset rules that apply to the default branch. This endpoint answers for the branch
+          # rather than for a named ruleset, so it stays correct if the ruleset is renamed or
+          # split — and unlike the classic branch-protection endpoint it does not need an admin
+          # token, which this one is not.
+          contexts="$(gh api "repos/${GH_REPO}/rules/branches/${DEFAULT_BRANCH}" \
+            --jq '[.[] | select(.type == "required_status_checks")
+                       | .parameters.required_status_checks[].context] | join(",")')"
+          echo "required status checks on ${DEFAULT_BRANCH}: ${contexts:-<none>}"
+          case ",${contexts}," in
+            *,ci,*) ;;
+            *)
+              echo "::error::\`ci\` is not a required status check on ${DEFAULT_BRANCH}, so"\
+                   "auto-merge has nothing to wait for and this pull request would merge untested."\
+                   "Restore the branch ruleset before re-running. See CLAUDE.md, Dependency Autopilot."
+              exit 1
+              ;;
+          esac
+
+      - name: Hand the pull request to auto-merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NODE_ID: ${{ github.event.pull_request.node_id }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          UPDATE_TYPE: ${{ steps.metadata.outputs.update-type }}
+          DEPENDENCIES: ${{ steps.metadata.outputs.dependency-names }}
+        run: |
+          set -uo pipefail
+          echo "::notice::${UPDATE_TYPE:-unknown update} of ${DEPENDENCIES:-unknown dependencies}"
+
+          # SQUASH, to match how every other pull request lands here and to keep one dependency
+          # bump as one commit on main.
+          #
+          # `$pr` below is a GraphQL variable — declared by the document and bound by `-F pr=`.
+          # Expanding it in the shell is exactly what must not happen, hence the single quotes.
+          # shellcheck disable=SC2016
+          if out="$(gh api graphql -F pr="$PR_NODE_ID" -f query='
+              mutation($pr: ID!) {
+                enablePullRequestAutoMerge(input: { pullRequestId: $pr, mergeMethod: SQUASH }) {
+                  pullRequest { number }
+                }
+              }' 2>&1)"; then
+            echo "auto-merge enabled on $PR_URL"
+            exit 0
+          fi
+
+          echo "$out"
+          case "$out" in
+            # Already armed by an earlier run of this workflow — the pull request was rebased, or
+            # somebody pressed the button first. Nothing to do.
+            *"already enabled"*|*"Auto merge is already"*)
+              echo "::notice::auto-merge was already enabled on $PR_URL"
+              exit 0
+              ;;
+            # Every required check has already reported green, so there is nothing left to wait
+            # for and GitHub refuses to schedule a merge for a state it can satisfy now. Merging
+            # here is not the fail-open case: the gate asserted above has been met.
+            *"Clean status"*|*"clean status"*|*"not in a mergeable state"*)
+              echo "::notice::$PR_URL is already mergeable; merging now"
+              exec gh pr merge --squash "$PR_URL"
+              ;;
+            *"not allowed"*)
+              echo "::error::Auto-merge is disabled for this repository."\
+                   "Settings -> General -> Pull Requests -> Allow auto-merge."
+              exit 1
+              ;;
+          esac
+          echo "::error::Could not enable auto-merge on $PR_URL"
+          exit 1

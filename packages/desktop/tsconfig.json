@@ -1,22 +1,24 @@
 {
   /* The desktop package cannot use the root tsconfig, which is why the root EXCLUDES it — and why
      nothing here was typechecked at all until an unbound identifier shipped through `bun run
-     typecheck` unnoticed.
+     typecheck` unnoticed. CI runs this config as a second step for that reason.
 
-     The cause is that electrobun's SDK ships raw TypeScript (Electrobun 2 projects `.ts` sources,
-     not `.d.ts`, under `.hutch/devkit/api` — see `extends` below), so importing it pulls its
-     sources into the program as first-class files. `skipLibCheck` does not apply to those — it only
-     suppresses `.d.ts` — and under the root's two strictest flags they emit 165 errors we cannot fix
-     in a dependency. Dropping exactly those two flags brings electrobun to zero and leaves only our
-     own code, which is the point of the exercise:
+     The cause is that electrobun's SDK is raw TypeScript, not declarations: Electrobun 2 projects
+     `.ts` sources under `.hutch/devkit/api` and the `paths` below point straight at them, so
+     importing the SDK pulls its sources into the program as first-class files. Neither `exclude`
+     nor `skipLibCheck` keeps them out — see the root config for why — and under the root's
+     `exactOptionalPropertyTypes` they emit errors we cannot fix in a dependency.
 
-       exactOptionalPropertyTypes  → 160 of them, every `tooltip?: string` given `string | undefined`
-       noUncheckedIndexedAccess    → the rest, plus one TS7030 in electrobun's Socket.ts
+     ONE of the root's flags is genuinely blocked. Measured on the electrobun 2.0.1 devkit:
 
-     Everything else stays on `strict`. That still catches unbound identifiers, wrong RPC shapes, and
-     bad handler signatures — the failures this package actually has. Prefer narrowing this file back
-     toward the root config over widening it. */
+       exactOptionalPropertyTypes  → 15 errors across 7 devkit files (BrowserView 7, BrowserWindow 2,
+                                     Updater 2, Utils, Tray, ContextMenu, ApplicationMenu). Ours: 7.
+       noUncheckedIndexedAccess    → 0 errors in electrobun. Ours: 129, ~90% of them array indexing
+                                     in tests (88 in window-manager.test.ts alone).
 
+     So `noUncheckedIndexedAccess` is off for OUR debt, not for the dependency's, and re-enabling it
+     is a bounded piece of work rather than a wait. Prefer narrowing this file back toward the root
+     config over widening it, and re-measure before believing either number. */
   "compilerOptions": {
     "allowImportingTsExtensions": true,
     "lib": ["ESNext", "DOM"],

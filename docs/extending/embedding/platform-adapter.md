@@ -10,6 +10,7 @@ code:
   - packages/studio/src/types.ts
   - packages/studio/src/platforms/devserver.ts
   - packages/desktop/src/platform.ts
+  - packages/desktop/src/chromium/platform.ts
 ---
 
 # Writing a platform adapter
@@ -24,7 +25,7 @@ Core members are required on every adapter. Grouped by family:
 
 | Family          | Members                                                                                                                                                                                                        |
 | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Identity        | `id`, `projectRoot` (get/set), `canvasUrl?`                                                                                                                                                                    |
+| Identity        | `id`, `projectRoot` (get/set), `canvasUrl?`, `documentBaseUrl?`                                                                                                                                                |
 | Session/project | `activate`, `openProject`, `probeRootProject`, `createDestination`, `createProject`, `resolveSiteContext`                                                                                                      |
 | Filesystem      | `listDirectory`, `readFile`, `writeFile`, `uploadFile`, `deleteFile`, `renameFile`, `createDirectory`, `locateFile`, `searchFiles`, `discoverComponents`                                                       |
 | Git             | `gitStatus`, `gitBranches`, `gitLog`, `gitStage`, `gitUnstage`, `gitCommit`, `gitPush`, `gitPull`, `gitFetch`, `gitCheckout`, `gitCreateBranch`, `gitDiff`, `gitShow`, `gitDiscard`, `gitInit`, `gitAddRemote` |
@@ -34,6 +35,14 @@ Core members are required on every adapter. Grouped by family:
 All paths passed into adapter methods are project-relative; translating them to whatever the backend expects (a server-root prefix, an absolute path, a repo path) is the adapter's job. A core member may still answer "not available" through its return type — `codeService` resolves `null` on platforms without code tooling — but the member itself must exist.
 
 `uploadFile` is the one member that carries binary. It takes `string | File | Blob | ArrayBuffer`, and every caller — the image field's Upload button, a file dropped on the canvas or the Files panel, the Library — hands it whatever the browser gave them, usually a `File`. If your transport is HTTP you can post that body straight through. **If your transport serializes its arguments** (JSON over RPC or a WebSocket, as the desktop adapters do), a `File` becomes `{}` on the wire: base64-encode it in the adapter before the call and decode it in the backend. `@jxsuite/studio/base64` exports `toBase64` for exactly this, and it passes a `string` through untouched so callers that already hold base64 keep working.
+
+`documentBaseUrl` is the other declaration worth knowing about. The canvas renders in an iframe and resolves a component `$ref` by fetching it — `readFile` is not reachable from that realm — so **project files have to exist at a URL**. The default base is `<canvas origin>/<projectRoot>/`, which is already correct for any backend that serves the project tree from its web root: the dev server does, and so does the desktop's loopback server.
+
+Set `documentBaseUrl` when your `projectRoot` is an **identifier rather than a served path**. Jx Cloud's is `owner/repo@branch`, so the default addressed nothing and every `$ref` fetch missed. Point it at whatever route serves your project tree, ending in `/`; Studio appends the project-relative path to it.
+
+:::doc-warning
+If your host answers a missing file with a single-page fallback — the app shell at **HTTP 200** rather than a 404 — a wrong base does not fail cleanly. The fetch succeeds, and the renderer reports `Unexpected token '<', "<!doctype "…` from the JSON parser. Studio now names that case explicitly, but the cure is a base that resolves.
+:::
 
 `createDestination` is a declaration, not a method: set it to `"path"` if your backend writes projects to a filesystem, or `"repo"` if a project is a remote repository. Studio uses it to decide which destination fields the New Project modal collects, and hands the answer back to `createProject` as `opts.destination`. **Your adapter must honor that destination and must not substitute one of its own** — a create with no usable destination is an error, not a cue to fall back to a default directory or account.
 
@@ -142,6 +151,17 @@ if (!match) {
 ### Desktop (`packages/desktop/src/platform.ts`)
 
 The desktop adapter translates the same interface into ElectroBun RPC: each member is a one-line `rpc.request.*` call into Bun-side handlers (`openProject()` is literally `return await rpc.request.openProject()`, backed by a native file dialog in the Bun process). Beyond the mapping, it patches `window.fetch` so the runtime's dev-proxy endpoints (`/__jx_resolve__`, `/__jx_server__`) also ride the RPC bridge, and it implements the desktop-only families — multi-window, backend-persisted recents and settings, `getAppInfo`.
+
+### Desktop, Chromium build (`packages/desktop/src/chromium/platform.ts`)
+
+The NixOS build runs Studio in a Chromium `--app` window and talks to its launcher over a WebSocket instead of ElectroBun's bridge, so it is a **second adapter over the same handler names** — one `request(method, params)` helper per member. It is a useful thing to read if you are writing your own: it implements the same optional families as the ElectroBun adapter, over a completely different transport, and the two are checked against one declaration (`packages/desktop/tests/_rpc-parity.ts`).
+
+Two lessons from it generalize to any adapter:
+
+- **A member you do not implement is a feature the user does not get, silently.** Studio probes for methods rather than asking what kind of host you are, so the launcher answered `buildSite` over RPC for months while its adapter never exposed the method — and **Open in Browser** reported that this backend could not build a preview. If you add a backend handler, add the member in the same change.
+- **Not every absent member is a gap.** This adapter deliberately omits the updater family (the system package manager owns updates, so there is no feed to report on) and `windowControls` (the desktop environment decorates the window, so Studio must not draw its own buttons). Omission is how you say "not here" — the alternative is a control that does nothing.
+
+Its transport also carries messages the launcher sends **unprompted**: a frame with a `method` and no request id. That is how `subscribeFileEvents` is fed, and how another window asks this one to come forward. If your host can push, a subscription member is a local handler plus a dispatch line, not a poll.
 
 ## Related
 

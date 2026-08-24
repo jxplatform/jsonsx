@@ -1,5 +1,6 @@
 import "./with-dom.js";
 import { beforeEach, describe, expect, test } from "bun:test";
+import { mountShellTree } from "../src/shell/tree";
 import {
   focusRegionOf,
   inspectorTabRegion,
@@ -14,8 +15,6 @@ import {
   regions,
   resolveAllRegions,
   resolveRegion,
-  SHELL_REGION_HOSTS,
-  stampShellRegions,
 } from "../src/ui/regions";
 import type { FocusRegion } from "../src/shell";
 
@@ -222,7 +221,6 @@ describe("derived ids", () => {
       overlayRegion("popover", "zoom-indicator"),
       overlayRegion("modal", "settings"),
       overlayRegion("dialog"),
-      ...Object.values(SHELL_REGION_HOSTS),
     ]) {
       expect(isRegionId(id)).toBe(true);
     }
@@ -235,7 +233,6 @@ describe("a region named by ROLE outlives the node it was minted on", () => {
     // The id did neither, because it names the assistant's PLACE in the inspector rather than a
     // Node. `panels/chat-panel.ts` stamps it on whatever container hosts the chat, so this table
     // Has one fewer row and `ai-sidebar-chat`'s crop still resolves.
-    expect(SHELL_REGION_HOSTS["#chat-panel"]).toBeUndefined();
     expect(isRegionId("inspector.assistant")).toBe(true);
     const host = tree(`<div id="assistant" data-jx-region="inspector.assistant"></div>`);
     expect(resolveRegion("inspector.assistant", host)?.id).toBe("assistant");
@@ -248,40 +245,37 @@ describe("a region named by ROLE outlives the node it was minted on", () => {
     // It named a grid row. The row is gone and the Document Header card is drawn inside the stage,
     // Where `panels/frontmatter-panel.ts` stamps the id on the card's own <section> — so the table
     // Has one fewer row and `properties-bar`'s crop still resolves.
-    expect(SHELL_REGION_HOSTS["#frontmatter-panel"]).toBeUndefined();
     expect(isRegionId("pane.primary/frontmatter")).toBe(true);
     const host = tree(
       `<div id="canvas-wrap"><section class="doc-header" id="card"
          data-jx-region="pane.primary/frontmatter"></section></div>`,
     );
-    stampShellRegions(host);
     expect(resolveRegion("pane.primary/frontmatter", host)?.id).toBe("card");
     // It is a PART of the primary pane, so focus lands in the pane it belongs to.
     expect(focusRegionOf(host.querySelector("#card"))).toBe("pane");
   });
 });
 
-describe("stampShellRegions", () => {
-  test("stamps the hosts index.html declares, and is idempotent", () => {
-    const host = tree(
-      Object.keys(SHELL_REGION_HOSTS)
-        .map((selector) => `<div id="${selector.slice(1)}"></div>`)
-        .join(""),
+describe("the shell's own regions", () => {
+  /* They used to be stamped onto bare divs by `stampShellRegions()`, off a selector-to-id map whose
+     comment gave the reason — index.html declared them, "so it cannot stamp itself". The frame is a
+     template now (src/shell/tree.ts), so the id sits on the element it names and there is one
+     definition. What this suite still owes is that those ids are well-formed and resolvable, which
+     the map used to guarantee by construction. */
+  test("every id the frame stamps parses and resolves to exactly one element", () => {
+    const host = document.createElement("div");
+    mountShellTree(host);
+    const stamped = [...host.querySelectorAll(`[${REGION_ATTR}]`)].map((el) =>
+      el.getAttribute(REGION_ATTR)!,
     );
-    stampShellRegions(host);
-    stampShellRegions(host);
-    for (const [selector, id] of Object.entries(SHELL_REGION_HOSTS)) {
-      expect(host.querySelector(selector)?.getAttribute(REGION_ATTR)).toBe(id);
+    expect(stamped.length).toBeGreaterThan(5);
+    for (const id of stamped) {
+      expect(isRegionId(id), `${id} is not a well-formed region id`).toBe(true);
+      expect(resolveAllRegions(id, host), `${id} resolves to more than one element`).toHaveLength(
+        1,
+      );
     }
-    expect(listRegions(host)).toEqual(Object.values(SHELL_REGION_HOSTS).toSorted());
-  });
-
-  test("an absent host is simply not stamped", () => {
-    const host = tree(`<div id="statusbar"></div>`);
-    expect(() => {
-      stampShellRegions(host);
-    }).not.toThrow();
-    expect(listRegions(host)).toEqual(["statusbar"]);
+    expect(listRegions(host)).toEqual(stamped.toSorted());
   });
 });
 

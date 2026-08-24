@@ -43,9 +43,6 @@ const GLOBAL = [
   ".oxlintrc.json",
   ".oxlintrc.typecheck.json",
   ".oxlintignore",
-  "flake.nix",
-  "flake.lock",
-  "bun.nix",
   ".github/workflows/test.yml",
   ".github/actions/**",
   "scripts/ci/**",
@@ -135,6 +132,12 @@ const EXTRA_EDGES: ExtraEdge[] = [
  * workspace prefix, nor an extra edge, nor GLOBAL, turns everything on (see FAIL OPEN above).
  */
 const NO_TESTS = [
+  // The Nix derivation's inputs. No test suite reads them, so they must not FAIL OPEN into the
+  // Whole matrix. Nothing here gates the `nix` job any more — it runs on the release pull request
+  // Alone (test.yml), so this list is only about keeping the test matrix off them.
+  "flake.nix",
+  "flake.lock",
+  "bun.nix",
   "docs/**",
   "specs/**",
   "scripts/docs/**",

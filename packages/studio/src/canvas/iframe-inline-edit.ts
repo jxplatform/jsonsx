@@ -25,6 +25,7 @@ import {
   handleSlashTrigger,
   isEditableBlock,
   isEditing,
+  isPlainSession,
   isSlashActive,
   openSlashMenu,
   refreshSlashMenu,
@@ -277,14 +278,44 @@ export function startIframeInlineEdit(
       return true;
     }
     const node = getNodeAtPath(shadowDoc, hostPath) as JxMutableNode | undefined;
+    /*
+     * `$props` IS NOT THE ONLY PLACE A PROP VALUE LIVES, and "absent from $props" is therefore not
+     * the same question as "unset". Two shapes deliver one through `attributes` instead, and both
+     * were reproduced against the real runtime:
+     *
+     *   1. The JSON shorthand `attributes: { "props.text": "…" }`. `connectedCallback` collects
+     *      `props.*` attributes into state, so the marker renders that text while `$props` is
+     *      empty. This repo's own site carries 95 of them.
+     *   2. A prop whose name collides with a REFLECTED HTMLElement property — `title`, `role`,
+     *      `id`, `lang`, `dir`, `slot`, `hidden`. `setAttribute("title", …)` writes the JS property
+     *      as a side effect, and the merge `key in this && this[key] !== undefined` picks it up.
+     *      41 shipped starter components declare `title` or `role` as state.
+     *
+     * Editing either would write `$props[prop]` and leave the attribute standing — two sources for
+     * one rendered value. In case 2 the attribute WINS (applyAttributes runs after the $props
+     * assignment), so the edit is simply invisible; in case 1 clearing the prop later resurrects
+     * the old text. Refusing keeps the properties panel, which edits the attribute itself, as the
+     * one way in.
+     */
+    const attrs = node?.attributes as Record<string, unknown> | undefined;
+    if (attrs?.[`props.${prop}`] !== undefined || attrs?.[prop] !== undefined) {
+      return false;
+    }
     const raw = (node?.$props as Record<string, unknown> | undefined)?.[prop];
     if (raw == null) {
       return true; // Unset — editing ADDS the prop, overriding the definition default.
     }
-    if (typeof raw === "object") {
+    /*
+     * Only a STRING is text. A number or a boolean renders as text and reads as editable, but this
+     * session commits `textContent` — so editing `count: 3` wrote the string `"3"` and silently
+     * retyped the prop, after which `${count * 2}` is `"33"` and `${enabled ? …}` is always truthy.
+     * Objects were already excluded; the scalar cases were not, and are the ones a component
+     * actually declares. They stay editable in the properties panel, which knows their type.
+     */
+    if (typeof raw !== "string") {
       return false;
     }
-    return !(typeof raw === "string" && raw.includes("${"));
+    return !raw.includes("${");
   };
 
   /**
@@ -309,6 +340,13 @@ export function startIframeInlineEdit(
         onEnd: () => {
           clearHighlight();
           lastNonEmptyRange = null;
+          /*
+           * Enter and Escape end the session inside the engine, which knows nothing about the
+           * editing host that adopted this marker. Without this the host kept pointing at the dead
+           * session, so the very next click on the same text was swallowed by the
+           * `el !== activeEl` re-entry guard — you had to click something else and come back.
+           */
+          root.forget();
           channel.post({ kind: "editEnd" });
         },
         // Prop values are single plain strings — no split, no slash-insert.
@@ -324,6 +362,15 @@ export function startIframeInlineEdit(
     const el = getActiveElement();
     if (!el) {
       return; // Session not active → no-op.
+    }
+    /*
+     * A prop value carries no formatting — "formatting is off" is the documented rule for this
+     * session. The chord is inertified inside the frame, but a caret-scoped ⌘B is ALSO forwarded to
+     * the parent, matched by the shortcut registry, and posted straight back as an intent that
+     * lands here. This is the one chokepoint both routes pass through.
+     */
+    if (isPlainSession()) {
+      return;
     }
     // Restore the cached range ONLY if it's still usable (the DOM may have re-rendered).
     if (
@@ -509,6 +556,21 @@ export function startIframeInlineEdit(
       return;
     }
     if (!editingAllowed()) {
+      return;
+    }
+    if (msg.prop !== undefined) {
+      /*
+       * A prop host cannot be re-entered by placing a caret: the marker has no path, and the
+       * `$props` patch that prompted this REPLACED the instance element, so the node the old
+       * session held is detached. Find the marker again inside the fresh instance and open it.
+       */
+      const instance = elementForPath(container, msg.path);
+      const marker = instance?.querySelector<HTMLElement>(
+        `[data-jx-bound-prop="${CSS.escape(msg.prop)}"]`,
+      );
+      if (marker) {
+        activateProp(marker);
+      }
       return;
     }
     // Follow-the-caret after a split or slash-insert: the parent re-renders and then names the path

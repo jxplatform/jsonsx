@@ -1,5 +1,133 @@
 # Changelog
 
+## [2.3.3](https://github.com/jxsuite/jx/compare/desktop-v2.3.2...desktop-v2.3.3) (2026-08-24)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/compiler bumped to 2.0.5
+    * @jxsuite/create bumped to 1.3.5
+    * @jxsuite/parser bumped to 1.5.4
+    * @jxsuite/server bumped to 2.2.5
+    * @jxsuite/starters bumped to 1.6.2
+    * @jxsuite/studio bumped to 2.4.1
+  * devDependencies
+    * @jxsuite/server bumped to 2.2.5
+
+## [2.3.2](https://github.com/jxsuite/jx/compare/desktop-v2.3.1...desktop-v2.3.2) (2026-08-23)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/compiler bumped to 2.0.4
+    * @jxsuite/create bumped to 1.3.4
+    * @jxsuite/parser bumped to 1.5.3
+    * @jxsuite/protocol bumped to 1.2.0
+    * @jxsuite/server bumped to 2.2.4
+    * @jxsuite/starters bumped to 1.6.1
+    * @jxsuite/studio bumped to 2.4.0
+  * devDependencies
+    * @jxsuite/server bumped to 2.2.4
+
+## [2.3.1](https://github.com/jxsuite/jx/compare/desktop-v2.3.0...desktop-v2.3.1) (2026-08-23)
+
+
+### Bug Fixes
+
+* **desktop:** the electrobun config is one the CLI can actually load ([#170](https://github.com/jxsuite/jx/issues/170)) ([f04baa8](https://github.com/jxsuite/jx/commit/f04baa87d245c1b1879c8213318372b86e1d04dd))
+
+## [2.3.0](https://github.com/jxsuite/jx/compare/desktop-v2.2.2...desktop-v2.3.0) (2026-08-23)
+
+
+### Features
+
+* **studio:** the package states its own layout, and hosts itself ([17ed4bc](https://github.com/jxsuite/jx/commit/17ed4bcfce451a21adb5729054a4934f2ef032f4))
+
+
+### Bug Fixes
+
+* **desktop:** a bare jx-studio watched the whole home directory ([b9d78d7](https://github.com/jxsuite/jx/commit/b9d78d74484c54ec6b983ab81bb19364d3a4a779))
+* **desktop:** a bare jx-studio watched the whole home directory ([f60059b](https://github.com/jxsuite/jx/commit/f60059b86ba92341fe62f8280c24ae250fc891bc))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/server bumped to 2.2.3
+    * @jxsuite/studio bumped to 2.3.0
+  * devDependencies
+    * @jxsuite/server bumped to 2.2.3
+
+## [2.2.2](https://github.com/jxsuite/jx/compare/desktop-v2.2.1...desktop-v2.2.2) (2026-08-21)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/compiler bumped to 2.0.3
+    * @jxsuite/create bumped to 1.3.3
+    * @jxsuite/server bumped to 2.2.2
+    * @jxsuite/starters bumped to 1.6.0
+    * @jxsuite/studio bumped to 2.2.2
+  * devDependencies
+    * @jxsuite/server bumped to 2.2.2
+
+## [2.2.1](https://github.com/jxsuite/jx/compare/desktop-v2.2.0...desktop-v2.2.1) (2026-08-21)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/compiler bumped to 2.0.2
+    * @jxsuite/create bumped to 1.3.2
+    * @jxsuite/parser bumped to 1.5.2
+    * @jxsuite/protocol bumped to 1.1.2
+    * @jxsuite/schema bumped to 1.8.0
+    * @jxsuite/server bumped to 2.2.1
+    * @jxsuite/starters bumped to 1.5.0
+    * @jxsuite/studio bumped to 2.2.1
+  * devDependencies
+    * @jxsuite/connector bumped to 0.5.2
+    * @jxsuite/server bumped to 2.2.1
+
+## [2.2.0](https://github.com/jxsuite/jx/compare/desktop-v2.1.0...desktop-v2.2.0) (2026-08-21)
+
+
+### Features
+
+* **desktop:** bring the chromium launcher to PAL parity with electrobun ([9a94240](https://github.com/jxsuite/jx/commit/9a9424048403e48faf333e3ce788502ede4d2ce9))
+* **desktop:** bring the chromium launcher to PAL parity with electrobun ([9846e1d](https://github.com/jxsuite/jx/commit/9846e1dcf8d94bb68082fa79f40d38c139689a91))
+
+
+### Bug Fixes
+
+* **desktop:** give the chromium window an identity the taskbar can resolve ([e816dfa](https://github.com/jxsuite/jx/commit/e816dfabb9de69b0a56d03cfa3f254e6841111f8))
+* **desktop:** type two test mocks to the contracts they stand in for ([bc82556](https://github.com/jxsuite/jx/commit/bc82556185720f76c3fa45383db066cbd2f56001))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/compiler bumped to 2.0.1
+    * @jxsuite/create bumped to 1.3.1
+    * @jxsuite/parser bumped to 1.5.1
+    * @jxsuite/protocol bumped to 1.1.1
+    * @jxsuite/schema bumped to 1.7.0
+    * @jxsuite/server bumped to 2.2.0
+    * @jxsuite/starters bumped to 1.4.0
+    * @jxsuite/studio bumped to 2.2.0
+  * devDependencies
+    * @jxsuite/connector bumped to 0.5.1
+    * @jxsuite/server bumped to 2.2.0
+
 ## [2.1.0](https://github.com/jxsuite/jx/compare/desktop-v2.0.1...desktop-v2.1.0) (2026-08-19)
 
 

@@ -1,5 +1,42 @@
 # Changelog
 
+## [0.36.2](https://github.com/jxsuite/jx/compare/ai-v0.36.1...ai-v0.36.2) (2026-08-23)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/protocol bumped to 1.2.0
+
+## [0.36.1](https://github.com/jxsuite/jx/compare/ai-v0.36.0...ai-v0.36.1) (2026-08-21)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/protocol bumped to 1.1.2
+
+## [0.36.0](https://github.com/jxsuite/jx/compare/ai-v0.35.0...ai-v0.36.0) (2026-08-21)
+
+
+### Features
+
+* **ai:** export the StreamEvent union, its members, and the factory option types ([9e0f4b3](https://github.com/jxsuite/jx/commit/9e0f4b3f41f3d63887b468263ff5d33640090024))
+
+
+### Bug Fixes
+
+* defects surfaced by fact-checking the new package READMEs ([c4a614d](https://github.com/jxsuite/jx/commit/c4a614dae5e199d49384f998a0b937354f9de882))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/protocol bumped to 1.1.1
+
 ## [0.35.0](https://github.com/jxsuite/jx/compare/ai-v0.34.0...ai-v0.35.0) (2026-08-19)
 
 

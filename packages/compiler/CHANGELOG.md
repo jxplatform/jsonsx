@@ -1,5 +1,66 @@
 # Changelog
 
+## [2.0.5](https://github.com/jxsuite/jx/compare/compiler-v2.0.4...compiler-v2.0.5) (2026-08-24)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/create bumped to 1.3.5
+    * @jxsuite/runtime bumped to 2.0.4
+  * devDependencies
+    * @jxsuite/parser bumped to 1.5.4
+
+## [2.0.4](https://github.com/jxsuite/jx/compare/compiler-v2.0.3...compiler-v2.0.4) (2026-08-23)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/create bumped to 1.3.4
+    * @jxsuite/runtime bumped to 2.0.3
+  * devDependencies
+    * @jxsuite/parser bumped to 1.5.3
+
+## [2.0.3](https://github.com/jxsuite/jx/compare/compiler-v2.0.2...compiler-v2.0.3) (2026-08-21)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/create bumped to 1.3.3
+
+## [2.0.2](https://github.com/jxsuite/jx/compare/compiler-v2.0.1...compiler-v2.0.2) (2026-08-21)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/create bumped to 1.3.2
+    * @jxsuite/runtime bumped to 2.0.2
+    * @jxsuite/schema bumped to 1.8.0
+  * devDependencies
+    * @jxsuite/connector bumped to 0.5.2
+    * @jxsuite/parser bumped to 1.5.2
+
+## [2.0.1](https://github.com/jxsuite/jx/compare/compiler-v2.0.0...compiler-v2.0.1) (2026-08-21)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/create bumped to 1.3.1
+    * @jxsuite/runtime bumped to 2.0.1
+    * @jxsuite/schema bumped to 1.7.0
+  * devDependencies
+    * @jxsuite/connector bumped to 0.5.1
+    * @jxsuite/parser bumped to 1.5.1
+
 ## [2.0.0](https://github.com/jxsuite/jx/compare/compiler-v1.5.0...compiler-v2.0.0) (2026-08-19)
 
 

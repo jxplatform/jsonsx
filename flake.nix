@@ -10,9 +10,27 @@
     };
   };
 
+  # Two caches, for two different reasons.
+  #
+  # nix-community carries bun2nix, without which every dependency of this flake is built from
+  # source. jxsuite carries jx-studio itself — the ONE store path cache.nixos.org cannot serve,
+  # because it is produced here. Everything else in the runtime closure (chromium, bun, glibc) is
+  # upstream and already substitutable, so this single entry is the difference between
+  # `nix run github:jxsuite/jx/release` downloading the app and it running a `bun install` plus a
+  # full monorepo build on the user's machine.
+  #
+  # Nix honours a flake's nixConfig only for a user in `trusted-users`, which on stock NixOS is
+  # root alone. An unprivileged account prints `ignoring untrusted substituter` and builds from
+  # source regardless — docs/start/install.md carries the `nix.settings` form for that case.
   nixConfig = {
-    extra-trusted-public-keys = "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs=";
-    extra-substituters = "https://nix-community.cachix.org";
+    extra-substituters = [
+      "https://nix-community.cachix.org"
+      "https://jxsuite.cachix.org"
+    ];
+    extra-trusted-public-keys = [
+      "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
+      "jxsuite.cachix.org-1:kwYafZ+qeKSsR7F9dxC2zLJjsJtGaBk012QoLhe4zMM="
+    ];
   };
 
   outputs =
@@ -112,9 +130,13 @@
                 # bun2nix derives every dependency hash from bun.lock, so the
                 # only thing to regenerate is bun.nix — there is no aggregate
                 # node_modules hash to chase with a fake-hash rebuild anymore.
-                echo "Regenerating bun.nix from bun.lock..."
-                bun2nix -o bun.nix
-                echo "Done — bun.nix is in sync with bun.lock."
+                #
+                # Delegated to `bun run nix:sync` rather than calling bun2nix
+                # directly, so this shell, the CI workflows and the release
+                # sync all invoke ONE definition of "regenerate bun.nix"
+                # (scripts/check-bun-nix.ts). It also reports which packages
+                # moved instead of leaving a 289 KB diff to read.
+                bun run nix:sync
               '')
             ];
 

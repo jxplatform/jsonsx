@@ -1,5 +1,56 @@
 # Changelog
 
+## [0.39.5](https://github.com/jxsuite/jx/compare/import-v0.39.4...import-v0.39.5) (2026-08-24)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * optionalDependencies
+    * @jxsuite/compiler bumped to 2.0.5
+
+## [0.39.4](https://github.com/jxsuite/jx/compare/import-v0.39.3...import-v0.39.4) (2026-08-23)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * optionalDependencies
+    * @jxsuite/compiler bumped to 2.0.4
+
+## [0.39.3](https://github.com/jxsuite/jx/compare/import-v0.39.2...import-v0.39.3) (2026-08-21)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * optionalDependencies
+    * @jxsuite/compiler bumped to 2.0.3
+
+## [0.39.2](https://github.com/jxsuite/jx/compare/import-v0.39.1...import-v0.39.2) (2026-08-21)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/markup bumped to 0.4.5
+    * @jxsuite/schema bumped to 1.8.0
+  * optionalDependencies
+    * @jxsuite/compiler bumped to 2.0.2
+
+## [0.39.1](https://github.com/jxsuite/jx/compare/import-v0.39.0...import-v0.39.1) (2026-08-21)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/markup bumped to 0.4.4
+    * @jxsuite/schema bumped to 1.7.0
+  * optionalDependencies
+    * @jxsuite/compiler bumped to 2.0.1
+
 ## [0.39.0](https://github.com/jxsuite/jx/compare/import-v0.38.2...import-v0.39.0) (2026-08-19)
 
 

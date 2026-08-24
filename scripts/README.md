@@ -39,19 +39,20 @@ bare `bun scripts/…` step, some through the `bun run` alias named beside them.
 `check-coverage-manifest.ts` runs once per workspace in the gated `test` matrix, and
 `publish-order.ts` is not a gate at all — `publish.yml` consumes its stdout.
 
-| Script                                        | Enforces                                                                                                                         |
-| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `check-dep-rules.ts`                          | [specs/extensions.md §2](../specs/extensions.md): core packages may not depend on or import an extension                         |
-| `check-shadowed-core.ts`                      | No project root ships its own `node_modules/@jxsuite/*` shadowing the workspace (`--fix`, aliased `bun run schema:clean-roots`)  |
-| `check-template-versions.ts`                  | Every `@jxsuite` range shipping inside a template names a released version (`bun run templates:check` / `templates:sync`)        |
-| `check-command-levels.ts`                     | [specs/studio-ui-guidelines.md §12](../specs/studio-ui-guidelines.md): each `menus` placement admits the command's level         |
-| `check-chrome-budget.ts`                      | Studio chrome caps, observed from the command and panel registries rather than a hand-kept list                                  |
-| `check-shot-contract.ts`                      | Lane 1 of the screenshot gate: no browser, seconds, red in the PR that renamed the command a shot names                          |
-| `check-image-lock.ts`                         | `bun run docs:images:check` — every committed PNG is manifest-producible, lock-named, and current                                |
-| `check-coverage-manifest.ts`                  | Per workspace: no `src/**/*.ts` file is absent from `coverage/lcov.info` (run as `bun scripts/check-coverage-manifest.ts <dir>`) |
-| `normalize-markdown.ts`                       | `bun run format:md` writes; `bun run docs:markdown` (`--check`) blocks on visual-editor escapes                                  |
-| `generate-schemas.ts` / `validate-schemas.ts` | `schema:generate-all` / `schema:validate-all` across every project root, including the shot fixtures                             |
-| `publish-order.ts`                            | Topological publish order for `publish.yml`, derived from the graph rather than a hand-kept `order` array                        |
+| Script                                        | Enforces                                                                                                                          |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `check-dep-rules.ts`                          | [specs/extensions.md §2](../specs/extensions.md): core packages may not depend on or import an extension                          |
+| `check-shadowed-core.ts`                      | No project root ships its own `node_modules/@jxsuite/*` shadowing the workspace (`--fix`, aliased `bun run schema:clean-roots`)   |
+| `check-template-versions.ts`                  | Every `@jxsuite` range shipping inside a template names a released version (`bun run templates:check` / `templates:sync`)         |
+| `check-command-levels.ts`                     | [specs/studio-ui-guidelines.md §12](../specs/studio-ui-guidelines.md): each `menus` placement admits the command's level          |
+| `check-chrome-budget.ts`                      | Studio chrome caps, observed from the command and panel registries rather than a hand-kept list                                   |
+| `check-shot-contract.ts`                      | Lane 1 of the screenshot gate: no browser, seconds, red in the PR that renamed the command a shot names                           |
+| `check-image-lock.ts`                         | `bun run docs:images:check` — every committed PNG is manifest-producible, lock-named, and current                                 |
+| `check-coverage-manifest.ts`                  | Per workspace: every `src/**/*.ts` file is exercised by some test (run as `bun scripts/check-coverage-manifest.ts <dir>`)         |
+| `normalize-markdown.ts`                       | `bun run format:md` writes; `bun run docs:markdown` (`--check`) blocks on visual-editor escapes                                   |
+| `generate-schemas.ts` / `validate-schemas.ts` | `schema:generate-all` / `schema:validate-all` across every project root, including the shot fixtures                              |
+| `check-schema-freshness.ts`                   | `bun run schema:verify` — every tracked `*schema.json` is what its generator produces (`schema:sync` fixes; `schemas.yml` pushes) |
+| `publish-order.ts`                            | Topological publish order for `publish.yml`, derived from the graph rather than a hand-kept `order` array                         |
 
 ## How these run
 
@@ -66,7 +67,13 @@ bun test --isolate scripts
 
 That is also the command to run locally. It is a substring path filter, not a directory, so it also
 picks up `packages/studio/tests/gate-scripts-diff-gaps.test.ts`, which runs a second time in the
-studio matrix job. To see what a working diff would trigger:
+studio matrix job.
+
+`check-coverage-manifest.ts` is the one script here that runs a subprocess: when a source file is
+missing from the report it re-runs `bun test --coverage` over just the tests that name that file,
+because Bun 1.4.0 has been seen dropping a record for a file the run really executed. That path is
+only reached when the gate is already failing, so the happy path is still pure lcov reading. Its
+header comment carries the evidence. To see what a working diff would trigger:
 
 ```sh
 git diff --name-only origin/main... | bun scripts/ci/affected.ts --stdin
@@ -117,6 +124,16 @@ git diff --name-only origin/main... | bun scripts/ci/affected.ts --stdin
 - **`check-shadowed-core.ts` must run bare and early in CI**, before `schema:verify` — whose
   `schema:generate-all` begins with the same script and `--fix`. Any placement after that makes the
   check a tautology, which is how the condition went six weeks unreported.
+- **A `git diff` pathspec is not the generator's output set.** `schema:verify` was a shell one-liner
+  that regenerated all seven core schema artifacts and diffed ONE of them; `class-schema.json`,
+  `project-schema.json` and the three `schemas/*.schema.json` were rewritten and never read, so a
+  stale one passed green. `check-schema-freshness.ts` derives the file set from `git ls-files`
+  instead. If you write a gate that regenerates something, diff **everything the run dirtied**, not
+  a glob you believe covers it.
+- **Committed schemas are written only by `bun run schema:sync`** and by the backfill lane
+  ([`schemas.yml`](../.github/workflows/schemas.yml)), the same way `docs/images/` is written only
+  by `bun run screenshots`. A hand-edited schema is a contract nothing generated, and the next run
+  of either overwrites it.
 - **`docs/images/` and `screenshots/capture.lock.json` are written only by `bun run screenshots`**
   and by the Lane 2 bot. A hand-added or hand-edited PNG whose hash has no lock entry is a hard
   failure. See [CLAUDE.md](../CLAUDE.md) and [screenshots/README.md](./screenshots/README.md).

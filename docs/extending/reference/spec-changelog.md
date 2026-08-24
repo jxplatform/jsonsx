@@ -14,6 +14,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `ai.md`
 
+- **0.1.8-draft** (2026-08-23) — 2.1 Managed providers: a platform may broker credentials, Studio offers that path before the key form, and the models endpoint is specified as a capability probe that must answer 200 for every credential state — with cf_not_connected, cf_reconnect_required and cf_upstream_error distinguished.
 - **0.1.7-draft** (2026-08-20) — The Anthropic client yields an error event with code NOT_IMPLEMENTED; it does not throw (§2).
 - **0.1.6-draft** (2026-08-16) — §2 failures are problem documents and the mid-stream frame carries one; gap:ai-problem-details closed.
 - **0.1.5-draft** (2026-08-15) — Add §5 Standards Alignment: SSE, the IANA special-purpose address registries the SSRF guard uses, and the problem+json gap.
@@ -72,8 +73,16 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `desktop.md`
 
-- **0.3.22-draft** (2026-08-24) — Electrobun 2.0 stable: the npm devDependency selects the toolchain (hutch.config.ts no longer pins a release), and stable installers drop the channel prefix the updater feed keeps.
-- **0.3.13-draft** (2026-08-20) — §7 records the ElectroBun 2 toolchain boundary: Hutch owns build orchestration, hutch.config.ts pins the release, the SDK is projected into .hutch/devkit, and the main process is pinned to bun explicitly.
+- **0.3.22-draft** (2026-08-24) — §7 records the ElectroBun 2 toolchain boundary: the electrobun npm devDependency selects Hutch, Cottontail and ElectroBun together (no machine-wide install and no release pin in hutch.config.ts), the SDK is projected into .hutch/devkit, the main process is pinned to bun explicitly, and stable installers drop the channel prefix that the updater feed keeps.
+- **0.3.21-draft** (2026-08-24) — 3.1 states that documentBaseUrl may be absolute or root-relative, and that a root-relative value is resolved against the canvas origin because the canvas composes it as new URL(path, base) — a relative base throws and fails the whole canvas mount.
+- **0.3.20-draft** (2026-08-23) — 3.1 adds the Canvas member family and states that the canvas needs project files at a URL rather than behind readFile: documentBaseUrl defaults to the canvas origin plus projectRoot and must be set by a platform whose root is an identifier rather than a served path.
+- **0.3.19-draft** (2026-08-22) — 10 SaaS/Cloud is Partial rather than Future: the adapter shipped and is deployed (10.1 Implemented, with what it implements and what it deliberately omits), collaboration shipped as a CRDT rather than the sketched lock model (10.3), and 10.2's storage table is marked Pending because the deployed backend is git-backed.
+- **0.3.18-draft** (2026-08-22) — 3.3 the init bundle loads through a declared boot slot rather than an exact-string replace on the shipped document.
+- **0.3.17-draft** (2026-08-22) — §9.2: the session watches a project or nothing — a root with no project.json is declined rather than scanned recursively.
+- **0.3.16-draft** (2026-08-22) — §9.2: the launcher adopts its working directory as a project root only when that directory holds a project.json — a named root is still taken at its word.
+- **0.3.15-draft** (2026-08-21) — §9.3: released builds are published to jxsuite.cachix.org and the flake names it, so a consumer substitutes jx-studio instead of building it; verify-cache proves that after each release. The release also builds aarch64-linux as an advisory leg beside the x86_64 gate, and nix.yml runs on pushes to main so pull requests inherit a warm Actions cache for the npm tarball derivations cache.nixos.org cannot serve.
+- **0.3.14-draft** (2026-08-20) — §9.3: the desktop entry ships under a stable id and claims the app_id Chromium actually gives an --app window, so the taskbar/dock can resolve the brand icon.
+- **0.3.13-draft** (2026-08-20) — Chromium launcher reaches PAL parity: its own adapter over createProjectServer (§9.1), multi-window through a cross-process window registry (§9.4), a server-to-client push channel behind live sidebar sync and focus, buildSite behind View: Open in Browser, appInfo for the About screen, and an OS-opener fallback so preview links and sign-in leave the app at all (§3.5, §9.5). New Window becomes the `view.newWindow` command rather than a native-menu-only item, and the native menu drops its duplicate accelerators (§4.2a).
 - **0.3.12-draft** (2026-08-19) — §9.3 documents the release branch as the ref a Nix consumer pins, and the nix build that gates it; corrects the install phase, which has used cp -r plus a dangling-symlink prune and src/chromium/index.ts since before this text was written.
 - **0.3.11-draft** (2026-08-16) — §3.6 the desktop signs in with an RFC 8252 loopback redirect and PKCE; the token rests in a 0600 credential store, not localStorage. RFC 8414 and RFC 7519 recorded Rejected as vacuous. Closes gap:native-oauth and gap:oauth-pkce.
 - **0.3.10-draft** (2026-08-16) — §5 the contract's failure half is specified — one RFC 9457 registry; gap:backend-failure-contract closed.
@@ -211,6 +220,8 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `server.md`
 
+- **0.2.11** (2026-08-22) — §3.1: watch-policy.ts — watchers watch only directories and regular files, and contain symlinks to the root, so a socket cannot throw and a link out cannot walk the filesystem.
+- **0.2.10** (2026-08-20) — The loopback project server's RPC socket carries server-initiated frames (ProjectServerHandle.push) — the loopback twin of the dev server's named fs SSE event, and the channel a desktop launcher raises a window over (§4.2).
 - **0.2.9** (2026-08-18) — §4.2: the Studio shell's report-only Trusted Types header is removed — see spec.md §21.5.
 - **0.2.8** (2026-08-18) — §4.2: both entry points send the Studio shell a report-only Trusted Types policy, and nothing else.
 - **0.2.7** (2026-08-16) — §4.2 Fetch Metadata on every gated surface, the loopback block, a constant-time token, and the three ungated project-server routes closed; gap:fetch-metadata closed.
@@ -308,6 +319,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `spec.md`
 
+- **0.5.5-draft** (2026-08-24) — 13.2 states that the runtime takes a prop from an instance only where the instance genuinely carries one — an own property or an attribute — because a state key colliding with a reflected DOM property otherwise reports an empty string and beats the component's declared default.
 - **0.5.4-draft** (2026-08-18) — §21.5: Trusted Types enforcement is declined rather than deferred — the observation run answered its question and was removed with its header; no innerHTML write remains in code Jx ships.
 - **0.5.3-draft** (2026-08-18) — §5.6: both tiers refuse a $props write against a private key, and a private entry gets no property accessor.
 - **0.5.2-draft** (2026-08-18) — §21.5: ship the Trusted Types observation stage, and correct two claims its first boot disproved.
@@ -385,6 +397,8 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio-ui-guidelines.md`
 
+- **0.3.14** (2026-08-22) — Template conventions (9.4) and the gate behind them; render orchestration described as it is; custom components corrected to the two that exist.
+- **0.3.13** (2026-08-21) — Chrome ships two themes; a theme in CHROME_THEMES must have its Spectrum colour fragment registered, and the semantic token table documents the dark fallbacks with the light ramp resolved from the brand fragment.
 - **0.3.12** (2026-08-16) — §15 the documentation screenshot pipeline drives Chromium over WebDriver BiDi rather than CDP — byte-identical captures, and the one behavioural difference (a pointer move outside the viewport) fixed rather than worked around.
 - **0.3.11** (2026-08-16) — §14 ATAG is Subset: Part A is §13.1a and §8.2, Part B is studio.md §16.6.
 - **0.3.10** (2026-08-16) — §1.1 the token table's fallbacks are corrected and gated against tokens.css; §8.2 cut/paste is the stated alternative to every drag (SC 2.5.7); §13.1a one live region, called from notify() itself, so a failure that lands in the Problems panel is announced.
@@ -414,6 +428,12 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.9.41-draft** (2026-08-24) — 8.2.6 refuses a prop delivered through attributes — the props.* JSON shorthand or a name colliding with a reflected DOM property — because reading $props alone reports it unset, and committing would leave two sources for one rendered value; and 8.2 re-enters a prop host after a $props patch rebuilds the instance.
+- **0.9.40-draft** (2026-08-24) — 8.2.6 refuses a non-string prop for inline editing (the session commits textContent, so a number or boolean would be retyped) and states that a session which changes nothing writes nothing, with Escape a real cancel that also undoes an idle commit made during the session.
+- **0.9.39-draft** (2026-08-24) — 8.2.1 records that a prop-bound host is classified before positions are resolved: it has no document path, so the unresolvable-position rule would otherwise reject every keystroke in it, and only the paragraph split and line break are prevented there.
+- **0.9.38-draft** (2026-08-24) — 8.2 states that a component island covers the component's internals and never the document slotted into it: a child with a stamped path is re-opened, a nested instance stays frozen, and connectedCallback internals are never re-opened.
+- **0.9.37-draft** (2026-08-22) — 11.2 Hosting the Studio: the asset manifest, the two layout modes, generated documents, the boot slot and the layering rule; 11.1 states the entry-rooted asset rule; 3.4's stale member names and file extensions corrected.
+- **0.9.36-draft** (2026-08-21) — Preferences → Appearance states what the theme repaints: the chrome, the overlays and an open code view, with the canvas a light document in both.
 - **0.9.35-draft** (2026-08-20) — Declare the Monaco editor feature set in monaco-setup (one register import per capability, and the measured caveat that 0.56.0's contrib graph does not yet honour the exclusions); drop the Monaco de-duplication plugin now that the first-party collab binding leaves one importer.
 - **0.9.34-draft** (2026-08-19) — A stage with no pan/zoom surface leaves the wheel to the scroll container under it, and blocks ctrl/cmd+wheel page zoom instead of handing it to the browser.
 - **0.9.33-draft** (2026-08-19) — §20.4: the parity grid keys on the document's $translationKey, so a localized slug is one row rather than two half-translated ones.

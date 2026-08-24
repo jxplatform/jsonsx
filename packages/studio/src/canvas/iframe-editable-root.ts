@@ -135,6 +135,12 @@ export interface EditableRootHandle {
   /** Tear the host down. */
   stop: () => void;
   /**
+   * Forget the active element without committing or notifying — for when the EDITING ENGINE has
+   * already ended the session itself (Enter / Escape in a prop host) and only this module's
+   * bookkeeping is left pointing at it.
+   */
+  forget: () => void;
+  /**
    * Re-derive the active block from the live selection. Call after moving the selection
    * programmatically — `selectionchange` is dispatched as a task, so a caller that needs the
    * activation to have happened before it returns cannot wait for the event.
@@ -240,6 +246,23 @@ export function startEditableRoot(
     composing = false;
     // One commit for the whole composed run, on the same idle path a normal edit takes.
     scheduleCommitTick();
+  };
+
+  /**
+   * Drop the active element WITHOUT telling the engine — the engine is what asked.
+   *
+   * `deactivate()` exists for the caret leaving, and calls `onDeactivate` to commit on the way out.
+   * When the ENGINE ends a session itself (Enter or Escape in a prop host), that has already
+   * happened, and calling back into it would re-enter a teardown that is mid-flight. What was
+   * missing was the other half: nothing cleared `activeEl`/`activeKey`, so the host kept pointing
+   * at a dead session — `onPointerDownCapture`'s `el !== activeEl` guard was then false and the
+   * next click on the same text did nothing at all, and `inPropHost` stayed true with no session
+   * behind it.
+   */
+  const forget = () => {
+    cancelCommitTick();
+    activeEl = null;
+    activeKey = null;
   };
 
   /** Release whatever is active, if anything. */
@@ -358,6 +381,9 @@ export function startEditableRoot(
       atBlockStart: resolved ? isAtBlockStart(resolved.from) : false,
       data: e.data ?? "",
       from: resolved?.from ?? null,
+      /* An adopted element with no path IS the prop-bound host — `onPointerDownCapture` sets
+         exactly that pair, and `syncActiveBlock` preserves it while the caret stays inside. */
+      inPropHost: activeEl !== null && activeKey === null,
       inputType: e.inputType,
       to: resolved?.to ?? null,
     });
@@ -456,6 +482,7 @@ export function startEditableRoot(
 
   return {
     capture: () => captureDocSelection(container, deps.isEditableBlock),
+    forget,
     /** Whether an IME composition is in flight — callers must not rewrite the DOM under it. */
     isComposing: () => composing,
     flush: () => {

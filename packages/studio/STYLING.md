@@ -8,7 +8,11 @@ There are three layers. Reach for the **most semantic** one that fits.
 
 1.  **Spectrum tokens — `--spectrum-*`** Provided by `@spectrum-web-components/theme`. These are the source of truth for colour, spacing, radius, typography, etc. Examples: `--spectrum-accent-color-700`, `--spectrum-gray-300`, `--spectrum-spacing-100`, `--spectrum-corner-radius-100`, `--spectrum-font-size-75`, `--spectrum-sans-font-family-stack`.
 
-    The stock dark theme is re-valued by the **Jx brand fragment** (`src/ui/jx-theme.ts`), registered as the Spectrum `'app'` theme fragment in `src/ui/spectrum.ts`. It overrides only the gray and blue palette `-rgb` triplets (plus the font stacks) with the canonical brand palette from `sites/jxsuite.com/project.json`, so every derived Spectrum token — accent, focus ring, background layers, alpha tints — follows the brand automatically. Change brand colours there, not in chrome CSS. Under this ramp `--spectrum-accent-color-700` is the exact brand blue (#3b82f6) and `-900` is the soft on-dark tint (#93c5fd).
+    Both stock themes are re-valued by the **Jx brand fragment** (`src/ui/jx-theme.ts`), registered as the Spectrum `'app'` theme fragment in `src/ui/spectrum.ts`. It overrides only the gray and blue palette `-rgb` triplets (plus the font stacks) with the canonical brand palette from `sites/jxsuite.com/project.json`, so every derived Spectrum token — accent, focus ring, background layers, alpha tints — follows the brand automatically. Change brand colours there, not in chrome CSS. Under the dark ramp `--spectrum-accent-color-700` is the exact brand blue (#3b82f6) and `-900` is the soft on-dark tint (#93c5fd).
+
+    **Two ramps, one fragment.** The `'app'` fragment is adopted whatever `color` is, so the dark ramp sits on a bare `:host` (the theme the app boots in) and the light one overrides it under `:host([color="light"])`. A stop overridden in one block and forgotten in the other reads the _other_ theme's brand value, which is worse than not overriding it at all. A Spectrum ramp is ordered by the theme's own background rather than by luminance — in dark, gray 50 is the darkest surface and 900 the lightest ink; in light the ends swap — so the light ramp is the same brand scale re-anchored, not the dark one reversed. On light, `--accent` is `#2563eb`, one stop down the brand ramp, because the exact brand blue is only 3.1:1 on a light background.
+
+    Registering the colour fragment is not optional: `<sp-theme>` adopts the fragment registered under the `color` it is given and silently adopts **none** for a name it does not know. Only `dark` was registered for a long time, so `color="light"` left every `--spectrum-*` colour token undefined, the semantic layer below fell through to its hex fallbacks, and Preferences → Appearance → Light changed nothing at all.
 
 2.  **Studio semantic layer — `--bg`, `--accent`, `--radius`, …** A small set of studio aliases declared **on the `sp-theme` element** in `index.html`. Each maps to a Spectrum token with a hex fallback:
 
@@ -76,7 +80,7 @@ Spectrum's spacing scale is coarse, so structural px are acceptable and **not** 
 
 ### The light canvas
 
-Document/preview surfaces (`.canvas-panel-viewport`, stylebook, element previews) always render light, even though the chrome is dark. The `--canvas-*` palette is derived from the theme-independent `--spectrum-white` / `--spectrum-black` tokens via `color-mix`, so it stays light and Spectrum-sourced without a nested theme. Those surfaces also set `color-scheme: light`.
+Document/preview surfaces (`.canvas-panel-viewport`, stylebook, element previews) always render light, in **either** chrome theme — a document is a document, and does not follow the chrome. The `--canvas-*` palette is derived from the theme-independent `--spectrum-white` / `--spectrum-black` tokens via `color-mix`, so it stays light and Spectrum-sourced without a nested theme. Those surfaces also set `color-scheme: light`.
 
 ## Guard
 

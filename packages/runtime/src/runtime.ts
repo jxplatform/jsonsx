@@ -139,12 +139,31 @@ export async function resolve(source: string | JxDocument): Promise<JxDocument> 
   if (_resolveCache.has(source)) {
     return _resolveCache.get(source)!;
   }
-  const p = fetch(source).then((res) => {
+  const p = fetch(source).then(async (res) => {
     if (!res.ok) {
       throw new Error(`Jx: failed to fetch ${source} (${res.status})`);
     }
+    /*
+     * `res.ok` is not enough on a single-page host. A static host configured with an SPA fallback
+     * answers a path it does not have with the APPLICATION SHELL at HTTP 200, so a missing document
+     * arrives looking like a successful fetch and dies inside `res.json()` as
+     * `Unexpected token '<', "<!doctype "... is not valid JSON` — a parser error for what is
+     * actually a 404. Jx Cloud did this to every component `$ref` in the canvas.
+     *
+     * Checked on the content type rather than by sniffing the body: a host that says `text/html`
+     * has told us plainly, and saying so costs nothing.
+     */
+    // Optional-chained: a response that carries no headers at all is one we have no EVIDENCE
+    // About, and guessing is worse than proceeding. Every real `Response` has them.
+    const contentType = res.headers?.get("Content-Type") ?? "";
+    if (contentType.includes("text/html")) {
+      throw new Error(
+        `Jx: ${source} returned HTML, not a document — the host answered a missing file with its ` +
+          `app shell (a single-page fallback), so this path is not served.`,
+      );
+    }
     // Trust boundary: fetched sources are Jx documents by contract.
-    return res.json() as Promise<JxDocument>;
+    return (await res.json()) as JxDocument;
   });
   _resolveCache.set(source, p);
   return p;
@@ -2174,6 +2193,39 @@ const _privatePropWarned = new Set<string>();
  * @param {string} [where] - The site refusing it, for a message that points somewhere
  * @returns {boolean} True when the key is private and the caller must skip it
  */
+/**
+ * Whether the instance genuinely CARRIES `key`, rather than the prototype merely having an accessor
+ * for it.
+ *
+ * `key in el` cannot tell those apart, and for a REFLECTED DOM property — `title`, `role`, `id`,
+ * `lang`, `dir`, `slot`, `hidden` — the accessor answers `""` when nothing is set. `"" !==
+ * undefined`, so a component declaring `state.title` never rendered its own default: the empty
+ * string won. `quote` next to it kept its default, which is what made the bug look like bad
+ * content.
+ *
+ * The test is NOT `Object.hasOwn` alone, and that distinction is the whole subtlety. Assigning a
+ * reflected name goes through the prototype accessor and creates no own property, so a legitimate
+ * `$props.title` would be discarded by an own-property test — silently, for every component that
+ * declares one. What the accessor DOES do is write the attribute, so the attribute is the evidence
+ * that somebody set it, whether that was `$props` before connection or the author in the document.
+ *
+ * @param {HTMLElement} el - The instance being connected.
+ * @param {string} key - A state key declared by the component definition.
+ * @returns {boolean}
+ */
+function instanceSupplies(el: HTMLElement, key: string): boolean {
+  if (Object.hasOwn(el, key)) {
+    return true;
+  }
+  if (el.hasAttribute(key)) {
+    return true;
+  }
+  // ARIA-style reflections carry a kebab attribute for a camelCase property (`ariaLabel` →
+  // `aria-label`), so the direct name lookup above would miss a value that really was set.
+  const kebab = key.replaceAll(/[A-Z]/gu, (c) => `-${c.toLowerCase()}`);
+  return kebab !== key && el.hasAttribute(kebab);
+}
+
 function refusePrivateProp(key: string, where?: string): boolean {
   if (!isPrivateStateKey(key)) {
     return false;
@@ -2511,7 +2563,11 @@ export async function defineElement(source: string | JxDocument, baseUrl?: strin
         if (isPrivateStateKey(key)) {
           continue;
         }
-        if (key in this && (this as Record<string, unknown>)[key] !== undefined) {
+        if (
+          key in this &&
+          (this as Record<string, unknown>)[key] !== undefined &&
+          instanceSupplies(this, key)
+        ) {
           state[key] = (this as Record<string, unknown>)[key];
         }
       }

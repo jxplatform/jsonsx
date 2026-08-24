@@ -166,6 +166,40 @@ export interface StudioPlatform {
    * "desktop"`, but only chromium sets this.
    */
   canvasUrl?: string;
+  /**
+   * True when this platform resolves {@link canvasUrl} ASYNCHRONOUSLY.
+   *
+   * Electrobun does: the url is this window's loopback port, fetched over RPC inside `activate()`.
+   * Until the canvas fallback was anchored to the bundle it did not matter — the old literal
+   * `/packages/studio/canvas.html` resolved to nothing servable under `views://`, so an early frame
+   * simply failed and the host rebuilt when the real url landed. Now the fallback RESOLVES:
+   * `views://studio/canvas.html` is a document electrobun really stages. An early frame would boot
+   * the whole canvas bundle inside the SHELL's app-privileged origin, in a CEF instance running
+   * `disable-site-isolation-trials` — and the cross-origin loopback canvas exists precisely so that
+   * cannot happen. Declaring it makes the host wait instead.
+   *
+   * Not keyed on `id`: chromium and electrobun both report `"desktop"`, and only electrobun defers.
+   */
+  canvasUrlDeferred?: boolean;
+  /**
+   * Base URL the canvas fetches PROJECT FILES from — component `$ref`s, `$src` modules, images.
+   *
+   * The renderer resolves a `$ref` with `fetch(url).then(r => r.json())` from inside the iframe, so
+   * project files have to exist at a URL, not merely behind {@link readFile}. Hosts that serve the
+   * project tree from their web root need no value here: the default is `<canvas
+   * origin>/<projectRoot>/`, which is what the dev server and the desktop loopback both already
+   * answer.
+   *
+   * A host whose project files are NOT at a URL-shaped `projectRoot` must set this. Jx Cloud is
+   * one: its `projectRoot` is the identifier `owner/repo@branch`, nothing served the tree, and
+   * every `$ref` fetch landed on the SPA fallback — which answers HTML at **200**, so `res.ok`
+   * passed and the parse died on `Unexpected token '<'`. Images failed the same way in silence.
+   *
+   * May be absolute or root-relative — a root-relative value is resolved against the canvas origin,
+   * because the canvas uses this as `new URL(path, base)` and a relative BASE throws. A missing
+   * trailing `/` is added: without it `new URL` drops the last segment.
+   */
+  documentBaseUrl?: string;
   activate: (root?: string) => Promise<void>;
   openProject: () => Promise<{
     config: ProjectConfig;

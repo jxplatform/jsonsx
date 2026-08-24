@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.2.2](https://github.com/jxsuite/jx/compare/search-v0.2.1...search-v0.2.2) (2026-08-21)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/schema bumped to 1.8.0
+
+## [0.2.1](https://github.com/jxsuite/jx/compare/search-v0.2.0...search-v0.2.1) (2026-08-21)
+
+
+### Bug Fixes
+
+* defects surfaced by fact-checking the new package READMEs ([c4a614d](https://github.com/jxsuite/jx/commit/c4a614dae5e199d49384f998a0b937354f9de882))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/schema bumped to 1.7.0
+
 ## [0.2.0](https://github.com/jxsuite/jx/compare/search-v0.1.0...search-v0.2.0) (2026-08-19)
 
 

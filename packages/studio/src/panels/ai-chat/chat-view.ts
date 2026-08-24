@@ -32,6 +32,7 @@
  */
 
 import { html, nothing } from "lit-html";
+import { repeat } from "lit-html/directives/repeat.js";
 import type { TemplateResult } from "lit-html";
 import { ref } from "lit-html/directives/ref.js";
 import type { Message, ToolCallRecord } from "@jxsuite/ai/chat-state";
@@ -443,21 +444,31 @@ export function renderMessageList(opts: MessageListOptions): TemplateResult {
             `
           : nothing
       }
-      ${messages.map((msg, i) => {
-        if (msg.role === "user") {
-          return renderUserMessage(msg);
-        }
-        if (msg.role === "tool") {
-          return renderToolMessage(msg);
-        }
-        if (msg.role === "assistant") {
-          if (status === "streaming" && i === lastIdx) {
-            return renderStreamingTail(msg);
+      ${repeat(
+        messages,
+        /* Keyed on msg.id, for two reasons a reader can see. The last assistant row swaps between
+           renderStreamingTail and renderAssistantMessage the moment a stream completes, so an
+           unkeyed list tears down and rebuilds the longest node in the transcript every time one
+           finishes. And an assistant row holds the reader's OWN open/closed state on its
+           ai-msg-changes details element, which position-based reuse hands to a different
+           message. */
+        (msg) => msg.id,
+        (msg, i) => {
+          if (msg.role === "user") {
+            return renderUserMessage(msg);
           }
-          return renderAssistantMessage(msg, opts.onRestore);
-        }
-        return nothing;
-      })}
+          if (msg.role === "tool") {
+            return renderToolMessage(msg);
+          }
+          if (msg.role === "assistant") {
+            if (status === "streaming" && i === lastIdx) {
+              return renderStreamingTail(msg);
+            }
+            return renderAssistantMessage(msg, opts.onRestore);
+          }
+          return nothing;
+        },
+      )}
       ${
         status !== "streaming" && opts.error
           ? html`

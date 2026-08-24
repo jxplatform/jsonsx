@@ -38,6 +38,7 @@ import {
   tabOfContainer,
 } from "./canvas-surface";
 import { cloneSelection, primarySelection, toggleSelected } from "../tabs/selection";
+import { getNodeAtPath } from "../state";
 import type { JxPath } from "../state";
 import { setLayoutSelection, shell } from "../shell";
 import { formatEditableVerdicts } from "../format/constraints";
@@ -67,6 +68,7 @@ import type { OverlayLayer, OverlayPlacement } from "./iframe-overlay";
 import type { SlashCommand } from "../editor/inline-edit";
 import type { Tab } from "../tabs/tab";
 import type { JxExpressionNode, JxMutableNode } from "@jxsuite/schema/types";
+import { bundleUrl } from "../services/bundle-base";
 
 /** A rect in PARENT coordinates (overlay-local from {@link canvasRectToParent}, same field shape). */
 type ParentRect = OverlayPlacement;
@@ -197,7 +199,13 @@ interface HostState {
    * render acks (`renderComplete`) at a bumped one — both satisfy `gen >= minGen`. An immediate
    * `enterEdit` would race the escalated ASYNC render and silently fail to find the element.
    */
-  pendingEnterEdit: { path: (string | number)[]; minGen: number; offset?: number } | null;
+  pendingEnterEdit: {
+    path: (string | number)[];
+    minGen: number;
+    offset?: number;
+    /** Set when the deferred re-entry is a PROP host rather than a block (see deferEnterEdit). */
+    prop?: string;
+  } | null;
   /**
    * Stylebook capability (set by {@link mountStylebookCanvas}, cleared by page mounts). The specimen
    * doc's paths decode to TAGS, not tab-document paths: hits route to the injected stylebook
@@ -1245,6 +1253,66 @@ function withEchoSuppressed(host: HostState, paths: (string | number)[][], fn: (
 }
 
 /** The tab whose document `state`'s iframe currently renders (null when unknown or closed). */
+/**
+ * Serialized path of an in-place prop commit whose patch was echo-suppressed, or null.
+ *
+ * One value rather than a set: a plain session edits exactly one prop of one instance at a time,
+ * and it is cleared on the release that follows.
+ */
+let propEchoPending: string | null = null;
+
+/**
+ * Serialized instance path whose release commit just transacted, so a `$props` patch rebuilding it
+ * is in flight. Read by the very next `editStart` and cleared there — the two messages arrive back
+ * to back when the user clicks from one prop slot to another in the same component.
+ */
+let propRebuildAt: string | null = null;
+
+/**
+ * Whether a release commit has to re-render the instance itself.
+ *
+ * Exported for its own test: the posting side ({@link postPatchToHosts}) needs a resolvable stage
+ * and is covered elsewhere, but the STATE MACHINE here is the part that was wrong, and it is three
+ * conditions that have to agree — the release must have declined to transact, an in-place commit
+ * must have been suppressed, and it must have been for this same instance.
+ *
+ * @param {boolean} transacted - Whether the release commit wrote to the document.
+ * @param {string | null} pending - Serialized path of a suppressed in-place commit, if any.
+ * @param {string} path - Serialized path of the instance being released.
+ * @returns {boolean}
+ */
+export function needsReleaseReconcile(
+  transacted: boolean,
+  pending: string | null,
+  path: string,
+): boolean {
+  return !transacted && pending === path;
+}
+
+/**
+ * Re-render a component instance from the document, WITHOUT transacting.
+ *
+ * Used when a release commit legitimately no-ops but the DOM is still showing what the suppressed
+ * in-place commits rendered. The op is the same `set-key $props` the patcher would have produced,
+ * so it takes the ordinary `replaceSubtree` path — this adds no rendering mechanism, it re-sends
+ * the one that was deliberately dropped while the caret needed protecting.
+ *
+ * @param {HostState} state - The host whose tab owns the document.
+ * @param {JxPath} path - The component instance's document path.
+ * @returns {void}
+ */
+function reconcileInstance(state: HostState, path: JxPath): void {
+  const tab = hostTab(state);
+  if (!tab) {
+    return;
+  }
+  const node = getNodeAtPath(tab.doc.document, path);
+  if (!node) {
+    return;
+  }
+  postPatchToHosts([{ key: "$props", op: "set-key", path, value: node.$props }], tab.id);
+}
+
 function hostTab(state: HostState): Tab | null {
   return state.tabId ? (workspace.tabs.get(state.tabId) ?? null) : null;
 }
@@ -1473,10 +1541,27 @@ function requestStylebookSelection(host: HostState): void {
 }
 
 /**
- * The default iframe document URL (a static shell that boots the slim canvas bundle). Used when the
- * platform does not provide its own canvasUrl — i.e. the dev server and electrobun keep this path.
+ * The canvas document, beside the bundle that asked for it.
+ *
+ * This was the literal `/packages/studio/canvas.html` — a repo dev-server path baked into a browser
+ * bundle, correct on exactly one host out of four. It happened to work because every other host
+ * overrides `canvasUrl`: the chromium launcher builds one from its token, electrobun fetches one
+ * over RPC, and the cloud adapter hard-codes its own. So the default was never the default; it was
+ * the dev server's URL with nothing saying so.
+ *
+ * `bundleUrl` resolves it against the ENTRY's directory, which is the one fact every host agrees on
+ * (see services/bundle-base.ts), so the fallback is now correct everywhere rather than accidentally
+ * unused.
  */
-const DEFAULT_CANVAS_URL = "/packages/studio/canvas.html";
+function defaultCanvasUrl(): string {
+  return bundleUrl("../canvas.html");
+}
+
+/**
+ * Loads nothing, deliberately: what a platform that resolves its canvasUrl LATER gets in the
+ * meantime. See {@link StudioPlatform.canvasUrlDeferred}.
+ */
+const DEFERRED_CANVAS_URL = "about:blank";
 
 /**
  * Release one host: its channel, its overlay, its frame, and everything awaiting a reply from it.
@@ -1524,6 +1609,29 @@ function releaseHost(host: HostState): void {
 }
 
 /**
+ * Which document this pane's canvas iframe should load.
+ *
+ * The `canvasUrlDeferred` branch is the one that needs saying. Electrobun resolves its canvasUrl
+ * asynchronously — it is this window's loopback port, fetched over RPC inside `activate()` — and
+ * until the fix above, the bundle-relative default resolved to nothing servable under `views://`,
+ * so an early frame simply failed and `ensureHost` rebuilt against the real URL when it landed. Now
+ * that default RESOLVES: `views://studio/canvas.html` is a document electrobun really does stage.
+ * An early frame would therefore boot the whole canvas bundle inside the SHELL's app-privileged
+ * origin, in a CEF instance running `disable-site-isolation-trials` — and the cross-origin loopback
+ * canvas exists precisely so that never happens.
+ */
+function resolveCanvasUrl(): string {
+  if (!hasPlatform()) {
+    return defaultCanvasUrl();
+  }
+  const platform = getPlatform();
+  if (platform.canvasUrl) {
+    return platform.canvasUrl;
+  }
+  return platform.canvasUrlDeferred ? DEFERRED_CANVAS_URL : defaultCanvasUrl();
+}
+
+/**
  * Release every canvas host mounted under `root`, and say how many there were.
  *
  * The one NON-lazy path out of {@link liveHosts}. Eleven sites prune a disconnected host when they
@@ -1554,7 +1662,7 @@ export function releaseCanvasHosts(root: HTMLElement): number {
 function ensureHost(canvasEl: HTMLElement): HostState {
   // Read the platform's canvasUrl when one is registered; otherwise fall back to the default. The
   // Dev server leaves it unset, and some tests mount without a platform registered.
-  const canvasUrl = (hasPlatform() ? getPlatform().canvasUrl : undefined) ?? DEFAULT_CANVAS_URL;
+  const canvasUrl = resolveCanvasUrl();
   const existing = hosts.get(canvasEl);
   if (existing) {
     if (existing.canvasUrl === canvasUrl) {
@@ -2210,6 +2318,13 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
         activeEditHost.snapshot = null;
       }
       activeEditHost = state;
+      /* The session that just opened is inside an instance a release commit is about to rebuild —
+         defer a re-entry so it survives the patch. Only for the SAME instance: moving to a slot in
+         a different component is not disturbed by this rebuild. */
+      if (msg.prop !== undefined && propRebuildAt === serializeJxPath(msg.path)) {
+        deferEnterEdit(state, msg.path, undefined, msg.prop);
+      }
+      propRebuildAt = null;
       // Each visit to a block is one undoable edit. Bumping the run id here breaks the history
       // Coalescing run, so returning to the same paragraph later is a separate ⌘Z step.
       editRunSeq += 1;
@@ -2273,9 +2388,34 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       const applyProp = () => applyInlinePropCommit(hostTab(state), msg.path, msg.prop, msg.value);
       if (msg.inPlace) {
         withEchoSuppressed(state, [msg.path], applyProp);
-      } else {
-        applyProp();
+        propEchoPending = serializeJxPath(msg.path);
+        return;
       }
+      const transacted = applyProp();
+      /*
+       * "The instance re-renders for real on release" was only true when the release actually
+       * transacted. After an idle tick the release posts the SAME string, the apply no-ops, and no
+       * patch is ever generated — so the suppressed in-place render was the last word and the
+       * canvas kept showing pre-edit output. Emptying a heading left it visibly empty while the
+       * document had dropped the prop entirely, and any SECOND place the component renders that
+       * value kept the old one.
+       *
+       * Reconciling here rather than lifting the no-op: that guard is load-bearing (it is what
+       * stops a commit → patch → disturb → re-commit loop, and keeps undo clean), so the fix is to
+       * re-render without transacting.
+       */
+      if (needsReleaseReconcile(transacted, propEchoPending, serializeJxPath(msg.path))) {
+        reconcileInstance(state, msg.path);
+      }
+      propEchoPending = null;
+      /*
+       * A release that TRANSACTED rebuilds the whole instance — `set-key $props` at the instance
+       * path becomes a `replaceSubtree`. If the user got here by clicking a SECOND prop slot in
+       * that same instance, the frame has already adopted a marker inside the subtree about to be
+       * replaced, so the session it just opened is dead on arrival: the click did nothing and they
+       * had to click again. The next `editStart` tells us whether that is what happened.
+       */
+      propRebuildAt = transacted ? serializeJxPath(msg.path) : null;
       return;
     }
     case "editMerge": {
@@ -2393,7 +2533,7 @@ function onDomUpdated(state: HostState, gen: number): void {
   requestPresence(state);
   hideInsertZoneNow(state);
   if (state.pendingEnterEdit && gen >= state.pendingEnterEdit.minGen) {
-    const { offset, path } = state.pendingEnterEdit;
+    const { offset, path, prop } = state.pendingEnterEdit;
     state.pendingEnterEdit = null;
     /* Re-enter only when this host STILL SHOWS THE TAB IT OWES THE CARET TO — which is a question
        about this host's pane, not about the focus. A background tab's iframe renders a different
@@ -2403,7 +2543,7 @@ function onDomUpdated(state: HostState, gen: number): void {
        there is one stage. With two, the side pane could be displaying its tab, holding a caret it
        owed, and drop it because the PRIMARY had focus. */
     if (state.tabId !== null && state.tabId === tabOfContainer(state.canvasEl)?.id) {
-      reenterEdit(state, path, offset);
+      reenterEdit(state, path, offset, prop);
     }
   }
 }
@@ -2414,20 +2554,32 @@ function onDomUpdated(state: HostState, gen: number): void {
  * that same gen; an escalated full render acks at a bumped one — both satisfy `gen >= minGen`,
  * while a stale ack cannot. Latest-wins on overwrite.
  */
-function deferEnterEdit(state: HostState, path: (string | number)[], offset?: number): void {
+function deferEnterEdit(
+  state: HostState,
+  path: (string | number)[],
+  offset?: number,
+  prop?: string,
+): void {
   state.pendingEnterEdit = {
     minGen: state.lastRenderedGen,
     path: [...path],
     ...(offset === undefined ? {} : { offset }),
+    ...(prop === undefined ? {} : { prop }),
   };
 }
 
 /** Ask the host's iframe to (re-)enter inline editing on `path` (a plain copy crosses the bridge). */
-function reenterEdit(state: HostState, path: (string | number)[], offset?: number): void {
+function reenterEdit(
+  state: HostState,
+  path: (string | number)[],
+  offset?: number,
+  prop?: string,
+): void {
   state.channel.post({
     kind: "enterEdit",
     path: [...path],
     ...(offset === undefined ? {} : { offset }),
+    ...(prop === undefined ? {} : { prop }),
   });
 }
 

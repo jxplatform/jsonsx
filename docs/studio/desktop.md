@@ -52,7 +52,7 @@ Each window holds one project, and the window's title tells you which. When you 
 
 Opening a project that's already open never duplicates it: whichever you chose, the window that has it comes to the front instead.
 
-_File > Open Project…_ from the app menu always opens into a window of its own, and _File > New Window_ (:kbd[⇧⌘N] / :kbd[Ctrl+Shift+N]) opens a fresh welcome window when you want to start something else.
+_File > Open Project…_ from the app menu always opens into a window of its own, and **New Window** (:kbd[⇧⌘N] / :kbd[Ctrl+Shift+N]) opens a fresh welcome window when you want to start something else — from the _File_ menu, or by name from the **[command list](/docs/studio/interface/commands)**.
 
 ## How it differs from Studio in the browser
 
@@ -61,13 +61,20 @@ Studio itself is identical in both — every page in this documentation applies 
 - **Nothing to run.** In the browser, Studio is served by a local dev server you start from a terminal (see **[The dev server](/docs/framework/build/dev-server)**). The desktop app carries its own backend — launch it like any other application.
 - **Native dialogs.** Opening projects and picking folders use your operating system's file dialogs instead of the browser's folder picker.
 - **Windows, menus, and file associations.** One window per project, a real _File_ menu, and `project.json` opening from the file manager.
-- **Built-in updates.** The app updates itself in the background; a dev-server setup updates with your package manager.
+- **Built-in updates.** The app updates itself in the background; a dev-server setup — and the NixOS build below — updates with your package manager.
 
 The AI assistant, publishing, and everything on the canvas behave the same in both.
 
 ## Platform notes
 
-Installers are provided for macOS (Apple Silicon), Windows (x64), and Linux (x64 and ARM64) — see the **[install page](/docs/start/install)** for downloads. Intel Macs are no longer among the builds. On NixOS the app is packaged differently (built with `nix build`, running Studio in a Chromium app window), but presents the same Studio.
+Installers are provided for macOS (Apple Silicon), Windows (x64), and Linux (x64 and ARM64) — see the **[install page](/docs/start/install)** for downloads. Intel Macs are no longer among the builds. On NixOS the app is packaged differently: `nix build` produces it, and it runs Studio in a Chromium app window rather than a native one.
+
+Everything on this page applies to it. Projects open the same way, through the same native dialogs; each project gets a window of its own, and opening one that is already open brings that window forward. Two things differ, and both follow from who packaged it:
+
+- **Your package manager updates it**, so there is no in-app updater and _About_ shows no update status.
+- **Your desktop draws the window frame**, so the minimize/maximize/close buttons are your system's rather than Studio's.
+
+Windows there come from the _File_ menu's **New Window**, from the **This Window / New Window** question above, or from running `jx-studio <project>` again — and running it for a project that is already open raises that window instead of opening a second one.
 
 ## Next
 

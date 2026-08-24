@@ -4,16 +4,42 @@
 # static unit test (packages/desktop/tests/nix-bundle-completeness.test.ts, which parses `cp -r`
 # lines out of package.nix) and otherwise ran only on whoever happened to type `nix build`.
 #
-# Two callers, one definition:
+# Five callers, one definition:
 #
-#   * `pull_request`, path-filtered to the inputs that can break it. Measured at ~90s of build on a
-#     warm store, so a PR that touches the packaging finds out in the PR.
+#   * `workflow_call` from test.yml, which owns the PULL-REQUEST leg — on the RELEASE pull request
+#     alone (`startsWith(github.head_ref, 'release-please--')`). It used to be an `on: pull_request`
+#     trigger here, and that is precisely what made it unusable as a required status check: a
+#     path-filtered workflow that does not fire leaves a required check pending forever. test.yml
+#     has no `paths:` filter, so the Nix build reports into the single `ci` aggregate that branch
+#     protection names. It was then gated on the derivation's inputs, which is most Dependabot pull
+#     requests and by far the slowest job in that workflow; it is now gated on the release branch
+#     instead. The cost of that is explicit: a dependency bump which breaks packaging no longer
+#     blocks its own auto-merge, and surfaces on the release pull request, where `ci` still requires
+#     this job and a human is already reading the diff.
+#   * `push` to `main`, path-filtered. This one exists for the CACHE, not the check: GitHub
+#     Actions caches are branch-scoped, and a PR may read the default branch's cache but never
+#     another PR's. Without a run on `main` there is no base cache for any PR to inherit, and every
+#     PR would refetch the ~1000 npm tarball derivations bun.nix pins from scratch.
 #   * `workflow_call` from release-please.yml at the desktop release tag, where it is the gate the
-#     `release` branch advances behind.
+#     `release` branch advances behind. `runner` picks the architecture.
+#   * `schedule`, nightly, which is what keeps that cache warm now that most merges to `main` are
+#     auto-merges and raise no `push` event at all.
+#   * `workflow_dispatch`, to measure what a release would cost a binary cache (see `measure`).
+#
+# A release-PR merge touches packages/desktop/** (the version bump), so it fires the `push` trigger
+# AND the `workflow_call` from release-please. That is two builds of the same commit. It is left
+# that way deliberately: they occupy different concurrency groups, and the `push` leg is what keeps
+# `main`'s cache warm for the next PR.
 name: Nix
 
 on:
-  pull_request:
+  push:
+    branches:
+      - main
+    # This filter is now the ONLY path list for the Nix build; affected.ts no longer carries a
+    # Counterpart (`NIX_INPUTS` is gone, along with the gate it fed). It is a CACHE trigger, not a
+    # Check: it decides when `main` refreshes the cache every pull request inherits, so being a
+    # Little generous here is cheap and being narrow is what leaves a PR refetching ~1000 tarballs.
     paths:
       # The derivation, the generated dependency set, and the lockfile it is generated from.
       - "flake.nix"
@@ -25,35 +51,138 @@ on:
       # Path and the nightly-equivalent: a red `release` that refuses to advance.
       - "packages/desktop/**"
       - ".github/workflows/nix.yml"
+  schedule:
+    # Nightly, and NOT a nicety. This workflow's `push` leg exists to keep `main`'s Actions cache
+    # warm for the next pull request — and a Dependabot merge never raises `push`, because GitHub
+    # suppresses the events its own token causes and auto-merge merges as `GITHUB_TOKEN`. Under
+    # the dependency-autopilot policy most merges to `main` are exactly those, so without a cron
+    # the cache would go cold precisely on the branch that feeds every pull request. It also
+    # catches drift no commit caused: nixpkgs-unstable moving under a lockfile that did not.
+    - cron: "0 4 * * *"
   workflow_call:
     inputs:
       ref:
         description: "Git ref to build. Defaults to the checked-out ref."
         required: false
         type: string
+      runner:
+        description: "Runner to build on. `ubuntu-24.04-arm` builds aarch64-linux."
+        required: false
+        default: ubuntu-latest
+        type: string
+      publish:
+        description: "Push the built closure to the public Cachix cache. Release path only."
+        required: false
+        default: false
+        type: boolean
+    secrets:
+      CACHIX_AUTH_TOKEN:
+        description: "Write token for the `jxsuite` Cachix cache. Only needed when `publish`."
+        required: false
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: "Runner to build on."
+        required: false
+        default: ubuntu-latest
+        type: choice
+        options:
+          - ubuntu-latest
+          - ubuntu-24.04-arm
+      measure:
+        description: "Report what one release would cost a binary cache."
+        required: false
+        default: true
+        type: boolean
 
 permissions:
   contents: read
 
+# The runner is part of the key. Without it the x86 and aarch64 legs of one release tag share a
+# group, and `cancel-in-progress` makes whichever starts second kill the first.
 concurrency:
-  group: nix-${{ github.event.pull_request.number || inputs.ref || github.ref }}
+  group: nix-${{ github.event.pull_request.number || inputs.ref || github.ref }}-${{ inputs.runner || 'ubuntu-latest' }}
   cancel-in-progress: true
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref || github.ref }}
 
-      - uses: DeterminateSystems/nix-installer-action@main
+      # `install: false` — and this is load-bearing, not an economy. `packages/desktop/package.nix`
+      # builds `src = lib.cleanSource ../..`, and `lib.cleanSource` filters `.git` and editor
+      # droppings but NOT `node_modules`. A `bun install` here would fold the entire dependency
+      # tree into the derivation's inputs: a different store path on every run, a cache that never
+      # hits, and a `nix build` measured in gigabytes. `bun scripts/check-bun-nix.ts` needs no
+      # install — it shells out to `bunx bun2nix@<the version package.json pins>`, which writes
+      # only to bun's own global cache.
+      - uses: ./.github/actions/setup-bun
+        with:
+          install: "false"
+
+      # bun.nix is a pure function of bun.lock, and under the dependency-autopilot policy it is
+      # allowed to lag: a Dependabot pull request moves the lockfile and cannot regenerate this
+      # file, because a GITHUB_TOKEN push to a bot branch produces no check runs on the new head.
+      # See CLAUDE.md, Dependency Autopilot.
+      #
+      # So the two legs ask different questions, and the difference is the whole point.
+      #
+      #   * On a pull request or a `main` build, regenerate IN THE WORKING TREE and build that.
+      #     The question worth answering there is "does this dependency set build?", not "did a bot
+      #     remember to run a generator?" — and answering the first one is what makes this a
+      #     meaningful required check on a Dependabot bump rather than a guaranteed red X.
+      #   * On the release leg (`publish`), a drift is a FAILURE. That tree is the tag, and
+      #     `nix run github:jxsuite/jx/release` reads the bun.nix that was committed — not one CI
+      #     invented after the fact. release-bun-nix.yml is what puts it there, on the release
+      #     pull request; this is the assertion that it did.
+      - name: bun.nix must describe the lockfile in this tree
+        env:
+          STRICT: ${{ inputs.publish && 'true' || 'false' }}
+        run: |
+          set -euo pipefail
+          if [ "$STRICT" = "true" ]; then
+            bun scripts/check-bun-nix.ts
+          else
+            bun scripts/check-bun-nix.ts --fix
+            if ! git diff --quiet -- bun.nix; then
+              echo "::notice::bun.nix was stale for this tree and has been regenerated for the"\
+                   "build only — nothing is committed. It is brought into agreement on the release"\
+                   "pull request (.github/workflows/release-bun-nix.yml)."
+            fi
+          fi
+
+      # Pinned by SHA: both of these are published only on a moving `main`, which dependabot cannot
+      # track, so the alternative to a pin is an unreviewed third party in the release gate.
+      - uses: DeterminateSystems/nix-installer-action@v22
         with:
           # The flake declares the nix-community substituter in `nixConfig`. Without accepting it,
           # Every dependency is built from source instead of fetched, and a 90-second build becomes
           # An afternoon.
           extra-conf: |
             accept-flake-config = true
+
+      # Backs /nix/store with the GitHub Actions cache. cache.nixos.org already serves the nixpkgs
+      # half of the closure; what it can never serve is the ~1000 fixed-output npm tarball
+      # derivations bun.nix pins, and those are what this recovers between runs. Fork PRs get a
+      # read-only token and degrade to pull-only on their own, so no fork guard is needed.
+      - uses: DeterminateSystems/magic-nix-cache-action@v14
+        with:
+          # Perf/diagnostic telemetry to Determinate Systems is on by default; "" disables it.
+          diagnostic-endpoint: ""
+
+      # Installs the `cachix` binary and adds https://jxsuite.cachix.org as a substituter. Pushing
+      # is deliberately NOT delegated to this action: its default daemon mode pushes every path
+      # built during the job, which here means the ~1000 npm tarball derivations as well. Those are
+      # build-time only — a consumer whose `$out` substitutes never realises them — so publishing
+      # them would spend a 5 GB public budget on bytes no user downloads. The explicit push below
+      # sends exactly the runtime closure instead.
+      - uses: cachix/cachix-action@v17
+        with:
+          name: jxsuite
+          skipPush: true
 
       - name: Build
         run: nix build .#default --accept-flake-config -L
@@ -83,3 +212,85 @@ jobs:
           entry="$(sed -n 's#.*bun[^ ]*/bin/bun"  *run \([^ ]*\).*#\1#p' "$wrapper")"
           test -f "$entry"
           echo "entry -> $entry"
+
+      # Publish exactly what a consumer cannot get from cache.nixos.org. A path that came from any
+      # cache carries that cache's signature, so an EMPTY `signatures` array is the set we have to
+      # serve ourselves — in practice `$out` alone, because chromium, bun and glibc are all upstream.
+      # That one path is the whole point: it is the `bun install` plus `bun run build` that a
+      # `nix run github:jxsuite/jx/release` otherwise performs on the user's machine.
+      #
+      # Paths go as ARGUMENTS, not on stdin: `cachix push --help` documents only
+      # `CACHE-NAME [PATHS...]`, and `xargs -r` additionally makes the empty case a no-op
+      # rather than an invocation that waits on a pipe. An empty set is normal — it means
+      # this release's closure was already published.
+      #
+      # `continue-on-error` is deliberate. A cache is an optimisation, and a failed push must not
+      # fail the job that `advance-release-branch` gates the `release` branch on — the worst case
+      # without a cache is today's behaviour, a build from source. The `verify-cache` job in
+      # release-please.yml notices the gap afterwards and opens an issue.
+      - name: Publish the release closure to Cachix
+        if: inputs.publish
+        continue-on-error: true
+        env:
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CACHIX_AUTH_TOKEN:-}" ]; then
+            echo "::error::publish was requested but CACHIX_AUTH_TOKEN is empty"
+            exit 1
+          fi
+          nix path-info --json --recursive ./result \
+            | jq 'if type == "array" then . else (to_entries | map({path: .key} + .value)) end' \
+            | jq -r '.[] | select((.signatures // []) | length == 0) | .path' \
+            | tee /dev/stderr \
+            | xargs -r cachix push jxsuite
+
+      # What a binary cache would actually have to hold, measured rather than guessed. A path that
+      # came from any cache carries that cache's signature, so an EMPTY `signatures` array is the
+      # set cache.nixos.org cannot serve — i.e. exactly what we would have to publish ourselves.
+      # This is the same heuristic cachix-action uses to decide what to push.
+      - name: Report what one release costs a binary cache
+        if: github.event_name == 'workflow_dispatch' && inputs.measure
+        run: |
+          set -euo pipefail
+          # `nix path-info --json` returns an ARRAY on older Nix and an OBJECT keyed by store
+          # path on 2.20+, where the path is the key rather than a `.path` field. Normalise to the
+          # array shape once, here, so every query below reads the same thing on either version.
+          nix path-info --json --recursive ./result \
+            | jq 'if type == "array" then . else (to_entries | map({path: .key} + .value)) end' \
+            > closure.json
+
+          closure="$(jq '[.[].narSize] | add // 0' closure.json)"
+          unsigned="$(jq '[.[] | select((.signatures // []) | length == 0) | .narSize] | add // 0' closure.json)"
+          jq -r '.[] | select((.signatures // []) | length == 0) | .path' closure.json > unsigned.txt
+
+          # Caches store the compressed form. zstd is what Cachix uses; xz is the fallback for a
+          # runner image that ships without it.
+          if command -v zstd >/dev/null 2>&1; then comp=(zstd -19 -T0); else comp=(xz -9 -T0); fi
+
+          rows=""
+          pushed=0
+          while IFS= read -r p; do
+            [ -n "$p" ] || continue
+            n="$(nix-store --dump "$p" | "${comp[@]}" | wc -c)"
+            pushed=$((pushed + n))
+            rows="${rows}| \`$(basename "$p")\` | $(numfmt --to=iec "$n") |"$'\n'
+          done < unsigned.txt
+
+          {
+            echo "## Binary-cache budget — $(nix eval --raw --impure --expr 'builtins.currentSystem')"
+            echo
+            echo "| Metric | Size |"
+            echo "|---|---:|"
+            echo "| Full runtime closure (uncompressed) | $(numfmt --to=iec "$closure") |"
+            echo "| Of that, not on cache.nixos.org | $(numfmt --to=iec "$unsigned") |"
+            echo "| **Compressed, per release** | **$(numfmt --to=iec "$pushed")** |"
+            echo
+            echo "Paths we would publish:"
+            echo
+            echo "| Store path | Compressed |"
+            echo "|---|---:|"
+            printf '%s' "$rows"
+            echo
+            echo "Cachix's open-source tier is 5 GB; GitHub Pages caps a published site at 1 GB."
+          } >> "$GITHUB_STEP_SUMMARY"

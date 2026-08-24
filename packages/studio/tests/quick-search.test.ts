@@ -11,7 +11,7 @@
  * - The file list is fetched ONCE per open with an empty query — `searchFiles`'s glob is a basename
  *   substring, so full-path fuzzy matching has to happen on this side of it.
  */
-import { flush, installMockPlatform, resetStudioState } from "./harness";
+import { flush, installMockPlatform, resetStudioState, mountOverlayLayers } from "./harness";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import type { StudioFormat } from "../src/format/format-host";
 
@@ -49,11 +49,7 @@ const RECENT_PROJECTS_KEY = "jx-studio-recent-projects";
 
 // Layer DOM is set up once — getLayerSlot caches its slot element, so the body must not be
 // Replaced between tests (the cached slot would keep pointing into a detached subtree).
-document.body.innerHTML = `
-  <div id="layer-popover"></div>
-  <div id="layer-modal"></div>
-  <div id="layer-dialog"></div>
-`;
+mountOverlayLayers(document.body);
 initLayers();
 
 const MARKDOWN_FORMAT: StudioFormat = {

@@ -11,9 +11,10 @@
  * between waves, not concurrently from several branches.
  */
 import "./with-dom.js";
-import { render } from "lit-html";
+import { render as litRender, render } from "lit-html";
 import type { TemplateResult } from "lit-html";
 import { registerPlatform } from "../src/platform";
+import { overlayLayers } from "../src/shell/tree";
 import { setProjectState } from "../src/store";
 import { closeAllTabs, openTab } from "../src/workspace/workspace";
 import {
@@ -513,4 +514,23 @@ export function stubRect(el: Element, rect: Partial<DOMRect>): void {
     ...rect,
   } as DOMRect;
   (el as { getBoundingClientRect: () => DOMRect }).getBoundingClientRect = () => full;
+}
+
+/**
+ * Render the shell's four overlay layers into `host`.
+ *
+ * The frame's overlay half, for a fixture that wants it without the rest. Twenty test files used to
+ * describe this set by hand and had stopped agreeing — most carried three layers, one carried four
+ * — so whether a toast host existed depended on which file you were in. The template is
+ * `src/shell/tree.ts`'s; only the mounting is a test convenience, which is why it lives here rather
+ * than shipping in the bundle.
+ */
+export function mountOverlayLayers(host: ParentNode = document.body): void {
+  /* Same clear-and-eject as src/shell/tree.ts's mountInto, for the same two reasons: a fixture that
+     empties the body leaves lit's part marker pointing at comment nodes that are gone, and ejecting
+     without clearing makes a second mount paint a second copy beside the first. */
+  (host as HTMLElement).textContent = "";
+  // @ts-expect-error -- _$litPart$ is lit's private render-part marker, not in the DOM types
+  delete (host as HTMLElement)["_$litPart$"];
+  litRender(overlayLayers(), host as HTMLElement);
 }

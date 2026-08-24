@@ -35,7 +35,7 @@ Jx Studio is designed for three deployment targets that share a single core code
 | **Desktop app**   | ElectroBun (Bun + native webview) | Bun process (local)           | Filesystem                | All platforms except NixOS   |
 | **NixOS desktop** | Chromium `--app` + Bun            | `@jxsuite/server` (localhost) | Filesystem via dev server | NixOS only (via `nix build`) |
 | **Dev mode**      | Chrome                            | `@jxsuite/server` (localhost) | Filesystem via dev server | Active (Studio development)  |
-| **SaaS/PaaS**     | Browser                           | Cloud API server              | Database / object storage | Future                       |
+| **SaaS/PaaS**     | Browser                           | Session gateway over git      | Git repository            | Shipped (see §10)            |
 
 ### 1.1a Platform Strategy
 
@@ -90,6 +90,19 @@ The canonical `StudioPlatform` interface is `packages/studio/src/types.ts` — r
 | **Publish / identity**   | `getUser?`, `getAccountStatus?`, `listRepos?`, `importProject?`, `cfConnection?`, `cfConnect?`, `cfApi?`                                                                                                                       |
 | **Code services / AI**   | `codeService` (§5.3), `resolveClass?`, `aiChatUrl`                                                                                                                                                                             |
 | **Multi-window / shell** | `openProjectInNewWindow?`, `pickProject?`, `newWindow?`, `setWindowProject?`, `getProjectRoot?`, `getAppInfo?`, backend-persisted settings                                                                                     |
+| **Canvas**               | `canvasUrl?`, `canvasUrlDeferred?`, `documentBaseUrl?`                                                                                                                                                                         |
+
+**The canvas needs project files at a URL, not behind `readFile`.** It renders in an iframe, and the
+renderer resolves a component `$ref` by fetching it, so a platform must be able to say where the
+project tree is served. `documentBaseUrl` is that declaration. It defaults to
+`<canvas origin>/<projectRoot>/`, which is already right for any backend serving the tree from its
+web root — the dev server and the desktop loopback both do — and **MUST** be set by a platform whose
+`projectRoot` is an identifier rather than a served path. It may be absolute or root-relative; a
+root-relative value is resolved against the canvas origin, because the canvas composes it as
+`new URL(path, base)` and a relative base throws rather than resolving — which fails the whole
+canvas MOUNT, not one fetch. A host that answers a missing file with a
+single-page fallback compounds a wrong base rather than exposing it: the shell arrives at HTTP 200,
+so the fetch succeeds and the failure surfaces from the JSON parser instead.
 
 **Core vs. optional, and degradation.** Required members are the minimal backend every platform implements. Optional members (marked `?` in the interface) each back an optional protocol route; Studio feature-detects them and degrades gracefully when they are absent — hiding the corresponding UI or falling back to a client-side path. Each optional route's `degradation` note in `STUDIO_ROUTES` records exactly what turns off (e.g. no `collab` → Studio edits solo with file-level saves; no `importSite` → the New Project modal hides its Import tab).
 
@@ -123,7 +136,9 @@ export function hasPlatform() {
 }
 ```
 
-Each deployment target either pre-registers its adapter before Studio initializes, or hands Studio a signal to build one itself. The desktop init bundle pre-registers the RPC-backed adapter on `__jxPlatform`. The cloud shell (the platform repo's `edit-init`) instead publishes a `window.__jxCloud` signal — the bound project, or `null` for the project-less hub — and lets the studio entry construct the adapter, so the cloud adapter (and the collab WebSocket client's `yjs` instance) lives **inside** the studio bundle rather than the shell; a second bundled `yjs` in the shell would break collab's cross-module `instanceof` checks. When nothing pre-registered, the studio entry resolves the default adapter — cloud when `__jxCloud` was signalled, else the dev server:
+Each deployment target either pre-registers its adapter before Studio initializes, or hands Studio a signal to build one itself. The desktop init bundle pre-registers the RPC-backed adapter on `__jxPlatform`.
+
+**Where the init bundle is loaded from is a declared slot, not a string replace.** `studioShellHtml({ boot })` (studio.md §11.2) emits the module tags ahead of the studio entry. Both hosts used to obtain this by an exact-string `replace()` on the shipped `index.html`'s script tag; only the cloud's checked that the replace had matched, so a whitespace change upstream would have produced a packaged desktop app with no platform registered at all — which then self-registers the dev-server adapter and fetches `/__studio/*` against a `views://` origin. The ordering constraint below is unchanged and is why `boot` is a list rather than a single hook. The cloud shell (the platform repo's `edit-init`) instead publishes a `window.__jxCloud` signal — the bound project, or `null` for the project-less hub — and lets the studio entry construct the adapter, so the cloud adapter (and the collab WebSocket client's `yjs` instance) lives **inside** the studio bundle rather than the shell; a second bundled `yjs` in the shell would break collab's cross-module `instanceof` checks. When nothing pre-registered, the studio entry resolves the default adapter — cloud when `__jxCloud` was signalled, else the dev server:
 
 ```javascript
 // Desktop (init bundle, loaded before studio.js) — pre-registers its adapter
@@ -153,12 +168,26 @@ if (!hasPlatform()) {
 
 ### 3.5 Leaving the Webview
 
-The desktop shell registers Studio's preview-navigation override (`@jxsuite/studio/preview-navigate`)
-so a link clicked in Preview mode goes to the **user's default browser** via an `openExternal` RPC onto
-`Utils.openExternal`, not to this webview. Following a link in Preview exists to see the page behave
-like the deployed thing — routing, history, devtools — and a webview with no address bar is not that;
-navigating it would also replace the editor. When the shell is unavailable or the OS refuses, the
-studio's own `window.open` default still applies.
+**Both** desktop launchers register Studio's preview-navigation override
+(`@jxsuite/studio/preview-navigate`) so a link clicked in Preview mode goes to the **user's default
+browser** via an `openExternal` RPC, not to the editor's own window. Following a link in Preview
+exists to see the page behave like the deployed thing — routing, history, devtools — and neither a
+webview nor a frameless Chromium `--app` window is that; navigating either would also replace the
+editor. `View: Open in Browser` (§9.5) and the sign-in redirect (§3.6) use the same seam.
+
+The Bun side hands the URL over in two steps, and the second is not redundancy. ElectroBun's
+`Utils.openExternal` comes from `electrobun/bun` — the module the chromium launcher is defined by
+never loading — so when that is the only path, **every** URL on that build is silently dropped: a
+preview click did nothing at all and sign-in reported "Could not open a browser". The fallback hands
+the URL to the desktop's own opener (`xdg-open`, `open`, `rundll32 url.dll,FileProtocolHandler`) as a
+single argument with no shell, and only for `http`, `https` and `mailto`. The scheme restriction is
+the point of having a list at all: an opener resolves a scheme to whatever handler the desktop
+registered for it, and the pages whose links arrive here are a project's own content.
+
+Refusal is a **return value**, not an exception — `{ ok: false }` — because both steps can decline
+without anything going wrong. A caller that branches only on a rejection loses the click, which is
+what both platform adapters did before. On a genuine refusal Studio's own `window.open` default
+applies.
 
 ### 3.6 Signing In
 
@@ -300,6 +329,8 @@ on every branch above.
 ```
 
 **The outcome is reported, never the intent.** The three results — opened here, opened in a new window, raised an existing window — are distinguishable, and a cancelled picker is silent. Announcing the chosen target instead produces reports of things that did not happen: "Opening the project in a new window…" over a dismissed file dialog, or over a window that merely came to the front.
+
+**An empty window is its own verb.** `newWindow` opens a welcome window with no project, and it is the `view.newWindow` command (`Cmd/Ctrl+Shift+N`, gated on the same multi-window capability every member above is) — not a menu item. It was a menu item, and only ElectroBun's native application menu had it, so on a launcher whose window has no menu bar the member existed on the platform and could not be run. The native menu keeps the item and **claims no accelerator**: a chord with two owners fires twice, which is two welcome windows from one press.
 
 ### 4.3 Single File Mode
 
@@ -780,36 +811,66 @@ On NixOS, ElectroBun cannot be built in a Nix sandbox, and system Chromium provi
 ### 9.1 Architecture
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│                  Chromium App-Mode                        │
-│                                                          │
-│  ┌──────────────────┐           ┌──────────────────────┐ │
-│  │   Bun Process     │  HTTP     │  Chromium --app       │ │
-│  │                   │◄────────►│                        │ │
-│  │  @jxsuite/server  │          │  @jxsuite/studio       │ │
-│  │  - File I/O       │          │  @jxsuite/runtime      │ │
-│  │  - Studio API     │          │  Lit + Spectrum        │ │
-│  │  - Code services  │          │  Monaco                │ │
-│  └──────────────────┘          └──────────────────────┘ │
-│                                                          │
-└──────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│  One window = one launcher process                            │
+│                                                               │
+│  ┌────────────────────────┐  HTTP + WS  ┌───────────────────┐ │
+│  │  Bun launcher          │◄───────────►│  Chromium --app   │ │
+│  │  createProjectServer() │             │  @jxsuite/studio  │ │
+│  │  one ProjectSession    │             │  chromium/        │ │
+│  │  fs watcher            │             │   platform.ts     │ │
+│  └───────────┬────────────┘             └───────────────────┘ │
+└──────────────┼────────────────────────────────────────────────┘
+               │  <data>/jx-studio/windows/<pid>.json
+               ▼
+      ┌────────────────────┐
+      │  window registry   │  ← every other launcher on this machine
+      └────────────────────┘
 ```
 
-Unlike ElectroBun (which uses WebSocket RPC between the Bun process and a native webview), the Chromium app-mode runtime reuses the `@jxsuite/server` dev server as its backend. The Bun process starts the server on a random port, then launches Chromium with `--app=<serverUrl>/studio/index.html`. Studio registers the `DevServerPlatform` adapter — the same one used in Chrome development mode.
+The backend is `createProjectServer()` from `@jxsuite/server` — the same loopback-bound factory
+each ElectroBun window stands up (§7.1), with the same token gate, the same `/__studio__/` asset
+namespace and the same WS-RPC dispatch. It is **not** the dev server, and Studio does **not**
+register the dev-server adapter: `packages/desktop/src/chromium/platform.ts` is this launcher's own
+PAL implementation, translating each member into a WS request against `chromium/index.ts`'s handler
+map. `packages/desktop/tests/_rpc-parity.ts` reads the request names back out of `rpc-schema.ts` and
+fails when either launcher declares one it does not answer.
 
-### 9.2 Launcher (`chromium-mode.ts`)
+The WS carries traffic in both directions. Frames with an `id` answer something the shell asked;
+frames with a `method` and **no** `id` are the launcher speaking first (`ProjectServerHandle.push`),
+which is how filesystem events reach the sidebar and how a focus request reaches a window.
 
-The entry point (`packages/desktop/src/chromium-mode.ts`) performs:
+### 9.2 Launcher (`chromium/index.ts`)
 
-1. Starts `@jxsuite/server` on a random port with middleware for studio assets and project public files
-2. Locates a Chromium binary via `CHROMIUM_BIN` env var or PATH lookup (`chromium`, `chromium-browser`, `google-chrome`, `google-chrome-stable`)
-3. Launches Chromium with app-mode flags:
-   - `--app=<serverUrl>/studio/index.html` — frameless window
+The entry point performs, in order:
+
+1. Resolves the project root: the first positional argument, else `JSONSX_PROJECT_ROOT`, else the
+   working directory **but only when it holds a `project.json`** — unless `JX_STUDIO_NO_PROJECT`
+   marks it a welcome window (§9.4). A root that was named is taken at its word; the one nobody
+   typed has to prove itself, because the launcher is also started from a desktop entry and from a
+   shell sitting anywhere. Adopting a directory that is not a project bought nothing — the shell
+   shows the welcome screen either way, since `probeRootProject` reads the same `project.json` —
+   and cost a recursive filesystem watch of, in the reported case, the whole home directory
+   (what such a watcher will and will not descend into is `server.md` §3.1)
+2. **Raises an existing window instead of opening a second one** for a project already open (§9.4)
+3. Locates a Chromium binary via `CHROMIUM_BIN` or PATH (`chromium`, `chromium-browser`,
+   `google-chrome`, `google-chrome-stable`); this binary is also the import pipeline's browser
+4. Starts `createProjectServer()` on an ephemeral loopback port, and hosts the sign-in redirect on it
+5. Points the session's filesystem-event sink at the server's push channel, so the sidebar is live.
+   **Registering the sink is what starts the watcher, and the session watches a project or nothing
+   at all:** with no `project.json` at the root it logs one line and declines, because that is the
+   same root `probeRootProject` reports as "no project" — a recursive watch of it would be a scan
+   of a user's directory tree on behalf of a project the window is not showing. Nothing is lost by
+   waiting, since every way a project can arrive (`openProject`, `createProject`,
+   `setWindowProject`) re-roots the session and arms the watcher then
+6. Publishes itself in the window registry and starts watching for focus requests
+7. Launches Chromium with app-mode flags:
+   - `--app=<serverUrl>/__studio__/index.html?token=<rpcToken>` — frameless window, gated surface
    - `--no-first-run --no-default-browser-check` — suppress first-run prompts
    - `--window-size=1400,900`
-   - `--user-data-dir=<projectRoot>/.jx/chromium-profile` — isolated profile
+   - `--user-data-dir=<profile>` — this window's profile (§9.4)
    - `--ozone-platform=wayland --enable-features=UseOzonePlatform` — when `WAYLAND_DISPLAY` is set
-4. Exits when the browser window closes
+8. Leaves the registry and exits when the browser window closes
 
 ### 9.3 Nix Package
 
@@ -820,6 +881,26 @@ The flake's `packages.default` produces a fully sandboxed NixOS package:
 - **Build phase** runs `bun run build` (compiler, runtime, studio, schema) and `pre-build.ts` (bundles the studio init bridge and copies assets)
 - **Install phase** copies `packages/`, `extensions/` and `node_modules` into the nix store with plain `cp -r`, then deletes dangling symlinks (`find … -xtype l -delete`) rather than dereferencing with `cp -rL`. The prune is why `packages/desktop/tests/nix-bundle-completeness.test.ts` exists: it reads the copied directories back out of `package.nix` and asserts every `@jxsuite/*` dependency of the desktop app lands under one of them, after `extensions/parser` was once pruned out of the bundle silently
 - **Wrapper** creates a `jx-studio` binary that runs `bun run packages/desktop/src/chromium/index.ts` with `CHROMIUM_BIN` and `JX_STUDIO_ASSETS` pre-set to nix store paths. The first positional argument is the **project root**; there is no flag surface
+
+**The desktop entry and the window have to agree.** A taskbar or dock does not read the process,
+the title or `--class`: it takes the window's Wayland `app_id` (X11: `WM_CLASS`) and looks for an
+entry claiming it. Two things were in the way, and each hid the other:
+
+- The entry was installed through `desktopItems`, which takes the **store path's basename** — so it
+  shipped as `<hash>-jx-studio.desktop`, an id that changed with every rebuild. It is installed by
+  hand at a fixed name now.
+- Chromium derives an `--app` window's id from the shell URL and the profile directory and
+  **ignores `--class`** — measured across two ports and two `--user-data-dir` values, all producing
+  `chrome-127.0.0.1____studio___index.html-Default`, and there is no switch to override it
+  (`--wm-class-name` / `--wm-class-class` are Electron's, and absent from the binary).
+
+So the entry declares that derived string in `StartupWMClass`, which makes a file in
+`packages/desktop/` depend on a URL composed in `chromium/index.ts`. `chromium/app-id.ts` owns the
+derivation and the shell path the launcher builds the URL from, and the test beside it asserts the
+entry carries exactly what the launcher produces — because the failure mode is silent. Nothing
+errors; the icon is a generic square, and everything else about the app still works, which is why
+it survived in the app launcher (which reads the file, never the window) while the taskbar showed
+nothing.
 
 **Which ref a consumer gets.** `packages/desktop/package.nix` builds `src = lib.cleanSource ../..`
 — whatever tree was fetched — so the ref names the release. `main` is the development trunk and
@@ -834,6 +915,30 @@ $ nix build github:jxsuite/jx/release && ./result/bin/jx-studio [project-root]
 
 Locally, `nix build` (no ref) builds the working tree, which is what a contributor wants.
 
+**And the consumer downloads it.** The release publishes `packages.<system>.default` to
+`https://jxsuite.cachix.org`, and the flake's own `nixConfig` names that cache, so
+`nix run github:jxsuite/jx/release` fetches the app rather than producing it. What is published is
+essentially one store path. Everything else in the runtime closure — Chromium, Bun, glibc — is
+already on `cache.nixos.org`, and any path carrying a cache's signature is filtered out of the
+push, so what remains is precisely the `bun install` plus `bun run build` a user would otherwise
+run. Their build-time inputs are never fetched either: Nix does not realise the inputs of a
+derivation whose output it can substitute, which is why the ~1000 npm tarball derivations `bun.nix`
+pins do not have to be published for the substitution to be complete.
+
+The push is best-effort by design — a cache is an optimisation, and failing it must not fail the
+job `release` advances behind, whose worst case is the behaviour that preceded the cache. What is
+not best-effort is **noticing**. `verify-cache` runs after the branch moves and asks two things of
+the released ref: does the cache hold the path evaluation produces, and does `nix build
+--max-jobs 0` — substitute or fail — succeed against `github:jxsuite/jx/release`. Either answering
+no opens an issue. The second question is also the only check anywhere that the store path CI
+published is the one a consumer's flake fetch evaluates to; CI builds a git checkout and a user
+builds a GitHub tarball, and nothing else in the pipeline would notice if those stopped agreeing.
+
+Nix honours a flake's `nixConfig` substituters only for a user in `trusted-users`, so an
+unprivileged NixOS account ignores the cache and builds from source anyway. That is a property of
+Nix rather than of this packaging, and the install page carries the `nix.settings` form that
+survives it.
+
 `release` never advances to a commit whose flake does not build: `.github/workflows/nix.yml` builds
 `.#default` at the tag and asserts the wrapper's `CHROMIUM_BIN` and `JX_STUDIO_ASSETS` resolve, and
 the branch moves only if that succeeds. When it does not, the branch stays where it is and an issue
@@ -841,19 +946,123 @@ is opened — a stale ref that works beats a fresh one that does not. The same w
 pull request touching `flake.nix`, `bun.nix`, `bun.lock` or `packages/desktop/**`, which is the
 first time the flake has been built by CI at all.
 
+**Both architectures are built; only one is a gate.** `meta.platforms` has always claimed
+`aarch64-linux`, and nothing had ever built it — the `forThisHost` filter that trims `bun.nix` to
+the host's `os`/`cpu` had only been exercised on x86_64. The release therefore runs a second leg on
+an arm runner, and that leg is **advisory**: it is absent from `advance-release-branch`'s `needs`,
+because a first-ever aarch64 failure freezing `release` would strand every x86 user over an
+architecture nobody has received yet. It becomes a gate once it has been green across several
+releases.
+
+**The workflow also runs on pushes to `main`, and that trigger is about the cache rather than the
+check.** A GitHub Actions cache is branch-scoped: a pull request may read the default branch's
+cache, never another pull request's. With no run on `main` there is no base cache to inherit, so
+each PR would refetch from scratch the roughly one thousand fixed-output npm tarball derivations
+`bun.nix` pins — the half of the closure `cache.nixos.org` does not carry and never will, because
+those derivations exist only here. A release-PR merge consequently builds twice, once through the
+`push` trigger and once through release-please's `workflow_call`; they sit in different concurrency
+groups, and the `push` leg is what leaves `main` warm for the next PR.
+
+### 9.4 Windows Are Processes
+
+> **Status: Implemented.**
+
+An ElectroBun window is a `BrowserWindow` inside one process, so its window manager is a `Map`
+(§7.1). Chromium owns its own browser process, and the only thing that lives exactly as long as one
+`--app` window is the launcher that started it — so **on this build a window is a process**, and
+`newWindow` / `openProjectInNewWindow` spawn another launcher rather than another object.
+
+That makes the window list the one thing a `Map` cannot be: an answer that spans processes. It is a
+directory of one small owner-only file per window, named for its pid:
+
+```
+<data>/jx-studio/windows/<pid>.json     ← written and deleted by that window, nobody else
+<data>/jx-studio/windows/<pid>.focus    ← written by ANOTHER window to ask this one forward
+```
+
+**One writer per file is the whole concurrency design.** Nothing read-modify-writes a shared
+document, so two launchers starting at the same instant cannot lose each other's row, and a launcher
+that dies without cleaning up leaves a row whose pid no longer resolves — pruned by the next window
+to read the directory, with no daemon to have missed the death. `JX_STUDIO_WINDOWS_DIR` relocates
+the store, which is what keeps a test run out of the real user's windows.
+
+**A focus request is a file, not a signal.** A pid the OS has recycled would receive a signal meant
+for a process that no longer exists, and `SIGUSR2` terminates a process that installed no handler.
+A file only the real launcher watches for is inert to anyone else. The request is consumed before
+the window is raised, so a window asked twice comes forward twice.
+
+**Raising is the page's job.** Nothing on the Bun side can bring a Chromium `--app` window forward,
+so the launcher relays the request to its shell as a `focusWindow` push and the page calls
+`window.focus()`. A window manager that refuses the raise leaves the window where it is.
+
+**Every window needs a profile directory of its own**, because Chromium's process singleton is keyed
+on it: two windows sharing one directory would be one browser process, and the second launcher's
+window would be handed to the first launcher's browser pointing at a server about to die. A
+project's window uses `<root>/.jx/chromium-profile`, so its Studio layout, theme and open tabs
+survive a restart; a welcome window has no project to key on and takes the lowest `welcome-<n>` slot
+no live window is using. The parent chooses the child's directory (`JX_STUDIO_PROFILE_DIR`) because
+only the parent can see which ones are taken.
+
+**Dedupe is by normalized root** — resolved, symlinks followed, case-folded on Windows — and it
+applies at three points: launching for a project already open (which raises that window and exits),
+`openProjectInNewWindow`, and `setWindowProject`. The third excludes the calling window, so
+re-rooting never dedupes against itself.
+
+### 9.5 What This Build Does Not Implement, and Why
+
+Two PAL families are absent on purpose, and their absence is a claim recorded in
+`CHROMIUM_RPC_EXEMPT`:
+
+- **The self-updater.** This build is installed and replaced by whatever packaged it. It has no feed
+  to check, so it answers the About screen through `appInfo` — version, channel (`system` when the
+  Nix wrapper's `JX_STUDIO_ASSETS` is set, `development` otherwise), commit — and reports **no**
+  update status rather than an "Up to date" it never verified. ElectroBun answers the same request
+  from its updater, so the About screen has one shape and each launcher fills in only what it knows.
+- **Client-side window decorations.** Studio draws minimize/maximize/close only when the launcher
+  exposes `windowControls`, which ElectroBun does because its `BrowserWindow` is frameless. A
+  Chromium `--app` window is decorated by the desktop environment, and a second set of buttons
+  inside the page would minimize and close nothing.
+
+Everything else the ElectroBun launcher implements, this one implements: `buildSite` behind
+`View: Open in Browser`, `subscribeFileEvents` behind the live sidebar, `findReferences`,
+`importSite`, the data and secrets surfaces, the native folder and project pickers (via the XDG
+desktop portal, §8.2.1), and sign-in (§3.6).
+
 ---
 
 ## 10. SaaS / Cloud Mode
 
-> **Status: Future.** This section describes the target architecture for a hosted Studio deployment.
+> **Status: Partial.** The adapter shipped and is deployed; §10.2's storage model is not what it was
+> built on. This section said **Future** for as long as the cloud editor had been live, which is the
+> failure mode a status marker exists to prevent — so what follows separates what runs from what is
+> still a sketch.
 
 ### 10.1 Cloud Platform Adapter
 
+> **Status: Implemented.** `packages/studio/src/platforms/cloud.ts`, registered by the studio entry
+> rather than by the shell — see §3.3 and the `yjs` singleton note there.
+
 A cloud adapter replaces filesystem operations with API calls to a remote service. The project root becomes a project ID rather than a filesystem path. All PAL methods translate to REST or WebSocket calls to the cloud API.
+
+Concretely, the shipped adapter is session-bound: every call goes to
+`/api/v1/p/:owner/:repo/:branch/studio/*` with cookie auth, so the "project id" is the triple in the
+path. It reports `id: "cloud"`, `canvasUrl: "/canvas.html"` and `openProjectPicker: "repo-list"` —
+that last one routes New Project through Studio's own repository picker over `listRepos` +
+`importProject`, so `openProject()` is never called (§3.4). It implements the full git family, the
+identity and publish members, `subscribeFileEvents` over SSE, and `collab`. It deliberately omits
+`pickDirectory`, `importSite`, the package install family, `gitClone`, `resolveClass`,
+`discoverComponents` and `codeService`; each degrades exactly as its protocol route's `degradation`
+field describes, which is what makes an omission a documented state rather than a break.
 
 Because a cloud project _is_ a repository, the adapter sets `createDestination: "repo"` and the New Project modal collects a repository location — owner (personal account or organization), repository name, and visibility — instead of a folder (§4.5). The adapter forwards all three to the API, which resolves the owner against the session login to choose between the personal and organization creation endpoints. Nothing about the destination is defaulted server-side.
 
 ### 10.2 Storage Backend
+
+> **Status: Pending.** One possible mapping, and not the one that shipped. The deployed backend is
+> **git-backed** — a cloud project IS a repository, which is why the adapter sets
+> `createDestination: "repo"` and carries the whole git family. The table below is kept because the
+> equivalence it draws is the useful part: whatever a backend stores projects in, the PAL is what
+> Studio sees.
 
 The cloud backend stores projects in a database with an abstraction equivalent to the filesystem:
 
@@ -866,9 +1075,13 @@ The cloud backend stores projects in a database with an abstraction equivalent t
 
 The same PAL interface means Studio code doesn't change — only the adapter implementation.
 
-### 10.3 Collaboration (Future)
+### 10.3 Collaboration
 
-A cloud backend can extend the PAL with collaboration features:
+> **Status: Implemented**, and not as sketched. The interface below is what this section proposed;
+> the paragraph after it is what shipped. Kept side by side because the difference is the design
+> decision: locks were replaced by convergence.
+
+The sketch was a lock-and-notify model:
 
 ```typescript
 interface CollaborativePlatform extends StudioPlatform {
@@ -878,7 +1091,16 @@ interface CollaborativePlatform extends StudioPlatform {
 }
 ```
 
-These are additive — Studio checks for their presence and enables collaboration UI when available.
+What shipped is one optional PAL member — `collab?: (docPath) => Promise<CollabHandle | null>` — over
+a CRDT (`@jxsuite/collab`, Yjs). There are no locks: two authors edit the same document and the
+document converges, rather than one of them being refused. The adapter probes `/collab` once and
+passes the `protocols` the backend lists to the wire client, which offers one as
+`Sec-WebSocket-Protocol`; a client that offers a subprotocol the server does not echo fails the
+connection outright ([RFC 6455 §4.1](https://www.rfc-editor.org/rfc/rfc6455#section-4.1)), so an
+unconditional offer would break co-editing against every backend that predates negotiation.
+
+The member is still additive in the way this section intended: Studio checks for its presence and
+falls back to solo, file-level saves without it.
 
 ---
 
@@ -910,11 +1132,15 @@ Package Studio as an ElectroBun app:
 
 Package Studio as a NixOS-native app using Chromium `--app` mode:
 
-- [x] Implement `chromium-mode.ts` launcher (server + Chromium `--app`)
+- [x] Implement `chromium/index.ts` launcher (project server + Chromium `--app`)
 - [x] Wayland support via `--ozone-platform=wayland` auto-detection
 - [x] Sandboxed `nix build` via bun2nix (no `__noChroot`, no network at build time)
 - [x] `makeWrapper` producing `jx-studio` binary with bundled Chromium and Bun
 - [x] Auto-refresh `bun.nix` via postinstall hook
+- [x] Its own PAL adapter over `createProjectServer`, not the dev-server adapter (§9.1)
+- [x] Multi-window through the cross-process window registry (§9.4)
+- [x] Live sidebar sync and `View: Open in Browser`, over the server-to-client push channel (§9.1)
+- [x] About-screen build info via `appInfo`, with no update status it cannot verify (§9.5)
 
 ### Phase 3: Feature Parity
 
@@ -926,12 +1152,15 @@ Ensure desktop app matches dev-mode capabilities:
 - [ ] Build / SSG pipeline accessible from Studio toolbar
 - [ ] Drag-and-drop component insertion from sidebar
 
-### Phase 4: Cloud Adapter (Future)
+### Phase 4: Cloud Adapter ✅
 
-- [ ] Define cloud API specification (REST endpoints mirroring PAL)
-- [ ] Implement `CloudPlatform` adapter
-- [ ] Project authentication and authorization
-- [ ] Real-time collaboration via WebSocket change feed
+- [x] Define cloud API specification (REST endpoints mirroring PAL) — `@jxsuite/protocol`'s route
+      table, one contract for every adapter rather than a cloud-specific one
+- [x] Implement `CloudPlatform` adapter — `packages/studio/src/platforms/cloud.ts`
+- [x] Project authentication and authorization — GitHub OAuth, cookie-bound sessions per
+      `owner/repo@branch`
+- [x] Real-time collaboration via WebSocket change feed — a CRDT rather than a change feed; see
+      §10.3
 
 ## 12. Standards Alignment
 
@@ -947,8 +1176,16 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
-- **0.3.22-draft** (2026-08-24) — Electrobun 2.0 stable: the npm devDependency selects the toolchain (hutch.config.ts no longer pins a release), and stable installers drop the channel prefix the updater feed keeps.
-- **0.3.13-draft** (2026-08-20) — §7 records the ElectroBun 2 toolchain boundary: Hutch owns build orchestration, hutch.config.ts pins the release, the SDK is projected into .hutch/devkit, and the main process is pinned to bun explicitly.
+- **0.3.22-draft** (2026-08-24) — §7 records the ElectroBun 2 toolchain boundary: the electrobun npm devDependency selects Hutch, Cottontail and ElectroBun together (no machine-wide install and no release pin in hutch.config.ts), the SDK is projected into .hutch/devkit, the main process is pinned to bun explicitly, and stable installers drop the channel prefix that the updater feed keeps.
+- **0.3.21-draft** (2026-08-24) — 3.1 states that documentBaseUrl may be absolute or root-relative, and that a root-relative value is resolved against the canvas origin because the canvas composes it as new URL(path, base) — a relative base throws and fails the whole canvas mount.
+- **0.3.20-draft** (2026-08-23) — 3.1 adds the Canvas member family and states that the canvas needs project files at a URL rather than behind readFile: documentBaseUrl defaults to the canvas origin plus projectRoot and must be set by a platform whose root is an identifier rather than a served path.
+- **0.3.19-draft** (2026-08-22) — 10 SaaS/Cloud is Partial rather than Future: the adapter shipped and is deployed (10.1 Implemented, with what it implements and what it deliberately omits), collaboration shipped as a CRDT rather than the sketched lock model (10.3), and 10.2's storage table is marked Pending because the deployed backend is git-backed.
+- **0.3.18-draft** (2026-08-22) — 3.3 the init bundle loads through a declared boot slot rather than an exact-string replace on the shipped document.
+- **0.3.17-draft** (2026-08-22) — §9.2: the session watches a project or nothing — a root with no project.json is declined rather than scanned recursively.
+- **0.3.16-draft** (2026-08-22) — §9.2: the launcher adopts its working directory as a project root only when that directory holds a project.json — a named root is still taken at its word.
+- **0.3.15-draft** (2026-08-21) — §9.3: released builds are published to jxsuite.cachix.org and the flake names it, so a consumer substitutes jx-studio instead of building it; verify-cache proves that after each release. The release also builds aarch64-linux as an advisory leg beside the x86_64 gate, and nix.yml runs on pushes to main so pull requests inherit a warm Actions cache for the npm tarball derivations cache.nixos.org cannot serve.
+- **0.3.14-draft** (2026-08-20) — §9.3: the desktop entry ships under a stable id and claims the app_id Chromium actually gives an --app window, so the taskbar/dock can resolve the brand icon.
+- **0.3.13-draft** (2026-08-20) — Chromium launcher reaches PAL parity: its own adapter over createProjectServer (§9.1), multi-window through a cross-process window registry (§9.4), a server-to-client push channel behind live sidebar sync and focus, buildSite behind View: Open in Browser, appInfo for the About screen, and an OS-opener fallback so preview links and sign-in leave the app at all (§3.5, §9.5). New Window becomes the `view.newWindow` command rather than a native-menu-only item, and the native menu drops its duplicate accelerators (§4.2a).
 - **0.3.12-draft** (2026-08-19) — §9.3 documents the release branch as the ref a Nix consumer pins, and the nix build that gates it; corrects the install phase, which has used cp -r plus a dangling-symlink prune and src/chromium/index.ts since before this text was written.
 - **0.3.11-draft** (2026-08-16) — §3.6 the desktop signs in with an RFC 8252 loopback redirect and PKCE; the token rests in a 0600 credential store, not localStorage. RFC 8414 and RFC 7519 recorded Rejected as vacuous. Closes gap:native-oauth and gap:oauth-pkce.
 - **0.3.10-draft** (2026-08-16) — §5 the contract's failure half is specified — one RFC 9457 registry; gap:backend-failure-contract closed.

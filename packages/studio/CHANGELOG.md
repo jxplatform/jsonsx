@@ -1,5 +1,125 @@
 # Changelog
 
+## [2.4.1](https://github.com/jxsuite/jx/compare/studio-v2.4.0...studio-v2.4.1) (2026-08-24)
+
+
+### Bug Fixes
+
+* **canvas:** a component-slot session writes only what you typed, and hands the host back ([#182](https://github.com/jxsuite/jx/issues/182)) ([3e33330](https://github.com/jxsuite/jx/commit/3e333301fc59c77e3d522b853dac9f5207ca8c90))
+* **canvas:** a prop slot survives the rebuild, and refuses a value it does not own ([#187](https://github.com/jxsuite/jx/issues/187)) ([d8310be](https://github.com/jxsuite/jx/commit/d8310be7fe906cccbee852d9c4a8b640c778e968))
+* **canvas:** keystrokes land in a component slot, not just the caret ([#181](https://github.com/jxsuite/jx/issues/181)) ([833ae19](https://github.com/jxsuite/jx/commit/833ae199e7e1977fb14cca048b12dcd4d454eb60))
+* **canvas:** prose slotted into a component is editable again ([#179](https://github.com/jxsuite/jx/issues/179)) ([8cf9641](https://github.com/jxsuite/jx/commit/8cf964194b4ace6c32dd144be2a52aca85c1f35e))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/create bumped to 1.3.5
+    * @jxsuite/formulas bumped to 0.0.11
+    * @jxsuite/runtime bumped to 2.0.4
+
+## [2.4.0](https://github.com/jxsuite/jx/compare/studio-v2.3.0...studio-v2.4.0) (2026-08-23)
+
+
+### Features
+
+* **studio:** Cloudflare is the lead AI recommendation, and can be reconnected ([#174](https://github.com/jxsuite/jx/issues/174)) ([aa13308](https://github.com/jxsuite/jx/commit/aa1330859b995e2c0b4a658cc04cf4525cb3ff79))
+
+
+### Bug Fixes
+
+* **canvas:** project files load on a host that does not serve them at its root ([#176](https://github.com/jxsuite/jx/issues/176)) ([eba67a9](https://github.com/jxsuite/jx/commit/eba67a9206eec389090a9fd4e0b77b29891ed32a))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/ai bumped to 0.36.2
+    * @jxsuite/create bumped to 1.3.4
+    * @jxsuite/formulas bumped to 0.0.10
+    * @jxsuite/protocol bumped to 1.2.0
+    * @jxsuite/runtime bumped to 2.0.3
+
+## [2.3.0](https://github.com/jxsuite/jx/compare/studio-v2.2.2...studio-v2.3.0) (2026-08-23)
+
+
+### Features
+
+* **studio:** gate the two rules that make a template the only writer ([d9a6947](https://github.com/jxsuite/jx/commit/d9a6947faf098f90aa017148f8073be63cf28525))
+* **studio:** the package states its own layout, and generates its documents ([ca3e327](https://github.com/jxsuite/jx/commit/ca3e3276b36cf1a9caedfbeaa2eefd5bcbdd52ff))
+* **studio:** the package states its own layout, and hosts itself ([17ed4bc](https://github.com/jxsuite/jx/commit/17ed4bcfce451a21adb5729054a4934f2ef032f4))
+
+
+### Bug Fixes
+
+* **studio:** make the template the only writer where two writers diverged ([fd77a06](https://github.com/jxsuite/jx/commit/fd77a0663f8a259673cf3e405d40f64a0b08869d))
+* **studio:** resolve Monaco workers against the entry, not the chunk ([495cd4b](https://github.com/jxsuite/jx/commit/495cd4b96fc3d290ab2fe945d9bb24b1362a5402))
+* **studio:** the hosting contract compiles under a consumer's flags ([eb44339](https://github.com/jxsuite/jx/commit/eb443391f70bb11369d809fa3fa47ad0dd23cffe))
+
+## [2.2.2](https://github.com/jxsuite/jx/compare/studio-v2.2.1...studio-v2.2.2) (2026-08-21)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/create bumped to 1.3.3
+
+## [2.2.1](https://github.com/jxsuite/jx/compare/studio-v2.2.0...studio-v2.2.1) (2026-08-21)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/ai bumped to 0.36.1
+    * @jxsuite/collab bumped to 0.8.1
+    * @jxsuite/create bumped to 1.3.2
+    * @jxsuite/formulas bumped to 0.0.9
+    * @jxsuite/markup bumped to 0.4.5
+    * @jxsuite/protocol bumped to 1.1.2
+    * @jxsuite/runtime bumped to 2.0.2
+    * @jxsuite/schema bumped to 1.8.0
+
+## [2.2.0](https://github.com/jxsuite/jx/compare/studio-v2.1.0...studio-v2.2.0) (2026-08-21)
+
+
+### Features
+
+* **desktop:** bring the chromium launcher to PAL parity with electrobun ([9a94240](https://github.com/jxsuite/jx/commit/9a9424048403e48faf333e3ce788502ede4d2ce9))
+* **desktop:** bring the chromium launcher to PAL parity with electrobun ([9846e1d](https://github.com/jxsuite/jx/commit/9846e1dcf8d94bb68082fa79f40d38c139689a91))
+* **studio:** own the Monaco↔Y.Text binding, and move to monaco-editor 0.56 ([fd68efb](https://github.com/jxsuite/jx/commit/fd68efb485b0a257763011bde11262f9f114cba6))
+* **studio:** own the Monaco↔Y.Text binding, and move to monaco-editor 0.56 ([4e6c9dd](https://github.com/jxsuite/jx/commit/4e6c9ddb90a0c9e26ddf2c2427ff9a468886e5e5))
+
+
+### Bug Fixes
+
+* **ci:** make the coverage manifest gate prove its accusation ([c6609c9](https://github.com/jxsuite/jx/commit/c6609c94ef3bb760c2b50407cd10b5bcc6275da1))
+* **ci:** make the coverage manifest gate prove its accusation ([15d5aea](https://github.com/jxsuite/jx/commit/15d5aea6a46c480a1eefa682c3cc7bead0fc0770))
+* defects surfaced by fact-checking the new package READMEs ([c4a614d](https://github.com/jxsuite/jx/commit/c4a614dae5e199d49384f998a0b937354f9de882))
+* **studio:** make the light chrome theme actually apply ([dbe20fd](https://github.com/jxsuite/jx/commit/dbe20fd60dfc245a10eb71855138f4a5b3d10ab7))
+* **studio:** make the light chrome theme actually apply ([8fc04a4](https://github.com/jxsuite/jx/commit/8fc04a4498d27258a34b167165145e6149a362b4))
+* **studio:** point the bundle budget at the studio.js the lane actually builds ([daa00f1](https://github.com/jxsuite/jx/commit/daa00f16dfbd0b55d73c933319a323987f3f04a3))
+* **studio:** stop four tests depending on the working directory and a tick count ([ea8151b](https://github.com/jxsuite/jx/commit/ea8151b56f02d4bda2470453b474151b31ae6fee))
+* **studio:** stop the canvas source-mode tests racing the Monaco load ([5642bca](https://github.com/jxsuite/jx/commit/5642bca501e1f5bae522cb31c4d501dfd3bfa387))
+* **studio:** the two Test-workflow failures on the tip of main ([b8abb6d](https://github.com/jxsuite/jx/commit/b8abb6d3f8444fd406dfad1afee991c96449f731))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/ai bumped to 0.36.0
+    * @jxsuite/collab bumped to 0.8.0
+    * @jxsuite/create bumped to 1.3.1
+    * @jxsuite/formulas bumped to 0.0.8
+    * @jxsuite/markup bumped to 0.4.4
+    * @jxsuite/protocol bumped to 1.1.1
+    * @jxsuite/runtime bumped to 2.0.1
+    * @jxsuite/schema bumped to 1.7.0
+
 ## [2.1.0](https://github.com/jxsuite/jx/compare/studio-v2.0.1...studio-v2.1.0) (2026-08-19)
 
 

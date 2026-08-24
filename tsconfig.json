@@ -23,6 +23,28 @@
     "target": "ESNext",
     "types": ["bun-types"]
   },
+  /* `packages/desktop` is checked by its OWN config (`packages/desktop/tsconfig.json`), which CI runs
+     as a second step. It is excluded here for a reason that is easy to misdiagnose, so:
+
+     `electrobun`'s package.json `exports` maps every entry point at raw TypeScript
+     (`./dist/api/bun/index.ts`), and it ships 48 `.ts` against 2 `.d.ts`. Importing it therefore
+     pulls a dependency's SOURCE into whichever program imports it, and neither obvious defence
+     applies:
+
+       - `"node_modules"` below does NOT stop it. `exclude` only filters which files `include`
+         promotes to program ROOTS; anything reached by an import from a root joins the program
+         regardless. The two node_modules entries here have never protected anything.
+       - `skipLibCheck` does NOT stop it. That suppresses errors in `.d.ts` only, and these are
+         ordinary `.ts`, so every flag above applies to them.
+
+     Two escape routes were measured and are closed as well: project references reject a referenced
+     project with `noEmit` (TS6310), so unifying under `tsc -b` would mean emitting build artifacts
+     purely to typecheck; and generating `.d.ts` from electrobun's sources emits nothing, because
+     TS4094 in its own `index.ts` blocks declaration emit.
+
+     So the split stands until electrobun ships declarations — and
+     `packages/desktop/tests/electrobun-config.test.ts` fails when it does, rather than leaving this
+     comment to be believed forever. */
   "exclude": ["node_modules", "**/node_modules", "**/dist", "**/assets", "packages/desktop"],
   "include": [
     "types.d.ts",

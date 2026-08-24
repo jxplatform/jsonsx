@@ -57,9 +57,20 @@ export function createDesktopPlatform() {
    * studio's own `window.open` default still applies.
    */
   setPreviewNavigateHandler((url) => {
-    void rpc.request.openExternal({ url }).catch(() => {
+    const fallback = () => {
       window.open(url, "_blank", "noopener,noreferrer");
-    });
+    };
+    /* `{ ok: false }` is a REFUSAL, not a rejection — the backend answers the request either way,
+       and branching only on a thrown error left the click doing nothing at all when the OS had no
+       opener for it. */
+    void rpc.request
+      .openExternal({ url })
+      .then((result) => {
+        if (!result?.ok) {
+          fallback();
+        }
+      })
+      .catch(fallback);
   });
 
   const electroview = new Electroview({ rpc });
@@ -238,6 +249,13 @@ export function createDesktopPlatform() {
      * against it, and the asset observer rewrites relative panel asset srcs to this origin.
      */
     canvasUrl: undefined as string | undefined,
+    /* This window's loopback port, so the url is not known until activate() has asked for it over
+       RPC. Declared so the iframe host waits rather than mounting the bundle-relative fallback —
+       which under views:// now RESOLVES, to a canvas.html this app really stages, and would boot
+       the canvas inside the shell's app-privileged origin in a CEF instance running
+       disable-site-isolation-trials. The cross-origin loopback canvas exists so that cannot
+       happen. Chromium sets canvasUrl synchronously and needs none of this. */
+    canvasUrlDeferred: true,
 
     async activate() {
       // Request this window's loopback canvas URL over RPC (kills the preload/executeJavascript
@@ -590,27 +608,12 @@ export function createDesktopPlatform() {
       return rpc.request.setPackageVersions({ updates });
     },
 
+    /* One request, composed on the Bun side. It used to be assembled here from two updater calls,
+       which made the About screen's contents a property of THIS launcher's webview rather than of
+       the build it describes — so the chromium launcher, which has no updater to call, could not
+       answer the question at all. */
     async getAppInfo() {
-      const info = await rpc.request.updaterGetLocalInfo();
-      let updateStatus: string | undefined;
-      try {
-        const status = await rpc.request.updaterGetStatus();
-        updateStatus = status.error
-          ? `Update check failed: ${status.error}`
-          : status.updateReady
-            ? `Update ready (${status.version ?? "?"})`
-            : status.updateAvailable
-              ? `Update available (${status.version ?? "?"})`
-              : "Up to date";
-      } catch {
-        // Status is best-effort; omit it if the updater isn't reachable.
-      }
-      return {
-        version: info.version,
-        channel: info.channel,
-        hash: info.hash,
-        ...(updateStatus === undefined ? {} : { updateStatus }),
-      };
+      return rpc.request.appInfo();
     },
 
     async createProject(opts: {

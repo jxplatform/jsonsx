@@ -285,54 +285,19 @@ export function focusRegionOf(el: Element | null): FocusRegion | null {
 
 // ─── Stamping ─────────────────────────────────────────────────────────────────
 
-/**
- * The shell's fixed hosts, declared once.
+/*
+ * There is no SHELL_REGION_HOSTS map here any more, and no stampShellRegions().
  *
- * These live in `index.html` as bare `<div id>`s, so they cannot stamp themselves the way a panel
- * or an overlay slot does. The table is the shell's own layout stated in region terms, and it is
- * the only place a surface id is written down by hand.
+ * It existed because the shell's hosts were bare `<div id>` elements in index.html — the map's
+ * own comment said so: it "cannot stamp itself". The frame is a lit template now
+ * (`src/shell/tree.ts`), so each id sits on the element it names, and a selector-to-id map beside
+ * it would be a second definition of the same fact — which is the thing moving the frame into code
+ * was for. `tests/shell-tree.test.ts` asserts the frame's ids parse and resolve uniquely, which is
+ * what the map used to guarantee by construction.
  *
- * `#tab-strip` is addressed as `pane.primary/tabs` deliberately: the region names the PANE's strip,
- * so the id survives the node. The assistant is the case that has now happened twice over:
- * `inspector.assistant` was minted while the chat was a fifth grid column, survived the column
- * being deleted, and survives the `#chat-panel` DIV being deleted too — it is stamped by
- * `panels/chat-panel.ts` on whatever container hosts the assistant, which is now the Inspector's
- * fourth tab body. That is the whole argument for naming the role rather than the div, and the
- * reason this table lost a row without any shot losing its subject.
- *
- * `pane.primary/frontmatter` left the table for the same reason. It named `#frontmatter-panel`, a
- * grid row; the Document Header card is now drawn INSIDE the stage, so
- * `panels/frontmatter-panel.ts` stamps the id on the card's own `<section>` wherever the stage puts
- * it. Two rows gone, no shot re-pointed.
- *
- * `pane.primary` and `pane.primary/tabs` are the third and fourth to leave, and the clearest case
- * yet: they named `#canvas-wrap` and `#tab-strip`, two flat siblings of an APPLICATION grid that
- * were only ever the primary pane's stage and strip. `panels/pane-grid.ts` builds a cell per pane
- * and stamps {@link paneRegion} on each, so the id is derived from the pane rather than from a div
- * that could only ever be one of them. Four rows gone, not one shot re-pointed.
+ * A surface that is NOT part of the frame stamps its own id from its own template, which is what
+ * the derived helpers below are for.
  */
-export const SHELL_REGION_HOSTS: Readonly<Record<string, string>> = {
-  "#activity-bar": "rail",
-  // The fourth overlay layer. It is here rather than stamped by `ui/layers.ts` for the same reason
-  // Every other row is: it is a bare `<div id>` in index.html, so it cannot stamp itself, and the
-  // Id has to resolve whether or not a toast has ever been raised — a region that only exists once
-  // Something has gone wrong is a region a shot cannot address and focus cannot be moved into.
-  "#layer-toast": "overlay.toasts",
-  "#left-panel": "navigator",
-  "#right-panel": "inspector",
-  "#statusbar": "statusbar",
-  "#toolbar": "commandbar",
-};
-
-/**
- * Stamp the shell hosts. Idempotent, and safe to call before the DOM exists (an absent host is
- * simply not stamped — the desktop shell and the tests both boot partial trees).
- */
-export function stampShellRegions(root: ParentNode = document): void {
-  for (const [selector, id] of Object.entries(SHELL_REGION_HOSTS)) {
-    root.querySelector(selector)?.setAttribute(REGION_ATTR, id);
-  }
-}
 
 /**
  * Region id for a pane, or for a part inside one — derived from the pane's own id.

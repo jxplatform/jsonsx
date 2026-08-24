@@ -8,7 +8,10 @@
 
 import { createProjectSession } from "./project-session";
 
-export { setFileDialog, setDirectoryDialog } from "./project-session";
+/* `pickProjectFile` is session-free (it picks without binding), but it is re-exported HERE rather
+   than imported straight from project-session so the launcher keeps ONE backend module boundary —
+   which is also the seam this package's launcher tests mock. */
+export { setFileDialog, setDirectoryDialog, pickProjectFile } from "./project-session";
 export type { ProjectSession, ProxyResult, StudioSchema } from "./project-session";
 
 const _default = createProjectSession(null);
@@ -28,6 +31,9 @@ export const { formatAction } = _default;
 export const { openProject } = _default;
 
 export const { openExternal } = _default;
+/* Registering a sink is what starts the filesystem watcher; the launcher points it at its push
+   channel so the studio sidebar sees a file appear the moment it lands. */
+export const { setFileEventSink } = _default;
 export const { buildSite } = _default;
 export const { createProject } = _default;
 export const { listDirectory } = _default;

@@ -1215,7 +1215,7 @@ function styleSidebarTemplate(
       return html`
         <sp-accordion-item
           label=${sec.label}
-          .open=${isOpen}
+          .open=${live(isOpen)}
           @sp-accordion-item-toggle=${(e: Event) => {
             activeTab.value!.session.ui.styleSections = {
               ...activeTab.value!.session.ui.styleSections,
@@ -1235,7 +1235,7 @@ function styleSidebarTemplate(
   const customSectionT = html`
     <sp-accordion-item
       label="Custom"
-      .open=${customIsOpen}
+      .open=${live(customIsOpen)}
       @sp-accordion-item-toggle=${(e: Event) => {
         activeTab.value!.session.ui.styleSections = {
           ...activeTab.value!.session.ui.styleSections,
@@ -1319,7 +1319,7 @@ function styleSidebarTemplate(
       ? html`
           <sp-accordion-item
             label="Relative Styling"
-            .open=${nestedIsOpen}
+            .open=${live(nestedIsOpen)}
             @sp-accordion-item-toggle=${(e: Event) => {
               activeTab.value!.session.ui.styleSections = {
                 ...activeTab.value!.session.ui.styleSections,

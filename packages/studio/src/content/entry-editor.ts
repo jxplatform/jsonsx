@@ -34,6 +34,7 @@
  */
 
 import { html, nothing, render as litRender } from "lit-html";
+import { live } from "lit-html/directives/live.js";
 import { activeRegistry } from "../commands/active-registry";
 import { effect, effectScope } from "../reactivity";
 import { projectState } from "../store";
@@ -182,7 +183,7 @@ function headerTpl(tab: Tab, collection: EntryCollection) {
               <sp-switch
                 size="s"
                 class="entry-draft-switch"
-                ?checked=${draft}
+                .checked=${live(draft)}
                 title=${DRAFT_MEANING}
                 @change=${(e: Event) => setEntryDraft(tab, (e.target as HTMLInputElement).checked)}
                 >Draft</sp-switch

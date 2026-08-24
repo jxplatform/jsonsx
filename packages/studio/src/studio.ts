@@ -112,7 +112,6 @@ import {
   openLastSessionOrHome,
   registerFileTreeDnD,
   reloadCleanTab,
-  setupTreeKeyboard,
 } from "./files/files";
 import { startFsSync } from "./files/fs-events";
 import { invalidateParamValues } from "./page-params";
@@ -233,6 +232,24 @@ import { convertToComponent } from "./editor/convert-to-component";
 import type { GitDiffState } from "./types";
 import type { Tab } from "./tabs/tab";
 import type { JxMutableNode, ProjectConfig } from "@jxsuite/schema/types";
+import { setBundleBase } from "./services/bundle-base";
+import { mountShellTree } from "./shell/tree";
+
+/**
+ * Anchor every shipped-asset URL to THIS module's directory.
+ *
+ * Only an ENTRY may do this, and it must be an entry: `splitting: true` may hoist any other module
+ * into a content-hashed chunk under `dist/chunks/`, where `import.meta.url` means something else
+ * entirely. That is not hypothetical — it is the bug this call fixes, in `services/monaco-setup`.
+ * `tests/entry-anchors.test.ts` holds the line in both directions.
+ *
+ * Placed before any other statement so nothing can read the base before it exists. In ESM the
+ * entry's body runs AFTER its whole static import graph, so a module that called `bundleUrl()`
+ * during evaluation would still throw — deliberately, and loudly. Nothing does today: Monaco is
+ * reached only through the dynamic `services/monaco-lazy`, and `workerUrl` runs inside
+ * `MonacoEnvironment.getWorker`.
+ */
+setBundleBase(import.meta.url);
 
 void _swc;
 
@@ -418,6 +435,10 @@ if (!hasPlatform()) {
 mountResizeEdges();
 
 // ─── Render loop ──────────────────────────────────────────────────────────────
+
+/* The application frame, before anything adopts a host out of it. index.html carries an empty body
+   and this is the only definition — see src/shell/tree.ts for what that fixed. */
+mountShellTree();
 
 initShellRefs();
 // One effect projects the dock record onto the shell grid — collapse classes and column widths.
@@ -815,7 +836,6 @@ leftPanelMod.mount({
   setGitDiffState: (state: GitDiffState | null) => {
     shell.git.diffState = state;
   },
-  setupTreeKeyboard,
   webdata,
 });
 

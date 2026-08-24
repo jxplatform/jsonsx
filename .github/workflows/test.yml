@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   # Which of the jobs below this diff can actually fail. See scripts/ci/affected.ts for the rules
-  # and for why only three things here are gated at all.
+  # and for why only four things here are gated at all.
   #
   # This workflow must NEVER grow an `on:`-level `paths:` filter. A path-filtered workflow that
   # does not trigger leaves a required status check pending forever; the `ci` job at the bottom is
@@ -30,6 +30,7 @@ jobs:
       has_tests: ${{ steps.affected.outputs.has_tests }}
       all_workspaces: ${{ steps.affected.outputs.all_workspaces }}
       lens_mutants: ${{ steps.affected.outputs.gate_lens_mutants }}
+      bundles: ${{ steps.affected.outputs.gate_bundle }}
       mode: ${{ steps.affected.outputs.mode }}
     steps:
       - uses: actions/checkout@v7
@@ -281,7 +282,29 @@ jobs:
       # Neither is expressible in the type system — `ViewState` has an index signature and a
       # module-level `let active` is well-typed — so the guard is a ratcheting allow-list.
       - run: bun --cwd packages/studio scripts/check-pane-singletons.ts
+      # The template layer's two rules: a Spectrum control binds the state it moves ITSELF as a
+      # live property (an attribute binding is dirty-checked away exactly when it mattered), and a
+      # module holds its own rendered nodes with ref() rather than re-finding them by selector.
+      # Both carry a ratcheting backlog; source-only, about a second.
+      - run: bun --cwd packages/studio scripts/check-lit-conventions.ts
+      # What the package promises about itself: the stylesheet list IS the stylesheets (a sheet the
+      # list omits is one no document links — the 2.1.0 dead-links outage), `files` covers every
+      # manifest path and every import that escapes src/, the abstraction declares no backend
+      # package, and node: stays confined to the stager. Source-only, about a second.
+      - run: bun --cwd packages/studio scripts/check-studio-package.ts
+      # The hosting contract, compiled under a CONSUMER's flags rather than this repo's.
+      # jx-platform sets exactOptionalPropertyTypes, verbatimModuleSyntax and isolatedModules, none
+      # of which the root tsconfig sets — and two type errors in the contract were found by
+      # consuming it rather than by building it. See the note in that tsconfig.
+      - run: bunx tsc -p packages/studio/src/hosting/tsconfig.json
       - run: bun --cwd packages/studio scripts/check-icons.ts
+      # The desktop's electrobun config, judged WITHOUT building the app. The CLI is a compiled Bun
+      # binary whose resolver takes node: builtins and relative paths and NOT bare specifiers — and
+      # a config it cannot load is answered by silently using a different one, so the build dies
+      # later on an entrypoint this package never declared. Nothing was red until a release. Also
+      # checks that the studio copy rows still cover the manifest: a config can load perfectly and
+      # derive an EMPTY list, which packages an app with no studio in it.
+      - run: bun --cwd packages/desktop scripts/check-electrobun-config.ts
       - run: bun run typecheck
       # packages/desktop resolves `electrobun/*` out of .hutch/devkit, which only exists once the
       # SDK has been projected into it — Electrobun 2 publishes no SDK on npm, so `bun install`
@@ -323,13 +346,38 @@ jobs:
       # fixtures) validates end-to-end — project.json, documents, classes, fragments, and
       # self-contained committed entry docs. See scripts/validate-schemas.ts.
       - run: bun run schema:validate-all
-      # …and every committed schema is what its own generator produces — the core, and all 50
-      # per-project entry documents. `schema:validate-all` checks that DOCUMENTS satisfy the
-      # committed schemas; it cannot see a committed schema that has fallen behind its generator.
-      # That gap hid two separate faults for six weeks: 40 CSS properties un-propagated from the
-      # core, and one starter whose entry document was composed against a published @jxsuite/schema
-      # left in a stray node_modules, so it was NARROWER than its own content required.
+      # …and every committed schema is what its own generator produces — all seven core artifacts
+      # and all 52 per-project entry documents. `schema:validate-all` checks that DOCUMENTS satisfy
+      # the committed schemas; it cannot see a committed schema that has fallen behind its
+      # generator. That gap hid two separate faults for six weeks: 40 CSS properties un-propagated
+      # from the core, and one starter whose entry document was composed against a published
+      # @jxsuite/schema left in a stray node_modules, so it was NARROWER than its own content
+      # required.
+      #
+      # This used to be a shell one-liner whose two `git diff` pathspecs were each narrower than the
+      # generator they followed — it regenerated all seven core artifacts and looked at ONE, so a
+      # stale `class-schema.json`, `project-schema.json` or `schemas/*.schema.json` passed. It is
+      # now scripts/check-schema-freshness.ts, which derives the file set from the tree and reports
+      # drift as the JSON Pointers that moved rather than as 500 KB of diff.
+      #
+      # It stays a hard red X even though .github/workflows/schemas.yml backfills the same drift
+      # automatically: that lane cannot push to a fork, and a required check is what keeps a stale
+      # schema off `main` when it cannot.
       - run: bun run schema:verify
+      # Changelog safety: a commit SUBJECT (or BREAKING CHANGE note) carrying a raw `<tag>` makes
+      # release-please DROP that package from its own release — silently, exit 0. That is how
+      # `schema` and `starters` fell out of three consecutive releases and `npm i @jxsuite/create`
+      # became unresolvable. `.husky/commit-msg` runs the same rule, but a hook is skippable with
+      # `--no-verify`, which is how the offending subject reached main. See commitlint.config.js.
+      #
+      # Pull-request-only, and it names the two shas explicitly rather than using HEAD: `checks`
+      # runs on the merge commit, whose own subject is not a conventional commit.
+      - name: Commit subjects must be changelog-safe
+        if: github.event_name == 'pull_request'
+        run: |
+          bun scripts/check-changelog-safety.ts \
+            --from ${{ github.event.pull_request.base.sha }} \
+            --to ${{ github.event.pull_request.head.sha }}
 
   # Its own job because it is 87 of the 159 seconds `checks` used to take, and everything else
   # in there is 0-4s. It is gated on studio's OWN tree — not on studio merely being retested —
@@ -352,6 +400,58 @@ jobs:
       - uses: ./.github/actions/setup-bun
       - run: bun --cwd packages/studio scripts/check-lens-mutants.ts
 
+  # What the BUILD emitted, against what the package says it ships.
+  #
+  # A job of its own because it needs a real `bun run build`, and the `checks` job deliberately
+  # builds nothing (its own comment budgets it at 22 seconds). It answers the question that let
+  # dist/codicon.ttf go missing for months: the build emitted a 140 KB font, the shipped CSS
+  # referenced it, and nothing compared the two — so the tarball, the desktop bundle and the cloud
+  # all drew tofu where Monaco draws icons, with no error anywhere.
+  #
+  # Gated on `gate_bundle` containing studio, which affected.ts already computes and which nothing
+  # else consumed. Part of the `ci` aggregate below, so a build that emits something nobody ships
+  # cannot merge.
+  studio-dist:
+    needs: changes
+    if: contains(fromJSON(needs.changes.outputs.bundles), 'studio')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-bun
+      - run: bun run --cwd packages/studio build
+      - run: bun --cwd packages/studio scripts/check-studio-dist.ts
+      - run: bun packages/studio/scripts/check-bundle-budget.ts
+      # The generated document must match what the build writes — the same diff discipline
+      # docs:verify and schema:verify use.
+      - run: git diff --exit-code -- packages/studio/index.html
+
+  # The Nix build, as a job of THIS workflow rather than a workflow of its own.
+  #
+  # It used to be `on: pull_request` in nix.yml with a `paths:` filter, and that is exactly why it
+  # could never be required: a path-filtered workflow that does not fire leaves a required status
+  # check pending forever — the same trap the `ci` job below is written to avoid. Moving the
+  # pull-request leg here puts it behind a gate that always runs and always reports, so `nix / build`
+  # becomes part of the one `ci` aggregate branch protection names.
+  #
+  # That matters most for the thing that motivated it: a dependency bump auto-merges on a green
+  # `ci`, and the Nix package is the ONLY consumer of bun.nix and the flake inputs. Without this,
+  # a bump that breaks packaging would land on main and first be noticed by a release refusing to
+  # advance. The gate is scripts/ci/affected.ts's NIX_INPUTS.
+  # THE RELEASE PULL REQUEST ONLY. It used to run on any diff touching the derivation's inputs —
+  # `bun.lock`, `package.json`, `packages/desktop/**` — which is most Dependabot pull requests, and
+  # it is by far the slowest job here. The trade taken deliberately: a dependency bump that breaks
+  # packaging no longer blocks its own auto-merge, and is caught on the release pull request
+  # instead, where `ci` still requires this job and a human is already reading the diff. The two
+  # legs that were never about pull requests are untouched — nix.yml still builds on `push: main`
+  # and nightly to keep the cache warm, and release-please.yml still gates the `release` branch on
+  # it, BARE, so a broken derivation can never reach a `nix run github:jxsuite/jx/release` user.
+  nix:
+    if: startsWith(github.head_ref, 'release-please--')
+    # No `with:` — the defaults are the pull-request shape (ubuntu-latest, the checked-out ref, no
+    # publish). No `secrets:` either: CACHIX_AUTH_TOKEN is only needed on the release leg, and a
+    # pull request must not be able to write to the public cache.
+    uses: ./.github/workflows/nix.yml
+
   # The ONE stable name to make a required status check on `main`. It lives in a workflow with no
   # `paths:` filter, so it always runs and always reports — a required check on a path-filtered
   # workflow hangs pending forever instead.
@@ -360,7 +460,7 @@ jobs:
   # of this design: a job the diff cannot reach must leave this green.
   ci:
     if: always()
-    needs: [changes, test, checks, lens-mutants, coverage-comment]
+    needs: [changes, test, checks, lens-mutants, studio-dist, nix, coverage-comment]
     runs-on: ubuntu-latest
     steps:
       - name: Gate

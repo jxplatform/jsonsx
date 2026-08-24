@@ -1,37 +1,41 @@
 # Jx Studio UI/UX Interface Guidelines
 
-**Version:** 0.3.12
+**Version:** 0.3.14
 **Status:** Implemented
-**Updated:** 2026-08-16
+**Updated:** 2026-08-22
 **Applies to:** `packages/studio/`
 
 ---
 
 ## 1. Design System Foundation
 
-Jx Studio builds on **Adobe Spectrum Web Components** (`@spectrum-web-components/*`) with a dark theme (`color="dark"`, `scale="medium"`). All UI chrome uses Spectrum components; the canvas renders content via the Jx runtime on a light background.
+Jx Studio builds on **Adobe Spectrum Web Components** (`@spectrum-web-components/*`) at `scale="medium"`. All UI chrome uses Spectrum components; the canvas renders content via the Jx runtime on a light background in **both** chrome themes — a document is a document, and does not follow the chrome.
+
+The chrome ships two themes, `color="dark"` (the default the app boots in) and `color="light"`, chosen in Preferences → Appearance. Each is a Spectrum colour fragment, and **a theme named in `CHROME_THEMES` must have its fragment registered in `src/ui/spectrum.ts`**: `<sp-theme>` adopts the fragment registered under the `color` it is given and silently adopts none for a name it does not know, which leaves every `--spectrum-*` colour token undefined and the chrome unchanged. That is not a hypothetical — it is how Light shipped as a setting that did nothing.
 
 ### 1.1 Theme Tokens
 
 Use CSS custom properties from `:root` — never hardcode color values.
 
 > The **Fallback** column is checked against `styles/tokens.css` by `packages/studio/scripts/check-styles.ts`, and the check is why the values below are right. Seven of them had been wrong for months — this table named `#1e1e1e` for `--bg` where the app had shipped `#111111` since the brand ramp landed — so anyone designing against the documented palette was designing against one that no longer existed. A correction without a gate only resets the clock.
+>
+> Every token below is a reference to a Spectrum token, so it is the **declaration** that is the contract and the fallback that is merely checkable. The fallbacks are the dark ramp because dark is what the app boots in; under `color="light"` the same declarations resolve to the light ramp in `src/ui/jx-theme.ts` (`--bg` `#f4f4f5`, `--bg-panel` `#ffffff`, `--fg` `#27272a`, `--accent` `#2563eb`) with nothing in `tokens.css` branching on the theme. A token that has to be spelled twice, once per theme, is a token that belongs in the brand fragment instead.
 
-| Token         | Purpose                           | Fallback                 |
-| ------------- | --------------------------------- | ------------------------ |
-| `--bg`        | App background                    | `#111111`                |
-| `--bg-panel`  | Panel background                  | `#1a1a1a`                |
-| `--bg-input`  | Input field background            | `#1a1a1a`                |
-| `--border`    | Borders and separators            | `#222222`                |
-| `--fg`        | Primary text                      | `#e4e4e7`                |
-| `--fg-dim`    | Secondary text (labels, hints)    | `#a1a1aa`                |
-| `--accent`    | Interactive elements, focus rings | `#3b82f6`                |
-| `--accent-fg` | Text on accent backgrounds        | `#ffffff`                |
-| `--danger`    | Destructive actions, errors       | `#f44747`                |
-| `--success`   | Positive states                   | `#89d185`                |
-| `--warning`   | Caution states                    | `#c5a332`                |
-| `--radius`    | Standard border radius            | `3px`                    |
-| `--hover-bg`  | Hover overlay                     | `rgba(255,255,255,0.04)` |
+| Token         | Purpose                           | Fallback                                                                |
+| ------------- | --------------------------------- | ----------------------------------------------------------------------- |
+| `--bg`        | App background                    | `#111111`                                                               |
+| `--bg-panel`  | Panel background                  | `#1a1a1a`                                                               |
+| `--bg-input`  | Input field background            | `#1a1a1a`                                                               |
+| `--border`    | Borders and separators            | `#222222`                                                               |
+| `--fg`        | Primary text                      | `#e4e4e7`                                                               |
+| `--fg-dim`    | Secondary text (labels, hints)    | `#a1a1aa`                                                               |
+| `--accent`    | Interactive elements, focus rings | `#3b82f6`                                                               |
+| `--accent-fg` | Text on accent backgrounds        | `#ffffff`                                                               |
+| `--danger`    | Destructive actions, errors       | `#f44747`                                                               |
+| `--success`   | Positive states                   | `#89d185`                                                               |
+| `--warning`   | Caution states                    | `#c5a332`                                                               |
+| `--radius`    | Standard border radius            | `3px`                                                                   |
+| `--hover-bg`  | Hover overlay                     | `color-mix(in srgb, var(--spectrum-gray-900, #fafafa) 5%, transparent)` |
 
 **Accent opacity variants** for backgrounds:
 
@@ -349,17 +353,29 @@ Registered in `packages/studio/src/ui/spectrum.ts`:
 
 ### 6.2 Custom Components
 
-| Component            | File                           | Purpose                                          |
-| -------------------- | ------------------------------ | ------------------------------------------------ |
-| `jx-styled-combobox` | `src/ui/jx-styled-combobox.js` | Dual-mode picker/combobox with styled menu items |
+Studio defines exactly two custom elements, both `LitElement`, both registered from the manual
+table in `src/ui/spectrum.ts` — there are no decorators anywhere in the package.
 
-**`jx-styled-combobox` API:**
+| Element             | Class             | File                       | Purpose                                                     |
+| ------------------- | ----------------- | -------------------------- | ----------------------------------------------------------- |
+| `jx-value-selector` | `JxValueSelector` | `src/ui/value-selector.ts` | Dual-mode picker/combobox: snaps to an option, or free-text |
+| `jx-color-popover`  | `JxColorPopover`  | `src/ui/color-selector.ts` | Colour area, sliders and swatches, kept in sync             |
+
+**`jx-value-selector` API:**
 
 - Properties: `value`, `placeholder`, `size`, `.options` (array)
 - Options format: `{ value, label, style? }` or `{ divider: true }`
 - Events: `change` (selection), `input` (typing)
-- Mode: Auto-switches between `sp-picker` (value matches option) and textfield+dropdown (free-text)
-- No shadow DOM — renders into light DOM via `createRenderRoot() { return this; }`
+- Mode: auto-switches between `sp-picker` (value matches an option) and textfield-plus-dropdown
+
+**Both render into the light DOM** — `createRenderRoot() { return this; }` — and every new element
+must. Spectrum's theming reaches its descendants through `sp-theme`, and the whole 232 KB chrome
+stylesheet under `styles/` is written against a light tree; a shadow root cuts both off. That is
+also why `static styles` is not used here: the design system is one cascade, not per-component.
+
+Everything else in the shell is a plain function returning a `lit-html` template, rendered by its
+own module into its own root. A component class earns its keep when a surface owns local state that
+no store should hold — which is what both of these do — and not otherwise.
 
 ---
 
@@ -620,13 +636,83 @@ cannot undo or save is worse than a refused change.
 
 ### 9.3 Render Orchestration
 
-The `update()` function triggers selective re-renders based on what changed:
+**There is no root render, and no central dispatcher.** The description this section used to carry —
+an `update()` that selectively re-renders three regions — has not matched the code for some time.
+What actually runs is about thirty independent pairs, each a module-scope `effectScope` holding one
+`effect()` that reads its own dependency list and calls one `litRender()` into its own host.
 
-- Document changed → re-render canvas + left panel + right panel
-- Selection changed → re-render left panel + right panel
-- UI-only change → re-render affected panel only
+`store.ts` additionally keeps a name-to-callback registry — `registerRenderer` / `render()` /
+`renderOnly(...)` — but it holds only seven entries, all registered from the bootstrap, and the
+bootstrap calls it "compat during migration". Every surface added since (statusbar, toolbar, activity
+bar, tab strip, jump bar, pane context, pane grid, bottom dock, the assistant, settings, library) is
+driven by its own effect alone. `render()` coalesces nothing: two calls in one tick paint twice.
 
-Module-local state (Sets, variables) persists across renders and doesn't need to go through the state system.
+Three schedulers sit between an effect and its `litRender`, and each exists for a reason worth
+knowing before adding a fourth:
+
+- `panels/panel-scheduler.ts` coalesces to one animation frame **and withholds a repaint entirely
+  while a text input inside the panel root has focus**, publishing `data-jx-stale` on the host while
+  it does. Without it, a repaint mid-typing truncated or dropped characters.
+- `panels/overlays.ts` coalesces on a microtask.
+- `panels/ai-panel.ts` runs its own frame loop and deliberately BYPASSES the focus guard, so a
+  streaming reply repaints while the composer is focused.
+
+Re-render granularity is therefore per-surface, not per-app. Below that, per-pane canvas state lives
+on the pane's `CanvasSurface`, and below THAT an edit usually causes no render at all — the canvas
+patcher classifies the operation and posts it to the iframe instead (`studio.md` §4).
+
+Module-local state (Sets, variables) persists across renders and does not need to go through the
+state system.
+
+### 9.4 Template Conventions
+
+> **Status:** Implemented
+
+The template is the only writer of what it renders. Both halves of that have been broken in shipped
+code, so both are gated by `packages/studio/scripts/check-lit-conventions.ts`, which carries a
+ratcheting backlog per rule and fails both ways — a new occurrence fails, and an entry left behind
+after its site is fixed fails too.
+
+| Convention                                             | Instead of                                        |
+| ------------------------------------------------------ | ------------------------------------------------- |
+| `createRef()` + `ref()` for a node this module renders | `querySelector` at call time                      |
+| `@event=` on a node this module renders                | `addEventListener` after render                   |
+| `classMap({ … })`                                      | a class attribute built by string concatenation   |
+| `styleMap({ … })`, with **hyphenated** keys            | a `style` attribute built by string concatenation |
+| `repeat(items, keyFn, tpl)` for a keyed collection     | `.map()` where children hold state or reorder     |
+| `.value=${live(v)}` on a Spectrum control              | `value=${v}`                                      |
+| `guard([id], …)` around a third-party mount            | relying on the template shape staying the same    |
+
+**Spectrum controls bind their own state as a live property.** `sp-textfield`, `sp-picker`,
+`sp-search`, `sp-switch`, `sp-checkbox` and `sp-accordion-item` all move `value` / `checked` / `open`
+themselves when the reader touches them, and none of them reflects that back to the attribute. So an
+attribute binding is committed once and then dirty-checked away on exactly the render that needed to
+correct it — the control keeps a value the document does not have, silently. `live()` compares
+against the live property instead.
+
+**A module holds its own nodes.** A node found by selector is real only until the next render
+replaces it, and with a second pane open the query can return the other pane's copy. `ref()` is how
+you get a handle; `src/panels/target-line.ts` states the rule at its definition site. This does not
+object to imperative USE — measuring, scrolling into view, moving focus — only to re-finding the
+node each time instead of holding it.
+
+**Hyphenated `styleMap` keys are load-bearing.** `check-styles.ts` finds `font-size:` and
+`border-radius:` textually, so `styleMap({ fontSize: "12px" })` is invisible to the token nudge while
+`styleMap({ "font-size": "12px" })` is not. Converting a literal class name to a computed one has the
+mirror effect on the orphan rule.
+
+**Where the rules stop.** `src/canvas/**` is imperative by design, not by neglect: the patcher exists
+so that nothing re-renders on an edit, the overlay places boxes per pointer-move against measured
+geometry, and the iframe modules run in a realm lit does not reach. Those modules are named in the
+gate's `EXCLUDED` map with the reason, so the exemption is a statement rather than a gap.
+
+**LitElement adoption is deferred, deliberately.** Four reasons, recorded so the question restarts
+from them: shadow DOM is already excluded (§6.2), which removes most of what the component model
+buys; `@vue/reactivity` owns the update model and is version-pinned to `@jxsuite/runtime`, so
+`@lit/context` would sit beside it rather than replace it; `probe.idle()` — the predicate that
+replaced 115 sleeps, and the foundation of the screenshot lane — would gain a second settling
+condition it cannot see in every element's `updateComplete`; and every defect found in the last audit
+of the template layer was fixed by a binding, a key or a ref.
 
 ---
 
@@ -643,6 +729,14 @@ When building new UI in Studio, verify:
 - [ ] Colors reference CSS custom properties, not hex values
 - [ ] State mutations are immutable (produce new objects)
 - [ ] Custom components use light DOM (`createRenderRoot() { return this; }`)
+- [ ] Spectrum controls bind the state they move themselves as `.value=${live(v)}` / `.checked=` /
+      `.open=` — never as a plain attribute (§9.4; an attribute binding is dirty-checked away on the
+      render that needed it)
+- [ ] A node this module renders is held with `ref()`, not re-found with `querySelector` (§9.4)
+- [ ] A list whose children hold state or can reorder uses `repeat()` with a real key — a canvas
+      iframe, a `details` the reader opened, or a field mid-edit is not index-addressable (§9.4)
+- [ ] A container handed to a third-party widget (Monaco, Tabulator) is `guard()`ed on the identity
+      it belongs to, so no repaint can take it back (§9.4)
 - [ ] Event handlers call `e.stopPropagation()` when wrapping Spectrum events in light DOM components
 - [ ] Text entry and confirmation go through `ui/layers.ts` (§8.7) — never `prompt()`, `confirm()`, or `alert()`
 - [ ] `sp-dialog-wrapper` labels use kebab-case attributes (`confirm-label`, not `confirmLabel`)
@@ -984,6 +1078,8 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.3.14** (2026-08-22) — Template conventions (9.4) and the gate behind them; render orchestration described as it is; custom components corrected to the two that exist.
+- **0.3.13** (2026-08-21) — Chrome ships two themes; a theme in CHROME_THEMES must have its Spectrum colour fragment registered, and the semantic token table documents the dark fallbacks with the light ramp resolved from the brand fragment.
 - **0.3.12** (2026-08-16) — §15 the documentation screenshot pipeline drives Chromium over WebDriver BiDi rather than CDP — byte-identical captures, and the one behavioural difference (a pointer move outside the viewport) fixed rather than worked around.
 - **0.3.11** (2026-08-16) — §14 ATAG is Subset: Part A is §13.1a and §8.2, Part B is studio.md §16.6.
 - **0.3.10** (2026-08-16) — §1.1 the token table's fallbacks are corrected and gated against tokens.css; §8.2 cut/paste is the stated alternative to every drag (SC 2.5.7); §13.1a one live region, called from notify() itself, so a failure that lands in the Problems panel is announced.

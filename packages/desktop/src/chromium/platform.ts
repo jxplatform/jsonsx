@@ -1,15 +1,19 @@
 /// <reference lib="dom" />
 import { streamImport } from "@jxsuite/studio/import-client";
 import { toBase64 } from "@jxsuite/studio/base64";
+import { setPreviewNavigateHandler } from "@jxsuite/studio/preview-navigate";
 import type {
+  AppInfo,
   ComponentMeta,
   CreateProjectDestination,
   ExtensionsInfo,
+  FsEvent,
   ImportProgressEvent,
   ImportSiteOptions,
   RecentProjectEntry,
   ReferencesResult,
   RenameResult,
+  SiteBuildResult,
   StarterInfo,
   StudioPlatform,
 } from "@jxsuite/studio/types";
@@ -56,17 +60,50 @@ export function createDesktopPlatform() {
   let nextId = 1;
   const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
 
+  /* Server-initiated frames (`method`, no `id`) — the twin of electrobun's `handlers.messages`.
+     A launcher speaks first for the things the shell cannot ask about: a file changed under the
+     project root, or another window asked this one to come forward. */
+  const messages: Record<string, (params: never) => void> = {
+    /* Raise this window. The launcher relays it when a second window is asked to open a project
+       this one already holds; nothing else in the shell can bring an OS window forward. */
+    focusWindow: () => {
+      try {
+        window.focus();
+      } catch {
+        // A window manager that refuses the raise simply leaves the window where it is.
+      }
+    },
+    /* Batched filesystem changes from the backend watcher — the sidebar's live sync. */
+    onFileEvents: (params: { events?: FsEvent[] }) => {
+      const { events } = params;
+      if (events && events.length > 0) {
+        fileEventHandler?.(events);
+      }
+    },
+  };
+
+  // The studio sidebar's live-sync subscriber, if any. Set via subscribeFileEvents below.
+  let fileEventHandler: ((events: FsEvent[]) => void) | null = null;
+
   ws.addEventListener("message", (event) => {
     const msg = JSON.parse(event.data as string) as {
-      id: number;
+      id?: number;
+      method?: string;
+      params?: unknown;
       error?: string;
       result?: unknown;
     };
-    const p = pending.get(msg.id);
+    if (msg.method) {
+      // Unsolicited: dispatch by name. An unknown method is a newer launcher talking to an older
+      // Shell, which is not an error — it is a message this build has no use for.
+      messages[msg.method]?.(msg.params as never);
+      return;
+    }
+    const p = msg.id === undefined ? undefined : pending.get(msg.id);
     if (!p) {
       return;
     }
-    pending.delete(msg.id);
+    pending.delete(msg.id!);
     if (msg.error) {
       p.reject(new Error(msg.error));
     } else {
@@ -89,6 +126,33 @@ export function createDesktopPlatform() {
         }),
     );
   }
+
+  /*
+   * Preview link clicks go to the user's REAL browser, not this app window.
+   *
+   * Following a link in Preview exists to see the page behave like the deployed thing — routing,
+   * history, devtools. A Chromium `--app` window has no address bar and no tab strip, so it is not
+   * that, and navigating THIS one would replace the editor. The Bun side hands the URL to the OS
+   * (`Utils.openExternal`); on failure the studio's own `window.open` default still applies.
+   *
+   * `View: Open in Browser` reuses the same seam, which is why it belongs here and not only on
+   * electrobun: without it the built page opened in a second frameless app window.
+   */
+  setPreviewNavigateHandler((url: string) => {
+    const fallback = () => {
+      window.open(url, "_blank", "noopener,noreferrer");
+    };
+    /* `{ ok: false }` is a REFUSAL, not a rejection — the backend answers the request either way.
+       Branching only on a thrown error left the click doing nothing at all whenever the desktop had
+       no opener to hand it to. */
+    void request("openExternal", { url })
+      .then((result) => {
+        if (!(result as { ok?: boolean } | null)?.ok) {
+          fallback();
+        }
+      })
+      .catch(fallback);
+  });
 
   const platform = {
     id: "desktop" as const,
@@ -218,6 +282,23 @@ export function createDesktopPlatform() {
       return request("findReferences", target) as Promise<ReferencesResult>;
     },
 
+    /**
+     * Live filesystem sync for the sidebar.
+     *
+     * The launcher watches the project root for the whole life of the window (it re-arms itself
+     * whenever the root changes) and pushes batched events as `onFileEvents` frames, so this only
+     * has to say where they go. Without it the chromium sidebar refreshed only when asked, and a
+     * file written by a terminal — or by the AI assistant — stayed invisible until then.
+     */
+    subscribeFileEvents(handler: (events: FsEvent[]) => void) {
+      fileEventHandler = handler;
+      return () => {
+        if (fileEventHandler === handler) {
+          fileEventHandler = null;
+        }
+      };
+    },
+
     async createDirectory(path: string) {
       return request("createDirectory", { path }) as Promise<void>;
     },
@@ -303,6 +384,19 @@ export function createDesktopPlatform() {
 
     async gitInit() {
       await request("gitInit");
+    },
+
+    /**
+     * Build the site to its output directory and name the origin it is browsable at.
+     *
+     * `View: Open in Browser` runs this before it opens anything, so the reader sees the OUTPUT the
+     * author's document produces rather than whatever the last build happened to leave on disk. The
+     * origin is the backend's to name: the built site is served on a port of its own, because this
+     * launcher's own paths mean the project's SOURCES and a built page means its output by those
+     * very same paths.
+     */
+    async buildSite() {
+      return request("buildSite") as Promise<SiteBuildResult>;
     },
 
     async gitAddRemote(name: string, url: string) {
@@ -418,6 +512,41 @@ export function createDesktopPlatform() {
 
     async setPackageVersions(updates: { name: string; version: string; dev?: boolean }[]) {
       return request("setPackageVersions", { updates }) as Promise<PackageOpResult>;
+    },
+
+    /**
+     * Build info for the About screen.
+     *
+     * The channel is the honest difference between the two desktop builds: this one is installed
+     * and updated by the system package manager, so it reports no `updateStatus` — an in-app
+     * updater it does not have could only ever answer "unknown".
+     */
+    async getAppInfo() {
+      return request("appInfo") as Promise<AppInfo>;
+    },
+
+    // ─── Multi-window ───────────────────────────────────────────────────────────
+    /* A window is a launcher process here, where on electrobun it is a BrowserWindow inside one.
+       Studio cannot tell the difference: it asks which project, then asks for it elsewhere, and
+       both launchers answer whether a window was opened or an existing one raised. */
+
+    /**
+     * Pick a project WITHOUT binding this window to it — the New Window branch of Open Project.
+     * `openProject()` re-roots the asking window as a side effect of picking, which is the one
+     * thing this branch must not do.
+     */
+    async pickProject() {
+      return request("pickProject") as Promise<{ root: string; name: string } | null>;
+    },
+
+    /** Open a project in another window, focusing the window that already holds it if there is one. */
+    async openProjectInNewWindow(root: string) {
+      return request("openProjectInNewWindow", { root }) as Promise<{ focused: boolean }>;
+    },
+
+    /** Open a fresh welcome window. */
+    async newWindow() {
+      await request("newWindow");
     },
 
     async createProject(opts: {

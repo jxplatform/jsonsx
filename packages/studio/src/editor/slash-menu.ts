@@ -58,6 +58,9 @@ export interface SlashMenuAnchorRect {
 
 let callbacks: SlashMenuCallbacks | null = null;
 let activeIdx = 0;
+
+/** What the current open() asked for, so a repaint driven by the keyboard reproduces it. */
+let showFilter = false;
 let filteredItems: SlashCommand[] = [];
 let open = false;
 let _anchorRect: SlashMenuAnchorRect | null = null;
@@ -123,7 +126,8 @@ function showAt(rect: SlashMenuAnchorRect, filter: string, cbs: SlashMenuCallbac
 
   activeIdx = 0;
 
-  render(cbs.showFilter || false);
+  showFilter = cbs.showFilter || false;
+  render();
 
   if (!open) {
     open = true;
@@ -163,8 +167,9 @@ export function dismissSlashMenu() {
 
 // ─── Internal ─────────────────────────────────────────────────────────────────
 
-/** @param {boolean} showFilter */
-function render(showFilter: boolean) {
+/* No parameter: `showFilter` is module state now, so there is one answer to what this
+   menu is, and a keyboard repaint cannot disagree with the open() that created it. */
+function render() {
   const rect = _anchorRect;
   if (!rect) {
     return;
@@ -203,7 +208,7 @@ function render(showFilter: boolean) {
               ? filteredItems.map(
                   (cmd, i) => html`
                     <sp-menu-item
-                      ?focused=${i === 0}
+                      ?focused=${i === activeIdx}
                       @click=${(e: Event) => {
                         e.preventDefault();
                         e.stopPropagation();
@@ -255,7 +260,7 @@ function onFilterInput(e: Event) {
     : source;
 
   activeIdx = 0;
-  render(true);
+  render();
 
   // Re-focus input after re-render
   requestAnimationFrame(() => {
@@ -265,6 +270,18 @@ function onFilterInput(e: Event) {
       _filterEl.selectionEnd = _filterEl.value.length;
     }
   });
+}
+
+/**
+ * Scroll the active row into view after a repaint.
+ *
+ * The only imperative half of the keyboard model, and it stays imperative on purpose: where a row
+ * sits in a scroller is a measurement, not something a template can express. Everything else —
+ * WHICH row is active — is now a binding, because it has to be.
+ */
+function revealActive(): void {
+  const rows = getHost().querySelectorAll("sp-menu-item:not([disabled])");
+  rows[activeIdx]?.scrollIntoView({ block: "nearest" });
 }
 
 /**
@@ -285,18 +302,16 @@ export function handleSlashMenuKey(key: string): void {
     if (items.length === 0) {
       return;
     }
-    items[activeIdx]?.removeAttribute("focused");
     activeIdx = (activeIdx + 1) % items.length;
-    items[activeIdx]?.setAttribute("focused", "");
-    items[activeIdx]?.scrollIntoView({ block: "nearest" });
+    render();
+    revealActive();
   } else if (key === "ArrowUp") {
     if (items.length === 0) {
       return;
     }
-    items[activeIdx]?.removeAttribute("focused");
     activeIdx = (activeIdx - 1 + items.length) % items.length;
-    items[activeIdx]?.setAttribute("focused", "");
-    items[activeIdx]?.scrollIntoView({ block: "nearest" });
+    render();
+    revealActive();
   } else if (key === "Enter") {
     const cmd = filteredItems[activeIdx];
     if (cmd) {

@@ -203,6 +203,49 @@ describe("prop-bound nested hosts", () => {
     expect(rec.props).toEqual([]);
   });
 
+  /*
+   * The wiring, dispatched for real rather than reasoned about.
+   *
+   * `inPropHost` is computed in this module (`activeEl !== null && activeKey === null`) and only
+   * consumed by the pure classifier, so a classifier test alone cannot tell the flag apart from a
+   * hardcoded `false` — which is exactly what it effectively WAS: a prop host has no path, so the
+   * unresolvable-position rule rejected every keystroke and typing into a component slot did
+   * nothing while showing a caret. These dispatch `beforeinput` at the marker.
+   */
+  test("typing in an adopted prop host is NOT prevented", () => {
+    const { container } = mount(WITH_PROP, { onPropActivate: () => true });
+    const marker = container.querySelector("[data-jx-bound-prop]") as HTMLElement;
+    marker.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+    expect(beforeInput(marker, "insertText", "x")).toBe(false);
+  });
+
+  test("a paragraph split in a prop host IS prevented — one plain string", () => {
+    const { container } = mount(WITH_PROP, { onPropActivate: () => true });
+    const marker = container.querySelector("[data-jx-bound-prop]") as HTMLElement;
+    marker.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+    expect(beforeInput(marker, "insertParagraph")).toBe(true);
+  });
+
+  test("without adoption the same keystroke is still refused", () => {
+    /* The other half of the flag. A REFUSED marker is not a prop host, so the position stays
+       unresolvable and the keystroke must not slip through — this is what proves the guard is the
+       adoption state and not merely "the target has data-jx-bound-prop". */
+    const { container } = mount(WITH_PROP, { onPropActivate: () => false });
+    const marker = container.querySelector("[data-jx-bound-prop]") as HTMLElement;
+    marker.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+    expect(beforeInput(marker, "insertText", "x")).toBe(true);
+  });
+
+  test("after leaving for a page block, the prop exemption is gone", () => {
+    // The flag must not outlive the session: once a real block is active, `activeKey` is set again
+    // And the chokepoint judges by position as usual.
+    const { container } = mount(WITH_PROP, { onPropActivate: () => true });
+    const marker = container.querySelector("[data-jx-bound-prop]") as HTMLElement;
+    marker.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+    caretInto(container.querySelector("p") as HTMLElement, 1);
+    expect(beforeInput(marker, "insertParagraph")).toBe(true);
+  });
+
   test("leaving the nested host for a page block releases it", () => {
     const { container, rec } = mount(WITH_PROP, { onPropActivate: () => true });
     const marker = container.querySelector("[data-jx-bound-prop]") as HTMLElement;

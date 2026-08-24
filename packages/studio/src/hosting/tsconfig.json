@@ -1,0 +1,18 @@
+{
+  "//": "The hosting contract is compiled under a CONSUMER's flags, not this repo's.",
+  "//why": "These three modules are published for other repositories to import, and jx-platform — the first real subscriber — sets exactOptionalPropertyTypes, verbatimModuleSyntax and isolatedModules, none of which the jx root tsconfig sets. Two type errors were found by consuming the API rather than by building it: `from: string | undefined` did not satisfy `from?: string` under exactOptionalPropertyTypes. Compiling this directory under the stricter set means the next one is found here instead of after a release. `types: []` and a bare lib are the other half: layout.ts and document.ts must not depend on node or DOM globals, because a Worker build, a Vite plugin or a Deno host has to be able to read them.",
+  "compilerOptions": {
+    "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "types": ["bun"]
+  },
+  "include": ["layout.ts", "document.ts"]
+}

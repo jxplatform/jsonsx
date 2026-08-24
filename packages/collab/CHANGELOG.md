@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.8.1](https://github.com/jxsuite/jx/compare/collab-v0.8.0...collab-v0.8.1) (2026-08-21)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/schema bumped to 1.8.0
+
+## [0.8.0](https://github.com/jxsuite/jx/compare/collab-v0.7.0...collab-v0.8.0) (2026-08-21)
+
+
+### Features
+
+* **studio:** own the Monaco↔Y.Text binding, and move to monaco-editor 0.56 ([fd68efb](https://github.com/jxsuite/jx/commit/fd68efb485b0a257763011bde11262f9f114cba6))
+* **studio:** own the Monaco↔Y.Text binding, and move to monaco-editor 0.56 ([4e6c9dd](https://github.com/jxsuite/jx/commit/4e6c9ddb90a0c9e26ddf2c2427ff9a468886e5e5))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/schema bumped to 1.7.0
+
 ## [0.7.0](https://github.com/jxsuite/jx/compare/collab-v0.6.0...collab-v0.7.0) (2026-08-19)
 
 

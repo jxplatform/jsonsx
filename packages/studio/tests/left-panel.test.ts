@@ -50,7 +50,6 @@ function makeCtx(overrides: Record<string, unknown> = {}) {
     }),
     setCanvasMode: mock(() => {}),
     setGitDiffState: mock(() => {}),
-    setupTreeKeyboard: mock(() => {}),
     webdata: { elements: { Text: [{ tag: "p" }] } },
     ...overrides,
   };
@@ -92,20 +91,14 @@ afterEach(() => {
 });
 
 describe("left panel — project-level tabs", () => {
-  test("files tab renders the file tree and wires keyboard + DnD", async () => {
+  /* `afterRender` no longer wires the keyboard: the tree's keydown is a `@keydown` binding in
+     files.ts's own template, so there is nothing for the panel host to hand it. Drag-and-drop still
+     needs the pass, because pragmatic-dnd registers against real row elements. */
+  test("files tab renders the file tree and wires DnD", async () => {
     shell.leftTab = "files";
     await mountWith();
     expect(leftPanel.querySelector("#files-rendered")).not.toBeNull();
-    expect(ctx.setupTreeKeyboard).toHaveBeenCalledTimes(1);
-    expect(ctx.setupTreeKeyboard.mock.calls[0][0].classList.contains("file-tree")).toBe(true);
     expect(ctx.registerFileTreeDnD).toHaveBeenCalled();
-  });
-
-  test("files tab without a .file-tree skips keyboard wiring", async () => {
-    shell.leftTab = "files";
-    await mountWith({ renderFilesTemplate: mock(() => html`<div id="no-tree"></div>`) });
-    expect(leftPanel.querySelector("#no-tree")).not.toBeNull();
-    expect(ctx.setupTreeKeyboard).not.toHaveBeenCalled();
   });
 
   test("git tab passes the ctx through and reads project state, not the tab", async () => {

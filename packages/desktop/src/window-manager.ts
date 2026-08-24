@@ -10,7 +10,14 @@
 import { BrowserView, BrowserWindow, Screen } from "electrobun/main";
 import { realpathSync } from "node:fs";
 import { resolve } from "node:path";
-import { applyUpdate, checkForUpdate, downloadUpdate, getLocalInfo, getStatus } from "./updater";
+import {
+  applyUpdate,
+  checkForUpdate,
+  composeAppInfo,
+  downloadUpdate,
+  getLocalInfo,
+  getStatus,
+} from "./updater";
 import { createGitOps } from "./git";
 import { createPackageOps } from "./packages";
 import { createProjectServer } from "@jxsuite/server/project-server";
@@ -359,6 +366,9 @@ function buildWindowRpc(entry: WindowEntry, getWin: () => BrowserWindow) {
         githubSignIn: (params) => githubSignIn(params),
         githubSignOut: () => githubSignOut(),
         githubToken: () => githubTokenStatus(),
+
+        // About screen (composed from the updater, which only this launcher has)
+        appInfo: () => composeAppInfo(),
 
         // Updater (process-shared)
         updaterApplyUpdate: () => applyUpdate(),

@@ -26,6 +26,43 @@ export function canvasBaseOrigin(): string {
 }
 
 /**
+ * The base the canvas fetches PROJECT FILES against — component `$ref`s, `$src` modules, images.
+ *
+ * Two shapes, and the platform chooses. Most hosts serve the project tree from their web root, so
+ * `<canvas origin>/<projectRoot>/` is a real URL: the dev server serves by path (absolute
+ * filesystem paths included) and the desktop loopback does the same. Those set nothing.
+ *
+ * A host whose `projectRoot` is an IDENTIFIER rather than a served path sets `documentBaseUrl`. Jx
+ * Cloud is one — its root is `owner/repo@branch`, and the default produced a URL nothing answered,
+ * so every `$ref` fetch fell through to the SPA fallback. That fallback returns the marketing page
+ * at **HTTP 200**, so `res.ok` passed and the runtime's `res.json()` died on `Unexpected token
+ * '<'`; images failed the same way and reported nothing.
+ *
+ * @param {string | undefined} projectRoot - The active project root, for the default shape.
+ * @returns {string} A base URL ending in `/`, safe to pass to `new URL(relativePath, base)`.
+ */
+export function documentBase(projectRoot?: string): string {
+  const origin = canvasBaseOrigin();
+  const declared = hasPlatform() ? getPlatform().documentBaseUrl : undefined;
+  if (declared) {
+    const withSlash = declared.endsWith("/") ? declared : `${declared}/`;
+    /*
+     * ABSOLUTE, ALWAYS. The caller uses this as `new URL(documentPath, base)`, and a `base` that is
+     * itself relative throws `Failed to construct 'URL': Invalid base URL` — which is not a failed
+     * fetch but a failed MOUNT: the canvas renders nothing at all.
+     *
+     * Jx Cloud declares a root-relative base (`/api/v1/p/:owner/:repo/:branch/studio/raw/`), which
+     * is the natural thing to declare and must keep working. Resolving it against the canvas origin
+     * here means a platform may declare either shape. An already-absolute URL passes through
+     * unchanged, because that is what `new URL` does with one.
+     */
+    return new URL(withSlash, `${origin}/`).href;
+  }
+  const root = projectRoot || "";
+  return `${origin}/${root ? `${root}/` : ""}`;
+}
+
+/**
  * Build an absolute loopback-origin src for a PROJECT asset path referenced by a PARENT-realm
  * (shell) preview <img>. On the views:// shell a relative "/images/foo.png" resolves to
  * views://studio/images/foo.png, which the browser fetches immediately on paint — a stray request

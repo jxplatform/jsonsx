@@ -9,6 +9,7 @@
  */
 
 import { html, nothing } from "lit-html";
+import { createRef, ref } from "lit-html/directives/ref.js";
 import { componentRegistry } from "../files/components";
 import {
   disableElement,
@@ -29,6 +30,10 @@ import { transact } from "../tabs/transact";
 import type { ComponentEntry } from "../files/components";
 import type { ElementsEntry } from "../files/elements";
 import type { JxElement, JxMutableNode } from "@jxsuite/schema/types";
+
+/** The add-an-import draft fields — uncontrolled, held rather than re-found. See head-panel.ts. */
+const _addName = createRef<HTMLInputElement>();
+const _addPath = createRef<HTMLInputElement>();
 
 interface ImportsContext {
   renderLeftPanel: () => void;
@@ -142,23 +147,37 @@ function renderSiteLevelImports(renderLeftPanel: () => void) {
               })
         }
         <div class="import-add-form">
-          <sp-textfield placeholder="Name" size="s" class="import-add-name"></sp-textfield>
-          <sp-textfield placeholder="Path" size="s" class="import-add-path"></sp-textfield>
+          <sp-textfield
+            placeholder="Name"
+            size="s"
+            class="import-add-name"
+            ${ref(_addName)}
+          ></sp-textfield>
+          <sp-textfield
+            placeholder="Path"
+            size="s"
+            class="import-add-path"
+            ${ref(_addPath)}
+          ></sp-textfield>
           <sp-action-button
             quiet
             size="xs"
             title="Add import"
-            @click=${async (e: Event) => {
-              const form = (e.target as HTMLElement).closest(".import-add-form");
-              const nameField = form?.querySelector(".import-add-name") as HTMLInputElement;
-              const pathField = form?.querySelector(".import-add-path") as HTMLInputElement;
-              const name = nameField?.value?.trim();
-              const path = pathField?.value?.trim();
+            @click=${async () => {
+              /* Handles rather than a closest() walk back to a form drawn six lines above. The
+                 fields are an uncontrolled draft, so a ref is what reading and clearing them
+                 wants — and the panel is rebuilt on every repaint, so a node found once is gone. */
+              const name = _addName.value?.value?.trim();
+              const path = _addPath.value?.value?.trim();
               if (!name || !path) {
                 return;
               }
-              nameField.value = "";
-              pathField.value = "";
+              if (_addName.value) {
+                _addName.value.value = "";
+              }
+              if (_addPath.value) {
+                _addPath.value.value = "";
+              }
               const updated = { ...siteImports, [name]: path };
               await updateSiteConfig({ imports: updated });
               renderLeftPanel();
@@ -326,10 +345,10 @@ function renderDocumentLevelImports({
 
   const packageGroups = groupByPackage();
 
-  /** @param {string} ref */
-  const removeRef = (ref: string) => {
+  /** @param {string} elementRef The element reference to drop. Not `ref` — that is lit's directive. */
+  const removeRef = (elementRef: string) => {
     applyMutation((doc: JxMutableNode) => {
-      doc.$elements = removeElementRef((doc.$elements ?? []) as ElementsEntry[], ref) as (
+      doc.$elements = removeElementRef((doc.$elements ?? []) as ElementsEntry[], elementRef) as (
         | string
         | JxElement
       )[];

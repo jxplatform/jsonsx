@@ -49,6 +49,17 @@ body {
      shown behind the app before sp-theme fills the viewport. */
   background: var(--spectrum-background-layer-1-color, #111111);
 }
+/* …which is why the backdrop needs an attribute to follow the chrome. It is
+   the one rule that cannot read the theme it belongs to, so a light Studio
+   used to boot behind, and rubber-band onto, the dark theme's near-black.
+   `data-theme` is stamped on <html> by applyChromeTheme() (src/shell.ts);
+   the token here is undefined at :root by the same rule as above, so the
+   fallback is what paints — it mirrors the light ramp's gray-100 in
+   src/ui/jx-theme.ts, which is the light theme's layer-1. */
+html[data-theme="light"],
+html[data-theme="light"] body {
+  background: var(--spectrum-gray-100, #f4f4f5);
+}
 /* Panel layout widths. These must live on :root (the <html> element),
    not on sp-theme or #app, because the resize logic in
    src/ui/panel-resize.ts reads and writes them as inline styles on
@@ -102,8 +113,12 @@ sp-theme {
      --spectrum-code-font-family-stack for SWC components. */
   --font-mono:
     "JetBrains Mono", "SF Mono", "Fira Code", var(--spectrum-code-font-family-stack, monospace);
-  /* Hover wash and accent tints */
-  --hover-bg: rgba(255, 255, 255, 0.04);
+  /* Hover wash and accent tints. The wash is a tint of the ramp's INK end
+     (gray-900), not a literal white: a white wash is invisible on the light
+     theme's white panels, which is the one place a row has to show that the
+     pointer is on it. gray-900 is near-white in the dark ramp, so at 5% this
+     reads the same there as the flat 4% white it replaces. */
+  --hover-bg: color-mix(in srgb, var(--spectrum-gray-900, #fafafa) 5%, transparent);
   --accent-8: color-mix(in srgb, var(--accent) 8%, transparent);
   --accent-10: color-mix(in srgb, var(--accent) 10%, transparent);
   --accent-15: color-mix(in srgb, var(--accent) 15%, transparent);

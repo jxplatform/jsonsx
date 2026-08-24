@@ -1,0 +1,153 @@
+# Brings `bun.nix` back into agreement with `bun.lock` on the release pull request — the one branch
+# where it has to be right, because that tree becomes the tag.
+#
+# WHY IT IS HERE AND NOT ON THE DEPENDENCY PULL REQUEST. `bun.nix` is a pure function of `bun.lock`
+# (bun2nix reads the lockfile and nothing else), so every Dependabot bun update makes it stale by
+# construction, and Dependabot has no hook that could regenerate it. The obvious fix — a bot commit
+# on the Dependabot branch — does not work on this repository: a push made with `GITHUB_TOKEN`
+# raises no `pull_request: synchronize` event, so the new head gets NO check runs at all. That is
+# measured, not assumed: PR #131 carries a `chore(screenshots)` commit pushed by
+# `github-actions[bot]`, and `repos/jxsuite/jx/commits/8991f653…/status` still reports
+# `state=pending` with zero checks. Under a required `ci` check that pull request could never have
+# merged. Making it work needs a credential that is not `GITHUB_TOKEN`.
+#
+# So the policy is: `bun.nix` LAGS on `main` between releases, and converges here. Two things make
+# that safe rather than merely tolerable —
+#
+#   * `nix.yml` regenerates the file in its WORKING TREE before every build, so the Nix check on a
+#     dependency pull request answers "does this dependency set build?" rather than going red on a
+#     generator nobody could have run. A bump that genuinely breaks packaging still blocks itself.
+#   * `nix.yml`'s release leg (`publish: true`) runs the same check BARE. If this workflow ever
+#     fails to land its commit, the release build fails, `release` does not advance, and
+#     release-please.yml opens an issue. A stale bun.nix cannot reach a user.
+#
+# TERMINATION is a fixed point, not a guard. The job pushes only when regenerating changes the
+# file; the run its own push triggers (if any) regenerates to the same bytes and pushes nothing.
+# That is why there is no `github.actor != 'github-actions[bot]'` refusal here as there is in
+# screenshots.yml — the release pull request is *authored* by a bot, so that condition would skip
+# every single release.
+name: Release bun.nix
+
+on:
+  pull_request:
+    branches: [main]
+  # The escape hatch, and the answer to the one fragility above: if a push here lands without
+  # queueing checks on the new head, re-run this by hand against the pull request number, or push
+  # an empty commit to it. `bun run nix:sync` locally does the same thing from a human's account,
+  # which is the version that always re-triggers CI.
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "Pull request number to sync bun.nix on."
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: release-bun-nix-${{ github.event.pull_request.number || inputs.pr }}
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    # Only the release pull request. A prefix match, because release-please names the branch from
+    # its own config and the suffix is the target branch.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      startsWith(github.head_ref, 'release-please--')
+    runs-on: ubuntu-latest
+    steps:
+      - id: target
+        # Every one of these arrives as an ENVIRONMENT VARIABLE rather than being interpolated
+        # into the script. A branch name is attacker-controllable text on a public repository, and
+        # `${{ … }}` substitution happens before bash ever sees the line — so an inline head ref is
+        # a shell-injection hole, not a style preference.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          INPUT_PR: ${{ inputs.pr }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            echo "branch=${HEAD_REF}" >> "$GITHUB_OUTPUT"
+            echo "pr=${PR_NUMBER}" >> "$GITHUB_OUTPUT"
+          else
+            branch="$(gh pr view "$INPUT_PR" --json headRefName --jq .headRefName)"
+            echo "branch=$branch" >> "$GITHUB_OUTPUT"
+            echo "pr=$INPUT_PR" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v7
+        with:
+          # The BRANCH, not the head sha: this job pushes, and a detached head has nothing to push.
+          ref: ${{ steps.target.outputs.branch }}
+          persist-credentials: true
+
+      # `install: false` for the same reason as nix.yml: the check shells out to
+      # `bunx bun2nix@<the version package.json pins>` and needs no node_modules.
+      - uses: ./.github/actions/setup-bun
+        with:
+          install: "false"
+
+      - id: sync
+        run: |
+          set -euo pipefail
+          bun scripts/check-bun-nix.ts --fix
+          if git diff --quiet -- bun.nix; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "bun.nix already agrees with bun.lock; nothing to push."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit the regenerated bun.nix
+        if: steps.sync.outputs.changed == 'true'
+        env:
+          BRANCH: ${{ steps.target.outputs.branch }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # `chore(deps)`, deliberately: release-please does not bump a version for `chore`, so
+          # this commit cannot change what the release pull request it is landing on will release.
+          git commit -m "chore(deps): regenerate bun.nix from bun.lock" -- bun.nix
+          git push origin "HEAD:${BRANCH}"
+          echo "pushed $(git rev-parse --short HEAD) to ${BRANCH}"
+
+      - name: Say what happened, on the pull request
+        if: steps.sync.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ steps.target.outputs.pr }}
+        run: |
+          set -euo pipefail
+          {
+            echo "<!-- release-bun-nix -->"
+            echo "### \`bun.nix\` regenerated"
+            echo
+            echo "\`bun.nix\` had fallen behind \`bun.lock\` — expected, and the reason this"
+            echo "workflow exists: dependency pull requests merge without it (see"
+            echo "\`.github/workflows/release-bun-nix.yml\` for why nothing can regenerate it there)."
+            echo "It has been regenerated and pushed to this branch."
+            echo
+            echo "**If this pull request now shows no checks on its head commit**, that is the known"
+            echo "limitation: a push made with \`GITHUB_TOKEN\` does not always queue workflow runs."
+            echo "Push an empty commit, or re-run the required workflows, and it will go green."
+            echo "The release build itself re-checks this ( \`nix.yml\` with \`publish: true\` fails on"
+            echo "any drift), so nothing stale can ship either way."
+          } > body.md
+          existing="$(gh api "repos/${GH_REPO}/issues/${PR}/comments" \
+            --jq '[.[] | select(.body | startswith("<!-- release-bun-nix -->")) | .id] | first // empty')"
+          if [ -n "$existing" ]; then
+            gh api --method PATCH "repos/${GH_REPO}/issues/comments/${existing}" \
+              --field body=@body.md > /dev/null
+          else
+            gh api --method POST "repos/${GH_REPO}/issues/${PR}/comments" \
+              --field body=@body.md > /dev/null
+          fi

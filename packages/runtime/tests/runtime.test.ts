@@ -201,6 +201,34 @@ describe("resolve", () => {
     // oxlint-disable-next-line typescript/await-thenable -- bun-types types `.rejects.toThrow()` as void, but it returns a Promise at runtime that must be awaited
     await expect(resolve("http://example.com/missing.json")).rejects.toThrow("404");
   });
+
+  test("a 200 carrying HTML is a MISSING file, and says so", async () => {
+    /* A static host with a single-page fallback answers a path it does not have with the app shell
+       at HTTP 200, so `res.ok` is true and the failure surfaces from `res.json()` as
+       `Unexpected token '<'` — a parser error for what is really a 404. Jx Cloud did this to every
+       component $ref in the Studio canvas. The message has to name the cause, because the parser's
+       does not. */
+    global.fetch = mock(() =>
+      Promise.resolve(
+        new Response("<!doctype html><html></html>", {
+          headers: { "Content-Type": "text/html; charset=utf-8" },
+        }),
+      ),
+    ) as any;
+    // oxlint-disable-next-line typescript/await-thenable -- see above
+    await expect(resolve("http://example.com/spa-fallback.json")).rejects.toThrow(
+      "returned HTML, not a document",
+    );
+  });
+
+  test("a response with no headers at all is still parsed — no evidence, no guess", async () => {
+    // The check is evidence-based. A custom fetch that omits headers must not be broken by it.
+    const payload = { tagName: "b" };
+    global.fetch = mock(() =>
+      Promise.resolve({ json: () => Promise.resolve(payload), ok: true }),
+    ) as any;
+    expect(await resolve("http://example.com/headerless.json")).toEqual(payload);
+  });
 });
 
 // ─── buildScope — Five-Shape state Grammar ───────────────────────────────────

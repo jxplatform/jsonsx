@@ -21,6 +21,7 @@ function at(
     atBlockStart: flags.atBlockStart ?? false,
     data: flags.data ?? "",
     from: pos,
+    inPropHost: false,
     inputType,
     to: pos,
   };
@@ -38,6 +39,7 @@ function span(
     atBlockStart: flags.atBlockStart ?? false,
     data: flags.data ?? "",
     from,
+    inPropHost: false,
     inputType,
     to,
   };
@@ -82,6 +84,7 @@ describe("classifyBeforeInput — rejected", () => {
         atBlockStart: false,
         data: "x",
         from: null,
+        inPropHost: false,
         inputType: "insertText",
         to: null,
       }),
@@ -92,6 +95,7 @@ describe("classifyBeforeInput — rejected", () => {
         atBlockStart: false,
         data: "x",
         from: P0_MID,
+        inPropHost: false,
         inputType: "insertText",
         to: null,
       }),
@@ -263,5 +267,117 @@ describe("classifyBeforeInput — single-block natives", () => {
     // New engine behaviours are far more often ordinary text editing than structural surgery; the
     // MutationObserver net is what catches the exceptions.
     expect(classifyBeforeInput(at("insertSomethingNewIn2027", P0_MID))).toEqual({ kind: "native" });
+  });
+});
+
+/**
+ * A prop-bound host — text inside a component instance that is an invertible prop binding.
+ *
+ * It is editable text with NO document path, because it is written back as a prop VALUE
+ * (`editCommitProp`) rather than as a block. `from`/`to` are therefore always null for it, which
+ * put it straight into the null-position rule: every keystroke was rejected. Measured in Chrome —
+ * `beforeinput` fired `insertText "Q"` on the heading and arrived at the container already
+ * `defaultPrevented`, and the text never changed. The caret was visible the whole time, which is
+ * what made it look like an editing bug rather than a suppression one.
+ */
+describe("a prop-bound host has no path, and is still editable", () => {
+  /** A caret in a prop-bound host: no resolvable position, by construction. */
+  function inProp(inputType: string, data = ""): BeforeInputContext {
+    return {
+      atBlockEnd: false,
+      atBlockStart: false,
+      data,
+      from: null,
+      inPropHost: true,
+      inputType,
+      to: null,
+    };
+  }
+
+  test("typing runs natively — the regression, stated once", () => {
+    expect(classifyBeforeInput(inProp("insertText", "Q"))).toEqual({ kind: "native" });
+  });
+
+  test("every ordinary text edit runs natively despite the null position", () => {
+    for (const inputType of [
+      "insertText",
+      "insertReplacementText",
+      "insertFromPaste",
+      "insertFromYank",
+      "insertTranspose",
+      "deleteContentBackward",
+      "deleteContentForward",
+      "deleteWordBackward",
+      "deleteWordForward",
+      "deleteSoftLineBackward",
+      "deleteByCut",
+    ]) {
+      expect({ action: classifyBeforeInput(inProp(inputType, "x")), inputType }).toEqual({
+        action: { kind: "native" },
+        inputType,
+      });
+    }
+  });
+
+  test("a paragraph split is refused — a prop is ONE plain string", () => {
+    /* The writing docs put it as "paragraph splits are off", and Enter FINISHES the edit.
+       The chokepoint's job is only to stop the browser inserting the newline first; committing and
+       leaving is the editing engine's keystroke handling, not an input event. */
+    expect(classifyBeforeInput(inProp("insertParagraph"))).toEqual({ kind: "reject" });
+    expect(classifyBeforeInput(inProp("insertLineBreak"))).toEqual({ kind: "reject" });
+  });
+
+  test("it is never re-expressed as a document mutation", () => {
+    // A prop host has no path, so a split/merge/replaceRange would carry a null target. The
+    // Classifier must only ever answer native or reject here.
+    for (const inputType of [
+      "insertText",
+      "insertParagraph",
+      "deleteContentBackward",
+      "deleteContentForward",
+      "insertFromPaste",
+    ]) {
+      expect(["native", "reject"]).toContain(classifyBeforeInput(inProp(inputType)).kind);
+    }
+  });
+
+  test("composition still wins, so IME into a component slot is untouched", () => {
+    // Ordered before the prop branch on purpose: preventing composition strands the candidate
+    // Window mid-word, and that is true in a prop host as much as anywhere else.
+    expect(classifyBeforeInput(inProp("insertCompositionText"))).toEqual({ kind: "native" });
+  });
+
+  test("the universally-refused intents stay refused in a prop host", () => {
+    // Native formatting, native history and text drag are wrong everywhere; the prop branch must
+    // Not have re-admitted them by sitting too early.
+    for (const inputType of [
+      "formatBold",
+      "formatItalic",
+      "historyUndo",
+      "historyRedo",
+      "insertFromDrop",
+      "deleteByDrag",
+    ]) {
+      expect({ action: classifyBeforeInput(inProp(inputType)), inputType }).toEqual({
+        action: { kind: "reject" },
+        inputType,
+      });
+    }
+  });
+
+  test("a null position OUTSIDE a prop host is still refused", () => {
+    // The rule the prop branch steps in front of must keep working: canvas chrome and component
+    // Internals still have nowhere to write.
+    expect(
+      classifyBeforeInput({
+        atBlockEnd: false,
+        atBlockStart: false,
+        data: "x",
+        from: null,
+        inPropHost: false,
+        inputType: "insertText",
+        to: null,
+      }),
+    ).toEqual({ kind: "reject" });
   });
 });

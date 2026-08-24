@@ -152,6 +152,40 @@ describe("Slash Menu", () => {
       expect(selected.tag).toBe("h2");
     });
 
+    /* The row that LOOKS focused is the row Enter takes, at every step.
+       These were two mechanisms until recently: the template declared `?focused=${i === 0}` while
+       the arrow handler moved the attribute itself, off a live `querySelectorAll` of the host. They
+       never disagreed on screen only because lit's dirty-check makes an imperative write STICK — a
+       repaint re-commits `i === 0` as the same `true` it committed before and skips, leaving the
+       attribute wherever the handler last put it. Two writers, one attribute, and no way for the
+       template to take it back. `?focused=${i === activeIdx}` makes the binding the only writer,
+       and this asserts the property that would break if a second one ever appears. */
+    test("the focused row is the row Enter takes, at every step", () => {
+      const taken: string[] = [];
+      const focusedIndex = () => getMenuItems().findIndex((el) => el.hasAttribute("focused"));
+
+      for (const steps of [0, 1, 2]) {
+        let selected: any = null;
+        showSlashMenu(anchor, "", { onSelect: (cmd) => (selected = cmd) });
+        for (let i = 0; i < steps; i++) {
+          pressKey("ArrowDown");
+        }
+        const shown = focusedIndex();
+        const labels = getMenuItems().map((el) => el.textContent?.trim() ?? "");
+        expect(shown).toBe(steps);
+        // Exactly one, so nothing is left behind by a previous move.
+        expect(getMenuItems().filter((el) => el.hasAttribute("focused")).length).toBe(1);
+
+        pressKey("Enter");
+        expect(selected).not.toBeNull();
+        expect(labels[shown]).toContain(selected.label);
+        taken.push(selected.label);
+      }
+
+      // And the three steps really did land on three different commands.
+      expect(new Set(taken).size).toBe(3);
+    });
+
     test("Enter dismisses the menu", () => {
       showSlashMenu(anchor, "", { onSelect: () => {} });
       pressKey("Enter");

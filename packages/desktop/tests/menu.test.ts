@@ -65,6 +65,20 @@ describe("installApplicationMenu", () => {
     expect(on).toHaveBeenCalledWith("application-menu-clicked", expect.any(Function));
   });
 
+  test("claims no accelerator, because the command records own both chords", () => {
+    // ⌘⇧N and ⌘O are `view.newWindow` and `project.open`, which the shell dispatches on every
+    // Launcher. A chord with two owners fires twice — two welcome windows from one press.
+    installApplicationMenu();
+    const menu = capturedMenu as MenuItem[];
+    const file = menu.find((m) => m.label === "File")!;
+    expect(file.submenu!.map((item) => item.accelerator)).toEqual([
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+    ]);
+  });
+
   test("new-window action opens a welcome window", async () => {
     installApplicationMenu();
     await fire("new-window");

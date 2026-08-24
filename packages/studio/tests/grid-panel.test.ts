@@ -173,6 +173,37 @@ describe("renderGridMode", () => {
     expect(gridPanelMounted("primary", tabB)).toBeTrue();
   });
 
+  /* The Tabulator host is guarded, and this pins both halves of what that buys.
+     Tabulator owns the host's children the moment createGridView hands the node over, so a toolbar
+     repaint must leave the node — and therefore the engine — alone. It does today only because
+     shellTpl happens to return the same template shape every pass; `guard` states it instead. The
+     dependency is the SOURCE and not nothing, because an empty list also memoises past the
+     re-commit a tab switch needs, which leaves the incoming panel with a null host and no engine
+     at all. Both directions are asserted here so neither can be tightened away. */
+  test("a toolbar repaint keeps the engine and its host node; a new source replaces both", async () => {
+    const wrap = document.createElement("div");
+    document.body.append(wrap);
+    const tab = gridTab("grid://collection/guarded");
+    const controller = createGridController(tab, stubSource("grid://collection/guarded"));
+    await controller.load();
+    renderGridMode(surfaceOf(wrap), tab);
+    await flush();
+
+    const engine = FakeTabulator.instances.length;
+    const host = wrap.querySelector(".jx-grid-host");
+    expect(host).not.toBeNull();
+
+    // A toolbar-only state change: the effect tracks `saving`, so this repaints the shell.
+    controller.state.saving = true;
+    await flush();
+    controller.state.saving = false;
+    await flush();
+
+    expect(wrap.querySelector(".jx-grid-host")).toBe(host);
+    expect(FakeTabulator.instances.length).toBe(engine);
+    expect(FakeTabulator.instances.at(-1)!.destroyed).toBeFalse();
+  });
+
   test("Save button reflects the dirty count and triggers controller.save", async () => {
     const wrap = document.createElement("div");
     document.body.append(wrap);

@@ -488,6 +488,9 @@ export function renderFilesTemplate({
       class="file-tree"
       role="tree"
       aria-label="Project files"
+      @keydown=${(e: KeyboardEvent) => {
+        onFileTreeKeydown(e, e.currentTarget as HTMLElement);
+      }}
       ${ref((el) => {
         if (el) {
           afterFileTreeRender(el as HTMLElement);
@@ -814,26 +817,15 @@ async function toggleTreeDirectory(path: string): Promise<void> {
   }
 }
 
-/** Tree elements this module has already given a keydown listener. */
-const _keyboardTrees = new WeakSet<HTMLElement>();
-
-/**
- * Give the tree its keyboard, once per tree ELEMENT.
+/*
+ * There is no setupTreeKeyboard here any more, and no WeakSet of trees that already have one.
  *
- * The panel's `afterRender` calls this after every repaint and lit re-uses the `.file-tree` element
- * across all of them, so the unguarded `addEventListener` it replaces accumulated one listener per
- * render — after ten repaints a single Down keystroke walked ten rows. The WeakSet still lets a
- * remounted panel's new element bind its own.
+ * The panel's afterRender called it after every repaint and lit re-uses the `.file-tree` element
+ * across all of them, so the unguarded `addEventListener` it replaced accumulated one listener per
+ * render — after ten repaints a single Down keystroke walked ten rows. The WeakSet made that safe;
+ * `@keydown` on the element the template already renders makes it impossible, because lit owns the
+ * binding and swaps it rather than stacking it.
  */
-export function setupTreeKeyboard(tree: HTMLElement) {
-  if (_keyboardTrees.has(tree)) {
-    return;
-  }
-  _keyboardTrees.add(tree);
-  tree.addEventListener("keydown", (e: KeyboardEvent) => {
-    onFileTreeKeydown(e, tree);
-  });
-}
 
 /**
  * The tree's keyboard model: ↑↓ walk the rows, → expands, ← collapses, Enter opens.
@@ -1875,11 +1867,7 @@ export function registerFilesPanel(): void {
     dock: "navigator",
     icon: "sp-icon-folder",
     render: (ctx) => ctx.deps.renderFilesTemplate(),
-    afterRender: (ctx, host) => {
-      const tree = host.querySelector(".file-tree") as HTMLElement | null;
-      if (tree) {
-        ctx.deps.setupTreeKeyboard(tree);
-      }
+    afterRender: (ctx) => {
       ctx.deps.registerFileTreeDnD({ renderLeftPanel: ctx.rerender });
     },
   });

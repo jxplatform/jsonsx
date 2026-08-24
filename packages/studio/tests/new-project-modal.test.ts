@@ -14,6 +14,7 @@ import {
   npPreview,
   npSlug,
   npType,
+  mountOverlayLayers,
 } from "./harness";
 import { afterEach, describe, expect, test } from "bun:test";
 
@@ -21,11 +22,7 @@ const { closeNewProjectModal, openNewProjectModal } =
   await import("../src/new-project/new-project-modal");
 const { initLayers } = await import("../src/ui/layers");
 
-document.body.innerHTML = `
-  <div id="layer-popover"></div>
-  <div id="layer-modal"></div>
-  <div id="layer-dialog"></div>
-`;
+mountOverlayLayers(document.body);
 initLayers();
 
 function modal(): HTMLElement | null {

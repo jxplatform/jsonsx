@@ -137,6 +137,7 @@ const {
   setToolbarRefresh,
 } = await import("../src/canvas/iframe-host");
 const { flushCanvasEdits } = await import("../src/canvas/iframe-host");
+const { needsReleaseReconcile } = await import("../src/canvas/iframe-host");
 
 beforeEach(() => {
   channels.length = 0;
@@ -560,6 +561,67 @@ describe("mountIframeCanvas", () => {
       const q1 = new URL(src1, location.href).searchParams;
       expect(q1.get("parentOrigin")).toBe(location.origin);
       expect(q1.get("token")).toBeTruthy();
+    } finally {
+      g.__jxPlatform = saved;
+    }
+  });
+
+  /* The fallback, which for most of its life was a literal `/packages/studio/canvas.html` — the
+     repo dev server's path, baked into a browser bundle, correct on one host out of four. It
+     resolves against the ENTRY's directory now, so it is right everywhere rather than accidentally
+     unused because every other host overrode it. tests/with-dom.ts anchors the entry at the url the
+     dev server really serves it from, so the answer here is byte-identical to the old literal. */
+  test("with no canvasUrl the default resolves beside the bundle", async () => {
+    const g = globalThis as unknown as { __jxPlatform?: unknown };
+    const saved = g.__jxPlatform;
+    g.__jxPlatform = { id: "devserver" } as never;
+    try {
+      const canvasEl = document.createElement("div");
+      document.body.append(canvasEl);
+      await mountIframeCanvas(41, { tagName: "div" } as never, canvasEl);
+      const src = canvasEl.querySelector("iframe")!.getAttribute("src")!;
+      expect(src.startsWith("/packages/studio/canvas.html?")).toBe(true);
+    } finally {
+      g.__jxPlatform = saved;
+    }
+  });
+
+  /* Electrobun resolves its canvasUrl over RPC inside activate(), and the fallback must NOT be
+     mounted while it waits. Before the fallback was anchored it did not matter — the old literal
+     resolved to nothing servable under views://, so an early frame just failed. Now it resolves,
+     to a canvas.html electrobun really stages, and an early frame would boot the canvas bundle
+     inside the shell's app-privileged origin in a CEF instance running
+     disable-site-isolation-trials. The cross-origin loopback canvas exists so that cannot happen. */
+  test("a platform that defers its canvasUrl gets about:blank, not the bundle-relative default", async () => {
+    const g = globalThis as unknown as { __jxPlatform?: unknown };
+    const saved = g.__jxPlatform;
+    g.__jxPlatform = { canvasUrlDeferred: true, id: "desktop" } as never;
+    try {
+      const canvasEl = document.createElement("div");
+      document.body.append(canvasEl);
+      await mountIframeCanvas(42, { tagName: "div" } as never, canvasEl);
+      const src = canvasEl.querySelector("iframe")!.getAttribute("src")!;
+      expect(src.startsWith("about:blank")).toBe(true);
+      expect(src).not.toContain("canvas.html");
+    } finally {
+      g.__jxPlatform = saved;
+    }
+  });
+
+  test("a deferred platform that has since resolved its url uses it", async () => {
+    const g = globalThis as unknown as { __jxPlatform?: unknown };
+    const saved = g.__jxPlatform;
+    g.__jxPlatform = {
+      canvasUrl: "http://127.0.0.1:5111/__studio__/canvas.html",
+      canvasUrlDeferred: true,
+      id: "desktop",
+    } as never;
+    try {
+      const canvasEl = document.createElement("div");
+      document.body.append(canvasEl);
+      await mountIframeCanvas(43, { tagName: "div" } as never, canvasEl);
+      const src = canvasEl.querySelector("iframe")!.getAttribute("src")!;
+      expect(src.startsWith("http://127.0.0.1:5111/__studio__/canvas.html?")).toBe(true);
     } finally {
       g.__jxPlatform = saved;
     }
@@ -1565,6 +1627,98 @@ describe("iframe canvas inline-edit bridge", () => {
     });
     const card = (activeTab.value!.doc.document.children as { $props?: { title?: string } }[])[0]!;
     expect(card.$props?.title).toBe("Regional");
+  });
+
+  test("an in-place prop commit is echo-suppressed — the caret must survive it", async () => {
+    // A $props change re-renders the whole instance, which would tear out the nested editing host
+    // The user is typing in. This is why the suppression exists, and the next test is why it needs
+    // Undoing on release.
+    resetWorkspaceWithTab({
+      children: [{ $props: { title: "Local" }, tagName: "x-card" }],
+      tagName: "div",
+    });
+    await mountReady();
+    channels[0]!.posts.length = 0;
+    channels[0]!.deliver({
+      inPlace: true,
+      kind: "editCommitProp",
+      path: ["children", 0],
+      prop: "title",
+      value: "Regional",
+    });
+    expect(channels[0]!.posts.filter((m) => m.kind === "patch")).toEqual([]);
+  });
+
+  describe("re-rendering the instance when the release commit no-ops", () => {
+    /* The tick wrote and its patch was suppressed so the caret would survive; the release then
+       posts the SAME string, the apply legitimately declines to transact, and — before this — no
+       patch was ever generated. The canvas kept showing pre-edit output while the document held the
+       new value: empty a heading and it stays visibly empty, and any second place the component
+       renders that prop keeps the old text.
+
+       The decision is tested here rather than the post: postPatchToHosts needs a resolvable stage
+       that this harness does not build, and it is covered on its own. What was wrong is the state
+       machine — three conditions that have to agree. */
+    const AT = '["children",0]';
+
+    test("a suppressed in-place commit followed by a no-op release reconciles", () => {
+      expect(needsReleaseReconcile(false, AT, AT)).toBe(true);
+    });
+
+    test("a release that DID transact is not reconciled — its own patch already ran", () => {
+      expect(needsReleaseReconcile(true, AT, AT)).toBe(false);
+    });
+
+    test("a release with nothing suppressed behind it reconciles nothing", () => {
+      // Type-and-leave inside the idle window: there was never a suppressed render to make good.
+      expect(needsReleaseReconcile(false, null, AT)).toBe(false);
+    });
+
+    test("a suppressed commit on a DIFFERENT instance does not reconcile this one", () => {
+      // Two prop sessions in a row: the pending path must be matched, not merely present, or
+      // Releasing the second would rebuild the first.
+      expect(needsReleaseReconcile(false, '["children",1]', AT)).toBe(false);
+    });
+  });
+
+  describe("clicking from one prop slot to another in the same instance", () => {
+    /* The first slot's release commit transacts, which rebuilds the WHOLE instance
+       (`set-key $props` → replaceSubtree). The frame has already adopted a marker inside the
+       subtree about to be replaced, so the session it just opened is dead on arrival — the click
+       did nothing and the user had to click again. The host defers a re-entry so it survives. */
+    async function twoSlots(secondPath: (string | number)[], value = "Regional") {
+      resetWorkspaceWithTab({
+        children: [{ $props: { subtitle: "S", title: "Local" }, tagName: "x-card" }],
+        tagName: "div",
+      });
+      await mountReady();
+      channels[0]!.deliver({ kind: "editCommitProp", path: ["children", 0], prop: "title", value });
+      channels[0]!.posts.length = 0;
+      channels[0]!.deliver({ kind: "editStart", path: secondPath, prop: "subtitle" });
+      return channels[0]!;
+    }
+
+    test("the second session is re-entered after the rebuild", async () => {
+      const ch = await twoSlots(["children", 0]);
+      // The deferral drains when the host acks a render at or past the gen it recorded.
+      ch.deliver({ gen: 99, kind: "renderComplete" });
+      const enter = ch.posts.find((m) => m.kind === "enterEdit");
+      expect(enter).toMatchObject({ path: ["children", 0], prop: "subtitle" });
+    });
+
+    test("a slot in a DIFFERENT instance is left alone — that rebuild does not touch it", async () => {
+      // Deferring there would re-enter a session the patch never disturbed, stealing the caret.
+      const ch = await twoSlots(["children", 1]);
+      ch.deliver({ gen: 99, kind: "renderComplete" });
+      expect(ch.posts.find((m) => m.kind === "enterEdit")).toBeUndefined();
+    });
+
+    test("a release that did NOT transact defers nothing — there is no rebuild to survive", async () => {
+      // Unchanged text commits nothing (see #182), so the instance is never replaced.
+      const ch = await twoSlots(["children", 0], "Local");
+      ch.deliver({ gen: 99, kind: "renderComplete" });
+      expect(ch.posts.find((m) => m.kind === "enterEdit")).toBeUndefined();
+    });
   });
 
   test("editCommitProp routes to the ORIGINATING tab when it races a tab switch", async () => {

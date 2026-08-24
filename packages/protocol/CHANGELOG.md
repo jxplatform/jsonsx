@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.2.0](https://github.com/jxsuite/jx/compare/protocol-v1.1.2...protocol-v1.2.0) (2026-08-23)
+
+
+### Features
+
+* **studio:** Cloudflare is the lead AI recommendation, and can be reconnected ([#174](https://github.com/jxsuite/jx/issues/174)) ([aa13308](https://github.com/jxsuite/jx/commit/aa1330859b995e2c0b4a658cc04cf4525cb3ff79))
+
+## [1.1.2](https://github.com/jxsuite/jx/compare/protocol-v1.1.1...protocol-v1.1.2) (2026-08-21)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/schema bumped to 1.8.0
+
+## [1.1.1](https://github.com/jxsuite/jx/compare/protocol-v1.1.0...protocol-v1.1.1) (2026-08-21)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/schema bumped to 1.7.0
+
 ## [1.1.0](https://github.com/jxsuite/jx/compare/protocol-v1.0.0...protocol-v1.1.0) (2026-08-19)
 
 

@@ -80,7 +80,7 @@ committed passthrough `public/CNAME`.
 | bun run docs:claims         | Marketing copy, download links, starter counts and card slugs, screenshot references  |
 | bun run docs:check          | Docs `code:` frontmatter resolves — several pages name files in `jxsuite.com` by path |
 | bun run schema:validate-all | Every project root here validates end-to-end against its composed schema              |
-| bun run schema:verify       | The committed `project.schema.json` / `document.schema.json` match their generators   |
+| bun run schema:verify       | Every committed schema matches its generator (`schema:sync` fixes; CI pushes the fix) |
 
 `docs:claims` runs both in the ungated `checks` job on every PR and, before anything is built, as the
 site deploy's first gate.

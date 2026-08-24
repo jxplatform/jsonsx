@@ -21,3 +21,17 @@ const { happyDOM } = globalThis as {
 if (happyDOM?.settings) {
   happyDOM.settings.disableIframePageLoading = true;
 }
+
+/*
+ * Anchor the bundle base, which only an ENTRY sets in production (`src/services/bundle-base.ts`).
+ *
+ * `bun test` imports modules directly, so no entry runs and `bundleUrl()` would throw — correctly,
+ * but uselessly, in every suite that reaches a Monaco worker url or the default canvas url. Set the
+ * url the repo dev server really serves the entry from, so those suites resolve exactly what a
+ * browser at `http://localhost:3000/packages/studio/index.html` resolves.
+ *
+ * This file rather than `harness.ts`: `harness.ts` imports it, and 127 test files import `with-dom`
+ * directly without the harness.
+ */
+const { setBundleBase } = await import("../src/services/bundle-base");
+setBundleBase("http://localhost:3000/packages/studio/dist/studio.js");

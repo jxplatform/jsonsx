@@ -82,6 +82,7 @@ void mock.module("@jxsuite/studio/import-client", () => ({
 // ─── Import module under test (after mocks + DOM) ──────────────────────────
 
 const { createDesktopPlatform } = await import("../src/platform");
+const { getPreviewNavigateHandler } = await import("@jxsuite/studio/preview-navigate");
 
 // Stub the original fetch BEFORE the platform wraps it, so passthrough is observable.
 const passthroughFetch = mock(async () => new Response("passthrough-body", { status: 299 }));
@@ -787,14 +788,86 @@ describe("activate() initial asset sweep", () => {
   });
 });
 
+// ─── Preview links ───────────────────────────────────────────────────────────
+
+/*
+ * A link followed in Preview exists to see the real page behave like the real thing, so it leaves
+ * the editor entirely. The failure mode this covers is quiet: `openExternal` ANSWERS when the OS
+ * has no opener — `{ ok: false }` — so a handler that only caught rejections dropped the click.
+ */
+describe("preview link navigation", () => {
+  test("hands the url to the OS", async () => {
+    const before = callsFor("openExternal").length;
+    impls.set("openExternal", () => ({ ok: true }));
+    getPreviewNavigateHandler()!("https://example.com/blog/");
+    await until(() => callsFor("openExternal").length > before);
+    expect(callsFor("openExternal").at(-1)!.args).toEqual([{ url: "https://example.com/blog/" }]);
+  });
+
+  test("falls back to a new tab when the OS REFUSES rather than throws", async () => {
+    impls.set("openExternal", () => ({ ok: false }));
+    const opened = trackWindowOpen();
+    try {
+      getPreviewNavigateHandler()!("https://example.com/refused/");
+      await until(() => opened.urls.length > 0);
+      expect(opened.urls).toEqual(["https://example.com/refused/"]);
+    } finally {
+      opened.restore();
+    }
+  });
+
+  test("falls back to a new tab when the request rejects", async () => {
+    impls.set("openExternal", () => {
+      throw new Error("rpc down");
+    });
+    const opened = trackWindowOpen();
+    try {
+      getPreviewNavigateHandler()!("https://example.com/thrown/");
+      await until(() => opened.urls.length > 0);
+      expect(opened.urls).toEqual(["https://example.com/thrown/"]);
+    } finally {
+      opened.restore();
+    }
+  });
+});
+
+/** Capture `window.open` calls without letting happy-dom navigate anything. */
+function trackWindowOpen() {
+  const urls: string[] = [];
+  const original = window.open;
+  window.open = ((url?: string | URL) => {
+    urls.push(String(url));
+    return null;
+  }) as typeof window.open;
+  return {
+    restore: () => {
+      window.open = original;
+    },
+    urls,
+  };
+}
+
+/** Wait for a condition a pending promise will make true. */
+async function until(predicate: () => boolean, timeoutMs = 2000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!predicate() && Date.now() < deadline) {
+    await new Promise((resolve) => {
+      setTimeout(resolve, 5);
+    });
+  }
+}
+
 describe("getAppInfo", () => {
-  test("reports 'Up to date' when no update is pending", async () => {
-    impls.set("updaterGetLocalInfo", () => ({ channel: "stable", hash: "abc", version: "1.2.3" }));
-    impls.set("updaterGetStatus", () => ({
-      error: null,
-      updateAvailable: false,
-      updateReady: false,
-      version: null,
+  /* The composition moved to the Bun side (updater.ts `composeAppInfo`, covered in
+     updater.test.ts), so what is left to check here is that the webview asks for it as ONE request
+     and passes the answer through untouched — the property that lets the chromium launcher, which
+     has no updater, answer the same About screen. */
+  test("passes the launcher's composed answer through", async () => {
+    impls.set("appInfo", () => ({
+      channel: "stable",
+      hash: "abc",
+      updateStatus: "Up to date",
+      version: "1.2.3",
     }));
     const info = await platform.getAppInfo!();
     expect(info).toEqual({
@@ -805,46 +878,11 @@ describe("getAppInfo", () => {
     });
   });
 
-  test("reports available then ready updates", async () => {
-    impls.set("updaterGetLocalInfo", () => ({ channel: "canary", hash: "d", version: "1.0.0" }));
-    impls.set("updaterGetStatus", () => ({
-      error: null,
-      updateAvailable: true,
-      updateReady: false,
-      version: "1.1.0",
-    }));
-    const available = await platform.getAppInfo!();
-    expect(available.updateStatus).toBe("Update available (1.1.0)");
-    impls.set("updaterGetStatus", () => ({
-      error: null,
-      updateAvailable: true,
-      updateReady: true,
-      version: "1.1.0",
-    }));
-    const ready = await platform.getAppInfo!();
-    expect(ready.updateStatus).toBe("Update ready (1.1.0)");
-  });
-
-  test("reports a failed update check", async () => {
-    impls.set("updaterGetLocalInfo", () => ({ channel: "stable", hash: "d", version: "1.0.0" }));
-    impls.set("updaterGetStatus", () => ({
-      error: "boom",
-      updateAvailable: false,
-      updateReady: false,
-      version: null,
-    }));
-    const failed = await platform.getAppInfo!();
-    expect(failed.updateStatus).toBe("Update check failed: boom");
-  });
-
-  test("omits updateStatus when the status call throws", async () => {
-    impls.set("updaterGetLocalInfo", () => ({ channel: "stable", hash: "d", version: "1.0.0" }));
-    impls.set("updaterGetStatus", () => {
-      throw new Error("rpc down");
-    });
+  test("a launcher with no update feed omits the status rather than inventing one", async () => {
+    impls.set("appInfo", () => ({ channel: "system", hash: "unknown", version: "1.4.1" }));
     const info = await platform.getAppInfo!();
     expect(info.updateStatus).toBeUndefined();
-    expect(info.version).toBe("1.0.0");
+    expect(info.channel).toBe("system");
   });
 });
 

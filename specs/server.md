@@ -2,9 +2,9 @@
 
 ## Development Server with Live Reload, Proxy Resolution, and Studio API
 
-**Version:** 0.2.9
+**Version:** 0.2.11
 **Status:** Implemented
-**Updated:** 2026-08-18
+**Updated:** 2026-08-22
 **License:** MIT
 
 ---
@@ -81,6 +81,13 @@ SSE (Server-Sent Events) endpoint backed by `src/watch.ts`. A chokidar watcher o
 1. Runs the `preReload` hook, if configured (e.g. `jx dev`'s site rebuild)
 2. Selectively rebuilds any `builds` entries whose `match` covers the changed file, broadcasting a reload on success
 3. Otherwise broadcasts a reload only when `reloadOnAnyChange` is set
+
+**What a watcher will not watch (`src/watch-policy.ts`).** `watch.ignore` is a rule about names, and two things that break a watcher cannot be recognised by name. Both watchers — this one and the desktop session's (`refactor/watcher.ts`) — therefore compose it with an entry-kind rule:
+
+- **Only directories and regular files are watched.** A unix socket, FIFO or device node answers `fs.watch` with `ENXIO`, which chokidar raises as an `error` event; a watcher without an `error` listener does not log that, it throws. Both watchers listen.
+- **Symlinks are contained, not banned.** A link resolving back inside the root is project content and keeps its events; one resolving outside it, or dangling, is dropped. Following a link out of the root turns a project watcher into a walk of the filesystem — `~/.wine/dosdevices/z:` points at `/`, and a launcher that had adopted the home directory as its project root found it.
+
+The second rule is a containment invariant, not a convenience: **a watcher never emits an event for a path outside the root it was given.**
 
 Two event streams share the connection: the default (unnamed) `reload` message that the injected client (`injectSSE`) turns into `location.reload()`, and named `fs` events — coalesced structured filesystem events that the Studio shell subscribes to for its sidebar while the preview iframe ignores them. Heartbeats every 15 s keep connections alive.
 
@@ -187,6 +194,8 @@ A second, looser **`embeddable`** policy exists for one reason: the desktop canv
 **The loopback block, not one address.** IANA reserves `127.0.0.0/8` and every address in it is this machine, so `127.0.0.2` is loopback exactly as `127.0.0.1` is; recognizing only the canonical spelling would reject a client for nothing. `0.0.0.0` is accepted as a **Host** — a server bound to it in a container is reached at that literal — and **never as an Origin**, since no page is ever served from `http://0.0.0.0`.
 
 **Loopback project server (`src/project-server.ts`, used by the desktop launchers).** Adds, on top of the above, a **per-server token** as the hard gate on the WebSocket RPC upgrade, the resolve/import routes, and the AI proxy — the desktop canvas iframe is cross-origin, so it carries the token in its URL where the same-origin dev server does not need one.
+
+The RPC socket carries traffic in **both** directions. A frame with an `id` answers something the shell asked; a frame with a `method` and **no** `id` is the server speaking first (`ProjectServerHandle.push`), which is how the desktop launchers deliver what is not an answer to anything: batched filesystem events for the sidebar — the loopback twin of the dev server's named `fs` SSE event (§3.1) — and a request that a window come forward. A push may be addressed to one window id or broadcast, and reports how many sockets it reached, so a launcher can tell "delivered" from "nobody is listening yet".
 
 Which instrument gates which surface is a judgement about who calls it, not a uniform strength:
 
@@ -321,6 +330,8 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.2.11** (2026-08-22) — §3.1: watch-policy.ts — watchers watch only directories and regular files, and contain symlinks to the root, so a socket cannot throw and a link out cannot walk the filesystem.
+- **0.2.10** (2026-08-20) — The loopback project server's RPC socket carries server-initiated frames (ProjectServerHandle.push) — the loopback twin of the dev server's named fs SSE event, and the channel a desktop launcher raises a window over (§4.2).
 - **0.2.9** (2026-08-18) — §4.2: the Studio shell's report-only Trusted Types header is removed — see spec.md §21.5.
 - **0.2.8** (2026-08-18) — §4.2: both entry points send the Studio shell a report-only Trusted Types policy, and nothing else.
 - **0.2.7** (2026-08-16) — §4.2 Fetch Metadata on every gated surface, the loopback block, a constant-time token, and the three ungated project-server routes closed; gap:fetch-metadata closed.
@@ -344,4 +355,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/server` Specification v0.2.9_
+_`@jxsuite/server` Specification v0.2.11_

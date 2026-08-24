@@ -544,6 +544,91 @@ describe("ws dispatch", () => {
   });
 });
 
+// ─── Server-initiated frames ─────────────────────────────────────────────────
+
+/*
+ * Everything else on this socket answers an `id` the client chose. `push` is the other direction —
+ * the launcher speaking first about something the shell never asked for: a file changed under the
+ * project root, or another window asked this one to come forward. A pushed frame carries a `method`
+ * and no `id`, which is exactly how a client tells the two apart.
+ */
+describe("push", () => {
+  /** Collect the next frame carrying `method`, or resolve null on timeout. */
+  function nextPush(
+    ws: WebSocket,
+    method: string,
+    timeoutMs = 2000,
+  ): Promise<Record<string, unknown> | null> {
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        ws.removeEventListener("message", handler);
+        resolve(null);
+      }, timeoutMs);
+      const handler = (event: MessageEvent) => {
+        const msg = JSON.parse(event.data as string) as { method?: string };
+        if (msg.method !== method) {
+          return;
+        }
+        clearTimeout(timer);
+        ws.removeEventListener("message", handler);
+        resolve(msg as Record<string, unknown>);
+      };
+      ws.addEventListener("message", handler);
+    });
+  }
+
+  test("delivers an unsolicited frame with a method and no id", async () => {
+    const ws = await openWs(`?token=${token}&win=one`);
+    try {
+      const pushed = nextPush(ws, "onFileEvents");
+      expect(handle.push("onFileEvents", { events: [{ path: "a.json" }] })).toBe(1);
+      expect(await pushed).toEqual({
+        method: "onFileEvents",
+        params: { events: [{ path: "a.json" }] },
+      });
+    } finally {
+      ws.close();
+    }
+  });
+
+  test("a payload-less push carries no params at all", async () => {
+    const ws = await openWs(`?token=${token}&win=one`);
+    try {
+      const pushed = nextPush(ws, "focusWindow");
+      handle.push("focusWindow");
+      expect(await pushed).toEqual({ method: "focusWindow" });
+    } finally {
+      ws.close();
+    }
+  });
+
+  test("addressing a window delivers only to that window's sockets", async () => {
+    const one = await openWs(`?token=${token}&win=one`);
+    const two = await openWs(`?token=${token}&win=two`);
+    try {
+      const onTwo = nextPush(two, "focusWindow");
+      const onOne = nextPush(one, "focusWindow", 300);
+      expect(handle.push("focusWindow", undefined, "two")).toBe(1);
+      expect(await onTwo).toEqual({ method: "focusWindow" });
+      expect(await onOne).toBeNull();
+    } finally {
+      one.close();
+      two.close();
+    }
+  });
+
+  test("reaches nobody once the shell is gone, rather than throwing", async () => {
+    const ws = await openWs(`?token=${token}&win=one`);
+    ws.close();
+    // The close is asynchronous; wait for the server to drop the socket from its set.
+    const deadline = Date.now() + 2000;
+    while (handle.push("focusWindow") !== 0 && Date.now() < deadline) {
+      await Bun.sleep(10);
+    }
+    expect(handle.push("focusWindow")).toBe(0);
+  });
+});
+
 // ─── The OAuth loopback callback (RFC 8252) ──────────────────────────────────
 
 describe("the OAuth loopback callback", () => {

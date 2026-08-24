@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, jest, mock, test } from "bun:test";
+import type { UpdateStatus } from "../src/updater";
 
 const mockGetLocalInfo = mock(() => ({
   baseUrl: "https://updates.example.com",
@@ -9,7 +10,10 @@ const mockGetLocalInfo = mock(() => ({
   version: "1.0.0",
 }));
 
-const mockCheckForUpdate = mock(() => ({
+/* Annotated, not inferred. Inference off this one answer pins `version` to `string` and `error` to
+   `null`, which are exactly the two fields the interesting cases vary — an update with no version,
+   and a check that failed. */
+const mockCheckForUpdate = mock((): UpdateStatus => ({
   error: null,
   updateAvailable: true,
   updateReady: false,
@@ -34,6 +38,7 @@ void mock.module("electrobun/main", () => ({
 const {
   getLocalInfo,
   checkForUpdate,
+  composeAppInfo,
   downloadUpdate,
   applyUpdate,
   getStatus,
@@ -205,5 +210,74 @@ describe("startBackgroundChecks", () => {
     await Promise.resolve();
 
     expect(notifyCallback).toHaveBeenCalledWith("2.0.0");
+  });
+});
+
+// ─── composeAppInfo (the About screen's payload) ────────────────────────────
+
+/*
+ * The wording used to live in the electrobun webview, which is why the chromium launcher — with no
+ * updater to call — could not answer the About screen at all. It is composed on the Bun side now,
+ * so each launcher says only what its own build can know.
+ */
+describe("composeAppInfo", () => {
+  test("carries version, channel and hash from the local info", async () => {
+    mockCheckForUpdate.mockImplementationOnce(() => ({
+      error: null,
+      updateAvailable: false,
+      updateReady: false,
+      version: null,
+    }));
+    await checkForUpdate();
+    const info = await composeAppInfo();
+    expect(info).toEqual({
+      channel: "stable",
+      hash: "abc123",
+      updateStatus: "Up to date",
+      version: "1.0.0",
+    });
+  });
+
+  test("names an available update, then a ready one", async () => {
+    mockCheckForUpdate.mockImplementationOnce(() => ({
+      error: null,
+      updateAvailable: true,
+      updateReady: false,
+      version: "1.1.0",
+    }));
+    await checkForUpdate();
+    const available = await composeAppInfo();
+    expect(available.updateStatus).toBe("Update available (1.1.0)");
+
+    mockCheckForUpdate.mockImplementationOnce(() => ({
+      error: null,
+      updateAvailable: true,
+      updateReady: true,
+      version: "1.1.0",
+    }));
+    await checkForUpdate();
+    const ready = await composeAppInfo();
+    expect(ready.updateStatus).toBe("Update ready (1.1.0)");
+  });
+
+  test("a version-less update is named rather than hidden", async () => {
+    mockCheckForUpdate.mockImplementationOnce(() => ({
+      error: null,
+      updateAvailable: true,
+      updateReady: false,
+      version: null,
+    }));
+    await checkForUpdate();
+    const info = await composeAppInfo();
+    expect(info.updateStatus).toBe("Update available (?)");
+  });
+
+  test("reports a failed check instead of claiming to be up to date", async () => {
+    mockCheckForUpdate.mockImplementationOnce(() => {
+      throw new Error("boom");
+    });
+    await checkForUpdate();
+    const info = await composeAppInfo();
+    expect(info.updateStatus).toBe("Update check failed: boom");
   });
 });

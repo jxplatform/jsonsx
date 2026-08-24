@@ -75,7 +75,106 @@ describe("nothing at all", () => {
   });
 
   test("an empty diff runs nothing", () => {
-    expect(decide([], workspaces).testDirs).toEqual([]);
+    const d = decide([], workspaces);
+    expect(d.testDirs).toEqual([]);
+    expect(d.bundles).toEqual([]);
+  });
+});
+
+describe("the nix build", () => {
+  /*
+   * It runs on the RELEASE pull request alone. It used to be gated on the derivation's own inputs
+   * — bun.lock, package.json, packages/desktop/** — which is most Dependabot pull requests, and it
+   * is by far the slowest job in this workflow. The trade is deliberate and it is a real one: a
+   * dependency bump that breaks packaging no longer blocks its own auto-merge. It is caught one
+   * step later instead, on the release pull request, where `ci` still requires this job.
+   */
+  test("nix is gated on the release branch, not on a diff", async () => {
+    const workflow = await Bun.file(".github/workflows/test.yml").text();
+    expect(workflow).toContain("if: startsWith(github.head_ref, 'release-please--')");
+    expect(workflow).toContain("uses: ./.github/workflows/nix.yml");
+    // `head_ref` is empty on `push`, so the push-to-main run of THIS workflow does not build nix.
+    // Nix.yml's own `push: main` trigger owns that leg, and it exists for the cache, not the check.
+    expect(workflow).not.toContain("needs.changes.outputs.nix");
+  });
+
+  test("the branch prefix is the one release-please actually opens", () => {
+    // Not derivable from release-please-config.json: the branch name is release-please's default,
+    // `release-please--branches--<target>`. Pinned from the merged pull requests in this repo
+    // (#171, #164, #159 … all `release-please--branches--main`), and asserted here so a change to
+    // `separate-pull-requests` or a branch-prefix setting has to come past this line.
+    expect("release-please--branches--main".startsWith("release-please--")).toBe(true);
+  });
+
+  test("ci still depends on nix, so a red derivation blocks the RELEASE pull request", async () => {
+    // The whole value of moving it: skipped is green, failed is not. `ci` is the one name branch
+    // Protection points at, and a nix job it does not depend on could not block anything.
+    const workflow = await Bun.file(".github/workflows/test.yml").text();
+    expect(workflow).toContain(
+      "needs: [changes, test, checks, lens-mutants, studio-dist, nix, coverage-comment]",
+    );
+  });
+
+  test("the derivation's inputs still cost NOTHING in the test matrix", () => {
+    // This is what kept flake.nix out of GLOBAL, and it outlives the gate: no test suite reads
+    // These, so they must not fail open into the whole ~22-job fan-out either.
+    for (const path of ["flake.nix", "flake.lock", "bun.nix"]) {
+      const d = decide([path], workspaces);
+      expect(d.mode).toBe("affected");
+      expect(d.testDirs).toEqual([]);
+      expect(d.bundles).toEqual([]);
+    }
+  });
+
+  test("nix.yml must not ALSO carry its own pull_request trigger", async () => {
+    // Two triggers would mean two builds of the same commit on the release pull request, in
+    // Different concurrency groups, neither cancelling the other. test.yml owns this leg.
+    const workflow = await Bun.file(".github/workflows/nix.yml").text();
+    const triggers = workflow.slice(workflow.indexOf("\non:"), workflow.indexOf("\npermissions:"));
+    expect(triggers).not.toContain("pull_request:");
+    expect(triggers).toContain("workflow_call:");
+  });
+
+  test("test.yml requires studio-dist, and gates it on this script's output", async () => {
+    // The dist gate needs a real build, so it cannot live in `checks`. That makes it a job of its
+    // Own, and a job of its own is only load-bearing if the `ci` aggregate depends on it — the
+    // Assertion above pins that. This one pins the other half: it runs when, and only when, the
+    // Diff can reach studio's bundle. It consumes `gate_bundle`, which affected.ts already computes
+    // For bundle-analysis, so there is no second gate to keep in step.
+    const workflow = await Bun.file(".github/workflows/test.yml").text();
+    expect(workflow).toContain("if: contains(fromJSON(needs.changes.outputs.bundles), 'studio')");
+  });
+
+  test("every output the changes job forwards is one this script actually writes", async () => {
+    /*
+     * The mirror of the rule below, and the same silent failure from the other end: a job output
+     * Wired to `steps.affected.outputs.<name>` that the script never writes resolves to the empty
+     * String, so every consumer of it quietly reads false. `gate_nix` became exactly that the
+     * Moment the nix gate was deleted, and only this assertion would have said so.
+     */
+    const workflow = await Bun.file(".github/workflows/test.yml").text();
+    const script = await Bun.file("scripts/ci/affected.ts").text();
+    const block = workflow.slice(workflow.indexOf("    outputs:"), workflow.indexOf("    steps:"));
+    const wired = [...block.matchAll(/steps\.affected\.outputs\.(\w+)/g)].map((m) => m[1]);
+    const written = new Set([...script.matchAll(/^ {4}(\w+):/gm)].map((m) => m[1]));
+    expect(wired.length).toBeGreaterThan(0);
+    expect(wired.filter((name) => !written.has(name))).toEqual([]);
+  });
+
+  test("every needs.changes output a job reads is one the changes job declares", async () => {
+    // A `needs.<job>.outputs.<name>` that the producing job never declares is not an error in
+    // Actions — it resolves to the empty string. So `contains(fromJSON(""), 'studio')` is simply
+    // False, forever, and the job it guards silently never runs. That is exactly how studio-dist
+    // Shipped dead: affected.ts sets the STEP output `gate_bundle`, the changes job forwarded
+    // Five other outputs and not that one, and nothing anywhere said so.
+    const workflow = await Bun.file(".github/workflows/test.yml").text();
+    const block = workflow.slice(workflow.indexOf("    outputs:"), workflow.indexOf("    steps:"));
+    const declared = new Set([...block.matchAll(/^ {6}(\w+):/gm)].map((m) => m[1]));
+    const read = new Set(
+      [...workflow.matchAll(/needs\.changes\.outputs\.(\w+)/g)].map((m) => m[1]),
+    );
+    expect(declared.size).toBeGreaterThan(0);
+    expect([...read].filter((name) => !declared.has(name))).toEqual([]);
   });
 });
 

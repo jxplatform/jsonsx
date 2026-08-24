@@ -15,7 +15,14 @@
  *   overflow menu reopened AFTER such a click is the live one, which is the reachable state a stale
  *   `_overflowHandle` would have to be visible in.
  */
-import { flush, key, renderInto, resetWorkspaceWithTab, stubRect } from "./harness";
+import {
+  flush,
+  key,
+  renderInto,
+  resetWorkspaceWithTab,
+  stubRect,
+  mountOverlayLayers,
+} from "./harness";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import {
   activeTab,
@@ -536,11 +543,7 @@ describe("the tab strip", () => {
  */
 describe("a popover dismissed before its listener is armed", () => {
   beforeEach(() => {
-    document.body.innerHTML = `
-      <div id="layer-popover"></div>
-      <div id="layer-modal"></div>
-      <div id="layer-dialog"></div>
-    `;
+    mountOverlayLayers(document.body);
     initLayers();
   });
 

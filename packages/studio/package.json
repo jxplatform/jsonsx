@@ -1,6 +1,6 @@
 {
   "name": "@jxsuite/studio",
-  "version": "2.1.0",
+  "version": "2.4.1",
   "description": "Jx Studio — visual builder for Jx documents",
   "license": "MIT",
   "repository": {
@@ -9,12 +9,15 @@
     "directory": "packages/studio"
   },
   "files": [
-    "*.js",
     "src",
+    "data",
     "dist/studio.js",
     "dist/studio.css",
     "dist/iframe-entry.js",
-    "dist/chunks",
+    "dist/codicon.ttf",
+    "dist/manifest.json",
+    "dist/chunks/*.js",
+    "dist/chunks/*.css",
     "dist/workers",
     "index.html",
     "canvas.html",
@@ -30,6 +33,10 @@
     "./directory-picker": "./src/services/directory-picker.ts",
     "./import-client": "./src/services/import-client.ts",
     "./github-auth": "./src/github/github-auth.ts",
+    "./hosting": "./src/hosting/stage.ts",
+    "./hosting/layout": "./src/hosting/layout.ts",
+    "./hosting/document": "./src/hosting/document.ts",
+    "./package.json": "./package.json",
     "./platforms/cloud": "./src/platforms/cloud.ts",
     "./preview-navigate": "./src/canvas/preview-navigate.ts"
   },
@@ -38,7 +45,7 @@
   },
   "scripts": {
     "build": "bun run scripts/build.ts",
-    "build:metafile": "bun build ./src/studio.ts --outdir dist --target browser --sourcemap=linked --metafile=metafile.json",
+    "build:metafile": "bun build ./src/studio.ts --outdir dist-metafile --target browser --sourcemap=linked --metafile=metafile.json",
     "gen:webdata": "bun run scripts/gen-webdata.js",
     "eval": "bun run evals/cli.ts",
     "eval:headless": "bun run tests/harness/run-eval.ts",

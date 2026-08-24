@@ -1,6 +1,6 @@
 // oxlint-disable typescript/await-thenable -- bun test .resolves/.rejects matchers are typed `void` but return real Promises at runtime; the await is required.
 import { afterAll, beforeAll, describe, expect, mock, test } from "bun:test";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { CHROMIUM_RPC_EXEMPT, rpcParity } from "./_rpc-parity";
 
@@ -23,6 +23,10 @@ function toUrlPath(absPath: string): string {
 mkdirSync(join(FIXTURES, "public"), { recursive: true });
 mkdirSync(STUDIO_ASSETS, { recursive: true });
 writeFileSync(join(FIXTURES, "hello.txt"), "Hello Index");
+// A directory that is a project, and one that merely is a directory (what `$HOME` looks like).
+mkdirSync(join(FIXTURES, "implicit-project"), { recursive: true });
+mkdirSync(join(FIXTURES, "implicit-not-a-project"), { recursive: true });
+writeFileSync(join(FIXTURES, "implicit-project", "project.json"), '{"name":"implicit"}');
 writeFileSync(join(FIXTURES, "public", "pub.css"), "body { margin: 0 }");
 writeFileSync(join(STUDIO_ASSETS, "index.html"), "<html>studio-shell</html>");
 // The iframe canvas assets the launcher must serve (staged by scripts/stage-studio-assets.ts).
@@ -106,10 +110,24 @@ const handlerMocks = {
   openExternal: mock(({ url }: { url: string }) => ({ ok: url.startsWith("http") })),
   openProject: mock(() => Promise.resolve({ config: { name: "P" }, handle: { root: "." } })),
   createProject: mock(() => Promise.resolve({ config: { name: "New" }, root: "/new" })),
+  /* The picker WITHOUT the binding — the New Window branch of Open Project. Typed to the real
+     signature rather than inferred from this one answer: a cancel resolves null, and a stand-in
+     that cannot express it cannot stand in for the case that matters most. */
+  pickProjectFile: mock(
+    (): Promise<{ config: { name: string }; name: string; root: string } | null> =>
+      Promise.resolve({ config: { name: "Picked" }, name: "Picked", root: "/picked/project" }),
+  ),
   setDirectoryDialog: mock(() => {}),
   setFileDialog: mock(() => {}),
+  /* Registering a sink starts the watcher; the launcher points it at the project server's push
+     channel, so the test can drive a filesystem event straight into the wire. */
+  setFileEventSink: mock((sink: ((events: unknown[]) => void) | null) => {
+    fileEventSink = sink;
+  }),
   setProjectRoot: mock(() => {}),
 };
+
+let fileEventSink: ((events: unknown[]) => void) | null = null;
 
 const gitMocks = {
   gitAddRemote: mock(() => Promise.resolve()),
@@ -200,6 +218,9 @@ void mock.module("@jxsuite/import/run", () => ({ importSite: importSiteMock }));
 
 class FakeChrome {
   kill = mock(() => true);
+  /* Child launchers (the windows this one opens) are detached and unreferenced so that closing the
+     window which opened another does not close the other. */
+  unref = mock(() => {});
   private handlers = new Map<string, ((...args: unknown[]) => void)[]>();
 
   on(event: string, handler: (...args: unknown[]) => void): this {
@@ -216,9 +237,14 @@ class FakeChrome {
   }
 }
 const fakeChrome = new FakeChrome();
-const spawnCalls: { bin: string; args: string[] }[] = [];
-const spawnMock = mock((bin: string, args: string[], _opts: unknown) => {
-  spawnCalls.push({ args, bin });
+const spawnCalls: { bin: string; args: string[]; opts: SpawnOpts }[] = [];
+interface SpawnOpts {
+  detached?: boolean;
+  env?: Record<string, string>;
+  stdio?: string;
+}
+const spawnMock = mock((bin: string, args: string[], opts: SpawnOpts) => {
+  spawnCalls.push({ args, bin, opts });
   return fakeChrome;
 });
 void mock.module("node:child_process", () => ({ spawn: spawnMock }));
@@ -229,6 +255,13 @@ process.argv[2] = FIXTURES;
 process.env.JX_STUDIO_ASSETS = STUDIO_ASSETS;
 process.env.CHROMIUM_BIN = "sh";
 process.env.WAYLAND_DISPLAY ||= "wayland-test";
+/* The window registry is a real directory of real files shared by every launcher on the machine.
+   Point it at the fixtures so a test run neither reads the developer's open windows (which would
+   make the launcher's "already open — raising it" boot path fire against a live editor) nor leaves
+   a row behind in them. */
+const WINDOWS_DIR = join(FIXTURES, "_windows");
+process.env.JX_STUDIO_WINDOWS_DIR = WINDOWS_DIR;
+rmSync(WINDOWS_DIR, { force: true, recursive: true });
 
 const exitCalls: number[] = [];
 const realExit = process.exit;
@@ -259,6 +292,12 @@ console.log = (...args: unknown[]) => {
 };
 
 const chromiumIndex = await import("../src/chromium/index");
+
+/* Snapshot the registry row the launcher published at boot. Read HERE, before any test re-roots
+   the window, because the row is live state — `setWindowProject` rewrites it by design. */
+const bootEntry = JSON.parse(
+  readFileSync(join(WINDOWS_DIR, `${process.pid}.json`), "utf8"),
+) as Record<string, unknown>;
 
 console.log = realLog;
 (Bun as unknown as { serve: typeof Bun.serve }).serve = realServe;
@@ -852,5 +891,270 @@ describe("chromium launcher lifecycle", () => {
     }
     expect(captured.some((line) => line.includes("Browser closed (code 7)"))).toBe(true);
     expect(exitCalls.length).toBe(exitsBefore + 1);
+  });
+});
+
+// ─── Multi-window ───────────────────────────────────────────────────────────
+
+/*
+ * A window on this launcher is a PROCESS, so everything below crosses one: the registry is a real
+ * directory, "another window" is a real live pid, and opening one is a real spawn of this same
+ * entry point. Mocking the registry would test nothing — its entire purpose is to be readable by a
+ * process that shares no memory with this one.
+ */
+
+/** A live process to stand in for another window, since only a real pid reads as alive. */
+const otherWindow = Bun.spawn([process.execPath, "-e", "setTimeout(() => {}, 30000)"], {
+  stdio: ["ignore", "ignore", "ignore"],
+});
+
+afterAll(() => {
+  otherWindow.kill();
+});
+
+function registryFile(name: string): string {
+  return join(WINDOWS_DIR, name);
+}
+
+/** Publish a second live window at `root`, the way another launcher process would. */
+function publishOtherWindow(root: string | null) {
+  mkdirSync(WINDOWS_DIR, { recursive: true });
+  writeFileSync(
+    registryFile(`${otherWindow.pid}.json`),
+    JSON.stringify({
+      name: root ? root.split("/").pop() : null,
+      pid: otherWindow.pid,
+      profileDir: "/tmp/other-profile",
+      root,
+      url: "http://127.0.0.1:1",
+    }),
+  );
+}
+
+function clearOtherWindow() {
+  rmSync(registryFile(`${otherWindow.pid}.json`), { force: true });
+  rmSync(registryFile(`${otherWindow.pid}.focus`), { force: true });
+}
+
+/** Resolve with the next server-initiated frame carrying `method`, or reject on timeout. */
+function nextPush(method: string, timeoutMs = 3000): Promise<Record<string, unknown>> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      ws.removeEventListener("message", handler);
+      reject(new Error(`no ${method} push within ${timeoutMs}ms`));
+    }, timeoutMs);
+    const handler = (event: MessageEvent) => {
+      const msg = JSON.parse(event.data as string) as { method?: string };
+      if (msg.method !== method) {
+        return;
+      }
+      clearTimeout(timer);
+      ws.removeEventListener("message", handler);
+      resolve(msg as Record<string, unknown>);
+    };
+    ws.addEventListener("message", handler);
+  });
+}
+
+describe("window registry", () => {
+  test("the launcher publishes itself, so another window can find and dedupe against it", () => {
+    expect(bootEntry.pid).toBe(process.pid);
+    expect(bootEntry.root).toBe(FIXTURES);
+    expect(bootEntry.name).toBe("_fixtures_chromium_index");
+    // The row names the origin this window is serving, so the listing is worth reading.
+    expect(bootEntry.url).toBe(baseUrl);
+    expect(bootEntry.profileDir).toContain(join(".jx", "chromium-profile"));
+  });
+
+  test("listOpenWindows enumerates every live window, this one included", async () => {
+    publishOtherWindow("/proj/sibling");
+    try {
+      const windows = (await rpc("listOpenWindows")) as { id: number; projectRoot: string }[];
+      expect(windows.map((w) => w.id)).toContain(process.pid);
+      expect(windows).toContainEqual({ id: otherWindow.pid, projectRoot: "/proj/sibling" });
+    } finally {
+      clearOtherWindow();
+    }
+  });
+});
+
+describe("opening projects elsewhere", () => {
+  test("pickProject answers WHICH project without re-rooting this window", async () => {
+    const before = handlerMocks.setProjectRoot.mock.calls.length;
+    await expect(rpc("pickProject")).resolves.toEqual({
+      name: "Picked",
+      root: "/picked/project",
+    });
+    // The whole reason this exists beside openProject: picking must not bind.
+    expect(handlerMocks.setProjectRoot.mock.calls.length).toBe(before);
+  });
+
+  test("a cancelled pick is null, not an error", async () => {
+    handlerMocks.pickProjectFile.mockImplementationOnce(() => Promise.resolve(null));
+    await expect(rpc("pickProject")).resolves.toBeNull();
+  });
+
+  test("openProjectInNewWindow spawns another launcher for the project", async () => {
+    const before = spawnCalls.length;
+    await expect(rpc("openProjectInNewWindow", { root: "/proj/fresh" })).resolves.toEqual({
+      focused: false,
+    });
+    expect(spawnCalls.length).toBe(before + 1);
+    const spawned = spawnCalls.at(-1)!;
+    // The child is THIS entry point, given the project as its one positional argument.
+    expect(spawned.args[0]).toContain("chromium");
+    expect(spawned.args[1]).toBe("/proj/fresh");
+    // Its Chromium profile sits beside the project, so that window's layout and open tabs survive
+    // A restart — and, because the singleton is keyed on it, so that it gets a browser of its own.
+    expect(spawned.opts.env?.JX_STUDIO_PROFILE_DIR).toBe(
+      join("/proj/fresh", ".jx", "chromium-profile"),
+    );
+    expect(spawned.opts.env?.JX_STUDIO_NO_PROJECT).toBeUndefined();
+    expect(spawned.opts.detached).toBe(true);
+    expect(fakeChrome.unref).toHaveBeenCalled();
+  });
+
+  test("a project already open elsewhere is RAISED, and says so instead of opening a second one", async () => {
+    publishOtherWindow("/proj/already-open");
+    try {
+      const before = spawnCalls.length;
+      await expect(rpc("openProjectInNewWindow", { root: "/proj/already-open" })).resolves.toEqual({
+        focused: true,
+      });
+      expect(spawnCalls.length).toBe(before);
+      expect(existsSync(registryFile(`${otherWindow.pid}.focus`))).toBe(true);
+    } finally {
+      clearOtherWindow();
+    }
+  });
+
+  test("newWindow spawns a launcher with no project", async () => {
+    const before = spawnCalls.length;
+    await rpc("newWindow");
+    expect(spawnCalls.length).toBe(before + 1);
+    const spawned = spawnCalls.at(-1)!;
+    // No positional root — and the flag that stops the child adopting this process's cwd.
+    expect(spawned.args).toHaveLength(1);
+    expect(spawned.opts.env?.JX_STUDIO_NO_PROJECT).toBe("1");
+    // A welcome window has no project to key a profile on, so it takes a free numbered slot.
+    expect(spawned.opts.env?.JX_STUDIO_PROFILE_DIR).toContain("welcome-");
+  });
+});
+
+describe("setWindowProject", () => {
+  test("re-roots this window and republishes it under the new project", async () => {
+    const target = join(FIXTURES, "_rerooted");
+    mkdirSync(target, { recursive: true });
+    await expect(rpc("setWindowProject", { root: target })).resolves.toEqual({
+      config: null,
+      deduped: false,
+    });
+    expect(handlerMocks.setProjectRoot).toHaveBeenLastCalledWith(target);
+    const own = JSON.parse(readFileSync(registryFile(`${process.pid}.json`), "utf8")) as {
+      root: string;
+      name: string;
+    };
+    expect(own.root).toBe(target);
+    expect(own.name).toBe("_rerooted");
+  });
+
+  test("refuses to bind a project another window already holds, and raises that one", async () => {
+    publishOtherWindow("/proj/taken");
+    try {
+      const before = handlerMocks.setProjectRoot.mock.calls.length;
+      await expect(rpc("setWindowProject", { root: "/proj/taken" })).resolves.toEqual({
+        config: null,
+        deduped: true,
+      });
+      expect(handlerMocks.setProjectRoot.mock.calls.length).toBe(before);
+      expect(existsSync(registryFile(`${otherWindow.pid}.focus`))).toBe(true);
+    } finally {
+      clearOtherWindow();
+    }
+  });
+});
+
+// ─── Server-initiated frames ────────────────────────────────────────────────
+
+describe("pushed messages", () => {
+  test("filesystem changes reach the shell unasked, which is what keeps the sidebar live", async () => {
+    const pushed = nextPush("onFileEvents");
+    fileEventSink?.([{ isDir: false, path: "pages/index.json", type: "change" }]);
+    await expect(pushed).resolves.toEqual({
+      method: "onFileEvents",
+      params: { events: [{ isDir: false, path: "pages/index.json", type: "change" }] },
+    });
+  });
+
+  test("a focus request from another window is relayed to the page, which is what can raise it", async () => {
+    const pushed = nextPush("focusWindow");
+    mkdirSync(WINDOWS_DIR, { recursive: true });
+    writeFileSync(registryFile(`${process.pid}.focus`), "");
+    await expect(pushed).resolves.toEqual({ method: "focusWindow" });
+    // Consumed, so the window does not keep raising itself forever.
+    expect(existsSync(registryFile(`${process.pid}.focus`))).toBe(false);
+  });
+});
+
+// ─── About screen ───────────────────────────────────────────────────────────
+
+describe("appInfo", () => {
+  test("reports the channel and no update status — the packager owns updates here", async () => {
+    const info = (await rpc("appInfo")) as { channel: string; updateStatus?: string };
+    expect(info.channel).toBe("system");
+    expect(info.updateStatus).toBeUndefined();
+  });
+});
+
+// ─── The working directory as a project root ────────────────────────────────
+
+describe("implicitProjectRoot", () => {
+  test("adopts the working directory when it holds a project.json", () => {
+    // The workflow the fallback exists for: `jx-studio` typed inside a project opens it.
+    expect(chromiumIndex.implicitProjectRoot(join(FIXTURES, "implicit-project"))).toBe(
+      join(FIXTURES, "implicit-project"),
+    );
+  });
+
+  test("refuses a working directory that is not a project", () => {
+    // The regression: launched from a desktop entry or a shell sitting in $HOME, the old
+    // Unconditional fallback made the home directory the project root and the session watched all
+    // Of it — while the window showed the welcome screen, because nothing there was a project.
+    expect(chromiumIndex.implicitProjectRoot(join(FIXTURES, "implicit-not-a-project"))).toBeNull();
+  });
+});
+
+// ─── Second launcher for an already-open project ────────────────────────────
+
+describe("raiseExistingWindow", () => {
+  test("raises the window that holds the project instead of opening a second one", () => {
+    publishOtherWindow("/proj/held");
+    try {
+      expect(chromiumIndex.raiseExistingWindow("/proj/held")).toBe(true);
+      expect(existsSync(registryFile(`${otherWindow.pid}.focus`))).toBe(true);
+    } finally {
+      clearOtherWindow();
+    }
+  });
+
+  test("a project nobody holds opens here", () => {
+    expect(chromiumIndex.raiseExistingWindow("/proj/nobody-has-this")).toBe(false);
+  });
+
+  test("a welcome window has no project to dedupe on", () => {
+    expect(chromiumIndex.raiseExistingWindow(null)).toBe(false);
+  });
+});
+
+// ─── Leaving the registry ───────────────────────────────────────────────────
+// Last in the file on purpose: it removes this window's row, which everything above reads.
+
+describe("releaseWindow", () => {
+  test("removes this window's row, once, however the process is ending", () => {
+    expect(existsSync(registryFile(`${process.pid}.json`))).toBe(true);
+    chromiumIndex.releaseWindow();
+    expect(existsSync(registryFile(`${process.pid}.json`))).toBe(false);
+    // Idempotent: `exit` fires after a SIGINT handler has already torn things down.
+    expect(() => chromiumIndex.releaseWindow()).not.toThrow();
   });
 });

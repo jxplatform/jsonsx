@@ -13,7 +13,7 @@ import { repeat } from "lit-html/directives/repeat.js";
 import { getPlatform } from "../platform";
 import { now } from "../services/clock";
 import { formatForPath } from "../format/format-host";
-import { projectState } from "../store";
+import { projectState, renderOnly } from "../store";
 import { activeTab } from "../workspace/workspace";
 import type { Tab } from "../tabs/tab";
 import { shell } from "../shell";
@@ -244,6 +244,16 @@ async function doPull() {
  * longer inherits the first one's History selection and timestamp.
  */
 let _pollTimer = null as ReturnType<typeof setInterval> | null;
+
+/**
+ * Whether the commit button's split menu is showing.
+ *
+ * State rather than a `hidden` attribute toggled on a node found by selector. The two were fighting
+ * by construction: the template declared the menu `hidden` unconditionally, so lit had committed
+ * that attribute, and every repaint of the panel — the 30-second git poll among them — would leave
+ * whatever the handler had last done to it standing, with no way for the template to take it back.
+ */
+let _splitMenuOpen = false;
 
 async function fetchGitLog() {
   const plat = getPlatform();
@@ -583,25 +593,18 @@ export function renderGitPanel(ctx: {
           <sp-action-button
             class="git-split-trigger"
             size="s"
-            @click=${(e: Event) => {
-              const menu = (
-                (e.currentTarget as HTMLElement).parentElement as HTMLElement
-              ).querySelector(".git-split-menu");
-              if (menu) {
-                menu.toggleAttribute("hidden");
-              }
+            @click=${() => {
+              _splitMenuOpen = !_splitMenuOpen;
+              renderOnly("leftPanel");
             }}
           >
             <sp-icon-chevron-down slot="icon" size="xs"></sp-icon-chevron-down>
           </sp-action-button>
-          <div class="git-split-menu" hidden>
+          <div class="git-split-menu" ?hidden=${!_splitMenuOpen}>
             <button
               class="git-split-menu-item"
-              @click=${(e: Event) => {
-                ((e.currentTarget as HTMLElement).parentElement as HTMLElement).setAttribute(
-                  "hidden",
-                  "",
-                );
+              @click=${() => {
+                _splitMenuOpen = false;
                 void doCommit();
               }}
             >

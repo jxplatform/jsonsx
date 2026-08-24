@@ -836,6 +836,10 @@ export function registerStudioCommands(
       openPalette: (mode) => {
         openQuickSearch(mode);
       },
+      newWindow: () => {
+        const platform = hasPlatform() ? getPlatform() : null;
+        void platform?.newWindow?.();
+      },
       panelRoster: panelFocusRoster(),
       openProject: () => openProjectFlow(hooks),
       redo: redoDocument,

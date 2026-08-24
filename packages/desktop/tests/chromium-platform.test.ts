@@ -70,6 +70,15 @@ const responses: Record<string, unknown> = {
   dataDeleteRow: { ok: true },
   listSecrets: { names: ["MAIN_URL"] },
   setSecrets: { names: ["MAIN_URL"], ok: true },
+  // View: Open in Browser — build, then open the OUTPUT on the origin the backend names.
+  buildSite: { errors: [], files: 12, routes: 4, url: "http://127.0.0.1:45678" },
+  // About screen. A system-packaged build has no update feed, so it reports no status.
+  appInfo: { channel: "system", hash: "unknown", version: "1.4.1" },
+  // Multi-window
+  pickProject: { name: "Sibling", root: "/proj/sibling" },
+  openProjectInNewWindow: { focused: false },
+  newWindow: null,
+  openExternal: { ok: true },
 };
 
 // Track forced errors for specific methods
@@ -78,6 +87,16 @@ const forcedErrors = new Map<string, string>();
 // Every request the platform actually sent, so a test can assert both that one RPC was used and
 // That another one was NOT (the folder chooser must never fire two dialogs).
 const methodLog: { method: string; params?: Record<string, unknown> }[] = [];
+
+/* Sockets the mock launcher can speak FIRST on. The chromium launcher pushes filesystem events and
+   focus requests, which are not answers to anything the shell asked, so a test needs the same. */
+const clients: { send: (data: string) => void }[] = [];
+
+function pushToClient(frame: Record<string, unknown>) {
+  for (const client of clients) {
+    client.send(JSON.stringify(frame));
+  }
+}
 
 const server = Bun.serve({
   fetch(req, srv) {
@@ -88,6 +107,9 @@ const server = Bun.serve({
   },
   port: 0,
   websocket: {
+    open(ws) {
+      clients.push(ws);
+    },
     message(ws, raw) {
       const msg = JSON.parse(raw as string) as {
         id: number;
@@ -170,7 +192,19 @@ const streamImport = mock((...args: unknown[]) => {
 });
 void mock.module("@jxsuite/studio/import-client", () => ({ streamImport }));
 
+/* The shell runs in a browser; this file does not load happy-dom, so the two window members the
+   platform reaches for get a stub. Both are genuinely used: `focus` is the only thing that can
+   raise an `--app` window, and `open` is the fallback when handing a URL to the OS fails. */
+const windowFocus = mock(() => {});
+const windowOpen = mock((_url: string, _target?: string, _features?: string) => null);
+Object.defineProperty(globalThis, "window", {
+  configurable: true,
+  value: { focus: windowFocus, open: windowOpen },
+  writable: true,
+});
+
 const { createDesktopPlatform } = await import("../src/chromium/platform");
+const { getPreviewNavigateHandler } = await import("@jxsuite/studio/preview-navigate");
 
 // ─── Tests ─────────────────────────────────────────────────────────────────
 
@@ -632,4 +666,126 @@ describe("chromium desktop platform", () => {
       ok: true,
     });
   });
+
+  // ─── View: Open in Browser ─────────────────────────────────────────────
+
+  /*
+   * The gap this whole surface closed: `View: Open in Browser` refused with "This backend cannot
+   * build a preview of the site." because the command probes for `buildSite` and this launcher —
+   * whose backend has answered the request all along — never exposed it on the platform.
+   */
+  test("buildSite returns the build report and the origin it is browsable at", async () => {
+    const result = await platform.buildSite!();
+    expect(result).toEqual({
+      errors: [],
+      files: 12,
+      routes: 4,
+      url: "http://127.0.0.1:45678",
+    });
+  });
+
+  // ─── About screen ──────────────────────────────────────────────────────
+
+  test("getAppInfo passes the launcher's channel through, with no invented update status", async () => {
+    const info = await platform.getAppInfo!();
+    expect(info.channel).toBe("system");
+    expect(info.updateStatus).toBeUndefined();
+  });
+
+  // ─── Multi-window ──────────────────────────────────────────────────────
+
+  test("pickProject asks WHICH project without binding this window to the answer", async () => {
+    await expect(platform.pickProject!()).resolves.toEqual({
+      name: "Sibling",
+      root: "/proj/sibling",
+    });
+    // Studio offers the New Window branch only when BOTH members exist, because picking with
+    // `openProject()` would re-root the very window the user said to keep.
+    expect(typeof platform.openProjectInNewWindow).toBe("function");
+  });
+
+  test("openProjectInNewWindow reports whether a window opened or one was raised", async () => {
+    await expect(platform.openProjectInNewWindow!("/proj/sibling")).resolves.toEqual({
+      focused: false,
+    });
+    expect(methodLog.at(-1)).toEqual({
+      method: "openProjectInNewWindow",
+      params: { root: "/proj/sibling" },
+    });
+  });
+
+  test("newWindow resolves without a payload", async () => {
+    await expect(platform.newWindow!()).resolves.toBeUndefined();
+  });
+
+  // ─── Server-initiated frames ───────────────────────────────────────────
+
+  test("pushed filesystem events reach the sidebar's subscriber", async () => {
+    const batches: unknown[][] = [];
+    const unsubscribe = platform.subscribeFileEvents!((events) => batches.push(events));
+    try {
+      pushToClient({
+        method: "onFileEvents",
+        params: { events: [{ isDir: false, path: "pages/index.json", type: "change" }] },
+      });
+      await until(() => batches.length === 1);
+      expect(batches).toEqual([[{ isDir: false, path: "pages/index.json", type: "change" }]]);
+    } finally {
+      unsubscribe();
+    }
+    // After unsubscribing the shell stops listening rather than accumulating dead handlers.
+    pushToClient({ method: "onFileEvents", params: { events: [{ path: "a.json" }] } });
+    await Bun.sleep(40);
+    expect(batches).toHaveLength(1);
+  });
+
+  test("an empty batch is not delivered, and an unknown push is not an error", async () => {
+    const batches: unknown[][] = [];
+    const unsubscribe = platform.subscribeFileEvents!((events) => batches.push(events));
+    try {
+      pushToClient({ method: "onFileEvents", params: { events: [] } });
+      pushToClient({ method: "somethingThisBuildDoesNotKnow", params: {} });
+      await Bun.sleep(40);
+      expect(batches).toEqual([]);
+    } finally {
+      unsubscribe();
+    }
+  });
+
+  test("a focus request raises the window, which only the page can do", async () => {
+    const before = windowFocus.mock.calls.length;
+    pushToClient({ method: "focusWindow" });
+    await until(() => windowFocus.mock.calls.length > before);
+    // Every shell on the socket acts on it; this file has two platforms connected.
+    expect(windowFocus.mock.calls.length).toBeGreaterThan(before);
+  });
+
+  // ─── Preview links ─────────────────────────────────────────────────────
+
+  test("preview links are handed to the OS, not to this frameless app window", async () => {
+    const handler = getPreviewNavigateHandler();
+    expect(handler).toBeInstanceOf(Function);
+    handler!("https://example.com/blog/");
+    await until(() => methodLog.some((entry) => entry.method === "openExternal"));
+    expect(methodLog.findLast((entry) => entry.method === "openExternal")).toEqual({
+      method: "openExternal",
+      params: { url: "https://example.com/blog/" },
+    });
+  });
+
+  test("a backend that cannot reach the OS falls back to a new browser tab", async () => {
+    forcedErrors.set("openExternal", "no desktop portal");
+    const before = windowOpen.mock.calls.length;
+    getPreviewNavigateHandler()!("https://example.com/fallback/");
+    await until(() => windowOpen.mock.calls.length > before);
+    expect(windowOpen.mock.calls.at(-1)?.[0]).toBe("https://example.com/fallback/");
+  });
 });
+
+/** Wait for a condition a pushed frame or a pending request will make true. */
+async function until(predicate: () => boolean, timeoutMs = 2000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!predicate() && Date.now() < deadline) {
+    await Bun.sleep(10);
+  }
+}

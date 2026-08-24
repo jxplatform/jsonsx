@@ -2,7 +2,6 @@
   stdenv,
   bun,
   makeWrapper,
-  copyDesktopItems,
   chromium,
   lib,
   runCommand,
@@ -147,12 +146,9 @@ stdenv.mkDerivation {
   nativeBuildInputs = [
     bun
     makeWrapper
-    copyDesktopItems
   ];
 
   dontConfigure = true;
-
-  desktopItems = [ ./jx-studio.desktop ];
 
   # `bun install` re-resolves a workspace's directly declared dependencies
   # against the registry even with a full cache and `--frozen-lockfile`
@@ -233,6 +229,13 @@ stdenv.mkDerivation {
       --add-flags "run $out/lib/jx-studio/packages/desktop/src/chromium/index.ts" \
       --set CHROMIUM_BIN "${chromium}/bin/chromium" \
       --set JX_STUDIO_ASSETS "$out/lib/jx-studio/packages/desktop/assets/studio"
+
+    # Installed by hand rather than through `desktopItems`, because that hook takes the STORE PATH's
+    # basename — so the entry shipped as `<hash>-jx-studio.desktop`, an id that changed with every
+    # rebuild and matched no window. A launcher reads the file and shows Name + Icon either way,
+    # which is why the icon appeared there and nowhere else; anything resolving a window to an entry
+    # by id had nothing stable to find.
+    install -Dm644 packages/desktop/jx-studio.desktop $out/share/applications/jx-studio.desktop
 
     install -Dm644 packages/desktop/icon.png $out/share/icons/hicolor/512x512/apps/jx-studio.png
     install -Dm644 branding/jx_flattened.svg $out/share/icons/hicolor/scalable/apps/jx-studio.svg

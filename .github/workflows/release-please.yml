@@ -4,6 +4,19 @@ on:
   push:
     branches:
       - main
+  # …and on a schedule, because `push` is no longer reliable on this branch.
+  #
+  # Under the dependency-autopilot policy (CLAUDE.md) most merges to `main` are auto-merges, and
+  # GitHub suppresses the events raised by its own `GITHUB_TOKEN` — so a Dependabot merge produces
+  # no `push` event and this workflow would simply never see it. The visible symptom would be a
+  # release pull request that silently stops picking up commits.
+  #
+  # Everything here is idempotent: with nothing new to release, release-please refreshes (or
+  # declines to open) its pull request and every downstream job stays gated behind
+  # `releases_created`.
+  schedule:
+    - cron: "0 5 * * *"
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -179,6 +192,11 @@ jobs:
           if [ -n "$missing" ]; then
             echo "::warning::Release $TAG is missing expected desktop assets:$missing"
             gh release edit "$TAG" --prerelease
+            # The label must exist or `gh issue create` errors and the `|| true` below eats it —
+            # Which is how every guard in this workflow was quietly unable to file its report.
+            gh label create release-incomplete --color B60205 \
+              --description "A release shipped incomplete: a missing asset, publish, tag or cache entry" \
+              2>/dev/null || true
             gh issue create \
               --title "Release $TAG is missing desktop assets" \
               --label release-incomplete \
@@ -200,6 +218,28 @@ jobs:
     uses: ./.github/workflows/nix.yml
     with:
       ref: ${{ needs.release-please.outputs.desktop_tag }}
+      publish: true
+    secrets:
+      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+  # aarch64-linux has never been built by anything. `packages/desktop/package.nix` claims it in
+  # `meta.platforms` and CI has only ever run x86_64, so the first person to find out whether the
+  # host-filtered tarball set resolves on arm should be us, at a release, and not a user.
+  #
+  # It is deliberately absent from `advance-release-branch`'s `needs`. That job gates the branch
+  # NixOS users pin on `nix-build.result`; letting a first-ever aarch64 failure freeze `release`
+  # would strand every x86 user over an architecture nobody has received yet. Promote it to a gate
+  # once it has been green across a few releases.
+  nix-build-arm:
+    needs: release-please
+    if: needs.release-please.outputs.desktop_released == 'true'
+    uses: ./.github/workflows/nix.yml
+    with:
+      ref: ${{ needs.release-please.outputs.desktop_tag }}
+      runner: ubuntu-24.04-arm
+      publish: true
+    secrets:
+      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
   # Advance `release` to the commit that just released and built. A plain (fast-forward) push, never
   # A force: `release` only ever moves forward along main's history, so a non-fast-forward here means
@@ -238,6 +278,11 @@ jobs:
           set -euo pipefail
           if [ "$NIX_RESULT" != "success" ]; then
             echo "::warning::nix-build was $NIX_RESULT for $TAG; leaving \`release\` where it is"
+            # The label must exist or `gh issue create` errors and the `|| true` below eats it —
+            # Which is how every guard in this workflow was quietly unable to file its report.
+            gh label create release-incomplete --color B60205 \
+              --description "A release shipped incomplete: a missing asset, publish, tag or cache entry" \
+              2>/dev/null || true
             gh issue create \
               --title "\`release\` did not advance to $TAG" \
               --label release-incomplete \
@@ -246,6 +291,199 @@ jobs:
           fi
           git push origin "$(git rev-parse HEAD):refs/heads/release"
           echo "release -> $TAG ($(git rev-parse --short HEAD))"
+
+  # Prove a NixOS user gets a DOWNLOAD rather than a build. Nothing else in this pipeline can:
+  # `nix-build` proves the tree builds, and the Cachix push is best-effort by design, so without
+  # this job a cache that silently holds the wrong store path looks exactly like one that works.
+  #
+  # Two assertions, so a failure says which half broke:
+  #
+  #   1. Does the cache hold the path? `nix path-info --store` asks Cachix and downloads nothing.
+  #   2. Does the user's own command find it? `nix build --max-jobs 0` means SUBSTITUTE OR FAIL,
+  #      run against `github:jxsuite/jx/release` exactly as docs/start/install.md tells people to,
+  #      with --accept-flake-config so the flake's own nixConfig does the wiring.
+  #
+  # (2) is also the only thing that proves the store path CI published is the one a `github:` flake
+  # fetch evaluates to. CI builds a git checkout and a user builds a tarball; if those ever stop
+  # agreeing, every consumer quietly goes back to building from source and nothing else notices.
+  #
+  # It gates on `nix-build`, not on `advance-release-branch`, because that job exits 0 even when it
+  # declines to move the branch — so its success does not mean `release` advanced, and `nix-build`
+  # is the condition it actually tests.
+  verify-cache:
+    needs: [release-please, nix-build, nix-build-arm, advance-release-branch]
+    if: always() && needs.nix-build.result == 'success' && needs.release-please.outputs.desktop_released == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: DeterminateSystems/nix-installer-action@33c9ab3ef95cd57c164d9d6eb1f9a46338538d41 # main @ 2026-08-21
+        with:
+          extra-conf: |
+            accept-flake-config = true
+
+      - name: A consumer substitutes instead of building
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.release-please.outputs.desktop_tag }}
+          ARM_RESULT: ${{ needs.nix-build-arm.result }}
+        run: |
+          set -euo pipefail
+          ref="github:${GITHUB_REPOSITORY}/release"
+          cache="https://jxsuite.cachix.org"
+          problems=""
+
+          # Evaluation only — this is the path a user's Nix will ask for.
+          for system in x86_64-linux aarch64-linux; do
+            # Not `out=$(...)` bare: under `set -e` a failed eval would kill the script before it
+            # could report anything, turning "the cache is broken" into a silent red X.
+            #
+            # And NOT `2>&1`, which is how it was written for five releases. `nix eval` prints its
+            # fetch progress and its evaluation warnings to STDERR, so merging the streams put
+            # `unpacking 'github:jxsuite/jx/…' into the Git cache`, seven `copying path` lines and
+            # a `stdenv.isLinux is deprecated` warning INSIDE `$out`. `nix path-info` was then
+            # handed that blob in place of a store path and failed with
+            # `getting status of "…": No such file or directory` — the SAME message a genuinely
+            # absent path produces, which is why nothing looked wrong. This job filed
+            # "Binary cache does not serve <tag>" five times running against a cache that was
+            # serving every one of those paths (#161, #169, #172, #178, #190).
+            #
+            # stderr is still captured, because the diagnostic it carries is why it was merged in
+            # the first place — just not into the value.
+            err="$(mktemp)"
+            if ! out="$(nix eval --raw "${ref}#packages.${system}.default.outPath" 2>"$err")"; then
+              problems="${problems}- evaluating the $system package failed: \`$(tail -n 3 "$err")\`"$'\n'
+              continue
+            fi
+            # A check whose input is unvalidated cannot tell "the cache is empty" from "I did not
+            # understand the answer", and reports the first for both. Say which one it is.
+            case "$out" in
+              /nix/store/?*) ;;
+              *)
+                problems="${problems}- the $system evaluation did not return a store path, so the cache was never asked: \`$out\`"$'\n'
+                continue
+                ;;
+            esac
+            echo "$system -> $out"
+            if nix path-info --store "$cache" "$out" >/dev/null 2>&1; then
+              echo "::notice::$cache holds $out"
+            elif [ "$system" = "aarch64-linux" ] && [ "$ARM_RESULT" != "success" ]; then
+              echo "::notice::aarch64 leg was $ARM_RESULT; its absence from the cache is expected"
+            else
+              problems="${problems}- \`$cache\` does not hold the $system path \`$out\`"$'\n'
+            fi
+          done
+
+          # Substitute or fail: --max-jobs 0 refuses to build anything at all.
+          if nix build "$ref" --accept-flake-config --max-jobs 0 --no-link -L; then
+            echo "::notice::a consumer substitutes the entire closure"
+          else
+            problems="${problems}- \`nix build $ref --max-jobs 0\` failed, so a consumer still builds from source"$'\n'
+          fi
+
+          if [ -n "$problems" ]; then
+            echo "::warning::the binary cache does not serve $TAG"
+            # The label must exist or `gh issue create` errors and the `|| true` below eats it —
+            # Which is how every guard in this workflow was quietly unable to file its report.
+            gh label create release-incomplete --color B60205 \
+              --description "A release shipped incomplete: a missing asset, publish, tag or cache entry" \
+              2>/dev/null || true
+            gh issue create \
+              --title "Binary cache does not serve $TAG" \
+              --label release-incomplete \
+              --body "$(printf '%s\n%s\n' "A NixOS user on \`github:jxsuite/jx/release\` builds Jx Studio from source instead of downloading it. The release itself is fine; only the cache is." "$problems")" || true
+          else
+            echo "Cache serves $TAG on both architectures."
+          fi
+
+  # The site ships WITH the release rather than with the merge to `main`, so the docs a visitor
+  # reads describe the app they can download. deploy-site.yml's header explains why this is a
+  # `uses:` call and not an `on: push: branches: [release]` trigger.
+  #
+  # Gated on `nix-build`, not on `advance-release-branch`, for the same reason `verify-cache` is:
+  # that job exits 0 even when it declines to move the branch. Publishing on its success alone
+  # would put documentation for a tree that `release` refused to ship.
+  #
+  # It names the TAG, not the branch. They are the same commit here, and naming the tag keeps the
+  # deploy pinned to the release it belongs to even if something else moves `release` meanwhile.
+  deploy-site:
+    needs: [release-please, nix-build, advance-release-branch]
+    if: always() && needs.nix-build.result == 'success' && needs.release-please.outputs.desktop_released == 'true'
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/deploy-site.yml
+    with:
+      ref: ${{ needs.release-please.outputs.desktop_tag }}
+
+  # Did the release actually SHIP? Nothing asked before, and for six weeks the answer was no.
+  #
+  # Two ways to lose a component, both of which leave every job in this workflow green:
+  #
+  #   1. release-please skips a component whose changelog carries a raw `<tag>` — it logs
+  #      "Pull request contains releases, but not for component: starters", creates the other 18,
+  #      and exits 0. The manifest still claims the version. (commitlint.config.js has the full
+  #      mechanism; `checks` now blocks the commit subjects that cause it.)
+  #   2. The `release-please` job dies PART WAY THROUGH after creating some releases — a GitHub 5xx
+  #      during its commit-history walk, which is precisely what an un-tagged component provokes.
+  #      Re-running it then finds the pull request already labelled `autorelease: tagged`, so
+  #      `releases_created` comes back FALSE and `publish`, all four desktop bundlers, `nix-build`
+  #      and `deploy-site` skip. That is how desktop-v2.2.0 shipped with no installers at all.
+  #
+  # So this runs on `always()` and is gated on NOTHING: a run that released nothing is exactly the
+  # run that needs checking. `needs: publish` only orders it after the registry has been written.
+  #
+  # It fails the run rather than warning like `verify-desktop-assets` does, because its subject is
+  # not cosmetic: `@jxsuite/starters` sat at 1.2.2 on npm while `@jxsuite/create@1.3.2` shipped
+  # depending on `^1.5.0`, so `npm install @jxsuite/create` was unresolvable for everyone. Nothing
+  # `needs:` this job, so a red X here blocks no other release work.
+  verify-release-integrity:
+    needs: [release-please, publish]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+      # `install: false` — the script reads package.json files with node builtins and shells out to
+      # `gh` and `npm`. It has no dependency to install, and a job whose whole purpose is to report
+      # A broken release must not be able to fail on `--frozen-lockfile` instead.
+      - uses: ./.github/actions/setup-bun
+        with:
+          install: false
+      - name: Every version in the manifest must have a release and be on npm
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -uo pipefail
+          if bun scripts/check-release-integrity.ts 2>&1 | tee integrity.txt; then
+            exit 0
+          fi
+          echo "::error::the manifest claims versions that never shipped"
+
+          # One open issue, not one per run: this stays red until someone acts, and the daily
+          # schedule would otherwise comment every morning.
+          title="Released versions that never shipped"
+          open="$(gh issue list --state open --label release-incomplete \
+                    --search "$title in:title" --json number --jq '.[0].number // empty')"
+          if [ -z "$open" ]; then
+            gh label create release-incomplete --color B60205 \
+              --description "A release shipped incomplete: a missing asset, publish, tag or cache entry" \
+              2>/dev/null || true
+            gh issue create --title "$title" --label release-incomplete --body "$(
+              printf '%s\n\n```\n%s\n```\n' \
+                "\`bun run release:integrity\` on \`main\`, from [this run]($GITHUB_SERVER_URL/$GH_REPO/actions/runs/$GITHUB_RUN_ID)." \
+                "$(cat integrity.txt)"
+            )" || true
+          else
+            echo "tracked by #$open"
+          fi
+          exit 1
 
   pin-desktop-latest:
     needs:

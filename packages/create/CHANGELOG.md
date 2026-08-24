@@ -1,5 +1,55 @@
 # Changelog
 
+## [1.3.5](https://github.com/jxsuite/jx/compare/create-v1.3.4...create-v1.3.5) (2026-08-24)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/starters bumped to 1.6.2
+
+## [1.3.4](https://github.com/jxsuite/jx/compare/create-v1.3.3...create-v1.3.4) (2026-08-23)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/starters bumped to 1.6.1
+
+## [1.3.3](https://github.com/jxsuite/jx/compare/create-v1.3.2...create-v1.3.3) (2026-08-21)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/starters bumped to 1.6.0
+
+## [1.3.2](https://github.com/jxsuite/jx/compare/create-v1.3.1...create-v1.3.2) (2026-08-21)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/starters bumped to 1.5.0
+
+## [1.3.1](https://github.com/jxsuite/jx/compare/create-v1.3.0...create-v1.3.1) (2026-08-21)
+
+
+### Bug Fixes
+
+* defects surfaced by fact-checking the new package READMEs ([c4a614d](https://github.com/jxsuite/jx/commit/c4a614dae5e199d49384f998a0b937354f9de882))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/starters bumped to 1.4.0
+
 ## [1.3.0](https://github.com/jxsuite/jx/compare/create-v1.2.2...create-v1.3.0) (2026-08-19)
 
 

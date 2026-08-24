@@ -1,4 +1,5 @@
 import { Updater } from "electrobun/main";
+import type { AppInfo } from "@jxsuite/protocol";
 
 export interface UpdateStatus {
   version: string | null;
@@ -67,6 +68,31 @@ export async function applyUpdate(): Promise<void> {
 
 export function getStatus(): UpdateStatus {
   return cachedStatus;
+}
+
+/**
+ * Version, channel, commit and a human-readable update status for the About screen.
+ *
+ * Composed here rather than in the webview so that both launchers answer one request with one
+ * shape, and each says only what its own build can know — this one has an update feed, and the
+ * system-packaged chromium build (`chromium/app-info.ts`) does not.
+ */
+export async function composeAppInfo(): Promise<AppInfo> {
+  const info = await getLocalInfo();
+  const status = getStatus();
+  const updateStatus = status.error
+    ? `Update check failed: ${status.error}`
+    : status.updateReady
+      ? `Update ready (${status.version ?? "?"})`
+      : status.updateAvailable
+        ? `Update available (${status.version ?? "?"})`
+        : "Up to date";
+  return {
+    channel: info.channel,
+    hash: info.hash,
+    updateStatus,
+    version: info.version,
+  };
 }
 
 export function startBackgroundChecks() {

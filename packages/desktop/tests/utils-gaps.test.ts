@@ -7,6 +7,14 @@ void mock.module("electrobun/main", () => {
   throw new Error("electrobun unavailable in test env");
 });
 
+/* The OS opener is a real process launch; mocked so this file never opens a browser window on the
+   machine running it. Made to fail, because what this file tests is the no-shell path. */
+void mock.module("node:child_process", () => ({
+  spawn: () => {
+    throw new Error("no opener on this box");
+  },
+}));
+
 const { init, openFileDialog, openDirectoryDialog, openExternal } = await import("../src/utils");
 
 describe("dialogs and openExternal before init", () => {
@@ -19,9 +27,9 @@ describe("dialogs and openExternal before init", () => {
     expect(await openDirectoryDialog()).toBeNull();
   });
 
-  /* Without a shell there is nothing to hand the URL to. Reporting false lets the caller fall back
-     to `window.open` in the webview rather than losing the click. */
-  test("openExternal reports false without a shell", () => {
+  /* With neither the electrobun shell nor an OS opener there is nothing to hand the URL to.
+     Reporting false lets the caller fall back to `window.open` rather than losing the click. */
+  test("openExternal reports false with no shell and no OS opener", () => {
     expect(openExternal("https://example.com")).toBe(false);
   });
 });

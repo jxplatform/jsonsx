@@ -6,10 +6,18 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { findShadows, removeShadow, shadowsIn } from "./check-shadowed-core";
+import { findShadows, removeScopeBinLinks, removeShadow, shadowsIn } from "./check-shadowed-core";
 
 /** A project root with the given packages installed under `node_modules`. */
 function projectWith(
@@ -217,5 +225,59 @@ describe("a dangling first-party symlink", () => {
     } finally {
       rmSync(root, { force: true, recursive: true });
     }
+  });
+});
+
+describe("the bin links a removed shadow leaves behind", () => {
+  test("a link into the deleted scope goes with it, and a foreign one stays", () => {
+    /* This is not tidiness. A dangling symlink is not skipped by a recursive copy, it THROWS —
+       the desktop build copies packages/starters/sites wholesale into the app and died on
+       `ENOENT: statx .../node_modules/.bin/jx`, a link left by an install whose @jxsuite/compiler
+       this cleaner had already removed. */
+    const root = mkdtempSync(join(tmpdir(), "shadow-bin-"));
+    const nodeModules = join(root, "node_modules");
+    mkdirSync(join(nodeModules, ".bin"), { recursive: true });
+    symlinkSync("../@jxsuite/compiler/src/cli.js", join(nodeModules, ".bin", "jx"));
+    symlinkSync("../js-yaml/bin/js-yaml.mjs", join(nodeModules, ".bin", "js-yaml"));
+
+    const removed = removeScopeBinLinks(nodeModules);
+
+    expect(removed).toHaveLength(1);
+    expect(removed[0]).toContain("jx");
+    // `readdirSync`, not `existsSync`: the foreign link is dangling too (its target was never
+    // Created here), and existsSync FOLLOWS a symlink, so it answers false for a link that is
+    // Very much still on disk. Judging survival by the link itself is the whole point.
+    expect(readdirSync(join(nodeModules, ".bin"))).toEqual(["js-yaml"]);
+    rmSync(root, { force: true, recursive: true });
+  });
+
+  test("the .bin directory itself goes once nothing is left in it", () => {
+    const root = mkdtempSync(join(tmpdir(), "shadow-bin-"));
+    const nodeModules = join(root, "node_modules");
+    mkdirSync(join(nodeModules, ".bin"), { recursive: true });
+    symlinkSync("../@jxsuite/compiler/src/cli.js", join(nodeModules, ".bin", "jx"));
+
+    removeScopeBinLinks(nodeModules);
+
+    expect(existsSync(join(nodeModules, ".bin"))).toBe(false);
+    rmSync(root, { force: true, recursive: true });
+  });
+
+  test("a real file in .bin is never touched — only symlinks are judged", () => {
+    const root = mkdtempSync(join(tmpdir(), "shadow-bin-"));
+    const nodeModules = join(root, "node_modules");
+    mkdirSync(join(nodeModules, ".bin"), { recursive: true });
+    writeFileSync(join(nodeModules, ".bin", "jx"), "#!/bin/sh\n");
+
+    expect(removeScopeBinLinks(nodeModules)).toEqual([]);
+    expect(existsSync(join(nodeModules, ".bin", "jx"))).toBe(true);
+    rmSync(root, { force: true, recursive: true });
+  });
+
+  test("no .bin at all is not an error", () => {
+    const root = mkdtempSync(join(tmpdir(), "shadow-bin-"));
+    mkdirSync(join(root, "node_modules"), { recursive: true });
+    expect(removeScopeBinLinks(join(root, "node_modules"))).toEqual([]);
+    rmSync(root, { force: true, recursive: true });
   });
 });

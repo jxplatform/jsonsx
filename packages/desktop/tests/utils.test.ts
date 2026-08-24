@@ -4,6 +4,20 @@ import { beforeEach, describe, expect, mock, test } from "bun:test";
 const mockOpenFileDialog = mock(async () => ["/home/user/projects/project.json"]);
 const mockOpenExternal = mock((_url: string) => true);
 
+/* The OS opener is a real process launch — mocked here so a test run never opens a browser window
+   on the machine running it, and so the argument vector itself can be asserted. */
+const spawnCalls: { command: string; args: string[] }[] = [];
+let spawnThrows = false;
+const unref = mock(() => {});
+const mockSpawn = mock((command: string, args: string[]) => {
+  if (spawnThrows) {
+    throw new Error("no such binary");
+  }
+  spawnCalls.push({ args, command });
+  return { unref };
+});
+void mock.module("node:child_process", () => ({ spawn: mockSpawn }));
+
 void mock.module("electrobun/main", () => ({
   BrowserWindow: class {},
   Electrobun: { start: () => {} },
@@ -112,23 +126,72 @@ describe("openDirectoryDialog", () => {
    rather than a webview with no address bar, history or devtools. It reports failure instead of
    throwing, because the caller's fallback is `window.open` inside the webview. */
 describe("openExternal", () => {
-  test("hands the url to the shell and reports what it returned", async () => {
+  beforeEach(() => {
+    spawnCalls.length = 0;
+    spawnThrows = false;
+  });
+
+  test("hands the url to the shell, and nothing else needs to happen", async () => {
     await init();
     expect(openExternal("https://example.com/page")).toBe(true);
     expect(mockOpenExternal).toHaveBeenCalledWith("https://example.com/page");
+    expect(spawnCalls).toHaveLength(0);
   });
 
-  test("reports false when the shell declines", async () => {
+  /* The shell declining is not the end of the road any more: the chromium launcher never loads
+     electrobun at all, so if this were the answer, every url on that build would be dropped. */
+  test("falls back to the OS opener when the shell declines", async () => {
     await init();
     mockOpenExternal.mockImplementationOnce(() => false);
-    expect(openExternal("https://example.com")).toBe(false);
+    expect(openExternal("https://example.com")).toBe(true);
+    expect(spawnCalls).toHaveLength(1);
+    expect(spawnCalls[0]!.args).toContain("https://example.com");
   });
 
-  test("reports false rather than throwing when the shell call throws", async () => {
+  test("falls back to the OS opener when the shell call throws", async () => {
     await init();
     mockOpenExternal.mockImplementationOnce(() => {
       throw new Error("no portal");
     });
+    expect(openExternal("https://example.com")).toBe(true);
+    expect(spawnCalls).toHaveLength(1);
+  });
+
+  test("reports false when the OS has no opener either, so the caller can use window.open", async () => {
+    await init();
+    mockOpenExternal.mockImplementationOnce(() => false);
+    spawnThrows = true;
     expect(openExternal("https://example.com")).toBe(false);
+  });
+
+  /*
+   * The opener resolves a scheme to whatever handler the desktop registered for it, and the pages
+   * whose links arrive here are the project's own content. A non-web scheme is refused rather than
+   * handed to a program of the page's choosing.
+   */
+  test("refuses a scheme that is not the web", async () => {
+    await init();
+    mockOpenExternal.mockImplementation(() => false);
+    try {
+      expect(openExternal("file:///etc/passwd")).toBe(false);
+      // oxlint-disable-next-line no-script-url -- the point of the test is that this is refused
+      expect(openExternal("javascript:alert(1)")).toBe(false);
+      expect(openExternal("not a url at all")).toBe(false);
+      expect(spawnCalls).toHaveLength(0);
+      // `mailto` is what a previewed page's contact link actually is.
+      expect(openExternal("mailto:hi@example.com")).toBe(true);
+    } finally {
+      mockOpenExternal.mockImplementation(() => true);
+    }
+  });
+
+  test("passes the url as one argument, never as a command line", async () => {
+    await init();
+    mockOpenExternal.mockImplementationOnce(() => false);
+    openExternal("https://example.com/?a=1&b=2");
+    const [call] = spawnCalls;
+    expect(call!.args.at(-1)).toBe("https://example.com/?a=1&b=2");
+    expect(call!.command).not.toBe("sh");
+    expect(unref).toHaveBeenCalled();
   });
 });
