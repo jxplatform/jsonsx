@@ -208,7 +208,16 @@ jobs:
   # If `nix-build` fails, `release` stays where it is and an issue is opened. A stale ref that works
   # Beats a fresh one that does not.
   advance-release-branch:
-    needs: [release-please, nix-build, desktop-linux, desktop-macos, desktop-windows, build-msix, verify-desktop-assets]
+    needs:
+      [
+        release-please,
+        nix-build,
+        desktop-linux,
+        desktop-macos,
+        desktop-windows,
+        build-msix,
+        verify-desktop-assets,
+      ]
     if: always() && needs.release-please.outputs.desktop_released == 'true'
     runs-on: ubuntu-latest
     permissions:

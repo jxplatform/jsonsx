@@ -11,9 +11,9 @@ import {
 import {
   WINDOWS_RUNTIME_FILES,
   describeRuntimeSearch,
+  electrobunVersion,
   resolveWindowsRuntime,
 } from "./electrobun-runtime.ts";
-import hutchConfig from "../hutch.config.ts";
 
 if (process.platform !== "win32") {
   console.log("[build-msix] Skipping MSIX build (not Windows)");
@@ -29,18 +29,18 @@ const artifactsDir = join(desktopDir, "artifacts");
 await mkdir(distDir, { recursive: true });
 await mkdir(artifactsDir, { recursive: true });
 
-const buildDir = join(desktopDir, "build", "production-win-x64", "JxStudio");
+const buildDir = join(desktopDir, "build", "stable-win-x64", "JxStudio");
 if (!existsSync(buildDir)) {
   console.error(
-    "[build-msix] Build dir not found. Run 'hutch electrobun build --env=production' first.",
+    "[build-msix] Build dir not found. Run 'bun run build:stable' (electrobun build --env=stable) first.",
   );
   process.exit(1);
 }
 
-// Electrobun 2 keeps no runtime in node_modules; Hutch caches it per pinned version. The pin is
-// Read from hutch.config.ts so this cannot drift from what the build actually used. See
+// Electrobun 2 keeps no runtime in node_modules; Hutch caches it per release. The version is
+// Read from the installed electrobun package, which is what selected the toolchain. See
 // Scripts/electrobun-runtime.ts for the cache layout and the fallback search.
-const { dir: electrobunDist, searched } = resolveWindowsRuntime(hutchConfig.electrobun.version);
+const { dir: electrobunDist, searched } = resolveWindowsRuntime(electrobunVersion());
 if (!electrobunDist) {
   console.error(`[build-msix] ${describeRuntimeSearch(searched)}`);
   process.exit(1);
@@ -63,7 +63,7 @@ if (existsSync(resourcesDir) && !existsSync(join(resourcesDir, "app"))) {
   }
 }
 
-// --- Step 2: Place runtime files from the Hutch product cache ---
+// --- Step 2: Place runtime files from the Hutch release cache ---
 const binDir = join(buildDir, "bin");
 // No bun.exe here: step 3 compiles the patched launcher into one instead.
 for (const file of WINDOWS_RUNTIME_FILES) {

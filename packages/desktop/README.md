@@ -16,24 +16,16 @@
 
 ## Prerequisites
 
-Electrobun 2 builds through **Hutch**, its native build CLI. Hutch is not an npm dependency and
-`bun install` cannot supply it — install it once per machine:
+Just `bun install` at the repo root. Electrobun 2 builds through **Hutch**, its native build CLI,
+but nothing needs installing by hand: the `electrobun` devDependency is a dependency-free bootstrap
+whose version selects the whole toolchain. Its first command downloads the paired Hutch, verifies it
+against the release's published digest, and caches it under `~/.hutch` — so the Hutch, Cottontail
+and Electrobun versions all ride the workspace lockfile instead of a machine-wide install.
 
-```bash
-curl -fsSL https://hutch.blackboard.sh/hutch/install.sh | sh
-```
-
-On Windows:
-
-```powershell
-& ([scriptblock]::Create((irm https://hutch.blackboard.sh/hutch/install.ps1)))
-```
-
-Hutch reads the exact Electrobun release from [`hutch.config.ts`](hutch.config.ts), caches that
-release's platform archive under `~/.hutch`, and projects its SDK into a generated `.hutch/devkit`
-directory — which is where every `electrobun/*` import resolves from, and why there is no
-`electrobun` entry in `package.json`. Builds sync it implicitly; `bun run sync` does it on demand,
-which is what a fresh clone needs before `bun run typecheck` will pass.
+The Electrobun SDK is not on npm either. It is projected out of the release archive into a
+generated, gitignored `.hutch/devkit` directory, which is where every `electrobun/*` import
+resolves from — and why there is no `electrobun` entry under `dependencies`. Builds project it
+implicitly; a fresh clone needs `bun run sync` once before `bun run typecheck` will pass.
 
 ## Development
 

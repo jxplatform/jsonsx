@@ -72,6 +72,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `desktop.md`
 
+- **0.3.22-draft** (2026-08-24) — Electrobun 2.0 stable: the npm devDependency selects the toolchain (hutch.config.ts no longer pins a release), and stable installers drop the channel prefix the updater feed keeps.
 - **0.3.13-draft** (2026-08-20) — §7 records the ElectroBun 2 toolchain boundary: Hutch owns build orchestration, hutch.config.ts pins the release, the SDK is projected into .hutch/devkit, and the main process is pinned to bun explicitly.
 - **0.3.12-draft** (2026-08-19) — §9.3 documents the release branch as the ref a Nix consumer pins, and the nix build that gates it; corrects the install phase, which has used cp -r plus a dangling-symlink prune and src/chromium/index.ts since before this text was written.
 - **0.3.11-draft** (2026-08-16) — §3.6 the desktop signs in with an RFC 8252 loopback redirect and PKCE; the token rests in a 0600 credential store, not localStorage. RFC 8414 and RFC 7519 recorded Rejected as vacuous. Closes gap:native-oauth and gap:oauth-pkce.

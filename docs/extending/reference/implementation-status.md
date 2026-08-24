@@ -17,7 +17,7 @@ This page is generated from the `> **Status: …**` markers in the specification
 | `ai.md`                   | 0.1.7-draft  | Partial     | 2026-08-20 |
 | `collab.md`               | 0.2.5-draft  | Partial     | 2026-08-20 |
 | `compiler.md`             | 0.3.1-draft  | Partial     | 2026-08-18 |
-| `desktop.md`              | 0.3.13-draft | Pending     | 2026-08-20 |
+| `desktop.md`              | 0.3.22-draft | Pending     | 2026-08-24 |
 | `extensions.md`           | 0.3.10-draft | Partial     | 2026-08-20 |
 | `imports.md`              | 0.1.9-draft  | Partial     | 2026-08-15 |
 | `jx-markdown.md`          | 0.1.8-draft  | Partial     | 2026-08-15 |

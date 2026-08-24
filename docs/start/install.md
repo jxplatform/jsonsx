@@ -11,12 +11,12 @@ Jx Studio is a desktop application. There is no hosted, sign-in version — you 
 
 Grab an installer for your platform from the [latest release](https://github.com/jxsuite/jx/releases/latest):
 
-| Platform              | Download                                                                                                                 |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| macOS (Apple Silicon) | [`JxStudio.dmg`](https://github.com/jxsuite/jx/releases/latest/download/production-macos-arm64-JxStudio.dmg)             |
-| Windows (x64)         | [`JxStudio.msi`](https://github.com/jxsuite/jx/releases/latest/download/JxStudio.msi)                                    |
-| Linux (x64)           | [`JxStudio.tar.gz`](https://github.com/jxsuite/jx/releases/latest/download/production-linux-x64-JxStudio-Setup.tar.gz)   |
-| Linux (ARM64)         | [`JxStudio.tar.gz`](https://github.com/jxsuite/jx/releases/latest/download/production-linux-arm64-JxStudio-Setup.tar.gz) |
+| Platform              | Download                                                                                                      |
+| --------------------- | ------------------------------------------------------------------------------------------------------------- |
+| macOS (Apple Silicon) | [`JxStudio.dmg`](https://github.com/jxsuite/jx/releases/latest/download/macos-arm64-JxStudio.dmg)             |
+| Windows (x64)         | [`JxStudio.msi`](https://github.com/jxsuite/jx/releases/latest/download/JxStudio.msi)                         |
+| Linux (x64)           | [`JxStudio.tar.gz`](https://github.com/jxsuite/jx/releases/latest/download/linux-x64-JxStudio-Setup.tar.gz)   |
+| Linux (ARM64)         | [`JxStudio.tar.gz`](https://github.com/jxsuite/jx/releases/latest/download/linux-arm64-JxStudio-Setup.tar.gz) |
 
 The macOS build is notarized, so it opens without a Gatekeeper prompt. The Windows installer is not yet code-signed — SmartScreen will warn on first run; choose **More info → Run anyway**. The [Download page](/download) has the same links plus checksums and release notes.
 

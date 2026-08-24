@@ -4,21 +4,22 @@
  * tree, and the zig-zstd decompressor they use to expand the build's .tar.zst payload.
  *
  * Electrobun 1.x shipped them inside the npm package, at `node_modules/electrobun/dist-win-x64`, so
- * both scripts read straight out of the dependency tree. Electrobun 2 has no runtime on npm at all:
- * the npm package is a thin Hutch bootstrap, and the runtime lives in the pinned release's platform
- * core archive, which Hutch verifies and unpacks into a global cache. So the old path does not
+ * both scripts read straight out of the dependency tree. In Electrobun 2 the npm package is a
+ * dependency-free bootstrap: it downloads the Hutch paired to its own version, and Hutch verifies
+ * the release's platform core archive and unpacks it into a shared cache. So the old path does not
  * merely move — it stops existing, and reading it would silently produce an app with no launcher.
  *
- * The cache is laid out as `<hutch home>/products/electrobun/<version>/<os>-<arch>/`, and its
+ * The cache is laid out as `<hutch home>/releases/electrobun/<version>/<os>-<arch>/`, and its
  * contents are a direct replacement for the old `dist-win-x64` directory. Note the OS token is
  * `windows`, not the `win` that Electrobun's own artifact prefixes and `ELECTROBUN_OS` use — hence
  * {@link HUTCH_TARGET}, which exists so that discrepancy is stated once instead of inlined twice.
  *
  * Hutch owns this cache and may relayout it, so {@link resolveWindowsRuntime} falls back to
- * searching the pinned version's directory for `launcher.exe` before giving up, and reports every
+ * searching the selected version's directory for `launcher.exe` before giving up, and reports every
  * place it looked when it does.
  */
 import { Glob } from "bun";
+import { createRequire } from "node:module";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -37,8 +38,26 @@ export const WINDOWS_RUNTIME_FILES = [
 export const HUTCH_TARGET = "windows-x64";
 
 /**
+ * The Electrobun release these scripts must read binaries out of.
+ *
+ * Taken from the INSTALLED `electrobun` package rather than a hand-written constant, because that
+ * version is what selected the toolchain the build just ran: Electrobun 2.0 removed the
+ * `electrobun.version` pin from hutch.config.ts and made the npm dependency authoritative, so the
+ * lockfile is the single source of truth and this cannot drift from the bundle it is packaging.
+ */
+export function electrobunVersion(): string {
+  const require = createRequire(import.meta.url);
+  return (require("electrobun/package.json") as { version: string }).version;
+}
+
+/** The cache directory Hutch unpacks one Electrobun release's platform archive into. */
+export function releaseDir(version: string, home: string = hutchHome()): string {
+  return join(home, "releases", "electrobun", version, HUTCH_TARGET);
+}
+
+/**
  * Hutch's home directory, honoring the same overrides its own npm bootstrap does (see
- * `npm/electrobun/bin/electrobun.cjs`): `HUTCH_HOME` first, then `DASH_HOME` — kept there as a
+ * `npm/electrobun/bin/resolve-hutch.cjs`): `HUTCH_HOME` first, then `DASH_HOME` — kept there as a
  * deprecated fallback for Dash Desktop and older setups — then `~/.hutch`.
  */
 export function hutchHome(
@@ -48,15 +67,10 @@ export function hutchHome(
   return env.HUTCH_HOME || env.DASH_HOME || join(home, ".hutch");
 }
 
-/** The cache directory Hutch unpacks one pinned Electrobun release's platform archive into. */
-export function productDir(version: string, home: string = hutchHome()): string {
-  return join(home, "products", "electrobun", version, HUTCH_TARGET);
-}
-
 /**
  * Locate the directory to source Windows runtime binaries from.
  *
- * @param version The exact Electrobun version pinned in hutch.config.ts.
+ * @param version The Electrobun release the build used — see {@link electrobunVersion}.
  * @returns The runtime directory, or null with the list of places consulted — which callers must
  *   treat as fatal rather than packaging an app that cannot start.
  */
@@ -64,13 +78,13 @@ export function resolveWindowsRuntime(
   version: string,
   home: string = hutchHome(),
 ): { dir: string | null; searched: string[] } {
-  const exact = productDir(version, home);
+  const exact = releaseDir(version, home);
   if (existsSync(join(exact, "launcher.exe"))) {
     return { dir: exact, searched: [exact] };
   }
 
-  // The pinned version is cached but not under the target name this file expects — Hutch relayed
-  // Out the cache. Find the launcher rather than failing on a directory name.
+  // The version is cached but not under the target name this file expects — Hutch relaid out the
+  // Cache. Find the launcher rather than failing on a directory name.
   const versionRoot = dirname(exact);
   const searched = [exact, versionRoot];
   if (!existsSync(versionRoot)) {

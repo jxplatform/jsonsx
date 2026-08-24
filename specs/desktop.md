@@ -2,9 +2,9 @@
 
 ## Platform Abstraction, Project Loading, and Component Scoping
 
-**Version:** 0.3.13-draft
+**Version:** 0.3.22-draft
 **Status:** Pending
-**Updated:** 2026-08-20
+**Updated:** 2026-08-24
 **License:** MIT
 
 ---
@@ -535,7 +535,7 @@ When the user navigates into a sub-component (via `pushDocument()` in the state 
 
 The Bun process owns all filesystem and OS operations. The webview contains Studio's UI. Communication happens via ElectroBun's RPC bridge.
 
-**Toolchain boundary (ElectroBun 2).** Build orchestration belongs to **Hutch**, ElectroBun's build CLI, and the two config files divide cleanly: `hutch.config.ts` pins the exact ElectroBun release and names the project's tasks, while `electrobun.config.ts` describes the application and the build Hutch produces. ElectroBun 2 publishes no SDK to npm — `hutch electrobun sync` copies the pinned release's SDK out of its platform core archive into a generated, gitignored `.hutch/devkit` sysroot, which is where every `electrobun/*` import resolves from. `electrobun/main` is the runtime-neutral main-process namespace (`electrobun/bun` remains a deprecated alias); `electrobun/view` is unchanged.
+**Toolchain boundary (ElectroBun 2).** Build orchestration belongs to **Hutch**, ElectroBun's build CLI, but nothing installs it by hand: the `electrobun` devDependency is a dependency-free bootstrap whose version selects the whole toolchain — it downloads the paired Hutch, verifies it against the release's published digest, and caches it. Hutch, Cottontail and ElectroBun therefore all ride the workspace lockfile, and a machine-wide Hutch is only a fallback. `electrobun.config.ts` describes the application and the build Hutch produces; `hutch.config.ts` only names tasks. ElectroBun 2 publishes no SDK to npm — `electrobun prepare` copies the release's SDK out of its platform core archive into a generated, gitignored `.hutch/devkit` sysroot, which is where every `electrobun/*` import resolves from. `electrobun/main` is the runtime-neutral main-process namespace (`electrobun/bun` remains a deprecated alias); `electrobun/view` is unchanged.
 
 ElectroBun 2 defaults its main process to Cottontail. Jx Studio selects `build.mainProcess: "bun"` explicitly, because the main-process module graph is Bun-native throughout — `Bun.serve`, `Bun.$`, `Bun.spawn`, `Bun.Glob`. Hutch itself runs project TypeScript with Cottontail regardless, so the `preBuild` and `postBuild` hook scripts stay on portable APIs rather than Bun's shell.
 
@@ -631,7 +631,7 @@ export async function handleListDirectory(dir) {
 
 ```
 jx-studio-app/
-├── hutch.config.ts              # Pinned ElectroBun release + project tasks
+├── hutch.config.ts              # Project task names only (the npm dep selects the toolchain)
 ├── electrobun.config.ts         # App identity, main process, views, copy, signing, release
 ├── src/
 │   ├── bun/
@@ -649,7 +649,9 @@ jx-studio-app/
     └── @jxsuite/runtime/          # Canvas rendering
 ```
 
-`.hutch/devkit` is written by Hutch and gitignored — never edited or committed. There is deliberately no `electrobun` entry under `node_modules`: the npm package of that name is only a bootstrap that installs and invokes Hutch, and it carries neither runtime nor SDK.
+`.hutch/devkit` is written by Hutch and gitignored — never edited or committed. The `electrobun` package under `node_modules` carries neither runtime nor SDK: it is the bootstrap that resolves and invokes the paired Hutch, which is why it belongs in `devDependencies` rather than `dependencies`.
+
+**Distribution names.** A stable build's INSTALLER carries no channel prefix (`macos-arm64-JxStudio.dmg`), while its updater metadata and update archive keep one (`stable-macos-arm64-update.json`) — the same feed name ElectroBun 1.x used, so an installed 1.x app still finds its updates. ElectroBun 2 publishes no macOS x64 core archive, so that target is not built.
 
 **Packaged static data.** In a packaged build, ElectroBun inlines the whole bun-side JS graph into `app/bun/index.js`, so `import.meta.dirname` in every inlined module resolves to `app/bun/` at runtime. Static data directories read relative to it — `@jxsuite/create`'s `template/` and `templates/`, and `@jxsuite/starters`' `registry.json` and `sites/` — must therefore be staged to those exact paths by `build.copy` in `electrobun.config.ts`. The `postBuild` hook verifies the staged bundle (including the studio view assets) and fails the build on any omission.
 
@@ -945,6 +947,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.3.22-draft** (2026-08-24) — Electrobun 2.0 stable: the npm devDependency selects the toolchain (hutch.config.ts no longer pins a release), and stable installers drop the channel prefix the updater feed keeps.
 - **0.3.13-draft** (2026-08-20) — §7 records the ElectroBun 2 toolchain boundary: Hutch owns build orchestration, hutch.config.ts pins the release, the SDK is projected into .hutch/devkit, and the main process is pinned to bun explicitly.
 - **0.3.12-draft** (2026-08-19) — §9.3 documents the release branch as the ref a Nix consumer pins, and the nix build that gates it; corrects the install phase, which has used cp -r plus a dangling-symlink prune and src/chromium/index.ts since before this text was written.
 - **0.3.11-draft** (2026-08-16) — §3.6 the desktop signs in with an RFC 8252 loopback redirect and PKCE; the token rests in a 0600 credential store, not localStorage. RFC 8414 and RFC 7519 recorded Rejected as vacuous. Closes gap:native-oauth and gap:oauth-pkce.
@@ -977,4 +980,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx Studio Desktop Architecture Specification v0.3.13-draft_
+_Jx Studio Desktop Architecture Specification v0.3.22-draft_

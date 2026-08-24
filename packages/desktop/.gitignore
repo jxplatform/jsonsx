@@ -6,7 +6,7 @@ build/
 artifacts/
 
 # Hutch's generated SDK sysroot — copied out of the pinned Electrobun core archive by
-# `hutch electrobun sync`, replaced whenever the pin or target changes, and never edited or
+# `electrobun prepare`, replaced whenever the selected release or target changes, and never edited or
 # committed. tsconfig.json `paths` point into it; `electrobun/*` imports resolve through it.
 .hutch/
 
@@ -14,3 +14,8 @@ artifacts/
 # behind after a build, so without this every local build dirties the tree — which `docs:verify`
 # refuses to run against.
 .cottontail-tmp/
+
+# Scratch project tree that tests/data-session.test.ts builds beside itself. Left behind on a
+# failed or interrupted run, so without this it dirties the tree — which docs:verify refuses to
+# run against.
+tests/__test-data-session__/

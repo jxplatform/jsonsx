@@ -26,8 +26,8 @@
     "noFallthroughCasesInSwitch": true,
     "noImplicitOverride": true,
 
-    /* Where `electrobun/*` resolves from. Electrobun 2 ships no SDK on npm — `hutch electrobun
-       sync` copies the pinned release's SDK trees into a generated `.hutch/devkit` sysroot (run
+    /* Where `electrobun/*` resolves from. Electrobun 2 ships no SDK on npm — `electrobun
+       prepare` copies the release's SDK trees into a generated `.hutch/devkit` sysroot (run
        `bun run --cwd packages/desktop sync`, or any build, which syncs implicitly). Hutch also
        writes `.hutch/devkit/tsconfig.json` with the full 46-entry path map, and the intended
        wiring is to `extends` it — but that file sets `baseUrl`, which TypeScript 7 removed, so

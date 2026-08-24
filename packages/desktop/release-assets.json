@@ -1,8 +1,8 @@
 {
-  "$comment": "Single source of truth for GitHub release asset filenames and their signing status. Consumed by scripts/docs/check-site-claims.ts (download-link + 'signed' claim verification) and, going forward, the desktop build scripts. Update filenames HERE first. `signed` reflects whether the shipped artifact is actually code-signed/notarized today. The `production-` prefix is Electrobun 2's canonical build environment; `stable` survives only as an alias and no longer appears in emitted artifact names. macOS x64 is absent because Electrobun 2 publishes no macos-x64 core archive.",
+  "$comment": "Single source of truth for GitHub release asset filenames and their signing status. Consumed by scripts/docs/check-site-claims.ts (download-link + 'signed' claim verification) and the desktop build scripts. Update filenames HERE first. `signed` reflects whether the shipped artifact is actually code-signed/notarized today. Electrobun 2 drops the channel prefix from STABLE INSTALLER names (verified against a real build: `win-x64-JxStudio-Setup.zip`) while the updater feed keeps it (`stable-win-x64-update.json`) — so these download links carry no `stable-`, and existing 1.18 installs still find the same update feed. macOS x64 is absent because Electrobun 2 publishes no macos-x64 core archive.",
   "assets": [
     {
-      "file": "production-macos-arm64-JxStudio.dmg",
+      "file": "macos-arm64-JxStudio.dmg",
       "platform": "macos",
       "signed": true,
       "downloadable": true
@@ -14,13 +14,13 @@
       "downloadable": true
     },
     {
-      "file": "production-linux-x64-JxStudio-Setup.tar.gz",
+      "file": "linux-x64-JxStudio-Setup.tar.gz",
       "platform": "linux",
       "signed": false,
       "downloadable": true
     },
     {
-      "file": "production-linux-arm64-JxStudio-Setup.tar.gz",
+      "file": "linux-arm64-JxStudio-Setup.tar.gz",
       "platform": "linux",
       "signed": false,
       "downloadable": true

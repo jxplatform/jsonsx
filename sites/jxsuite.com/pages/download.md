@@ -49,7 +49,7 @@ macOS
 Signed &amp; notarized. Apple Silicon, macOS 12 or later.
 :::
 
-::cta-button{props.href="https://github.com/jxsuite/jx/releases/latest/download/production-macos-arm64-JxStudio.dmg" props.label="Apple Silicon" props.variant="primary" props.newTab="true"}
+::cta-button{props.href="https://github.com/jxsuite/jx/releases/latest/download/macos-arm64-JxStudio.dmg" props.label="Apple Silicon" props.variant="primary" props.newTab="true"}
 ::::
 
 ::::div{style.display="flex" style.flexDirection="column" style.gap="1rem" style.padding="2rem" style.borderRadius="var(--radius-lg)" style.border="1px solid var(--color-border)" style.backgroundColor="var(--color-bg-surface)" style.textAlign="center"}
@@ -81,9 +81,9 @@ Linux
 Portable archive. Runs on most modern distros.
 :::
 
-::cta-button{props.href="https://github.com/jxsuite/jx/releases/latest/download/production-linux-x64-JxStudio-Setup.tar.gz" props.label="x64" props.variant="primary" props.newTab="true"}
+::cta-button{props.href="https://github.com/jxsuite/jx/releases/latest/download/linux-x64-JxStudio-Setup.tar.gz" props.label="x64" props.variant="primary" props.newTab="true"}
 
-::cta-button{props.href="https://github.com/jxsuite/jx/releases/latest/download/production-linux-arm64-JxStudio-Setup.tar.gz" props.label="ARM64" props.variant="secondary" props.newTab="true"}
+::cta-button{props.href="https://github.com/jxsuite/jx/releases/latest/download/linux-arm64-JxStudio-Setup.tar.gz" props.label="ARM64" props.variant="secondary" props.newTab="true"}
 ::::
 
 :::::

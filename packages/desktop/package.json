@@ -9,13 +9,13 @@
   },
   "type": "module",
   "scripts": {
-    "build": "hutch electrobun build",
-    "build:msix": "hutch electrobun build --env=production && bun run scripts/build-msix.ts",
-    "build:release": "hutch electrobun build --env=canary",
-    "build:stable": "hutch electrobun build --env=production && bun run scripts/build-msi.ts",
+    "build": "electrobun build",
+    "build:msix": "electrobun build --env=stable && bun run scripts/build-msix.ts",
+    "build:release": "electrobun build --env=canary",
+    "build:stable": "electrobun build --env=stable && bun run scripts/build-msi.ts",
     "chromium": "bun run scripts/pre-build-rpc.ts && bun run src/chromium/index.ts",
-    "dev": "hutch electrobun dev",
-    "sync": "hutch electrobun sync",
+    "dev": "electrobun dev",
+    "sync": "electrobun prepare",
     "sign:cert": "bun run scripts/sign-cert.ts",
     "sign:trust": "powershell -ExecutionPolicy Bypass -File scripts/trust-cert.ps1",
     "upgrade": "bunx npm-check-updates -u && bun install",
@@ -41,6 +41,7 @@
     "@happy-dom/global-registrator": "^20.11.6",
     "@jxsuite/connector": "workspace:^",
     "@jxsuite/server": "workspace:^",
+    "electrobun": "2.0.1",
     "rcedit": "^5.0.2"
   }
 }
