@@ -358,6 +358,9 @@ export function startEditableRoot(
       atBlockStart: resolved ? isAtBlockStart(resolved.from) : false,
       data: e.data ?? "",
       from: resolved?.from ?? null,
+      /* An adopted element with no path IS the prop-bound host — `onPointerDownCapture` sets
+         exactly that pair, and `syncActiveBlock` preserves it while the caret stays inside. */
+      inPropHost: activeEl !== null && activeKey === null,
       inputType: e.inputType,
       to: resolved?.to ?? null,
     });

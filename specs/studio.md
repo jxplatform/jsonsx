@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.38-draft
+**Version:** 0.9.39-draft
 **Status:** Partial
 **Updated:** 2026-08-24
 **License:** MIT
@@ -989,6 +989,15 @@ The browser may edit text; it may not restructure the document. Every `beforeinp
 | Backspace at a block start, Delete at a block end | Prevented; block merge (§8.2.3)      |
 | Any edit spanning two blocks                      | Prevented; range collapse (§8.2.3)   |
 | Native formatting, native history, text drag      | Prevented; the studio owns these     |
+| Any edit in a prop-bound host (§8.2.5)            | Applied natively; splits prevented   |
+
+**A prop-bound host is classified before positions are resolved.** It is editable text with no
+document path of its own — it commits as a prop VALUE, not as a block — so its position always
+resolves to nothing, and the rule that suppresses an unresolvable position would otherwise reject
+every keystroke in it. That is not hypothetical: it is what made a component slot show a caret and
+silently swallow everything typed into it. Nothing in such a host is structural, so nothing is
+re-expressed; the only intents prevented are the paragraph split and the line break, because a prop
+is one plain string.
 
 A structural intent with no handler is **suppressed**, never delegated back to the browser: an
 unimplemented operation must leave the document untouched rather than let the engine restructure the
@@ -2381,6 +2390,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.9.39-draft** (2026-08-24) — 8.2.1 records that a prop-bound host is classified before positions are resolved: it has no document path, so the unresolvable-position rule would otherwise reject every keystroke in it, and only the paragraph split and line break are prevented there.
 - **0.9.38-draft** (2026-08-24) — 8.2 states that a component island covers the component's internals and never the document slotted into it: a child with a stamped path is re-opened, a nested instance stays frozen, and connectedCallback internals are never re-opened.
 - **0.9.37-draft** (2026-08-22) — 11.2 Hosting the Studio: the asset manifest, the two layout modes, generated documents, the boot slot and the layering rule; 11.1 states the entry-rooted asset rule; 3.4's stale member names and file extensions corrected.
 - **0.9.36-draft** (2026-08-21) — Preferences → Appearance states what the theme repaints: the chrome, the overlays and an open code view, with the canvas a light document in both.
@@ -2474,4 +2484,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.38-draft_
+_`@jxsuite/studio` Specification v0.9.39-draft_
