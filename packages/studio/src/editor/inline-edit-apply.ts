@@ -107,27 +107,33 @@ export function applyInlineCommit(
  * disturb→re-commit cycle loops (and pollutes undo history). An empty value deletes the prop
  * (mutateUpdateProp), reverting the instance to the definition default — same as clearing the
  * sidebar field.
+ *
+ * @returns Whether it transacted. The caller needs to know: an in-place commit's patch is
+ *   echo-suppressed so the caret survives, and the release that follows is expected to re-render
+ *   the instance for real. When the release posts the same value it no-ops here, nothing
+ *   re-renders, and the canvas keeps showing pre-edit output — see the reconcile in iframe-host.
  */
 export function applyInlinePropCommit(
   tab: Tab | null,
   path: JxPath,
   prop: string,
   value: string,
-): void {
+): boolean {
   if (!tab) {
-    return;
+    return false;
   }
   const node = getNodeAtPath(tab.doc.document, path);
   if (!node) {
-    return;
+    return false;
   }
   const current = (node.$props as Record<string, unknown> | undefined)?.[prop];
   if (`${current ?? ""}` === value) {
-    return;
+    return false;
   }
   transactDoc(tab, (t) => {
     mutateUpdateProp(t, path, prop, value);
   });
+  return true;
 }
 
 /**

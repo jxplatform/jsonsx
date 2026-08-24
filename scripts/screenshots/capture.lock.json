@@ -122,8 +122,8 @@
     },
     "docs/images/blog-grid.png": {
       "bytes": 230179,
-      "capturedAt": "2026-08-22T13:50:43Z",
-      "capturedBy": "screenshots@ci/32576812243",
+      "capturedAt": "2026-08-24T02:55:04Z",
+      "capturedBy": "screenshots@ci/32684459834",
       "definition": "0e8a0d9df9c3c6cc71eff7f71406b315871323a5e311e73d87d4d3b8a00c4e0f",
       "height": 2000,
       "runtime": {
@@ -241,9 +241,9 @@
       "width": 2688
     },
     "docs/images/convert-to-component.png": {
-      "bytes": 356529,
-      "capturedAt": "2026-08-19T16:04:51Z",
-      "capturedBy": "screenshots@ci/32273537346",
+      "bytes": 355673,
+      "capturedAt": "2026-08-24T02:02:23Z",
+      "capturedBy": "screenshots@ci/32681571677",
       "definition": "7decf0421e9b321071889d2975c88d621b4de5a1a43bc5db5eb7f26751870af8",
       "height": 2000,
       "runtime": {
@@ -251,7 +251,7 @@
         "fontset": "fc:cac8f480b341",
         "os": "debian-12"
       },
-      "sha256": "3b418f30f252799b8ffac24ce34397af52f3c53440f8957236854f119680b6f5",
+      "sha256": "21cdaf4c6c27cace933109c0a531ab56b04f24f62a00870a66981a619835318a",
       "shot": "convert-to-component",
       "width": 3840
     },
@@ -391,9 +391,9 @@
       "width": 480
     },
     "docs/images/data-grid.png": {
-      "bytes": 778936,
-      "capturedAt": "2026-08-22T13:51:15Z",
-      "capturedBy": "screenshots@ci/32576812243",
+      "bytes": 779548,
+      "capturedAt": "2026-08-24T02:55:39Z",
+      "capturedBy": "screenshots@ci/32684459834",
       "definition": "7733baf1d19aff069527b88fefd317f30bb3a8b2ec780f65ed6f5dfbb25d08ea",
       "height": 2000,
       "runtime": {
@@ -401,7 +401,7 @@
         "fontset": "fc:cac8f480b341",
         "os": "debian-12"
       },
-      "sha256": "c11d42c880f98d2406e2270eff6e673d7c613bf40caf2954e97b143606d0002c",
+      "sha256": "6f916fc822549394ca880db6a31c12af1881d94e337e0bfe0196bfe85e4c276a",
       "shot": "data-grid",
       "width": 3840
     },
@@ -811,9 +811,9 @@
       "width": 3840
     },
     "docs/images/repeat-dialog.png": {
-      "bytes": 199240,
-      "capturedAt": "2026-08-17T00:44:20Z",
-      "capturedBy": "screenshots@ci/31982773241",
+      "bytes": 198680,
+      "capturedAt": "2026-08-24T02:54:33Z",
+      "capturedBy": "screenshots@ci/32684459834",
       "definition": "b4b6805955ad2fea5a626c71383b0250f8af0689b6aec77124e91a41f7b4b643",
       "height": 2000,
       "runtime": {
@@ -821,7 +821,7 @@
         "fontset": "fc:cac8f480b341",
         "os": "debian-12"
       },
-      "sha256": "a3153e4dfbc6dcd4ff365477ba782599b85b275989fc83541261de178856a6e2",
+      "sha256": "69073bf86b43456893149e9cd02fca9d853d964a88c0738f074512c2ff5034db",
       "shot": "repeat-dialog",
       "width": 3840
     },

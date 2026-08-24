@@ -2,13 +2,16 @@ import "./with-dom.js";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import {
+  commitActiveBlock,
   getActiveElement,
+  handleSlashTrigger,
   getInlineActions,
   isEditableBlock,
   isEditing,
   isInlineElement,
   isInlineInContext,
   normalizeChildren,
+  openSlashMenu,
   setSlashController,
   startEditing,
   stopEditing,
@@ -385,6 +388,16 @@ describe("plain (plaintext-only) sessions", () => {
   let slashShown = false;
   const path = ["children", 2];
 
+  /** Put a real collapsed caret in `node` — openSlashMenu anchors to the live range. */
+  const caretAtEnd = (node: HTMLElement) => {
+    const range = document.createRange();
+    range.setStart(node.firstChild ?? node, node.firstChild?.textContent?.length ?? 0);
+    range.collapse(true);
+    const sel = window.getSelection()!;
+    sel.removeAllRanges();
+    sel.addRange(range);
+  };
+
   const start = () => {
     startEditing(
       el,
@@ -439,14 +452,48 @@ describe("plain (plaintext-only) sessions", () => {
     expect(isEditing()).toBe(false);
   });
 
-  test("Escape restores the original text and commits it unchanged", () => {
+  test("Escape restores the original text and writes NOTHING", () => {
+    /* It used to post the restored value and rely on the host to no-op it. The host compares
+       against the STORED prop, and an unset prop's stored value is `undefined` while the marker
+       renders the definition's default — so the "no-op" wrote `$props.<name> = "<default>"`, and
+       cancelling an edit dirtied the tab, made an undo entry, and detached the instance from its
+       definition. Cancel must not be a way to modify the document. */
     start();
     el.textContent = "half-typed junk";
     el.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Escape" }));
 
     expect(el.textContent).toBe("Local");
-    expect(commits).toEqual([{ children: null, path, textContent: "Local" }]);
+    expect(commits).toEqual([]);
     expect(isEditing()).toBe(false);
+  });
+
+  test("Escape AFTER an idle commit writes the original back", () => {
+    // The other half, and why a bare "don't post when unchanged" rule is not enough: the tick has
+    // Already put the typed text in the document, so cancelling has to undo it rather than go quiet.
+    start();
+    el.textContent = "typed";
+    commitActiveBlock();
+    el.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Escape" }));
+
+    expect(el.textContent).toBe("Local");
+    expect(commits).toEqual([
+      { children: null, path, textContent: "typed" },
+      { children: null, path, textContent: "Local" },
+    ]);
+  });
+
+  test("a session that changes nothing writes nothing", () => {
+    // A bare click on a component's text, then a click away. This is the whole finding: it used to
+    // Bake the definition's default onto the instance.
+    start();
+    stopEditing();
+    expect(commits).toEqual([]);
+  });
+
+  test("an idle tick that changes nothing writes nothing either", () => {
+    start();
+    commitActiveBlock();
+    expect(commits).toEqual([]);
   });
 
   test("commit flattens newlines to spaces (directive attributes are single-line)", () => {
@@ -457,9 +504,42 @@ describe("plain (plaintext-only) sessions", () => {
   });
 
   test("the slash menu never opens in a plain session", () => {
+    /* This used to dispatch the "/" keydown on the BLOCK, where nothing listens for the gesture —
+       the real trigger is a listener on the editing HOST (see the note in iframe-inline-edit.ts
+       about the block-vs-host mismatch), so it passed against a menu that opened perfectly well.
+       Calling the trigger directly tests the layer that actually decides. */
     start();
-    el.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "/" }));
+    caretAtEnd(el);
+    handleSlashTrigger(new KeyboardEvent("keydown", { bubbles: true, key: "/" }));
     expect(slashShown).toBe(false);
+  });
+
+  test("openSlashMenu is refused outright in a plain session", () => {
+    /* The guard is on the OPEN, not the trigger, so a programmatic open is covered too. It matters
+       because the menu's precondition (`!insertFn`) does not catch this: enterPropEditAt passes
+       `onInsert: () => {}`, and a no-op function is truthy. */
+    start();
+    caretAtEnd(el);
+    openSlashMenu();
+    expect(slashShown).toBe(false);
+  });
+
+  test("the menu still opens in an ordinary rich session", () => {
+    // The guard must not have turned the slash gesture off everywhere.
+    const rich = document.createElement("p");
+    rich.textContent = "x";
+    document.body.append(rich);
+    startEditing(rich, path, {
+      onCommit: () => {},
+      onEnd: () => {},
+      onInsert: () => {},
+      onSplit: () => {},
+    });
+    caretAtEnd(rich);
+    openSlashMenu();
+    expect(slashShown).toBe(true);
+    stopEditing();
+    rich.remove();
   });
 
   test("format shortcuts are inert (prevented) in a plain session", () => {

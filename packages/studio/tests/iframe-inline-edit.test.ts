@@ -795,6 +795,92 @@ describe("prop-bound inline editing", () => {
     stop();
   });
 
+  test("the same prop text can be re-entered after Enter", () => {
+    /* Enter ends the session inside the ENGINE, which knows nothing about the editing host that
+       adopted the marker. The host kept pointing at the dead session, so the re-entry guard
+       (`el !== activeEl`) swallowed the next click on the same text: no caret, no editStart. You
+       had to click something else first and come back. */
+    const { channel, posts } = fakeChannel();
+    const { container, h3, shadowDoc } = propBoundContainer({ title: "Local" });
+    const stop = boot(channel, container, { getShadowDoc: () => shadowDoc });
+
+    clickInto(h3);
+    expect(posts.filter((p) => p.kind === "editStart")).toHaveLength(1);
+
+    h3.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }));
+    clickInto(h3);
+
+    expect(posts.filter((p) => p.kind === "editStart")).toHaveLength(2);
+    stop();
+  });
+
+  test("and after Escape, which ends the session the same way", () => {
+    const { channel, posts } = fakeChannel();
+    const { container, h3, shadowDoc } = propBoundContainer({ title: "Local" });
+    const stop = boot(channel, container, { getShadowDoc: () => shadowDoc });
+
+    clickInto(h3);
+    h3.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Escape" }));
+    clickInto(h3);
+
+    expect(posts.filter((p) => p.kind === "editStart")).toHaveLength(2);
+    stop();
+  });
+
+  test("a forwarded format chord is refused in a prop session", () => {
+    /* "Formatting is off" is the documented rule here, and inertifying the chord inside the frame
+       is only half of it: a caret-scoped ⌘B is ALSO forwarded to the parent, matched by the
+       shortcut registry, and posted straight back as an applyFormat intent. That route bypasses the
+       keydown entirely and used to run toggleInlineFormat on the plaintext-only host. */
+    const { channel, deliver } = fakeChannel();
+    const { container, h3, shadowDoc } = propBoundContainer({ title: "Local" });
+    const stop = boot(channel, container, { getShadowDoc: () => shadowDoc });
+
+    clickInto(h3);
+    selectContents(h3.firstChild!);
+    document.dispatchEvent(new Event("selectionchange"));
+
+    deliver({ intent: { command: "bold" }, kind: "applyFormat" });
+
+    expect(h3.querySelector("strong")).toBeNull();
+    expect(h3.textContent).toBe("Local");
+    stop();
+  });
+
+  test("a NUMERIC prop is refused — the session would retype it as a string", () => {
+    /* The commit posts `textContent`, so editing `count: 3` wrote `"3"`, after which
+       `${count * 2}` is `"33"`. Objects were already excluded; the scalars a component actually
+       declares were not. They stay editable in the properties panel, which knows their type. */
+    const { channel, posts } = fakeChannel();
+    const { container, h3, shadowDoc } = propBoundContainer({ title: 3 as unknown as string });
+    const stop = boot(channel, container, { getShadowDoc: () => shadowDoc });
+
+    clickInto(h3);
+    expect(posts.filter((p) => p.kind === "editStart")).toEqual([]);
+    stop();
+  });
+
+  test("a BOOLEAN prop is refused for the same reason", () => {
+    const { channel, posts } = fakeChannel();
+    const { container, h3, shadowDoc } = propBoundContainer({ title: true as unknown as string });
+    const stop = boot(channel, container, { getShadowDoc: () => shadowDoc });
+
+    clickInto(h3);
+    expect(posts.filter((p) => p.kind === "editStart")).toEqual([]);
+    stop();
+  });
+
+  test("a plain string prop is still editable", () => {
+    // The guard must not have swallowed the ordinary case it sits in front of.
+    const { channel, posts } = fakeChannel();
+    const { container, h3, shadowDoc } = propBoundContainer({ title: "Local" });
+    const stop = boot(channel, container, { getShadowDoc: () => shadowDoc });
+
+    clickInto(h3);
+    expect(posts).toContainEqual({ kind: "editStart", path: ["children", 1], prop: "title" });
+    stop();
+  });
+
   test("a host without data-jx-path is blocked (definition internals have no write-back target)", () => {
     const { channel, posts } = fakeChannel();
     const { container, h3, host, shadowDoc } = propBoundContainer({ title: "Local" });

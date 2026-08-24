@@ -137,6 +137,7 @@ const {
   setToolbarRefresh,
 } = await import("../src/canvas/iframe-host");
 const { flushCanvasEdits } = await import("../src/canvas/iframe-host");
+const { needsReleaseReconcile } = await import("../src/canvas/iframe-host");
 
 beforeEach(() => {
   channels.length = 0;
@@ -1626,6 +1627,58 @@ describe("iframe canvas inline-edit bridge", () => {
     });
     const card = (activeTab.value!.doc.document.children as { $props?: { title?: string } }[])[0]!;
     expect(card.$props?.title).toBe("Regional");
+  });
+
+  test("an in-place prop commit is echo-suppressed — the caret must survive it", async () => {
+    // A $props change re-renders the whole instance, which would tear out the nested editing host
+    // The user is typing in. This is why the suppression exists, and the next test is why it needs
+    // Undoing on release.
+    resetWorkspaceWithTab({
+      children: [{ $props: { title: "Local" }, tagName: "x-card" }],
+      tagName: "div",
+    });
+    await mountReady();
+    channels[0]!.posts.length = 0;
+    channels[0]!.deliver({
+      inPlace: true,
+      kind: "editCommitProp",
+      path: ["children", 0],
+      prop: "title",
+      value: "Regional",
+    });
+    expect(channels[0]!.posts.filter((m) => m.kind === "patch")).toEqual([]);
+  });
+
+  describe("re-rendering the instance when the release commit no-ops", () => {
+    /* The tick wrote and its patch was suppressed so the caret would survive; the release then
+       posts the SAME string, the apply legitimately declines to transact, and — before this — no
+       patch was ever generated. The canvas kept showing pre-edit output while the document held the
+       new value: empty a heading and it stays visibly empty, and any second place the component
+       renders that prop keeps the old text.
+
+       The decision is tested here rather than the post: postPatchToHosts needs a resolvable stage
+       that this harness does not build, and it is covered on its own. What was wrong is the state
+       machine — three conditions that have to agree. */
+    const AT = '["children",0]';
+
+    test("a suppressed in-place commit followed by a no-op release reconciles", () => {
+      expect(needsReleaseReconcile(false, AT, AT)).toBe(true);
+    });
+
+    test("a release that DID transact is not reconciled — its own patch already ran", () => {
+      expect(needsReleaseReconcile(true, AT, AT)).toBe(false);
+    });
+
+    test("a release with nothing suppressed behind it reconciles nothing", () => {
+      // Type-and-leave inside the idle window: there was never a suppressed render to make good.
+      expect(needsReleaseReconcile(false, null, AT)).toBe(false);
+    });
+
+    test("a suppressed commit on a DIFFERENT instance does not reconcile this one", () => {
+      // Two prop sessions in a row: the pending path must be matched, not merely present, or
+      // Releasing the second would rebuild the first.
+      expect(needsReleaseReconcile(false, '["children",1]', AT)).toBe(false);
+    });
   });
 
   test("editCommitProp routes to the ORIGINATING tab when it races a tab switch", async () => {

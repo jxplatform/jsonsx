@@ -425,6 +425,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.9.40-draft** (2026-08-24) — 8.2.6 refuses a non-string prop for inline editing (the session commits textContent, so a number or boolean would be retyped) and states that a session which changes nothing writes nothing, with Escape a real cancel that also undoes an idle commit made during the session.
 - **0.9.39-draft** (2026-08-24) — 8.2.1 records that a prop-bound host is classified before positions are resolved: it has no document path, so the unresolvable-position rule would otherwise reject every keystroke in it, and only the paragraph split and line break are prevented there.
 - **0.9.38-draft** (2026-08-24) — 8.2 states that a component island covers the component's internals and never the document slotted into it: a child with a stamped path is re-opened, a nested instance stays frozen, and connectedCallback internals are never re-opened.
 - **0.9.37-draft** (2026-08-22) — 11.2 Hosting the Studio: the asset manifest, the two layout modes, generated documents, the boot slot and the layering rule; 11.1 states the entry-rooted asset rule; 3.4's stale member names and file extensions corrected.

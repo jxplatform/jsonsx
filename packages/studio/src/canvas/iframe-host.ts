@@ -38,6 +38,7 @@ import {
   tabOfContainer,
 } from "./canvas-surface";
 import { cloneSelection, primarySelection, toggleSelected } from "../tabs/selection";
+import { getNodeAtPath } from "../state";
 import type { JxPath } from "../state";
 import { setLayoutSelection, shell } from "../shell";
 import { formatEditableVerdicts } from "../format/constraints";
@@ -1246,6 +1247,59 @@ function withEchoSuppressed(host: HostState, paths: (string | number)[][], fn: (
 }
 
 /** The tab whose document `state`'s iframe currently renders (null when unknown or closed). */
+/**
+ * Serialized path of an in-place prop commit whose patch was echo-suppressed, or null.
+ *
+ * One value rather than a set: a plain session edits exactly one prop of one instance at a time,
+ * and it is cleared on the release that follows.
+ */
+let propEchoPending: string | null = null;
+
+/**
+ * Whether a release commit has to re-render the instance itself.
+ *
+ * Exported for its own test: the posting side ({@link postPatchToHosts}) needs a resolvable stage
+ * and is covered elsewhere, but the STATE MACHINE here is the part that was wrong, and it is three
+ * conditions that have to agree — the release must have declined to transact, an in-place commit
+ * must have been suppressed, and it must have been for this same instance.
+ *
+ * @param {boolean} transacted - Whether the release commit wrote to the document.
+ * @param {string | null} pending - Serialized path of a suppressed in-place commit, if any.
+ * @param {string} path - Serialized path of the instance being released.
+ * @returns {boolean}
+ */
+export function needsReleaseReconcile(
+  transacted: boolean,
+  pending: string | null,
+  path: string,
+): boolean {
+  return !transacted && pending === path;
+}
+
+/**
+ * Re-render a component instance from the document, WITHOUT transacting.
+ *
+ * Used when a release commit legitimately no-ops but the DOM is still showing what the suppressed
+ * in-place commits rendered. The op is the same `set-key $props` the patcher would have produced,
+ * so it takes the ordinary `replaceSubtree` path — this adds no rendering mechanism, it re-sends
+ * the one that was deliberately dropped while the caret needed protecting.
+ *
+ * @param {HostState} state - The host whose tab owns the document.
+ * @param {JxPath} path - The component instance's document path.
+ * @returns {void}
+ */
+function reconcileInstance(state: HostState, path: JxPath): void {
+  const tab = hostTab(state);
+  if (!tab) {
+    return;
+  }
+  const node = getNodeAtPath(tab.doc.document, path);
+  if (!node) {
+    return;
+  }
+  postPatchToHosts([{ key: "$props", op: "set-key", path, value: node.$props }], tab.id);
+}
+
 function hostTab(state: HostState): Tab | null {
   return state.tabId ? (workspace.tabs.get(state.tabId) ?? null) : null;
 }
@@ -2314,9 +2368,26 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       const applyProp = () => applyInlinePropCommit(hostTab(state), msg.path, msg.prop, msg.value);
       if (msg.inPlace) {
         withEchoSuppressed(state, [msg.path], applyProp);
-      } else {
-        applyProp();
+        propEchoPending = serializeJxPath(msg.path);
+        return;
       }
+      const transacted = applyProp();
+      /*
+       * "The instance re-renders for real on release" was only true when the release actually
+       * transacted. After an idle tick the release posts the SAME string, the apply no-ops, and no
+       * patch is ever generated — so the suppressed in-place render was the last word and the
+       * canvas kept showing pre-edit output. Emptying a heading left it visibly empty while the
+       * document had dropped the prop entirely, and any SECOND place the component renders that
+       * value kept the old one.
+       *
+       * Reconciling here rather than lifting the no-op: that guard is load-bearing (it is what
+       * stops a commit → patch → disturb → re-commit loop, and keeps undo clean), so the fix is to
+       * re-render without transacting.
+       */
+      if (needsReleaseReconcile(transacted, propEchoPending, serializeJxPath(msg.path))) {
+        reconcileInstance(state, msg.path);
+      }
+      propEchoPending = null;
       return;
     }
     case "editMerge": {
