@@ -339,10 +339,33 @@ jobs:
           for system in x86_64-linux aarch64-linux; do
             # Not `out=$(...)` bare: under `set -e` a failed eval would kill the script before it
             # could report anything, turning "the cache is broken" into a silent red X.
-            if ! out="$(nix eval --raw "${ref}#packages.${system}.default.outPath" 2>&1)"; then
-              problems="${problems}- evaluating the $system package failed: \`$out\`"$'\n'
+            #
+            # And NOT `2>&1`, which is how it was written for five releases. `nix eval` prints its
+            # fetch progress and its evaluation warnings to STDERR, so merging the streams put
+            # `unpacking 'github:jxsuite/jx/…' into the Git cache`, seven `copying path` lines and
+            # a `stdenv.isLinux is deprecated` warning INSIDE `$out`. `nix path-info` was then
+            # handed that blob in place of a store path and failed with
+            # `getting status of "…": No such file or directory` — the SAME message a genuinely
+            # absent path produces, which is why nothing looked wrong. This job filed
+            # "Binary cache does not serve <tag>" five times running against a cache that was
+            # serving every one of those paths (#161, #169, #172, #178, #190).
+            #
+            # stderr is still captured, because the diagnostic it carries is why it was merged in
+            # the first place — just not into the value.
+            err="$(mktemp)"
+            if ! out="$(nix eval --raw "${ref}#packages.${system}.default.outPath" 2>"$err")"; then
+              problems="${problems}- evaluating the $system package failed: \`$(tail -n 3 "$err")\`"$'\n'
               continue
             fi
+            # A check whose input is unvalidated cannot tell "the cache is empty" from "I did not
+            # understand the answer", and reports the first for both. Say which one it is.
+            case "$out" in
+              /nix/store/?*) ;;
+              *)
+                problems="${problems}- the $system evaluation did not return a store path, so the cache was never asked: \`$out\`"$'\n'
+                continue
+                ;;
+            esac
             echo "$system -> $out"
             if nix path-info --store "$cache" "$out" >/dev/null 2>&1; then
               echo "::notice::$cache holds $out"
