@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.4](https://github.com/jxsuite/jx/compare/runtime-v2.0.3...runtime-v2.0.4) (2026-08-24)
+
+
+### Bug Fixes
+
+* **runtime:** a reflected property name no longer clobbers a declared default ([#188](https://github.com/jxsuite/jx/issues/188)) ([9e40d99](https://github.com/jxsuite/jx/commit/9e40d999719ac276e2927e5af5a7c313facae2c2))
+
 ## [2.0.3](https://github.com/jxsuite/jx/compare/runtime-v2.0.2...runtime-v2.0.3) (2026-08-23)
 
 

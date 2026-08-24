@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.3.3](https://github.com/jxsuite/jx/compare/desktop-v2.3.2...desktop-v2.3.3) (2026-08-24)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/compiler bumped to 2.0.5
+    * @jxsuite/create bumped to 1.3.5
+    * @jxsuite/parser bumped to 1.5.4
+    * @jxsuite/server bumped to 2.2.5
+    * @jxsuite/starters bumped to 1.6.2
+    * @jxsuite/studio bumped to 2.4.1
+  * devDependencies
+    * @jxsuite/server bumped to 2.2.5
+
 ## [2.3.2](https://github.com/jxsuite/jx/compare/desktop-v2.3.1...desktop-v2.3.2) (2026-08-23)
 
 
