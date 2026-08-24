@@ -1241,6 +1241,18 @@ function isVendorClass(name: string): boolean {
 }
 
 /** Run both rules over a studio package directory. */
+/**
+ * Every repo-relative path this module reports or looks up, forward-slashed.
+ *
+ * `Glob.scan` yields the platform separator, so on Windows the walks below produced
+ * `src\panels\x.ts` while every budget and allow-list in this file is written with `/` — each file
+ * read as unlisted and each budget entry as stale, so the gate was noise there while staying
+ * correct on CI's Linux.
+ */
+function scanned(rel: string): string {
+  return rel.replaceAll("\\", "/");
+}
+
 export async function collect(root: string): Promise<StyleCheckResult> {
   const hexErrors: Finding[] = [];
   const pxWarnings: Finding[] = [];
@@ -1289,7 +1301,8 @@ export async function collect(root: string): Promise<StyleCheckResult> {
    * one `<style>` block inside index.html. They are real chrome CSS, so they carry both roles the
    * inline block did — definition source for the orphan rule, and subject of the hex/px rules.
    */
-  for await (const rel of new Glob("styles/*.css").scan(root)) {
+  for await (const raw of new Glob("styles/*.css").scan(root)) {
+    const rel = scanned(raw);
     const source = await read(rel);
     const { errors, warnings } = scanHex(rel, source);
     hexErrors.push(...errors);
@@ -1301,7 +1314,8 @@ export async function collect(root: string): Promise<StyleCheckResult> {
     }
   }
 
-  for await (const rel of new Glob("src/**/*.css").scan(root)) {
+  for await (const raw of new Glob("src/**/*.css").scan(root)) {
+    const rel = scanned(raw);
     const source = await read(rel);
     scanRings(rel, source);
     scanStacking(source);
@@ -1314,7 +1328,8 @@ export async function collect(root: string): Promise<StyleCheckResult> {
   /** Path → bare empty catches actually present. Compared with the budget after the walk. */
   const bareCatches = new Map<string, number>();
 
-  for await (const rel of new Glob("src/**/*.ts").scan(root)) {
+  for await (const raw of new Glob("src/**/*.ts").scan(root)) {
+    const rel = scanned(raw);
     const source = await read(rel);
     const { errors, warnings } = scanHex(rel, source);
     hexErrors.push(...errors);

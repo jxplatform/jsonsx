@@ -9,6 +9,7 @@
  * at module scope anywhere in the import graph would break Lane 1 in CI with a stack trace nobody
  * would connect to this file, so the subprocess test below fails here instead.
  */
+import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "bun:test";
 import { appCommandSet, defaultCommandSet, noopStage } from "../src/commands/app-commands";
 import { checkPlacements } from "../src/commands/levels";
@@ -260,7 +261,7 @@ describe("the injected no-op deps", () => {
 
 describe("bare-Bun loadability", () => {
   test("the module imports with no DOM, which is what the checks job gives it", () => {
-    const entry = new URL("../src/commands/app-commands.ts", import.meta.url).pathname;
+    const entry = fileURLToPath(new URL("../src/commands/app-commands.ts", import.meta.url));
     const result = Bun.spawnSync({
       cmd: [
         process.execPath,

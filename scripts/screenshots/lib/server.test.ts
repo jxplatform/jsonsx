@@ -157,7 +157,9 @@ describe("overlayProject", () => {
     forgetOverlays();
     const overlay = await overlayProject(root, "starter");
 
-    expect(overlay.root).toContain(WORK_DIR);
+    // WORK_DIR is a forward-slashed constant that `join` renders with the platform separator, so
+    // The produced path is compared in the same shape rather than against the literal.
+    expect(overlay.root).toContain(join(WORK_DIR));
     expect(overlay.root).not.toBe(join(root, "starter"));
     expect(await Bun.file(join(overlay.root, "pages/index.md")).text()).toBe(
       "# Come for the coffee\n",

@@ -5,11 +5,12 @@
  * emitted module is the package's only build artifact.
  */
 
+import { fileURLToPath } from "node:url";
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { BLESSED_OPERATORS, isBlessedGlobal, isMutating } from "@jxsuite/runtime/expression";
 
-const root = new URL("..", import.meta.url).pathname;
+const root = fileURLToPath(new URL("..", import.meta.url));
 const formulasDir = join(root, "formulas");
 
 interface CatalogEntry {

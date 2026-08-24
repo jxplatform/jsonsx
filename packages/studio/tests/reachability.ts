@@ -84,10 +84,23 @@ export interface ReachabilityReport {
   moduleCount: number;
 }
 
-const STUDIO_DIR = resolve(import.meta.dir, "..");
-const REPO = resolve(STUDIO_DIR, "..", "..");
-const SRC = join(STUDIO_DIR, "src");
-const TSCONFIG = join(REPO, "tsconfig.json");
+/**
+ * A path in TypeScript's spelling: absolute, forward-slashed.
+ *
+ * Every path this harness compares comes from the TS API — `configFileName`, the program's file
+ * names — and TypeScript normalises those to `/` on every platform. `resolve`/`join` do not: on
+ * Windows they yield `C:\\…`, so `p.configFileName === TSCONFIG` was never true, `configured` was
+ * silently undefined behind its `!`, and the run died on `p.program` — while the `SRC`-prefixed
+ * filters quietly matched nothing.
+ */
+function tsPath(...parts: string[]): string {
+  return resolve(...parts).replaceAll("\\", "/");
+}
+
+const STUDIO_DIR = tsPath(import.meta.dir, "..");
+const REPO = tsPath(STUDIO_DIR, "..", "..");
+const SRC = tsPath(STUDIO_DIR, "src");
+const TSCONFIG = tsPath(REPO, "tsconfig.json");
 
 /**
  * Directories that never hold a caller: build output, dependencies, and the tests themselves.
@@ -139,7 +152,7 @@ function callerFiles(dir: string): string[] {
     if (name.startsWith(".")) {
       continue;
     }
-    const path = join(dir, name);
+    const path = tsPath(dir, name);
     if (statSync(path).isDirectory()) {
       if (!SKIP_DIRS.has(name)) {
         out.push(...callerFiles(path));

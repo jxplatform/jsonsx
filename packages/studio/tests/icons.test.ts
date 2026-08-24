@@ -6,6 +6,7 @@
  * Control rail button rendering a 20px hole, so most of what is asserted here is the DISTINCTION.
  */
 
+import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -21,7 +22,7 @@ import {
   resolverKeys,
 } from "../scripts/check-icons";
 
-const STUDIO = new URL("..", import.meta.url).pathname;
+const STUDIO = fileURLToPath(new URL("..", import.meta.url));
 
 describe("check-icons", () => {
   test("the shipped tree is clean", () => {

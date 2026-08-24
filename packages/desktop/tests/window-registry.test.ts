@@ -16,8 +16,9 @@ import {
   symlinkSync,
   writeFileSync,
 } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
+import envPaths from "env-paths";
 import {
   findWindowByRoot,
   listWindows,
@@ -37,8 +38,22 @@ const REGISTRY = join(ROOT, "windows");
 const DATA = join(ROOT, "data");
 
 process.env.JX_STUDIO_WINDOWS_DIR = REGISTRY;
-// `nextWelcomeProfile` resolves under the app data dir; env-paths honours XDG per call.
+// `nextWelcomeProfile` resolves under the app data dir. env-paths honours XDG_DATA_HOME on Linux
+// Only — on Windows and macOS it reads LOCALAPPDATA / ~/Library regardless — so this isolates the
+// Linux run but cannot be what the expectations are built from.
 process.env.XDG_DATA_HOME = DATA;
+
+/**
+ * The app data path, resolved exactly as `user-config.dataFile` resolves it.
+ *
+ * Written out rather than hardcoded as `join(DATA, "jx-studio", …)`: that spelling is env-paths'
+ * LINUX layout, so on Windows it asserted a directory the implementation never names and all three
+ * data-dir tests failed there while passing on CI. What these tests are actually about is the
+ * structure under the base — `windows`, `chromium-profiles/welcome-N` — not the OS prefix.
+ */
+function dataPath(name: string): string {
+  return join(envPaths("jx-studio", { suffix: "" }).data, name);
+}
 
 /** A pid that certainly names nothing: spawned, waited for, and reaped. */
 function deadPid(): number {
@@ -78,7 +93,7 @@ describe("windowsDir", () => {
     const override = process.env.JX_STUDIO_WINDOWS_DIR;
     delete process.env.JX_STUDIO_WINDOWS_DIR;
     try {
-      expect(windowsDir()).toBe(join(DATA, "jx-studio", "windows"));
+      expect(windowsDir()).toBe(dataPath("windows"));
     } finally {
       process.env.JX_STUDIO_WINDOWS_DIR = override;
     }
@@ -295,18 +310,18 @@ describe("focus requests", () => {
 
 describe("profile directories", () => {
   test("a project's window keeps its profile beside the project", () => {
-    expect(projectProfile("/proj/alpha")).toBe(join("/proj/alpha", ".jx", "chromium-profile"));
+    expect(projectProfile("/proj/alpha")).toBe(resolve("/proj/alpha", ".jx", "chromium-profile"));
   });
 
   test("a welcome window takes the lowest slot no live window is using", () => {
-    const base = join(DATA, "jx-studio", "chromium-profiles");
+    const base = dataPath("chromium-profiles");
     expect(nextWelcomeProfile()).toBe(join(base, "welcome-0"));
     registerWindow(entry(process.pid, null, join(base, "welcome-0")));
     expect(nextWelcomeProfile()).toBe(join(base, "welcome-1"));
   });
 
   test("a slot freed by a closed window is reused rather than counting upward forever", () => {
-    const base = join(DATA, "jx-studio", "chromium-profiles");
+    const base = dataPath("chromium-profiles");
     registerWindow(entry(deadPid(), null, join(base, "welcome-0")));
     expect(nextWelcomeProfile()).toBe(join(base, "welcome-0"));
   });

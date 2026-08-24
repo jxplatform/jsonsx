@@ -28,17 +28,20 @@ function projectWith(
   for (const pkg of packages) {
     const dir = join(root, "node_modules", pkg.name);
     if (pkg.dangling) {
-      // A link to a target that is deliberately never created — the package moved out from under
-      // An install that predates the move.
+      /* A link to a target that is deliberately never created — the package moved out from under
+         an install that predates the move. A JUNCTION, like every directory link in this file:
+         Windows refuses a plain directory symlink with EPERM unless the process is elevated or
+         Developer Mode is on, while junctions need neither — and are what Bun itself makes for
+         workspace links. The argument is ignored on POSIX. */
       mkdirSync(resolve(dir, ".."), { recursive: true });
-      symlinkSync(join(root, "moved-away"), dir);
+      symlinkSync(join(root, "moved-away"), dir, "junction");
       continue;
     }
     if (pkg.symlink) {
       const target = join(root, "workspace-target");
       mkdirSync(target, { recursive: true });
       mkdirSync(resolve(dir, ".."), { recursive: true });
-      symlinkSync(target, dir);
+      symlinkSync(target, dir, "junction");
       continue;
     }
     mkdirSync(dir, { recursive: true });
@@ -228,30 +231,56 @@ describe("a dangling first-party symlink", () => {
   });
 });
 
+/**
+ * Whether this machine can create a symlink to a FILE.
+ *
+ * The two tests below are about `.bin` entries, which are file links, and Windows refuses those
+ * with EPERM unless the process is elevated or Developer Mode is on — a directory junction is no
+ * substitute. Probed rather than branched on `process.platform`, so the tests run on a Windows
+ * machine that does allow it, and are reported as skipped rather than passing vacuously on one that
+ * does not.
+ */
+const canSymlinkFiles = (() => {
+  const probeRoot = mkdtempSync(join(tmpdir(), "shadow-symlink-probe-"));
+  try {
+    const target = join(probeRoot, "target.js");
+    writeFileSync(target, "");
+    symlinkSync(target, join(probeRoot, "link.js"));
+    return true;
+  } catch {
+    return false;
+  } finally {
+    rmSync(probeRoot, { force: true, recursive: true });
+  }
+})();
+
 describe("the bin links a removed shadow leaves behind", () => {
-  test("a link into the deleted scope goes with it, and a foreign one stays", () => {
-    /* This is not tidiness. A dangling symlink is not skipped by a recursive copy, it THROWS —
+  test.skipIf(!canSymlinkFiles)(
+    "a link into the deleted scope goes with it, and a foreign one stays",
+    () => {
+      /* This is not tidiness. A dangling symlink is not skipped by a recursive copy, it THROWS —
        the desktop build copies packages/starters/sites wholesale into the app and died on
        `ENOENT: statx .../node_modules/.bin/jx`, a link left by an install whose @jxsuite/compiler
        this cleaner had already removed. */
-    const root = mkdtempSync(join(tmpdir(), "shadow-bin-"));
-    const nodeModules = join(root, "node_modules");
-    mkdirSync(join(nodeModules, ".bin"), { recursive: true });
-    symlinkSync("../@jxsuite/compiler/src/cli.js", join(nodeModules, ".bin", "jx"));
-    symlinkSync("../js-yaml/bin/js-yaml.mjs", join(nodeModules, ".bin", "js-yaml"));
+      const root = mkdtempSync(join(tmpdir(), "shadow-bin-"));
+      const nodeModules = join(root, "node_modules");
+      mkdirSync(join(nodeModules, ".bin"), { recursive: true });
+      symlinkSync("../@jxsuite/compiler/src/cli.js", join(nodeModules, ".bin", "jx"));
+      symlinkSync("../js-yaml/bin/js-yaml.mjs", join(nodeModules, ".bin", "js-yaml"));
 
-    const removed = removeScopeBinLinks(nodeModules);
+      const removed = removeScopeBinLinks(nodeModules);
 
-    expect(removed).toHaveLength(1);
-    expect(removed[0]).toContain("jx");
-    // `readdirSync`, not `existsSync`: the foreign link is dangling too (its target was never
-    // Created here), and existsSync FOLLOWS a symlink, so it answers false for a link that is
-    // Very much still on disk. Judging survival by the link itself is the whole point.
-    expect(readdirSync(join(nodeModules, ".bin"))).toEqual(["js-yaml"]);
-    rmSync(root, { force: true, recursive: true });
-  });
+      expect(removed).toHaveLength(1);
+      expect(removed[0]).toContain("jx");
+      // `readdirSync`, not `existsSync`: the foreign link is dangling too (its target was never
+      // Created here), and existsSync FOLLOWS a symlink, so it answers false for a link that is
+      // Very much still on disk. Judging survival by the link itself is the whole point.
+      expect(readdirSync(join(nodeModules, ".bin"))).toEqual(["js-yaml"]);
+      rmSync(root, { force: true, recursive: true });
+    },
+  );
 
-  test("the .bin directory itself goes once nothing is left in it", () => {
+  test.skipIf(!canSymlinkFiles)("the .bin directory itself goes once nothing is left in it", () => {
     const root = mkdtempSync(join(tmpdir(), "shadow-bin-"));
     const nodeModules = join(root, "node_modules");
     mkdirSync(join(nodeModules, ".bin"), { recursive: true });

@@ -1,7 +1,7 @@
 // oxlint-disable typescript/await-thenable -- bun test .resolves/.rejects matchers are typed `void` but return real Promises at runtime; the await is required.
 import { afterAll, beforeAll, describe, expect, mock, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve as resolvePath } from "node:path";
 import { CHROMIUM_RPC_EXEMPT, rpcParity } from "./_rpc-parity";
 
 // In-process import of src/chromium/index.ts, a launcher with import-time side effects.
@@ -1006,8 +1006,9 @@ describe("opening projects elsewhere", () => {
     expect(spawned.args[1]).toBe("/proj/fresh");
     // Its Chromium profile sits beside the project, so that window's layout and open tabs survive
     // A restart — and, because the singleton is keyed on it, so that it gets a browser of its own.
+    // Matches projectProfile(), which resolves: on Windows join() leaves the path drive-less.
     expect(spawned.opts.env?.JX_STUDIO_PROFILE_DIR).toBe(
-      join("/proj/fresh", ".jx", "chromium-profile"),
+      resolvePath("/proj/fresh", ".jx", "chromium-profile"),
     );
     expect(spawned.opts.env?.JX_STUDIO_NO_PROJECT).toBeUndefined();
     expect(spawned.opts.detached).toBe(true);

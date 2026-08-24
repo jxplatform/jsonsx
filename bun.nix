@@ -1502,6 +1502,10 @@
     url = "https://registry.npmjs.org/@ttsc/win32-x64/-/win32-x64-0.28.1.tgz";
     hash = "sha512-dqvfvb0hXNHRm9eJEMt/YVkHfLd327/AFrZH1sNCemYEbLaCT543Zdv2qMMT4RyJiAGTo0TeXhyHBRaga63/BQ==";
   };
+  "@types/bun@1.4.0" = fetchurl {
+    url = "https://registry.npmjs.org/@types/bun/-/bun-1.4.0.tgz";
+    hash = "sha512-K+lZULY23vRgK/CfTjFIV+tyifaNdSMlPh9j+6mQ/cLfpOznLyAuzgV/JQysyECpkBQLVMSyvjlr2fBUSA9wFQ==";
+  };
   "@types/debug@4.1.13" = fetchurl {
     url = "https://registry.npmjs.org/@types/debug/-/debug-4.1.13.tgz";
     hash = "sha512-KSVgmQmzMwPlmtljOomayoR89W4FynCAi3E8PPs7vmDVPe84hT+vGPKkJfThkmXs0x0jAaa9U8uW8bbfyS2fWw==";
