@@ -444,3 +444,72 @@ describe("prop-binding markers (setStampPropBindings)", () => {
     el.remove();
   });
 });
+
+/**
+ * A state key that collides with a REFLECTED DOM property.
+ *
+ * `connectedCallback` merges instance values with `key in this && this[key] !== undefined`. For a
+ * reflected name — `title`, `role`, `id`, `lang`, `dir`, `slot`, `hidden` — the accessor exists on
+ * the prototype and answers `""` when nothing is set, and `"" !== undefined`, so the empty string
+ * won and the component's own default never rendered. A plain key beside it kept its default, which
+ * is what made this look like broken content rather than a runtime bug. 41 shipped starter
+ * components declare `title` or `role` as state.
+ */
+describe("a reflected property name does not clobber the declared default", () => {
+  /** Render one instance of a definition declaring a reflected key and a plain one. */
+  async function render(instance: Record<string, unknown>) {
+    const tag = uniqueTag();
+    await defineElement({
+      children: [
+        { tagName: "h3", textContent: "${state.title}" },
+        { tagName: "p", textContent: "${state.quote}" },
+      ],
+      state: { quote: "DEFAULT QUOTE", title: "DEFAULT TITLE" },
+      tagName: tag,
+    } as never);
+    const el = renderNode({ tagName: tag, ...instance }, {}, {});
+    document.body.append(el);
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+    return {
+      quote: el.querySelector("p")?.textContent,
+      title: el.querySelector("h3")?.textContent,
+    };
+  }
+
+  test("with nothing supplied, BOTH defaults render", async () => {
+    // The regression, stated once: `title` rendered "" while `quote` rendered its default.
+    expect(await render({})).toEqual({ quote: "DEFAULT QUOTE", title: "DEFAULT TITLE" });
+  });
+
+  test("$props on a reflected name still wins", async () => {
+    /* The trap in the fix. Assigning a reflected name goes through the prototype accessor and
+       creates NO own property, so an `Object.hasOwn` test would discard this silently — for every
+       component that declares one. The accessor writes the attribute, and that is the evidence. */
+    const r = await render({ $props: { title: "FROM PROPS" } });
+    expect(r.title).toBe("FROM PROPS");
+  });
+
+  test("an explicitly EMPTY $props value is honoured, not replaced by the default", async () => {
+    // "" is a value an author may mean. It must not be read as "nothing was supplied".
+    const rendered = await render({ $props: { title: "" } });
+    expect(rendered.title).toBe("");
+  });
+
+  test("$props on a plain name still wins", async () => {
+    const rendered = await render({ $props: { quote: "FROM PROPS" } });
+    expect(rendered.quote).toBe("FROM PROPS");
+  });
+
+  test("a literal attribute of the same name still wins", async () => {
+    // Unchanged behaviour: the attribute is how a reflected value arrives, so it still supplies.
+    const rendered = await render({ attributes: { title: "FROM ATTR" } });
+    expect(rendered.title).toBe("FROM ATTR");
+  });
+
+  test("a props.* attribute still wins", async () => {
+    const r = await render({ attributes: { "props.title": "FROM PROPS-ATTR" } });
+    expect(r.title).toBe("FROM PROPS-ATTR");
+  });
+});

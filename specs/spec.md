@@ -2,9 +2,9 @@
 
 ## Declarative Document Object Model — JSON Edition
 
-**Version:** 0.5.4-draft
+**Version:** 0.5.5-draft
 **Status:** Partial
-**Updated:** 2026-08-18
+**Updated:** 2026-08-24
 **License:** MIT
 
 ---
@@ -1361,6 +1361,16 @@ Props are passed via `$props` on the instance node. This is the only mechanism f
 }
 ```
 
+**An instance supplies a prop, or it does not.** The runtime takes a value from the instance only
+where the instance genuinely carries one — an own JS property, or an attribute of that name. Probing
+the element for the key alone is not enough, because a state key that collides with a **reflected**
+DOM property (`title`, `role`, `id`, `lang`, `dir`, `slot`, `hidden`) always answers: the accessor
+lives on the prototype and reports `""` when nothing is set, which would otherwise beat the
+component's declared default and render blank. Testing for an own property alone is equally wrong in
+the other direction — assigning a reflected name goes through that same accessor and creates no own
+property, so a real `$props.title` would be discarded. The attribute the accessor writes is what
+distinguishes the two.
+
 ### 13.3 Signal Forwarding
 
 When a `$props` value is a `$ref` to a signal, the child receives the same reactive reference — writes in either scope trigger effects in both.
@@ -2477,6 +2487,7 @@ This rewrites the mutating handlers of Appendix A's idiom using `$expression`, l
 
 ## Changelog
 
+- **0.5.5-draft** (2026-08-24) — 13.2 states that the runtime takes a prop from an instance only where the instance genuinely carries one — an own property or an attribute — because a state key colliding with a reflected DOM property otherwise reports an empty string and beats the component's declared default.
 - **0.5.4-draft** (2026-08-18) — §21.5: Trusted Types enforcement is declined rather than deferred — the observation run answered its question and was removed with its header; no innerHTML write remains in code Jx ships.
 - **0.5.3-draft** (2026-08-18) — §5.6: both tiers refuse a $props write against a private key, and a private entry gets no property accessor.
 - **0.5.2-draft** (2026-08-18) — §21.5: ship the Trusted Types observation stage, and correct two claims its first boot disproved.
@@ -2535,4 +2546,4 @@ This rewrites the mutating handlers of Appendix A's idiom using `$expression`, l
 
 ---
 
-_Jx Specification v0.5.4-draft — subject to revision_
+_Jx Specification v0.5.5-draft — subject to revision_
