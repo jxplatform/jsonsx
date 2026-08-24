@@ -49,6 +49,15 @@ export interface BeforeInputContext {
   atBlockEnd: boolean;
   /** The event's `data` (inserted text), empty for deletions. */
   data: string;
+  /**
+   * The caret is in a PROP-BOUND nested host — text inside a component instance that is an
+   * invertible prop binding (studio.md §8.2.5), not a block of the page document.
+   *
+   * Such a host has no `data-jx-path` of its own, so `from`/`to` are always null for it. Without
+   * this flag the null-position rule below rejected every keystroke: the caret appeared, and
+   * nothing typed into a component slot ever landed.
+   */
+  inPropHost: boolean;
 }
 
 /**
@@ -92,6 +101,20 @@ const INSERT_TEXT = new Set([
 const NATIVE_FORMAT_PREFIX = "format";
 
 /**
+ * Intents refused inside a prop-bound host, because a prop value is ONE PLAIN STRING.
+ *
+ * `docs/studio/editing/writing.md` puts it as "paragraph splits are off": there is no second block
+ * for Enter to make, and a `<br>` would serialise into a value that is supposed to be a single
+ * line. Everything else — insert, delete, paste, cut, IME — is ordinary text editing on a
+ * `plaintext-only` host and runs natively.
+ *
+ * These are refused rather than re-expressed: Enter FINISHES the edit (handled as a keystroke by
+ * the editing engine, not as an input event), so the chokepoint's only job is to stop the browser
+ * inserting the newline first.
+ */
+const PROP_STRUCTURAL = new Set(["insertParagraph", "insertLineBreak"]);
+
+/**
  * Classify one `beforeinput`.
  *
  * The order of the checks is the contract: 1. composition is untouchable (preventing it breaks IME
@@ -124,7 +147,20 @@ export function classifyBeforeInput(ctx: BeforeInputContext): EditAction {
     return { kind: "reject" };
   }
 
-  // 2. No resolvable position means the caret is in canvas chrome or a `contenteditable="false"`
+  /*
+   * 2. A prop-bound host is editable text with NO document path — it is written back as a prop
+   * value by its own commit (`editCommitProp`), not as a block. It must be judged before the
+   * null-position rule below, which would otherwise reject it for having no path: that is exactly
+   * what made a component slot show a caret and swallow every keystroke.
+   *
+   * Nothing here is structural, so nothing is re-expressed; the browser edits the text and the
+   * session commits the string.
+   */
+  if (ctx.inPropHost) {
+    return PROP_STRUCTURAL.has(inputType) ? { kind: "reject" } : { kind: "native" };
+  }
+
+  // 3. No resolvable position means the caret is in canvas chrome or a `contenteditable="false"`
   // Island — there is no document node to write to.
   if (!from || !to) {
     return { kind: "reject" };
