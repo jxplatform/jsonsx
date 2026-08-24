@@ -87,19 +87,58 @@ describe("documentBase", () => {
     expect(documentBase()).toBe(`${location.origin}/`);
   });
 
-  test("a declared base wins, and the project root is NOT appended to it", () => {
-    /* The declared base already addresses one project — Jx Cloud's is
-       /api/v1/p/:owner/:repo/:branch/studio/raw/ — so appending the root key on top of it would
-       address a directory named "owner/repo@branch" inside that project. */
+  /**
+   * The result must be usable as `new URL(path, base)`, which is the ONLY thing the caller does
+   * with it. Asserting the returned string instead is what let a root-relative base ship: the
+   * caller threw `Failed to construct 'URL': Invalid base URL` and the canvas did not mount at all
+   * — not a failed fetch, a blank canvas with an error card.
+   *
+   * The other test here made it worse by prefixing `http://x` to the result by hand, writing the
+   * missing absolutisation into the test and hiding the very defect it was covering. So every case
+   * below composes a real path through the real API.
+   */
+  const compose = (path: string) => new URL(path, documentBase("acme/site@main")).href;
+
+  test("a ROOT-RELATIVE declared base is absolutised — the shape Jx Cloud declares", () => {
     g.__jxPlatform = { documentBaseUrl: "/api/v1/p/acme/site/main/studio/raw/" };
-    expect(documentBase("acme/site@main")).toBe("/api/v1/p/acme/site/main/studio/raw/");
+    expect(compose("pages/index.md")).toBe(
+      `${location.origin}/api/v1/p/acme/site/main/studio/raw/pages/index.md`,
+    );
+  });
+
+  test("and a component $ref resolves off it, which is what the canvas actually fetches", () => {
+    g.__jxPlatform = { documentBaseUrl: "/api/v1/p/acme/site/main/studio/raw/" };
+    const doc = new URL("pages/index.md", documentBase("acme/site@main"));
+    expect(new URL("../components/co-nav.json", doc).href).toBe(
+      `${location.origin}/api/v1/p/acme/site/main/studio/raw/components/co-nav.json`,
+    );
+  });
+
+  test("the project root is NOT appended to a declared base", () => {
+    /* The declared base already addresses one project, so appending the root key on top of it
+       would address a directory named "acme/site@main" inside that project. */
+    g.__jxPlatform = { documentBaseUrl: "/api/v1/p/acme/site/main/studio/raw/" };
+    expect(compose("pages/index.md")).not.toContain("acme/site@main");
+  });
+
+  test("an ALREADY-ABSOLUTE declared base passes through", () => {
+    // A platform may serve project files from another origin entirely.
+    g.__jxPlatform = { documentBaseUrl: "https://files.example.com/proj/" };
+    expect(compose("pages/index.md")).toBe("https://files.example.com/proj/pages/index.md");
   });
 
   test("a declared base missing its trailing slash still composes", () => {
-    // `new URL("pages/index.json", ".../raw")` would drop the last segment; the slash is load-bearing.
+    // Without the slash `new URL` drops the last segment, so "raw" would be lost.
     g.__jxPlatform = { documentBaseUrl: "/api/v1/p/acme/site/main/studio/raw" };
-    expect(new URL("pages/index.json", `http://x${documentBase("")}`).pathname).toBe(
-      "/api/v1/p/acme/site/main/studio/raw/pages/index.json",
+    expect(compose("pages/index.md")).toBe(
+      `${location.origin}/api/v1/p/acme/site/main/studio/raw/pages/index.md`,
+    );
+  });
+
+  test("the DEFAULT base composes too — it is used the same way", () => {
+    g.__jxPlatform = {};
+    expect(new URL("pages/index.md", documentBase("examples/site-demo")).href).toBe(
+      `${location.origin}/examples/site-demo/pages/index.md`,
     );
   });
 

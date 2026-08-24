@@ -82,7 +82,7 @@
     },
     "extensions/parser": {
       "name": "@jxsuite/parser",
-      "version": "1.5.2",
+      "version": "1.5.3",
       "dependencies": {
         "@jxsuite/markup": "workspace:^",
         "@jxsuite/schema": "workspace:^",
@@ -121,7 +121,7 @@
     },
     "packages/ai": {
       "name": "@jxsuite/ai",
-      "version": "0.36.1",
+      "version": "0.36.2",
       "dependencies": {
         "@jxsuite/protocol": "workspace:^",
         "@vue/reactivity": "3.5.41",
@@ -142,7 +142,7 @@
     },
     "packages/compiler": {
       "name": "@jxsuite/compiler",
-      "version": "2.0.2",
+      "version": "2.0.4",
       "bin": {
         "jx": "./bin/jx.js",
       },
@@ -165,7 +165,7 @@
     },
     "packages/create": {
       "name": "@jxsuite/create",
-      "version": "1.3.2",
+      "version": "1.3.4",
       "bin": {
         "create-jxsuite": "./index.ts",
       },
@@ -175,7 +175,7 @@
     },
     "packages/desktop": {
       "name": "@jxsuite/desktop",
-      "version": "2.2.1",
+      "version": "2.3.2",
       "dependencies": {
         "@jxsuite/compiler": "workspace:^",
         "@jxsuite/create": "workspace:^",
@@ -200,7 +200,7 @@
     },
     "packages/formulas": {
       "name": "@jxsuite/formulas",
-      "version": "0.0.9",
+      "version": "0.0.10",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
       },
@@ -210,7 +210,7 @@
     },
     "packages/import": {
       "name": "@jxsuite/import",
-      "version": "0.39.2",
+      "version": "0.39.4",
       "bin": {
         "jx-import": "./src/cli.ts",
       },
@@ -250,14 +250,14 @@
     },
     "packages/protocol": {
       "name": "@jxsuite/protocol",
-      "version": "1.1.2",
+      "version": "1.2.0",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
       },
     },
     "packages/runtime": {
       "name": "@jxsuite/runtime",
-      "version": "2.0.2",
+      "version": "2.0.3",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
         "@vue/reactivity": "3.5.41",
@@ -282,7 +282,7 @@
     },
     "packages/server": {
       "name": "@jxsuite/server",
-      "version": "2.2.1",
+      "version": "2.2.4",
       "dependencies": {
         "@jxsuite/collab": "workspace:^",
         "@jxsuite/compiler": "workspace:^",
@@ -304,7 +304,7 @@
     },
     "packages/starters": {
       "name": "@jxsuite/starters",
-      "version": "1.5.0",
+      "version": "1.6.1",
       "devDependencies": {
         "@jxsuite/parser": "workspace:^",
         "@jxsuite/runtime": "workspace:^",
@@ -315,7 +315,7 @@
     },
     "packages/studio": {
       "name": "@jxsuite/studio",
-      "version": "2.2.1",
+      "version": "2.4.0",
       "dependencies": {
         "@atlaskit/pragmatic-drag-and-drop": "^3.0.0",
         "@atlaskit/pragmatic-drag-and-drop-hitbox": "^2.1.0",
