@@ -317,6 +317,13 @@ export function startIframeInlineEdit(
         onEnd: () => {
           clearHighlight();
           lastNonEmptyRange = null;
+          /*
+           * Enter and Escape end the session inside the engine, which knows nothing about the
+           * editing host that adopted this marker. Without this the host kept pointing at the dead
+           * session, so the very next click on the same text was swallowed by the
+           * `el !== activeEl` re-entry guard — you had to click something else and come back.
+           */
+          root.forget();
           channel.post({ kind: "editEnd" });
         },
         // Prop values are single plain strings — no split, no slash-insert.

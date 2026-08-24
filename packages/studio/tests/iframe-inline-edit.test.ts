@@ -795,6 +795,38 @@ describe("prop-bound inline editing", () => {
     stop();
   });
 
+  test("the same prop text can be re-entered after Enter", () => {
+    /* Enter ends the session inside the ENGINE, which knows nothing about the editing host that
+       adopted the marker. The host kept pointing at the dead session, so the re-entry guard
+       (`el !== activeEl`) swallowed the next click on the same text: no caret, no editStart. You
+       had to click something else first and come back. */
+    const { channel, posts } = fakeChannel();
+    const { container, h3, shadowDoc } = propBoundContainer({ title: "Local" });
+    const stop = boot(channel, container, { getShadowDoc: () => shadowDoc });
+
+    clickInto(h3);
+    expect(posts.filter((p) => p.kind === "editStart")).toHaveLength(1);
+
+    h3.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }));
+    clickInto(h3);
+
+    expect(posts.filter((p) => p.kind === "editStart")).toHaveLength(2);
+    stop();
+  });
+
+  test("and after Escape, which ends the session the same way", () => {
+    const { channel, posts } = fakeChannel();
+    const { container, h3, shadowDoc } = propBoundContainer({ title: "Local" });
+    const stop = boot(channel, container, { getShadowDoc: () => shadowDoc });
+
+    clickInto(h3);
+    h3.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Escape" }));
+    clickInto(h3);
+
+    expect(posts.filter((p) => p.kind === "editStart")).toHaveLength(2);
+    stop();
+  });
+
   test("a forwarded format chord is refused in a prop session", () => {
     /* "Formatting is off" is the documented rule here, and inertifying the chord inside the frame
        is only half of it: a caret-scoped ⌘B is ALSO forwarded to the parent, matched by the
