@@ -2193,6 +2193,39 @@ const _privatePropWarned = new Set<string>();
  * @param {string} [where] - The site refusing it, for a message that points somewhere
  * @returns {boolean} True when the key is private and the caller must skip it
  */
+/**
+ * Whether the instance genuinely CARRIES `key`, rather than the prototype merely having an accessor
+ * for it.
+ *
+ * `key in el` cannot tell those apart, and for a REFLECTED DOM property — `title`, `role`, `id`,
+ * `lang`, `dir`, `slot`, `hidden` — the accessor answers `""` when nothing is set. `"" !==
+ * undefined`, so a component declaring `state.title` never rendered its own default: the empty
+ * string won. `quote` next to it kept its default, which is what made the bug look like bad
+ * content.
+ *
+ * The test is NOT `Object.hasOwn` alone, and that distinction is the whole subtlety. Assigning a
+ * reflected name goes through the prototype accessor and creates no own property, so a legitimate
+ * `$props.title` would be discarded by an own-property test — silently, for every component that
+ * declares one. What the accessor DOES do is write the attribute, so the attribute is the evidence
+ * that somebody set it, whether that was `$props` before connection or the author in the document.
+ *
+ * @param {HTMLElement} el - The instance being connected.
+ * @param {string} key - A state key declared by the component definition.
+ * @returns {boolean}
+ */
+function instanceSupplies(el: HTMLElement, key: string): boolean {
+  if (Object.hasOwn(el, key)) {
+    return true;
+  }
+  if (el.hasAttribute(key)) {
+    return true;
+  }
+  // ARIA-style reflections carry a kebab attribute for a camelCase property (`ariaLabel` →
+  // `aria-label`), so the direct name lookup above would miss a value that really was set.
+  const kebab = key.replaceAll(/[A-Z]/gu, (c) => `-${c.toLowerCase()}`);
+  return kebab !== key && el.hasAttribute(kebab);
+}
+
 function refusePrivateProp(key: string, where?: string): boolean {
   if (!isPrivateStateKey(key)) {
     return false;
@@ -2530,7 +2563,11 @@ export async function defineElement(source: string | JxDocument, baseUrl?: strin
         if (isPrivateStateKey(key)) {
           continue;
         }
-        if (key in this && (this as Record<string, unknown>)[key] !== undefined) {
+        if (
+          key in this &&
+          (this as Record<string, unknown>)[key] !== undefined &&
+          instanceSupplies(this, key)
+        ) {
           state[key] = (this as Record<string, unknown>)[key];
         }
       }
