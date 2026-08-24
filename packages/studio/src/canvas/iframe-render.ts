@@ -480,6 +480,17 @@ export function injectHead(doc: JxDocument): void {
  * + `data-jx-layout-file` (layout-originated nodes) on rendered nodes.
  */
 export function makeStamper(ctx: PathMapCtx) {
+  /*
+   * Paths of the component instances frozen below. Nodes arrive parent-first and `onNodeCreated`
+   * fires straight after `createElement`, BEFORE the node is attached — so there is no ancestor to
+   * walk at stamp time, and the path is the only way to know a node landed inside an island.
+   */
+  const islands: (string | number)[][] = [];
+  const insideIsland = (path: (string | number)[]): boolean =>
+    islands.some(
+      (island) => path.length > island.length && island.every((seg, i) => path[i] === seg),
+    );
+
   return (created: Node, path: (string | number)[], def: unknown) => {
     if (!(created instanceof HTMLElement)) {
       return;
@@ -503,8 +514,11 @@ export function makeStamper(ctx: PathMapCtx) {
     //
     // The opened document's own root is excluded: when a component definition is the file being
     // Edited, its subtree IS the document and must stay editable.
-    if (!isDefinitionRoot && created.tagName.includes("-") && isEditableMode(ctx.canvasMode)) {
+    const isIsland =
+      !isDefinitionRoot && created.tagName.includes("-") && isEditableMode(ctx.canvasMode);
+    if (isIsland) {
       created.contentEditable = "false";
+      islands.push(path);
     }
     const classified = classifyRenderNode(path, def, ctx);
     if (classified.kind === "layout") {
@@ -530,6 +544,29 @@ export function makeStamper(ctx: PathMapCtx) {
       return;
     }
     created.dataset.jxPath = serializeJxPath(classified.path);
+    /*
+     * SLOTTED PAGE CONTENT IS NOT COMPONENT INTERNALS.
+     *
+     * The island above exists to keep the caret out of what a component renders for itself. But a
+     * component's CHILDREN are the author's own document — in jx-markdown,
+     *
+     *     :::eer-intro
+     *     If you need reliable rental equipment fast, request a quote today!
+     *     :::
+     *
+     * is a paragraph the author typed, stamped here with its own `data-jx-path`. Inheriting the
+     * island's `contenteditable="false"` made every such paragraph uneditable: on a page written
+     * this way — which is most component-using pages — the caret could not be placed anywhere at
+     * all, and the only route to the text was the properties sidebar.
+     *
+     * Re-opening on the STAMPED node alone is what keeps the distinction. Component internals are
+     * created by the component's own `connectedCallback` in another document and never pass through
+     * this stamper, so they stay frozen; prop-bound internals keep their nested-host activation
+     * (see iframe-editable-root's `onPointerDownCapture`).
+     */
+    if (!isIsland && isEditableMode(ctx.canvasMode) && insideIsland(path)) {
+      created.contentEditable = "true";
+    }
   };
 }
 

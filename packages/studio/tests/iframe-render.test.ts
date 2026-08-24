@@ -21,6 +21,7 @@ import {
   syncStylebookCss,
 } from "../src/canvas/iframe-render";
 import type { PathMapCtx } from "../src/canvas/path-mapping";
+import { serializeJxPath } from "../src/canvas/path-mapping";
 
 const ctx: PathMapCtx = {
   arrayPaths: new Set(),
@@ -862,5 +863,128 @@ describe("syncStylebookCss", () => {
     expect(sheet()).toBeTruthy();
     expect(document.head.querySelector(`#${EDIT_PLACEHOLDER_STYLE_ID}`)).toBeNull();
     handle.dispose();
+  });
+});
+
+/**
+ * Slotted page content stays editable inside a component island.
+ *
+ * The island (`contenteditable="false"` on a component instance) exists so a caret cannot wander
+ * into what a component renders for ITSELF. But a component's children are the author's own
+ * document. In jx-markdown,
+ *
+ *     :::eer-intro
+ *     If you need reliable rental equipment fast, request a quote today!
+ *     :::
+ *
+ * That paragraph is page content with its own `data-jx-path`, and inheriting the island's `false`
+ * made it uneditable. On a page written this way — most component-using pages — the caret could not
+ * be placed ANYWHERE, and the only route to the text was the properties sidebar. Measured in Chrome
+ * on a real project: 23 stamped blocks, 0 of them editable.
+ */
+describe("component islands and the document inside them", () => {
+  const editable: PathMapCtx = { ...ctx, canvasMode: "edit" };
+
+  /** Stamp a component instance at `path`, then a child of it, and report the child. */
+  function stampChild(
+    componentPath: (string | number)[],
+    childPath: (string | number)[],
+    childTag = "p",
+  ): HTMLElement {
+    const stamp = makeStamper(editable);
+    const host = document.createElement("eer-intro");
+    stamp(host, componentPath, { tagName: "eer-intro" });
+    const child = document.createElement(childTag);
+    stamp(child, childPath, { tagName: childTag });
+    return child;
+  }
+
+  test("the component instance itself is frozen — it is selected whole, not typed into", () => {
+    const stamp = makeStamper(editable);
+    const host = document.createElement("eer-intro");
+    stamp(host, ["children", 1], { tagName: "eer-intro" });
+    expect(host.getAttribute("contenteditable")).toBe("false");
+  });
+
+  test("a stamped child of that instance is re-opened", () => {
+    const child = stampChild(["children", 1], ["children", 1, "children", 0]);
+    expect(child.getAttribute("contenteditable")).toBe("true");
+  });
+
+  test("it re-opens at any depth, not just direct children", () => {
+    // `:::eer-steps` wrapping `:::eer-step` wrapping a paragraph — three levels, all authored.
+    const child = stampChild(["children", 4], ["children", 4, "children", 2, "children", 0]);
+    expect(child.getAttribute("contenteditable")).toBe("true");
+  });
+
+  test("a SIBLING of the island is left alone — it was never blocked", () => {
+    // Path ["children", 2] is not inside ["children", 1]; a prefix test that compared strings
+    // Rather than segments would wrongly treat ["children", 10] as inside ["children", 1].
+    const child = stampChild(["children", 1], ["children", 2]);
+    expect(child.getAttribute("contenteditable")).toBeNull();
+  });
+
+  test("a path that merely SHARES A PREFIX DIGIT is not inside the island", () => {
+    const child = stampChild(["children", 1], ["children", 10, "children", 0]);
+    expect(child.getAttribute("contenteditable")).toBeNull();
+  });
+
+  test("top-level page content outside any component is untouched", () => {
+    const stamp = makeStamper(editable);
+    const el = document.createElement("p");
+    stamp(el, ["children", 0], { tagName: "p" });
+    // The container is the editing host; a plain block needs no attribute of its own.
+    expect(el.getAttribute("contenteditable")).toBeNull();
+    expect(el.dataset.jxPath).toBe(serializeJxPath(["children", 0]));
+  });
+
+  test("nothing is re-opened in a non-editable mode", () => {
+    // Preview and stylebook renders have no editing host at all, so an island is never created and
+    // There is nothing to re-open. A stray `true` here would make preview text typable.
+    const stamp = makeStamper({ ...ctx, canvasMode: "preview" });
+    const host = document.createElement("eer-intro");
+    stamp(host, ["children", 1], { tagName: "eer-intro" });
+    const child = document.createElement("p");
+    stamp(child, ["children", 1, "children", 0], { tagName: "p" });
+    expect(host.getAttribute("contenteditable")).toBeNull();
+    expect(child.getAttribute("contenteditable")).toBeNull();
+  });
+
+  test("a NESTED component instance stays frozen — it is an island, not slotted prose", () => {
+    /* The trap in the re-opening rule, and it is not hypothetical: a nested instance is BOTH an
+       island and a stamped descendant of one. Re-opening it unconditionally overrode its own
+       freeze, which put a caret directly into a nested component's internals — measured in Chrome,
+       16 prop-bound internals became typable that should only be reachable through the nested-host
+       activation. `:::eer-categories` wrapping `::eer-category` is the shape. */
+    const stamp = makeStamper(editable);
+    const outer = document.createElement("eer-categories");
+    stamp(outer, ["children", 2], { tagName: "eer-categories" });
+    const inner = document.createElement("eer-category");
+    stamp(inner, ["children", 2, "children", 0], { tagName: "eer-category" });
+    expect(inner.getAttribute("contenteditable")).toBe("false");
+  });
+
+  test("but prose slotted into that NESTED instance is still editable", () => {
+    // Two components deep, then the author's paragraph. `:::eer-steps` → `:::eer-step` → text.
+    const stamp = makeStamper(editable);
+    stamp(document.createElement("eer-steps"), ["children", 4], { tagName: "eer-steps" });
+    const step = document.createElement("eer-step");
+    stamp(step, ["children", 4, "children", 0], { tagName: "eer-step" });
+    const prose = document.createElement("p");
+    stamp(prose, ["children", 4, "children", 0, "children", 0], { tagName: "p" });
+    expect(step.getAttribute("contenteditable")).toBe("false");
+    expect(prose.getAttribute("contenteditable")).toBe("true");
+  });
+
+  test("the opened document's own root is not an island, so its subtree stays plain", () => {
+    // Editing a component DEFINITION: the subtree IS the document. It must not be frozen, and its
+    // Children must not be re-opened as though they were escaping one.
+    const stamp = makeStamper(editable);
+    const root = document.createElement("eer-cta");
+    stamp(root, [], { tagName: "eer-cta" });
+    const child = document.createElement("p");
+    stamp(child, ["children", 0], { tagName: "p" });
+    expect(root.getAttribute("contenteditable")).toBeNull();
+    expect(child.getAttribute("contenteditable")).toBeNull();
   });
 });
