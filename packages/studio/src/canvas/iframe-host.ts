@@ -199,7 +199,13 @@ interface HostState {
    * render acks (`renderComplete`) at a bumped one — both satisfy `gen >= minGen`. An immediate
    * `enterEdit` would race the escalated ASYNC render and silently fail to find the element.
    */
-  pendingEnterEdit: { path: (string | number)[]; minGen: number; offset?: number } | null;
+  pendingEnterEdit: {
+    path: (string | number)[];
+    minGen: number;
+    offset?: number;
+    /** Set when the deferred re-entry is a PROP host rather than a block (see deferEnterEdit). */
+    prop?: string;
+  } | null;
   /**
    * Stylebook capability (set by {@link mountStylebookCanvas}, cleared by page mounts). The specimen
    * doc's paths decode to TAGS, not tab-document paths: hits route to the injected stylebook
@@ -1256,6 +1262,13 @@ function withEchoSuppressed(host: HostState, paths: (string | number)[][], fn: (
 let propEchoPending: string | null = null;
 
 /**
+ * Serialized instance path whose release commit just transacted, so a `$props` patch rebuilding it
+ * is in flight. Read by the very next `editStart` and cleared there — the two messages arrive back
+ * to back when the user clicks from one prop slot to another in the same component.
+ */
+let propRebuildAt: string | null = null;
+
+/**
  * Whether a release commit has to re-render the instance itself.
  *
  * Exported for its own test: the posting side ({@link postPatchToHosts}) needs a resolvable stage
@@ -2305,6 +2318,13 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
         activeEditHost.snapshot = null;
       }
       activeEditHost = state;
+      /* The session that just opened is inside an instance a release commit is about to rebuild —
+         defer a re-entry so it survives the patch. Only for the SAME instance: moving to a slot in
+         a different component is not disturbed by this rebuild. */
+      if (msg.prop !== undefined && propRebuildAt === serializeJxPath(msg.path)) {
+        deferEnterEdit(state, msg.path, undefined, msg.prop);
+      }
+      propRebuildAt = null;
       // Each visit to a block is one undoable edit. Bumping the run id here breaks the history
       // Coalescing run, so returning to the same paragraph later is a separate ⌘Z step.
       editRunSeq += 1;
@@ -2388,6 +2408,14 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
         reconcileInstance(state, msg.path);
       }
       propEchoPending = null;
+      /*
+       * A release that TRANSACTED rebuilds the whole instance — `set-key $props` at the instance
+       * path becomes a `replaceSubtree`. If the user got here by clicking a SECOND prop slot in
+       * that same instance, the frame has already adopted a marker inside the subtree about to be
+       * replaced, so the session it just opened is dead on arrival: the click did nothing and they
+       * had to click again. The next `editStart` tells us whether that is what happened.
+       */
+      propRebuildAt = transacted ? serializeJxPath(msg.path) : null;
       return;
     }
     case "editMerge": {
@@ -2505,7 +2533,7 @@ function onDomUpdated(state: HostState, gen: number): void {
   requestPresence(state);
   hideInsertZoneNow(state);
   if (state.pendingEnterEdit && gen >= state.pendingEnterEdit.minGen) {
-    const { offset, path } = state.pendingEnterEdit;
+    const { offset, path, prop } = state.pendingEnterEdit;
     state.pendingEnterEdit = null;
     /* Re-enter only when this host STILL SHOWS THE TAB IT OWES THE CARET TO — which is a question
        about this host's pane, not about the focus. A background tab's iframe renders a different
@@ -2515,7 +2543,7 @@ function onDomUpdated(state: HostState, gen: number): void {
        there is one stage. With two, the side pane could be displaying its tab, holding a caret it
        owed, and drop it because the PRIMARY had focus. */
     if (state.tabId !== null && state.tabId === tabOfContainer(state.canvasEl)?.id) {
-      reenterEdit(state, path, offset);
+      reenterEdit(state, path, offset, prop);
     }
   }
 }
@@ -2526,20 +2554,32 @@ function onDomUpdated(state: HostState, gen: number): void {
  * that same gen; an escalated full render acks at a bumped one — both satisfy `gen >= minGen`,
  * while a stale ack cannot. Latest-wins on overwrite.
  */
-function deferEnterEdit(state: HostState, path: (string | number)[], offset?: number): void {
+function deferEnterEdit(
+  state: HostState,
+  path: (string | number)[],
+  offset?: number,
+  prop?: string,
+): void {
   state.pendingEnterEdit = {
     minGen: state.lastRenderedGen,
     path: [...path],
     ...(offset === undefined ? {} : { offset }),
+    ...(prop === undefined ? {} : { prop }),
   };
 }
 
 /** Ask the host's iframe to (re-)enter inline editing on `path` (a plain copy crosses the bridge). */
-function reenterEdit(state: HostState, path: (string | number)[], offset?: number): void {
+function reenterEdit(
+  state: HostState,
+  path: (string | number)[],
+  offset?: number,
+  prop?: string,
+): void {
   state.channel.post({
     kind: "enterEdit",
     path: [...path],
     ...(offset === undefined ? {} : { offset }),
+    ...(prop === undefined ? {} : { prop }),
   });
 }
 

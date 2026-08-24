@@ -97,6 +97,8 @@ Text that a component fills from data can't be edited this way — typing over i
 
 The same goes for an option that holds a **number or a yes/no value** rather than text: it shows as text on the page, but editing it here would turn it into text and break anything that counts or compares it. Use the properties sidebar, which knows what kind of value the option takes.
 
+An option the page sets as a plain attribute rather than a component option is also left to the sidebar — editing it here would quietly create a second copy of the same value, and the page would keep showing the first one.
+
 Clicking a component's text and clicking away again changes nothing — an option only gets set on that instance when you actually edit it. :kbd[Esc] is a real cancel, including after Studio has already saved a pause mid-edit.
 
 :::doc-note

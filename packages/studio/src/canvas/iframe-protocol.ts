@@ -190,6 +190,13 @@ export type ParentToIframe =
       path: (string | number)[];
       /** Character offset for the caret; defaults to the block's start. */
       offset?: number;
+      /**
+       * Re-enter the PROP-BOUND host for this prop of the instance at `path`, rather than placing a
+       * caret in a block. A prop host is identified by (instance, prop) — the marker element
+       * carries no path of its own — and it is re-entered rather than caret-placed because a
+       * `$props` patch rebuilds the whole instance, replacing the element the session was on.
+       */
+      prop?: string;
     }
   // Commit and end the inline-edit session if one is live (a no-op otherwise). Posted by the parent
   // When focus/intent leaves the edit surface in the PARENT realm (tab switch, layers-panel click,

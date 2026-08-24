@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.40-draft
+**Version:** 0.9.41-draft
 **Status:** Partial
 **Updated:** 2026-08-24
 **License:** MIT
@@ -1088,6 +1088,13 @@ slash menu.
 would read as editable, but the session commits `textContent` — so editing it retypes the value, and
 `${count * 2}` becomes string concatenation. Those props are refused here and edited in the
 properties panel, which knows their type. An expression (`${…}`) and an object were already refused.
+
+**`$props` is not the only place a value lives.** A prop delivered through `attributes` — either the
+JSON shorthand `"props.<name>"` or a name that collides with a reflected DOM property such as
+`title` or `role` — renders through the marker while `$props` holds nothing, so reading `$props`
+alone reports it as unset and offers to edit it. Committing would write `$props` and leave the
+attribute standing: two sources for one rendered value, and for a reflected name the attribute wins,
+so the edit is invisible. Both are refused; the properties panel edits the attribute itself.
 
 **A session that changes nothing writes nothing.** The commit is compared against the text the
 session opened with, not only against the stored prop: an _unset_ prop's stored value is `undefined`
@@ -2403,6 +2410,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.9.41-draft** (2026-08-24) — 8.2.6 refuses a prop delivered through attributes — the props.* JSON shorthand or a name colliding with a reflected DOM property — because reading $props alone reports it unset, and committing would leave two sources for one rendered value; and 8.2 re-enters a prop host after a $props patch rebuilds the instance.
 - **0.9.40-draft** (2026-08-24) — 8.2.6 refuses a non-string prop for inline editing (the session commits textContent, so a number or boolean would be retyped) and states that a session which changes nothing writes nothing, with Escape a real cancel that also undoes an idle commit made during the session.
 - **0.9.39-draft** (2026-08-24) — 8.2.1 records that a prop-bound host is classified before positions are resolved: it has no document path, so the unresolvable-position rule would otherwise reject every keystroke in it, and only the paragraph split and line break are prevented there.
 - **0.9.38-draft** (2026-08-24) — 8.2 states that a component island covers the component's internals and never the document slotted into it: a child with a stamped path is re-opened, a nested instance stays frozen, and connectedCallback internals are never re-opened.
@@ -2498,4 +2506,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.40-draft_
+_`@jxsuite/studio` Specification v0.9.41-draft_
