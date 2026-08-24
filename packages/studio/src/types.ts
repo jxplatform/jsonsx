@@ -195,7 +195,9 @@ export interface StudioPlatform {
    * every `$ref` fetch landed on the SPA fallback — which answers HTML at **200**, so `res.ok`
    * passed and the parse died on `Unexpected token '<'`. Images failed the same way in silence.
    *
-   * Must end in `/`; a project-relative path is appended to it verbatim.
+   * May be absolute or root-relative — a root-relative value is resolved against the canvas origin,
+   * because the canvas uses this as `new URL(path, base)` and a relative BASE throws. A missing
+   * trailing `/` is added: without it `new URL` drops the last segment.
    */
   documentBaseUrl?: string;
   activate: (root?: string) => Promise<void>;

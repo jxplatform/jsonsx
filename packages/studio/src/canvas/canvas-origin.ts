@@ -42,12 +42,24 @@ export function canvasBaseOrigin(): string {
  * @returns {string} A base URL ending in `/`, safe to pass to `new URL(relativePath, base)`.
  */
 export function documentBase(projectRoot?: string): string {
+  const origin = canvasBaseOrigin();
   const declared = hasPlatform() ? getPlatform().documentBaseUrl : undefined;
   if (declared) {
-    return declared.endsWith("/") ? declared : `${declared}/`;
+    const withSlash = declared.endsWith("/") ? declared : `${declared}/`;
+    /*
+     * ABSOLUTE, ALWAYS. The caller uses this as `new URL(documentPath, base)`, and a `base` that is
+     * itself relative throws `Failed to construct 'URL': Invalid base URL` — which is not a failed
+     * fetch but a failed MOUNT: the canvas renders nothing at all.
+     *
+     * Jx Cloud declares a root-relative base (`/api/v1/p/:owner/:repo/:branch/studio/raw/`), which
+     * is the natural thing to declare and must keep working. Resolving it against the canvas origin
+     * here means a platform may declare either shape. An already-absolute URL passes through
+     * unchanged, because that is what `new URL` does with one.
+     */
+    return new URL(withSlash, `${origin}/`).href;
   }
   const root = projectRoot || "";
-  return `${canvasBaseOrigin()}/${root ? `${root}/` : ""}`;
+  return `${origin}/${root ? `${root}/` : ""}`;
 }
 
 /**
