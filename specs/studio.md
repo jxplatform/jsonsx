@@ -2,9 +2,9 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.37-draft
+**Version:** 0.9.38-draft
 **Status:** Partial
-**Updated:** 2026-08-22
+**Updated:** 2026-08-24
 **License:** MIT
 
 ---
@@ -964,6 +964,14 @@ none of which the studio implements.
 
 Component instances are `contenteditable="false"` islands: the caret treats each as one atomic unit
 and never enters its internals. Prop-bound text inside a component (§8.2.5) is the exception.
+
+**An island covers a component's internals, never the document slotted into it.** A component's
+children are page content — in a markdown class-directive page they are the author's own prose, and
+as §4.1 notes those pages place _every_ editable block inside a component. Each such block is
+stamped with its own `data-jx-path` and re-opened with `contenteditable="true"`, so the island
+freezes only what the component renders for itself. A **nested** component instance is an island in
+its own right and stays frozen, even though it is also a child of one; internals rendered by a
+component's own `connectedCallback` never carry a stamped path, so they are never re-opened.
 
 Text reaches the document on a **~500 ms typing pause** and whenever the caret leaves a block. Any
 operation that reads the document as authoritative — chiefly saving — first flushes what the caret
@@ -2373,6 +2381,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.9.38-draft** (2026-08-24) — 8.2 states that a component island covers the component's internals and never the document slotted into it: a child with a stamped path is re-opened, a nested instance stays frozen, and connectedCallback internals are never re-opened.
 - **0.9.37-draft** (2026-08-22) — 11.2 Hosting the Studio: the asset manifest, the two layout modes, generated documents, the boot slot and the layering rule; 11.1 states the entry-rooted asset rule; 3.4's stale member names and file extensions corrected.
 - **0.9.36-draft** (2026-08-21) — Preferences → Appearance states what the theme repaints: the chrome, the overlays and an open code view, with the canvas a light document in both.
 - **0.9.35-draft** (2026-08-20) — Declare the Monaco editor feature set in monaco-setup (one register import per capability, and the measured caveat that 0.56.0's contrib graph does not yet honour the exclusions); drop the Monaco de-duplication plugin now that the first-party collab binding leaves one importer.
@@ -2465,4 +2474,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.37-draft_
+_`@jxsuite/studio` Specification v0.9.38-draft_
