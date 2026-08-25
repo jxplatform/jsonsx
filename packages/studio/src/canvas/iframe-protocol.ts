@@ -9,7 +9,7 @@
  * the cross-frame analog of the legacy renderer's `renderGeneration` staleness guard.
  */
 
-import type { AssetContext } from "./asset-refs";
+import type { AssetContext } from "./asset-resolve";
 import type { JxDocOp } from "../tabs/patch-ops";
 import type { JxContentResult, SlashCommand } from "../editor/inline-edit";
 import type { JxExpressionNode, JxMutableNode } from "@jxsuite/schema/types";

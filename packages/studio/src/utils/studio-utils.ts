@@ -120,8 +120,9 @@ export function abbreviateValue(val: string) {
 /**
  * The placeholder a content type's `source` may carry to say "one directory per locale".
  *
- * Duplicated from `@jxsuite/parser`'s content loader rather than imported: that module reads the
- * filesystem and this one runs in a browser.
+ * Held here rather than imported out of the parser extension's content loader ({@link
+ * file://../../../../extensions/parser/src/content-loader.ts}): that module reads the filesystem
+ * and this one runs in a browser. It is also an extension, and core may not import one.
  */
 const LOCALE_PLACEHOLDER = "{locale}";
 

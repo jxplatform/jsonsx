@@ -25,9 +25,9 @@ import {
   setSkipServerFunctions,
   setStampPropBindings,
 } from "@jxsuite/runtime";
-import { resolveAssetRef } from "./asset-refs";
+import { resolveAssetRef } from "./asset-resolve";
 import { classifyRenderNode, serializeJxPath } from "./path-mapping";
-import type { AssetContext } from "./asset-refs";
+import type { AssetContext } from "./asset-resolve";
 import { SITE_STYLE_ID, buildSiteStyleCSS } from "./site-style-css";
 import type { CanvasMode } from "./iframe-protocol";
 import type { JxDocument } from "@jxsuite/schema/types";

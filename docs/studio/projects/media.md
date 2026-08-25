@@ -15,6 +15,7 @@ code:
   - packages/studio/src/ui/media-picker.ts
   - packages/studio/src/editor/file-drop-action.ts
   - packages/studio/src/canvas/asset-refs.ts
+  - packages/studio/src/canvas/asset-resolve.ts
 ---
 
 # Media
