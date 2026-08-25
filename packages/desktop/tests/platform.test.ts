@@ -524,6 +524,14 @@ describe("platform methods", () => {
     ["getProjectRoot", [], "getProjectRoot", undefined],
     ["getRecentProjects", [], "getRecentProjects", undefined],
     ["getSettings", [], "getSettings", undefined],
+    /* A patch, and it ANSWERS with the resulting store — so the caller learns what actually landed
+       after composing with any concurrent writer. */
+    [
+      "patchSettings",
+      [{ remove: ["jx.ai.model"], set: { "jx.ai.openaiKey": "sk-x" } }],
+      "patchSettings",
+      { patch: { remove: ["jx.ai.model"], set: { "jx.ai.openaiKey": "sk-x" } } },
+    ],
     // Data surface + secrets (desktop twins of /__studio/data/* + /__studio/secrets)
     ["dataConnections", [], "dataConnections", undefined],
     ["dataConnectionTest", ["main"], "dataConnectionTest", { connection: "main" }],

@@ -216,6 +216,19 @@ describe("write-through", () => {
     ]);
   });
 
+  /**
+   * The store is what a fresh install reads back at boot. `"jx.ai.model": ""` there would be a
+   * model choice rather than the absence of one, so an emptied value travels as a removal.
+   */
+  test("an emptied value is sent as a removal, not as a blank", async () => {
+    const backend = installSettingsBackend({ [KEY]: "sk-old" });
+    await hydrateSettings();
+    clearSettings([SETTINGS.aiOpenAiKey]);
+    await settingsSettled();
+    expect(backend.patches.at(-1)).toEqual({ remove: [KEY], set: {} });
+    expect(backend.get()).toEqual({});
+  });
+
   test("a later write goes out after the first, not alongside it", async () => {
     const backend = installSettingsBackend();
     setSetting(SETTINGS.aiOpenAiKey, "sk-first");

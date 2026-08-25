@@ -35,15 +35,6 @@ import type { SettingsPatch } from "./write-queue";
 /** The synchronous source of truth. Absent key means unset — which is not the same as `""`. */
 const values = new Map<string, string>();
 
-/** Read the cache defensively; unavailable or throwing storage reads as unset. */
-function readCache(key: string): string | null {
-  try {
-    return globalThis.localStorage?.getItem(key) ?? null;
-  } catch {
-    return null;
-  }
-}
-
 /** Mirror a value into the cache, so the next boot is correct before the backend answers. */
 function writeCache(key: string, value: string | null): void {
   try {
@@ -57,12 +48,25 @@ function writeCache(key: string, value: string | null): void {
   }
 }
 
-/** Seed from the cache. Runs at module evaluation, before anything can read. */
-for (const definition of ALL_SETTINGS) {
-  const cached = readCache(definition.key);
-  if (cached !== null) {
-    values.set(definition.key, cached);
+/**
+ * Seed from the cache, at module evaluation and before anything can read.
+ *
+ * This is what makes the first frame correct: the chrome theme is read before the first paint, and
+ * `shell.ts` records that a mismatch with the theme `index.html` hard-codes flashes the shell. The
+ * backend's copy arrives later and reconciles through {@link hydrateSettings}.
+ *
+ * One `try` around the whole loop rather than one per key — storage that throws throws for all of
+ * them, and a private-mode window simply starts empty.
+ */
+try {
+  for (const definition of ALL_SETTINGS) {
+    const cached = globalThis.localStorage?.getItem(definition.key);
+    if (cached !== null && cached !== undefined) {
+      values.set(definition.key, cached);
+    }
   }
+} catch {
+  /* Storage unavailable — the map starts empty, and hydration fills it. */
 }
 
 // ─── Reading ──────────────────────────────────────────────────────────────────

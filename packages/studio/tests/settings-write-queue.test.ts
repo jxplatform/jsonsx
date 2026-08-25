@@ -71,6 +71,28 @@ describe("coalescing", () => {
     expect(sent).toEqual([{ key: null }]);
   });
 
+  /**
+   * A scheduler that runs the same flush twice must not send twice — the burst was handed over on
+   * the first call, and `pending` is empty by the second.
+   */
+  test("running a scheduled flush twice sends once", async () => {
+    const sent: SettingsPatch[] = [];
+    let scheduled: (() => void) | null = null;
+    const queue = createWriteQueue({
+      schedule: (run) => {
+        scheduled = run;
+      },
+      send: async (patch) => {
+        sent.push(patch);
+      },
+    });
+    queue.enqueue({ a: "1" });
+    scheduled!();
+    scheduled!();
+    await queue.settled();
+    expect(sent).toEqual([{ a: "1" }]);
+  });
+
   test("a second burst is its own send", async () => {
     const sent: SettingsPatch[] = [];
     const { queue, tick } = manualQueue(async (patch) => {
