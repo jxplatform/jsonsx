@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { rpcParity } from "./_rpc-parity";
+import type { SettingsPatch } from "@jxsuite/protocol";
 
 // ─── Mock electrobun/main ───────────────────────────────────────────────────
 
