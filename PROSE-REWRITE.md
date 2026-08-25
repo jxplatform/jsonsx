@@ -46,12 +46,16 @@ Commands, in this order, because `oxfmt` realigns tables and moves the offsets e
 bun scripts/docs/unwrap-prose.ts docs/<path>.md
 bun run docs:check
 bun run docs:links
+bun scripts/docs/check-prose.ts docs/<path>.md
 ```
+
+The gate holds new prose to zero em dashes and holds each existing page to the count it already had, so a rewrite that removes some must lower that page's entry in `scripts/docs/prose.json`. `bun scripts/docs/check-prose.ts --ratchet` prints the corrected map. Delete a page's entry when it reaches zero.
 
 Then, per pull request, after committing, because `docs:verify` regenerates and diffs and so needs a clean tree:
 
 ```sh
 bun run docs:verify
+bun run docs:links && bun run docs:prose
 bun run docs:claims && bun run docs:markdown && bun run docs:standards && bun run docs:spec-release
 git diff --name-only origin/main... | bun scripts/ci/affected.ts --stdin   # expect an empty matrix
 git diff --word-diff=color origin/main... -- docs/

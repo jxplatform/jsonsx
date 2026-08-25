@@ -25,11 +25,11 @@ The auth extension's section class, `extensions/auth/src/Auth.class.json`, decla
 "server": { "basePath": "/_jx/auth", "order": 10, "module": "@jxsuite/auth/worker" }
 ```
 
-| Key        | Meaning                                                                                               |
-| ---------- | ----------------------------------------------------------------------------------------------------- |
-| `basePath` | The route subtree this mount owns. Must be under `/_jx/`. Conflicts are a registry error.             |
-| `order`    | Mount order (ascending). Earlier mounts run first and may populate the shared context.                |
-| `module`   | Bare specifier the generated worker imports (robust under bundlers); falls back to `$implementation`. |
+| Key        | Meaning                                                                                                |
+| ---------- | ------------------------------------------------------------------------------------------------------ |
+| `basePath` | The route subtree this mount owns. Must be under `/_jx/`. Conflicts are a registry error.              |
+| `order`    | Mount order (ascending). Earlier mounts run first and may populate the shared context.                 |
+| `module`   | Bare specifier the generated worker imports, which survives bundling; falls back to `$implementation`. |
 
 Every mount lives under `/_jx/` — the reserved subtree for extension routes on a running site — and each `basePath` has exactly one owner. Two extensions claiming the same subtree fail the registry build instead of shadowing each other.
 
