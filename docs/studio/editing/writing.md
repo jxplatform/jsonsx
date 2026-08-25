@@ -39,9 +39,7 @@ Your writing is saved into the document as you pause, so :kbd[⌘S] (macOS) / :k
 
 ## What you can click into
 
-Anything that holds text: headings, paragraphs, list items, table cells, captions, definition
-lists, a disclosure's summary. Which ones those are comes from the page's own format rather than a
-fixed list, so a Markdown page and a component page each get the right answer.
+Anything that holds text: headings, paragraphs, list items, table cells, captions, definition lists, a disclosure's summary. Which ones those are comes from the page's own format rather than a fixed list, so a Markdown page and a component page each get the right answer.
 
 Two cases where the cursor lands somewhere you might not expect, and both are deliberate:
 
