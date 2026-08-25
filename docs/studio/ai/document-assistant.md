@@ -15,6 +15,8 @@ The sidebar starts closed and stays however you last left it, so open it with **
 
 ![The sidebar with an assistant reply carrying edit chips beside the open page on the canvas](../../images/ai-document-assistant.png)
 
+The assistant uses the model you picked in **[Preferences](/docs/studio/interface/preferences)**. If you have not picked one, it uses whatever your provider says it prefers.
+
 ## What it can do on the open page
 
 With a document active, the assistant edits the page the way you would, one change at a time:

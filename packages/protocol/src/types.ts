@@ -426,6 +426,24 @@ export interface SecretsSetResponse {
   names: string[];
 }
 
+// ─── User settings (desktop launchers; specs/desktop.md §3.1) ───────────────
+
+/**
+ * A set of changes to the user-level settings store.
+ *
+ * A patch rather than the whole map, and for the same reason {@link SecretsSetRequest} is one: a key
+ * named by neither `set` nor `remove` must be left exactly as it was found. Writing the whole map
+ * let any window overwrite the shared store with its own view of it — and on the chromium launcher
+ * every window is a separate process with a separate browser profile, so a window holding no
+ * settings could clear the credentials another had just stored.
+ */
+export interface SettingsPatch {
+  /** Keys to store, with their new values. */
+  set?: Record<string, string>;
+  /** Keys to forget. */
+  remove?: string[];
+}
+
 // ─── Packages ────────────────────────────────────────────────────────────────
 
 export interface PackageInfo {

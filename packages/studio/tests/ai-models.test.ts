@@ -3,14 +3,16 @@
  * platform's chat URL, credential header forwarding, the module-wide cache + invalidation, and
  * error surfacing.
  */
-import { installMockPlatform } from "./harness";
+import { clearSeededSettings, installMockPlatform, seedSettings } from "./harness";
 import { beforeEach, describe, expect, test } from "bun:test";
 import {
   ensureProxyProbe,
   fetchAvailableModels,
   getProxyDefaultModel,
   hasAiCredentials,
-  invalidateModelCache,
+  aiConnection,
+  cachedModels,
+  resetModelCache,
   isManagedProxy,
   isProxyConfigured,
 } from "../src/services/ai-models";
@@ -35,8 +37,9 @@ async function flush(turns = 4) {
 }
 
 beforeEach(() => {
-  globalThis.localStorage.clear();
-  invalidateModelCache();
+  localStorage.clear();
+  clearSeededSettings();
+  resetModelCache();
   fetchCalls.length = 0;
   fetchImpl = async () =>
     Response.json({ models: [{ id: "gpt-4o" }, { id: "x", name: "Model X" }] }, { status: 200 });
@@ -58,20 +61,52 @@ describe("fetchAvailableModels", () => {
     expect(headers["X-Api-Key"]).toBeUndefined();
     expect(headers["X-Api-Base-URL"]).toBeUndefined();
 
-    globalThis.localStorage.setItem("jx.ai.openaiKey", "sk-stored");
-    globalThis.localStorage.setItem("jx.ai.baseUrl", "http://localhost:11434/v1");
+    seedSettings({ "jx.ai.openaiKey": "sk-stored", "jx.ai.baseUrl": "http://localhost:11434/v1" });
     await fetchAvailableModels({ force: true });
     headers = fetchCalls.at(-1)!.init!.headers as Record<string, string>;
     expect(headers["X-Api-Key"]).toBe("sk-stored");
     expect(headers["X-Api-Base-URL"]).toBe("http://localhost:11434/v1");
   });
 
-  test("explicit overrides win over stored credentials", async () => {
-    globalThis.localStorage.setItem("jx.ai.openaiKey", "sk-stored");
-    await fetchAvailableModels({ apiKey: "sk-draft", baseUrl: "http://draft/v1" });
+  test("explicit credentials win over stored ones", async () => {
+    seedSettings({ "jx.ai.openaiKey": "sk-stored" });
+    await fetchAvailableModels({
+      credentials: { apiKey: "sk-draft", baseUrl: "http://draft/v1" },
+    });
     const headers = fetchCalls.at(-1)!.init!.headers as Record<string, string>;
     expect(headers["X-Api-Key"]).toBe("sk-draft");
     expect(headers["X-Api-Base-URL"]).toBe("http://draft/v1");
+  });
+
+  /**
+   * The cache used to be unkeyed, and two callers with different credentials wrote to it: the
+   * credentials form fetches with the drafts being edited, the capability probe with what is
+   * stored. Whichever landed last won, so the chat composer's picker could list one provider's
+   * catalogue while another was configured — which is what a user saw after setting a provider up.
+   */
+  test("a list fetched under one credential pair is not served for another", async () => {
+    const draft = { apiKey: "sk-draft", baseUrl: "http://draft/v1" };
+    const other = { apiKey: "sk-other", baseUrl: "http://other/v1" };
+    await fetchAvailableModels({ credentials: draft });
+    expect(fetchCalls).toHaveLength(1);
+
+    // Same credentials: served from the cache.
+    await fetchAvailableModels({ credentials: draft });
+    expect(fetchCalls).toHaveLength(1);
+    expect(cachedModels(draft)).not.toBeNull();
+
+    // Different credentials: a miss, not the other provider's list.
+    expect(cachedModels(other)).toBeNull();
+    await fetchAvailableModels({ credentials: other });
+    expect(fetchCalls).toHaveLength(2);
+    expect(cachedModels(draft)).toBeNull();
+  });
+
+  test("changing the stored credentials drops the cache", async () => {
+    await fetchAvailableModels();
+    expect(cachedModels(aiConnection())).not.toBeNull();
+    seedSettings({ "jx.ai.openaiKey": "sk-new" });
+    expect(cachedModels(aiConnection())).toBeNull();
   });
 
   test("caches until invalidated; force bypasses the cache", async () => {
@@ -82,7 +117,7 @@ describe("fetchAvailableModels", () => {
     await fetchAvailableModels({ force: true });
     expect(fetchCalls).toHaveLength(2);
 
-    invalidateModelCache();
+    resetModelCache();
     await fetchAvailableModels();
     expect(fetchCalls).toHaveLength(3);
   });
@@ -129,7 +164,7 @@ describe("proxy state flags", () => {
     fetchImpl = async () => Response.json({ models: [], configured: true }, { status: 200 });
     await fetchAvailableModels({ force: true });
     expect(isProxyConfigured()).toBe(true);
-    invalidateModelCache();
+    resetModelCache();
     expect(isProxyConfigured()).toBe(false);
     expect(getProxyDefaultModel()).toBe("");
   });
@@ -139,11 +174,12 @@ describe("hasAiCredentials", () => {
   test("is true for a stored key OR a backend that holds its own", async () => {
     expect(hasAiCredentials()).toBe(false);
 
-    globalThis.localStorage.setItem("jx.ai.openaiKey", "sk-stored");
+    seedSettings({ "jx.ai.openaiKey": "sk-stored" });
     expect(hasAiCredentials()).toBe(true);
 
     // Managed platforms (cloud Workers AI) unlock with no local key at all.
-    globalThis.localStorage.clear();
+    localStorage.clear();
+    clearSeededSettings();
     fetchImpl = async () =>
       Response.json({ models: [], configured: true, managed: true }, { status: 200 });
     await fetchAvailableModels({ force: true });
@@ -193,7 +229,7 @@ describe("ensureProxyProbe", () => {
     /* Saving/clearing BYOK credentials invalidates the cache, which clears the managed flag. If the
        probe stayed settled the gate would never learn managed mode again — the Connect Cloudflare
        option would vanish until a full page reload. */
-    invalidateModelCache();
+    resetModelCache();
     expect(isManagedProxy()).toBe(false);
     ensureProxyProbe();
     await flush();

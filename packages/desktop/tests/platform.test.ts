@@ -162,6 +162,32 @@ describe("RPC setup", () => {
     expect(electroviewCtorArgs).toEqual({ rpc: rpcObject });
   });
 
+  /**
+   * One process, N windows — but each has its own webview and its own settings kernel, so a change
+   * made in one only reaches the others through this message.
+   */
+  test("settingsChanged reaches the kernel's subscriber until it unsubscribes", () => {
+    const handler = capturedRpcConfig!.handlers.messages.settingsChanged as (p: {
+      settings: Record<string, string>;
+    }) => void;
+    const seen: Record<string, string>[] = [];
+    const unsubscribe = platform.subscribeSettings!((settings) => seen.push(settings));
+
+    handler({ settings: { "jx.ai.model": "o3" } });
+    expect(seen).toEqual([{ "jx.ai.model": "o3" }]);
+
+    unsubscribe();
+    handler({ settings: { "jx.ai.model": "gpt-4o" } });
+    expect(seen).toHaveLength(1);
+  });
+
+  test("a settingsChanged with no subscriber is not an error", () => {
+    const handler = capturedRpcConfig!.handlers.messages.settingsChanged as (p: {
+      settings: Record<string, string>;
+    }) => void;
+    expect(() => handler({ settings: { a: "1" } })).not.toThrow();
+  });
+
   test("fileChanged message handler runs without error", () => {
     const handler = capturedRpcConfig!.handlers.messages.fileChanged as (p: {
       path: string;
@@ -596,12 +622,6 @@ describe("platform methods", () => {
       [[{ name: "x", root: "/x", timestamp: 1 }]],
       "saveRecentProjects",
       { projects: [{ name: "x", root: "/x", timestamp: 1 }] },
-    ],
-    [
-      "saveSettings",
-      [{ aiApiKey: "sk-abc" }],
-      "saveSettings",
-      { settings: { aiApiKey: "sk-abc" } },
     ],
   ];
 

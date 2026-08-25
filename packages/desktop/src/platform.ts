@@ -8,9 +8,10 @@ import type { RecentProjectEntry, StudioRPC } from "./rpc-schema";
 import type {
   DataRowDelete,
   DataRowInsert,
-  DataRowsQuery,
   DataRowUpdate,
+  DataRowsQuery,
   SecretsSetRequest,
+  SettingsPatch,
 } from "@jxsuite/protocol";
 import type {
   CreateProjectDestination,
@@ -30,6 +31,8 @@ import { setPreviewNavigateHandler } from "@jxsuite/studio/preview-navigate";
 export function createDesktopPlatform() {
   // The studio sidebar's live-sync subscriber, if any. Set via subscribeFileEvents below.
   let fileEventHandler: ((events: FsEventPayload[]) => void) | null = null;
+  /** The settings kernel's subscriber, so another window's change reaches this one. */
+  let settingsHandler: ((settings: Record<string, string>) => void) | null = null;
   const rpc = Electroview.defineRPC<StudioRPC>({
     handlers: {
       messages: {
@@ -38,6 +41,9 @@ export function createDesktopPlatform() {
         },
         onFileEvents: (payload) => {
           fileEventHandler?.(payload.events);
+        },
+        settingsChanged: (payload) => {
+          settingsHandler?.(payload.settings);
         },
         updateReady: (payload) => {
           showUpdateToast(payload.version, rpc);
@@ -324,8 +330,15 @@ export function createDesktopPlatform() {
       return rpc.request.getSettings();
     },
 
-    async saveSettings(settings: Record<string, string>) {
-      await rpc.request.saveSettings({ settings });
+    async patchSettings(patch: SettingsPatch) {
+      return rpc.request.patchSettings({ patch });
+    },
+
+    subscribeSettings(handler: (settings: Record<string, string>) => void) {
+      settingsHandler = handler;
+      return () => {
+        settingsHandler = null;
+      };
     },
 
     async probeRootProject() {

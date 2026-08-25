@@ -19,16 +19,15 @@
  */
 
 import { html, nothing } from "lit-html";
+import { live } from "lit-html/directives/live.js";
 import type { TemplateResult } from "lit-html";
-import { fetchAvailableModels, invalidateModelCache } from "../services/ai-models";
+import { fetchAvailableModels } from "../services/ai-models";
 import {
   getBaseUrl,
-  getModel,
   getOpenAiKey,
   hasOpenAiKey,
-  setBaseUrl,
-  setModel,
-  setOpenAiKey,
+  saveAiProvider,
+  storedModel,
 } from "../services/ai-settings";
 
 export interface AiCredentialsFormOptions {
@@ -64,11 +63,23 @@ export function createAiCredentialsForm(opts: AiCredentialsFormOptions): AiCrede
   let modelsLoading = false;
   let modelsError = "";
 
-  /** Open the form pre-filled with the current settings, and load the model list. */
-  function startEdit() {
+  /**
+   * Load the drafts from what is stored.
+   *
+   * The model comes from {@link storedModel} rather than `getModel()`, so a user who has never
+   * picked one drafts an empty field instead of the `"gpt-4o"` default. Saving a prefilled default
+   * writes a choice nobody made, and `jx.ai.model: "gpt-4o"` is exactly what a broken install was
+   * left holding.
+   */
+  function loadDrafts() {
     keyDraft = getOpenAiKey();
     baseUrlDraft = getBaseUrl();
-    modelDraft = getModel();
+    modelDraft = storedModel();
+  }
+
+  /** Open the form pre-filled with the current settings, and load the model list. */
+  function startEdit() {
+    loadDrafts();
     opts.requestRender();
     // Auto-fetch available models if not already loaded.
     if (availableModels.length === 0 && !modelsLoading) {
@@ -76,26 +87,33 @@ export function createAiCredentialsForm(opts: AiCredentialsFormOptions): AiCrede
     }
   }
 
-  /** Persist the drafted key + endpoint + model and notify the host. */
+  /**
+   * Persist the drafted key + endpoint + model and notify the host.
+   *
+   * **Re-seeds the drafts; it must never blank them.** Preferences is a place rather than a wizard
+   * step, so the sheet stays open across Save and `startEdit` is not called again — which meant
+   * every field emptied the instant a save succeeded. That reads as "it didn't take", and the
+   * obvious response to it destroyed the credentials: a blank draft is what
+   * `setOpenAiKey`/`setBaseUrl` treat as _clear_, so pressing Save a second time on the emptied
+   * form deleted the key and endpoint that the first press had just stored. Reading back through
+   * the getters also shows what was actually kept — trimmed, and with the endpoint's trailing slash
+   * stripped — rather than what was typed.
+   */
   function save() {
-    setOpenAiKey(keyDraft);
-    setBaseUrl(baseUrlDraft);
-    setModel(modelDraft);
-    keyDraft = "";
-    baseUrlDraft = "";
-    modelDraft = "";
-    // Clear fetched models so they're re-fetched with the new credentials next time.
-    availableModels = [];
-    invalidateModelCache();
+    saveAiProvider({ apiKey: keyDraft, baseUrl: baseUrlDraft, model: modelDraft });
+    loadDrafts();
+    modelsError = "";
+    /* The fetched list stays: it was listed under exactly these credentials, and dropping it
+       collapsed the model combobox back to a free-text field on every save. The module cache is
+       dropped by ai-models' own settings subscription, so this form does not have to remember to. */
     opts.onSaved?.();
     opts.requestRender();
   }
 
   /** Dismiss the form without saving (only offered when a key already exists). */
   function cancel() {
-    keyDraft = "";
-    baseUrlDraft = "";
-    modelDraft = "";
+    loadDrafts();
+    modelsError = "";
     opts.onCancel?.();
     opts.requestRender();
   }
@@ -104,6 +122,11 @@ export function createAiCredentialsForm(opts: AiCredentialsFormOptions): AiCrede
    * Fetch available models via src/services/ai-models.ts, preferring the in-form drafts over the
    * stored settings so the list reflects the credentials being edited. Always forces past the
    * module cache — this runs on explicit user action (or first open) with possibly-new drafts.
+   *
+   * Both lines below read draft-first. The key used to read stored-first, against this paragraph
+   * and against the line beside it: editing a key in place and pressing Fetch models listed the OLD
+   * key's models, and — worse — a form whose drafts had been blanked still fetched successfully
+   * from storage, which is what made an emptied form look like it was working.
    */
   async function fetchModels() {
     modelsLoading = true;
@@ -111,8 +134,10 @@ export function createAiCredentialsForm(opts: AiCredentialsFormOptions): AiCrede
     opts.requestRender();
     try {
       availableModels = await fetchAvailableModels({
-        apiKey: getOpenAiKey() || keyDraft,
-        baseUrl: baseUrlDraft || getBaseUrl(),
+        credentials: {
+          apiKey: keyDraft || getOpenAiKey(),
+          baseUrl: baseUrlDraft || getBaseUrl(),
+        },
         force: true,
       });
     } catch (error: unknown) {
@@ -144,7 +169,7 @@ export function createAiCredentialsForm(opts: AiCredentialsFormOptions): AiCrede
           type="password"
           size="s"
           placeholder="sk-… or any compatible key"
-          .value=${keyDraft}
+          .value=${live(keyDraft)}
           @input=${(e: Event) => {
             keyDraft = (e.target as HTMLInputElement).value;
           }}
@@ -157,7 +182,7 @@ export function createAiCredentialsForm(opts: AiCredentialsFormOptions): AiCrede
                   class="ai-creds-field"
                   size="s"
                   allows-custom-value
-                  .value=${modelDraft}
+                  .value=${live(modelDraft)}
                   @change=${(e: Event) => {
                     modelDraft = (e.target as HTMLInputElement).value;
                   }}
@@ -175,7 +200,7 @@ export function createAiCredentialsForm(opts: AiCredentialsFormOptions): AiCrede
                   class="ai-creds-field"
                   size="s"
                   placeholder="Model ID (e.g. gpt-4o, claude-sonnet-4-20250514, etc.)"
-                  .value=${modelDraft}
+                  .value=${live(modelDraft)}
                   @input=${(e: Event) => {
                     modelDraft = (e.target as HTMLInputElement).value;
                   }}
@@ -198,7 +223,7 @@ export function createAiCredentialsForm(opts: AiCredentialsFormOptions): AiCrede
           class="ai-creds-field"
           size="s"
           placeholder="Endpoint (optional, e.g. http://localhost:11434/v1)"
-          .value=${baseUrlDraft}
+          .value=${live(baseUrlDraft)}
           @input=${(e: Event) => {
             baseUrlDraft = (e.target as HTMLInputElement).value;
           }}

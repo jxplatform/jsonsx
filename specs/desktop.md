@@ -2,7 +2,7 @@
 
 ## Platform Abstraction, Project Loading, and Component Scoping
 
-**Version:** 0.3.24-draft
+**Version:** 0.4.0-draft
 **Status:** Pending
 **Updated:** 2026-08-25
 **License:** MIT
@@ -89,8 +89,18 @@ The canonical `StudioPlatform` interface is `packages/studio/src/types.ts` — r
 | **Data / secrets**       | `dataConnections?`, `dataRows?`, row CRUD, `dataPush?`, `listSecrets?`, `setSecrets?`                                                                                                                                          |
 | **Publish / identity**   | `getUser?`, `getAccountStatus?`, `listRepos?`, `importProject?`, `cfConnection?`, `cfConnect?`, `cfApi?`                                                                                                                       |
 | **Code services / AI**   | `codeService` (§5.3), `resolveClass?`, `aiChatUrl`                                                                                                                                                                             |
-| **Multi-window / shell** | `openProjectInNewWindow?`, `pickProject?`, `newWindow?`, `setWindowProject?`, `getProjectRoot?`, `getAppInfo?`, backend-persisted settings                                                                                     |
+| **Multi-window / shell** | `openProjectInNewWindow?`, `pickProject?`, `newWindow?`, `setWindowProject?`, `getProjectRoot?`, `getAppInfo?`, `getSettings?`, `patchSettings?`                                                                               |
 | **Canvas**               | `canvasUrl?`, `canvasUrlDeferred?`, `documentBaseUrl?`, `assetSpace?`, `assetCapabilities?`                                                                                                                                    |
+
+**User settings are written as PATCHES, never as the whole map.** `patchSettings({ set, remove })`
+must leave a key named by neither exactly as it found it, and answers with the store as it then
+stands. A whole-map write cannot express "change this one thing", so every writer implicitly claims
+the whole store: on the chromium launcher, where each window is its own process with its own browser
+profile and therefore its own `localStorage`, a welcome window holding no settings overwrote the
+credentials another window had just stored — and a `settings.json` was left holding one key of the
+three its owner had configured. The rule also preserves keys the writing build does not know: one
+written by a newer version, or by hand. A backend applies the patch under a lock that spans the read
+and the write, so two concurrent patches compose rather than one overwriting the other.
 
 **The canvas needs project files at a URL, not behind `readFile`.** It renders in an iframe, and the
 renderer resolves a component `$ref` by fetching it, so a platform must be able to say where the
@@ -241,6 +251,15 @@ performs a sign-in; it never returns the store. The limitation is stated rather 
 file is plaintext, and another process running as the same user can read it. The OS keychain is the
 right answer and a native dependency per platform; this is strictly better than a browser storage
 entry and no better than that.
+
+**Which store a credential belongs in** is decided by one question, and the two stores exist to
+answer it differently: **does the webview have to send this credential itself?** The GitHub token
+does not — only the launcher's sign-in flow touches it — so it lives in `credentials.json` and the
+webview is never handed it. The AI provider key does: the browser sends it as `X-Api-Key` on every
+request to the proxy, so withholding it from the webview and then transmitting it from the webview
+would be the same trust boundary with more moving parts. It therefore stays in the settings store.
+Both files are written owner-only, so the property that actually protects a credential at rest — a
+copied profile, a backup, another account on the machine — does not depend on which one it is in.
 
 ---
 
@@ -1215,6 +1234,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.4.0-draft** (2026-08-25) — StudioPlatform writes user settings as patches (set/remove) rather than replacing the whole map, so one window cannot clear another's; and §3.6 states which store a credential belongs in.
 - **0.3.24-draft** (2026-08-25) — §3.1: a platform declares assetSpace beside documentBaseUrl; §10.2 (Pending → Partial): what a storage backend must declare, including that stored bytes come back losslessly.
 - **0.3.23-draft** (2026-08-25) — 10.1 removes discoverComponents from the cloud adapter's omissions: deriving component metadata from a JSON document executes nothing, and returning an empty registry left the canvas unable to register or fetch any component at all.
 - **0.3.22-draft** (2026-08-24) — §7 records the ElectroBun 2 toolchain boundary: the electrobun npm devDependency selects Hutch, Cottontail and ElectroBun together (no machine-wide install and no release pin in hutch.config.ts), the SDK is projected into .hutch/devkit, the main process is pinned to bun explicitly, and stable installers drop the channel prefix that the updater feed keeps.
@@ -1258,4 +1278,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx Studio Desktop Architecture Specification v0.3.24-draft_
+_Jx Studio Desktop Architecture Specification v0.4.0-draft_

@@ -204,7 +204,12 @@ import { initQuickSearch } from "./panels/quick-search";
 import { hydrateAccountStatus } from "./account-status";
 import { hydrateProjectList } from "./project-list";
 import { addRecentProject, hydrateRecentProjects, removeRecentProject } from "./recent-projects";
-import { hydrateSettings } from "./services/settings-store";
+import {
+  hydrateSettings,
+  onSettingsChanged,
+  settingsSettled,
+  watchRemoteSettings,
+} from "./services/settings/kernel";
 import { initWelcome } from "./panels/welcome-screen";
 import {
   openAddRepoModal,
@@ -1134,6 +1139,32 @@ void hydrateAccountStatus().then(() => {
 // oxlint-disable-next-line unicorn/prefer-top-level-await -- deliberate fire-and-forget: hydration must not block initial render
 void hydrateSettings().then(() => {
   render();
+});
+
+/*
+ * A setting changing repaints, wherever the change came from — this window's Preferences, or
+ * hydration landing after boot. Key-gated surfaces (the assistant's setup notice, the New Project
+ * gates, the Accounts list) read the store on the render path rather than caching a copy, so this
+ * one subscription is what keeps every one of them honest.
+ */
+onSettingsChanged(() => {
+  render();
+});
+
+/*
+ * Another window changing a setting is news this one wants. Nothing is lost without it — a patch
+ * cannot clobber a key it does not name — but a second window would otherwise show a provider that
+ * had been reconfigured somewhere else until it was restarted.
+ */
+watchRemoteSettings();
+
+/*
+ * Settings are written on a queue that coalesces a burst into one send, so a change made in the
+ * last moments before the window closes may still be in flight. Draining it here is the difference
+ * between "your provider was saved" and a settings file that never heard about it.
+ */
+globalThis.addEventListener("beforeunload", () => {
+  void settingsSettled();
 });
 
 // ─── Left panel: delegated to panels/left-panel.js ───────────────────────────

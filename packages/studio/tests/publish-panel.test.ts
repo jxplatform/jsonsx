@@ -15,7 +15,7 @@ import type { DeployConfig } from "@jxsuite/schema/types";
 
 const { openPublishPanel, seedPublishConnected } = await import("../src/publish/publish-panel");
 const { initLayers } = await import("../src/ui/layers");
-const { setCfToken } = await import("../src/services/cf-settings");
+const { clearCfConnection, setCfToken } = await import("../src/services/cf-settings");
 
 mountOverlayLayers(document.body);
 initLayers();
@@ -78,7 +78,8 @@ function cfApiMock(routes: Record<string, unknown>) {
 
 afterEach(() => {
   closePanel();
-  setCfToken("");
+  // Blank no longer clears — forgetting the connection is its own verb.
+  clearCfConnection();
 });
 
 describe("openPublishPanel — platform capability states", () => {

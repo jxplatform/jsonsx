@@ -7,16 +7,18 @@
  * ever scaffolded under the Location the user chose.
  */
 import {
+  clearSeededSettings,
   flush,
   installMockPlatform,
+  mountOverlayLayers,
   npFillLocation,
   npName,
   npPreview,
   npType,
-  mountOverlayLayers,
+  seedSettings,
 } from "./harness";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { invalidateModelCache } from "../src/services/ai-models";
+import { resetModelCache } from "../src/services/ai-models";
 
 const { closeNewProjectModal, openNewProjectModal } =
   await import("../src/new-project/new-project-modal");
@@ -62,8 +64,9 @@ let proxyState: { configured: boolean; managed: boolean } = { configured: false,
 
 beforeEach(() => {
   localStorage.clear();
+  clearSeededSettings();
   proxyState = { configured: false, managed: false };
-  invalidateModelCache(); // Re-arms the one-shot probe between tests.
+  resetModelCache(); // Re-arms the one-shot probe between tests.
 });
 
 afterEach(() => {
@@ -115,7 +118,7 @@ describe("Agent flow", () => {
   });
 
   test("shows the prompt once a key is stored and requires it before Next", () => {
-    localStorage.setItem("jx.ai.openaiKey", "sk-agent-test");
+    seedSettings({ "jx.ai.openaiKey": "sk-agent-test" });
     installMockPlatform();
     void openNewProjectModal();
     switchTab("agent");
@@ -131,7 +134,7 @@ describe("Agent flow", () => {
   });
 
   test("requires a name on the Parameters step", async () => {
-    localStorage.setItem("jx.ai.openaiKey", "sk-agent-test");
+    seedSettings({ "jx.ai.openaiKey": "sk-agent-test" });
     const { state } = installMockPlatform();
     void openNewProjectModal();
     switchTab("agent");
@@ -150,7 +153,7 @@ describe("Agent flow", () => {
   });
 
   test("blocks the agent create until a Location is chosen", async () => {
-    localStorage.setItem("jx.ai.openaiKey", "sk-agent-test");
+    seedSettings({ "jx.ai.openaiKey": "sk-agent-test" });
     const { state } = installMockPlatform();
     void openNewProjectModal();
     switchTab("agent");
@@ -170,7 +173,7 @@ describe("Agent flow", () => {
   });
 
   test("scaffolds a blank project at the chosen location and stores the pending agent prompt", async () => {
-    localStorage.setItem("jx.ai.openaiKey", "sk-agent-test");
+    seedSettings({ "jx.ai.openaiKey": "sk-agent-test" });
     const created: Record<string, unknown>[] = [];
     installMockPlatform({
       createProject: (async (opts: Record<string, unknown>) => {

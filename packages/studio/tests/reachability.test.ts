@@ -290,12 +290,8 @@ const KNOWN_UNREACHABLE: Record<string, Record<string, string>> = {
   },
   "services/announce.ts": { resetAnnouncer: TEST_RESET },
   "services/bundle-base.ts": { resetBundleBase: TEST_RESET },
+  "services/settings/kernel.ts": { resetSettings: TEST_RESET },
   "services/trusted-types.ts": { resetStudioPolicy: TEST_RESET },
-  "services/ai-models.ts": {
-    getProxyDefaultModel:
-      "the proxy's preferred model id. The picker offers the full list and defaults to the first, " +
-      "so the proxy's own preference is fetched, stored, and never consulted",
-  },
   "services/ai-writes.ts": { resetAiWrites: TEST_RESET },
   "services/cem-export.ts": {
     exportCemManifest:

@@ -289,7 +289,6 @@ export const SPECTRUM_DEBT: Record<string, number> = {
   /* Content-type field cards. Rebuilt wholesale on every edit today, so the reader has no window
      in which to diverge — which is why they are here rather than fixed. */
   "settings/schema-field-ui.ts": 9,
-  "ui/ai-credentials-form.ts": 4,
   "ui/color-selector.ts": 1,
   /* `value=${refVal || nothing}` — the attribute form is load-bearing here: `nothing` REMOVES the
      attribute, and sp-picker shows its placeholder. A property binding sets undefined instead,

@@ -73,6 +73,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `desktop.md`
 
+- **0.4.0-draft** (2026-08-25) — StudioPlatform writes user settings as patches (set/remove) rather than replacing the whole map, so one window cannot clear another's; and §3.6 states which store a credential belongs in.
 - **0.3.24-draft** (2026-08-25) — §3.1: a platform declares assetSpace beside documentBaseUrl; §10.2 (Pending → Partial): what a storage backend must declare, including that stored bytes come back losslessly.
 - **0.3.23-draft** (2026-08-25) — 10.1 removes discoverComponents from the cloud adapter's omissions: deriving component metadata from a JSON document executes nothing, and returning an empty registry left the canvas unable to register or fetch any component at all.
 - **0.3.22-draft** (2026-08-24) — §7 records the ElectroBun 2 toolchain boundary: the electrobun npm devDependency selects Hutch, Cottontail and ElectroBun together (no machine-wide install and no release pin in hutch.config.ts), the SDK is projected into .hutch/devkit, the main process is pinned to bun explicitly, and stable installers drop the channel prefix that the updater feed keeps.
@@ -433,6 +434,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.9.45-draft** (2026-08-25) — Preferences §15: a blank field never deletes, a default is never a stored value, and every preference roams between windows.
 - **0.9.44-draft** (2026-08-25) — Declare assetSpace: the canvas origin serves either the site URL space or repo paths under documentBaseUrl (§3.4/§4.1/§11.2); media resolves at render rather than by a document walk (§4.1); typed UploadResult and declared asset capabilities (§9.3).
 - **0.9.43-draft** (2026-08-25) — §13.5 names all seven quiescence sources, and adds the grid: a table still building, or built but not yet showing its selection range, is not settled.
 - **0.9.42-draft** (2026-08-24) — 8.2.6 refuses a prop delivered by any route the property bridge reads — a data-jx-props payload or a top-level key on the instance node, alongside the two attribute shapes — because $props is not the only place a value lives.

@@ -22,6 +22,8 @@
  */
 
 import { effect, effectScope, reactive } from "./reactivity";
+import { SETTINGS } from "./services/settings/definitions";
+import { readStoredSetting, setSetting } from "./services/settings/kernel";
 import { loadedMonaco } from "./services/monaco-lazy";
 import { applyStartupProfile } from "./services/profile";
 import { workspace } from "./workspace/workspace";
@@ -349,8 +351,6 @@ export interface ShellState {
 
 const DOCK_STORAGE_KEY = "jx-studio-panel-widths";
 
-const THEME_STORAGE_KEY = "jx-studio-theme";
-
 /**
  * The per-project record's key prefix — one namespaced record per project root (§4.4).
  *
@@ -378,14 +378,10 @@ function isChromeTheme(value: unknown): value is ChromeTheme {
   return typeof value === "string" && (CHROME_THEMES as readonly string[]).includes(value);
 }
 
-/** Read the persisted theme, falling back to {@link DEFAULT_THEME} on absent/corrupt storage. */
+/** Read the persisted theme, falling back to {@link DEFAULT_THEME} on an absent/unknown value. */
 function readPersistedTheme(): ChromeTheme {
-  try {
-    const stored = localStorage.getItem(THEME_STORAGE_KEY);
-    return isChromeTheme(stored) ? stored : DEFAULT_THEME;
-  } catch {
-    return DEFAULT_THEME;
-  }
+  const stored = readStoredSetting(SETTINGS.theme);
+  return isChromeTheme(stored) ? stored : DEFAULT_THEME;
 }
 
 export const DOCK_IDS: DockId[] = ["left", "right", "bottom"];
@@ -1168,11 +1164,7 @@ export function setChromeTheme(theme: ChromeTheme): void {
     return;
   }
   shell.theme = theme;
-  try {
-    localStorage.setItem(THEME_STORAGE_KEY, theme);
-  } catch {
-    // Storage full or unavailable — the theme is still applied, just not remembered.
-  }
+  setSetting(SETTINGS.theme, theme);
 }
 
 /**

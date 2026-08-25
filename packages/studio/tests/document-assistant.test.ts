@@ -6,7 +6,13 @@
  * real, so the full wiring — system prompt, context trim, tool registry, agent loop, persistence —
  * runs without a network. The tool path mutates the live document as one undo step.
  */
-import { installMockPlatform, resetStudioState, resetWorkspaceWithTab } from "./harness";
+import {
+  clearSeededSettings,
+  installMockPlatform,
+  resetStudioState,
+  resetWorkspaceWithTab,
+  seedSettings,
+} from "./harness";
 import { createChatState, createToolRegistry } from "@jxsuite/ai";
 import type { StreamEvent, StreamingClient } from "@jxsuite/ai/streaming-client";
 import type { JxMutableNode } from "@jxsuite/schema/types";
@@ -79,7 +85,8 @@ beforeEach(() => {
   resetProjectConfigDocument();
   setWorkspaceProject(null);
   setProjectAdopter(async () => {});
-  globalThis.localStorage.clear();
+  localStorage.clear();
+  clearSeededSettings();
   nextRounds = [];
   createErrorMessage = null;
   lastClientOpts = null;
@@ -88,13 +95,13 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  globalThis.localStorage.clear();
+  localStorage.clear();
+  clearSeededSettings();
 });
 
 describe("document-assistant", () => {
   test("streams a text reply and persists the conversation", async () => {
-    globalThis.localStorage.setItem("jx.ai.openaiKey", "sk-secret");
-    globalThis.localStorage.setItem("jx.ai.baseUrl", "http://localhost:11434/v1");
+    seedSettings({ "jx.ai.openaiKey": "sk-secret", "jx.ai.baseUrl": "http://localhost:11434/v1" });
     nextRounds = [
       [
         { content: "Hello there", type: "delta" },

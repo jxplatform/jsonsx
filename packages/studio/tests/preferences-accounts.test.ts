@@ -7,6 +7,7 @@
  * secret it describes.
  */
 import "./with-dom.js";
+import { clearSeededSettings, seedSettings } from "./harness";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import {
   listAccounts,
@@ -22,11 +23,13 @@ const CF_TOKEN = "cf_secretsecretsecret";
 
 function connectEverything(): void {
   localStorage.setItem("jx_github_token", GITHUB_TOKEN);
-  localStorage.setItem("jx.ai.openaiKey", AI_KEY);
-  localStorage.setItem("jx.ai.model", "gpt-4o-mini");
-  localStorage.setItem("jx.ai.baseUrl", "http://localhost:11434/v1");
-  localStorage.setItem("jx.cf.token", CF_TOKEN);
-  localStorage.setItem("jx.cf.accountId", "acc-1");
+  seedSettings({
+    "jx.ai.openaiKey": AI_KEY,
+    "jx.ai.model": "gpt-4o-mini",
+    "jx.ai.baseUrl": "http://localhost:11434/v1",
+    "jx.cf.token": CF_TOKEN,
+    "jx.cf.accountId": "acc-1",
+  });
 }
 
 function byId(id: string) {
@@ -35,6 +38,7 @@ function byId(id: string) {
 
 beforeEach(() => {
   localStorage.clear();
+  clearSeededSettings();
   resetCredentialListeners();
 });
 
@@ -66,12 +70,12 @@ describe("listAccounts", () => {
   });
 
   test("an AI key with no endpoint override says so without an empty ' via '", () => {
-    localStorage.setItem("jx.ai.openaiKey", AI_KEY);
+    seedSettings({ "jx.ai.openaiKey": AI_KEY });
     expect(byId("ai")!.detail).not.toContain("via");
   });
 
   test("a Cloudflare token with no account id still reads as connected", () => {
-    localStorage.setItem("jx.cf.token", CF_TOKEN);
+    seedSettings({ "jx.cf.token": CF_TOKEN });
     expect(byId("cloudflare")!.detail).toBe("Connected.");
   });
 });

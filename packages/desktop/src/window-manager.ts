@@ -24,7 +24,7 @@ import { createProjectServer } from "@jxsuite/server/project-server";
 import { listStarters } from "@jxsuite/starters";
 import { createProjectSession, pickProjectFile } from "./project-session";
 import { readRecents, writeRecents } from "./recent-store";
-import { readSettings, writeSettings } from "./settings-store";
+import { patchSettings, readSettings } from "./settings-store";
 import {
   githubSignIn,
   githubSignOut,
@@ -126,6 +126,22 @@ export function broadcastUpdateReady(version: string) {
       entry.rpc.send.updateReady({ version });
     } catch {
       // Webview may not be ready yet; the updater repeats on its interval
+    }
+  }
+}
+
+/**
+ * Tell every window the user-level settings moved.
+ *
+ * One process, N windows here — but each window has its own webview with its own settings kernel,
+ * so a change made in one is news to the others exactly as it is across processes on chromium.
+ */
+export function broadcastSettingsChanged(settings: Record<string, string>) {
+  for (const entry of windows.values()) {
+    try {
+      entry.rpc.send.settingsChanged({ settings });
+    } catch {
+      // Webview may not be ready yet; it reads the store at boot anyway.
     }
   }
 }
@@ -360,7 +376,7 @@ function buildWindowRpc(entry: WindowEntry, getWin: () => BrowserWindow) {
 
         // User settings (process-shared, user-level store)
         getSettings: () => readSettings(),
-        saveSettings: (params) => writeSettings(params.settings),
+        patchSettings: (params) => patchSettings(params.patch),
 
         // GitHub sign-in (RFC 8252 loopback + PKCE, hosted on this window's own server)
         githubSignIn: (params) => githubSignIn(params),

@@ -4,18 +4,20 @@
  * log, success/failure/cancel flows, and the options threaded into platform.importSite.
  */
 import {
+  clearSeededSettings,
   flush,
   installMockPlatform,
+  mountOverlayLayers,
   npFillLocation,
   npLocation,
   npName,
   npPreview,
   npSlug,
   npType,
-  mountOverlayLayers,
+  seedSettings,
 } from "./harness";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { invalidateModelCache } from "../src/services/ai-models";
+import { resetModelCache } from "../src/services/ai-models";
 import type { ImportTabCtx } from "../src/new-project/import-tab";
 import type { ImportProgressEvent } from "../src/types";
 
@@ -116,9 +118,11 @@ function importPlatform() {
 }
 
 function setKey() {
-  localStorage.setItem("jx.ai.openaiKey", "sk-import-test");
-  localStorage.setItem("jx.ai.baseUrl", "http://llm.local/v1");
-  localStorage.setItem("jx.ai.model", "test-model");
+  seedSettings({
+    "jx.ai.openaiKey": "sk-import-test",
+    "jx.ai.baseUrl": "http://llm.local/v1",
+    "jx.ai.model": "test-model",
+  });
 }
 
 /** Open the modal, switch to Import, fill the URL, and advance to the Parameters step. */
@@ -139,8 +143,9 @@ let proxyState: { configured: boolean; managed: boolean } = { configured: false,
 beforeEach(() => {
   captured = null;
   localStorage.clear();
+  clearSeededSettings();
   proxyState = { configured: false, managed: false };
-  invalidateModelCache(); // Re-arms the one-shot probe between tests.
+  resetModelCache(); // Re-arms the one-shot probe between tests.
 });
 
 afterEach(async () => {

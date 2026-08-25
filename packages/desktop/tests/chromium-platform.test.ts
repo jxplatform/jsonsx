@@ -31,7 +31,7 @@ const responses: Record<string, unknown> = {
   getSettings: { aiApiKey: "sk-abc" },
   pickDirectory: { path: "/picked/parent" },
   saveRecentProjects: null,
-  saveSettings: null,
+  patchSettings: { aiApiKey: "sk-abc", theme: "dark" },
   listDirectory: [
     {
       modified: "2025-01-01",
@@ -431,7 +431,11 @@ describe("chromium desktop platform", () => {
   test("settings round-trip through the backend store", async () => {
     const settings = await platform.getSettings!();
     expect(settings).toEqual({ aiApiKey: "sk-abc" });
-    await expect(platform.saveSettings!(settings)).resolves.toBeUndefined();
+    // A patch answers with the store as it then stands, so the caller learns what actually landed.
+    await expect(platform.patchSettings!({ set: { theme: "dark" } })).resolves.toEqual({
+      aiApiKey: "sk-abc",
+      theme: "dark",
+    });
   });
 
   test("probeRootProject returns null when readFile fails (no project → welcome screen)", async () => {
@@ -752,6 +756,30 @@ describe("chromium desktop platform", () => {
     pushToClient({ method: "onFileEvents", params: { events: [{ path: "a.json" }] } });
     await Bun.sleep(40);
     expect(batches).toHaveLength(1);
+  });
+
+  /**
+   * Every chromium window is its own process with its own browser profile, so this push is the only
+   * way one window hears that another changed a setting.
+   */
+  test("a pushed settings change reaches the kernel's subscriber", async () => {
+    const seen: Record<string, string>[] = [];
+    const unsubscribe = platform.subscribeSettings!((settings) => seen.push(settings));
+    try {
+      pushToClient({ method: "settingsChanged", params: { settings: { "jx.ai.model": "o3" } } });
+      await until(() => seen.length === 1);
+      expect(seen).toEqual([{ "jx.ai.model": "o3" }]);
+
+      // A frame carrying no settings is not a change.
+      pushToClient({ method: "settingsChanged", params: {} });
+      await Bun.sleep(40);
+      expect(seen).toHaveLength(1);
+    } finally {
+      unsubscribe();
+    }
+    pushToClient({ method: "settingsChanged", params: { settings: { a: "1" } } });
+    await Bun.sleep(40);
+    expect(seen).toHaveLength(1);
   });
 
   test("an empty batch is not delivered, and an unknown push is not an error", async () => {

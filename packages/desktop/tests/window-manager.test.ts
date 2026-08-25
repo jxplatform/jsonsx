@@ -21,7 +21,11 @@ interface RpcConfig {
 }
 const rpcConfigs: RpcConfig[] = [];
 const rpcObjects: {
-  send: { updateReady: ReturnType<typeof mock>; onFileEvents: ReturnType<typeof mock> };
+  send: {
+    updateReady: ReturnType<typeof mock>;
+    onFileEvents: ReturnType<typeof mock>;
+    settingsChanged: ReturnType<typeof mock>;
+  };
 }[] = [];
 const createdWindows: MockWindow[] = [];
 let nextWinId = 1;
@@ -56,6 +60,7 @@ void mock.module("electrobun/main", () => ({
       const rpc = {
         send: {
           onFileEvents: mock((_p: { events: unknown[] }) => {}),
+          settingsChanged: mock((_p: { settings: Record<string, string> }) => {}),
           updateReady: mock((_p: { version: string }) => {}),
         },
       };
@@ -202,10 +207,12 @@ void mock.module("../src/packages", () => ({ createPackageOps }));
 // ─── Mock the user-level settings store ──────────────────────────────────────
 
 const readSettingsMock = mock(async () => ({ aiApiKey: "sk-abc" }));
-const writeSettingsMock = mock(async (_settings: Record<string, string>) => {});
+const patchSettingsMock = mock(async (_patch: SettingsPatch) => ({ aiApiKey: "sk-new" }));
 void mock.module("../src/settings-store", () => ({
   readSettings: readSettingsMock,
-  writeSettings: writeSettingsMock,
+  patchSettings: patchSettingsMock,
+  /* The launcher starts the store's watch so a change in one window reaches the others. */
+  watchSettings: () => () => {},
 }));
 
 // ─── Mock updater ────────────────────────────────────────────────────────────
@@ -279,6 +286,7 @@ void mock.module("../src/github-signin", () => ({
 const {
   openProjectWindow,
   listOpenWindows,
+  broadcastSettingsChanged,
   broadcastUpdateReady,
   parseProjectDirFromUrl,
   setAiServerUrl,
@@ -481,9 +489,9 @@ describe("per-window RPC", () => {
     expect(await reqs.getSettings()).toEqual({ aiApiKey: "sk-abc" });
     expect(readSettingsMock.mock.calls.length).toBe(readsBefore + 1);
 
-    const settings = { aiApiKey: "sk-new", theme: "dark" };
-    await reqs.saveSettings({ settings });
-    expect(writeSettingsMock).toHaveBeenLastCalledWith(settings);
+    const patch = { remove: ["theme"], set: { aiApiKey: "sk-new" } };
+    expect(await reqs.patchSettings({ patch })).toEqual({ aiApiKey: "sk-new" });
+    expect(patchSettingsMock).toHaveBeenLastCalledWith(patch);
   });
 
   test("GitHub sign-in handlers reach the loopback flow", async () => {
@@ -793,6 +801,32 @@ describe("broadcastUpdateReady", () => {
     broadcastUpdateReady("9.9.9");
     expect(rpc1.send.updateReady).toHaveBeenCalledWith({ version: "9.9.9" });
     expect(rpc2.send.updateReady).toHaveBeenCalledWith({ version: "9.9.9" });
+  });
+});
+
+describe("broadcastSettingsChanged", () => {
+  /**
+   * One process, N windows — but each window is its own webview with its own settings kernel, so a
+   * change made in one is news to the others exactly as it is across processes on chromium.
+   */
+  test("sends settingsChanged to every open window", () => {
+    openProjectWindow("/proj/s1");
+    const rpc1 = rpcObjects.at(-1)!;
+    openProjectWindow("/proj/s2");
+    const rpc2 = rpcObjects.at(-1)!;
+    const settings = { aiApiKey: "sk-new" };
+    broadcastSettingsChanged(settings);
+    expect(rpc1.send.settingsChanged).toHaveBeenCalledWith({ settings });
+    expect(rpc2.send.settingsChanged).toHaveBeenCalledWith({ settings });
+  });
+
+  test("absorbs a send to a webview that is not ready", () => {
+    openProjectWindow("/proj/s3");
+    const rpc = rpcObjects.at(-1)!;
+    rpc.send.settingsChanged.mockImplementationOnce(() => {
+      throw new Error("not ready");
+    });
+    expect(() => broadcastSettingsChanged({ a: "1" })).not.toThrow();
   });
 });
 

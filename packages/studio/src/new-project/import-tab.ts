@@ -8,7 +8,8 @@
 
 import { html } from "lit-html";
 import { getPlatform } from "../platform";
-import { getBaseUrl, getModel, getOpenAiKey } from "../services/ai-settings";
+import { getBaseUrl, getOpenAiKey } from "../services/ai-settings";
+import { preferredModel } from "../services/ai-models";
 import { IMPORT_WARNING_PHASE } from "../services/import-client";
 import { notify } from "../services/notify";
 import { errorMessage } from "@jxsuite/schema/parse";
@@ -148,7 +149,7 @@ export async function startImport(ctx: ImportTabCtx) {
   try {
     const key = getOpenAiKey();
     const baseUrl = getBaseUrl();
-    const model = getModel();
+    const model = preferredModel();
     const result = await platform.importSite(
       {
         url: parsed.href,
