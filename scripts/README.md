@@ -13,13 +13,13 @@ released-paths output, the screenshot scope from the shot manifest. Where a hand
 unavoidable — a workflow `paths:` filter, release-please's package list — a test checks it against
 the derived answer in _both_ directions, so the failure names which side is wrong.
 
-| Directory                       | Contains                                                                                                                                                                                     |
-| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`ci/`](./ci)                   | `affected.ts`, which decides what a diff can fail, plus the tests guarding it and `bundle-analysis.yml`'s `paths:` filter                                                                    |
-| [`docs/`](./docs)               | The docs, link, spec-release, standards and marketing-claims gates; the reference-page generators; `spec:bump`; `unwrap-prose.ts`; shared parsers in `lib/`; `claims.json`, `standards.json` |
-| [`screenshots/`](./screenshots) | The capture pipeline and the [shot contract](./screenshots/README.md): `run.ts`, `lib/`, `affected.ts`, `thumbnails.ts`, the manifest, the lock, `fixtures/`                                 |
-| [`lib/`](./lib)                 | `workspaces.ts`, the one reader of the `@jxsuite` workspace graph, and `png.ts`, a dependency-free PNG decoder                                                                               |
-| top level                       | The gates answering repo-wide questions (`check-*.ts`), the schema tools, `publish-order.ts`, `normalize-markdown.ts`                                                                        |
+| Directory                       | Contains                                                                                                                                                                                            |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`ci/`](./ci)                   | `affected.ts`, which decides what a diff can fail, plus the tests guarding it and `bundle-analysis.yml`'s `paths:` filter                                                                           |
+| [`docs/`](./docs)               | The docs, link, prose, spec-release, standards and marketing-claims gates; the reference-page generators; `spec:bump`; `unwrap-prose.ts`; shared parsers in `lib/`; `claims.json`, `standards.json` |
+| [`screenshots/`](./screenshots) | The capture pipeline and the [shot contract](./screenshots/README.md): `run.ts`, `lib/`, `affected.ts`, `thumbnails.ts`, the manifest, the lock, `fixtures/`                                        |
+| [`lib/`](./lib)                 | `workspaces.ts`, the one reader of the `@jxsuite` workspace graph, and `png.ts`, a dependency-free PNG decoder                                                                                      |
+| top level                       | The gates answering repo-wide questions (`check-*.ts`), the schema tools, `publish-order.ts`, `normalize-markdown.ts`                                                                               |
 
 Nearly every file opens with a doc comment naming the specific failure it exists to prevent, usually
 with the incident: a starter shadowed by a published `@jxsuite/schema` for six weeks, twelve

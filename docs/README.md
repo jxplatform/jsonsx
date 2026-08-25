@@ -82,6 +82,7 @@ These commands guard this directory, but none of them live in it: each is a scri
 | bun run docs:generate     | Rewrites the generated pages                                                                               |
 | bun run docs:verify       | The CI chain — generate, `git diff --exit-code -- docs`, then both checks above                            |
 | bun run docs:links        | Every internal link: the slug against `nav.json`, and every `#anchor` against the target's headings        |
+| bun run docs:prose        | No em dash, curly quote, decorative emoji or stock AI vocabulary; the em-dash debt only falls              |
 | bun run docs:markdown     | Visual-editor escapes — an escaped heading number, an escaped inner underscore — every tracked `*.md`      |
 | bun run docs:sync         | Advisory only: maps a diff to the pages and spec sections declared for the files it touched                |
 
