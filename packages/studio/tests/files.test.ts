@@ -5,7 +5,7 @@
  */
 import { flush, installMockPlatform } from "./harness";
 import type { MockPlatformState } from "./harness";
-import { beforeEach, describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { requireProjectState, setProjectState, projectState } from "../src/store";
 import {
   PRIMARY_PANE,
@@ -28,10 +28,12 @@ import {
   openFileInTab,
   openHomePage,
   openProject,
+  pickAndUploadTo,
   reloadFileInTab,
 } from "../src/files/files";
 import { shell } from "../src/shell";
 import type { DirEntry, StudioPlatform } from "../src/types";
+import { uploadAccept } from "../src/files/media-upload";
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
 
@@ -755,5 +757,37 @@ describe("reloadFileInTab", () => {
     expect(tabA.doc.document.tagName).toBe("div");
     expect(tabB.doc.document.tagName).toBe("footer");
     expect(workspace.tabs.size).toBe(2);
+  });
+});
+
+/**
+ * The tree's "Upload Files…" picker.
+ *
+ * It is the one upload surface with no drop zone, so nothing else exercises it — and it is where a
+ * backend's declared `accept` has to reach, or the picker offers types that host will refuse.
+ */
+describe("pickAndUploadTo", () => {
+  test("opens a multi-file picker carrying the host's accept list", () => {
+    installMockPlatform();
+    const created: HTMLInputElement[] = [];
+    const realCreate = document.createElement.bind(document);
+    const spy = spyOn(document, "createElement").mockImplementation(((tag: string) => {
+      const el = realCreate(tag);
+      if (tag === "input") {
+        created.push(el as HTMLInputElement);
+        // The picker calls click() immediately; a headless DOM must not act on it.
+        (el as HTMLInputElement).click = () => {};
+      }
+      return el;
+    }) as typeof document.createElement);
+    try {
+      pickAndUploadTo("public", () => {});
+    } finally {
+      spy.mockRestore();
+    }
+    const [input] = created;
+    expect(input?.type).toBe("file");
+    expect(input?.multiple).toBe(true);
+    expect(input?.accept).toBe(uploadAccept());
   });
 });

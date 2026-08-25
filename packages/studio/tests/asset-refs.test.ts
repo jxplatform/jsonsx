@@ -344,6 +344,11 @@ describe("localized collections", () => {
     expect(contentMountFor("content/posts/hello.md", LOCALIZED, ["en", "fr"])).toBeNull();
   });
 
+  test("a document nowhere near the source is not one either", () => {
+    // Nothing to read a locale OUT of: the path does not begin with the source's fixed part.
+    expect(contentMountFor("pages/index.md", LOCALIZED, ["en", "fr"])).toBeNull();
+  });
+
   test("a French entry's relative image resolves inside its own locale", () => {
     const mount = contentMountFor("content/posts/fr/hello.md", LOCALIZED, ["fr"])!;
     expect(
