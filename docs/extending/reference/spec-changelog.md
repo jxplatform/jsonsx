@@ -429,6 +429,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.9.43-draft** (2026-08-25) — §13.5 names all seven quiescence sources, and adds the grid: a table still building, or built but not yet showing its selection range, is not settled.
 - **0.9.42-draft** (2026-08-24) — 8.2.6 refuses a prop delivered by any route the property bridge reads — a data-jx-props payload or a top-level key on the instance node, alongside the two attribute shapes — because $props is not the only place a value lives.
 - **0.9.41-draft** (2026-08-24) — 8.2.6 refuses a prop delivered through attributes — the props.* JSON shorthand or a name colliding with a reflected DOM property — because reading $props alone reports it unset, and committing would leave two sources for one rendered value; and 8.2 re-enters a prop host after a $props patch rebuilds the instance.
 - **0.9.40-draft** (2026-08-24) — 8.2.6 refuses a non-string prop for inline editing (the session commits textContent, so a number or boolean would be retyped) and states that a session which changes nothing writes nothing, with Escape a real cancel that also undoes an idle commit made during the session.

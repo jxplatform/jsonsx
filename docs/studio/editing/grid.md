@@ -51,7 +51,7 @@ Edited cells are highlighted, and nothing touches your files yet — everything 
 The **View** button in the toolbar holds everything about how the table is arranged. Each choice takes effect as you make it — there's no Apply step, so the popover never shows something the grid isn't already doing.
 
 - **Columns** — tick a column to show it, untick it to hide it. A hidden column isn't drawn, but its values are still loaded and still searched by **Filter rows**.
-- **Sort** — choose a column and a direction, or **Source order** for none. Empty cells sort last in both directions, and a row you just added stays at the bottom where you added it until you save.
+- **Sort** — choose a column and a direction, or **Source order** for none. Empty cells sort last in both directions, and a row you just added stays at the bottom where you added it until you save. Source order is the source's own: a collection lists its entry files by path, a CSV keeps its file's row order, and a table keeps what the query returned — so it is the same order every time you open the grid.
 - **Group by** — choose a column and rows sharing a value are gathered together, in the order those values first appear. The toolbar then reads "Grouped by Status · 3 groups", because grouping is a row order and the rows themselves don't announce it.
 
 Studio remembers all of this per grid — plus your column widths and order and the **Filter rows** text — so a table looks the way you left it when you come back to it, whether or not you ever name the arrangement.

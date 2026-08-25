@@ -43,9 +43,12 @@ const POSTS_SCHEMA = {
   required: ["title"],
 };
 
-function setup(seedFiles: Record<string, string> = {}) {
+function setup(
+  seedFiles: Record<string, string> = {},
+  platformOverrides: Partial<StudioPlatform> = {},
+) {
   const { state } = installMockPlatform(
-    { formatAction: mockFormatAction } as unknown as Partial<StudioPlatform>,
+    { formatAction: mockFormatAction, ...platformOverrides } as unknown as Partial<StudioPlatform>,
     {
       "content/posts/hello.md": HELLO_MD,
       "content/posts/world.md": WORLD_MD,
@@ -123,6 +126,40 @@ describe("load", () => {
     expect(hello.cells.tags).toEqual(["a", "b"]);
     expect(hello.cells.draft).toBe(false);
     expect(hello.fingerprint).toBe(HELLO_MD);
+  });
+
+  test("row order follows the sorted paths, not the order the reads finished", async () => {
+    /*
+     * The regression: `load()` populated its `entries` Map from inside `mapLimit`'s worker, so the
+     * Map's insertion order — which is the order the grid renders — was the order eight concurrent
+     * `readFile` calls happened to RESOLVE in. `hello.md` and `world.md` swapped places between
+     * runs, and that alone rewrote `blog-grid.png` in 3 of the 21 images the screenshot lane pushed
+     * across 24 commits.
+     *
+     * So the read that comes FIRST alphabetically is made to finish LAST here. Under the old code
+     * that produced world-then-hello; the order must now be hello-then-world regardless.
+     */
+    const seen: string[] = [];
+    setup({}, {
+      readFile: async (path: string) => {
+        seen.push(path);
+        if (path.endsWith("hello.md")) {
+          await new Promise((resolve) => {
+            setTimeout(resolve, 20);
+          });
+          return HELLO_MD;
+        }
+        return WORLD_MD;
+      },
+    } as unknown as Partial<StudioPlatform>);
+
+    const { rows } = await createCollectionSource("posts").rows();
+    expect(rows.map((row) => row.key)).toEqual([
+      "content/posts/hello.md",
+      "content/posts/world.md",
+    ]);
+    // The delay has to have actually been exercised, or the test proves nothing.
+    expect(seen).toContain("content/posts/hello.md");
   });
 
   test("an unknown collection surfaces as a load error", async () => {

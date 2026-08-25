@@ -44,8 +44,30 @@ import type {
  * A re-render that's visually indistinguishable from the committed PNG keeps the old bytes, so the
  * checked-in screenshots don't churn in git on every run. Per §13.4 this is for REVIEW PRESENTATION
  * and is no longer load-bearing for identity — the capture lock's `sha256` is.
+ *
+ * Sized against MEASUREMENT, not intuition. Every one of the 21 image rewrites the lane pushed
+ * across 24 consecutive `chore(screenshots)` commits was NONDETERMINISM rather than a UI change,
+ * and they fell into four bands:
+ *
+ * | churn                                | rewrites | Δ             |
+ * | ------------------------------------ | -------- | ------------- |
+ * | the rail's git badge (36×32 px)      | 11       | 0.010–0.014 % |
+ * | a `data-grid` cell's range outline   | 5        | 0.089 %       |
+ * | `blog-grid`'s collection row order   | 3        | 0.12–0.16 %   |
+ * | `media-upload`'s drop-zone indicator | 2        | 0.038 %       |
+ *
+ * 0.0002 clears the first band — the majority — and stops there ON PURPOSE. The regression this
+ * gate exists to catch is a thin surface being rewritten, and the status bar going from empty to
+ * three fields scores ~0.1 %: a threshold that also swallowed the other three bands would sit ABOVE
+ * that and re-blind the gate exactly the way its 32×32-thumbnail predecessor did.
+ *
+ * So the other three are fixed WHERE THEY ARE CAUSED — a self-contained overlay repo
+ * ({@link materialiseCopy}), a grid that reports its own layout as in-flight (`grid` in
+ * `services/idle.ts`), and a sorted collection read. No whole-frame pixel metric could have
+ * separated them from the regression anyway: a 1206×76 row swap and a 3840×24 status bar have the
+ * same area.
  */
-const DIFF_THRESHOLD = 0.0001;
+const DIFF_THRESHOLD = 0.0002;
 
 /**
  * How far one channel may move before a pixel counts as different.
@@ -63,9 +85,9 @@ const DIFF_THRESHOLD = 0.0001;
  * appeared, moved or changed its words moves many pixels a lot. `DIFF_THRESHOLD` is the fraction of
  * the frame that may do so and still count as noise.
  *
- * That fraction is deliberately TINY — 0.0001 is ~920 px of a 3840x2400 frame. The surfaces this
- * pipeline exists to keep honest are thin: the whole 24px status bar is 2 % of the frame and its
- * glyphs cover a tenth of that, so a bar that went from empty to three fields scores about 0.1 %. A
+ * That fraction stays SMALL — 0.0002 is ~1,840 px of a 3840x2400 frame. The surfaces this pipeline
+ * exists to keep honest are thin: the whole 24px status bar is 2 % of the frame and its glyphs
+ * cover a tenth of that, so a bar that went from empty to three fields scores about 0.1 %. A
  * threshold generous enough to absorb "noise" at that scale is generous enough to absorb the status
  * bar, which is how a stale picture got attested twice. Churn is the cheaper failure: a re-captured
  * image that did not need re-capturing costs a diff, and a kept image that did costs a

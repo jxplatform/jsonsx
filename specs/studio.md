@@ -2,9 +2,9 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.42-draft
+**Version:** 0.9.43-draft
 **Status:** Partial
-**Updated:** 2026-08-24
+**Updated:** 2026-08-25
 **License:** MIT
 
 ---
@@ -1748,12 +1748,18 @@ already open**, naming it (`scripts/screenshots/lib/shot.ts`); no shot raises a 
 first step, so this needs no opt-out.
 
 **"Settled" is a predicate, not a sleep** (`packages/studio/src/services/idle.ts`). `probe.idle()`
-resolves once four subsystems have been quiet for two consecutive animation frames — no renderer
+resolves once seven subsystems have been quiet for two consecutive animation frames — no renderer
 mid-paint (`store.ts`), no panel scheduler holding a frame or withholding a render
 (`panel-scheduler.ts`), no unacked canvas generation or patch **per host** and no outstanding
 font/animation/image-retry reported by the frame itself (`iframe-host.ts`, folding the
-`{kind: "idle"}` message the canvas posts at its own rAF-quiet), and no in-flight platform call
-(counted once, at `getPlatform()`, so every PAL method and every adapter is covered). **It rejects
+`{kind: "idle"}` message the canvas posts at its own rAF-quiet), no in-flight platform call
+(counted once, at `getPlatform()`, so every PAL method and every adapter is covered), no overlay
+still inside its settling window (`layers.ts`; a resting toast is not a blocker), no operation still
+RUNNING in the Activity tab (`activity-panel.ts`), and no grid still building or still laying out the
+selection range `selectableRange: 1` gives it (`grid-view.ts`). **A subsystem the predicate does not
+own is a subsystem automation photographs mid-flight**: a grid command resolves when the panel
+mounts, which is several frames before Tabulator has drawn a row, so `editor.kind` reading `grid`
+was never evidence that the grid was on screen. **It rejects
 with a `blockedBy` array naming each outstanding item**, and that rejection is the point: a sleep
 cannot fail, so a subsystem that is slow answers "+500 ms" and the caller proceeds against state that
 is still moving.
@@ -2420,6 +2426,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.9.43-draft** (2026-08-25) — §13.5 names all seven quiescence sources, and adds the grid: a table still building, or built but not yet showing its selection range, is not settled.
 - **0.9.42-draft** (2026-08-24) — 8.2.6 refuses a prop delivered by any route the property bridge reads — a data-jx-props payload or a top-level key on the instance node, alongside the two attribute shapes — because $props is not the only place a value lives.
 - **0.9.41-draft** (2026-08-24) — 8.2.6 refuses a prop delivered through attributes — the props.* JSON shorthand or a name colliding with a reflected DOM property — because reading $props alone reports it unset, and committing would leave two sources for one rendered value; and 8.2 re-enters a prop host after a $props patch rebuilds the instance.
 - **0.9.40-draft** (2026-08-24) — 8.2.6 refuses a non-string prop for inline editing (the session commits textContent, so a number or boolean would be retyped) and states that a session which changes nothing writes nothing, with Escape a real cancel that also undoes an idle commit made during the session.
@@ -2517,4 +2524,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.42-draft_
+_`@jxsuite/studio` Specification v0.9.43-draft_

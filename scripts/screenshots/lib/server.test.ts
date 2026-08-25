@@ -211,6 +211,59 @@ describe("overlayProject", () => {
     expect(linked.isSymbolicLink()).toBe(true);
   });
 
+  test("the overlay is a clean repository of its own, not a window onto the monorepo", async () => {
+    const root = await repoWithProject({
+      "pages/index.md": "# Come for the coffee\n",
+      "project.json": "{}\n",
+    });
+    /*
+     * The parent is a REAL repository with a dirty tree — which is exactly what `.cache/screenshots`
+     * sits inside during a run. `studio-api.ts` runs every `/__studio/git/*` command with `cwd` set
+     * to the project root, so before the seal an overlay with no `.git` of its own made git walk up
+     * and answer for this tree. The rail badge rendered that count, and because the runner writes
+     * each PNG as it goes the count CLIMBED mid-run: 11 of the 21 images the lane pushed across 24
+     * commits were that badge and nothing else.
+     */
+    await run(root, ["init", "--quiet", "--initial-branch=trunk"]);
+    await writeFile(join(root, "dirty-in-the-parent.txt"), "x\n");
+
+    forgetOverlays();
+    const overlay = await overlayProject(root, "starter");
+
+    expect(await run(overlay.root, ["status", "--porcelain"])).toBe("");
+    // Not the parent's `trunk`: `init.defaultBranch` is a per-machine setting and the branch name
+    // Is rendered, so it is pinned rather than inherited.
+    const branch = await run(overlay.root, ["rev-parse", "--abbrev-ref", "HEAD"]);
+    expect(branch.trim()).toBe("main");
+  });
+
+  test("a shot's own edit is the only thing the overlay reports dirty", async () => {
+    const root = await repoWithProject({
+      "pages/index.md": "original\n",
+      "project.json": "{}\n",
+    });
+    forgetOverlays();
+    const overlay = await overlayProject(root, "starter");
+    await writeFile(join(overlay.root, "pages/index.md"), "edited by a step\n");
+
+    const dirty = await run(overlay.root, ["status", "--porcelain"]);
+    expect(dirty.trimEnd()).toBe(" M pages/index.md");
+    // …and reset puts the answer back, so the next shot on this project starts from clean.
+    await overlay.reset();
+    expect(await run(overlay.root, ["status", "--porcelain"])).toBe("");
+  });
+
+  test("the node_modules junction is excluded, so linking it leaves nothing untracked", async () => {
+    const root = await repoWithProject({
+      "node_modules/dep/index.js": "export const x = 1;\n",
+      "project.json": "{}\n",
+    });
+    forgetOverlays();
+    const overlay = await overlayProject(root, "starter");
+    // An untracked entry is a dirty entry, and a dirty entry is the badge coming straight back.
+    expect(await run(overlay.root, ["status", "--porcelain"])).toBe("");
+  });
+
   test("a project that does not exist fails naming the path, not the symptom", async () => {
     const root = await repoWithProject({ "project.json": "{}\n" });
     forgetOverlays();
