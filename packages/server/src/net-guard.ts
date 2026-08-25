@@ -308,12 +308,81 @@ export async function serveContained(absPath: string, root: string): Promise<Res
 }
 
 /**
+ * Extensions a BUILD publishes as static assets, so a page may reference one by site URL.
+ *
+ * Deliberately excludes `.json`, `.md` and every other document extension: `serveProjectFile`
+ * serves two URL spaces at once — the SITE's, and the project tree's, which is how the Studio
+ * canvas fetches a component `$ref` — and only the site's is what {@link BUILD_LANES} defines. A
+ * `/components/x-card.json` answered from the project root is Studio's own protocol working
+ * correctly; a `/hero.jpg` answered from the project root is a preview telling a lie.
+ */
+const SITE_ASSET_EXTENSIONS = new Set([
+  ".apng",
+  ".avif",
+  ".bmp",
+  ".css",
+  ".gif",
+  ".ico",
+  ".jpeg",
+  ".jpg",
+  ".mp3",
+  ".mp4",
+  ".oga",
+  ".ogg",
+  ".ogv",
+  ".otf",
+  ".pdf",
+  ".png",
+  ".svg",
+  ".ttf",
+  ".txt",
+  ".wav",
+  ".webm",
+  ".webmanifest",
+  ".webp",
+  ".woff",
+  ".woff2",
+  ".xml",
+]);
+
+/** Paths already warned about, so a page that loads one image fifty times says it once. */
+const rootLaneWarned = new Set<string>();
+
+/**
+ * Say once, per path, that a file resolves here and will not resolve on the built site.
+ *
+ * @param {string} decodedPath - The site URL that matched the compatibility lane
+ */
+function warnRootLane(decodedPath: string): void {
+  const dot = decodedPath.lastIndexOf(".");
+  const ext = dot === -1 ? "" : decodedPath.slice(dot).toLowerCase();
+  if (!SITE_ASSET_EXTENSIONS.has(ext) || rootLaneWarned.has(decodedPath)) {
+    return;
+  }
+  rootLaneWarned.add(decodedPath);
+  console.warn(
+    `${decodedPath} resolves from the project root, which a BUILD does not do: it publishes ` +
+      `public/ at the site root and nothing else (site-architecture.md §9.3). This file loads in ` +
+      `the preview and 404s on the deployed site — move it into public/ to fix it. This ` +
+      `compatibility lane is going away.`,
+  );
+}
+
+/**
  * Try to serve a project file at its natural URL: an extension asset mount, then
- * absolute-under-root, then root-relative, then public/. Each candidate goes through containedPath
- * (realpath). `decodedPath` is the once-decoded URL pathname (leading slash, forward slashes).
+ * absolute-under-root, then `public/`, then the project root. Each candidate goes through
+ * containedPath (realpath). `decodedPath` is the once-decoded URL pathname (leading slash, forward
+ * slashes).
  *
  * Mounts come first and are contained against their own directory rather than the project root:
  * they exist precisely to publish directories that may sit outside it (extensions.md §8.5).
+ *
+ * **`public/` precedes the project root, which is the order a BUILD resolves in.** It did not: the
+ * root came first, so a file at `<root>/hero.jpg` loaded at `/hero.jpg` here and 404'd in
+ * production — a preview that lies in the one direction that matters, and one the spec never
+ * described (`site-architecture.md` §9.3 has always matched the compiler). The root lane survives
+ * as a COMPATIBILITY lane that warns, and is going away; it also still answers the project tree's
+ * own URL space, which is how the Studio canvas fetches a component `$ref`.
  *
  * The project's BUILT OUTPUT is deliberately NOT here, nor anywhere else in an editing server's
  * chain: these paths mean the project's SOURCES, and a built page addresses the same paths meaning
@@ -342,7 +411,8 @@ export async function serveProjectFile(
     ? decodedPath.slice(1)
     : decodedPath.replace(/^\/([A-Za-z]:)/, "$1");
 
-  // 1. Absolute path that falls under the project root.
+  /* 1. Absolute path that falls under the project root. Not a site URL at all — it is how Studio
+        addresses a file it already holds an absolute path for, so it stays ahead of both lanes. */
   if (normalizeForCompare(fsPath).startsWith(normalizeForCompare(root))) {
     const res = await serveContained(fsPath, root);
     if (res) {
@@ -350,19 +420,25 @@ export async function serveProjectFile(
     }
   }
 
-  // 2. Root-relative.
-  const relRes = await serveContained(resolve(root, `.${decodedPath}`), root);
-  if (relRes) {
-    return relRes;
-  }
-
-  // 3. public/ subdirectory.
+  // 2. public/ — the site's own URL space, and the only one a build publishes.
   const pubRes = await serveContained(resolve(root, "public", `.${decodedPath}`), root);
   if (pubRes) {
     return pubRes;
   }
 
+  // 3. The project root — the project tree's URL space, and a compatibility lane for site URLs.
+  const relRes = await serveContained(resolve(root, `.${decodedPath}`), root);
+  if (relRes) {
+    warnRootLane(decodedPath);
+    return relRes;
+  }
+
   return null;
+}
+
+/** Forget which paths have been warned about — for tests, which assert the warning fires. */
+export function resetRootLaneWarnings(): void {
+  rootLaneWarned.clear();
 }
 
 /** Result of decoding a URL pathname: the safe decoded/normalized path, or a rejection Response. */
