@@ -875,6 +875,32 @@ export const RESERVED_KEYS = new Set([
 /** Refs already warned about, so the §13 diagnostic fires once per distinct target. */
 const warnedRefChildren = new Set<string>();
 
+/** Foreign-content namespaces the HTML parser switches into, and the runtime must too. */
+const SVG_NS = "http://www.w3.org/2000/svg";
+const MATHML_NS = "http://www.w3.org/1998/Math/MathML";
+
+/**
+ * The namespace an element belongs in, given the one its parent established.
+ *
+ * The static build emits markup text, so the HTML parser applied foreign-content rules for it and
+ * SVG worked there. The runtime built every node with `document.createElement`, which is HTML-only,
+ * so the same document rendered blank in the Studio canvas and in any hydrated component — the
+ * editor and the deployed site disagreeing, with only the editor wrong.
+ *
+ * @param {string} tagName
+ * @param {string | null | undefined} inherited - The namespace the parent element established
+ * @returns {string | null} Null means HTML
+ */
+function elementNamespace(tagName: string, inherited: string | null | undefined): string | null {
+  if (tagName === "svg") {
+    return SVG_NS;
+  }
+  if (tagName === "math") {
+    return MATHML_NS;
+  }
+  return inherited ?? null;
+}
+
 export function renderNode(
   def: JxElement | string | number | boolean,
   state: JxScope,
@@ -957,7 +983,19 @@ export function renderNode(
     return renderSwitch(def, localState, options);
   }
 
-  const el = document.createElement(tagName);
+  const ns = elementNamespace(tagName, options?._ns);
+  /*
+   * `foreignObject` is itself an SVG element, and is the documented way back into HTML: its
+   * DESCENDANTS are HTML, so the element and its children carry different namespaces.
+   */
+  const childNs = tagName === "foreignObject" ? null : ns;
+  /*
+   * A namespaced node comes back as Element; every apply* helper below is typed for HTMLElement
+   * and touches only members both share (style, dataset, setAttribute, append).
+   */
+  const el = (ns
+    ? document.createElementNS(ns, tagName)
+    : document.createElement(tagName)) as unknown as HTMLElement;
 
   if (options?.onNodeCreated) {
     options.onNodeCreated(el, path, def, localState);
@@ -976,12 +1014,16 @@ export function renderNode(
   if (isMappedArray(kids)) {
     // Legacy whole-children repeater: the items render directly into `el` (which keeps its own
     // TagName, e.g. <ul>), with no extra wrapper element.
-    const arrOpts = options ? { ...options, _path: [...path, "children"] } : undefined;
+    const arrOpts =
+      options || childNs ? { ...options, _ns: childNs, _path: [...path, "children"] } : undefined;
     renderMappedArrayInto(el, kids, localState, arrOpts);
   } else if (Array.isArray(kids)) {
     for (let i = 0; i < kids.length; i++) {
       const child = kids[i]!;
-      const childOpts = options ? { ...options, _path: [...path, "children", i] } : undefined;
+      const childOpts =
+        options || childNs
+          ? { ...options, _ns: childNs, _path: [...path, "children", i] }
+          : undefined;
       if (isMappedArray(child)) {
         // Array pseudo-element among siblings: expand inline, no wrapper.
         renderMappedArrayInto(el, child, localState, childOpts);
@@ -1076,6 +1118,19 @@ function bindProperty(el: HTMLElement, key: string, val: unknown, state: JxScope
      spelling. Both are the same reference and both need the same resolution. */
   const asAsset = (resolved: unknown): unknown =>
     typeof resolved === "string" ? canvasAssetValue(el.tagName, key, resolved) : resolved;
+  /*
+   * `className` on an SVGElement is a read-only SVGAnimatedString, so assigning it throws in the
+   * strict mode an ES module always runs under. It is the most common Jx element property, so the
+   * attribute form is the only one that works on both.
+   */
+  const write = (resolved: unknown): void => {
+    const node = el as unknown as Element;
+    if (key === "className" && !(node instanceof HTMLElement)) {
+      node.setAttribute("class", resolved == null ? "" : String(resolved));
+      return;
+    }
+    target[key] = resolved;
+  };
   if (isRefObj(val)) {
     const refVal = val as { $ref: string };
     if (key === "id") {
@@ -1083,7 +1138,7 @@ function bindProperty(el: HTMLElement, key: string, val: unknown, state: JxScope
       return;
     }
     effect(() => {
-      target[key] = asAsset(resolveRef(refVal.$ref, state));
+      write(asAsset(resolveRef(refVal.$ref, state)));
     });
     return;
   }
@@ -1091,12 +1146,12 @@ function bindProperty(el: HTMLElement, key: string, val: unknown, state: JxScope
   // Universal ${} reactivity — template strings in element properties
   if (isTemplateString(val)) {
     effect(() => {
-      target[key] = asAsset(evaluateTemplate(val as string, state));
+      write(asAsset(evaluateTemplate(val as string, state)));
     });
     return;
   }
 
-  target[key] = asAsset(val);
+  write(asAsset(val));
 }
 
 /**

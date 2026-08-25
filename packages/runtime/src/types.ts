@@ -15,6 +15,8 @@ export type JxEventHandler = (scope: JxScope, event: Event) => unknown;
 
 export interface JxRenderOptions {
   _path?: JxPath;
+  /** The namespace the parent element established — SVG and MathML descendants inherit it. */
+  _ns?: string | null;
   /**
    * Called for each created node. `state` is the local scope the node's children render with —
    * callers can capture it to re-render a subtree in isolation later.
