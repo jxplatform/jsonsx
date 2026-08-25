@@ -325,6 +325,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `spec.md`
 
+- **0.5.6-draft** (2026-08-25) — Clarify that the parentheses in an @(condition) style key belong to the query, so a bare media type emits without them (§9).
 - **0.5.5-draft** (2026-08-24) — 13.2 states that the runtime takes a prop from an instance only where the instance genuinely carries one — an own property or an attribute — because a state key colliding with a reflected DOM property otherwise reports an empty string and beats the component's declared default.
 - **0.5.4-draft** (2026-08-18) — §21.5: Trusted Types enforcement is declined rather than deferred — the observation run answered its question and was removed with its header; no innerHTML write remains in code Jx ships.
 - **0.5.3-draft** (2026-08-18) — §5.6: both tiers refuse a $props write against a private key, and a private entry gets no property accessor.

@@ -1253,11 +1253,7 @@ export function applyStyle(
     if (key === "@--") {
       continue;
     } // Base canvas width, not a real media query
-    const query = key.startsWith("@--")
-      ? (mediaQueries[key.slice(1)] ?? key.slice(1))
-      : key.startsWith("@(")
-        ? key.slice(1)
-        : null;
+    const query = resolveAtQuery(key, mediaQueries);
     const atRule = query === null ? key : `@media ${query}`;
     const scope = `[data-jx="${uid}"]`;
     const scheme = query === null ? null : pureSchemeOf(query);
@@ -2408,6 +2404,39 @@ export function toCSSText(rules: Record<string, unknown> | object) {
     .filter(([k, v]) => !isNestedSelector(k) && (v === null || typeof v !== "object"))
     .map(([p, v]) => `${camelToKebab(p)}: ${canvasStyleValue(String(v))}`)
     .join("; ");
+}
+
+// ─── Style At-Rules ───────────────────────────────────────────────────────────
+
+/**
+ * The four CSS media types. A media _type_ is bare — `@media print` — while a media _feature_ is
+ * parenthesised, so `@media (print)` reads as a boolean feature named `print`, which does not exist
+ * and evaluates false.
+ */
+const MEDIA_TYPES = new Set(["all", "print", "screen", "speech"]);
+
+/**
+ * The media query an `@`-prefixed style key names, or null when the key is some other at-rule
+ * (`@supports`, `@starting-style`) that is emitted verbatim.
+ *
+ * `@--name` resolves through the project's `$media` map. `@(…)` carries its own parentheses, so
+ * they are stripped only when what they wrap is a bare media type: `@(print)` must become `@media
+ * print`, while `@(min-width: 40rem)` keeps them.
+ *
+ * @param {string} atKey
+ * @param {Record<string, string>} mediaQueries
+ * @returns {string | null}
+ * @docs framework/concepts/styling
+ */
+export function resolveAtQuery(atKey: string, mediaQueries: Record<string, string>): string | null {
+  if (atKey.startsWith("@--")) {
+    return mediaQueries[atKey.slice(1)] ?? atKey.slice(1);
+  }
+  if (atKey.startsWith("@(")) {
+    const inner = atKey.slice(2, -1).trim();
+    return MEDIA_TYPES.has(inner.toLowerCase()) ? inner : atKey.slice(1);
+  }
+  return null;
 }
 
 // ─── Color Schemes ────────────────────────────────────────────────────────────

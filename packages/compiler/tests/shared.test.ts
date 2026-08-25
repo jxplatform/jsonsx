@@ -1207,6 +1207,33 @@ describe("preRenderComponentHtml", () => {
 // ─── @starting-style and non-media at-rules ─────────────────────────────────
 
 describe("compileStyles — non-media at-rules", () => {
+  /*
+   * A media TYPE is bare — `@media print`. Wrapping it in the parentheses `@(…)` carries would
+   * make it read as a boolean media FEATURE named `print`, which does not exist, so the query
+   * evaluates false and the rule silently never applies. Feature queries keep their parentheses.
+   */
+  test("@(print) emits a media type, not a parenthesised feature", () => {
+    const doc = {
+      children: [],
+      id: "sheet",
+      style: { "@(print)": { display: "none" } },
+      tagName: "div",
+    };
+    const result = compileStyles(doc);
+    expect(result).toContain("@media print");
+    expect(result).not.toContain("@media (print)");
+  });
+
+  test("@(feature: value) keeps its parentheses", () => {
+    const doc = {
+      children: [],
+      id: "sheet",
+      style: { "@(prefers-reduced-motion: reduce)": { transition: "none" } },
+      tagName: "div",
+    };
+    expect(compileStyles(doc)).toContain("@media (prefers-reduced-motion: reduce)");
+  });
+
   test("@starting-style emits without @media wrapper", () => {
     const doc = {
       children: [],

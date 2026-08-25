@@ -12,6 +12,7 @@ import {
   RESERVED_KEYS,
   camelToKebab,
   pureSchemeOf,
+  resolveAtQuery,
   schemeSelectors,
   toCSSText,
 } from "@jxsuite/runtime";
@@ -1043,11 +1044,7 @@ function conditionalRuleEmitter(
   mediaQueries: Record<string, string>,
   rules: string[],
 ): (selector: string, props: string) => void {
-  const query = atKey.startsWith("@--")
-    ? (mediaQueries[atKey.slice(1)] ?? atKey.slice(1))
-    : atKey.startsWith("@(")
-      ? atKey.slice(1)
-      : null;
+  const query = resolveAtQuery(atKey, mediaQueries);
   const atRule = query === null ? atKey : `@media ${query}`;
   const scheme = query === null ? null : pureSchemeOf(query);
   return (selector: string, props: string) => {
