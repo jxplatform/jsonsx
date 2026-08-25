@@ -1,6 +1,6 @@
 /** Shared project generation logic. Used by both the CLI scaffolder and the Studio server endpoint. */
 
-import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { chmod, cp, lstat, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { adapterNeedsWrangler, buildWranglerJsonc } from "./scaffold";
 import { basename, join, relative, sep } from "node:path";
 
@@ -64,12 +64,114 @@ const STARTER_EXCLUDE = new Set([
 ]);
 
 /**
+ * Add owner-write to every file and directory in a freshly copied tree.
+ *
+ * `fs.cp` reproduces the SOURCE's permission bits on the destination — correct for a backup, wrong
+ * for a scaffolder. When the templates ship from a read-only store the new project lands read-only:
+ * every path under /nix/store is 444/555 by construction, and a root-owned or content-addressed
+ * install can be too. The generator then fails on its own next write (the project.json re-stamp,
+ * EACCES), and had it not, the user's `bun install`, `jx build` and every later edit would fail the
+ * same way — the destination directory itself is writable only because `mkdir` created it.
+ *
+ * Bits are OR-ed rather than assigned, so a template that deliberately marks a file executable
+ * keeps it; only owner-write is forced on, plus owner-search on directories so the walk can enter
+ * them. Symlinks are skipped: `chmod` follows them, and a link pointing out of the tree must not
+ * have its target rewritten. A link's target inside the tree is normalized when the walk reaches it
+ * directly.
+ *
+ * @param {string} dir — absolute path to a directory that is already writable
+ */
+async function makeWritable(dir: string): Promise<void> {
+  const entries = await readdir(dir, { withFileTypes: true });
+  await Promise.all(
+    entries.map(async (entry) => {
+      if (entry.isSymbolicLink()) {
+        return;
+      }
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        const { mode } = await lstat(full);
+        // Widened before recursing: a directory lacking owner-search cannot be read into.
+        // oxlint-disable-next-line no-bitwise -- st_mode is a bitfield; OR-ing is how a bit is added
+        await chmod(full, mode | 0o700);
+        await makeWritable(full);
+        return;
+      }
+      if (entry.isFile()) {
+        const { mode } = await lstat(full);
+        // oxlint-disable-next-line no-bitwise -- st_mode is a bitfield; OR-ing is how a bit is added
+        await chmod(full, mode | 0o200);
+      }
+    }),
+  );
+}
+
+/**
+ * Remove the debris of a scaffold that threw partway through.
+ *
+ * The safety rule is that this may only delete what the generator itself wrote. `destPath` is
+ * removed outright ONLY when the generator created it; when the caller pointed at a directory that
+ * already existed, {@link generateProject} has just proved it was empty, so everything inside is
+ * ours and the directory the user made is left standing. Nothing that predates the call is
+ * reachable either way.
+ *
+ * @param {string} destPath — absolute path to the project directory
+ * @param {boolean} destExisted — whether destPath existed before the generator ran
+ */
+async function discardPartialScaffold(destPath: string, destExisted: boolean): Promise<void> {
+  try {
+    // The tree is very likely read-only: that is the failure this most often follows.
+    // Unlinking an entry needs write permission on the directory that holds it.
+    await makeWritable(destPath);
+    if (!destExisted) {
+      await rm(destPath, { force: true, recursive: true });
+      return;
+    }
+    const entries = await readdir(destPath);
+    await Promise.all(
+      entries.map(async (entry) => rm(join(destPath, entry), { force: true, recursive: true })),
+    );
+  } catch {
+    // Best-effort: the scaffold failure is the one worth reporting.
+    // A cleanup that cannot finish must not replace it with a second, less useful error.
+  }
+}
+
+/**
  * Generate a new Jx project at the given path.
  *
  * @param {string} destPath — absolute path to the project directory
  * @param {ProjectOptions} opts
  */
 export async function generateProject(destPath: string, opts: ProjectOptions) {
+  const destExisted = existsSync(destPath);
+  if (destExisted) {
+    const { readdirSync } = await import("node:fs");
+    if (readdirSync(destPath).length > 0) {
+      throw new Error(`Directory "${destPath}" is not empty`);
+    }
+  }
+
+  await mkdir(destPath, { recursive: true });
+
+  try {
+    await populateProject(destPath, opts);
+  } catch (error) {
+    // A half-written project is worse than no project: it is what turns the user's retry into
+    // `Directory "..." is not empty`, an error that describes the debris rather than the failure.
+    await discardPartialScaffold(destPath, destExisted);
+    throw error;
+  }
+}
+
+/**
+ * Write the project itself. Split out of {@link generateProject} so the destination guard, the
+ * directory creation and the rollback surround every write below without indenting them.
+ *
+ * @param {string} destPath — absolute path to the (existing, empty) project directory
+ * @param {ProjectOptions} opts
+ */
+async function populateProject(destPath: string, opts: ProjectOptions) {
   const {
     name,
     description = "",
@@ -79,15 +181,6 @@ export async function generateProject(destPath: string, opts: ProjectOptions) {
     template = "blank",
     design,
   } = opts;
-
-  if (existsSync(destPath)) {
-    const { readdirSync } = await import("node:fs");
-    if (readdirSync(destPath).length > 0) {
-      throw new Error(`Directory "${destPath}" is not empty`);
-    }
-  }
-
-  await mkdir(destPath, { recursive: true });
 
   if (starter && starter !== "blank") {
     await scaffoldFromStarter(destPath, starter, {
@@ -125,6 +218,10 @@ export async function generateProject(destPath: string, opts: ProjectOptions) {
 
   await Promise.all(writes);
 
+  // The .gitignore, layouts/ and pages/ above are copies too, carrying the template's modes.
+  // The overlay below would otherwise fail to `force` over a file that came across read-only.
+  await makeWritable(destPath);
+
   // The mobile-app variant overlays the shared skeleton with its app-shell layout and home page.
   // Sequenced after the base copies so the overlay files win.
   if (template === "mobile-app") {
@@ -132,6 +229,7 @@ export async function generateProject(destPath: string, opts: ProjectOptions) {
       force: true,
       recursive: true,
     });
+    await makeWritable(destPath);
   }
 
   if (design?.logo) {
@@ -174,6 +272,9 @@ async function scaffoldFromStarter(
       return rel === "" || !rel.split(sep).some((seg) => STARTER_EXCLUDE.has(seg));
     },
   });
+
+  // Before the re-stamp below, which writes straight back into the tree that was just copied.
+  await makeWritable(destPath);
 
   // Re-stamp project.json with the new project's identity, keeping the starter's design tokens,
   // Content types, image pipeline, and head.

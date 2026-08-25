@@ -43,6 +43,10 @@ A blank scaffold produces:
 
 Choosing a starter instead copies the starter site verbatim (minus build artifacts), then re-stamps `project.json` with your name, URL, description, and adapter, and rebuilds `package.json` with current dependency ranges.
 
+The new project is always writable, whatever permissions the templates themselves carry. Templates are copied from wherever `@jxsuite/create` and `@jxsuite/starters` are installed, and a read-only install — every path under `/nix/store` is read-only by construction — would otherwise hand you a project you could not edit, install into, or build.
+
+A scaffold that fails partway cleans up after itself, so a retry sees the destination it expects rather than the debris of the previous attempt. Only what the scaffolder wrote is removed: a directory it created is deleted, a directory that already existed is emptied, and a destination that already had content is refused before anything is written at all.
+
 ## `jx build`
 
 Build the site to the configured `outDir` (default `dist/`). See [How compilation works](/docs/framework/build) for what happens inside.
