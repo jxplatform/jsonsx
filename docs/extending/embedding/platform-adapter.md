@@ -164,6 +164,8 @@ if (!match) {
 
 ### Desktop (`packages/desktop/src/platform.ts`)
 
+**Settings are written as patches.** `patchSettings({ set, remove })` changes only the keys it names and answers with the store as it then stands; a key named by neither must be left alone. That is a correctness rule, not an optimisation — a whole-map write means every writer implicitly claims the whole store, so a second window holding a different view of it silently overwrites the first. It also means a key your adapter has never heard of survives a write.
+
 The desktop adapter translates the same interface into ElectroBun RPC: each member is a one-line `rpc.request.*` call into Bun-side handlers (`openProject()` is literally `return await rpc.request.openProject()`, backed by a native file dialog in the Bun process). Beyond the mapping, it patches `window.fetch` so the runtime's dev-proxy endpoints (`/__jx_resolve__`, `/__jx_server__`) also ride the RPC bridge, and it implements the desktop-only families — multi-window, backend-persisted recents and settings, `getAppInfo`.
 
 ### Desktop, Chromium build (`packages/desktop/src/chromium/platform.ts`)

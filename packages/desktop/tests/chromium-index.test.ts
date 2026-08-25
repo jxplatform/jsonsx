@@ -182,10 +182,13 @@ void mock.module("../src/recent-store", () => ({
 }));
 
 const readSettingsMock = mock(() => Promise.resolve({ aiApiKey: "sk-abc" }));
-const writeSettingsMock = mock(() => Promise.resolve());
+const patchSettingsMock = mock(() => Promise.resolve({ aiApiKey: "sk-new" }));
+const watchSettingsMock = mock((_onChange: (s: Record<string, string>) => void) => () => {});
 void mock.module("../src/settings-store", () => ({
   readSettings: readSettingsMock,
-  writeSettings: writeSettingsMock,
+  patchSettings: patchSettingsMock,
+  /* The launcher starts the store's watch so a change in one window reaches the others. */
+  watchSettings: watchSettingsMock,
 }));
 
 /*
@@ -590,9 +593,10 @@ describe("chromium launcher RPC dispatch", () => {
   test("settings handlers read from and write to the store", async () => {
     expect(await rpc("getSettings")).toEqual({ aiApiKey: "sk-abc" });
     expect(readSettingsMock).toHaveBeenCalled();
-    const settings = { aiApiKey: "sk-new", theme: "dark" };
-    expect(await rpc("saveSettings", { settings })).toBeNull();
-    expect(writeSettingsMock).toHaveBeenCalledWith(settings);
+    const patch = { remove: ["theme"], set: { aiApiKey: "sk-new" } };
+    // A patch answers with the resulting store rather than null.
+    expect(await rpc("patchSettings", { patch })).toEqual({ aiApiKey: "sk-new" });
+    expect(patchSettingsMock).toHaveBeenCalledWith(patch);
   });
 
   test("GitHub sign-in handlers reach the loopback flow", async () => {
@@ -1084,6 +1088,20 @@ describe("pushed messages", () => {
     await expect(pushed).resolves.toEqual({
       method: "onFileEvents",
       params: { events: [{ isDir: false, path: "pages/index.json", type: "change" }] },
+    });
+  });
+
+  /**
+   * The store's watch is what carries a settings change across processes — every chromium window is
+   * its own, with its own browser profile, so nothing in-process can reach the others.
+   */
+  test("a settings change on disk is pushed to the shell", async () => {
+    const [onChange] = watchSettingsMock.mock.calls[0]!;
+    const pushed = nextPush("settingsChanged");
+    onChange({ "jx.ai.model": "o3" });
+    await expect(pushed).resolves.toEqual({
+      method: "settingsChanged",
+      params: { settings: { "jx.ai.model": "o3" } },
     });
   });
 

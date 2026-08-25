@@ -9,7 +9,7 @@ import { installMockPlatform } from "./harness";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { render } from "lit-html";
 import { createManagedConnect } from "../src/ui/ai-managed-connect";
-import { fetchAvailableModels, invalidateModelCache } from "../src/services/ai-models";
+import { fetchAvailableModels, resetModelCache } from "../src/services/ai-models";
 
 const { platform } = installMockPlatform();
 
@@ -55,7 +55,7 @@ async function probeManaged(managed: boolean, configured = false) {
 
 beforeEach(() => {
   globalThis.localStorage.clear();
-  invalidateModelCache();
+  resetModelCache();
   fetchCalls.length = 0;
   delete platform.cfConnect;
 });
@@ -219,7 +219,7 @@ describe("the recommendation, and its two moods", () => {
        it. Set in every case here, including the two that expect the block to stay hidden, so those
        prove the PROBE hid it rather than a missing platform method. */
     platform.cfConnect = async () => ({ connected: true });
-    invalidateModelCache();
+    resetModelCache();
     const { container, mc } = makeConnect();
     mc.ensureProbe();
     await flush();

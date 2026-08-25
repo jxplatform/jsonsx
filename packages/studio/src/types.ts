@@ -43,6 +43,7 @@ import type {
   RenameResult,
   SecretsSetRequest,
   SecretsSetResponse,
+  SettingsPatch,
   StarterInfo,
   UploadResult,
 } from "@jxsuite/protocol";
@@ -95,6 +96,7 @@ export type {
   SecretsListResponse,
   SecretsSetRequest,
   SecretsSetResponse,
+  SettingsPatch,
   StarterInfo,
 } from "@jxsuite/protocol";
 
@@ -546,8 +548,26 @@ export interface StudioPlatform {
    * settings live in localStorage only.
    */
   getSettings?: () => Promise<Record<string, string>>;
-  /** Persist the full user-level settings map to the backend store. */
-  saveSettings?: (settings: Record<string, string>) => Promise<void>;
+  /**
+   * Apply a set of changes to the backend store, and answer with the store as it then stands.
+   *
+   * A PATCH rather than the whole map, which is a correctness property and not an optimisation: a
+   * key named by neither `set` nor `remove` must be left exactly as it was found. Writing the whole
+   * map let any window overwrite the shared file with its own view of it, and on the chromium
+   * launcher every window is a separate process with a separate browser profile — so a window that
+   * held no settings could, and did, clear the credentials another window had just stored. It also
+   * preserves keys this build does not know: one written by a newer version, or by hand.
+   */
+  patchSettings?: (patch: SettingsPatch) => Promise<Record<string, string>>;
+  /**
+   * Be told when the backend store changes — by another window, or by hand. Returns the
+   * unsubscribe.
+   *
+   * Optional, and a display concern rather than a correctness one: `patchSettings` already stops a
+   * window from clobbering another's keys, so a platform without this leaves a second window
+   * showing a stale value until its next boot rather than losing anything.
+   */
+  subscribeSettings?: (handler: (settings: Record<string, string>) => void) => () => void;
 }
 
 // ─── Studio Types ───────────────────────────────────────────────────────────

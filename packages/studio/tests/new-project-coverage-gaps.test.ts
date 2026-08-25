@@ -8,15 +8,17 @@
  * - Add-repo-modal: double-open, double-import, import-less platforms, and Escape dismissal.
  */
 import {
+  clearSeededSettings,
   flush,
   installMockPlatform,
+  mountOverlayLayers,
   npFillLocation,
   npLocation,
   npName,
   npPreview,
   npSlug,
   npType,
-  mountOverlayLayers,
+  seedSettings,
 } from "./harness";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { RepoInfo, StarterInfo } from "../src/types";
@@ -95,6 +97,7 @@ const STARTERS: StarterInfo[] = [
 
 beforeEach(() => {
   localStorage.clear();
+  clearSeededSettings();
 });
 
 afterEach(() => {
@@ -185,7 +188,7 @@ describe("new-project modal gaps", () => {
   });
 
   test("agent submit derives a blank directory and surfaces create failures", async () => {
-    localStorage.setItem("jx.ai.openaiKey", "sk-agent-test");
+    seedSettings({ "jx.ai.openaiKey": "sk-agent-test" });
     const attempts: Record<string, unknown>[] = [];
     installMockPlatform({
       createProject: (async (opts: Record<string, unknown>) => {

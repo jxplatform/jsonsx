@@ -30,6 +30,7 @@ import type {
   SecretsListResponse,
   SecretsSetRequest,
   SecretsSetResponse,
+  SettingsPatch,
 } from "@jxsuite/protocol";
 import type {
   CodeServiceResult,
@@ -80,10 +81,19 @@ export function createDesktopPlatform() {
         fileEventHandler?.(events);
       }
     },
+    /* Another window's settings change. Every chromium window is its own process, so this is the
+       only way one hears about another. */
+    settingsChanged: (params: { settings?: Record<string, string> }) => {
+      if (params.settings) {
+        settingsHandler?.(params.settings);
+      }
+    },
   };
 
   // The studio sidebar's live-sync subscriber, if any. Set via subscribeFileEvents below.
   let fileEventHandler: ((events: FsEvent[]) => void) | null = null;
+  /** The settings kernel's subscriber, so another window's change reaches this one. */
+  let settingsHandler: ((settings: Record<string, string>) => void) | null = null;
 
   ws.addEventListener("message", (event) => {
     const msg = JSON.parse(event.data as string) as {
@@ -240,8 +250,15 @@ export function createDesktopPlatform() {
       return request("getSettings") as Promise<Record<string, string>>;
     },
 
-    async saveSettings(settings: Record<string, string>) {
-      await request("saveSettings", { settings });
+    async patchSettings(patch: SettingsPatch) {
+      return request("patchSettings", { patch }) as Promise<Record<string, string>>;
+    },
+
+    subscribeSettings(handler: (settings: Record<string, string>) => void) {
+      settingsHandler = handler;
+      return () => {
+        settingsHandler = null;
+      };
     },
 
     async resolveSiteContext(filePath: string) {

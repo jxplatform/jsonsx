@@ -1,5 +1,6 @@
 // oxlint-disable unicorn/no-process-exit -- standalone launcher CLI; exit codes are its interface
 import { basename, isAbsolute, resolve } from "node:path";
+import type { SettingsPatch } from "@jxsuite/protocol";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import {
@@ -87,7 +88,7 @@ import {
 import { createProjectServer } from "@jxsuite/server/project-server";
 import { listStarters } from "@jxsuite/starters";
 import { readRecents, writeRecents } from "../recent-store";
-import { readSettings, writeSettings } from "../settings-store";
+import { patchSettings, readSettings, watchSettings } from "../settings-store";
 import {
   githubSignIn,
   githubSignOut,
@@ -327,8 +328,7 @@ export const handlers: Record<string, (params: unknown) => Promise<unknown>> = {
   saveRecentProjects: (params) =>
     writeRecents((params as { projects: RecentProjectEntry[] }).projects),
   getSettings: () => readSettings(),
-  saveSettings: (params) =>
-    writeSettings((params as { settings: Record<string, string> }).settings),
+  patchSettings: (params) => patchSettings((params as { patch: SettingsPatch }).patch),
   githubSignIn: (params) => githubSignIn(params as { force?: boolean }),
   githubSignOut: () => githubSignOut(),
   githubToken: () => githubTokenStatus(),
@@ -427,6 +427,13 @@ setFileEventSink((events) => {
   projectServer.push("onFileEvents", { events });
 });
 
+/* Every chromium window is its own process with its own browser profile, so a settings change made
+   in one is invisible to the others until something re-reads the file. The store's watch is what
+   carries it across. */
+const stopSettingsWatch = watchSettings((settings) => {
+  projectServer.push("settingsChanged", { settings });
+});
+
 /* Another window may ask this one to come forward (see window-registry.ts). Only the page can
    raise an `--app` window, so the request is relayed to it. */
 const stopFocusWatch = watchFocusRequests(process.pid, () => {
@@ -451,6 +458,7 @@ export function releaseWindow(): void {
   }
   released = true;
   stopFocusWatch();
+  stopSettingsWatch();
   unregisterWindow(process.pid);
 }
 process.on("exit", releaseWindow);

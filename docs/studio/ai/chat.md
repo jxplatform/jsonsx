@@ -27,7 +27,7 @@ Type in the message box at the bottom and press :kbd[Enter] to send — :kbd[Shi
 The row under the message box holds the composer's controls:
 
 - **Attach context** (paperclip) — pin the current page or the selected element to your message (below).
-- The **model picker** — switch models mid-conversation; the list comes from your provider.
+- The **model picker** — switch models mid-conversation. The list comes from the provider you have configured, and only from that one: change the key or the endpoint and the picker re-asks rather than showing you the previous provider's catalogue.
 - **API key & endpoint** (gear) — reopen the **Assistant settings** dialog.
 - **Send** — becomes **Stop** while the assistant is replying; click it to halt the reply and any further actions.
 

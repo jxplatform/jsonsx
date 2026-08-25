@@ -6,7 +6,9 @@ import { init as initUtils, openDirectoryDialog, openFileDialog } from "./utils"
 import { handleAiApi } from "@jxsuite/server/ai-api";
 import { handleImportApi } from "@jxsuite/server/import-api";
 import { installApplicationMenu } from "./menu";
+import { watchSettings } from "./settings-store";
 import {
+  broadcastSettingsChanged,
   broadcastUpdateReady,
   openProjectWindow,
   parseProjectDirFromUrl,
@@ -72,6 +74,11 @@ async function main() {
 
   startBackgroundChecks();
   setNotifyWebview((version) => broadcastUpdateReady(version));
+
+  /* User settings are one file shared by every window and, on a machine running both
+     launchers, by both. Watching it is what lets a change made in one window reach the
+     others without a restart. */
+  watchSettings(broadcastSettingsChanged);
 
   // ─── Initial window ────────────────────────────────────────────────────────
   // A project root from argv (CLI / file association) or JSONSX_PROJECT_ROOT opens that project; a

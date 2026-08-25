@@ -4,27 +4,29 @@
  * single JSON file in the platform-conventional config directory (see user-config.ts).
  */
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
 import { configFile, migrateLegacyStore } from "./user-config";
+import { readJsonStore, writeStore } from "./user-store";
 import type { RecentProjectEntry } from "./rpc-schema";
 
 const STORE_NAME = "recent-projects.json";
 
 /** Read the recent-projects list, tolerating a missing or corrupt store file. */
 export async function readRecents(): Promise<RecentProjectEntry[]> {
-  try {
-    const raw = await readFile(await migrateLegacyStore(STORE_NAME), "utf8");
-    const parsed = JSON.parse(raw) as RecentProjectEntry[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+  return readJsonStore(
+    await migrateLegacyStore(STORE_NAME),
+    [] as RecentProjectEntry[],
+    (value): value is RecentProjectEntry[] => Array.isArray(value),
+  );
 }
 
-/** Persist the full recent-projects list, creating the parent directory if needed. */
+/**
+ * Persist the full recent-projects list, creating the parent directory if needed.
+ *
+ * A whole-list replace is right here, unlike settings: the list IS the value, and every writer has
+ * just read it. What it gains from the shared primitive is the atomic rename — a torn
+ * recent-projects file reads back as "no recent projects", which is a bad way to learn about a
+ * crash mid-write.
+ */
 export async function writeRecents(projects: RecentProjectEntry[]): Promise<void> {
-  const file = configFile(STORE_NAME);
-  await mkdir(dirname(file), { recursive: true });
-  await writeFile(file, JSON.stringify(projects, null, 2), "utf8");
+  await writeStore(configFile(STORE_NAME), projects);
 }

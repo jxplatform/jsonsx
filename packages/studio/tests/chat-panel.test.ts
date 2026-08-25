@@ -6,7 +6,13 @@
  * and consume a pending agent prompt as soon as the workspace adopts the project root it was stored
  * for (the New Project / bootstrap handoff) — which now REVEALS the tab instead of opening a dock.
  */
-import { flush, resetStudioState, resetWorkspaceWithTab } from "./harness";
+import {
+  clearSeededSettings,
+  flush,
+  resetStudioState,
+  resetWorkspaceWithTab,
+  seedSettings,
+} from "./harness";
 import { reactive } from "@vue/reactivity";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { initShellRefs } from "../src/store";
@@ -39,11 +45,14 @@ void mock.module("../src/services/document-assistant", () => ({
 /* Keep the credentials gate deterministic: no managed proxy, no configured proxy, no probe fetch.
    hasAiCredentials still tracks the stored key, since these tests drive the gate through it. */
 void mock.module("../src/services/ai-models", () => ({
+  aiConnection: () => ({ apiKey: "", baseUrl: "" }),
+  cachedModels: () => null,
+  preferredModel: () => "gpt-4o",
   ensureProxyProbe: () => {},
   fetchAvailableModels: async () => {},
   getProxyDefaultModel: () => "",
   hasAiCredentials: () => Boolean(globalThis.localStorage.getItem("jx.ai.openaiKey")),
-  invalidateModelCache: () => {},
+  resetModelCache: () => {},
   isManagedProxy: () => false,
   isProxyConfigured: () => false,
   // Every named export ai-managed-connect.ts imports must be here: a partial mock.module() of a
@@ -79,7 +88,8 @@ beforeEach(() => {
   resetStudioState();
   closeAllTabs();
   setWorkspaceProject(null);
-  globalThis.localStorage.clear();
+  localStorage.clear();
+  clearSeededSettings();
   shell.docks.right.collapsed = false;
   assistantSend.mockClear();
 });
@@ -108,7 +118,7 @@ describe("chat panel", () => {
   });
 
   test("renders the chat view once a key exists, with or without an open tab", async () => {
-    globalThis.localStorage.setItem("jx.ai.openaiKey", "sk-test");
+    seedSettings({ "jx.ai.openaiKey": "sk-test" });
     mount(chatHost());
     render();
     await flush(4);
@@ -123,7 +133,7 @@ describe("chat panel", () => {
   });
 
   test("consumes a pending agent prompt when the workspace adopts its project root", async () => {
-    globalThis.localStorage.setItem("jx.ai.openaiKey", "sk-test");
+    seedSettings({ "jx.ai.openaiKey": "sk-test" });
     shell.docks.right.collapsed = true;
     setPendingAgentPrompt("/proj-c", "build a landing page");
     mount(chatHost());

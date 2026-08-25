@@ -34,12 +34,14 @@
  */
 
 import { normalizeChord, overlappingScopes, parseChord } from "../commands/keymap";
+import { SETTINGS } from "../services/settings/definitions";
+import { clearSettings, readStoredSetting, setSetting } from "../services/settings/kernel";
 import type { KeybindingOverrides } from "../commands/keymap";
 import type { KeyScope } from "../commands/levels";
 import type { AnyCommand, CommandRegistry } from "../commands/registry";
 
 /** Where the user's layer is kept. One key, one JSON object of `id → chords`. */
-export const KEYBINDINGS_STORAGE_KEY = "jx.keybindings";
+export const KEYBINDINGS_STORAGE_KEY = SETTINGS.keybindings.key;
 
 /** Keys that type nothing, and so may be bound without a modifier. */
 const UNMODIFIED_KEYS = new Set([
@@ -114,12 +116,7 @@ export function isBindableChord(chord: string): boolean {
 }
 
 function readRaw(): string {
-  try {
-    return globalThis.localStorage?.getItem(KEYBINDINGS_STORAGE_KEY) ?? "";
-  } catch {
-    // Storage unavailable (private mode): every command keeps the chord it declared.
-    return "";
-  }
+  return readStoredSetting(SETTINGS.keybindings);
 }
 
 /** Every chord in one stored entry, canonicalised — or `null` if any of them is not a chord. */
@@ -175,18 +172,11 @@ export function loadKeybindingOverrides(): Map<string, string[]> {
 }
 
 function store(layer: KeybindingOverrides): void {
-  try {
-    if (layer.size === 0) {
-      globalThis.localStorage?.removeItem(KEYBINDINGS_STORAGE_KEY);
-      return;
-    }
-    globalThis.localStorage?.setItem(
-      KEYBINDINGS_STORAGE_KEY,
-      JSON.stringify(Object.fromEntries(layer)),
-    );
-  } catch {
-    // Storage unavailable — the rebinding is live in this window and is not remembered.
+  if (layer.size === 0) {
+    clearSettings([SETTINGS.keybindings]);
+    return;
   }
+  setSetting(SETTINGS.keybindings, JSON.stringify(Object.fromEntries(layer)));
 }
 
 /**

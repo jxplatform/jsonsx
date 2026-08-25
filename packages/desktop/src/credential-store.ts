@@ -14,46 +14,10 @@
  * better than a browser storage entry, and no better than that.
  */
 
-import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
 import { configFile } from "./user-config";
+import { readStringStore, updateStore } from "./user-store";
 
 const STORE_NAME = "credentials.json";
-
-/** Read the whole store, tolerating a missing or corrupt file. Never leaves this module. */
-async function readStore(): Promise<Record<string, string>> {
-  try {
-    const raw = await readFile(configFile(STORE_NAME), "utf8");
-    const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return {};
-    }
-    const out: Record<string, string> = {};
-    for (const [key, value] of Object.entries(parsed)) {
-      if (typeof value === "string") {
-        out[key] = value;
-      }
-    }
-    return out;
-  } catch {
-    return {};
-  }
-}
-
-/**
- * Write the store owner-only.
- *
- * `chmod` runs after the write rather than relying on `writeFile`'s mode, which only applies when
- * the file is created — an existing world-readable file would keep its mode forever otherwise.
- */
-async function writeStore(store: Record<string, string>): Promise<void> {
-  const file = configFile(STORE_NAME);
-  await mkdir(dirname(file), { recursive: true });
-  await writeFile(file, JSON.stringify(store, null, 2), { mode: 0o600 });
-  if (process.platform !== "win32") {
-    await chmod(file, 0o600);
-  }
-}
 
 /**
  * The stored credential for `name`, or null.
@@ -62,7 +26,7 @@ async function writeStore(store: Record<string, string>): Promise<void> {
  * @returns {Promise<string | null>}
  */
 export async function readCredential(name: string): Promise<string | null> {
-  const store = await readStore();
+  const store = await readStringStore(configFile(STORE_NAME));
   return store[name] ?? null;
 }
 
@@ -74,11 +38,16 @@ export async function readCredential(name: string): Promise<string | null> {
  * @returns {Promise<void>}
  */
 export async function writeCredential(name: string, value: string | null): Promise<void> {
-  const store = await readStore();
-  if (value === null) {
-    delete store[name];
-  } else {
-    store[name] = value;
-  }
-  await writeStore(store);
+  /* Read and write under one lock. This was a read-modify-write with an `await` between the halves
+     and nothing holding the file, so two credentials written at once each read the same base and
+     the second dropped the first. */
+  await updateStore(configFile(STORE_NAME), readStringStore, (current) => {
+    const next = { ...current };
+    if (value === null) {
+      delete next[name];
+    } else {
+      next[name] = value;
+    }
+    return next;
+  });
 }

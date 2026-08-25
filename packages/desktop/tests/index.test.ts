@@ -22,11 +22,13 @@ void mock.module("electrobun/main", () => ({
 const openProjectWindow = mock((_root: string | null) => ({}) as unknown);
 const setAiServerUrl = mock((_url: string) => {});
 const setImportServiceUrl = mock((_url: string) => {});
+const broadcastSettingsChanged = mock((_settings: Record<string, string>) => {});
 const broadcastUpdateReady = mock((_version: string) => {});
 const parseProjectDirFromUrl = mock((url: string) =>
   url.includes("project.json") ? "/parsed/dir" : null,
 );
 void mock.module("../src/window-manager", () => ({
+  broadcastSettingsChanged,
   broadcastUpdateReady,
   openProjectWindow,
   parseProjectDirFromUrl,

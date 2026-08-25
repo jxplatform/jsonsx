@@ -24,7 +24,7 @@ The first screen — **Choose a starting point** — opens on the starter galler
 
 Both AI tabs unlock the moment AI is available, by whichever route your Studio offers — the same options the [AI assistant](/docs/studio/ai) sidebar gives you:
 
-- **Connect Cloudflare** — on Jx Cloud, run Workers AI on your own Cloudflare account with no API key at all. Click the button, approve the Cloudflare authorization, and the tab unlocks when you land back in Studio.
+- **Connect Cloudflare** — on Jx Cloud, run Workers AI on your own Cloudflare account with no API key at all. Click the button, approve the Cloudflare authorization, and the tab unlocks when you land back in Studio. With no model of your own chosen, Studio uses the one that backend says it prefers rather than guessing a name it may not serve.
 - **An AI provider key** — paste any OpenAI-compatible key into the form. This is the only route on desktop and the dev server.
 - **Nothing to do** — if the Studio backend already holds a provider key (a dev server started with `OPENAI_API_KEY`, or a Cloudflare account you connected earlier), both tabs are unlocked from the start.
 

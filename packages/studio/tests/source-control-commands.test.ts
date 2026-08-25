@@ -18,6 +18,8 @@ const repoCalls: unknown[] = [];
 
 void mock.module("../src/platform.js", () => ({
   getPlatform: () => mockPlatform,
+  // Reached transitively: the settings kernel asks whether a platform is registered before writing.
+  hasPlatform: () => true,
   registerPlatform: () => {},
 }));
 

@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.44-draft
+**Version:** 0.9.45-draft
 **Status:** Partial
 **Updated:** 2026-08-25
 **License:** MIT
@@ -1983,6 +1983,24 @@ Two rules the sections must keep:
 Saving or revoking a credential announces itself, so surfaces that gate on one (the Assistant tab's
 setup notice) repaint without Preferences having to know they exist.
 
+Three rules govern the values themselves, and each of them is a defect that shipped:
+
+3.  **A blank field never deletes.** Storing an empty value and forgetting a value are different
+    operations, and only the second one forgets. Conflating them read as a convenience until a form
+    blanked its own drafts on Save while the sheet stayed open: pressing Save a second time on the
+    emptied form revoked the credentials the first press had stored. A form must therefore also show
+    what it saved rather than clearing itself, and clearing is the Accounts section's Disconnect.
+4.  **A default is not a stored value.** What a reader falls back to when nothing is stored must not
+    be readable as a choice the author made — a form prefilled from the fallback and saved persists
+    a decision nobody took, which is how a settings file came to name a model its owner had never
+    picked for a provider that did not serve it. Where a backend declares its own preference, that
+    preference is consulted before any default this app invents.
+5.  **A preference belongs to the author, not to the window.** Everything here roams: the theme, the
+    keyboard layer, the AI provider, every account. Two windows are two views of one set of
+    settings, so a change in either reaches the other, and a window that knows nothing about a
+    setting can never be the reason it is lost. Per-window state — dock geometry, which tabs are
+    open, a palette's recent commands — is the other thing and stays where it was written.
+
 ---
 
 ## 16. Feedback, Problems and Progress
@@ -2464,6 +2482,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.9.45-draft** (2026-08-25) — Preferences §15: a blank field never deletes, a default is never a stored value, and every preference roams between windows.
 - **0.9.44-draft** (2026-08-25) — Declare assetSpace: the canvas origin serves either the site URL space or repo paths under documentBaseUrl (§3.4/§4.1/§11.2); media resolves at render rather than by a document walk (§4.1); typed UploadResult and declared asset capabilities (§9.3).
 - **0.9.43-draft** (2026-08-25) — §13.5 names all seven quiescence sources, and adds the grid: a table still building, or built but not yet showing its selection range, is not settled.
 - **0.9.42-draft** (2026-08-24) — 8.2.6 refuses a prop delivered by any route the property bridge reads — a data-jx-props payload or a top-level key on the instance node, alongside the two attribute shapes — because $props is not the only place a value lives.
@@ -2563,4 +2582,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.44-draft_
+_`@jxsuite/studio` Specification v0.9.45-draft_

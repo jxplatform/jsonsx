@@ -26,7 +26,8 @@ import type { ToolAvailability } from "./gated-registry";
 import { adoptProject } from "./project-adoption";
 import { runAgentLoop } from "./tool-executor";
 import { AI_TOOL_TIERS, buildSystemPrompt, tierActive } from "./ai-system-prompt";
-import { getBaseUrl, getModel, getOpenAiKey } from "./ai-settings";
+import { getBaseUrl, getOpenAiKey } from "./ai-settings";
+import { preferredModel } from "./ai-models";
 import { trimContext } from "./context-manager";
 import { renderCheck } from "./render-critic";
 import { openFileInTab, reloadFileInTab } from "../files/files";
@@ -58,7 +59,7 @@ function projectRoot() {
  * }}
  */
 export function createDocumentAssistant() {
-  const chatState = createChatState({ model: getModel() });
+  const chatState = createChatState({ model: preferredModel() });
 
   /** The persisted session backing the live chat; null = fresh unsaved chat. */
   let sessionId: string | null = null;
@@ -212,7 +213,7 @@ export function createDocumentAssistant() {
       const chatUrl = await Promise.resolve(plat.aiChatUrl());
       // Re-read the persisted model each send: the session is constructed once at module load
       // (before the user sets a key/model), so the picker's choice must be picked up here.
-      chatState.setModel(getModel());
+      chatState.setModel(preferredModel());
       const streamingClient = createProxyStreamingClient({
         chatUrl,
         model: chatState.model,

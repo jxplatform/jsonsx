@@ -13,14 +13,54 @@
 
 import type { AiModelsResponse } from "@jxsuite/protocol";
 import { getPlatform } from "../platform";
-import { getBaseUrl, getOpenAiKey, hasOpenAiKey } from "./ai-settings";
+import { getBaseUrl, getOpenAiKey, hasOpenAiKey, storedModel } from "./ai-settings";
+import { SETTINGS } from "./settings/definitions";
+import { onSettingsChanged } from "./settings/kernel";
 
 export interface AiModel {
   id: string;
   name: string;
 }
 
+/**
+ * The credentials a model list belongs to.
+ *
+ * Two fields, taken together or not at all. The per-field overrides this replaces let a caller pass
+ * a draft key with a stored base URL, which is a pair that was never configured anywhere.
+ */
+export interface AiCredentials {
+  apiKey: string;
+  baseUrl: string;
+}
+
+/** The credentials the app is configured with right now. */
+export function aiConnection(): AiCredentials {
+  return { apiKey: getOpenAiKey(), baseUrl: getBaseUrl() };
+}
+
+/**
+ * An opaque identity for a credential pair.
+ *
+ * NUL-joined rather than concatenated: a key ending in the base URL's first characters would
+ * otherwise be indistinguishable from a shorter key and a longer URL.
+ */
+function fingerprint(credentials: AiCredentials): string {
+  return `${credentials.apiKey}\u0000${credentials.baseUrl}`;
+}
+
 let cache: AiModel[] | null = null;
+
+/**
+ * Which credentials {@link cache} was listed under.
+ *
+ * The cache used to be unkeyed, and two callers with different credentials wrote to it: the
+ * credentials form fetches with the drafts being edited, while the capability probe fetches with
+ * whatever is stored. Whichever landed last won, so the chat composer's picker could list a
+ * different provider's models than the one actually configured — which is exactly what a user saw
+ * after configuring a provider and finding the shell offering someone else's catalogue.
+ */
+let cacheKey = "";
+
 let proxyConfigured = false;
 let proxyManaged = false;
 let proxyDefaultModel = "";
@@ -34,9 +74,17 @@ let proxyCode: AiModelsResponse["code"];
 let proxyProbe: Promise<void> | null = null;
 const probeListeners = new Set<() => void>();
 
-/** Drop the cached model list (call after credentials/endpoint changes). */
-export function invalidateModelCache() {
+/**
+ * Drop the cached list and the capability reading.
+ *
+ * No surface calls this: it runs off the settings subscription below, because "the credentials
+ * changed" is a fact about the store rather than something each form has to remember to announce —
+ * and a form that forgot left every gate reading a stale capability probe. It stays exported only
+ * so a test can start from a cold module.
+ */
+export function resetModelCache() {
   cache = null;
+  cacheKey = "";
   proxyConfigured = false;
   proxyManaged = false;
   proxyDefaultModel = "";
@@ -45,6 +93,28 @@ export function invalidateModelCache() {
      would strand every gate on a permanent "unconfigured, unmanaged" reading — ensureProxyProbe
      would no-op forever and the managed option would vanish until a full reload. */
   proxyProbe = null;
+}
+
+/** The keys whose value changes what a provider would answer with. */
+const CONNECTION_KEYS = new Set<string>([
+  SETTINGS.aiOpenAiKey.key,
+  SETTINGS.aiBaseUrl.key,
+  SETTINGS.cfToken.key,
+  SETTINGS.cfAccountId.key,
+]);
+
+onSettingsChanged((keys) => {
+  if (keys.some((key) => CONNECTION_KEYS.has(key))) {
+    resetModelCache();
+  }
+});
+
+/**
+ * The cached list, if it was listed under `credentials`. Null when it was not, or when there is
+ * none — a caller must not show one provider's catalogue for another's key.
+ */
+export function cachedModels(credentials: AiCredentials): AiModel[] | null {
+  return cache && cacheKey === fingerprint(credentials) ? cache : null;
 }
 
 /**
@@ -109,6 +179,23 @@ export function getProxyDefaultModel(): string {
 }
 
 /**
+ * The model to SEND: what the user chose, else what the backend says it prefers, else the built-in
+ * default.
+ *
+ * The middle term is the point. A managed Workers AI backend declares its own `defaultModel`, and
+ * that value was fetched, stored and never read — so a user who had chosen nothing got the
+ * hardcoded `"gpt-4o"`, which Workers AI does not serve. Asking the backend what it prefers before
+ * falling back to a name invented here is the difference between working and a 404 on the first
+ * message.
+ *
+ * It lives here rather than in `ai-settings.ts` because only this module knows what the proxy said,
+ * and `ai-settings` must not import it — this module already imports `ai-settings`.
+ */
+export function preferredModel(): string {
+  return storedModel() || getProxyDefaultModel() || SETTINGS.aiModel.default;
+}
+
+/**
  * The sibling of the chat route, replacing the last path segment and keeping everything else.
  *
  * Written as a URL rewrite rather than `chatUrl.replace(/\/chat$/, …)`, because the chat URL is not
@@ -146,9 +233,13 @@ export function siblingRoute(chatUrl: string, segment: string): string {
  * @returns {Promise<AiModel[]>}
  */
 export async function fetchAvailableModels(
-  opts: { apiKey?: string; baseUrl?: string; force?: boolean } = {},
+  opts: { credentials?: AiCredentials; force?: boolean } = {},
 ): Promise<AiModel[]> {
-  if (cache && !opts.force) {
+  /* Resolve the credentials BEFORE consulting the cache. Checking the cache first is what let a
+     list fetched under one provider be handed to a caller asking about another. */
+  const credentials = opts.credentials ?? aiConnection();
+  const key = fingerprint(credentials);
+  if (cache && cacheKey === key && !opts.force) {
     return cache;
   }
   const plat = getPlatform();
@@ -156,13 +247,11 @@ export async function fetchAvailableModels(
   const modelsUrl = siblingRoute(chatUrl, "models");
 
   const headers: Record<string, string> = {};
-  const apiKey = opts.apiKey || getOpenAiKey();
-  if (apiKey) {
-    headers["X-Api-Key"] = apiKey;
+  if (credentials.apiKey) {
+    headers["X-Api-Key"] = credentials.apiKey;
   }
-  const baseUrl = opts.baseUrl || getBaseUrl();
-  if (baseUrl) {
-    headers["X-Api-Base-URL"] = baseUrl;
+  if (credentials.baseUrl) {
+    headers["X-Api-Base-URL"] = credentials.baseUrl;
   }
 
   const resp = await fetch(modelsUrl, { headers });
@@ -175,5 +264,6 @@ export async function fetchAvailableModels(
   proxyDefaultModel = data.defaultModel ?? "";
   proxyCode = data.code;
   cache = (data.models || []).map((m) => ({ id: m.id, name: m.name || m.id }));
+  cacheKey = key;
   return cache;
 }

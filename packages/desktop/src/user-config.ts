@@ -6,7 +6,7 @@
 
 import envPaths from "env-paths";
 import { existsSync } from "node:fs";
-import { copyFile, mkdir } from "node:fs/promises";
+import { chmod, copyFile, mkdir } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { homedir } from "node:os";
 
@@ -35,6 +35,11 @@ export function dataFile(name: string): string {
  * One-time migration: releases before the env-paths move kept store files under `~/.jx`. When the
  * new-location file is absent and a legacy one exists, copy it across (the legacy file is left in
  * place so a downgrade still works). Returns the new-location path either way.
+ *
+ * The copy is chmod'd owner-only afterwards. `copyFile` carries the SOURCE file's mode, so a legacy
+ * store that was world-readable arrived here still world-readable — and these stores hold API
+ * tokens. Every writer sets `0600`, but a store that is only ever read after migrating would never
+ * reach one.
  */
 export async function migrateLegacyStore(name: string): Promise<string> {
   const file = configFile(name);
@@ -43,6 +48,9 @@ export async function migrateLegacyStore(name: string): Promise<string> {
     try {
       await mkdir(dirname(file), { recursive: true });
       await copyFile(legacy, file);
+      if (process.platform !== "win32") {
+        await chmod(file, 0o600);
+      }
     } catch {
       // Best-effort: an unreadable legacy file just means the caller starts fresh.
     }

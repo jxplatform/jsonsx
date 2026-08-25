@@ -11,16 +11,19 @@
  * here instead: the rows come from the registry, and a record registered after this file was
  * written appears without this file knowing about it.
  */
-import { flush, installMockPlatform, key, pointer } from "./harness";
+import { flush, installMockPlatform, key, pointer, seedSettings } from "./harness";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 
 // Keep the credentials gate deterministic: no managed proxy, no probe fetch.
 void mock.module("../src/services/ai-models", () => ({
+  aiConnection: () => ({ apiKey: "", baseUrl: "" }),
+  cachedModels: () => null,
+  preferredModel: () => "gpt-4o",
   ensureProxyProbe: () => {},
   fetchAvailableModels: async () => [],
   getProxyDefaultModel: () => "",
   hasAiCredentials: () => Boolean(globalThis.localStorage.getItem("jx.ai.openaiKey")),
-  invalidateModelCache: () => {},
+  resetModelCache: () => {},
   isManagedProxy: () => false,
   isProxyConfigured: () => false,
   // Every named export ai-managed-connect.ts imports must be here: a partial mock.module() of a
@@ -607,7 +610,7 @@ describe("the app.preferences record", () => {
     // The bootstrap's one contact point with Preferences, and the reason a rebinding survives a
     // Reload: the layer lives in the keymap, so records registered AFTER this call are indexed
     // Against it too (`tests/preferences-keymap.test.ts` pins that half).
-    localStorage.setItem("jx.keybindings", JSON.stringify({ "app.preferences": ["mod+alt+,"] }));
+    seedSettings({ "jx.keybindings": JSON.stringify({ "app.preferences": ["mod+alt+,"] }) });
     const registry = createCommandRegistry({ getContext: emptyContext, mac: true });
     registerPreferencesCommands(registry);
     expect(registry.keymap.bindingsFor("app.preferences")).toEqual(["mod+alt+,"]);

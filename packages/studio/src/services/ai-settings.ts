@@ -1,52 +1,51 @@
 /// <reference lib="dom" />
 /**
- * Ai-settings.js — local persistence for the AI assistant's provider settings.
+ * Ai-settings.js — the AI assistant's provider settings, over the settings kernel.
  *
  * The Stack B proxy reads the OpenAI key from the `X-Api-Key` header (falling back to the server's
- * `OPENAI_API_KEY` env var). Studio stores a user-supplied key in localStorage so the browser/dev
- * build works without an env var. The key never leaves the machine except to the same-origin proxy.
+ * `OPENAI_API_KEY` env var). Studio stores a user-supplied key so the browser/dev build works
+ * without an env var. The key never leaves the machine except to the same-origin proxy.
+ *
+ * This module is now a typed façade over `settings/kernel.ts` — the storage keys, defaults and
+ * normalisation live in `settings/definitions.ts`, and the kernel owns the cache, the write queue
+ * and change notification. What it keeps is the vocabulary: callers say `getOpenAiKey()`, not
+ * `readSetting(SETTINGS.aiOpenAiKey)`.
+ *
+ * **Blank no longer deletes.** `setOpenAiKey("")` stores an empty string; {@link clearAiProvider}
+ * is the revoke path. The old conflation read as a convenience right up until a form that blanked
+ * its own drafts on Save called these setters with them, and a second Save revoked the credentials
+ * the first had stored.
  *
  * @license MIT
  */
 
-import { persistSettings } from "./settings-store";
+import { SETTINGS } from "./settings/definitions";
+import {
+  clearSettings,
+  hasSetting,
+  readStoredSetting,
+  setSetting,
+  setSettings,
+} from "./settings/kernel";
 
-const KEY_STORAGE = "jx.ai.openaiKey";
-const BASE_URL_STORAGE = "jx.ai.baseUrl";
-const MODEL_STORAGE = "jx.ai.model";
-const DEFAULT_MODEL = "gpt-4o";
-
-/** @returns {string} The stored OpenAI key, or "" if none/unavailable. */
+/** @returns {string} The stored OpenAI key, or "" if none. */
 export function getOpenAiKey() {
-  try {
-    return globalThis.localStorage?.getItem(KEY_STORAGE) ?? "";
-  } catch {
-    return "";
-  }
+  return readStoredSetting(SETTINGS.aiOpenAiKey);
 }
 
 /**
- * Persist (or clear) the OpenAI key.
+ * Persist the OpenAI key.
  *
- * @param {string} key - The key to store; an empty/blank value clears it.
+ * @param {string} key - The key to store. A blank value stores blank; it does NOT clear — see
+ *   {@link clearAiProvider}.
  */
 export function setOpenAiKey(key: string) {
-  try {
-    const trimmed = (key || "").trim();
-    if (trimmed) {
-      globalThis.localStorage?.setItem(KEY_STORAGE, trimmed);
-    } else {
-      globalThis.localStorage?.removeItem(KEY_STORAGE);
-    }
-    persistSettings();
-  } catch {
-    /* LocalStorage unavailable — settings are not persisted. */
-  }
+  setSetting(SETTINGS.aiOpenAiKey, key || "");
 }
 
 /** @returns {boolean} Whether a non-empty key is stored. */
 export function hasOpenAiKey() {
-  return getOpenAiKey().length > 0;
+  return hasSetting(SETTINGS.aiOpenAiKey);
 }
 
 /**
@@ -54,59 +53,58 @@ export function hasOpenAiKey() {
  *   or "" to use the proxy's default (`https://api.openai.com/v1` / server `OPENAI_BASE_URL`).
  */
 export function getBaseUrl() {
-  try {
-    return globalThis.localStorage?.getItem(BASE_URL_STORAGE) ?? "";
-  } catch {
-    return "";
-  }
-}
-
-/**
- * Persist (or clear) the base URL override.
- *
- * @param {string} url - The base URL; an empty/blank value clears the override.
- */
-export function setBaseUrl(url: string) {
-  try {
-    const trimmed = (url || "").trim().replace(/\/+$/, "");
-    if (trimmed) {
-      globalThis.localStorage?.setItem(BASE_URL_STORAGE, trimmed);
-    } else {
-      globalThis.localStorage?.removeItem(BASE_URL_STORAGE);
-    }
-    persistSettings();
-  } catch {
-    /* LocalStorage unavailable — settings are not persisted. */
-  }
+  return readStoredSetting(SETTINGS.aiBaseUrl);
 }
 
 // ─── Model selection ────────────────────────────────────────────────────────
 
-/** @returns {string} The stored model ID, or the default ("gpt-4o"). */
-export function getModel() {
-  try {
-    return globalThis.localStorage?.getItem(MODEL_STORAGE) || DEFAULT_MODEL;
-  } catch {
-    return DEFAULT_MODEL;
-  }
+/**
+ * The model the user actually chose, with no default standing in for silence.
+ *
+ * The getter this replaced masked _unset_ as `"gpt-4o"`, which is right for a sender and wrong for
+ * anything that writes back: a form prefilled from it and then saved persists a choice nobody made,
+ * which is how `jx.ai.model: "gpt-4o"` came to be the only surviving key in a settings file whose
+ * owner had configured a different provider entirely. Senders want
+ * {@link ../services/ai-models!preferredModel} instead.
+ *
+ * @returns {string} The stored model ID, or "" when none has been chosen.
+ */
+export function storedModel() {
+  return readStoredSetting(SETTINGS.aiModel);
 }
 
 /**
  * Persist the selected model ID.
  *
- * @param {string} modelId - The model ID to store; an empty/blank value clears it, reverting to
- *   default.
+ * @param {string} modelId - The model ID to store. A blank value stores blank; it does NOT clear.
  */
 export function setModel(modelId: string) {
-  try {
-    const trimmed = (modelId || "").trim();
-    if (trimmed) {
-      globalThis.localStorage?.setItem(MODEL_STORAGE, trimmed);
-    } else {
-      globalThis.localStorage?.removeItem(MODEL_STORAGE);
-    }
-    persistSettings();
-  } catch {
-    /* LocalStorage unavailable — settings are not persisted. */
-  }
+  setSetting(SETTINGS.aiModel, modelId || "");
+}
+
+/**
+ * Store the provider's key, endpoint and model as ONE change.
+ *
+ * What a credentials form's Save should call. Three separate setters coalesce into one write
+ * anyway, but they announce three times, and each intermediate announcement describes a provider
+ * the user never asked for — a new key against the old endpoint, then against no model.
+ *
+ * @param {{ apiKey: string; baseUrl: string; model: string }} provider
+ */
+export function saveAiProvider(provider: { apiKey: string; baseUrl: string; model: string }) {
+  setSettings([
+    [SETTINGS.aiOpenAiKey, provider.apiKey],
+    [SETTINGS.aiBaseUrl, provider.baseUrl],
+    [SETTINGS.aiModel, provider.model],
+  ]);
+}
+
+/**
+ * Forget the provider entirely — key, endpoint and model.
+ *
+ * The one deletion path, and the one the Accounts list's Disconnect uses. Deliberately all three
+ * together: a key with an orphaned endpoint is a state no surface knows how to describe.
+ */
+export function clearAiProvider() {
+  clearSettings([SETTINGS.aiOpenAiKey, SETTINGS.aiBaseUrl, SETTINGS.aiModel]);
 }

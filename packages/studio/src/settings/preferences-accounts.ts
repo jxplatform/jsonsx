@@ -20,15 +20,9 @@
  */
 
 import { clearGithubToken, githubTokenLocation, githubTokenStored } from "../github/github-auth";
-import { getCfAccountId, getCfToken, setCfAccountId, setCfToken } from "../services/cf-settings";
-import {
-  getBaseUrl,
-  getModel,
-  hasOpenAiKey,
-  setBaseUrl,
-  setModel,
-  setOpenAiKey,
-} from "../services/ai-settings";
+import { clearCfConnection, getCfAccountId, getCfToken } from "../services/cf-settings";
+import { clearAiProvider, getBaseUrl, hasOpenAiKey } from "../services/ai-settings";
+import { preferredModel } from "../services/ai-models";
 
 /** One stored credential, as the Accounts section renders it. */
 export interface AccountRecord {
@@ -53,7 +47,7 @@ export function listAccounts(): AccountRecord[] {
   const githubToken = githubTokenStored();
   const cfToken = getCfToken();
   const cfAccount = getCfAccountId();
-  const model = getModel();
+  const model = preferredModel();
   const endpoint = getBaseUrl();
   return [
     {
@@ -74,11 +68,7 @@ export function listAccounts(): AccountRecord[] {
         ? `Key stored. Model ${model}${endpoint ? ` via ${endpoint}` : ""}.`
         : "No key stored. The Assistant section is where one is entered.",
       connected: hasOpenAiKey(),
-      revoke: () => {
-        setOpenAiKey("");
-        setBaseUrl("");
-        setModel("");
-      },
+      revoke: clearAiProvider,
     },
     {
       id: "cloudflare",
@@ -87,10 +77,7 @@ export function listAccounts(): AccountRecord[] {
         ? `Connected${cfAccount ? ` — account ${cfAccount}` : ""}.`
         : "Not connected. Publishing will ask when it needs it.",
       connected: Boolean(cfToken),
-      revoke: () => {
-        setCfToken("");
-        setCfAccountId("");
-      },
+      revoke: clearCfConnection,
     },
   ];
 }

@@ -8,18 +8,20 @@
  * holds singleton state, so these tests run as one ordered scenario.
  */
 import {
+  clearSeededSettings,
   flush,
   installMockPlatform,
   key,
   pointer,
   resetWorkspaceWithTab,
+  seedSettings,
   setValue,
 } from "./harness";
 import { reactive } from "@vue/reactivity";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import type { Message } from "@jxsuite/ai/chat-state";
 import type { SessionMeta } from "../src/services/ai-session-store";
-import { fetchAvailableModels, invalidateModelCache } from "../src/services/ai-models";
+import { fetchAvailableModels, resetModelCache } from "../src/services/ai-models";
 
 const { platform: mockPlatform } = installMockPlatform();
 
@@ -193,7 +195,8 @@ beforeEach(() => {
 
 describe("ai-panel", () => {
   test("keeps the chat and offers the settings action when no key is stored", async () => {
-    globalThis.localStorage.clear();
+    localStorage.clear();
+    clearSeededSettings();
     pushMessage("user", "pre-existing");
     await flush(3); // Watcher → rAF render
     // The panel is a chat, not a credentials form — the transcript and composer are both up.
@@ -209,7 +212,8 @@ describe("ai-panel", () => {
   });
 
   test("the notice opens Preferences on the Assistant section; Close dismisses it", async () => {
-    globalThis.localStorage.clear();
+    localStorage.clear();
+    clearSeededSettings();
     await flush(3);
     await openSettingsFromNotice();
     expect(d(".ai-creds-form")).not.toBeNull();
@@ -225,7 +229,8 @@ describe("ai-panel", () => {
   });
 
   test("saving a key retires the notice — and leaves Preferences open", async () => {
-    globalThis.localStorage.clear();
+    localStorage.clear();
+    clearSeededSettings();
     await flush(3);
     await openSettingsFromNotice();
     const field = d<HTMLInputElement>("sp-textfield")!;
@@ -239,12 +244,14 @@ describe("ai-panel", () => {
     expect(d(".ai-creds-form")).not.toBeNull();
     expect(q(".ai-setup-notice")).toBeNull();
     await closeSettings();
-    globalThis.localStorage.clear();
+    localStorage.clear();
+    clearSeededSettings();
     await flush(3);
   });
 
   test("offers Connect Cloudflare in the dialog and retires the notice after connecting", async () => {
-    globalThis.localStorage.clear();
+    localStorage.clear();
+    clearSeededSettings();
     const realFetch = globalThis.fetch;
     // Managed platform, Workers AI not yet connected.
     (globalThis as Record<string, unknown>).fetch = async () =>
@@ -275,13 +282,14 @@ describe("ai-panel", () => {
     await closeSettings();
     chatState.messages.length = 0;
     delete mockPlatform.cfConnect;
-    invalidateModelCache();
+    resetModelCache();
     (globalThis as Record<string, unknown>).fetch = realFetch;
     await flush(3);
   });
 
   test("no notice at all when the proxy reports itself configured (managed platforms)", async () => {
-    globalThis.localStorage.clear();
+    localStorage.clear();
+    clearSeededSettings();
     const realFetch = globalThis.fetch;
     (globalThis as Record<string, unknown>).fetch = async () =>
       Response.json(
@@ -294,13 +302,13 @@ describe("ai-panel", () => {
     expect(q(".ai-setup-notice")).toBeNull();
     expect(q(".ai-composer textarea")).not.toBeNull();
     chatState.messages.length = 0;
-    invalidateModelCache();
+    resetModelCache();
     (globalThis as Record<string, unknown>).fetch = realFetch;
     await flush(3);
   });
 
   test("shows the chat view once a key exists, and streams reactively into it", async () => {
-    globalThis.localStorage.setItem("jx.ai.openaiKey", "sk-test");
+    seedSettings({ "jx.ai.openaiKey": "sk-test" });
     pushMessage("user", "hello");
     await flush(3);
     expect(q(".ai-setup-notice")).toBeNull();
@@ -456,7 +464,8 @@ describe("ai-panel", () => {
   });
 
   test("seedAssistantMessages stages a canned conversation and retires the notice", async () => {
-    globalThis.localStorage.clear();
+    localStorage.clear();
+    clearSeededSettings();
     chatState.messages.length = 0;
     await flush(3); // With no key the setup notice is back.
     expect(q(".ai-setup-notice")).not.toBeNull();
@@ -604,7 +613,7 @@ function record(id: string) {
 describe("the Assistant command family", () => {
   beforeEach(() => {
     resetNotifications();
-    globalThis.localStorage.setItem("jx.ai.openaiKey", "sk-test");
+    seedSettings({ "jx.ai.openaiKey": "sk-test" });
     chatState.messages.length = 0;
     chatState.error = null;
     chatState.status = "idle";

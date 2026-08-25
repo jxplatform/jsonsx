@@ -54,11 +54,15 @@ If Cloudflare itself is briefly unreachable, Studio does **not** ask you to reco
 Below the Cloudflare option (or on its own, everywhere else) is the **AI provider key** form:
 
 1. Paste an API key. Any OpenAI-compatible key works — OpenAI itself, a compatible hosted provider, or a local model server.
-2. Pick a **Model**. Click **Fetch models** to list what your key can use, or type a model ID directly.
-3. Optionally set an **Endpoint** — leave it empty for OpenAI, or point it at a compatible server such as a local LLM (for example `http://localhost:11434/v1`).
-4. Click **Save**.
+2. Optionally set an **Endpoint** — leave it empty for OpenAI, or point it at a compatible server such as a local LLM (for example `http://localhost:11434/v1`).
+3. Pick a **Model**. Click **Fetch models** to list what your key can use, or type a model ID directly. Leave it empty to use your provider's own default.
+4. Click **Save**. The form keeps showing what it saved, so you can see the endpoint it kept and the model it recorded.
 
-To change any of this later, click the gear button (**API key & endpoint**) at the bottom of the tab — it reopens the same dialog. You can also switch models per conversation with the model picker next to the message box.
+To change any of this later, click the gear button (**API key & endpoint**) at the bottom of the tab — it reopens **Preferences › Assistant**. You can also switch models per conversation with the model picker next to the message box.
+
+:::doc-tip
+Fetch models tests the key and endpoint **currently in the form**, not the ones already saved — so you can paste a new key and check it lists what you expect before saving it.
+:::
 
 :::doc-note
 The key, endpoint, and model choice are stored locally on your machine, per browser or app install. If the Studio backend you're running already holds credentials — a dev server started with an `OPENAI_API_KEY` environment variable, or a Cloudflare account you connected earlier — the assistant unlocks without asking for anything.

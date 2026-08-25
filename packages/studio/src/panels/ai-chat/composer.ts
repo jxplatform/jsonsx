@@ -20,13 +20,18 @@ import type { TemplateResult } from "lit-html";
 import { live } from "lit-html/directives/live.js";
 import { ref } from "lit-html/directives/ref.js";
 import { getNodeAtPath } from "../../state";
-import { fetchAvailableModels } from "../../services/ai-models";
-import { getModel, setModel } from "../../services/ai-settings";
+import {
+  aiConnection,
+  cachedModels,
+  fetchAvailableModels,
+  preferredModel,
+} from "../../services/ai-models";
+import { setModel } from "../../services/ai-settings";
 import { activeTab } from "../../workspace/workspace";
 import { primarySelection } from "../../tabs/selection";
 import { buildMessageWithContext } from "./attached-context";
 import type { ContextChip } from "./attached-context";
-import type { AiModel } from "../../services/ai-models";
+import type { AiCredentials } from "../../services/ai-models";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
 /** Tallest the textarea auto-grows before it scrolls internally. */
@@ -72,24 +77,36 @@ export function createComposer(opts: ComposerOptions): Composer {
   let chips: ContextChip[] = [];
 
   /** Null until the first fetch settles; kept on error so the picker can offer Retry. */
-  let models: AiModel[] | null = null;
   let modelsLoading = false;
   let modelsError = "";
 
+  /**
+   * The connection the last fetch was made for, so a failure is not retried on every render.
+   *
+   * The list itself is NOT held here. A private copy is how the picker came to show one provider's
+   * catalogue while another was configured: it was filled once and never reconsidered. Reading it
+   * from `cachedModels(connection)` means a list can only ever be shown for the credentials it was
+   * listed under, and a credential change makes it unavailable rather than stale.
+   */
+  let attempted: AiCredentials | null = null;
+
   // ── Model picker ──────────────────────────────────────────────────────
 
+  function sameConnection(a: AiCredentials | null, b: AiCredentials): boolean {
+    return a !== null && a.apiKey === b.apiKey && a.baseUrl === b.baseUrl;
+  }
+
   function ensureModels(force = false) {
-    if (modelsLoading || (models !== null && !force)) {
+    const credentials = aiConnection();
+    const settled = cachedModels(credentials) !== null || sameConnection(attempted, credentials);
+    if (modelsLoading || (settled && !force)) {
       return;
     }
     modelsLoading = true;
     modelsError = "";
-    fetchAvailableModels({ force })
-      .then((list) => {
-        models = list;
-      })
+    attempted = credentials;
+    fetchAvailableModels({ credentials, force })
       .catch((error: unknown) => {
-        models = [];
         modelsError = (error as Error).message || "Failed to fetch models";
       })
       .finally(() => {
@@ -101,7 +118,7 @@ export function createComposer(opts: ComposerOptions): Composer {
   function onModelChange(e: Event) {
     const { value } = e.target as HTMLInputElement;
     if (value === RETRY_MODELS) {
-      models = null;
+      attempted = null;
       ensureModels(true);
       // Re-render so the picker snaps back to the stored model instead of "Retry".
       opts.requestRender();
@@ -114,8 +131,8 @@ export function createComposer(opts: ComposerOptions): Composer {
 
   function renderModelPicker(): TemplateResult {
     ensureModels();
-    const current = getModel();
-    const listed = models ?? [];
+    const current = preferredModel();
+    const listed = cachedModels(aiConnection()) ?? [];
     const items = listed.some((m) => m.id === current)
       ? listed
       : [{ id: current, name: current }, ...listed];

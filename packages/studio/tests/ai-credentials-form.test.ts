@@ -4,9 +4,11 @@
  * Fetch is stubbed (no network), and the platform mock supplies aiChatUrl. Each form instance
  * renders into its own detached container via a requestRender that re-renders synchronously.
  */
-import { installMockPlatform } from "./harness";
+import { clearSeededSettings, installMockPlatform, seedSettings } from "./harness";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { render } from "lit-html";
+import { storedModel } from "../src/services/ai-settings";
+import { preferredModel } from "../src/services/ai-models";
 import { createAiCredentialsForm } from "../src/ui/ai-credentials-form";
 import type { AiCredentialsFormOptions } from "../src/ui/ai-credentials-form";
 
@@ -71,7 +73,8 @@ function fire(el: HTMLElement | null, type: string, value?: string) {
 }
 
 beforeEach(() => {
-  globalThis.localStorage.clear();
+  localStorage.clear();
+  clearSeededSettings();
   fetchCalls.length = 0;
   fetchImpl = async () => Response.json({ models: [] }, { status: 200 });
 });
@@ -147,18 +150,92 @@ describe("ai-credentials-form", () => {
     const { container, form } = makeForm({ onCancel });
     // No stored key → no Cancel button.
     expect(byText(container, "Cancel")).toBeUndefined();
-    globalThis.localStorage.setItem("jx.ai.openaiKey", "sk-existing");
+    seedSettings({ "jx.ai.openaiKey": "sk-existing" });
     fetchCalls.length = 0;
     form.startEdit();
     await flush();
     // Drafts preloaded from the stored settings; Cancel offered now that a key exists.
     expect(fieldByPlaceholder(container, "sk-")!.value).toBe("sk-existing");
-    expect(fieldByPlaceholder(container, "Model ID")!.value).toBe("gpt-4o");
+    /* Empty rather than "gpt-4o": nothing has been chosen, and a prefilled default is a choice the
+       user did not make — Save would then persist it. */
+    expect(fieldByPlaceholder(container, "Model ID")!.value).toBe("");
     expect(byText(container, "Cancel")).toBeDefined();
     // StartEdit auto-fetched the model list.
     expect(fetchCalls.length).toBe(1);
     click(byText(container, "Cancel"));
     expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * The reported bug, as a test.
+   *
+   * Save used to blank its own drafts while the Preferences sheet stayed open, so every field
+   * emptied the moment a save succeeded. Blank is what the setters treat as _clear_, so the obvious
+   * response — press Save again — deleted the key and endpoint the first press had just stored. A
+   * real install was left holding `{"jx.ai.model": "gpt-4o"}` and nothing else.
+   */
+  test("Save leaves the form showing what it stored, and a second Save does not erase it", () => {
+    const { container } = makeForm();
+    fire(fieldByPlaceholder(container, "sk-"), "input", "sk-keepme");
+    fire(fieldByPlaceholder(container, "Endpoint"), "input", "https://opencode.ai/zen/go/v1");
+    fire(fieldByPlaceholder(container, "Model ID"), "input", "deepseek-v4-pro");
+    click(byText(container, "Save"));
+
+    // The fields still show what was persisted — not blanks.
+    expect(fieldByPlaceholder(container, "sk-")!.value).toBe("sk-keepme");
+    expect(fieldByPlaceholder(container, "Endpoint")!.value).toBe("https://opencode.ai/zen/go/v1");
+    expect(fieldByPlaceholder(container, "Model ID")!.value).toBe("deepseek-v4-pro");
+
+    // And pressing Save again is a no-op re-write rather than a revoke.
+    click(byText(container, "Save"));
+    expect(globalThis.localStorage.getItem("jx.ai.openaiKey")).toBe("sk-keepme");
+    expect(globalThis.localStorage.getItem("jx.ai.baseUrl")).toBe("https://opencode.ai/zen/go/v1");
+    expect(globalThis.localStorage.getItem("jx.ai.model")).toBe("deepseek-v4-pro");
+  });
+
+  /**
+   * A blank model field means "whatever the provider defaults to". It must not become a stored
+   * choice: prefilling the field with `getModel()`'s `"gpt-4o"` fallback and then saving it is what
+   * left a real install holding `jx.ai.model: "gpt-4o"` for a provider that never served it.
+   */
+  test("Save with no model chosen records no model choice", () => {
+    const { container } = makeForm();
+    fire(fieldByPlaceholder(container, "sk-"), "input", "sk-nomodel");
+    click(byText(container, "Save"));
+    expect(globalThis.localStorage.getItem("jx.ai.openaiKey")).toBe("sk-nomodel");
+    expect(storedModel()).toBe("");
+    // A sender still has something to send.
+    expect(preferredModel()).toBe("gpt-4o");
+  });
+
+  test("Save keeps the fetched model list, so the combobox does not collapse", async () => {
+    fetchImpl = async () => Response.json({ models: [{ id: "gpt-4o" }] }, { status: 200 });
+    const { container } = makeForm();
+    fire(fieldByPlaceholder(container, "sk-"), "input", "sk-list");
+    click(byText(container, "Fetch models"));
+    await flush();
+    expect(container.querySelector("sp-combobox")).not.toBeNull();
+    click(byText(container, "Save"));
+    expect(container.querySelector("sp-combobox")).not.toBeNull();
+    expect(byText(container, "Refresh models")).toBeDefined();
+  });
+
+  /**
+   * The precedence used to be `getOpenAiKey() || keyDraft` for the key while the endpoint beside it
+   * read draft-first. Editing a key in place therefore tested the OLD one — and a form whose drafts
+   * had been blanked still fetched successfully from storage, which is what made an emptied form
+   * look like it was working.
+   */
+  test("Fetch models sends the drafted key, not the stored one", async () => {
+    seedSettings({ "jx.ai.openaiKey": "sk-old" });
+    fetchImpl = async () => Response.json({ models: [] }, { status: 200 });
+    const { container } = makeForm();
+    fire(fieldByPlaceholder(container, "sk-"), "input", "sk-new");
+    fetchCalls.length = 0;
+    click(byText(container, "Fetch models"));
+    await flush();
+    const headers = fetchCalls.at(-1)!.init!.headers as Record<string, string>;
+    expect(headers["X-Api-Key"]).toBe("sk-new");
   });
 
   test("two instances keep independent draft state", () => {

@@ -20,6 +20,7 @@
  * (`keymap.overlappingScopes`) and no more — `caret` and `grid` never are, and forbidding them one
  * chord between them would forbid the shadowing ladder its whole purpose.
  */
+import { clearSeededSettings, seedSettings } from "./harness";
 import "./with-dom.js";
 import { beforeEach, describe, expect, test } from "bun:test";
 import {
@@ -107,6 +108,9 @@ function stored(): unknown {
 }
 
 beforeEach(() => {
+  /* The kernel owns these values now, so clearing its cache alone would leave the previous test's
+     layer in memory. */
+  clearSeededSettings();
   localStorage.clear();
 });
 
@@ -299,7 +303,7 @@ describe("the store", () => {
   });
 
   test("applying before the rest of the bootstrap registers still binds the later records", () => {
-    localStorage.setItem(KEYBINDINGS_STORAGE_KEY, JSON.stringify({ "file.save": ["mod+alt+s"] }));
+    seedSettings({ [KEYBINDINGS_STORAGE_KEY]: JSON.stringify({ "file.save": ["mod+alt+s"] }) });
     const app = createCommandRegistry({ getContext: emptyContext, mac: true });
     applyKeybindingOverrides(app);
     app.registerAll(RECORDS);
@@ -312,18 +316,17 @@ describe("the store", () => {
 
   test("a corrupt or hostile store degrades to the defaults, entry by entry", () => {
     for (const raw of ["{not json", '"a string"', "[1,2,3]", "null"]) {
-      localStorage.setItem(KEYBINDINGS_STORAGE_KEY, raw);
+      seedSettings({ [KEYBINDINGS_STORAGE_KEY]: raw });
       expect(loadKeybindingOverrides().size).toBe(0);
     }
-    localStorage.setItem(
-      KEYBINDINGS_STORAGE_KEY,
-      JSON.stringify({
+    seedSettings({
+      [KEYBINDINGS_STORAGE_KEY]: JSON.stringify({
         "file.save": ["mod+alt+s"],
         "a.notAnArray": "mod+x",
         "a.notStrings": [7],
         "a.notAChord": ["mod+"],
       }),
-    );
+    });
     // The one valid entry survives; the other three are dropped, and their commands keep the chord
     // They declared — the only failure mode that leaves the app usable.
     expect([...loadKeybindingOverrides()]).toEqual([["file.save", ["mod+alt+s"]]]);
@@ -359,10 +362,9 @@ describe("the store", () => {
   });
 
   test("stored chords are canonicalised on the way in, however they were spelled", () => {
-    localStorage.setItem(
-      KEYBINDINGS_STORAGE_KEY,
-      JSON.stringify({ "file.save": ["Cmd + Shift + S"] }),
-    );
+    seedSettings({
+      [KEYBINDINGS_STORAGE_KEY]: JSON.stringify({ "file.save": ["Cmd + Shift + S"] }),
+    });
     expect(loadKeybindingOverrides().get("file.save")).toEqual(["mod+shift+s"]);
   });
 });

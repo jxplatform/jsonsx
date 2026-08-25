@@ -15,6 +15,9 @@ import { render as litRender, render } from "lit-html";
 import type { TemplateResult } from "lit-html";
 import { registerPlatform } from "../src/platform";
 import { overlayLayers } from "../src/shell/tree";
+import { ALL_SETTINGS } from "../src/services/settings/definitions";
+import type { SettingDefinition } from "../src/services/settings/definitions";
+import { resetSettings, setSettings } from "../src/services/settings/kernel";
 import { setProjectState } from "../src/store";
 import { closeAllTabs, openTab } from "../src/workspace/workspace";
 import {
@@ -60,6 +63,33 @@ export function resetStudioState(overrides: Record<string, unknown> = {}): void 
     projectConfig: null,
     ...overrides,
   } as unknown as ProjectState);
+}
+
+/**
+ * Seed stored settings by key, the way a previous session would have left them.
+ *
+ * Tests used to write `localStorage.setItem("jx.ai.openaiKey", …)` directly. That stopped working
+ * when the settings kernel took ownership: it seeds its Map once at module evaluation, so a later
+ * poke at the cache it was built from is invisible. Going through the kernel is also what a test
+ * should have been doing — the storage layout is not the contract, the settings are.
+ *
+ * Unknown keys throw rather than being ignored, so a renamed setting fails the test that seeds it
+ * instead of silently seeding nothing.
+ */
+export function seedSettings(values: Record<string, string>): void {
+  const entries = Object.entries(values).map(([settingKey, value]) => {
+    const definition = ALL_SETTINGS.find((candidate) => candidate.key === settingKey);
+    if (!definition) {
+      throw new Error(`seedSettings: no setting is declared with the key "${settingKey}"`);
+    }
+    return [definition, value] as [SettingDefinition, string];
+  });
+  setSettings(entries);
+}
+
+/** Forget every stored setting. Call between tests that seed. */
+export function clearSeededSettings(): void {
+  resetSettings();
 }
 
 /** Close all tabs and open a fresh one so activeTab.value is populated. */

@@ -4,18 +4,20 @@
  * (page/selection), and the model picker states.
  */
 import {
+  clearSeededSettings,
   flush,
   installMockPlatform,
   key,
   pointer,
   resetWorkspaceWithTab,
+  seedSettings,
   setValue,
 } from "./harness";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { render } from "lit-html";
 import { createComposer } from "../src/panels/ai-chat/composer";
 import { ATTACHED_CONTEXT_DELIMITER } from "../src/panels/ai-chat/attached-context";
-import { invalidateModelCache } from "../src/services/ai-models";
+import { resetModelCache } from "../src/services/ai-models";
 import type { ComposerOptions } from "../src/panels/ai-chat/composer";
 
 installMockPlatform();
@@ -63,8 +65,9 @@ function makeComposer(extra: Partial<ComposerOptions> = {}) {
 }
 
 beforeEach(() => {
-  globalThis.localStorage.clear();
-  invalidateModelCache();
+  localStorage.clear();
+  clearSeededSettings();
+  resetModelCache();
   resetWorkspaceWithTab();
   fetchImpl = async () =>
     Response.json({ models: [{ id: "gpt-4o" }, { id: "o3", name: "o3 mini" }] }, { status: 200 });
@@ -230,7 +233,7 @@ describe("model picker", () => {
   });
 
   test("prepends a stored custom model id missing from the list", async () => {
-    globalThis.localStorage.setItem("jx.ai.model", "my-custom-model");
+    seedSettings({ "jx.ai.model": "my-custom-model" });
     const c = makeComposer();
     await flush();
     c.rerender();

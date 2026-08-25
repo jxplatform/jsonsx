@@ -6,19 +6,20 @@ import type { StarterMeta } from "@jxsuite/starters";
 import type {
   AppInfo,
   ComponentMeta,
-  DataConnectionsResponse,
   DataConnectionTestResult,
+  DataConnectionsResponse,
   DataPushRequest,
   DataPushResult,
   DataRowDelete,
   DataRowInsert,
+  DataRowUpdate,
   DataRowsQuery,
   DataRowsResult,
-  DataRowUpdate,
   ExtensionsInfo,
   SecretsListResponse,
   SecretsSetRequest,
   SecretsSetResponse,
+  SettingsPatch,
 } from "@jxsuite/protocol";
 
 // ─── Domain types ─────────────────────────────────────────────────────────────
@@ -549,9 +550,16 @@ export interface StudioRPC {
         params: void;
         response: Record<string, string>;
       };
-      saveSettings: {
-        params: { settings: Record<string, string> };
-        response: void;
+      /*
+       * A PATCH, not the map. A whole-map write let any window overwrite the shared file with its
+       * own view — and on chromium every window is its own process with its own browser profile,
+       * so a window holding no settings could clear another's credentials. The resulting map comes
+       * back so the caller learns what the store actually holds after composing with any concurrent
+       * writer.
+       */
+      patchSettings: {
+        params: { patch: SettingsPatch };
+        response: Record<string, string>;
       };
       /*
        * GitHub sign-in (RFC 8252 loopback + PKCE). Deliberately three narrow requests rather than
@@ -576,6 +584,8 @@ export interface StudioRPC {
   webview: RPCSchema<{
     requests: Record<string, never>;
     messages: {
+      /** The user-level settings changed — in this window, another window, or by hand. */
+      settingsChanged: { settings: Record<string, string> };
       fileChanged: { path: string };
       updateReady: { version: string };
       onFileEvents: { events: FsEventPayload[] };
