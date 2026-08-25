@@ -81,6 +81,7 @@ These commands guard this directory, but none of them live in it: each is a scri
 | bun run docs:images:check | The bytes: every PNG is one the lock names, and each shot's definition hash still matches the working tree |
 | bun run docs:generate     | Rewrites the generated pages                                                                               |
 | bun run docs:verify       | The CI chain — generate, `git diff --exit-code -- docs`, then both checks above                            |
+| bun run docs:links        | Every internal link: the slug against `nav.json`, and every `#anchor` against the target's headings        |
 | bun run docs:markdown     | Visual-editor escapes — an escaped heading number, an escaped inner underscore — every tracked `*.md`      |
 | bun run docs:sync         | Advisory only: maps a diff to the pages and spec sections declared for the files it touched                |
 
@@ -90,8 +91,9 @@ These commands guard this directory, but none of them live in it: each is a scri
 
 ## Surprises
 
-- **No gate checks internal links.** Write them as root-absolute slugs (`/docs/framework/site/routing`,
-  no `.md`, no trailing slash) and verify each against `nav.json` by hand. A relative `../foo.md` link publishes broken, because the site serves the target verbatim.
+- **A relative `../foo.md` link publishes broken**, because the site serves the target verbatim
+  rather than rewriting it to a URL. It is the failure that looks right while you write it: the
+  relative form is exactly what resolves in a Markdown preview. `docs:links` is the gate.
 - **A `spec:` anchor breaks when someone renumbers a spec heading**, which is why spec sections are
   edited in place and never renumbered or removed. The failure surfaces here, not in the spec.
 - **The screenshots lane's normal outcome is a bot commit, not a red X.** It re-captures, pushes the

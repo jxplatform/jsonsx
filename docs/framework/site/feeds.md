@@ -66,7 +66,7 @@ When a feed contains your entire history it says so, and readers can stop lookin
 
 ## One feed per language
 
-If the feed's collection keeps [one directory per locale](./i18n.md#content-in-one-directory-per-locale), you get one feed per language — no extra configuration:
+If the feed's collection keeps [one directory per locale](/docs/framework/site/i18n#content-in-one-directory-per-locale), you get one feed per language — no extra configuration:
 
 | File              | Holds             | Says               |
 | ----------------- | ----------------- | ------------------ |

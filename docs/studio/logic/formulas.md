@@ -81,7 +81,7 @@ Eight of the blessed functions format text the way a language actually does, rat
 :::doc-note
 **A formula that names no language uses the page's, and a date with no time zone uses `UTC`** — never the machine that happens to be building the site. That is what stops the same page rendering `1,234.5` on your laptop and `1.234,5` on a colleague's, and it matters most for dates: `02:00` on the 16th in UTC is still the 15th in New York, so a build machine's time zone could quietly move a published date by a day. Pass a language and a `timeZone` when you want a different answer.
 
-The page's locale is `$page.locale` — the tag its route implies, which is what `<html lang>` says (see [locales and languages](../../framework/site/i18n.md)). Where there is no page — inside a component, whose state is its own, or in the expression editor's preview — the fallback is `en-US`.
+The page's locale is `$page.locale` — the tag its route implies, which is what `<html lang>` says (see [locales and languages](/docs/framework/site/i18n)). Where there is no page — inside a component, whose state is its own, or in the expression editor's preview — the fallback is `en-US`.
 :::
 
 Picking an entry replaces the current step with that operation, ready for you to fill in its operands.
