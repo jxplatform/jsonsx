@@ -1,15 +1,21 @@
 ---
 title: "Reactivity"
 description: "Template strings, signals, computed values, and reactive bindings in Jx."
+spec:
+  - spec.md#6
+code:
+  - packages/runtime/src/runtime.ts
 ---
 
 # Reactivity
 
-> **Studio writes this format for you.** The State, Data, and Events panels ([Script & logic](/docs/studio/logic)) generate everything below — this page documents the model if you want to hand-edit or understand it.
+> **Studio writes this format for you.** The **State** and **Data** panels and the Inspector's **Logic** tab ([Logic](/docs/studio/logic)) generate everything below. This page documents the model if you want to hand-edit or understand it.
 
-Template literal syntax `${}` is valid **anywhere a string value appears** in the document tree. All reactivity is powered by `@vue/reactivity`.
+Template literal syntax `${}` is valid **anywhere a string value appears** in the document tree, not only inside `state`. Wherever you write one, the value recomputes when the state it reads changes. All reactivity is powered by `@vue/reactivity`.
 
-## Reactive Element Properties
+A template resolves `state.propertyName` against the current component's reactive proxy, plus the iteration bindings (`$map`, `item`, `index`) where an Array map provides them.
+
+## Reactive element properties
 
 ```json
 {
@@ -20,7 +26,7 @@ Template literal syntax `${}` is valid **anywhere a string value appears** in th
 }
 ```
 
-## Reactive Style Properties
+## Reactive style properties
 
 ```json
 {
@@ -32,7 +38,7 @@ Template literal syntax `${}` is valid **anywhere a string value appears** in th
 }
 ```
 
-## Reactive Attributes
+## Reactive attributes
 
 ```json
 {
@@ -44,7 +50,7 @@ Template literal syntax `${}` is valid **anywhere a string value appears** in th
 }
 ```
 
-## How It Works
+## How it works
 
 When the compiler encounters `${}` in any string-valued property, it wraps the binding in a reactive effect:
 
@@ -56,14 +62,16 @@ watchEffect(() => {
 
 Dependencies are tracked automatically by Vue when `state.*` properties are read.
 
-## `$ref` vs Template Strings
+## Choosing between `$ref` and a template string
+
+Prefer `${}` for a single-use reactive binding, and `$ref` for a signal that is named and reused.
 
 | Pattern                       | Use when                                          |
 | ----------------------------- | ------------------------------------------------- |
 | `{ "$ref": "#/state/label" }` | Binding to a named signal used in multiple places |
 | `"${state.count} items"`      | Inline computed binding used in exactly one place |
 
-## Computed State
+## Computed state
 
 Template strings in `state` become `computed()` values:
 
@@ -77,7 +85,7 @@ Template strings in `state` become `computed()` values:
 }
 ```
 
-## Signal Access in JavaScript
+## Reading and writing state from JavaScript
 
 Within `body` strings and external `.js` files, read and write state directly:
 
@@ -95,9 +103,9 @@ state.items.push(newItem);
 state.user.name = "Alice";
 ```
 
-No `.get()` or `.set()` calls. No `this`. All component state is accessed via `state`.
+There are no `.get()` or `.set()` calls and no `this`. All component state is reached through `state`.
 
-## Web API Prototypes
+## Prototypes for web APIs
 
 Built-in prototypes for common web APIs:
 
@@ -118,3 +126,9 @@ Built-in prototypes for common web APIs:
 | `"client"`   | Resolved at runtime in the browser (default)    |
 | `"server"`   | Resolved at runtime on the server via RPC       |
 | `"compiler"` | Resolved at build time, baked into emitted HTML |
+
+## Related
+
+- [State](/docs/framework/concepts/state) declares the signals a template reads.
+- [Expressions](/docs/framework/concepts/expressions) covers what may appear inside `${}`.
+- [Timing](/docs/framework/concepts/timing) covers when each value resolves.
