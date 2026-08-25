@@ -8,6 +8,7 @@
  */
 
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
+import { componentMetaFrom } from "@jxsuite/schema/component-meta";
 import { errorMessage } from "@jxsuite/schema/parse";
 import { mkdir, readFile, readdir, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync, statSync, unlinkSync } from "node:fs";
@@ -91,38 +92,6 @@ interface ComponentDoc {
   $elements?: unknown[];
   state?: Record<string, unknown>;
   [key: string]: unknown;
-}
-
-interface SlotDef {
-  name: string;
-  fallback?: unknown[];
-}
-
-/**
- * Collect slot definitions (name + fallback children) from a parsed component tree. Whitespace-only
- * names count as unnamed (""). Only static children arrays are walked.
- */
-function collectSlotDefs(node: unknown, out: SlotDef[] = []): SlotDef[] {
-  if (!node || typeof node !== "object" || Array.isArray(node)) {
-    return out;
-  }
-  const el = node as Record<string, unknown>;
-  if (el.tagName === "slot") {
-    const attrs = el.attributes as Record<string, unknown> | undefined;
-    const rawName = attrs?.name;
-    const name = typeof rawName === "string" ? rawName.trim() : "";
-    const { children } = el;
-    out.push({
-      name,
-      ...(Array.isArray(children) && children.length > 0 ? { fallback: children } : {}),
-    });
-  }
-  if (Array.isArray(el.children)) {
-    for (const c of el.children) {
-      collectSlotDefs(c, out);
-    }
-  }
-  return out;
 }
 
 // ─── Extension registry (per project root, invalidated on project.json change) ──
@@ -792,42 +761,14 @@ export async function handleStudioApi(
             const source = await readFile(fp, "utf8");
             content = (await entry.call("parse", source)) as ComponentDoc;
           }
-          if (content.tagName && content.tagName.includes("-")) {
-            const slotDefs = collectSlotDefs(content);
-            components.push({
-              $id: content.$id || null,
-              hasElements: Array.isArray(content.$elements) && content.$elements.length > 0,
-              path: fwd(match),
-              props: Object.entries(content.state || {})
-                .filter(([, d]) => {
-                  if (d == null) {
-                    return false;
-                  }
-                  // Shorthand: "key": "value" or "key": 0 etc.
-                  if (typeof d !== "object") {
-                    return true;
-                  }
-                  // Full form: skip computed/handler/prototype entries
-                  const obj = d as Record<string, unknown>;
-                  return !obj.$prototype && !obj.$handler && !obj.$compute;
-                })
-                .map(([name, d]) => {
-                  if (typeof d !== "object" || d === null) {
-                    // Shorthand: infer type from value
-                    return { default: d, name, type: typeof d };
-                  }
-                  const obj = d as Record<string, unknown>;
-                  return {
-                    default: obj.default,
-                    format: obj.format,
-                    name,
-                    type: obj.type,
-                  };
-                }),
-              ...(slotDefs.length > 0 ? { slots: slotDefs } : {}),
-              source: "jx",
-              tagName: content.tagName,
-            });
+          /* The metadata rules live in @jxsuite/schema/component-meta because THREE backends need
+             the same answer — this one, the desktop session, and now the cloud adapter, which can
+             discover JSON components precisely because deriving them executes nothing. Two copies
+             had already drifted apart in wording; a third would have made "which state entries are
+             props" a question with three answers. */
+          const meta = componentMetaFrom(content, fwd(match));
+          if (meta) {
+            components.push({ ...meta, source: "jx" });
           }
         } catch {} // Skip non-JSON or parse errors
       }

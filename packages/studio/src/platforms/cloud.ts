@@ -15,8 +15,10 @@ import { negotiateCollab } from "@jxsuite/collab/negotiate";
 import type { CollabNegotiation } from "@jxsuite/collab/negotiate";
 import type { WsCollabConnection } from "@jxsuite/collab/client";
 import type { ProjectConfig } from "@jxsuite/schema/types";
+import { componentMetaFrom } from "@jxsuite/schema/component-meta";
 import type {
   AccountStatus,
+  ComponentMeta,
   CreateProjectDestination,
   DirEntry,
   ExtensionsInfo,
@@ -518,9 +520,66 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
 
     // ─── Components / code services (cloud: static-only posture) ──────────
 
+    /**
+     * Component discovery, by READING rather than executing.
+     *
+     * This returned `[]` under "no execution of project JS in the cloud", and the cost was not the
+     * loss of discovery — it was the canvas. `canvas-live-render` injects the `$elements` a
+     * document's tags need only when the registry is non-empty, so an empty registry meant nothing
+     * was ever registered, no component was ever fetched, and every component instance rendered as
+     * an unregistered custom element: an empty inline box. A page built from components came up as
+     * blank space between the layout's chrome.
+     *
+     * Discovery does not need to execute anything. For a JSON component it is a file read and a
+     * property lookup — `componentMetaFrom` is that function, shared with the two Bun backends so
+     * "which `state` entries are props" has one answer. Non-JSON component formats DO need a
+     * project-supplied parser, and those stay out: the posture is kept where it actually applies
+     * rather than across the whole feature.
+     *
+     * Bounded rather than unbounded: the walk skips the directories a scan has no business in and
+     * stops at a depth and a file count, because this runs against a remote session over HTTP and a
+     * pathological tree must not turn opening a project into thousands of requests.
+     */
     async discoverComponents() {
-      // No execution of project JS in the cloud (MVP security posture).
-      return [];
+      const SKIP = new Set(["node_modules", "dist", ".git", ".claude", ".obsidian", "build"]);
+      const MAX_FILES = 400;
+      const MAX_DEPTH = 6;
+      const jsonPaths: string[] = [];
+
+      const walk = async (dir: string, depth: number): Promise<void> => {
+        if (depth > MAX_DEPTH || jsonPaths.length >= MAX_FILES) {
+          return;
+        }
+        let entries: DirEntry[];
+        try {
+          entries = await platform.listDirectory(dir);
+        } catch {
+          return; // A directory that vanished mid-walk is not a discovery failure.
+        }
+        const dirs: string[] = [];
+        for (const entry of entries) {
+          if (entry.type === "directory") {
+            if (!SKIP.has(entry.name) && !entry.name.startsWith(".")) {
+              dirs.push(entry.path);
+            }
+          } else if (entry.name.endsWith(".json") && jsonPaths.length < MAX_FILES) {
+            jsonPaths.push(entry.path);
+          }
+        }
+        await Promise.all(dirs.map(async (d) => walk(d, depth + 1)));
+      };
+      await walk("", 0);
+
+      const metas = await Promise.all(
+        jsonPaths.map(async (path) => {
+          try {
+            return componentMetaFrom(JSON.parse(await platform.readFile(path)), path);
+          } catch {
+            return null; // Not JSON, not readable, or not a component — all the same answer here.
+          }
+        }),
+      );
+      return metas.filter((m): m is NonNullable<typeof m> => m !== null) as ComponentMeta[];
     },
 
     async codeService() {

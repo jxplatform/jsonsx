@@ -73,6 +73,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `desktop.md`
 
+- **0.3.23-draft** (2026-08-25) — 10.1 removes discoverComponents from the cloud adapter's omissions: deriving component metadata from a JSON document executes nothing, and returning an empty registry left the canvas unable to register or fetch any component at all.
 - **0.3.22-draft** (2026-08-24) — §7 records the ElectroBun 2 toolchain boundary: the electrobun npm devDependency selects Hutch, Cottontail and ElectroBun together (no machine-wide install and no release pin in hutch.config.ts), the SDK is projected into .hutch/devkit, the main process is pinned to bun explicitly, and stable installers drop the channel prefix that the updater feed keeps.
 - **0.3.21-draft** (2026-08-24) — 3.1 states that documentBaseUrl may be absolute or root-relative, and that a root-relative value is resolved against the canvas origin because the canvas composes it as new URL(path, base) — a relative base throws and fails the whole canvas mount.
 - **0.3.20-draft** (2026-08-23) — 3.1 adds the Canvas member family and states that the canvas needs project files at a URL rather than behind readFile: documentBaseUrl defaults to the canvas origin plus projectRoot and must be set by a platform whose root is an identifier rather than a served path.

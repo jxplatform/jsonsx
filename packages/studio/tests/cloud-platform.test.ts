@@ -907,10 +907,9 @@ describe("formats (session backend registry)", () => {
 });
 
 describe("static-posture members", () => {
-  test("component discovery and code services are inert", async () => {
+  test("code services stay inert — those DO need project JS", async () => {
     mockFetch({});
     const p = createCloudPlatform(PROJECT);
-    expect(await p.discoverComponents()).toEqual([]);
     expect(await p.codeService("lint", {})).toBeNull();
     expect(await p.fetchPluginSchema("src")).toBeNull();
     expect(p.aiChatUrl()).toBe("/api/v1/ai/chat");
@@ -1035,5 +1034,129 @@ describe("collab capability", () => {
     } finally {
       console.warn = realWarn;
     }
+  });
+});
+
+/**
+ * Component discovery, by reading rather than executing.
+ *
+ * This returned `[]` under a blanket "no execution of project JS" posture, and the canvas paid for
+ * it: `canvas-live-render` injects the `$elements` a document's tags need only when the registry is
+ * non-empty, so nothing was ever registered, no component was ever fetched, and every instance
+ * rendered as an unregistered custom element — blank space where the component should be.
+ */
+describe("discoverComponents", () => {
+  /** A session whose tree is `dirs` and whose files answer with `files`. */
+  function session(dirs: Record<string, unknown[]>, files: Record<string, unknown>) {
+    globalThis.fetch = ((url: string) => {
+      const listed = /\/files\?dir=([^&]*)/u.exec(url);
+      if (listed) {
+        return Promise.resolve(Response.json(dirs[decodeURIComponent(listed[1] ?? "")] ?? []));
+      }
+      const read = /\/file\?path=([^&]*)/u.exec(url);
+      if (read) {
+        const path = decodeURIComponent(read[1] ?? "");
+        return path in files
+          ? Promise.resolve(Response.json({ content: JSON.stringify(files[path]) }))
+          : Promise.resolve(Response.json({ error: "gone" }, { status: 404 }));
+      }
+      return Promise.resolve(Response.json({}));
+    }) as unknown as typeof fetch;
+  }
+
+  const dir = (name: string, path: string) => ({ name, path, type: "directory" });
+  const file = (name: string, path: string) => ({ name, path, type: "file" });
+
+  test("finds a component nested in the tree, and reports its props", async () => {
+    session(
+      {
+        "": [dir("components", "components"), file("package.json", "package.json")],
+        components: [file("card.json", "components/card.json")],
+      },
+      {
+        "components/card.json": { state: { title: "Hi" }, tagName: "my-card" },
+        "package.json": { name: "site" },
+      },
+    );
+    const found = await createCloudPlatform(PROJECT).discoverComponents();
+    expect(found).toEqual([
+      {
+        $id: null,
+        hasElements: false,
+        path: "components/card.json",
+        props: [{ default: "Hi", name: "title", type: "string" }],
+        tagName: "my-card",
+      },
+    ]);
+  });
+
+  test("a JSON file that is not a component is not reported", async () => {
+    // Most of what a whole-tree scan reads is pages and data. The hyphen test is what separates
+    // Them, and it lives in the shared extractor rather than here.
+    session(
+      { "": [file("index.json", "pages/index.json")] },
+      { "pages/index.json": { children: [], tagName: "main" } },
+    );
+    expect(await createCloudPlatform(PROJECT).discoverComponents()).toEqual([]);
+  });
+
+  test("unreadable or non-JSON files are skipped, not fatal", async () => {
+    // A scan reads whatever it finds; one bad file must not lose every other component.
+    session(
+      {
+        "": [file("broken.json", "broken.json"), file("ok.json", "ok.json")],
+      },
+      { "ok.json": { tagName: "a-b" } },
+    );
+    const found = await createCloudPlatform(PROJECT).discoverComponents();
+    expect(found.map((c) => c.tagName)).toEqual(["a-b"]);
+  });
+
+  test("node_modules and build output are never walked", async () => {
+    /* Not a nicety: a session tree with node_modules in it would turn opening a project into
+       thousands of HTTP reads against a remote Durable Object. */
+    const calls: string[] = [];
+    session(
+      {
+        "": [dir("node_modules", "node_modules"), dir("dist", "dist"), dir("src", "src")],
+        dist: [file("a.json", "dist/a.json")],
+        node_modules: [file("b.json", "node_modules/b.json")],
+        src: [],
+      },
+      {},
+    );
+    const inner = globalThis.fetch;
+    globalThis.fetch = ((url: string, init?: RequestInit) => {
+      calls.push(url);
+      return (inner as (u: string, i?: RequestInit) => Promise<Response>)(url, init);
+    }) as unknown as typeof fetch;
+
+    await createCloudPlatform(PROJECT).discoverComponents();
+    expect(calls.some((u) => u.includes("node_modules"))).toBe(false);
+    expect(calls.some((u) => u.includes("dist"))).toBe(false);
+  });
+
+  test("a dot-directory is skipped too", async () => {
+    const calls: string[] = [];
+    session({ "": [dir(".git", ".git"), dir(".claude", ".claude")] }, {});
+    const inner = globalThis.fetch;
+    globalThis.fetch = ((url: string, init?: RequestInit) => {
+      calls.push(url);
+      return (inner as (u: string, i?: RequestInit) => Promise<Response>)(url, init);
+    }) as unknown as typeof fetch;
+    await createCloudPlatform(PROJECT).discoverComponents();
+    expect(calls.some((u) => u.includes(".git") || u.includes(".claude"))).toBe(false);
+  });
+
+  test("a directory that fails to list does not abort the walk", async () => {
+    session({ "": [dir("components", "components")] }, {});
+    const inner = globalThis.fetch;
+    globalThis.fetch = ((url: string, init?: RequestInit) => {
+      if (url.includes("dir=components")) {
+        return Promise.resolve(Response.json({ error: "gone" }, { status: 500 }));
+      }
+      return (inner as (u: string, i?: RequestInit) => Promise<Response>)(url, init);
+    }) as unknown as typeof fetch;
+    expect(await createCloudPlatform(PROJECT).discoverComponents()).toEqual([]);
   });
 });

@@ -10,6 +10,7 @@
   "exports": {
     ".": "./src/schema.ts",
     "./asset-paths": "./src/asset-paths.ts",
+    "./component-meta": "./src/component-meta.ts",
     "./extension-registry": "./src/extension-registry.ts",
     "./format-registry": "./src/format-registry.ts",
     "./project-schemas": "./src/project-schemas.ts",

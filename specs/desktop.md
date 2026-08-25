@@ -2,9 +2,9 @@
 
 ## Platform Abstraction, Project Loading, and Component Scoping
 
-**Version:** 0.3.22-draft
+**Version:** 0.3.23-draft
 **Status:** Pending
-**Updated:** 2026-08-24
+**Updated:** 2026-08-25
 **License:** MIT
 
 ---
@@ -1050,9 +1050,18 @@ path. It reports `id: "cloud"`, `canvasUrl: "/canvas.html"` and `openProjectPick
 that last one routes New Project through Studio's own repository picker over `listRepos` +
 `importProject`, so `openProject()` is never called (§3.4). It implements the full git family, the
 identity and publish members, `subscribeFileEvents` over SSE, and `collab`. It deliberately omits
-`pickDirectory`, `importSite`, the package install family, `gitClone`, `resolveClass`,
-`discoverComponents` and `codeService`; each degrades exactly as its protocol route's `degradation`
-field describes, which is what makes an omission a documented state rather than a break.
+`pickDirectory`, `importSite`, the package install family, `gitClone`, `resolveClass` and
+`codeService`; each degrades exactly as its protocol route's `degradation` field describes, which is
+what makes an omission a documented state rather than a break.
+
+**`discoverComponents` is NOT among them, and the reason it once was is worth keeping.** It returned
+nothing under a blanket "no execution of project JS" posture — but for a JSON component, discovery
+is a file read and a property lookup, and executes nothing. The posture belongs to the formats that
+genuinely need a project-supplied parser, not to the whole feature. Omitting it did not cost a
+feature list: the canvas injects the `$elements` a document's tags need only when the component
+registry is non-empty, so an empty registry meant no component was ever registered or fetched, and
+every instance rendered as an unregistered custom element — blank space where the component should
+be. An omission is only a documented state when something actually degrades gracefully.
 
 Because a cloud project _is_ a repository, the adapter sets `createDestination: "repo"` and the New Project modal collects a repository location — owner (personal account or organization), repository name, and visibility — instead of a folder (§4.5). The adapter forwards all three to the API, which resolves the owner against the session login to choose between the personal and organization creation endpoints. Nothing about the destination is defaulted server-side.
 
@@ -1176,6 +1185,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.3.23-draft** (2026-08-25) — 10.1 removes discoverComponents from the cloud adapter's omissions: deriving component metadata from a JSON document executes nothing, and returning an empty registry left the canvas unable to register or fetch any component at all.
 - **0.3.22-draft** (2026-08-24) — §7 records the ElectroBun 2 toolchain boundary: the electrobun npm devDependency selects Hutch, Cottontail and ElectroBun together (no machine-wide install and no release pin in hutch.config.ts), the SDK is projected into .hutch/devkit, the main process is pinned to bun explicitly, and stable installers drop the channel prefix that the updater feed keeps.
 - **0.3.21-draft** (2026-08-24) — 3.1 states that documentBaseUrl may be absolute or root-relative, and that a root-relative value is resolved against the canvas origin because the canvas composes it as new URL(path, base) — a relative base throws and fails the whole canvas mount.
 - **0.3.20-draft** (2026-08-23) — 3.1 adds the Canvas member family and states that the canvas needs project files at a URL rather than behind readFile: documentBaseUrl defaults to the canvas origin plus projectRoot and must be set by a platform whose root is an identifier rather than a served path.
@@ -1217,4 +1227,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx Studio Desktop Architecture Specification v0.3.22-draft_
+_Jx Studio Desktop Architecture Specification v0.3.23-draft_
