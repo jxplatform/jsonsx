@@ -125,10 +125,15 @@ describe("the per-path lock", () => {
   /** A rejected update must not strand every write queued behind it. */
   test("a failed update does not poison the chain", async () => {
     await updateStore(storeFile(), readStringStore, () => ({ a: "1" }));
-    const boom = updateStore(storeFile(), readStringStore, () => {
-      throw new Error("mutate failed");
-    });
-    await expect(boom).rejects.toThrow("mutate failed");
+    let failure: unknown;
+    try {
+      await updateStore(storeFile(), readStringStore, () => {
+        throw new Error("mutate failed");
+      });
+    } catch (error: unknown) {
+      failure = error;
+    }
+    expect((failure as Error).message).toBe("mutate failed");
     await updateStore(storeFile(), readStringStore, (c) => ({ ...c, b: "2" }));
     expect(await readStringStore(storeFile())).toEqual({ a: "1", b: "2" });
   });
