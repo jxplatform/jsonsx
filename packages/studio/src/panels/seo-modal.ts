@@ -24,8 +24,7 @@
 
 import { html, nothing } from "lit-html";
 import { activeRegistry } from "../commands/active-registry";
-import { loopbackAssetSrc } from "../canvas/canvas-origin";
-import { previewAssetSrc } from "../canvas/content-assets";
+import { previewAssetSrc } from "../canvas/asset-refs";
 import { renderFieldRow } from "../ui/field-row";
 import { renderMediaPicker } from "../ui/media-picker";
 import { renderProvenanceChip } from "./provenance";
@@ -140,9 +139,9 @@ function serpCard(preview: SeoPreview): TemplateResult {
 /**
  * The mock social card.
  *
- * The image is resolved the same way every other image in the studio chrome is —
- * `loopbackAssetSrc(previewAssetSrc(…))` — so a content-relative `./images/hero.jpg` previews at
- * its asset-mount URL while the authored ref stays exactly as written.
+ * The image is resolved the same way every other image in the studio chrome is — `previewAssetSrc`
+ * — so a content-relative `./images/hero.jpg` previews at its asset-mount URL while the authored
+ * ref stays exactly as written.
  */
 function socialCard(preview: SeoPreview): TemplateResult {
   const image = seoField(preview, "og:image").value.trim();
@@ -152,7 +151,7 @@ function socialCard(preview: SeoPreview): TemplateResult {
       <div class="seo-social-media">
         ${
           image
-            ? html`<img src=${loopbackAssetSrc(previewAssetSrc(image))} alt="" />`
+            ? html`<img src=${previewAssetSrc(image)} alt="" />`
             : html`<span class="seo-unset">No image</span>`
         }
       </div>

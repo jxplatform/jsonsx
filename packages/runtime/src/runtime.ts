@@ -42,6 +42,7 @@ import {
   isTemplateString,
   paramNames,
 } from "@jxsuite/schema/guards";
+import { formatSrcset, parseSrcset } from "@jxsuite/schema/asset-paths";
 import { runStatements } from "./statements.ts";
 import { readCookie, serializeCookie } from "./cookie.ts";
 import type {
@@ -329,6 +330,110 @@ function canvasAttrName(el: HTMLElement, key: string): string {
     return "data-jx-href";
   }
   return key;
+}
+
+/**
+ * Rewrite one asset reference for a host that does not serve the site's own URL space.
+ *
+ * The runtime writes a reference VERBATIM — `el.src = "/hero.jpg"` — so the browser resolves it
+ * against the document, and the document is whatever page the renderer happens to be running in. On
+ * a real site and on an editing server that serves the project tree, that is correct and this hook
+ * stays null. On a multi-tenant editor origin it is not: `/hero.jpg` resolves against the editor,
+ * misses, and — behind a single-page-app fallback — comes back as HTML at HTTP 200, so the image
+ * renders broken and nothing is logged.
+ *
+ * A function rather than data because it cannot be one: the values it must fix are produced INSIDE
+ * reactive effects (`{"$ref": "#/state/hero"}` is not a string until the effect runs), so no
+ * document walk can see them. The Studio canvas iframe sets this at render time.
+ *
+ * Returning null leaves the value exactly as written, and a null resolver makes every call site
+ * below the identity — so production rendering is byte-identical.
+ *
+ * @param {CanvasAssetResolver | null} fn - The resolver, or null to restore verbatim rendering
+ */
+export type CanvasAssetResolver = (value: string, key: string) => string | null;
+
+let _canvasAssetResolver: CanvasAssetResolver | null = null;
+export function setCanvasAssetResolver(fn: CanvasAssetResolver | null) {
+  _canvasAssetResolver = fn;
+}
+
+/** Attribute/property names whose value is an asset reference, on any element. */
+const ASSET_KEYS = new Set(["src", "poster", "data"]);
+
+/** Names whose value is a `srcset`-shaped candidate list rather than one reference. */
+const SRCSET_KEYS = new Set(["srcset", "imagesrcset"]);
+
+/**
+ * Elements on which `href` names an ASSET rather than a destination.
+ *
+ * `<a href>` and `<area href>` are places to go, not files to load; rewriting one would send a
+ * click at the file that backs the page instead of at the page. `<link href>` is the opposite — a
+ * stylesheet, an icon, a preload — and is the reason `$head` needs this at all.
+ */
+const HREF_ASSET_TAGS = new Set(["LINK"]);
+
+/** True when writing `key` on a `<tagName>` writes an asset reference. */
+function isAssetKey(tagName: string, key: string): boolean {
+  return ASSET_KEYS.has(key) || (key === "href" && HREF_ASSET_TAGS.has(tagName));
+}
+
+/**
+ * The value to actually write for `key` on a `<tagName>` — resolved when it is an asset reference,
+ * and the input itself in every other case, including whenever no resolver is installed.
+ *
+ * `srcset` is split into its candidates and resolved one at a time, because it is N references in
+ * one attribute and a resolver handed the whole string would have to re-implement HTML's parser to
+ * find them.
+ */
+function canvasAssetValue(tagName: string, key: string, value: string): string {
+  if (!_canvasAssetResolver || value === "") {
+    return value;
+  }
+  const name = key.toLowerCase();
+  if (SRCSET_KEYS.has(name)) {
+    const candidates = parseSrcset(value);
+    let changed = false;
+    const next = candidates.map((candidate) => {
+      const resolved = _canvasAssetResolver?.(candidate.url, name) ?? null;
+      if (resolved === null || resolved === candidate.url) {
+        return candidate;
+      }
+      changed = true;
+      return { descriptor: candidate.descriptor, url: resolved };
+    });
+    return changed ? formatSrcset(next) : value;
+  }
+  if (!isAssetKey(tagName, name)) {
+    return value;
+  }
+  return _canvasAssetResolver(value, name) ?? value;
+}
+
+/** Every `url(...)` inside a CSS value, unquoted or quoted with either quote. */
+const CSS_URL_RE = /\burl\(\s*(?<q>["']?)(?<u>[^"')]*)\k<q>\s*\)/g;
+
+/**
+ * Resolve every `url()` inside a CSS value.
+ *
+ * Applied to CSS rather than to a list of properties because in CSS a `url()` is ALWAYS a resource
+ * reference — `background-image`, `mask`, `cursor`, `@font-face src`, `list-style-image` and every
+ * shorthand that contains them — so enumerating the properties would be a list that goes stale
+ * while the syntax does not.
+ */
+function canvasStyleUrls(value: string): string {
+  if (!_canvasAssetResolver || !value.includes("url(")) {
+    return value;
+  }
+  return value.replaceAll(CSS_URL_RE, (whole, quote: string, url: string) => {
+    const resolved = url === "" ? null : (_canvasAssetResolver?.(url, "url()") ?? null);
+    return resolved === null ? whole : `url(${quote}${resolved}${quote})`;
+  });
+}
+
+/** A style scalar as the canvas wants it written: assets resolved, then viewport units transposed. */
+function canvasStyleValue(value: string): string {
+  return transposeCanvasUnits(canvasStyleUrls(value));
 }
 
 /**
@@ -957,6 +1062,11 @@ function bindProperty(el: HTMLElement, key: string, val: unknown, state: JxScope
   if (boundProp) {
     el.dataset.jxBoundProp = boundProp;
   }
+  /* An `<img>` in a document says `{"tagName": "img", "src": "/hero.jpg"}`, so `src` arrives HERE
+     as a top-level key and is written as a DOM PROPERTY — `attributes: { src }` is the rarer
+     spelling. Both are the same reference and both need the same resolution. */
+  const asAsset = (resolved: unknown): unknown =>
+    typeof resolved === "string" ? canvasAssetValue(el.tagName, key, resolved) : resolved;
   if (isRefObj(val)) {
     const refVal = val as { $ref: string };
     if (key === "id") {
@@ -964,7 +1074,7 @@ function bindProperty(el: HTMLElement, key: string, val: unknown, state: JxScope
       return;
     }
     effect(() => {
-      target[key] = resolveRef(refVal.$ref, state);
+      target[key] = asAsset(resolveRef(refVal.$ref, state));
     });
     return;
   }
@@ -972,12 +1082,12 @@ function bindProperty(el: HTMLElement, key: string, val: unknown, state: JxScope
   // Universal ${} reactivity — template strings in element properties
   if (isTemplateString(val)) {
     effect(() => {
-      target[key] = evaluateTemplate(val as string, state);
+      target[key] = asAsset(evaluateTemplate(val as string, state));
     });
     return;
   }
 
-  target[key] = val;
+  target[key] = asAsset(val);
 }
 
 /**
@@ -1038,22 +1148,22 @@ export function applyStyle(
     if (prop.startsWith("--")) {
       if (isTemplateString(val)) {
         effect(() => {
-          el.style.setProperty(prop, transposeCanvasUnits(evaluateTemplate(val, state)));
+          el.style.setProperty(prop, canvasStyleValue(evaluateTemplate(val, state)));
         });
       } else {
-        el.style.setProperty(prop, transposeCanvasUnits(scalar));
+        el.style.setProperty(prop, canvasStyleValue(scalar));
       }
     } else if (isTemplateString(val)) {
       effect(() => {
-        (el.style as unknown as Record<string, string>)[prop] = transposeCanvasUnits(
+        (el.style as unknown as Record<string, string>)[prop] = canvasStyleValue(
           evaluateTemplate(val, state),
         );
       });
     } else if (mediaOverriddenProps.has(prop)) {
-      // Goes through toCSSText (which transposes) — don't double-transpose here.
+      // Goes through toCSSText (which resolves and transposes) — don't do either twice here.
       baseDecls[prop] = scalar;
     } else {
-      (el.style as unknown as Record<string, string>)[prop] = transposeCanvasUnits(scalar);
+      (el.style as unknown as Record<string, string>)[prop] = canvasStyleValue(scalar);
     }
   }
 
@@ -1201,12 +1311,17 @@ export function reapplyStyle(
 function applyAttributes(el: HTMLElement, attrs: Record<string, JxAttributeValue>, state: JxScope) {
   for (const [k, v] of Object.entries(attrs)) {
     const attr = canvasAttrName(el, k);
+    /* Inside the effects, not before them. A `$ref` or `${…}` value is not a string until the
+       effect runs — which is exactly why the document walk this replaced could never see it. */
+    const write = (resolved: unknown) => {
+      el.setAttribute(attr, canvasAssetValue(el.tagName, k, String(resolved ?? "")));
+    };
     if (isRefObj(v)) {
-      effect(() => el.setAttribute(attr, String(resolveRef(v.$ref, state) ?? "")));
+      effect(() => write(resolveRef(v.$ref, state)));
     } else if (isTemplateString(v)) {
-      effect(() => el.setAttribute(attr, String(evaluateTemplate(v, state))));
+      effect(() => write(evaluateTemplate(v, state)));
     } else {
-      el.setAttribute(attr, String(v));
+      write(v);
     }
   }
 }
@@ -2282,7 +2397,7 @@ export function camelToKebab(s: string) {
 export function toCSSText(rules: Record<string, unknown> | object) {
   return Object.entries(rules)
     .filter(([k, v]) => !isNestedSelector(k) && (v === null || typeof v !== "object"))
-    .map(([p, v]) => `${camelToKebab(p)}: ${transposeCanvasUnits(String(v))}`)
+    .map(([p, v]) => `${camelToKebab(p)}: ${canvasStyleValue(String(v))}`)
     .join("; ");
 }
 
@@ -2424,15 +2539,17 @@ function injectHead(entries: JxHeadEntry[], _base: string) {
     // Resolve href/src: bare npm specifiers -> /node_modules/ path
     for (const key of ["href", "src"] as const) {
       const v = attrs[key];
-      if (
-        typeof v === "string" &&
-        v &&
-        !v.startsWith("/") &&
-        !v.startsWith(".") &&
-        !v.startsWith("http")
-      ) {
-        attrs[key] = `/node_modules/${v}`;
+      if (typeof v !== "string" || v === "") {
+        continue;
       }
+      if (!v.startsWith("/") && !v.startsWith(".") && !v.startsWith("http")) {
+        /* The bare-specifier lane owns `/node_modules/<pkg>`, which is the HOST's URL space and
+           not the project's. A canvas resolver must never claim it: the file is not in the
+           repository, so there is nothing for it to resolve to. */
+        attrs[key] = `/node_modules/${v}`;
+        continue;
+      }
+      attrs[key] = canvasAssetValue(tag.toUpperCase(), key, v);
     }
 
     // Deduplicate: skip if an identical element already exists

@@ -25,27 +25,22 @@
  * as written rather than on the file as stored.
  *
  * Everything here is pure string math over project-relative, forward-slashed paths. The only input
- * from outside is the open project's content sections, read the same way `content-assets.ts` reads
- * them.
+ * from outside is the open project's content sections, read the same way `canvas/asset-refs.ts`
+ * reads them.
  *
  * @docs studio/projects/media
  */
 
-import { contentMountFor } from "../canvas/content-assets";
+import { normalizeProjectPath, PUBLIC_DIR } from "@jxsuite/schema/asset-paths";
+import { contentMountFor } from "../canvas/asset-refs";
+import { loopbackAssetSrc } from "../canvas/canvas-origin";
 import { projectState } from "../store";
 import type { AssetMount } from "@jxsuite/schema/asset-paths";
 import type { ContentSectionEntry } from "../types";
 
-/** The directory whose contents are served from the site root. */
-const PUBLIC_DIR = "public";
-
-/**
- * A project-relative path in the one spelling every function here expects: forward slashes, no `./`
- * prefix, no leading `/`, no trailing `/`.
- */
-export function normalizeProjectPath(path: string): string {
-  return path.replaceAll("\\", "/").replace(/^\.\//, "").replace(/^\/+/, "").replace(/\/+$/, "");
-}
+/* Re-exported rather than redefined: the same normalization is what the compiler, the servers and
+   the canvas resolver all key on, so there is one definition of it in `@jxsuite/schema`. */
+export { normalizeProjectPath } from "@jxsuite/schema/asset-paths";
 
 /** The filename of a project-relative path. */
 export function baseName(path: string): string {
@@ -138,4 +133,26 @@ export function authoredRefTargets(path: string): string[] {
     }
   }
   return targets;
+}
+
+/**
+ * The src a PARENT-REALM preview should load for a PROJECT FILE PATH — a library thumbnail, a
+ * media-browser tile.
+ *
+ * The sibling of `previewAssetSrc` in `canvas/asset-refs`, and separate from it because the two
+ * take different things and confusing them is silent. A file path is NOT an authored reference:
+ * `public/hero.jpg` is written `/hero.jpg`, a string that shares not one segment with it. The
+ * library grid built its `<img src>` by prefixing the path with a slash, so every `public/` image
+ * asked for `/public/hero.jpg` — a URL the site does not publish — and every content-collection
+ * image skipped its mount entirely.
+ *
+ * @param {string} path - A project-relative file path, as the file tree spells it
+ * @returns {string} A src the parent realm can load
+ */
+export function previewFileSrc(path: string): string {
+  const normalized = normalizeProjectPath(path);
+  if (normalized === "") {
+    return path;
+  }
+  return loopbackAssetSrc(mediaSiteUrl(normalized));
 }

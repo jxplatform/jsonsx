@@ -19,7 +19,7 @@ import { html, nothing } from "lit-html";
 import { repeat } from "lit-html/directives/repeat.js";
 import { ref } from "lit-html/directives/ref.js";
 import { isImage } from "../files/media-upload";
-import { loopbackAssetSrc } from "../canvas/canvas-origin";
+import { previewFileSrc } from "../files/media-paths";
 import { localeLabel } from "@jxsuite/schema/locale";
 import { groupByCategory, groupByDate } from "./library-model";
 import type { LibraryFile, LibraryLayout } from "./library-model";
@@ -154,7 +154,7 @@ function previewTpl(file: LibraryFile, ctx: LayoutContext): TemplateResult {
     return html`<img
       class="library-thumb"
       loading="lazy"
-      src=${loopbackAssetSrc(`/${file.path}`)}
+      src=${previewFileSrc(file.path)}
       alt=""
     />`;
   }
@@ -268,7 +268,7 @@ export function mediaTpl(files: readonly LibraryFile[], ctx: LayoutContext): Tem
               ? html`<img
                   class="library-thumb"
                   loading="lazy"
-                  src=${loopbackAssetSrc(`/${file.path}`)}
+                  src=${previewFileSrc(file.path)}
                   alt=""
                 />`
               : html`<sp-icon-document size="l"></sp-icon-document>`

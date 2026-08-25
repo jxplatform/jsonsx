@@ -4,7 +4,9 @@ import { describe, test, expect, afterEach } from "bun:test";
 import { reactive } from "@vue/reactivity";
 import {
   applyStyle,
+  Jx,
   renderNode as _renderNode,
+  setCanvasAssetResolver,
   setCanvasDelinkAnchors,
   setCanvasViewportTranspose,
   toCSSText,
@@ -19,10 +21,11 @@ try {
 
 const renderNode: (...args: Parameters<typeof _renderNode>) => HTMLElement = _renderNode as any;
 
-// Both flags are GLOBAL module state. Reset BOTH after every test.
+// All three hooks are GLOBAL module state. Reset every one after every test.
 afterEach(() => {
   setCanvasViewportTranspose(false);
   setCanvasDelinkAnchors(false);
+  setCanvasAssetResolver(null);
 });
 
 // ─── transposeCanvasUnits ───────────────────────────────────────────────────────
@@ -230,5 +233,191 @@ describe("applyAttributes anchor de-link", () => {
       setTimeout(resolve, 0);
     });
     expect(el.dataset.jxHref).toBe("/second");
+  });
+});
+
+// ─── setCanvasAssetResolver ─────────────────────────────────────────────────
+
+/**
+ * The canvas asset resolver.
+ *
+ * The runtime writes a reference verbatim — `el.src = "/hero.jpg"` — so the BROWSER resolves it,
+ * against whatever document the renderer happens to be running in. That is right on a site and on
+ * an editing server that serves the project tree, and wrong on a multi-tenant editor origin, where
+ * `/hero.jpg` misses and a single-page-app fallback answers HTML at HTTP 200: the image renders
+ * broken and nothing is logged.
+ *
+ * A hook rather than a document rewrite because the values are produced INSIDE reactive effects. A
+ * `{"$ref": "#/state/hero"}` is not a string until the effect runs, so no walk over the document
+ * can see it — which is why the walk this replaces only ever fixed literal values.
+ */
+describe("setCanvasAssetResolver", () => {
+  /** Prefix every reference, so any rewrite is visible and any missed one is too. */
+  const prefixResolver = (value: string) => `/raw/${value.replace(/^\//, "")}`;
+
+  test("a literal src is resolved", () => {
+    setCanvasAssetResolver(prefixResolver);
+    const el = renderNode({ src: "/hero.jpg", tagName: "img" } as never, reactive({}));
+    expect(el.getAttribute("src")).toBe("/raw/hero.jpg");
+  });
+
+  /* THE case the document walk could not reach. The value does not exist as a string until the
+     effect runs, so a walk over the document sees `{"$ref": …}` and rewrites nothing. */
+  test("a $ref-bound src is resolved, inside the effect", async () => {
+    setCanvasAssetResolver(prefixResolver);
+    const state = reactive({ hero: "/hero.jpg" });
+    const el = renderNode({ src: { $ref: "#/state/hero" }, tagName: "img" } as never, state);
+    expect(el.getAttribute("src")).toBe("/raw/hero.jpg");
+    // And again when the binding changes — the resolution is part of the effect, not a one-off.
+    state.hero = "/other.jpg";
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+    expect(el.getAttribute("src")).toBe("/raw/other.jpg");
+  });
+
+  test("a templated src is resolved", () => {
+    setCanvasAssetResolver(prefixResolver);
+    const el = renderNode(
+      { src: "${state.dir}/a.png", tagName: "img" } as never,
+      reactive({ dir: "/img" }),
+    );
+    expect(el.getAttribute("src")).toBe("/raw/img/a.png");
+  });
+
+  test("the attributes spelling of the same reference", () => {
+    setCanvasAssetResolver(prefixResolver);
+    const el = renderNode(
+      { attributes: { src: "/hero.jpg" }, tagName: "img" } as never,
+      reactive({}),
+    );
+    expect(el.getAttribute("src")).toBe("/raw/hero.jpg");
+  });
+
+  test("poster too, in both spellings", () => {
+    setCanvasAssetResolver(prefixResolver);
+    // As a top-level key it is a DOM property; as an `attributes` entry it is an attribute.
+    const asProp = renderNode({ poster: "/p.jpg", tagName: "video" } as never, reactive({}));
+    expect((asProp as unknown as { poster: string }).poster).toBe("/raw/p.jpg");
+    const asAttr = renderNode(
+      { attributes: { poster: "/p.jpg" }, tagName: "video" } as never,
+      reactive({}),
+    );
+    expect(asAttr.getAttribute("poster")).toBe("/raw/p.jpg");
+  });
+
+  test("every srcset candidate, descriptors preserved", () => {
+    setCanvasAssetResolver(prefixResolver);
+    const el = renderNode(
+      { srcset: "/a.png 1x, /b.png 2x", tagName: "img" } as never,
+      reactive({}),
+    );
+    expect(el.getAttribute("srcset")).toBe("/raw/a.png 1x, /raw/b.png 2x");
+  });
+
+  test("url() inside a style value, in the inline and the emitted-stylesheet paths", () => {
+    setCanvasAssetResolver(prefixResolver);
+    const el = renderNode(
+      { style: { backgroundImage: "url('/bg.png')" }, tagName: "div" } as never,
+      reactive({}),
+    );
+    expect(el.style.backgroundImage.replaceAll('"', "'")).toBe("url('/raw/bg.png')");
+    expect(toCSSText({ maskImage: "url(/m.svg)" })).toBe("mask-image: url(/raw/m.svg)");
+  });
+
+  /* An `<a href>` is a place to go, not a file to load. Rewriting one would send a click at the
+     document that backs the page instead of at the page. A `<link href>` is the opposite. */
+  test("href is an asset on <link> and a destination on <a>", () => {
+    setCanvasAssetResolver(prefixResolver);
+    const anchor = renderNode({ href: "/about", tagName: "a" } as never, reactive({}));
+    expect(anchor.getAttribute("href")).toBe("/about");
+    const link = renderNode(
+      { attributes: { href: "/styles/main.css", rel: "stylesheet" }, tagName: "link" } as never,
+      reactive({}),
+    );
+    expect(link.getAttribute("href")).toBe("/raw/styles/main.css");
+  });
+
+  test("a resolver that returns null leaves the value exactly as written", () => {
+    setCanvasAssetResolver(() => null);
+    const el = renderNode({ src: "/hero.jpg", tagName: "img" } as never, reactive({}));
+    expect(el.getAttribute("src")).toBe("/hero.jpg");
+  });
+
+  test("an empty reference is never handed to the resolver", () => {
+    let calls = 0;
+    setCanvasAssetResolver((value) => {
+      calls += 1;
+      return `/raw/${value}`;
+    });
+    renderNode({ src: "", tagName: "img" } as never, reactive({}));
+    expect(calls).toBe(0);
+  });
+
+  /**
+   * The identity guarantee. A null resolver is the default and it is what production renders with,
+   * so every one of these must come out byte-identical to a build that has never heard of the
+   * hook.
+   */
+  test("with NO resolver, every value is byte-identical", () => {
+    const cases = [
+      { src: "/hero.jpg", tagName: "img" },
+      { srcset: "/a.png 1x, /b.png 2x", tagName: "img" },
+      { attributes: { poster: "/p.jpg" }, tagName: "video" },
+      { style: { backgroundImage: "url('/bg.png')" }, tagName: "div" },
+      { attributes: { href: "/styles/main.css" }, tagName: "link" },
+    ];
+    for (const def of cases) {
+      const el = renderNode(def as never, reactive({}));
+      for (const [key, expected] of Object.entries(def)) {
+        if (key === "tagName" || key === "style" || key === "attributes") {
+          continue;
+        }
+        expect(el.getAttribute(key)).toBe(expected as string);
+      }
+    }
+    expect(
+      renderNode(cases[3] as never, reactive({})).style.backgroundImage.replaceAll('"', "'"),
+    ).toBe("url('/bg.png')");
+    expect(toCSSText({ maskImage: "url(/m.svg)" })).toBe("mask-image: url(/m.svg)");
+  });
+
+  test("a non-URL attribute is never resolved, however it is written", () => {
+    setCanvasAssetResolver(prefixResolver);
+    const el = renderNode(
+      { attributes: { alt: "/hero.jpg", "data-x": "/hero.jpg" }, tagName: "img" } as never,
+      reactive({}),
+    );
+    expect(el.getAttribute("alt")).toBe("/hero.jpg");
+    expect(el.dataset.x).toBe("/hero.jpg");
+  });
+});
+
+describe("$head asset resolution", () => {
+  /* `/node_modules/<pkg>` is the HOST's URL space, not the project's: the file is not in the
+     repository, so there is nothing for a project resolver to resolve it to. A resolver that
+     claimed the bare-specifier lane would point every packaged stylesheet at a 404. */
+  test("a bare specifier stays in /node_modules and is never offered to the resolver", async () => {
+    const seen: string[] = [];
+    setCanvasAssetResolver((value) => {
+      seen.push(value);
+      return `/raw/${value.replace(/^\//, "")}`;
+    });
+    const target = document.createElement("div");
+    await Jx(
+      {
+        $head: [
+          { attributes: { href: "some-canvas-pkg/style.css", rel: "stylesheet" }, tagName: "link" },
+          { attributes: { href: "/styles/main.css", rel: "stylesheet" }, tagName: "link" },
+        ],
+        tagName: "div",
+      } as never,
+      target,
+    );
+    expect(
+      document.head.querySelector('link[href="/node_modules/some-canvas-pkg/style.css"]'),
+    ).toBeTruthy();
+    expect(document.head.querySelector('link[href="/raw/styles/main.css"]')).toBeTruthy();
+    expect(seen).toEqual(["/styles/main.css"]);
   });
 });
