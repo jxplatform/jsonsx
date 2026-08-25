@@ -45,15 +45,12 @@ import {
   projectPathForRef,
   splitRefSuffix,
 } from "@jxsuite/schema/asset-paths";
-import { loopbackAssetSrc } from "./canvas-origin";
+import { documentBase, loopbackAssetSrc } from "./canvas-origin";
+import { getPlatform, hasPlatform } from "../platform";
 import { projectState } from "../store";
 import { activeTab } from "../workspace/workspace";
 import type { AssetLane, AssetMount } from "@jxsuite/schema/asset-paths";
 import type { ContentSectionEntry } from "../types";
-import type { JxMutableNode } from "@jxsuite/schema/types";
-
-/** Node keys whose value is a media reference. Mirrors `ASSET_KEYS` in the content loader. */
-const ASSET_KEYS = ["src", "poster"] as const;
 
 /** Content type names safe in a URL path segment. Mirrors `SAFE_TYPE_NAME` in the content loader. */
 const SAFE_TYPE_NAME = /^[\w.~-]+$/;
@@ -219,84 +216,6 @@ export function mountedRefFor(value: string, entryDir: string, mount: AssetMount
 }
 
 /**
- * Rewrite one node's media refs, returning the node unchanged when nothing applies.
- *
- * PURE REBUILD: a node with a rewritten ref is replaced by a shallow copy, and so is every ancestor
- * on the path to it. Untouched subtrees keep their original references, so the render doc still
- * shares the vast majority of its nodes with the source doc.
- */
-function rewriteNode(node: JxMutableNode, ctx: AssetContext): JxMutableNode {
-  const record = node as unknown as Record<string, unknown>;
-  /** Accumulated changed keys; stays null (and the node is returned as-is) when nothing applies. */
-  let patch: Record<string, unknown> | null = null;
-
-  for (const key of ASSET_KEYS) {
-    const value = record[key];
-    if (typeof value === "string") {
-      const rewritten = resolveAssetRef(value, ctx);
-      if (rewritten) {
-        patch ??= {};
-        patch[key] = rewritten;
-      }
-    }
-  }
-
-  const attributes = record.attributes as Record<string, unknown> | undefined;
-  if (attributes) {
-    let nextAttrs: Record<string, unknown> | null = null;
-    for (const key of ASSET_KEYS) {
-      const value = attributes[key];
-      if (typeof value === "string") {
-        const rewritten = resolveAssetRef(value, ctx);
-        if (rewritten) {
-          nextAttrs ??= { ...attributes };
-          nextAttrs[key] = rewritten;
-        }
-      }
-    }
-    if (nextAttrs) {
-      patch ??= {};
-      patch.attributes = nextAttrs;
-    }
-  }
-
-  const children = record.children as unknown[] | undefined;
-  if (Array.isArray(children)) {
-    let nextChildren: unknown[] | null = null;
-    for (const [i, child] of children.entries()) {
-      if (!child || typeof child !== "object") {
-        continue;
-      }
-      const rewrittenChild = rewriteNode(child as JxMutableNode, ctx);
-      if (rewrittenChild !== child) {
-        nextChildren ??= [...children];
-        nextChildren[i] = rewrittenChild;
-      }
-    }
-    if (nextChildren) {
-      patch ??= {};
-      patch.children = nextChildren;
-    }
-  }
-
-  return patch ? ({ ...node, ...patch } as JxMutableNode) : node;
-}
-
-/**
- * Map a document's media refs for rendering.
- *
- * Returns `doc` itself when there is no context or no rewritable ref, so the common case costs one
- * walk and allocates nothing.
- *
- * This walk sees only LITERAL values. A `{"$ref": …}` or `"${…}"` src is resolved inside a reactive
- * effect and is not a string when the walk runs, so the canvas resolves those through the runtime's
- * own hook instead — see `setCanvasAssetResolver`.
- */
-export function rewriteAssetRefs(doc: JxMutableNode, ctx: AssetContext | null): JxMutableNode {
-  return ctx ? rewriteNode(doc, ctx) : doc;
-}
-
-/**
  * The src a PARENT-REALM preview should load for an AUTHORED value — a media-picker thumbnail, the
  * social card in the SEO modal.
  *
@@ -320,6 +239,27 @@ export function previewAssetSrc(value: string): string {
   if (!value) {
     return value;
   }
-  const ctx = assetContextFor(activeTab.value?.documentPath);
+  const ctx = assetContextFor(activeTab.value?.documentPath, hostAssetDeclarations());
   return loopbackAssetSrc(resolveAssetRef(value, ctx) ?? value);
+}
+
+/**
+ * What the registered host says about media — the platform's `assetSpace`, and the base project
+ * files are served under.
+ *
+ * Read through the platform rather than passed in, because every caller is panel chrome with no
+ * access to the render pipeline and because the answer is a property of the HOST, not of the call.
+ * The canvas pipeline builds the same two values from the same two places; the difference is only
+ * that it already has the document in hand.
+ *
+ * @returns {{ space?: "site" | "repo"; fileBaseUrl: string }} The host's declarations
+ */
+export function hostAssetDeclarations(): {
+  space?: "site" | "repo" | undefined;
+  fileBaseUrl: string;
+} {
+  return {
+    fileBaseUrl: documentBase(projectState?.projectRoot),
+    ...(hasPlatform() ? { space: getPlatform().assetSpace } : {}),
+  };
 }

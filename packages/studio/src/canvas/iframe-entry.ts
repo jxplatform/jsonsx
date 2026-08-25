@@ -859,6 +859,7 @@ export function startCanvasIframe(opts: {
         stopDataScopeWatch = null;
         handle?.dispose();
         handle = await renderResolvedDocument({
+          assets: msg.assets ?? null,
           container,
           doc: msg.doc as JxDocument,
           docBase: msg.docBase,

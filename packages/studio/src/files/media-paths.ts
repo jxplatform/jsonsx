@@ -31,8 +31,8 @@
  * @docs studio/projects/media
  */
 
-import { normalizeProjectPath, PUBLIC_DIR } from "@jxsuite/schema/asset-paths";
-import { contentMountFor } from "../canvas/asset-refs";
+import { encodeProjectPath, normalizeProjectPath, PUBLIC_DIR } from "@jxsuite/schema/asset-paths";
+import { contentMountFor, hostAssetDeclarations } from "../canvas/asset-refs";
 import { loopbackAssetSrc } from "../canvas/canvas-origin";
 import { projectState } from "../store";
 import type { AssetMount } from "@jxsuite/schema/asset-paths";
@@ -153,6 +153,12 @@ export function previewFileSrc(path: string): string {
   const normalized = normalizeProjectPath(path);
   if (normalized === "") {
     return path;
+  }
+  /* In repo space nothing answers a site URL, so the site URL is the wrong question entirely: the
+     host serves the FILE, at its own path, under the declared base. */
+  const { space, fileBaseUrl } = hostAssetDeclarations();
+  if (space === "repo") {
+    return `${fileBaseUrl}${encodeProjectPath(normalized)}`;
   }
   return loopbackAssetSrc(mediaSiteUrl(normalized));
 }

@@ -200,6 +200,24 @@ export interface StudioPlatform {
    * trailing `/` is added: without it `new URL` drops the last segment.
    */
   documentBaseUrl?: string;
+  /**
+   * What the canvas ORIGIN answers for a SITE URL — and therefore how Studio must address media.
+   *
+   * `"site"` (the default when absent): the canvas origin already serves the published site URL
+   * space, so `/hero.jpg` and `/styles/main.css` resolve on their own and Studio touches neither.
+   * The dev server and the desktop loopback both do — `serveProjectFile` in `@jxsuite/server` IS
+   * that URL space — so neither declares anything here and both stay byte-identical.
+   *
+   * `"repo"`: the host serves PROJECT-RELATIVE paths under {@link documentBaseUrl}, and nothing
+   * answers the site URL space. Studio resolves each authored reference to the project file it
+   * names and rebases that path onto `documentBaseUrl`. Inert without one — a host that says its
+   * site URLs are wrong without saying what is right has told Studio nothing it can act on.
+   *
+   * This is about the ORIGIN, not the backend: a host whose files are perfectly reachable can still
+   * be `"repo"` space, because what decides it is what answers `GET /hero.jpg` on the document the
+   * canvas is running in.
+   */
+  assetSpace?: "site" | "repo";
   activate: (root?: string) => Promise<void>;
   openProject: () => Promise<{
     config: ProjectConfig;

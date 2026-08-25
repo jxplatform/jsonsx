@@ -431,8 +431,17 @@ function canvasStyleUrls(value: string): string {
   });
 }
 
-/** A style scalar as the canvas wants it written: assets resolved, then viewport units transposed. */
-function canvasStyleValue(value: string): string {
+/**
+ * A style scalar as the canvas wants it written: assets resolved, then viewport units transposed.
+ *
+ * Exported because the canvas emits some CSS itself — the site-level `style` block, which never
+ * passes through {@link applyStyle} — and a second implementation of "what the canvas does to a
+ * style value" is a second thing to keep in step.
+ *
+ * @param {string} value - A CSS declaration value
+ * @returns {string} The value as the canvas should write it
+ */
+export function canvasStyleValue(value: string): string {
   return transposeCanvasUnits(canvasStyleUrls(value));
 }
 

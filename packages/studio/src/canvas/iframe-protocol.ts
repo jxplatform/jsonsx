@@ -9,6 +9,7 @@
  * the cross-frame analog of the legacy renderer's `renderGeneration` staleness guard.
  */
 
+import type { AssetContext } from "./asset-refs";
 import type { JxDocOp } from "../tabs/patch-ops";
 import type { JxContentResult, SlashCommand } from "../editor/inline-edit";
 import type { JxExpressionNode, JxMutableNode } from "@jxsuite/schema/types";
@@ -88,6 +89,14 @@ export type ParentToIframe =
        */
       allowAutoRequests?: boolean;
       docBase: string;
+      /**
+       * How this host addresses project media, or null/absent when the canvas origin serves the
+       * site's own URL space (desktop, `jx dev`) and no reference needs resolving.
+       *
+       * Plain data because the resolver is a FUNCTION and functions do not cross a realm: the
+       * iframe rebuilds the resolver from this and installs it on the runtime.
+       */
+      assets?: AssetContext | null;
       mapperCtx: WireMapperCtx;
       siteStyle: Record<string, unknown> | null;
       // Forced color-scheme preview (spec §9.5): "light"/"dark" sets data-color-scheme on the

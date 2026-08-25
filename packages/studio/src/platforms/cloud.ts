@@ -232,8 +232,15 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
        The session serves the project tree at /raw.
 
        Conditional because `base` is "" until a project is bound, and "/raw/" would be a confident
-       wrong answer — worse than the default, which at least fails visibly. */
-    ...(base ? { documentBaseUrl: `${base}/raw/` } : {}),
+       wrong answer — worse than the default, which at least fails visibly.
+
+       `assetSpace` rides in the SAME spread, and that is the whole of its correctness: studio.jx-
+       suite.com is a multi-tenant SPA origin, so `/hero.jpg` misses Workers Static Assets and the
+       single-page-app fallback answers index.html at HTTP 200 — the <img> gets HTML, renders
+       broken, and logs nothing. Declaring "repo" tells Studio to resolve each reference to the
+       project file it names and address it under /raw. Until a project is bound there is no /raw to
+       address, so the project-less hub declares neither and stays exactly as it was. */
+    ...(base ? { assetSpace: "repo" as const, documentBaseUrl: `${base}/raw/` } : {}),
     /* Open Project routes through Studio's repo picker (write-access repos via listRepos +
        importProject) — sessions are URL-bound, so openProject() below never opens a dialog. */
     openProjectPicker: "repo-list",

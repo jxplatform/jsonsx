@@ -2775,6 +2775,7 @@ function preparePassRender(
     const formatElements = formatByName(renderTab?.doc.sourceFormat)?.studio?.elements;
     const editableTags = formatElements ? formatEditableVerdicts(formatElements) : undefined;
     return {
+      assets: resolved.assets,
       doc: cloneableDoc,
       docBase: resolved.docBase ?? `${canvasBaseOrigin()}/`,
       mapperCtx: resolved.mapperCtx,
@@ -2898,6 +2899,9 @@ export function mountStylebookCanvas(
   const message: ParentToIframe = {
     // The specimen carries no tab identity, but the STAGE it is mounted into does: a stylebook is
     // Opened as a tab like anything else, and its `previewColorScheme` is that tab's.
+    /* A stylebook specimen is generated, not a project document, so it references no project
+       media and needs no resolution. */
+    assets: null,
     colorScheme: schemeWireFor(tabOfContainer(canvasEl)),
     doc: cloneableDoc,
     docBase: `${canvasBaseOrigin()}/`,

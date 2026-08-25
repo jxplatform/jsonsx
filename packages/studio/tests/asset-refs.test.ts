@@ -3,10 +3,12 @@
  *
  * The `"site"` block below is a CHARACTERISATION suite, carried over from `content-assets.test.ts`
  * unchanged in what it asserts: `"site"` is what desktop and `jx dev` have always done, so every
- * one of these answers must survive the rebuild byte for byte. The rules mirror
- * `rewriteEntryAssets` in extensions/parser/src/content-loader.ts, and the cases are written
- * against the CONTRACT (relative + inside the collection → mounted; everything else untouched) so a
- * divergence between the two shows up here.
+ * one of these answers must survive the rebuild byte for byte. It is expressed against
+ * `resolveAssetRef` rather than against the document walk it used to run through, because the walk
+ * is gone — a walk sees only LITERAL values, and the canvas now resolves every reference at render
+ * time, bound ones included. The rules mirror `rewriteEntryAssets` in
+ * extensions/parser/src/content-loader.ts, and the cases are written against the CONTRACT (relative
+ * + inside the collection → mounted; everything else untouched) so a divergence shows up here.
  *
  * The `"repo"` block is the new space — a host that serves PROJECT PATHS because nothing answers a
  * site URL on its origin.
@@ -20,11 +22,9 @@ import {
   mountedRefFor,
   previewAssetSrc,
   resolveAssetRef,
-  rewriteAssetRefs,
 } from "../src/canvas/asset-refs";
 import { BUILD_LANES } from "@jxsuite/schema/asset-paths";
 import type { AssetContext } from "../src/canvas/asset-refs";
-import type { JxMutableNode } from "@jxsuite/schema/types";
 
 const POSTS = { posts: { format: "Markdown", source: "./content/posts/" } };
 const MOUNT = { dir: "content/posts", urlPrefix: "/content/posts" };
@@ -150,93 +150,6 @@ describe("mountedRefFor", () => {
 
 // ─── Document rewrite ────────────────────────────────────────────────────────
 
-describe("rewriteAssetRefs, in site space", () => {
-  const doc = (): JxMutableNode =>
-    ({
-      children: [
-        { attributes: { alt: "", src: "./images/hero.png" }, tagName: "img" },
-        { children: ["untouched"], tagName: "p" },
-        { attributes: { poster: "./images/thumb.png", src: "/movie.mp4" }, tagName: "video" },
-      ],
-      tagName: "div",
-    }) as unknown as JxMutableNode;
-
-  test("maps src and poster, in attributes and as top-level keys", () => {
-    const source = doc();
-    (source.children as JxMutableNode[]).push({
-      src: "./images/top-level.png",
-      tagName: "source",
-    } as unknown as JxMutableNode);
-
-    const out = rewriteAssetRefs(source, assetContextFor("content/posts/hello.md"));
-    const kids = out.children as Record<string, any>[];
-
-    expect(kids[0]!.attributes.src).toBe("/content/posts/images/hero.png");
-    expect(kids[2]!.attributes.poster).toBe("/content/posts/images/thumb.png");
-    // A root-absolute src is already meaningful and stays put.
-    expect(kids[2]!.attributes.src).toBe("/movie.mp4");
-    expect(kids[3]!.src).toBe("/content/posts/images/top-level.png");
-  });
-
-  test("the SOURCE document is never mutated — it is what gets serialized back to disk", () => {
-    const source = doc();
-    const before = structuredClone(source);
-    rewriteAssetRefs(source, assetContextFor("content/posts/hello.md"));
-    expect(source).toEqual(before);
-  });
-
-  test("untouched subtrees keep their identity (pure rebuild, not a deep clone)", () => {
-    const source = doc();
-    const [, untouched] = source.children as JxMutableNode[];
-    const out = rewriteAssetRefs(source, assetContextFor("content/posts/hello.md"));
-
-    expect(out).not.toBe(source); // The path to a rewritten node is rebuilt…
-    const [, stillShared] = out.children as JxMutableNode[];
-    expect(stillShared).toBe(untouched); // …but siblings are shared.
-  });
-
-  test("a document with nothing to rewrite is returned as-is", () => {
-    const clean = {
-      children: [{ children: ["hi"], tagName: "p" }],
-      tagName: "div",
-    } as JxMutableNode;
-    expect(rewriteAssetRefs(clean, assetContextFor("content/posts/hello.md"))).toBe(clean);
-  });
-
-  test("a non-content document is returned as-is", () => {
-    const source = doc();
-    expect(rewriteAssetRefs(source, assetContextFor("pages/index.json"))).toBe(source);
-  });
-
-  test("nested children are reached", () => {
-    const nested = {
-      children: [
-        {
-          children: [{ attributes: { src: "./images/deep.png" }, tagName: "img" }],
-          tagName: "figure",
-        },
-      ],
-      tagName: "div",
-    } as unknown as JxMutableNode;
-
-    const out = rewriteAssetRefs(nested, assetContextFor("content/posts/hello.md"));
-    const [figure] = out.children as any[];
-    const [img] = figure.children;
-    expect(img.attributes.src).toBe("/content/posts/images/deep.png");
-  });
-
-  test("a nested entry resolves against its OWN directory", () => {
-    const nested = {
-      children: [{ attributes: { src: "./images/a.png" }, tagName: "img" }],
-      tagName: "div",
-    } as unknown as JxMutableNode;
-
-    const out = rewriteAssetRefs(nested, assetContextFor("content/posts/2026/hello.md"));
-    const [img] = out.children as any[];
-    expect(img.attributes.src).toBe("/content/posts/2026/images/a.png");
-  });
-});
-
 // ─── Parent-realm previews ───────────────────────────────────────────────────
 
 describe("previewAssetSrc", () => {
@@ -294,6 +207,20 @@ describe("resolveAssetRef", () => {
     test("a site URL is left exactly as written", () => {
       expect(resolveAssetRef("/hero.jpg", ctxFor("content/posts"))).toBeNull();
       expect(resolveAssetRef("https://cdn.example.com/a.png", ctxFor("content/posts"))).toBeNull();
+    });
+
+    test("a nested entry resolves against its OWN directory", () => {
+      expect(resolveAssetRef("./images/a.png", ctxFor("content/posts/2026"))).toBe(
+        "/content/posts/2026/images/a.png",
+      );
+    });
+
+    test("poster and src are the same question — the KEY is the runtime's business", () => {
+      // This module never sees a key: it answers about a value, and the runtime decides which
+      // Attributes and properties carry one. That split is why `srcset` and `url()` came for free.
+      expect(resolveAssetRef("./images/thumb.png", ctxFor("content/posts"))).toBe(
+        "/content/posts/images/thumb.png",
+      );
     });
 
     test("outside any mount, nothing resolves", () => {
@@ -366,18 +293,6 @@ describe("resolveAssetRef", () => {
         expect(resolveAssetRef(value, inert)).toBeNull();
       }
     });
-  });
-});
-
-describe("rewriteAssetRefs with no context", () => {
-  /* Identity, asserted on the OBJECT: the walk must not allocate a copy when there is nothing to
-     do, because the render doc shares its nodes with the tab's source document. */
-  test("returns the very same document", () => {
-    const doc = {
-      children: [{ attributes: { src: "./images/hero.png" }, tagName: "img" }],
-      tagName: "div",
-    } as unknown as JxMutableNode;
-    expect(rewriteAssetRefs(doc, null)).toBe(doc);
   });
 });
 

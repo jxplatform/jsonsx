@@ -402,6 +402,30 @@ describe("project-less mode (/studio)", () => {
   });
 });
 
+/**
+ * What the canvas origin answers for a site URL — the declaration the whole media fix turns on.
+ *
+ * Studio.jxsuite.com is a multi-tenant SPA origin: `/hero.jpg` misses Workers Static Assets and the
+ * single-page-app fallback answers index.html at HTTP 200, so the `<img>` gets HTML, renders
+ * broken, and logs nothing. `"repo"` is how the adapter says so.
+ */
+describe("assetSpace", () => {
+  test("a bound session serves project paths under /raw", () => {
+    const p = createCloudPlatform(PROJECT);
+    expect(p.assetSpace).toBe("repo");
+    expect(p.documentBaseUrl).toBe(`${BASE}/raw/`);
+  });
+
+  /* Both or neither. Until a project is bound there is no /raw to address, and a declaration that
+     said "your site URLs are wrong" without saying what is right would leave the hub resolving
+     every reference to a base that does not exist. */
+  test("the project-less hub declares NEITHER", () => {
+    const p = createCloudPlatform(null);
+    expect(p.assetSpace).toBeUndefined();
+    expect(p.documentBaseUrl).toBeUndefined();
+  });
+});
+
 describe("identity & cloudflare surface", () => {
   test("getUser maps the platform identity and nulls on 401", async () => {
     mockFetch({

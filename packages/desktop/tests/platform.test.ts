@@ -297,6 +297,17 @@ describe("platform methods", () => {
     expect(platform.createDestination).toBe("path");
     await platform.activate();
   });
+  /**
+   * THIS ASSERTION IS THE IDENTITY GUARANTEE.
+   *
+   * `assetSpace` absent means `"site"`, and `"site"` is exactly what shipped: the desktop loopback
+   * IS the published site URL space (`serveProjectFile` in `@jxsuite/server`), so `/hero.jpg`
+   * already resolves and Studio must not touch it. A value here — any value — would put the canvas
+   * on a resolution path this host has never needed.
+   */
+  test("declares NO assetSpace: the loopback already serves the site URL space", () => {
+    expect(platform.assetSpace).toBeUndefined();
+  });
 
   test("activate stores the loopback canvasUrl returned by getCanvasUrl", async () => {
     impls.set("getCanvasUrl", () => ({
