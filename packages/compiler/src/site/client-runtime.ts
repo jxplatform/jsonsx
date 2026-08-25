@@ -15,7 +15,7 @@
  * @docs framework/build
  */
 
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, relative, resolve } from "node:path";
 import type { BundleResolver } from "./bundler.ts";
@@ -84,7 +84,15 @@ export interface ClientRuntime {
  * @param {string} [resolveDir] - Directory bare specifiers resolve from; defaults to this package
  * @returns {ClientRuntime}
  */
-export function resolveClientRuntime(resolveDir: string = import.meta.dir): ClientRuntime {
+/**
+ * This package's own directory, resolved under both runtimes. `import.meta.dir` is Bun-only and is
+ * `undefined` under Node — and `bin/jx.js` carries a Node shebang, so every `bunx jx build` took
+ * that path, `join(undefined, …)` threw, the bare catch read it as "cannot resolve", and the import
+ * map fell back to the esm.sh CDN. `import.meta.dirname` is defined on both.
+ */
+const PACKAGE_DIR = import.meta.dirname;
+
+export function resolveClientRuntime(resolveDir: string = PACKAGE_DIR): ClientRuntime {
   const imports: Record<string, string> = {};
   const warnings: string[] = [];
   const assetPaths: string[] = [];
@@ -122,7 +130,7 @@ export function resolveClientRuntime(resolveDir: string = import.meta.dir): Clie
 export async function writeClientRuntime(
   runtime: ClientRuntime,
   outDir: string,
-  resolveDir: string = import.meta.dir,
+  resolveDir: string = PACKAGE_DIR,
 ): Promise<{ written: number; errors: string[] }> {
   const errors: string[] = [];
   let written = 0;
@@ -212,7 +220,7 @@ const MAX_SUBPATH_PASSES = 10;
  */
 export async function writeRuntimeSubpaths(
   outDir: string,
-  resolveDir: string = import.meta.dir,
+  resolveDir: string = PACKAGE_DIR,
 ): Promise<{ written: number; errors: string[] }> {
   const errors: string[] = [];
   const done = new Set<string>();
@@ -235,7 +243,7 @@ export async function writeRuntimeSubpaths(
 
   /** `from "lit-html/directives/class-map.js"` — the import forms a bundler emits. */
   const importedSpecifiers = async (file: string): Promise<string[]> => {
-    const text = await Bun.file(file).text();
+    const text = readFileSync(file, "utf8");
     return [...text.matchAll(/(?:from|import)\s*["']([^"']+)["']/g)].map((m) => m[1] as string);
   };
 
@@ -243,9 +251,10 @@ export async function writeRuntimeSubpaths(
     let discovered = 0;
     let files: string[] = [];
     try {
-      files = await Array.fromAsync(
-        new Bun.Glob("**/*.js").scan({ absolute: true, cwd: assetsDir }),
-      );
+      files = readdirSync(assetsDir, { recursive: true })
+        .map(String)
+        .filter((entry) => entry.endsWith(".js"))
+        .map((entry) => join(assetsDir, entry));
     } catch {
       return finish(outDir, mirrors, errors, written);
     }

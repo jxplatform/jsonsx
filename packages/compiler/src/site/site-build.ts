@@ -18,6 +18,7 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
+import { createHash } from "node:crypto";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { isMappedArray, isRef } from "@jxsuite/schema/guards";
 import { isNpmSpecifier, npmAssetPath, sidecarAssetPath } from "@jxsuite/schema/asset-paths";
@@ -181,7 +182,11 @@ export async function buildSite(
   const elementBundles = new Map<string, string[]>();
   const registerElementBundle = (specifiers: string[]): string => {
     const sorted = specifiers.toSorted();
-    const key = Bun.hash(sorted.join("\u0000")).toString(36);
+    /*
+     * `node:crypto` rather than `Bun.hash`: the jx bin runs under Node, where the Bun global does
+     * not exist, and this line is reached by any page registering npm `$elements`.
+     */
+    const key = createHash("sha1").update(sorted.join("\u0000")).digest("hex").slice(0, 12);
     const assetPath = `/assets/elements-${key}.js`;
     elementBundles.set(assetPath, sorted);
     return assetPath;
