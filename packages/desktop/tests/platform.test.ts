@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
+import type { StudioPlatform } from "@jxsuite/studio/types";
 
 try {
   GlobalRegistrator.register();
@@ -306,7 +307,10 @@ describe("platform methods", () => {
    * on a resolution path this host has never needed.
    */
   test("declares NO assetSpace: the loopback already serves the site URL space", () => {
-    expect(platform.assetSpace).toBeUndefined();
+    // Through the INTERFACE: the factory returns an INFERRED type (see `platform.ts`), so a
+    // Property it deliberately does not set is not on that type at all. The assertion is about
+    // What a host MAY declare, and this one declaring nothing.
+    expect((platform as unknown as StudioPlatform).assetSpace).toBeUndefined();
   });
 
   test("activate stores the loopback canvasUrl returned by getCanvasUrl", async () => {
