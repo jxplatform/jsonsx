@@ -296,6 +296,80 @@ describe("resolveAssetRef", () => {
   });
 });
 
+/**
+ * Localized collections — `content/posts/{locale}`.
+ *
+ * A localized content type is N directories, not N content types, and each publishes separately at
+ * `/content/<type>/<locale>` so a French post's `./hero.png` and its English translation's cannot
+ * collide at one URL. The mount lookup normalized the source and then tested
+ * `path.startsWith("content/posts/{locale}/")` — a prefix no real path has ever begun with — so a
+ * translated entry matched NO mount at all and every one of its images resolved against
+ * `canvas.html`. Silent, and worse on the platform where nothing answers there either.
+ */
+describe("localized collections", () => {
+  const LOCALIZED = { posts: { format: "Markdown", source: "./content/posts/{locale}/" } };
+
+  test("an entry's locale directory becomes its own mount", () => {
+    expect(contentMountFor("content/posts/fr/hello.md", LOCALIZED, ["en", "fr"])).toEqual({
+      dir: "content/posts/fr",
+      urlPrefix: "/content/posts/fr",
+    });
+  });
+
+  /* Two writers name that directory and they differ: a project that declared `fr-CA` most likely
+     typed `fr-CA/`, while Studio creates `fr-ca/` because a page directory becomes a URL and the
+     site's URLs are lowercase. The mount's `dir` is what is on disk; its prefix is the canonical
+     tag, exactly as the content loader publishes it. */
+  test("the directory matches case-insensitively, and the URL keeps the canonical tag", () => {
+    expect(contentMountFor("content/posts/fr-ca/hello.md", LOCALIZED, ["en", "fr-CA"])).toEqual({
+      dir: "content/posts/fr-ca",
+      urlPrefix: "/content/posts/fr-CA",
+    });
+  });
+
+  test("a directory the project does not declare as a locale is not a mount", () => {
+    expect(contentMountFor("content/posts/de/hello.md", LOCALIZED, ["en", "fr"])).toBeNull();
+    // And with no locales declared at all, a `{locale}` source publishes nothing.
+    expect(contentMountFor("content/posts/fr/hello.md", LOCALIZED, [])).toBeNull();
+  });
+
+  test("a nested entry inside a locale directory belongs to the same mount", () => {
+    expect(contentMountFor("content/posts/fr/2026/hello.md", LOCALIZED, ["fr"])).toEqual({
+      dir: "content/posts/fr",
+      urlPrefix: "/content/posts/fr",
+    });
+  });
+
+  test("the collection root itself is not an entry", () => {
+    expect(contentMountFor("content/posts/hello.md", LOCALIZED, ["en", "fr"])).toBeNull();
+  });
+
+  test("a French entry's relative image resolves inside its own locale", () => {
+    const mount = contentMountFor("content/posts/fr/hello.md", LOCALIZED, ["fr"])!;
+    expect(
+      resolveAssetRef("./images/hero.png", ctxFor("content/posts/fr", { mounts: [mount] })),
+    ).toBe("/content/posts/fr/images/hero.png");
+  });
+
+  test("and in repo space it names the real file, locale directory and all", () => {
+    const mount = contentMountFor("content/posts/fr/hello.md", LOCALIZED, ["fr"])!;
+    expect(
+      resolveAssetRef(
+        "./images/hero.png",
+        ctxFor("content/posts/fr", {
+          fileBaseUrl: "https://studio.example.com/p/o/r/main/raw/",
+          mounts: [mount],
+          space: "repo",
+        }),
+      ),
+    ).toBe("https://studio.example.com/p/o/r/main/raw/content/posts/fr/images/hero.png");
+  });
+
+  test("a locale segment that is not URL-safe is refused", () => {
+    expect(contentMountFor("content/posts/a b/hello.md", LOCALIZED, ["a b"])).toBeNull();
+  });
+});
+
 describe("assetContextFor", () => {
   test("site space needs a mount to have anything to do", () => {
     expect(assetContextFor("pages/index.json")).toBeNull();
@@ -323,5 +397,20 @@ describe("assetContextFor", () => {
      that makes the preview agree with the deployed site is the build's, not the dev server's. */
   test("resolves site URLs the way a BUILD would", () => {
     expect(assetContextFor("content/posts/hello.md")?.lanes).toBe(BUILD_LANES);
+  });
+
+  test("reads the project's canonical locales, so a localized entry gets its mount", () => {
+    resetStudioState({
+      projectConfig: {
+        content: { posts: { format: "Markdown", source: "./content/posts/{locale}/" } },
+        i18n: { locales: ["EN-us", "fr"] },
+      },
+      name: "Demo",
+    });
+    // `EN-us` canonicalizes to `en-US`, so the directory matches case-insensitively either way.
+    expect(assetContextFor("content/posts/en-us/hello.md")).toMatchObject({
+      documentDir: "content/posts/en-us",
+      mounts: [{ dir: "content/posts/en-us", urlPrefix: "/content/posts/en-US" }],
+    });
   });
 });

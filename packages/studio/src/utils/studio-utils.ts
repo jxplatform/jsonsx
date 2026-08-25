@@ -118,6 +118,34 @@ export function abbreviateValue(val: string) {
 }
 
 /**
+ * The placeholder a content type's `source` may carry to say "one directory per locale".
+ *
+ * Duplicated from `@jxsuite/parser`'s content loader rather than imported: that module reads the
+ * filesystem and this one runs in a browser.
+ */
+const LOCALE_PLACEHOLDER = "{locale}";
+
+/**
+ * True when a schema `format` names a MEDIA reference.
+ *
+ * Two spellings, and both are real. `"uri-reference"` is JSON Schema's own and the one the spec
+ * uses — it is what the content loader keys its asset rewrite on (`rewriteEntryAssets`) and what a
+ * schema written against the documentation says. `"image"` is Studio's own shorthand, used by
+ * component props and settings schemas.
+ *
+ * They were accepted in different places, so which editor a field got depended on which panel was
+ * asking: `inferInputType` took both, the frontmatter panel took only `"image"`, and the drop
+ * target, the signals panel and the data grid each took only one. One predicate, so a field is a
+ * media field everywhere or nowhere.
+ *
+ * @param {unknown} format - A schema entry's `format`
+ * @returns {boolean}
+ */
+export function isMediaFormat(format: unknown): boolean {
+  return format === "image" || format === "uri-reference";
+}
+
+/**
  * Determine input widget type from a css-meta entry
  *
  * @param {Record<string, unknown>} entry
@@ -136,7 +164,7 @@ export function inferInputType(entry: Record<string, unknown>) {
   if (entry.format === "color") {
     return "color";
   }
-  if (entry.format === "uri-reference") {
+  if (isMediaFormat(entry.format)) {
     return "media";
   }
   if (entry.$units !== undefined) {
@@ -179,7 +207,7 @@ export function findContentTypeSchema(
       continue;
     }
     const src = def.source.replace(/^\.\//, "").replace(/\/$/, "");
-    const hasExt = src.includes(".") && !src.endsWith("/");
+    const hasExt = src.includes(".") && !src.endsWith("/") && !src.includes(LOCALE_PLACEHOLDER);
     if (hasExt) {
       if (docPath === src || docPath.endsWith(`/${src}`)) {
         return { name, schema: def.schema };
@@ -191,7 +219,20 @@ export function findContentTypeSchema(
           : (formatByName(def.format)?.extensions[0] ??
             defaultContentFormat()?.extensions[0] ??
             ".json");
-      if (docPath.startsWith(`${src}/`) && docPath.endsWith(ext)) {
+      /* A localized source is N directories, one content type: `content/posts/{locale}` matches
+         `content/posts/fr/hello.md` and carries the SAME schema, because a translation is the same
+         post. Without this the placeholder was compared literally, matched no path anybody has, and
+         a translated entry showed no frontmatter fields at all. */
+      const prefix = src.includes(LOCALE_PLACEHOLDER)
+        ? new RegExp(
+            `^${src
+              .split(LOCALE_PLACEHOLDER)
+              .map((part) => part.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`))
+              .join("[^/]+")}/`,
+          )
+        : null;
+      const matches = prefix ? prefix.test(docPath) : docPath.startsWith(`${src}/`);
+      if (matches && docPath.endsWith(ext)) {
         return { name, schema: def.schema };
       }
     }

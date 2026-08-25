@@ -32,7 +32,7 @@
  */
 
 import { encodeProjectPath, normalizeProjectPath, PUBLIC_DIR } from "@jxsuite/schema/asset-paths";
-import { contentMountFor, hostAssetDeclarations } from "../canvas/asset-refs";
+import { contentMountFor, hostAssetDeclarations, projectLocales } from "../canvas/asset-refs";
 import { loopbackAssetSrc } from "../canvas/canvas-origin";
 import { projectState } from "../store";
 import type { AssetMount } from "@jxsuite/schema/asset-paths";
@@ -70,7 +70,7 @@ function contentSections(): Record<string, ContentSectionEntry> | null {
  * rather than duplicating the loop.
  */
 function mountOf(path: string): AssetMount | null {
-  return contentMountFor(path, contentSections());
+  return contentMountFor(path, contentSections(), projectLocales());
 }
 
 /**

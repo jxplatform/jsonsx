@@ -45,6 +45,7 @@ import {
   projectPathForRef,
   splitRefSuffix,
 } from "@jxsuite/schema/asset-paths";
+import { resolveI18n } from "@jxsuite/schema/locale";
 import { documentBase, loopbackAssetSrc } from "./canvas-origin";
 import { getPlatform, hasPlatform } from "../platform";
 import { projectState } from "../store";
@@ -57,6 +58,14 @@ const SAFE_TYPE_NAME = /^[\w.~-]+$/;
 
 /** The project.json section key content types live under; also their URL namespace. */
 const SECTION_KEY = "content";
+
+/**
+ * The placeholder a content type's `source` may carry to say "one directory per locale".
+ *
+ * Duplicated from `@jxsuite/parser`'s content loader rather than imported: that module reads the
+ * filesystem, and this one runs in a browser. The two are asserted to agree in the parser's tests.
+ */
+const LOCALE_PLACEHOLDER = "{locale}";
 
 /**
  * Everything the canvas needs to resolve one reference, as PLAIN DATA.
@@ -96,30 +105,100 @@ export interface AssetContext {
  * Only in-project sources can match: an entry Studio can address project-relatively is by
  * definition inside the project, and a source pointing elsewhere (`../../docs`) names files the
  * file tree cannot reach in the first place.
+ *
+ * @param {string | null | undefined} documentPath - Project-relative path of the open document
+ * @param {Record<string, ContentSectionEntry> | null | undefined} content - Project.json `content`
+ * @param {readonly string[]} [locales] - Canonical locale tags, for `{locale}` sources
+ * @returns {AssetMount | null} The mount, project-relative
  */
 export function contentMountFor(
   documentPath: string | null | undefined,
   content: Record<string, ContentSectionEntry> | null | undefined,
+  locales: readonly string[] = [],
 ): AssetMount | null {
   if (!documentPath || !content) {
     return null;
   }
   const path = documentPath.replaceAll("\\", "/").replace(/^\.\//, "");
   let best: AssetMount | null = null;
+  const consider = (dir: string, urlPrefix: string): void => {
+    if (path.startsWith(`${dir}/`) && (!best || dir.length > best.dir.length)) {
+      best = { dir, urlPrefix };
+    }
+  };
   for (const [name, def] of Object.entries(content)) {
     if (!def?.source || !SAFE_TYPE_NAME.test(name)) {
       continue;
     }
     const dir = normalizeSource(def.source);
     // A single-file source is not a collection directory — its siblings are not its assets.
-    if (dir === "" || dir.startsWith("..") || /\.[a-z0-9]+$/i.test(dir)) {
+    if (dir === "" || dir.startsWith("..")) {
       continue;
     }
-    if (path.startsWith(`${dir}/`) && (!best || dir.length > best.dir.length)) {
-      best = { dir, urlPrefix: `/${SECTION_KEY}/${name}` };
+    if (dir.includes(LOCALE_PLACEHOLDER)) {
+      const mount = localeMountFor(path, dir, name, locales);
+      if (mount) {
+        consider(mount.dir, mount.urlPrefix);
+      }
+      continue;
     }
+    if (/\.[a-z0-9]+$/i.test(dir)) {
+      continue;
+    }
+    consider(dir, `/${SECTION_KEY}/${name}`);
   }
   return best;
+}
+
+/**
+ * The mount for ONE locale of a `{locale}` source — the locale being whichever one `path` is in.
+ *
+ * A localized content type is N directories, not N content types, and each publishes separately at
+ * `/content/<type>/<locale>` so a French post's `./hero.png` and its English translation's cannot
+ * collide at one URL. The content loader picks the directory by probing the disk (`localeSource`);
+ * Studio has no disk, so it reads the locale out of the document path it was given and checks that
+ * against the project's declared tags. That is not a weaker test — the path IS the file, so the
+ * only question left is whether its directory is a locale the project declares.
+ *
+ * Matched case-insensitively, for the same reason the loader does: two writers name that directory
+ * and they differ. A project that declared `fr-CA` most likely typed `fr-CA/`, while Studio creates
+ * `fr-ca/` because a page directory becomes a URL and the site's URLs are lowercase. The mount's
+ * `dir` is the spelling on disk and its `urlPrefix` is the CANONICAL tag, exactly as the loader
+ * publishes it.
+ */
+function localeMountFor(
+  path: string,
+  source: string,
+  name: string,
+  locales: readonly string[],
+): AssetMount | null {
+  const cut = source.indexOf(LOCALE_PLACEHOLDER);
+  const head = source.slice(0, cut);
+  const tail = source.slice(cut + LOCALE_PLACEHOLDER.length);
+  if (!path.startsWith(head)) {
+    return null;
+  }
+  const segment = path.slice(head.length).split("/")[0] ?? "";
+  if (segment === "" || !SAFE_TYPE_NAME.test(segment)) {
+    return null;
+  }
+  const canonical = locales.find((tag) => tag.toLowerCase() === segment.toLowerCase());
+  if (canonical === undefined || !SAFE_TYPE_NAME.test(canonical)) {
+    return null;
+  }
+  const dir = `${head}${segment}${tail}`.replace(/\/+$/, "");
+  return { dir, urlPrefix: `/${SECTION_KEY}/${name}/${canonical}` };
+}
+
+/**
+ * The open project's canonical locale tags, or `[]` when it declares none.
+ *
+ * Through `resolveI18n` rather than off the raw config, so `EN-us` means the same thing here as it
+ * does in the compiler and the content loader — the whole reason that resolver is in
+ * `@jxsuite/schema`.
+ */
+export function projectLocales(): string[] {
+  return resolveI18n(projectState?.projectConfig ?? {}).i18n?.locales ?? [];
 }
 
 /** Strip `./` and any trailing slash from a configured `source`, the way collectionDirs does. */
@@ -142,6 +221,7 @@ export function assetContextFor(
   const mount = contentMountFor(
     documentPath,
     projectState?.projectConfig?.content as Record<string, ContentSectionEntry> | undefined,
+    projectLocales(),
   );
   /* In site space the mount is the ONLY thing that needs doing, so no mount means no work. In repo
      space every reference needs rebasing, mount or not. */

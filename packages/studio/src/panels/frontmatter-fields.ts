@@ -14,7 +14,7 @@ import { renderFieldRow } from "../ui/field-row";
 import { spNumberField, spTextField } from "../ui/field-input";
 import { renderMediaPicker } from "../ui/media-picker";
 import { mutateUpdateFrontmatter, transactDoc } from "../tabs/transact";
-import { findContentTypeSchema } from "../utils/studio-utils";
+import { findContentTypeSchema, isMediaFormat } from "../utils/studio-utils";
 import { NULL_FORM_CONTEXT, getFormControl, referenceTarget } from "../ui/schema-form";
 import type { JsonSchema } from "../ui/schema-form";
 
@@ -233,7 +233,11 @@ export function renderFmField(
     });
   }
 
-  if (entry.format === "image") {
+  /* Both spellings. `"uri-reference"` is the one the SPEC uses and the one the content loader keys
+     its asset rewrite on (`rewriteEntryAssets`), so a schema written against the spec got a plain
+     text box here while the same field got a media picker in the properties panel — which reads
+     `inferInputType`, and that has always accepted it. */
+  if (isMediaFormat(entry.format)) {
     return renderFieldRow({
       hasValue: hasVal,
       label: displayLabel,

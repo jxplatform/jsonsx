@@ -49,7 +49,13 @@ import { renderFieldRow, renderKvRow } from "../ui/field-row";
 import type { FieldProvenance } from "./provenance";
 import { renderDynamicSlot, slotMode } from "../ui/dynamic-slot";
 import { spTextArea, spTextField } from "../ui/field-input";
-import { attrLabel, camelToLabel, inferInputType, parseCemType } from "../utils/studio-utils";
+import {
+  attrLabel,
+  camelToLabel,
+  inferInputType,
+  isMediaFormat,
+  parseCemType,
+} from "../utils/studio-utils";
 import { classifyHref, composeHref } from "../utils/link-target";
 import type { LinkKind } from "../utils/link-target";
 import {
@@ -274,7 +280,7 @@ function renderComponentPropsFieldsTemplate(
       /** @type {ReturnType<typeof setTimeout> | undefined} */
       let debounce: ReturnType<typeof setTimeout> | undefined;
       let widgetTpl;
-      if (prop.format === "image") {
+      if (isMediaFormat(prop.format)) {
         widgetTpl = renderMediaPicker(prop.name, staticVal, onChange);
       } else if (prop.format === "color") {
         widgetTpl = renderColorSelector(prop.name, staticVal, onChange);
