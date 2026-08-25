@@ -17,19 +17,19 @@ This page is generated from the `> **Status: …**` markers in the specification
 | `ai.md`                   | 0.1.8-draft  | Partial     | 2026-08-23 |
 | `collab.md`               | 0.2.5-draft  | Partial     | 2026-08-20 |
 | `compiler.md`             | 0.3.1-draft  | Partial     | 2026-08-18 |
-| `desktop.md`              | 0.3.23-draft | Pending     | 2026-08-25 |
-| `extensions.md`           | 0.3.10-draft | Partial     | 2026-08-20 |
+| `desktop.md`              | 0.3.24-draft | Pending     | 2026-08-25 |
+| `extensions.md`           | 0.3.11-draft | Partial     | 2026-08-25 |
 | `imports.md`              | 0.1.9-draft  | Partial     | 2026-08-15 |
 | `jx-markdown.md`          | 0.1.8-draft  | Partial     | 2026-08-15 |
 | `parser.md`               | 0.2.9-draft  | Partial     | 2026-08-16 |
 | `relationships.md`        | 0.1.4-draft  | Partial     | 2026-08-15 |
 | `schema.md`               | 0.4.8-draft  | Partial     | 2026-08-16 |
 | `server.md`               | 0.2.11       | Implemented | 2026-08-22 |
-| `site-architecture.md`    | 0.5.16-draft | Partial     | 2026-08-19 |
+| `site-architecture.md`    | 0.5.17-draft | Partial     | 2026-08-25 |
 | `spec.md`                 | 0.5.5-draft  | Partial     | 2026-08-24 |
 | `standards.md`            | 0.1.15-draft | Partial     | 2026-08-17 |
 | `studio-ui-guidelines.md` | 0.3.14       | Implemented | 2026-08-22 |
-| `studio.md`               | 0.9.43-draft | Partial     | 2026-08-25 |
+| `studio.md`               | 0.9.44-draft | Partial     | 2026-08-25 |
 
 ## Sections not yet implemented
 
@@ -38,6 +38,7 @@ This page is generated from the `> **Status: …**` markers in the specification
 - `collab.md` §5 — Version Skew
 - `compiler.md` §3 — Output Tiers
 - `desktop.md` §10 — SaaS / Cloud Mode
+- `desktop.md` §10.2 — Storage Backend
 - `parser.md` §3 — `Markdown` — the markdown format class
 - `site-architecture.md` §9.4 — Studio Media Browser
 - `site-architecture.md` §13 — Internationalization
@@ -58,7 +59,6 @@ This page is generated from the `> **Status: …**` markers in the specification
 ### Pending
 
 - `desktop.md` §4.3 — Single File Mode
-- `desktop.md` §10.2 — Storage Backend
 - `site-architecture.md` §12.3 — Incremental Builds
 
 ### Removed

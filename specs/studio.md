@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.43-draft
+**Version:** 0.9.44-draft
 **Status:** Partial
 **Updated:** 2026-08-25
 **License:** MIT
@@ -113,6 +113,25 @@ Studio uses a platform abstraction (`src/platform.ts`) to decouple UI from backe
 | `fetchProjectSchemas?()` | The active project's generated entry documents, PRE-BUNDLED (extensions.md §5.2) — drives §4.2.1           |
 | `canvasUrl?`             | The canvas iframe document. Absent means the bundle-relative default (§11.2)                               |
 | `canvasUrlDeferred?`     | This platform resolves `canvasUrl` asynchronously; the host waits rather than mounting the default (§11.2) |
+| `assetSpace?`            | What the canvas ORIGIN answers for a site URL: `"site"` (the default when absent) or `"repo"` (below)      |
+| `assetCapabilities?`     | What this backend accepts as an upload — `maxUploadBytes`, `accept`. Absent means no declared limit (§9.3) |
+
+**`assetSpace` is about the ORIGIN, not the backend.** A document references media by site URL
+(`/hero.jpg`) or relative to itself (`./images/hero.png`), and neither is a URL the canvas can use
+unless something on the canvas document's own origin serves the published site. A local editing
+server is that thing, so it declares nothing and `assetSpace` defaults to `"site"`: the origin
+already answers, and the only mapping Studio owes is the content-mount one in §4.1.
+
+A multi-tenant editor origin is not, and there a site URL reaches the editor's application shell —
+behind a single-page-app fallback, at **HTTP 200**, so the image renders broken and nothing is
+logged. Such a host declares `assetSpace: "repo"` together with `documentBaseUrl`, and Studio then
+resolves every authored reference to the **project file** it names and addresses that file under
+that base (`site-architecture.md` §9.3). `"repo"` without a base is inert: a host that says its
+site URLs are wrong without saying what is right has told Studio nothing it can act on.
+
+The two declarations MUST be made together or not at all. A session-less shell has no base to give,
+and half a declaration is worse than none — it would put every reference on a resolution path
+ending nowhere.
 
 Three platform targets:
 
@@ -163,9 +182,13 @@ Site style is injected into the canvas as a real stylesheet (custom properties i
 
 **Color-scheme preview.** When the effective `$media` declares a pure `prefers-color-scheme` query, the tab bar shows an Auto/Light/Dark control (one per tab; available in edit, design, and stylebook modes). Light/Dark force the scheme by setting `data-color-scheme` on the canvas iframe's root element — a patch-free document-level attribute flip that never re-renders; Auto removes the attribute and follows the OS. Scheme queries no longer render as generic feature toggles. The same tri-state also selects which scheme layer style-sidebar edits target (§6.2).
 
-**Content-entry media.** A content entry references its media relative to ITSELF (`./images/hero.png`), and the built site serves those files from the content type's asset mount (`site-architecture.md` §9.3). Studio opens an entry as a standalone document, so the collection loader that normally performs that mapping never runs — the canvas would otherwise resolve the authored path against `canvas.html`. The render document is therefore mapped onto the mount before it is posted to the iframe, in every mode, so the canvas previews the URL production serves.
+**Media is resolved AT RENDER, not by rewriting the document.** A content entry references its media relative to ITSELF (`./images/hero.png`) and the built site serves those files from the content type's asset mount (`site-architecture.md` §9.3); Studio opens an entry as a standalone document, so the collection loader that normally performs that mapping never runs. A page references media by site URL, which resolves only if the canvas origin serves the site's URL space (§3.4).
 
-The mapping is render-only: the tab's source document keeps the authored relative reference, so serialization and the properties panel are unaffected. Parent-realm previews of the same values — the media picker's thumbnail — apply it too, since panel chrome would otherwise resolve them against `index.html`. Eligibility and URL math are shared with the loader; the browser cannot perform the loader's existence check, so a reference to a missing file maps optimistically and fails at the mount URL instead.
+Both are answered by one hook the canvas installs on the runtime, applied wherever a URL-bearing value reaches the DOM — an attribute, a DOM property, a `srcset` candidate, a `url()` in a style value, a `$head` `href`. The parent supplies the plain-data context the hook closes over; the resolver itself is a function and cannot cross the realm.
+
+**It MUST NOT be a walk over the render document.** `applyAttributes` resolves a `{"$ref": …}` or `"${…}"` value INSIDE a reactive effect, so at walk time a bound image `src` is not a string at all: a walk fixes literals and silently leaves every bound reference broken. That failure is invisible in design and edit, which replace a bound media `src` with a transparent placeholder, and appears all at once in preview — where a collection listing of bound card images is thirty broken pictures.
+
+Resolution is render-only in either space: the tab's source document keeps the authored reference, so serialization and the properties panel are unaffected. Parent-realm previews resolve through the same math (`site-architecture.md` §9.4). The browser cannot perform the loader's existence check, so a reference to a missing file resolves optimistically and fails at the resolved URL instead.
 
 ### 4.2 Modes
 
@@ -1254,6 +1277,14 @@ An ambiguous component (two or more image props) falls through to an insert rath
 
 `StudioPlatform.uploadFile` accepts `string | File | Blob | ArrayBuffer`. The HTTP platforms (dev server, cloud) post the binary body directly; the RPC platforms (electrobun, chromium) JSON-serialize their params, so they base64-encode binary before the call and the backend decodes it. A `string` payload is already base64 and passes through untouched.
 
+It answers `UploadResult` — `{ path, size? }` — and **`path` is the answer, not an echo.** A backend MUST report where the bytes actually landed, and Studio MUST build the document's reference from that rather than from the path it asked for. A store that de-duplicates by content hash, appends a collision suffix, or normalizes a name writes somewhere else, and a reference built from the request names a file that is not there. A backend that writes exactly where it was told still reports it, so no caller has to know which kind of backend it is talking to.
+
+#### Declared limits
+
+A backend MAY declare `assetCapabilities`: `maxUploadBytes`, and an `accept` string in `<input accept>` syntax. Every field is optional and absence means **no declared limit** — Studio MUST NOT invent one, because a limit it made up is a file the author cannot upload for no reason anyone can name.
+
+A declared limit is different. Studio refuses an oversized file before spending the round trip and names the number in the refusal; the rest of the batch still lands. A declared `accept` NARROWS the file picker's own list and never widens it, because offering a type Studio cannot place in a document helps nobody.
+
 ---
 
 ## 10. Keyboard Shortcuts
@@ -1458,6 +1489,13 @@ rebases the canvas document's single entry reference; that document stays hand-a
 has to apply before the first paint. Hosts used to rewrite the shipped HTML with a prefix list, and
 when 2.1.0 split the chrome into `./styles/*.css` the cloud's list missed it: seven dead stylesheet
 links, an unstyled editor, and a build that exited 0.
+
+**A host declares what its origin serves.** Serving the tree is one half; the other is saying
+whether the canvas document's own origin answers a SITE URL. A host that mounts the studio beside
+the project it edits answers yes by construction and declares nothing. A host that mounts it on a
+shared origin does not, and must declare `assetSpace: "repo"` with `documentBaseUrl` (§3.4) — the
+canvas cannot discover this, because a single-page-app fallback answers a missing asset with the
+shell at HTTP 200 and there is nothing for it to detect.
 
 **`boot` is the PAL seam.** Module URLs evaluated before the studio entry, in order. The runtime
 half is unchanged (§3.3 of `desktop.md`): a boot module sets `globalThis.__jxPlatform`, or publishes
@@ -2426,6 +2464,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.9.44-draft** (2026-08-25) — Declare assetSpace: the canvas origin serves either the site URL space or repo paths under documentBaseUrl (§3.4/§4.1/§11.2); media resolves at render rather than by a document walk (§4.1); typed UploadResult and declared asset capabilities (§9.3).
 - **0.9.43-draft** (2026-08-25) — §13.5 names all seven quiescence sources, and adds the grid: a table still building, or built but not yet showing its selection range, is not settled.
 - **0.9.42-draft** (2026-08-24) — 8.2.6 refuses a prop delivered by any route the property bridge reads — a data-jx-props payload or a top-level key on the instance node, alongside the two attribute shapes — because $props is not the only place a value lives.
 - **0.9.41-draft** (2026-08-24) — 8.2.6 refuses a prop delivered through attributes — the props.* JSON shorthand or a name colliding with a reflected DOM property — because reading $props alone reports it unset, and committing would leave two sources for one rendered value; and 8.2 re-enters a prop host after a $props patch rebuilds the instance.
@@ -2524,4 +2563,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.43-draft_
+_`@jxsuite/studio` Specification v0.9.44-draft_

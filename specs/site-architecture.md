@@ -2,9 +2,9 @@
 
 ## File-Based Routing, Content Collections, Layouts, and Static Site Generation
 
-**Version:** 0.5.16-draft
+**Version:** 0.5.17-draft
 **Status:** Partial
-**Updated:** 2026-08-19
+**Updated:** 2026-08-25
 **License:** MIT
 
 ---
@@ -1399,6 +1399,18 @@ The rewrite above runs when a **collection** is loaded. An editor that opens a s
 
 A browser-hosted editor cannot perform the existence check, so it maps optimistically: a reference to a missing file resolves to its mount URL and 404s there rather than 404ing against the editor's document. Both are broken; the mount URL is the failure the build would also report.
 
+#### Editors whose host does not serve the site URL space
+
+The mapping above assumes the editor's own origin answers a site URL — that `/hero.jpg` reaches `public/hero.jpg` because something on that origin serves the published site. A local editing server is that thing; a multi-tenant editor origin is not, and there a site URL reaches the editor's own application shell instead. Behind a single-page-app fallback it reaches it at **HTTP 200**, so the failure is silent: the image renders broken and nothing is logged.
+
+Such an editor MUST NOT emit site URLs at all. It MUST resolve every authored reference to the **project file** it names and address that file by path, under a base its host serves:
+
+- A content-relative reference resolves against the entry's own directory, which is already a project path — `content/blog/images/hero.jpg`. **The mount detour disappears**: a mount publishes a file at a site URL, and this editor is not using site URLs.
+- A site-absolute reference is resolved the way a **build** resolves it — `public/…` first, then a mount's directory — never the way a local editing server does, whose extra project-root lane is a compatibility affordance and not part of this contract. An editor with no filesystem cannot probe, so it must take the build's answer: the preview's job is to agree with the deployed site.
+- A reference that names no project file — an absolute URL, a `data:` URI, a template — is left exactly as authored.
+
+An editor that declares this and gives no base has said its site URLs are wrong without saying what is right, and MUST leave every reference untouched rather than invent one.
+
 Only statically referenced files are copied into the build. A `src` computed at runtime belongs in `public/`.
 
 ### 9.4 Studio Media Browser
@@ -1407,6 +1419,15 @@ Only statically referenced files are copied into the build. A `src` computed at 
 > COMPUTED but not browsable — see the list at the end of this section, which contradicted this
 > marker for as long as both existed. The full Studio-side contract is `studio.md` §9.3 — this
 > section states only what it means for the media on disk.
+
+**A preview resolves in the same space the canvas does.** Panel chrome — a media-picker thumbnail,
+the social card in a search-appearance preview — renders in the editor's own document, not the
+canvas, so a reference resolved for one and not the other breaks in exactly the places nobody
+photographs. The two take different things and must not be confused: a preview of what the AUTHOR
+WROTE resolves as §9.3 describes, while a preview of a FILE the browser is listing starts from the
+path and asks where that file publishes. `public/hero.jpg` is written `/hero.jpg` — a string that
+shares not one segment with it — so a preview built by prefixing a file path with a slash names a
+URL the site does not publish.
 
 **Usage is keyed on the AUTHORED reference, not the resolved one.** A content-relative `./images/`
 reference previews at its asset-mount URL while the source keeps the authored form, so keying on
@@ -2633,6 +2654,7 @@ This spec builds on existing Jx primitives wherever possible:
 
 ## Changelog
 
+- **0.5.17-draft** (2026-08-25) — §9.3: an editor whose host does not serve the site URL space MUST resolve references to the project files they name; §9.4: a parent-realm preview resolves in the same space, and an authored reference is not a file path.
 - **0.5.16-draft** (2026-08-19) — §13.5: a translation key may name its route's parameters, so a collection's URLs can be localized; §13.3: a ContentEntry lookup is scoped to the route's language and a locale directory is matched case-insensitively; §6.7: a localized collection publishes one feed per language.
 - **0.5.15-draft** (2026-08-18) — §13.5: a document declares its identity across languages with $translationKey, so a localized slug is a translation; two routes claiming one language are reported, as an error when declared.
 - **0.5.14-draft** (2026-08-18) — §13.5 exposes the translation set to the page as $page.alternates, with each locale's autonym; §13.7 defaults a helper's locale to the page's own; §13.6 reports a prefix-always root no static deployment can answer.

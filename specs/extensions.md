@@ -2,9 +2,9 @@
 
 ## Extension Packages, Schema Composition, and the Capability Contract
 
-**Version:** 0.3.10-draft
+**Version:** 0.3.11-draft
 **Status:** Partial
-**Updated:** 2026-08-20
+**Updated:** 2026-08-25
 **License:** MIT
 
 Supersedes v1 ("Format-Extension Classes and the Capability Contract"). The
@@ -684,6 +684,19 @@ Statically referenced assets are the contract. A `src` a page computes at
 runtime cannot be discovered by the build scan, so those files belong in
 `public/`.
 
+**A host that cannot execute extension code sees only content-section mounts.**
+`assets` is a class capability, so a host with no extension runtime — a
+browser-hosted editor, a Worker session that loads configuration but not
+implementations — cannot call it and cannot know a third-party section's
+mounts. Such a host derives the mounts of the built-in `content` section from
+`project.json` alone, which is deterministic (`/content/<type>`, one per
+locale directory for a `{locale}` source), and treats every other section as
+having none. The consequence is bounded and worth stating: media beside an
+unknown section's sources resolves as authored rather than at a mount URL, so
+it is broken in that host's preview and correct on the built site. A mount
+whose `dir` sits outside the project root is unreachable for such a host in
+any case, because it addresses files by project path.
+
 ---
 
 ### 8.6 `head`
@@ -1117,6 +1130,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.3.11-draft** (2026-08-25) — §8.5: record that a host which cannot execute extension code sees only content-section mounts.
 - **0.3.10-draft** (2026-08-20) — §5.1 records the first-party fragment $id shape, https://jxsuite.com/schema/ext/<extension>/<kind>/v<n>.
 - **0.3.9-draft** (2026-08-16) — §13.1 auth session cookies: __Host- prefix derived from the origin's scheme, rate limiting on everywhere, session lifetime stated, Partitioned never set. Closes gap:cookie-prefixes.
 - **0.3.8-draft** (2026-08-16) — §8 _meta is reserved in a resolvePaths result — it carries the source entry's facts, never a route parameter.
@@ -1142,4 +1156,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx Extensions Specification v0.3.10-draft_
+_Jx Extensions Specification v0.3.11-draft_
