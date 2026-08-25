@@ -1,77 +1,46 @@
 /**
- * Content-relative asset resolution for the canvas — the mapping that makes a content entry's
- * `./images/hero.png` preview at the URL the built site serves (`/content/<type>/images/hero.png`)
- * instead of resolving against `canvas.html`.
+ * Asset resolution for the canvas.
  *
- * The rules mirror `rewriteEntryAssets` in extensions/parser/src/content-loader.ts; the cases below
- * are written against the CONTRACT (relative + inside the collection → mounted; everything else
- * untouched) so a divergence between the two shows up here.
+ * The `"site"` block below is a CHARACTERISATION suite, carried over from `content-assets.test.ts`
+ * unchanged in what it asserts: `"site"` is what desktop and `jx dev` have always done, so every
+ * one of these answers must survive the rebuild byte for byte. The rules mirror
+ * `rewriteEntryAssets` in extensions/parser/src/content-loader.ts, and the cases are written
+ * against the CONTRACT (relative + inside the collection → mounted; everything else untouched) so a
+ * divergence between the two shows up here.
+ *
+ * The `"repo"` block is the new space — a host that serves PROJECT PATHS because nothing answers a
+ * site URL on its origin.
  */
 import { beforeEach, describe, expect, test } from "bun:test";
 import { resetStudioState, resetWorkspaceWithTab } from "./harness";
 import { closeAllTabs } from "../src/workspace/workspace";
 import {
+  assetContextFor,
   contentMountFor,
-  dirOf,
   mountedRefFor,
   previewAssetSrc,
-  resolveRelativePath,
-  rewriteContentAssets,
-} from "../src/canvas/content-assets";
+  resolveAssetRef,
+  rewriteAssetRefs,
+} from "../src/canvas/asset-refs";
+import { BUILD_LANES } from "@jxsuite/schema/asset-paths";
+import type { AssetContext } from "../src/canvas/asset-refs";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
 const POSTS = { posts: { format: "Markdown", source: "./content/posts/" } };
 const MOUNT = { dir: "content/posts", urlPrefix: "/content/posts" };
 
+/** The context the canvas builds for an entry in POSTS, in whichever space. */
+function ctxFor(documentDir: string, over: Partial<AssetContext> = {}): AssetContext {
+  return { documentDir, lanes: BUILD_LANES, mounts: [MOUNT], space: "site", ...over };
+}
+
 beforeEach(() => {
-  resetStudioState();
+  // `assetContextFor` reads the open project's content sections, so seed them.
+  resetStudioState({ projectConfig: { content: POSTS, name: "Demo" } });
   closeAllTabs();
 });
 
-// ─── Path math ───────────────────────────────────────────────────────────────
-
-describe("resolveRelativePath", () => {
-  test("resolves ./ and bare segments against the directory", () => {
-    expect(resolveRelativePath("content/posts", "./images/a.png")).toBe(
-      "content/posts/images/a.png",
-    );
-    expect(resolveRelativePath("content/posts", "images/a.png")).toBe("content/posts/images/a.png");
-  });
-
-  test("walks .. and collapses redundant segments", () => {
-    expect(resolveRelativePath("content/posts/nested", "../images/a.png")).toBe(
-      "content/posts/images/a.png",
-    );
-    expect(resolveRelativePath("content/posts", "./././images//a.png")).toBe(
-      "content/posts/images/a.png",
-    );
-  });
-
-  test("a root-level directory still resolves", () => {
-    expect(resolveRelativePath("", "a.png")).toBe("a.png");
-    expect(resolveRelativePath(".", "a.png")).toBe("a.png");
-  });
-
-  test("climbing above the project root is refused — it can never name a mounted file", () => {
-    expect(resolveRelativePath("content/posts", "../../../outside.png")).toBeNull();
-    expect(resolveRelativePath("", "../outside.png")).toBeNull();
-  });
-
-  test("backslashes normalize to forward slashes", () => {
-    expect(resolveRelativePath(String.raw`content\posts`, String.raw`.\images\a.png`)).toBe(
-      "content/posts/images/a.png",
-    );
-  });
-});
-
-describe("dirOf", () => {
-  test("returns the directory, or empty for a root-level file", () => {
-    expect(dirOf("content/posts/hello.md")).toBe("content/posts");
-    expect(dirOf("hello.md")).toBe("");
-  });
-});
-
-// ─── Mount lookup ────────────────────────────────────────────────────────────
+// ─── Mounts ─────────────────────────────────────────────────────────────────
 
 describe("contentMountFor", () => {
   test("maps an entry to its content type's mount", () => {
@@ -181,7 +150,7 @@ describe("mountedRefFor", () => {
 
 // ─── Document rewrite ────────────────────────────────────────────────────────
 
-describe("rewriteContentAssets", () => {
+describe("rewriteAssetRefs, in site space", () => {
   const doc = (): JxMutableNode =>
     ({
       children: [
@@ -199,7 +168,7 @@ describe("rewriteContentAssets", () => {
       tagName: "source",
     } as unknown as JxMutableNode);
 
-    const out = rewriteContentAssets(source, "content/posts/hello.md", POSTS);
+    const out = rewriteAssetRefs(source, assetContextFor("content/posts/hello.md"));
     const kids = out.children as Record<string, any>[];
 
     expect(kids[0]!.attributes.src).toBe("/content/posts/images/hero.png");
@@ -212,14 +181,14 @@ describe("rewriteContentAssets", () => {
   test("the SOURCE document is never mutated — it is what gets serialized back to disk", () => {
     const source = doc();
     const before = structuredClone(source);
-    rewriteContentAssets(source, "content/posts/hello.md", POSTS);
+    rewriteAssetRefs(source, assetContextFor("content/posts/hello.md"));
     expect(source).toEqual(before);
   });
 
   test("untouched subtrees keep their identity (pure rebuild, not a deep clone)", () => {
     const source = doc();
     const [, untouched] = source.children as JxMutableNode[];
-    const out = rewriteContentAssets(source, "content/posts/hello.md", POSTS);
+    const out = rewriteAssetRefs(source, assetContextFor("content/posts/hello.md"));
 
     expect(out).not.toBe(source); // The path to a rewritten node is rebuilt…
     const [, stillShared] = out.children as JxMutableNode[];
@@ -231,12 +200,12 @@ describe("rewriteContentAssets", () => {
       children: [{ children: ["hi"], tagName: "p" }],
       tagName: "div",
     } as JxMutableNode;
-    expect(rewriteContentAssets(clean, "content/posts/hello.md", POSTS)).toBe(clean);
+    expect(rewriteAssetRefs(clean, assetContextFor("content/posts/hello.md"))).toBe(clean);
   });
 
   test("a non-content document is returned as-is", () => {
     const source = doc();
-    expect(rewriteContentAssets(source, "pages/index.json", POSTS)).toBe(source);
+    expect(rewriteAssetRefs(source, assetContextFor("pages/index.json"))).toBe(source);
   });
 
   test("nested children are reached", () => {
@@ -250,7 +219,7 @@ describe("rewriteContentAssets", () => {
       tagName: "div",
     } as unknown as JxMutableNode;
 
-    const out = rewriteContentAssets(nested, "content/posts/hello.md", POSTS);
+    const out = rewriteAssetRefs(nested, assetContextFor("content/posts/hello.md"));
     const [figure] = out.children as any[];
     const [img] = figure.children;
     expect(img.attributes.src).toBe("/content/posts/images/deep.png");
@@ -262,7 +231,7 @@ describe("rewriteContentAssets", () => {
       tagName: "div",
     } as unknown as JxMutableNode;
 
-    const out = rewriteContentAssets(nested, "content/posts/2026/hello.md", POSTS);
+    const out = rewriteAssetRefs(nested, assetContextFor("content/posts/2026/hello.md"));
     const [img] = out.children as any[];
     expect(img.attributes.src).toBe("/content/posts/2026/images/a.png");
   });
@@ -294,5 +263,150 @@ describe("previewAssetSrc", () => {
   test("passes through with no tab open", () => {
     resetStudioState({ projectConfig: { content: POSTS, name: "Demo" } });
     expect(previewAssetSrc("./images/hero.png")).toBe("./images/hero.png");
+  });
+});
+
+// ─── The resolver itself ─────────────────────────────────────────────────────
+
+/**
+ * `resolveAssetRef` is the whole of the resolution — the walk above and the runtime hook the canvas
+ * installs both call this and nothing else. Testing it directly is what keeps the two honest: a
+ * bound `{"$ref": …}` src never reaches the walk, so the walk's tests can only ever cover half of
+ * what the canvas does.
+ */
+describe("resolveAssetRef", () => {
+  test("no context resolves nothing at all", () => {
+    expect(resolveAssetRef("./images/hero.png", null)).toBeNull();
+  });
+
+  test("an empty reference resolves to nothing", () => {
+    expect(resolveAssetRef("", ctxFor("content/posts"))).toBeNull();
+  });
+
+  describe("site space — the origin already answers site URLs", () => {
+    test("a content-relative ref takes its collection's mount", () => {
+      expect(resolveAssetRef("./images/hero.png", ctxFor("content/posts"))).toBe(
+        "/content/posts/images/hero.png",
+      );
+    });
+
+    /* The origin serves these correctly already, so touching them would be the bug. */
+    test("a site URL is left exactly as written", () => {
+      expect(resolveAssetRef("/hero.jpg", ctxFor("content/posts"))).toBeNull();
+      expect(resolveAssetRef("https://cdn.example.com/a.png", ctxFor("content/posts"))).toBeNull();
+    });
+
+    test("outside any mount, nothing resolves", () => {
+      expect(resolveAssetRef("./images/hero.png", ctxFor("pages", { mounts: [] }))).toBeNull();
+    });
+  });
+
+  /**
+   * Repo space — nothing on the canvas origin answers a site URL, so every reference resolves to
+   * the project file it names and is rebased onto the host's file base.
+   *
+   * The mount detour disappears here: a content entry's `./images/hero.png` IS
+   * `content/posts/images/hero.png`, a real path the host already serves. That is what keeps this
+   * cheap — no `public/`→root mapping on the host, no asset-mount mapping, no new route.
+   */
+  describe("repo space — the host serves project paths", () => {
+    const repo = (documentDir: string): AssetContext =>
+      ctxFor(documentDir, {
+        fileBaseUrl: "https://studio.example.com/p/o/r/main/raw/",
+        space: "repo",
+      });
+
+    test("a site URL resolves to the file the BUILD would publish there", () => {
+      expect(resolveAssetRef("/hero.jpg", repo("pages"))).toBe(
+        "https://studio.example.com/p/o/r/main/raw/public/hero.jpg",
+      );
+    });
+
+    test("a content-relative ref resolves against its own entry, with no mount in between", () => {
+      expect(resolveAssetRef("./images/hero.png", repo("content/posts"))).toBe(
+        "https://studio.example.com/p/o/r/main/raw/content/posts/images/hero.png",
+      );
+      expect(resolveAssetRef("../images/a.png", repo("content/posts/2026"))).toBe(
+        "https://studio.example.com/p/o/r/main/raw/content/posts/images/a.png",
+      );
+    });
+
+    test("a mounted site URL resolves back through the mount", () => {
+      expect(resolveAssetRef("/content/posts/images/a.png", repo("pages"))).toBe(
+        "https://studio.example.com/p/o/r/main/raw/content/posts/images/a.png",
+      );
+    });
+
+    test("the query and hash survive, and the path is encoded", () => {
+      expect(resolveAssetRef("./images/my photo.png?v=2", repo("content/posts"))).toBe(
+        "https://studio.example.com/p/o/r/main/raw/content/posts/images/my%20photo.png?v=2",
+      );
+      expect(resolveAssetRef("./doc.pdf#page=3", repo("content/posts"))).toBe(
+        "https://studio.example.com/p/o/r/main/raw/content/posts/doc.pdf#page=3",
+      );
+    });
+
+    test("a value that names no project file is left as written", () => {
+      for (const value of [
+        "https://cdn.example.com/a.png",
+        "data:image/png;base64,AA==",
+        "#anchor",
+        "${state.hero}",
+        "../../../outside.png",
+      ]) {
+        expect(resolveAssetRef(value, repo("content/posts"))).toBeNull();
+      }
+    });
+
+    /* A host that declares repo space and no base has said its site URLs are wrong without saying
+       what is right. Inventing an answer there would be worse than leaving the ref alone. */
+    test("with NO file base, every value is untouched", () => {
+      const inert = ctxFor("content/posts", { space: "repo" });
+      for (const value of ["/hero.jpg", "./images/hero.png", "/content/posts/images/a.png"]) {
+        expect(resolveAssetRef(value, inert)).toBeNull();
+      }
+    });
+  });
+});
+
+describe("rewriteAssetRefs with no context", () => {
+  /* Identity, asserted on the OBJECT: the walk must not allocate a copy when there is nothing to
+     do, because the render doc shares its nodes with the tab's source document. */
+  test("returns the very same document", () => {
+    const doc = {
+      children: [{ attributes: { src: "./images/hero.png" }, tagName: "img" }],
+      tagName: "div",
+    } as unknown as JxMutableNode;
+    expect(rewriteAssetRefs(doc, null)).toBe(doc);
+  });
+});
+
+describe("assetContextFor", () => {
+  test("site space needs a mount to have anything to do", () => {
+    expect(assetContextFor("pages/index.json")).toBeNull();
+    expect(assetContextFor("content/posts/hello.md")).toMatchObject({
+      documentDir: "content/posts",
+      mounts: [MOUNT],
+      space: "site",
+    });
+  });
+
+  test("repo space always has work, mount or not", () => {
+    const ctx = assetContextFor("pages/index.json", {
+      fileBaseUrl: "/raw/",
+      space: "repo",
+    });
+    expect(ctx).toMatchObject({
+      documentDir: "pages",
+      fileBaseUrl: "/raw/",
+      mounts: [],
+      space: "repo",
+    });
+  });
+
+  /* With no filesystem to probe, a lane list has to collapse to ONE candidate — and the candidate
+     that makes the preview agree with the deployed site is the build's, not the dev server's. */
+  test("resolves site URLs the way a BUILD would", () => {
+    expect(assetContextFor("content/posts/hello.md")?.lanes).toBe(BUILD_LANES);
   });
 });

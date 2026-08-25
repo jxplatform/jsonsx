@@ -14,7 +14,7 @@ code:
   - packages/studio/src/browse/library-pane.ts
   - packages/studio/src/ui/media-picker.ts
   - packages/studio/src/editor/file-drop-action.ts
-  - packages/studio/src/canvas/content-assets.ts
+  - packages/studio/src/canvas/asset-refs.ts
 ---
 
 # Media

@@ -15,6 +15,7 @@ import {
   dirName,
   mediaSiteUrl,
   normalizeProjectPath,
+  previewFileSrc,
 } from "../src/files/media-paths";
 
 /** A project whose `blog` collection is sourced from a directory that is not its mount prefix. */
@@ -66,6 +67,33 @@ describe("mediaSiteUrl", () => {
   test("the conventional content layout maps onto itself", () => {
     withCollections({ blog: { source: "content/blog" } });
     expect(mediaSiteUrl("content/blog/images/hero.png")).toBe("/content/blog/images/hero.png");
+  });
+});
+
+/**
+ * The seam panel chrome loads a FILE by.
+ *
+ * The library grid used to build its `<img src>` by prefixing the path with a slash, so a
+ * `public/hero.jpg` asked for `/public/hero.jpg` — a URL the site does not publish — and a
+ * content-collection image skipped its mount entirely. Both thumbnails were simply broken; nothing
+ * reported it, because a broken `<img>` in a grid of tiles looks like a slow one.
+ */
+describe("previewFileSrc", () => {
+  test("a public/ file loads at the URL the site publishes it at", () => {
+    expect(previewFileSrc("public/hero.jpg")).toBe("/hero.jpg");
+  });
+
+  test("a content-collection file loads through its mount", () => {
+    withCollections({ blog: { source: "posts" } });
+    expect(previewFileSrc("posts/images/hero.png")).toBe("/content/blog/images/hero.png");
+  });
+
+  test("anything else loads from its own path", () => {
+    expect(previewFileSrc("assets/logo.svg")).toBe("/assets/logo.svg");
+  });
+
+  test("an empty path is returned as given, not as a lone slash", () => {
+    expect(previewFileSrc("")).toBe("");
   });
 });
 

@@ -26,8 +26,7 @@ import { debouncedStyleCommit, renderOnly } from "../store";
 import { getLayerSlot, popoverLayerFor } from "./layers";
 import type { LayerKind } from "./layers";
 import { rectOf } from "../utils/geometry";
-import { loopbackAssetSrc } from "../canvas/canvas-origin";
-import { previewAssetSrc } from "../canvas/content-assets";
+import { previewAssetSrc } from "../canvas/asset-refs";
 import {
   IMAGE_EXTENSIONS,
   MEDIA_EXTENSIONS,
@@ -42,7 +41,7 @@ import {
   recordImageSize,
   seedMediaMeta,
 } from "../files/media-meta";
-import { mediaSiteUrl } from "../files/media-paths";
+import { mediaSiteUrl, previewFileSrc } from "../files/media-paths";
 
 // ─── Media file cache ────────────────────────────────────────────────────────
 
@@ -283,7 +282,7 @@ function renderMediaPickerPopover() {
                         m.isImage
                           ? html`<img
                               slot="icon"
-                              src=${loopbackAssetSrc(m.path)}
+                              src=${previewFileSrc(m.file)}
                               alt=""
                               style="width:24px;height:24px;object-fit:cover;border-radius:var(--spectrum-corner-radius-75, 2px)"
                               @load=${(e: Event) => noteImageSize(m.file, e.target)}
@@ -422,11 +421,7 @@ export function renderMediaPicker(prop: string, value: string, onCommit: (val: s
     <div class="media-picker">
       ${
         isImage && currentValue
-          ? html`<img
-              class="media-picker-thumb"
-              src=${loopbackAssetSrc(previewAssetSrc(currentValue))}
-              alt=""
-            />`
+          ? html`<img class="media-picker-thumb" src=${previewAssetSrc(currentValue)} alt="" />`
           : nothing
       }
       <sp-textfield
