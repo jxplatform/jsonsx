@@ -2,9 +2,9 @@
 
 ## Development Server with Live Reload, Proxy Resolution, and Studio API
 
-**Version:** 0.2.11
+**Version:** 0.2.12
 **Status:** Implemented
-**Updated:** 2026-08-22
+**Updated:** 2026-08-25
 **License:** MIT
 
 ---
@@ -68,7 +68,11 @@ The request path is matched in this order (`src/server.ts`):
 4. `/_jx/*` — extension server mounts
 5. `/__studio/*` — Studio API (collab WebSocket/probe, activate, AI proxy, site import, code services, then the main studio handler)
 6. Custom `middleware`
-7. Static files — the active project's extension asset mounts ([extensions.md §8.5](./extensions.md)), then the server root, then the active project root, then its `public/` (mirroring production), then npm bare specifiers resolved through `node_modules` and bundled on demand with `Bun.build`. Served HTML gets the live-reload client injected (except the Studio shell, which manages its own state); all responses carry `Cache-Control: no-cache`. Content types come from `Bun.file`'s own inference, corrected only where a registration disagrees with it — `.md` carries the `variant` that names its dialect and `.yaml` is `application/yaml` rather than the retired `text/yaml` (`MEDIA_TYPE_BY_EXTENSION` in `@jxsuite/schema/media-type`, shared with `jx preview`); every other extension keeps the inferred type.
+7. Static files — the active project's extension asset mounts ([extensions.md §8.5](./extensions.md)), then the server root, then the active project's `public/`, then the active project root, then npm bare specifiers resolved through `node_modules` and bundled on demand with `Bun.build`. Served HTML gets the live-reload client injected (except the Studio shell, which manages its own state); all responses carry `Cache-Control: no-cache`. Content types come from `Bun.file`'s own inference, corrected only where a registration disagrees with it — `.md` carries the `variant` that names its dialect and `.yaml` is `application/yaml` rather than the retired `text/yaml` (`MEDIA_TYPE_BY_EXTENSION` in `@jxsuite/schema/media-type`, shared with `jx preview`); every other extension keeps the inferred type.
+
+**`public/` precedes the project root, and the project root is a compatibility lane.** The order above is the order a BUILD resolves in ([site-architecture.md §9.3](./site-architecture.md)): a site-absolute `/x` names `public/x` and nothing else. This server also serves the PROJECT TREE's own URL space at the same paths — that is how a Studio canvas fetches a component `$ref` — so the project root still answers, and the two spaces collide wherever a file exists in both.
+
+The order used to be the other way round, which made the preview lie in the one direction that matters: a file at `<root>/hero.jpg` loaded at `/hero.jpg` here and 404'd on the deployed site, and where both copies existed the preview showed the one production would never serve. Serving from the root a site URL that a build would not publish is now a diagnostic naming the file and the fix (move it into `public/`), and the lane is scheduled for removal. The diagnostic is scoped to extensions a build publishes as static assets, so a project document answered from the root — the canvas doing its job — says nothing.
 
 **Asset mounts.** A mount publishes a directory that may sit outside the project root — a content collection's co-located images — at the same site URL the built site will use, so a dev preview and a production page render identically. Each candidate is contained against the mount's own directory (lexical + realpath), and the URL→path mapping refuses `.`/`..`, empty segments, and still-encoded dots or slashes. Mounts come from the section owner's `assets` capability via the per-project context cache, so they refresh when `project.json` changes on disk. The desktop loopback server (`project-server.ts`) resolves them through the same `serveProjectFile` path.
 
@@ -330,6 +334,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.2.12** (2026-08-25) — §3: the static-file order now matches a build — public/ precedes the project root, which survives as a compatibility lane that warns.
 - **0.2.11** (2026-08-22) — §3.1: watch-policy.ts — watchers watch only directories and regular files, and contain symlinks to the root, so a socket cannot throw and a link out cannot walk the filesystem.
 - **0.2.10** (2026-08-20) — The loopback project server's RPC socket carries server-initiated frames (ProjectServerHandle.push) — the loopback twin of the dev server's named fs SSE event, and the channel a desktop launcher raises a window over (§4.2).
 - **0.2.9** (2026-08-18) — §4.2: the Studio shell's report-only Trusted Types header is removed — see spec.md §21.5.
@@ -355,4 +360,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/server` Specification v0.2.11_
+_`@jxsuite/server` Specification v0.2.12_

@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -13,6 +13,7 @@ import {
   originIsLoopbackOrAbsent,
   presentedToken,
   secretsMatch,
+  resetRootLaneWarnings,
   serveContained,
   serveProjectFile,
 } from "../src/net-guard.ts";
@@ -161,10 +162,72 @@ describe("serveProjectFile", () => {
     expect(res).not.toBeNull();
     expect(await res!.text()).toContain("in-root");
   });
-  test("falls back to public/", async () => {
+  test("serves from public/", async () => {
     const res = await serveProjectFile("/style.css", PROJECT);
     expect(res).not.toBeNull();
     expect(await res!.text()).toContain("body{}");
+  });
+
+  /**
+   * The lane order, and the one place a preview used to lie.
+   *
+   * A BUILD resolves `/x` to `public/x` and nowhere else (`site-architecture.md` §9.3, and
+   * `resolveImagePath` in the compiler). This server tried the project ROOT first, so a file at
+   * `<root>/hero.jpg` loaded at `/hero.jpg` here and 404'd on the deployed site — and when both
+   * copies existed, the preview showed the one production would never serve.
+   */
+  describe("the lane order matches a build", () => {
+    const both = join(PROJECT, "collide.png");
+    const pub = join(PROJECT, "public", "collide.png");
+
+    beforeEach(() => {
+      resetRootLaneWarnings();
+      writeFileSync(both, "root-copy");
+      writeFileSync(pub, "public-copy");
+    });
+
+    test("public/ wins when a file exists in both — that is what production serves", async () => {
+      const res = await serveProjectFile("/collide.png", PROJECT);
+      expect(await res!.text()).toBe("public-copy");
+    });
+
+    test("the project root still answers, and says the preview is lying", async () => {
+      rmSync(pub);
+      const warn = spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        const res = await serveProjectFile("/collide.png", PROJECT);
+        expect(await res!.text()).toBe("root-copy");
+        expect(warn.mock.calls[0]?.[0]).toContain("move it into public/");
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    test("it says so ONCE, not once per request", async () => {
+      rmSync(pub);
+      const warn = spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        await serveProjectFile("/collide.png", PROJECT);
+        await serveProjectFile("/collide.png", PROJECT);
+        await serveProjectFile("/collide.png", PROJECT);
+        expect(warn.mock.calls).toHaveLength(1);
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    /* The root lane serves TWO URL spaces: the site's, and the project tree's — which is how the
+       Studio canvas fetches a component `$ref`. Only the first is what a build defines, so a
+       document answered from the project root is the protocol working, not a preview lying. */
+    test("a project document answered from the root says nothing", async () => {
+      const warn = spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        await serveProjectFile("/index.html", PROJECT);
+        expect(warn.mock.calls).toHaveLength(0);
+      } finally {
+        warn.mockRestore();
+      }
+    });
   });
   test("returns null for a missing file", async () => {
     expect(await serveProjectFile("/nope.html", PROJECT)).toBeNull();
