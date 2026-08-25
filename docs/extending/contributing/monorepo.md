@@ -16,7 +16,7 @@ The Jx monorepo ([github.com/jxsuite/jx](https://github.com/jxsuite/jx)) is a Bu
 - `extensions/` — extension packages built on the public hooks: parser (Markdown/CSV formats and content), connector (databases), auth, search, feed.
 - `specs/` — the numbered specifications. These are the living source of truth: consult and update them **before** implementing a feature.
 - `sites/` — real sites built with Jx, including jxsuite.com.
-- `docs/` — this documentation (see [Contributing to these docs](/docs/extending/contributing/docs/)).
+- `docs/` — this documentation (see [Contributing to these docs](/docs/extending/contributing/docs)).
 
 ## Everyday commands
 

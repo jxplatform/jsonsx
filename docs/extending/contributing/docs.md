@@ -83,8 +83,8 @@ Use at most a couple per screenful, and never open a page with one.
 
 Write them as root-absolute slugs — `/docs/framework/site/routing` — with no `.md` extension and no trailing slash. Never use a relative `../foo.md` link: the site serves the target verbatim rather than rewriting it to a URL, so the link is broken the moment it publishes.
 
-:::doc-warning
-**No gate checks internal links.** `docs:check` validates frontmatter, spec anchors, `code:` paths, images, and the nav bijection — nothing resolves a link target. A typo, or a renamed page, ships silently. Verify each slug against `docs/nav.json` as you write it, and grep for the old slug whenever you rename a page.
+:::doc-note
+`bun run docs:links` resolves every one of them: the slug against `docs/nav.json`, and any `#anchor` against the headings the target page actually publishes. A heading's anchor comes from its rendered text, lowercased, so **re-casing a heading is safe and rewording one is not**. `bun scripts/docs/check-doc-links.ts --anchors` lists every heading another page links to, which is what to check before you touch one.
 :::
 
 ## Screenshots
