@@ -32,6 +32,7 @@ void mock.module("../src/grid/cell-popovers.js", () => ({
 
 const { createGridController, ROW_KEY_FIELD } = await import("../src/grid/grid-controller");
 const { createGridView } = await import("../src/grid/grid-view");
+const { gridIdleBlockers } = await import("../src/grid/grid-idle");
 
 function stubSource(overrides: Partial<GridSource> = {}): GridSource {
   return {
@@ -120,6 +121,57 @@ describe("createGridView — construction", () => {
     const defs = table.options.columns as Record<string, unknown>[];
     expect(defs.every((d) => d.headerSort === false)).toBeTrue();
     expect(defs.every((d) => d.headerFilter === undefined)).toBeTrue();
+  });
+});
+
+describe("gridIdleBlockers", () => {
+  /*
+   * Filtered by grid id rather than asserted whole. `liveGrids` is module state and every other
+   * test in this file builds a view it never destroys, so an unfiltered assertion would pass or
+   * fail on test ORDER — which is the one thing a quiescence test must not do.
+   */
+  const mine = (id: string) => gridIdleBlockers().filter((line) => line.includes(id));
+
+  test("a grid is in-flight until it is built AND its range is laid out", async () => {
+    const id = "grid://idle/built";
+    const { table, view } = await setupView(stubSource({ id }));
+
+    // `data.openGrid` has already resolved by here and `editor.kind` already reads "grid", which
+    // Is precisely why the screenshot runner used to photograph the table mid-build.
+    expect(mine(id)).toEqual([`grid[${id}]: building`]);
+
+    table.emit("tableBuilt");
+    expect(mine(id)).toEqual([`grid[${id}]: selection range not laid out`]);
+
+    const row = fakeRow({ [ROW_KEY_FIELD]: "a" });
+    const cell = fakeCell(row, "title", table);
+    table.ranges.push(fakeRange([[cell]]));
+    expect(mine(id)).toEqual([]);
+
+    view.destroy();
+    expect(mine(id)).toEqual([]);
+  });
+
+  test("an empty grid never waits for the range it will never be given", async () => {
+    const id = "grid://idle/empty";
+    const { table, view } = await setupView(
+      stubSource({ id, rows: async () => ({ rows: [], total: 0 }) }),
+    );
+
+    table.emit("tableBuilt");
+    // `selectableRange: 1` gives no range to a table with no cells, so requiring one here would
+    // Block `probeIdle()` until it timed out.
+    expect(mine(id)).toEqual([]);
+    view.destroy();
+  });
+
+  test("a destroyed grid stops answering, even if it never finished building", async () => {
+    const id = "grid://idle/torn-down";
+    const { view } = await setupView(stubSource({ id }));
+    expect(mine(id)).toEqual([`grid[${id}]: building`]);
+    view.destroy();
+    // A probe left behind on a torn-down table would block every later idle check forever.
+    expect(mine(id)).toEqual([]);
   });
 });
 

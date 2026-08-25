@@ -40,6 +40,7 @@ import type {
 } from "tabulator-tables";
 import type { GridCellValue, GridColumn } from "./grid-source";
 import type { GridController } from "./grid-controller";
+import { registerGridProbe } from "./grid-idle";
 
 export interface GridView {
   /** Re-pull controller.effectiveRows() into the table (buffer → table sync). */
@@ -222,6 +223,23 @@ export function createGridView(host: HTMLElement, controller: GridController): G
     }
   });
 
+  /*
+   * Settled means BUILT AND LAID OUT, not merely constructed. `selectableRange: 1` gives a
+   * non-empty table an initial range, and that range's outline is a rendered element — so until it
+   * exists the picture is still changing. An empty table is exempt, because it never gets one and
+   * waiting for it would be waiting forever.
+   */
+  const probe = (): string | null => {
+    if (!built) {
+      return `grid[${gridId}]: building`;
+    }
+    if (controller.effectiveRows().length > 0 && table.getRanges().length === 0) {
+      return `grid[${gridId}]: selection range not laid out`;
+    }
+    return null;
+  };
+  const unregisterProbe = registerGridProbe(probe);
+
   table.on("cellEdited", (cell: CellComponent) => {
     if (suppress) {
       return;
@@ -307,6 +325,9 @@ export function createGridView(host: HTMLElement, controller: GridController): G
 
   return {
     destroy() {
+      // Before `table.destroy()`: a probe left registered against a torn-down table would be asking
+      // Tabulator questions it can no longer answer.
+      unregisterProbe();
       controller.bindView(null);
       table.destroy();
     },

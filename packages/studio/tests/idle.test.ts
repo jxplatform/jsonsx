@@ -136,7 +136,7 @@ describe("probeIdle", () => {
 });
 
 describe("defaultIdleSources", () => {
-  test("names the six subsystems and is quiet in a bare page", () => {
+  test("names the seven subsystems and is quiet in a bare page", () => {
     expect(defaultIdleSources().map((s) => s.name)).toEqual([
       "render",
       "panels",
@@ -144,6 +144,9 @@ describe("defaultIdleSources", () => {
       "platform",
       "overlay",
       "activity",
+      // Tabulator owns frames nothing else was counting: a grid command resolves when the panel
+      // Mounts, several frames before the table is drawn.
+      "grid",
     ]);
     expect(idleBlockers()).toEqual([]);
   });

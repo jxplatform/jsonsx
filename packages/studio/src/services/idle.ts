@@ -27,6 +27,9 @@
  *    duplicate of `platform`: an activity spans a whole operation (an install, a deploy, a clone)
  *    across many PAL calls, so the gaps between them look quiet at the seam while the operation is
  *    plainly mid-flight. A finished entry never blocks — the list stays on screen forever.
+ * 7. `grid-idle.gridIdleBlockers()` — tables still building, or built but not yet showing the
+ *    selection range `selectableRange: 1` gives them. Nothing else covered Tabulator: a grid
+ *    command resolves when the panel mounts, which is several frames before the table is drawn.
  *
  * The consumers are the `packages/studio:verify` skill, the screenshot runner and P4.2's Activity
  * tracker (this is a read-only projection of the same in-flight set that dock renders).
@@ -38,6 +41,7 @@ import { pendingSchedulers } from "../panels/panel-scheduler";
 import { canvasIdleBlockers } from "../canvas/iframe-host";
 import { platformInFlight } from "../platform";
 import { overlayIdleBlockers } from "../ui/layers";
+import { gridIdleBlockers } from "../grid/grid-idle";
 
 /** One subsystem that can be outstanding, and its account of why. */
 export interface IdleSource {
@@ -69,7 +73,7 @@ export class NotIdleError extends Error {
 }
 
 /**
- * The six live sources.
+ * The seven live sources.
  *
  * Built per call rather than held in a module constant so a test can substitute one without
  * unpicking the others, and so a second window's hosts are never read through the first window's
@@ -101,6 +105,7 @@ export function defaultIdleSources(): IdleSource[] {
     },
     { blockers: overlayIdleBlockers, name: "overlay" },
     { blockers: activityIdleBlockers, name: "activity" },
+    { blockers: gridIdleBlockers, name: "grid" },
   ];
 }
 

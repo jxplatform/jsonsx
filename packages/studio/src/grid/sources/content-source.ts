@@ -269,20 +269,41 @@ function buildEntryFileSource(opts: EntryFileSourceOptions): GridSource {
       const files = await opts.list();
       entries.clear();
       columnsCache = null;
-      await mapLimit(files, 8, async (path) => {
+      /*
+       * Read concurrently, INSERT IN ORDER.
+       *
+       * `entries` is a Map and the grid renders it in insertion order, so setting it from inside
+       * the worker made row order the order the reads happened to FINISH in — which is a race
+       * between two `platform.readFile` calls, not a property of the collection. The two posts in
+       * the `first-collection` fixture swapped places between runs, and that alone rewrote
+       * `blog-grid.png` in 3 of the 21 images the screenshot lane pushed over 24 commits.
+       *
+       * `mapLimit` already documents that it preserves item order; the fix is to USE its result
+       * rather than to mutate shared state from inside it. The concurrency is worth keeping — a
+       * collection is a directory of files and reading it eight at a time is why the grid opens
+       * quickly.
+       */
+      const loaded = await mapLimit(files, 8, async (path): Promise<EntryRecord | null> => {
         try {
           const text = await platform.readFile(path);
           const parsed = await parseSourceForPath(path, text);
-          entries.set(path, {
+          return {
             document: parsed.document,
             formatName: parsed.format.name,
             frontmatter: parsed.frontmatter ?? {},
             rawText: text,
-          });
+          };
         } catch {
           // Unparseable entry — leave it out rather than failing the whole grid.
+          return null;
         }
       });
+      for (const [index, path] of files.entries()) {
+        const record = loaded[index];
+        if (record) {
+          entries.set(path, record);
+        }
+      }
     })();
     return loadPromise;
   };
