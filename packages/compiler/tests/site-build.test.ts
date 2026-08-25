@@ -929,6 +929,24 @@ describe("buildSite — component CSS generation", () => {
     expect(html).toContain('src="./app.js"');
   });
 
+  /*
+   * A non-static instance discards its prerendered markup on upgrade and re-renders from state, so
+   * unless the props survive as data the element comes back showing "Default" — correct content
+   * painting first and then being replaced by the wrong content. compiler.md §5.2 gives
+   * connectedCallback a data-jx-props payload as its first prop source; nothing wrote it, and
+   * lifting `props.*` into $props had already removed the other channel.
+   */
+  it("carries $props to a non-static instance as a data-jx-props payload", async () => {
+    await buildSite(COMP_TMP, { clean: true });
+    const html = readFileSync(resolve(COMP_TMP, "dist/index.html"), "utf8");
+    // Non-static: the prerender is a first paint, not a hydration target.
+    expect(html).toContain("data-jx-prerendered");
+    expect(html).toContain("data-jx-props=");
+    const payload = /data-jx-props="([^"]*)"/.exec(html)?.[1] ?? "";
+    const decoded = payload.replaceAll("&quot;", '"').replaceAll("&amp;", "&");
+    expect(JSON.parse(decoded)).toEqual({ label: "Click" });
+  });
+
   it("writes the component JS sidecar into dist, never beside the source component", async () => {
     await buildSite(COMP_TMP, { clean: true });
     // The compiled custom-element module lands in dist/components/, mirroring the .css sidecar.

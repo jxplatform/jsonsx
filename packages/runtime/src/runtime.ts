@@ -2677,7 +2677,8 @@ export async function defineElement(source: string | JxDocument, baseUrl?: strin
 
       const state = await buildScope(def, {}, base);
 
-      // Read properties from directive encoding (markdown → data-jx-props)
+      // Read properties from the data-jx-props payload the site build writes on a
+      // Non-static instance, so an upgrade re-renders with the authored props, not the defaults.
       const propsAttr = this.dataset.jxProps;
       if (propsAttr) {
         try {
