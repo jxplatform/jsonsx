@@ -1,5 +1,30 @@
 # Changelog
 
+## [2.2.7](https://github.com/jxsuite/jx/compare/server-v2.2.6...server-v2.2.7) (2026-08-25)
+
+
+### Bug Fixes
+
+* **cloud:** discover components by reading them, so the canvas can register any ([#200](https://github.com/jxsuite/jx/issues/200)) ([e97b57d](https://github.com/jxsuite/jx/commit/e97b57db1ed2c9d8e1c103f6021ff332118d09be))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/collab bumped to 0.8.2
+    * @jxsuite/compiler bumped to 2.0.7
+    * @jxsuite/create bumped to 1.3.6
+    * @jxsuite/import bumped to 0.39.7
+    * @jxsuite/protocol bumped to 1.2.1
+    * @jxsuite/runtime bumped to 2.0.5
+    * @jxsuite/schema bumped to 1.8.1
+    * @jxsuite/starters bumped to 1.6.3
+  * devDependencies
+    * @jxsuite/auth bumped to 0.5.4
+    * @jxsuite/connector bumped to 0.5.4
+    * @jxsuite/parser bumped to 1.5.5
+
 ## [2.2.6](https://github.com/jxsuite/jx/compare/server-v2.2.5...server-v2.2.6) (2026-08-24)
 
 

@@ -1,6 +1,6 @@
 {
   "name": "@jxsuite/parser",
-  "version": "1.5.4",
+  "version": "1.5.5",
   "description": "Jx markdown parser and external class integration",
   "license": "MIT",
   "repository": {
