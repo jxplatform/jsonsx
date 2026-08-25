@@ -25,7 +25,7 @@
  * built at capture time.
  */
 
-import { cp, mkdir, readdir, rm, stat, symlink, unlink } from "node:fs/promises";
+import { cp, mkdir, readdir, rm, stat, symlink, unlink, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
@@ -220,7 +220,28 @@ export function overlaySlug(project: string): string {
   return project.replaceAll(/[^\w.-]+/g, "-").replaceAll(/^-+|-+$/g, "");
 }
 
-/** Copy a project tree, skipping {@link NEVER_COPIED} and symlinking `node_modules` if it exists. */
+/**
+ * Copy a project tree, skipping {@link NEVER_COPIED}, SEAL IT AS ITS OWN REPOSITORY, and symlink
+ * `node_modules` if it exists.
+ *
+ * The seal is not decoration — it is the fix for the single largest source of screenshot churn. The
+ * overlay has to live inside this repository (see {@link WORK_DIR}: the dev server refuses a
+ * project root outside its own tree), and a directory with no `.git` of its own makes git walk UP.
+ * `packages/server/src/studio-api.ts` runs every `/__studio/git/*` command with `cwd` set to the
+ * active project root, so `git status` answered for THE MONOREPO and the rail's badge rendered
+ * `ctx.git.dirtyCount` of this working tree into the picture.
+ *
+ * That is a feedback loop, not just a leak: the runner writes each PNG as it goes, so the
+ * monorepo's dirty count CLIMBS DURING THE RUN. Every shot photographed a different number, a run
+ * that rewrote a different set of images moved the number again, and the badge alone accounted for
+ * 11 of the 21 images the lane pushed across 24 consecutive `chore(screenshots)` commits.
+ *
+ * An empty repository at the overlay root stops the upward walk, so the answer is the overlay's own
+ * state and nothing else. `main` is pinned because the branch name is rendered too, and
+ * `init.defaultBranch` is a per-machine setting. The excludes are written BEFORE the commit so the
+ * `node_modules` junction added below is never untracked — an untracked entry is a dirty entry, and
+ * a dirty entry is the badge coming straight back.
+ */
 async function materialiseCopy(source: string, dest: string): Promise<void> {
   await rm(dest, { force: true, recursive: true });
   await mkdir(dirname(dest), { recursive: true });
@@ -231,6 +252,7 @@ async function materialiseCopy(source: string, dest: string): Promise<void> {
     },
     recursive: true,
   });
+  await sealOverlayRepo(dest);
   const modules = join(source, "node_modules");
   if (existsSync(modules)) {
     /* A junction, not a "dir" symlink. Windows refuses the latter with EPERM unless the process is
@@ -305,6 +327,43 @@ async function git(cwd: string, args: string[], at?: string): Promise<void> {
       `git ${args.join(" ")} failed (${code}): ${await new Response(proc.stderr).text()}`,
     );
   }
+}
+
+/**
+ * Directories the overlay repository must never see.
+ *
+ * `node_modules` is a junction into the source tree, `dist` and `.cache` are build output a shot
+ * can provoke. Any of them left untracked is one more dirty file, which is the badge this seal
+ * exists to silence.
+ */
+const OVERLAY_EXCLUDES = [".cache", "dist", "node_modules", "*.log"];
+
+/** The one date every overlay commit carries, so nothing derived from it can move between runs. */
+const OVERLAY_EPOCH = "2026-01-01T00:00:00Z";
+
+/**
+ * Turn a freshly copied overlay into a self-contained repository with a CLEAN status.
+ *
+ * Clean rather than absent: `git status` has to answer, because the git panel and the rail badge
+ * both render its answer, and "no repository at all" is a different picture from "a repository with
+ * nothing to report". What matters is only that the answer comes from the overlay instead of from
+ * whatever this monorepo happened to have dirty — see {@link materialiseCopy}.
+ *
+ * `--no-verify` because husky publishes `core.hooksPath` and a hook firing inside a screenshot run
+ * would be someone else's lint failing a capture.
+ */
+async function sealOverlayRepo(dest: string): Promise<void> {
+  await git(dest, ["init", "--quiet", "--initial-branch=main"]);
+  await writeFile(join(dest, ".git", "info", "exclude"), `${OVERLAY_EXCLUDES.join("\n")}\n`);
+  await git(dest, ["config", "user.name", "Jx Screenshots"]);
+  await git(dest, ["config", "user.email", "screenshots@example.com"]);
+  await git(dest, ["config", "commit.gpgsign", "false"]);
+  await git(dest, ["add", "-A"]);
+  await git(
+    dest,
+    ["commit", "--quiet", "--no-verify", "--allow-empty", "-m", "Project"],
+    OVERLAY_EPOCH,
+  );
 }
 
 /**

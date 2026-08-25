@@ -230,13 +230,36 @@ fresh `BrowserContext` per shot (the HTTP cache is context-scoped, so shot warmt
 running order); `--force-color-profile=srgb --font-render-hinting=none --disable-lcd-text`; `TZ=UTC`
 and `LANG=C.UTF-8` in the browser's environment; pointer and focus reset before every capture.
 
-`DIFF_THRESHOLD = 0.01` on a 32×32 mean-absolute-difference decides whether committed bytes are
-rewritten. Per §13.4 it is for **review presentation** and is no longer load-bearing for identity.
+`DIFF_THRESHOLD = 0.0002` decides whether committed bytes are rewritten — a COUNT of pixels whose
+channels moved more than `CHANNEL_TOLERANCE` (16), at native resolution. (It was a mean-absolute
+difference over 32×32 THUMBNAILS, at which size a 3840×2400 frame's whole status bar is a fraction
+of one pixel row; a rail that lost two buttons scored 0.07 % and the stale bytes were kept.) Per
+§13.4 it is for **review presentation** and is no longer load-bearing for identity.
+
+The number is sized against measurement. Of the 21 images the lane pushed across 24 consecutive
+`chore(screenshots)` commits, every one was nondeterminism rather than a UI change: the rail's git
+badge (11, 0.010–0.014 %), a `data-grid` cell's range outline (5, 0.089 %), `blog-grid`'s collection
+row order (3, 0.12–0.16 %) and `media-upload`'s drop-zone indicator (2, 0.038 %). 0.0002 clears the
+first band and deliberately stops there: a status bar going from empty to three fields scores
+~0.1 %, so a threshold that also swallowed the rest would sit above the very regression this gate
+exists to catch. **The other bands are fixed where they are caused, not absorbed here** — no
+whole-frame pixel metric could separate them anyway, since a 1206×76 row swap and a 3840×24 status
+bar have the same area.
 
 ## The overlay
 
 **No shot ever opens a committed project.** `lib/server.ts` materialises a copy under
 `.cache/screenshots/projects/` and the shot opens that.
+
+**The copy is sealed as its own git repository** (`sealOverlayRepo`) — `git init`, everything
+committed, `node_modules`/`dist`/`.cache` excluded, branch pinned to `main`. The overlay has to live
+inside this repository (the dev server refuses a project root outside its own tree), and a directory
+with no `.git` of its own makes git walk UP: `studio-api.ts` runs every `/__studio/git/*` command
+with `cwd` set to the active project root, so `git status` answered for THE MONOREPO and the rail
+rendered its dirty count into the picture. That is a feedback loop rather than a mere leak — the
+runner writes each PNG as it goes, so the count climbs during the run — and it alone accounted for
+11 of the 21 images the lane pushed over 24 commits. Sealed, the answer is the overlay's own state:
+clean, unless the shot itself edited something.
 
 This deletes a real hazard, not a theoretical one. `slash-menu-shot` pressed Enter into
 `packages/starters/sites/restaurant/pages/index.md` — a committed file — and then ran a cleanup
