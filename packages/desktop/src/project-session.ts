@@ -841,13 +841,20 @@ export function createProjectSession(initialRoot: string | null) {
     await mkdir(abs, { recursive: true });
   }
 
-  async function uploadFile(params: { path: string; data: string }): Promise<void> {
+  async function uploadFile(params: {
+    path: string;
+    data: string;
+  }): Promise<{ path: string; size: number }> {
     const root = requireRoot();
     const abs = resolve(root, params.path);
     assertUnderRoot(abs, root);
     await mkdir(dirname(abs), { recursive: true });
     const buffer = Buffer.from(params.data, "base64");
     await Bun.write(abs, buffer);
+    /* The path this backend wrote is the one it was asked for — it is a filesystem, not a
+       content-addressed store — but it REPORTS it, because the caller must not have to know
+       which kind of backend it is talking to. */
+    return { path: params.path, size: buffer.byteLength };
   }
 
   async function resolveSiteContext(params: {

@@ -13,6 +13,7 @@ import type {
 
 import type {
   AppInfo,
+  AssetCapabilities,
   CfConnection,
   CodeServiceResult,
   ComponentMeta,
@@ -43,6 +44,7 @@ import type {
   SecretsSetRequest,
   SecretsSetResponse,
   StarterInfo,
+  UploadResult,
 } from "@jxsuite/protocol";
 
 export type {
@@ -218,6 +220,15 @@ export interface StudioPlatform {
    * canvas is running in.
    */
   assetSpace?: "site" | "repo";
+  /**
+   * What this backend will accept as an upload, when it says.
+   *
+   * Absent, or any field absent, means "no declared limit", and Studio must not invent one — a
+   * limit it made up is a file the user cannot upload for no reason anyone can name. A DECLARED
+   * limit is different: Studio refuses before spending the round trip and names the number in the
+   * refusal, and narrows the file picker's `accept` to match.
+   */
+  assetCapabilities?: AssetCapabilities;
   activate: (root?: string) => Promise<void>;
   openProject: () => Promise<{
     config: ProjectConfig;
@@ -242,7 +253,16 @@ export interface StudioPlatform {
   listDirectory: (dir: string) => Promise<DirEntry[]>;
   readFile: (path: string) => Promise<string>;
   writeFile: (path: string, content: string) => Promise<void>;
-  uploadFile: (path: string, data: string | File | Blob | ArrayBuffer) => Promise<unknown>;
+  /**
+   * Store bytes at a project path, and report where they really landed.
+   *
+   * The result's `path` is the ANSWER, not an echo: a backend may de-duplicate by content hash,
+   * append a collision suffix, or normalize a name, and the reference Studio writes into the
+   * document has to name what was actually written. This was `Promise<unknown>` and every caller
+   * used the REQUESTED path, so any such backend produced documents pointing at files that are not
+   * there.
+   */
+  uploadFile: (path: string, data: string | File | Blob | ArrayBuffer) => Promise<UploadResult>;
   deleteFile: (path: string) => Promise<void>;
   renameFile: (from: string, to: string) => Promise<RenameResult>;
   /**

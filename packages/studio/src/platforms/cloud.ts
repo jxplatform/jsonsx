@@ -36,6 +36,7 @@ import type {
   StudioPlatform,
 } from "../types";
 import { problemDetail, problemSlug } from "@jxsuite/protocol";
+import type { UploadResult } from "@jxsuite/protocol";
 
 export interface CloudProject {
   owner: string;
@@ -321,7 +322,10 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
         method: "POST",
         body: data,
       });
-      return okJson<unknown>(res, `Upload failed: ${path}`);
+      const body = await okJson<Partial<UploadResult>>(res, `Upload failed: ${path}`);
+      // The session echoes the path today; falling back to the request keeps a backend that says
+      // Nothing working rather than writing `undefined` into a document.
+      return { path: body.path ?? path, ...(body.size === undefined ? {} : { size: body.size }) };
     },
 
     async deleteFile(path: string) {

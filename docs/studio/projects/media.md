@@ -73,6 +73,12 @@ Everything in `public/` is served from your site's root, so `public/hero.jpg` be
 
 A post's own pictures are written the way any markdown editor expects — `./images/hero.jpg`, relative to the post — so the file still reads correctly outside Studio. On your published site those become `/content/posts/images/hero.jpg`, and the canvas previews them at that same address, so what you see while editing is what visitors get.
 
+A **translated** collection keeps each language's pictures apart the same way. A collection sourced from `content/posts/{locale}` publishes each locale's folder separately, so a French post's `./images/hero.jpg` is `/content/posts/fr/images/hero.jpg` and its English translation's is `/content/posts/en/images/hero.jpg` — two different pictures at two different addresses, which is usually the point.
+
+:::doc-note
+Some hosts cap the size of a single upload. When yours does, Studio refuses an oversized file before sending it and says what the limit is — so a large video fails in a moment with a number rather than after a long wait.
+:::
+
 :::doc-note
 Uploads never overwrite. If a file of the same name is already there, the new one becomes `hero-1.jpg`, then `hero-2.jpg`, and so on — the original is left alone. A batch doesn't collide with itself either.
 :::

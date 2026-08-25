@@ -178,7 +178,9 @@ export interface StudioRPC {
       };
       uploadFile: {
         params: { path: string; data: string };
-        response: void;
+        /* The path is the ANSWER, not an echo: a backend may store the bytes somewhere other than
+           the path asked for, and the reference Studio writes has to name what was written. */
+        response: { path: string; size: number };
       };
       resolveSiteContext: {
         params: { filePath: string };

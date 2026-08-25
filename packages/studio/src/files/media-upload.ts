@@ -17,7 +17,7 @@
  */
 
 import { errorMessage } from "@jxsuite/schema/parse";
-import { getPlatform } from "../platform";
+import { getPlatform, hasPlatform } from "../platform";
 import { notify } from "../services/notify";
 import { activeTab } from "../workspace/workspace";
 
@@ -50,8 +50,20 @@ export const MEDIA_EXTENSIONS = new Set([
   ".otf",
 ]);
 
-/** The `accept` attribute for every upload file input. */
-export const UPLOAD_ACCEPT = [
+/** A byte count as a person reads it, for a refusal that names the limit. */
+function formatBytes(bytes: number): string {
+  const units = ["B", "KB", "MB", "GB"];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return `${unit === 0 ? value : Number(value.toFixed(1))} ${units[unit]}`;
+}
+
+/** What Studio itself offers, before any backend narrows it. */
+const DEFAULT_ACCEPT = [
   "image/*",
   "video/*",
   "audio/*",
@@ -62,6 +74,20 @@ export const UPLOAD_ACCEPT = [
   ".ttf",
   ".otf",
 ].join(",");
+
+/**
+ * The `accept` attribute for every upload file input.
+ *
+ * A backend may NARROW it by declaring `assetCapabilities.accept`; nothing widens it, because the
+ * picker offering a type Studio cannot place in a document helps no one. Read as a function, not a
+ * constant, because the platform is registered after this module is imported.
+ *
+ * @returns {string} An `<input accept>` value
+ */
+export function uploadAccept(): string {
+  const declared = hasPlatform() ? getPlatform().assetCapabilities?.accept : undefined;
+  return declared ?? DEFAULT_ACCEPT;
+}
 
 /** What kind of element an uploaded asset wants to become. */
 export type AssetKind = "image" | "video" | "audio" | "file";
@@ -225,18 +251,33 @@ export async function uploadAssets(
     taken = new Set(); // Directory doesn't exist yet — the backend mkdir -p's on write.
   }
 
+  /* A DECLARED limit, or none. Studio must not invent one: a limit it made up is a file the user
+     cannot upload for no reason anyone can name. A declared one is different — refusing here saves
+     the round trip and lets the refusal say the number. */
+  const maxBytes = hasPlatform() ? getPlatform().assetCapabilities?.maxUploadBytes : undefined;
+
   const uploaded: UploadedAsset[] = [];
   for (const file of list) {
+    if (maxBytes !== undefined && file.size > maxBytes) {
+      notify.error(`${file.name} is too large.`, {
+        detail: `This backend accepts at most ${formatBytes(maxBytes)}; that file is ${formatBytes(file.size)}.`,
+        source: "Media",
+      });
+      continue;
+    }
     const name = uniqueName(file.name, taken);
     taken.add(name);
-    const path = joinDir(dir, name);
+    const requested = joinDir(dir, name);
     try {
-      await platform.uploadFile(path, file);
+      /* The path the backend REPORTS, not the one asked for. A store that de-duplicates by content
+         hash, appends a collision suffix, or normalizes a name writes somewhere else, and the
+         reference that goes into the document has to name what is really there. */
+      const { path } = await platform.uploadFile(requested, file);
       uploaded.push({ kind: mediaKind(file), name, path, ref: assetRef(path) });
     } catch (error) {
       notify.error(`Could not upload ${file.name}.`, {
         detail: errorMessage(error),
-        path,
+        path: requested,
         source: "Media",
       });
     }

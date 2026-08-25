@@ -547,6 +547,19 @@ describe("platform methods", () => {
 
   // The RPC transport JSON-serializes params, so a File/Blob would arrive as `{}`. The platform
   // Base64-encodes binary before the call; a string (already base64) passes through untouched.
+  /* The path the backend REPORTS, not the one asked for. A store that de-duplicates by content
+     hash, appends a suffix, or normalizes a name writes somewhere else, and the reference Studio
+     puts in the document has to name what is really there. The RPC used to answer `void`. */
+  test("uploadFile reports where the bytes landed", async () => {
+    impls.set("uploadFile", () => ({ path: "public/sha256-deadbeef.png", size: 2 }));
+    try {
+      const result = await platform.uploadFile("img.png", new File(["hi"], "img.png"));
+      expect(result).toEqual({ path: "public/sha256-deadbeef.png", size: 2 });
+    } finally {
+      impls.delete("uploadFile");
+    }
+  });
+
   test("uploadFile base64-encodes a File before the RPC", async () => {
     await platform.uploadFile("img.png", new File(["hi"], "img.png"));
     expect(lastCall("uploadFile")!.args[0]).toEqual({ data: "aGk=", path: "img.png" });

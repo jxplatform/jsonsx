@@ -25,7 +25,7 @@ Core members are required on every adapter. Grouped by family:
 
 | Family          | Members                                                                                                                                                                                                        |
 | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Identity        | `id`, `projectRoot` (get/set), `canvasUrl?`, `documentBaseUrl?`                                                                                                                                                |
+| Identity        | `id`, `projectRoot` (get/set), `canvasUrl?`, `documentBaseUrl?`, `assetSpace?`, `assetCapabilities?`                                                                                                           |
 | Session/project | `activate`, `openProject`, `probeRootProject`, `createDestination`, `createProject`, `resolveSiteContext`                                                                                                      |
 | Filesystem      | `listDirectory`, `readFile`, `writeFile`, `uploadFile`, `deleteFile`, `renameFile`, `createDirectory`, `locateFile`, `searchFiles`, `discoverComponents`                                                       |
 | Git             | `gitStatus`, `gitBranches`, `gitLog`, `gitStage`, `gitUnstage`, `gitCommit`, `gitPush`, `gitPull`, `gitFetch`, `gitCheckout`, `gitCreateBranch`, `gitDiff`, `gitShow`, `gitDiscard`, `gitInit`, `gitAddRemote` |
@@ -36,6 +36,8 @@ All paths passed into adapter methods are project-relative; translating them to 
 
 `uploadFile` is the one member that carries binary. It takes `string | File | Blob | ArrayBuffer`, and every caller — the image field's Upload button, a file dropped on the canvas or the Files panel, the Library — hands it whatever the browser gave them, usually a `File`. If your transport is HTTP you can post that body straight through. **If your transport serializes its arguments** (JSON over RPC or a WebSocket, as the desktop adapters do), a `File` becomes `{}` on the wire: base64-encode it in the adapter before the call and decode it in the backend. `@jxsuite/studio/base64` exports `toBase64` for exactly this, and it passes a `string` through untouched so callers that already hold base64 keep working.
 
+It answers `UploadResult` — `{ path, size? }` — and **`path` is the answer, not an echo**. Report where the bytes really landed: a store that de-duplicates by content hash, appends a collision suffix, or normalizes a name writes somewhere other than the path it was asked for, and the reference Studio puts in the document has to name the file that exists. A backend that writes exactly where it was told still reports it, so no caller has to know which kind of backend it is talking to.
+
 `documentBaseUrl` is the other declaration worth knowing about. The canvas renders in an iframe and resolves a component `$ref` by fetching it — `readFile` is not reachable from that realm — so **project files have to exist at a URL**. The default base is `<canvas origin>/<projectRoot>/`, which is already correct for any backend that serves the project tree from its web root: the dev server does, and so does the desktop's loopback server.
 
 Set `documentBaseUrl` when your `projectRoot` is an **identifier rather than a served path**. Jx Cloud's is `owner/repo@branch`, so the default addressed nothing and every `$ref` fetch missed. Point it at whatever route serves your project tree, ending in `/`; Studio appends the project-relative path to it.
@@ -43,6 +45,18 @@ Set `documentBaseUrl` when your `projectRoot` is an **identifier rather than a s
 :::doc-warning
 If your host answers a missing file with a single-page fallback — the app shell at **HTTP 200** rather than a 404 — a wrong base does not fail cleanly. The fetch succeeds, and the renderer reports `Unexpected token '<', "<!doctype "…` from the JSON parser. Studio now names that case explicitly, but the cure is a base that resolves.
 :::
+
+`assetSpace` says what your ORIGIN answers for a **site URL** — and it is about the origin, not about the backend. A host whose files are perfectly reachable through `readFile` can still need this, because what decides it is what answers `GET /hero.jpg` on the document the canvas is running in.
+
+Leave it absent when that origin already serves the published site URL space. The dev server and the desktop loopback both do, so neither declares anything and `/hero.jpg` resolves natively.
+
+Set it to `"repo"` when nothing does, and set `documentBaseUrl` with it — `"repo"` is inert on its own, because a host that says its site URLs are wrong without saying what is right has told Studio nothing it can act on. Studio then resolves every authored reference to the **project file** it names and addresses that file under your base: `/hero.jpg` is `public/hero.jpg`, and a content entry's `./images/hero.png` is `content/posts/images/hero.png`. Both are real repository paths, so you need no `public/`→root mapping, no asset-mount mapping, and no route beyond the one already serving project files.
+
+:::doc-note
+A site URL is resolved the way a **build** would resolve it, not the way the editing servers do. The two differ: `serveProjectFile` tries the project root before `public/`, so a file at `<root>/hero.jpg` loads at `/hero.jpg` in a dev preview and 404s on the deployed site. With no filesystem to probe, the canvas has to pick one answer, and the one that makes the preview agree with production is the build's.
+:::
+
+`assetCapabilities` declares what your backend will accept as an upload — `maxUploadBytes` and an `accept` string in `<input accept>` syntax. Both are optional and absence means "no declared limit": Studio will not invent one, because a limit it made up is a file the user cannot upload for no reason anyone can name. Declare a limit and Studio refuses oversized files before spending the round trip, naming the number, and narrows the file picker to your `accept`. Nothing widens it.
 
 `createDestination` is a declaration, not a method: set it to `"path"` if your backend writes projects to a filesystem, or `"repo"` if a project is a remote repository. Studio uses it to decide which destination fields the New Project modal collects, and hands the answer back to `createProject` as `opts.destination`. **Your adapter must honor that destination and must not substitute one of its own** — a create with no usable destination is an error, not a cue to fall back to a default directory or account.
 

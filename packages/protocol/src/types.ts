@@ -68,6 +68,43 @@ export interface RenameResult {
   error?: string;
 }
 
+/**
+ * What an upload actually stored.
+ *
+ * `path` is the ANSWER, not an echo. A backend may store the bytes somewhere other than the path
+ * asked for — a store that de-duplicates by content hash, one that appends a collision suffix, one
+ * that normalizes a name — and the client has to write a reference to what was really written. The
+ * upload response used to be untyped (`Promise<unknown>`), and every caller ignored it and used the
+ * requested path, so any such backend produced a document pointing at a file that is not there.
+ *
+ * `size` is what the backend recorded, when it says: the client already knows the bytes it sent, so
+ * a differing value is the backend telling you it transformed them.
+ */
+export interface UploadResult {
+  /** Project-relative path the bytes were stored at. */
+  path: string;
+  /** Stored size in bytes, when the backend reports one. */
+  size?: number;
+}
+
+/**
+ * What a backend will accept as an upload, when it says.
+ *
+ * Every field is optional and absence means "no declared limit" — a client must not invent one,
+ * because a limit it made up is a file the user cannot upload for no reason it can name. A DECLARED
+ * limit is different: it lets the client refuse before spending the round trip, and name the number
+ * in the refusal.
+ */
+export interface AssetCapabilities {
+  /** Largest single upload the backend accepts, in bytes. */
+  maxUploadBytes?: number;
+  /**
+   * Media types and extensions the backend accepts, in `<input accept>` syntax (`"image/*,.pdf"`).
+   * Narrows the client's own default; it never widens it.
+   */
+  accept?: string;
+}
+
 /** One kind of reference in one file, with how many times it occurs there. */
 export interface ReferenceHit {
   /**
