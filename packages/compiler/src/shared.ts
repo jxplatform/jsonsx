@@ -780,6 +780,37 @@ function readsRuntimeOnlyState(str: string, scope: Record<string, unknown>) {
 }
 
 /**
+ * Whether the whole string is exactly ONE `${…}` — the interpolation that opens at index 0 also
+ * closes at the final character.
+ *
+ * A greedy `/^\$\{(.+)\}$/` also matched `"${a} / ${b}"`, spliced the interior into `return (a} /
+ * ${b)`, and the SyntaxError became a silent null: the node rendered empty, and a `$head` entry
+ * shipped its own template text. A brace-depth scan is exact where a tightened regex is not —
+ * `"${`${a}-x`}"` is still one expression, and must keep returning a raw value.
+ *
+ * @param {string} str
+ * @returns {boolean}
+ */
+export function isSingleExpression(str: string): boolean {
+  if (!str.startsWith("${") || !str.endsWith("}")) {
+    return false;
+  }
+  let depth = 0;
+  for (let i = 1; i < str.length; i += 1) {
+    const c = str[i];
+    if (c === "{") {
+      depth += 1;
+    } else if (c === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return i === str.length - 1;
+      }
+    }
+  }
+  return false;
+}
+
+/**
  * @param {string} str
  * @param {Record<string, unknown>} scope
  * @returns {unknown}
@@ -799,8 +830,7 @@ export function evaluateStaticTemplate(str: string, scope: Record<string, unknow
   const args = ["state", "$map", "$site", "$page"] as const;
   const values = [scope, scope?.$map, scope?.$site, scope?.$page];
   try {
-    const singleExprMatch = str.match(/^\$\{(.+)\}$/s);
-    const body = singleExprMatch ? `return (${singleExprMatch[1]})` : `return \`${str}\``;
+    const body = isSingleExpression(str) ? `return (${str.slice(2, -1)})` : `return \`${str}\``;
     const fn = new Function(...args, body) as (...a: unknown[]) => unknown;
     return fn(...values);
   } catch {

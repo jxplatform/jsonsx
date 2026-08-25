@@ -63,6 +63,7 @@ import {
   colorSchemePrePaintScript,
   evaluateStaticTemplate,
   isComponentFullyStatic,
+  isSingleExpression,
   isTemplateString,
   preRenderComponentHtml,
   pureSchemeOf,
@@ -1739,15 +1740,8 @@ function evaluateMapTemplate(str: string, scope: Record<string, unknown>) {
   try {
     const item = (scope.$map as Record<string, unknown>)?.item;
     const index = (scope.$map as Record<string, unknown>)?.index;
-    const singleExprMatch = str.match(/^\$\{(.+)\}$/s);
-    if (singleExprMatch) {
-      const fn = new Function(
-        "state",
-        "$map",
-        "item",
-        "index",
-        `return (${singleExprMatch[1]})`,
-      ) as (
+    if (isSingleExpression(str)) {
+      const fn = new Function("state", "$map", "item", "index", `return (${str.slice(2, -1)})`) as (
         state: Record<string, unknown>,
         $map: unknown,
         item: unknown,

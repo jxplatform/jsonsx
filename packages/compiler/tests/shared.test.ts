@@ -425,6 +425,30 @@ describe("evaluateStaticTemplate", () => {
   test("returns null on error", () => {
     expect(evaluateStaticTemplate("${invalidSyntax.}", {})).toBe(null);
   });
+
+  /*
+   * A greedy single-expression test matched a string that merely STARTED and ENDED with an
+   * interpolation, spliced its interior into `return (a} / ${b)`, and turned the SyntaxError into a
+   * silent null — so the node rendered empty and a $head entry shipped its own template text.
+   * specs/spec.md §351 and site-architecture.md §996 both teach exactly this shape.
+   */
+  test("interpolates a string that both opens and closes with an expression", () => {
+    expect(evaluateStaticTemplate("${state.num} / ${state.total}", { num: 2, total: 24 })).toBe(
+      "2 / 24",
+    );
+    expect(
+      evaluateStaticTemplate("${$site.url}/blog/${$page.params.slug}", {
+        $page: { params: { slug: "hello" } },
+        $site: { url: "https://example.com" },
+      }),
+    ).toBe("https://example.com/blog/hello");
+  });
+
+  test("a lone expression still returns the raw value, nested braces included", () => {
+    expect(evaluateStaticTemplate("${state.n}", { n: 5 })).toBe(5);
+    expect(evaluateStaticTemplate('${state.a ? "{x}" : "y"}', { a: true })).toBe("{x}");
+    expect(evaluateStaticTemplate("${`${state.a}-x`}", { a: 1 })).toBe("1-x");
+  });
 });
 
 describe("getPathValue", () => {

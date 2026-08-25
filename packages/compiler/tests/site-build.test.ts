@@ -2752,6 +2752,9 @@ describe("buildSite — rich map template expansion", () => {
                 children: [
                   { tagName: "h2", textContent: "Post: ${item.title}" },
                   { tagName: "small", textContent: "${item.missing.deep}" },
+                  // Opens AND closes with an interpolation — the shape the greedy
+                  // Single-expression test used to splice into a SyntaxError.
+                  { tagName: "p", textContent: "${item.title} — ${item.id}" },
                   "static-sep",
                 ],
                 style: { color: "${item.color}" },
@@ -2825,6 +2828,9 @@ describe("buildSite — rich map template expansion", () => {
     // Attribute template resolved per item.
     expect(html).toContain('data-id="1"');
     expect(html).toContain('data-id="2"');
+    // A template that both opens and closes with an interpolation resolves per item.
+    expect(html).toContain("First — 1");
+    expect(html).toContain("Second — 2");
     // Static string child preserved.
     expect(html).toContain("static-sep");
     // Literal-array items expanded.
