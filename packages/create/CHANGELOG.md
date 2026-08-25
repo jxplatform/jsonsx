@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.3.6](https://github.com/jxsuite/jx/compare/create-v1.3.5...create-v1.3.6) (2026-08-25)
+
+
+### Bug Fixes
+
+* **create:** scaffold writable projects from read-only template stores ([ed4e091](https://github.com/jxsuite/jx/commit/ed4e0917d278341d079dacefb995cc8c60c79f01))
+* **create:** scaffold writable projects from read-only template stores ([aedfc41](https://github.com/jxsuite/jx/commit/aedfc41c9e4cedbfd7003134de5c1d3dc1c22ec8))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/starters bumped to 1.6.3
+
 ## [1.3.5](https://github.com/jxsuite/jx/compare/create-v1.3.4...create-v1.3.5) (2026-08-24)
 
 

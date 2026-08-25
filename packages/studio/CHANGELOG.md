@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.4.3](https://github.com/jxsuite/jx/compare/studio-v2.4.2...studio-v2.4.3) (2026-08-25)
+
+
+### Bug Fixes
+
+* **cloud:** discover components by reading them, so the canvas can register any ([#200](https://github.com/jxsuite/jx/issues/200)) ([e97b57d](https://github.com/jxsuite/jx/commit/e97b57db1ed2c9d8e1c103f6021ff332118d09be))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/ai bumped to 0.36.3
+    * @jxsuite/collab bumped to 0.8.2
+    * @jxsuite/create bumped to 1.3.6
+    * @jxsuite/formulas bumped to 0.0.13
+    * @jxsuite/markup bumped to 0.4.6
+    * @jxsuite/protocol bumped to 1.2.1
+    * @jxsuite/runtime bumped to 2.0.5
+    * @jxsuite/schema bumped to 1.8.1
+
 ## [2.4.2](https://github.com/jxsuite/jx/compare/studio-v2.4.1...studio-v2.4.2) (2026-08-24)
 
 

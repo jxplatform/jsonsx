@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.1](https://github.com/jxsuite/jx/compare/schema-v1.8.0...schema-v1.8.1) (2026-08-25)
+
+
+### Bug Fixes
+
+* **cloud:** discover components by reading them, so the canvas can register any ([#200](https://github.com/jxsuite/jx/issues/200)) ([e97b57d](https://github.com/jxsuite/jx/commit/e97b57db1ed2c9d8e1c103f6021ff332118d09be))
+
 ## [1.8.0](https://github.com/jxsuite/jx/compare/schema-v1.7.0...schema-v1.8.0) (2026-08-21)
 
 

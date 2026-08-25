@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.0.5](https://github.com/jxsuite/jx/compare/runtime-v2.0.4...runtime-v2.0.5) (2026-08-25)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/schema bumped to 1.8.1
+
 ## [2.0.4](https://github.com/jxsuite/jx/compare/runtime-v2.0.3...runtime-v2.0.4) (2026-08-24)
 
 
