@@ -1151,9 +1151,34 @@ describe("renderStaticNode", () => {
 // ─── preRenderComponentHtml ────────────────────────────────────────────────
 
 describe("preRenderComponentHtml", () => {
-  test("returns empty for doc with no children", () => {
+  test("returns empty for doc with no content at all", () => {
     expect(preRenderComponentHtml({})).toBe("");
     expect(preRenderComponentHtml({ state: {} })).toBe("");
+  });
+
+  /*
+   * Spec.md §17.2 recommends `textContent` over `children` whenever every child would be a bare
+   * string, and this dropped exactly that shape — it looked at `children` alone. jxsuite.com ships
+   * the result today: five empty section-label elements on /features/, marked static so no module
+   * ever loads to fill them.
+   */
+  test("renders root-level textContent when the definition has no children", () => {
+    expect(preRenderComponentHtml({ state: { text: "Label" }, textContent: "${state.text}" })).toBe(
+      "Label",
+    );
+  });
+
+  test("root-level textContent takes the instance prop override", () => {
+    expect(
+      preRenderComponentHtml(
+        { state: { text: "Label" }, textContent: "${state.text}" },
+        { text: "Features" },
+      ),
+    ).toBe("Features");
+  });
+
+  test("renders root-level innerHTML when the definition has no children", () => {
+    expect(preRenderComponentHtml({ innerHTML: "<b>hi</b>" })).toBe("<b>hi</b>");
   });
 
   test("renders children with state", () => {

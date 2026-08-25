@@ -52,6 +52,29 @@ describe("Custom Elements", () => {
     el.remove();
   });
 
+  /*
+   * A definition's content can be root-level `textContent` rather than `children` — the shape
+   * spec.md §17.2 recommends when every child would be a bare string. The interpreter looked at
+   * `children` alone, so such a component upgraded to an empty element.
+   */
+  test("renders root-level textContent when the definition has no children", async () => {
+    const tag = uniqueTag();
+    await defineElement({
+      state: { text: "Label" },
+      tagName: tag,
+      textContent: "${state.text}",
+    });
+
+    const el = document.createElement(tag);
+    document.body.append(el);
+    await new Promise((r) => {
+      setTimeout(r, 100);
+    });
+
+    expect(el.textContent).toBe("Label");
+    el.remove();
+  });
+
   test("$props override state defaults", async () => {
     const tag = uniqueTag();
     await defineElement({

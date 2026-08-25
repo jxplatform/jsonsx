@@ -1541,6 +1541,40 @@ export function resolveStaticTagName(
 }
 
 /**
+ * The content of one node: `textContent`, else `innerHTML`, else rendered `children`.
+ *
+ * Shared with `preRenderComponentHtml`, which returns a component's innerHTML and so cannot call
+ * `renderStaticNode` (that would wrap the result in the host tag). It used to look at `children`
+ * alone and return "" for anything else, so a component whose content is root-level `textContent` —
+ * the shape spec.md §17.2 recommends when every child is a bare string — prerendered to nothing.
+ *
+ * @param {JxElement | JxMutableNode} node
+ * @param {Record<string, unknown> | null} scope
+ * @param {string | null} slotContent
+ * @returns {string}
+ */
+function renderInner(
+  node: JxElement | JxMutableNode,
+  scope: Record<string, unknown> | null,
+  slotContent: string | null,
+): string {
+  if (node.textContent !== undefined) {
+    const val = resolveStaticValue(node.textContent, scope);
+    return val != null ? escapeHtml(String(val)) : "";
+  }
+  if (node.innerHTML) {
+    const val = resolveStaticValue(node.innerHTML, scope);
+    return val != null ? String(val) : (node.innerHTML as string);
+  }
+  if (Array.isArray(node.children)) {
+    return node.children
+      .map((c: JxElement | JxMutableNode | string) => renderStaticNode(c, scope, slotContent))
+      .join("\n");
+  }
+  return "";
+}
+
+/**
  * Recursively render a Jx node tree to static HTML for pre-rendering.
  *
  * @param {JxElement | JxMutableNode | string} node
@@ -1614,20 +1648,7 @@ export function renderStaticNode(
     return `<${tag}${attrs}>`;
   }
 
-  let inner = "";
-  if (node.textContent !== undefined) {
-    const val = resolveStaticValue(node.textContent, scope);
-    inner = val != null ? escapeHtml(String(val)) : "";
-  } else if (node.innerHTML) {
-    const val = resolveStaticValue(node.innerHTML, scope);
-    inner = val != null ? String(val) : (node.innerHTML as string);
-  } else if (Array.isArray(node.children)) {
-    inner = node.children
-      .map((c: JxElement | JxMutableNode | string) => renderStaticNode(c, scope, slotContent))
-      .join("\n");
-  }
-
-  return `<${tag}${attrs}>${inner}</${tag}>`;
+  return `<${tag}${attrs}>${renderInner(node, scope, slotContent)}</${tag}>`;
 }
 
 /**
@@ -1663,12 +1684,7 @@ export function preRenderComponentHtml(
     }
   }
   const scope = buildInitialScope(stateDefs, null);
-  if (!Array.isArray(doc.children)) {
-    return "";
-  }
-  return doc.children
-    .map((c: JxElement | JxMutableNode | string) => renderStaticNode(c, scope, slotContent))
-    .join("\n");
+  return renderInner(doc, scope, slotContent);
 }
 
 /**

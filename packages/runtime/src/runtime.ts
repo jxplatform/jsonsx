@@ -2763,6 +2763,14 @@ export async function defineElement(source: string | JxDocument, baseUrl?: strin
       applyStyle(this, def.style ?? {}, (state["$media"] as Record<string, string>) ?? {}, state);
       applyAttributes(this, def.attributes ?? {}, state);
 
+      /*
+       * Root-level `textContent` is a definition's content just as much as `children` is — it is
+       * the shape spec.md §17.2 recommends when every child would be a bare string — and it was
+       * dropped here, so such a component rendered empty everywhere the interpreter runs.
+       */
+      if (!Array.isArray(def.children) && def.textContent !== undefined) {
+        bindProperty(this, "textContent", def.textContent, state);
+      }
       const children = Array.isArray(def.children) ? def.children : [];
       for (const childDef of children) {
         this.append(renderNode(childDef, state));
