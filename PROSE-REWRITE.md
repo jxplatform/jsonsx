@@ -47,7 +47,10 @@ bun scripts/docs/unwrap-prose.ts docs/<path>.md
 bun run docs:check
 bun run docs:links
 bun scripts/docs/check-prose.ts docs/<path>.md
+bun scripts/docs/check-prose-facts.ts --base <branch point> docs/<path>.md
 ```
+
+The fact differ compares the working tree against the branch point and blocks on a LOSS: a removed code fence, link, keystroke or image. Everything else it prints is advisory and gets adjudicated line by line in the pull request body. Point `--base` at the branch point rather than at `main`, or a stacked change reads as a loss.
 
 The gate holds new prose to zero em dashes and holds each existing page to the count it already had, so a rewrite that removes some must lower that page's entry in `scripts/docs/prose.json`. `bun scripts/docs/check-prose.ts --ratchet` prints the corrected map. Delete a page's entry when it reaches zero.
 
@@ -112,6 +115,7 @@ A rewrite must never guess at a fact. Anything below gets recorded here and deci
   before picking up any `gap:` id, and `packages/studio/UX-REDESIGN-PLAN.md` §13, cited as the design authority for the shot contract. Neither exists in the tree.
 - **`packages/README.md`, `extensions/README.md` and `scripts/README.md` match no rule in
   `affected.ts`** and fail open to a full test matrix.
+- **Two pages describe the same screenshot differently.** `docs/images/mode-manage.png` was captioned "Jx Studio Manage Files modal with live previews of every project file" on `start/first-project.md` and "The Library open in a Studio pane, listing a project's pages and components as cards with live previews" on `studio/projects/browse.md`, which owns the shot. The pilot adopted the owning page's wording, which narrows the claim from every project file to pages and components and changes modal to pane. Someone who can see the image should settle which is right.
 - **Whether a docs page should transcribe a spec at all.** `framework/concepts/` is a copy of
   `specs/spec.md`. This campaign fixes the prose; the information architecture is a larger question.
 

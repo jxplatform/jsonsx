@@ -98,9 +98,6 @@
     "docs/extending/extensions/connectors.md": {
       "em-dash": 20
     },
-    "docs/extending/extensions/first-party.md": {
-      "em-dash": 20
-    },
     "docs/extending/extensions/formats.md": {
       "em-dash": 26
     },
@@ -124,9 +121,6 @@
     },
     "docs/extending/extensions/tutorial-toml-format.md": {
       "em-dash": 17
-    },
-    "docs/framework.md": {
-      "em-dash": 8
     },
     "docs/framework/agents.md": {
       "em-dash": 24
@@ -173,9 +167,6 @@
     "docs/framework/concepts/props-and-scope.md": {
       "em-dash": 16
     },
-    "docs/framework/concepts/reactivity.md": {
-      "em-dash": 1
-    },
     "docs/framework/concepts/references.md": {
       "em-dash": 28
     },
@@ -187,9 +178,6 @@
     },
     "docs/framework/concepts/statements.md": {
       "em-dash": 22
-    },
-    "docs/framework/concepts/styling.md": {
-      "em-dash": 3
     },
     "docs/framework/concepts/switching.md": {
       "em-dash": 18
@@ -263,9 +251,6 @@
     "docs/start/first-component.md": {
       "em-dash": 41
     },
-    "docs/start/first-project.md": {
-      "em-dash": 21
-    },
     "docs/start/install.md": {
       "em-dash": 10
     },
@@ -274,9 +259,6 @@
     },
     "docs/start/videos.md": {
       "em-dash": 8
-    },
-    "docs/studio.md": {
-      "em-dash": 9
     },
     "docs/studio/ai.md": {
       "em-dash": 26
@@ -361,9 +343,6 @@
     },
     "docs/studio/interface/languages.md": {
       "em-dash": 12
-    },
-    "docs/studio/interface/modes.md": {
-      "em-dash": 28
     },
     "docs/studio/interface/preferences.md": {
       "em-dash": 21
