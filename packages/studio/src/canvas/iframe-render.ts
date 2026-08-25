@@ -13,18 +13,21 @@
 
 import {
   buildScope,
+  canvasStyleValue,
   defineElement,
   renderNode,
   runScoped,
+  setCanvasAssetResolver,
   setCanvasDelinkAnchors,
   setCanvasViewportTranspose,
   setRootMedia,
   setSkipAutoRequests,
   setSkipServerFunctions,
   setStampPropBindings,
-  transposeCanvasUnits,
 } from "@jxsuite/runtime";
+import { resolveAssetRef } from "./asset-resolve";
 import { classifyRenderNode, serializeJxPath } from "./path-mapping";
+import type { AssetContext } from "./asset-resolve";
 import { SITE_STYLE_ID, buildSiteStyleCSS } from "./site-style-css";
 import type { CanvasMode } from "./iframe-protocol";
 import type { JxDocument } from "@jxsuite/schema/types";
@@ -409,7 +412,9 @@ export function applySiteStyle(
     existing?.remove();
     return;
   }
-  const css = buildSiteStyleCSS(siteStyle, mediaQueries, transposeCanvasUnits);
+  /* `canvasStyleValue`, not `transposeCanvasUnits`: the site style block is CSS the canvas emits
+     itself, so a `url()` in it needs the same asset resolution every other declaration gets. */
+  const css = buildSiteStyleCSS(siteStyle, mediaQueries, canvasStyleValue);
   if (existing) {
     existing.textContent = css;
     return;
@@ -434,7 +439,7 @@ export function applyPreviewColorScheme(doc: Document, scheme: "light" | "dark" 
 }
 
 /** Inject the document's `$head` (link/meta/script) into the iframe's <head>, de-duped by href/src. */
-export function injectHead(doc: JxDocument): void {
+export function injectHead(doc: JxDocument, assets: AssetContext | null = null): void {
   const head = (doc as { $head?: HeadEntry[] }).$head;
   if (!Array.isArray(head)) {
     return;
@@ -451,14 +456,16 @@ export function injectHead(doc: JxDocument): void {
     const attrs = { ...entry.attributes } as Record<string, unknown>;
     for (const key of ["href", "src"]) {
       const val = attrs[key];
-      if (
-        typeof val === "string" &&
-        !val.startsWith("/") &&
-        !val.startsWith(".") &&
-        !val.startsWith("http")
-      ) {
-        attrs[key] = `/node_modules/${val}`;
+      if (typeof val !== "string" || val === "") {
+        continue;
       }
+      if (!val.startsWith("/") && !val.startsWith(".") && !val.startsWith("http")) {
+        /* The bare-specifier lane owns `/node_modules/<pkg>` — the HOST's URL space, not the
+           project's. A project resolver has nothing to resolve it to, so it never sees it. */
+        attrs[key] = `/node_modules/${val}`;
+        continue;
+      }
+      attrs[key] = resolveAssetRef(val, assets) ?? val;
     }
     const sel = `${tag}${attrs.href ? `[href="${String(attrs.href)}"]` : ""}${attrs.src ? `[src="${String(attrs.src)}"]` : ""}`;
     if (sel !== tag && document.head.querySelector(sel)) {
@@ -620,9 +627,20 @@ export async function renderResolvedDocument(opts: {
   mode: CanvasMode;
   mapperCtx: PathMapCtx;
   siteStyle?: Record<string, unknown> | null;
+  /**
+   * How this host addresses project media, or null when the canvas origin serves the site's own URL
+   * space (desktop, `jx dev`) and references need no resolution at all.
+   */
+  assets?: AssetContext | null;
   /** This render may fetch automatic `Request` entries even outside preview (Data-panel Refresh). */
   allowAutoRequests?: boolean;
 }): Promise<RenderHandle> {
+  /* FIRST, before anything emits CSS or an attribute. The resolver is module-global in the runtime,
+     so it is set on every render — including to null — or a previous document's context would
+     resolve this one's references. It cannot cross the realm as a function, which is why the parent
+     posts the plain-data context and the resolver is closed over it here. */
+  const assets = opts.assets ?? null;
+  setCanvasAssetResolver(assets ? (value) => resolveAssetRef(value, assets) : null);
   setSkipServerFunctions(opts.mode !== "preview");
   // Same gate for automatic `$prototype: "Request"` state entries. `buildScope` re-resolves every
   // State entry on each full render, so without this an escalating authoring action (a signals-panel
@@ -644,7 +662,7 @@ export async function renderResolvedDocument(opts: {
   // Component internals get stamped).
   setStampPropBindings(opts.mode === "design" || opts.mode === "edit");
   applySiteStyle(opts.siteStyle, (opts.doc as { $media?: Record<string, string> }).$media ?? {});
-  injectHead(opts.doc);
+  injectHead(opts.doc, assets);
   syncEditModeCss(opts.container.ownerDocument, opts.mode);
   syncPreviewShell(opts.container.ownerDocument, opts.mode);
   syncStylebookCss(opts.container.ownerDocument, opts.mode);

@@ -8,7 +8,7 @@
 
 import "./with-dom.js";
 import { beforeEach, describe, expect, test } from "bun:test";
-import { resetStudioState } from "./harness";
+import { installMockPlatform, resetStudioState } from "./harness";
 import {
   authoredRefTargets,
   baseName,
@@ -17,6 +17,8 @@ import {
   normalizeProjectPath,
   previewFileSrc,
 } from "../src/files/media-paths";
+
+const { happyDOM } = globalThis as unknown as { happyDOM: { setURL: (u: string) => void } };
 
 /** A project whose `blog` collection is sourced from a directory that is not its mount prefix. */
 function withCollections(content: Record<string, { source: string }>): void {
@@ -94,6 +96,28 @@ describe("previewFileSrc", () => {
 
   test("an empty path is returned as given, not as a lone slash", () => {
     expect(previewFileSrc("")).toBe("");
+  });
+
+  /* In repo space nothing answers a site URL, so the site URL is the wrong question entirely — the
+     host serves the FILE, at its own path, under the declared base. A library thumbnail on a
+     multi-tenant editor origin is exactly this case, and asking for `/hero.jpg` there gets the
+     application shell at HTTP 200. */
+  test("in repo space it addresses the file itself, under the host's base", () => {
+    // `documentBase` resolves a root-relative base against the CANVAS origin, so the host needs
+    // One — a relative base would throw rather than resolve, which fails the whole canvas mount.
+    happyDOM.setURL("https://studio.example.com/");
+    installMockPlatform({
+      assetSpace: "repo",
+      canvasUrl: "https://studio.example.com/canvas.html",
+      documentBaseUrl: "https://studio.example.com/p/o/r/main/raw/",
+    } as never);
+    expect(previewFileSrc("public/hero.jpg")).toBe(
+      "https://studio.example.com/p/o/r/main/raw/public/hero.jpg",
+    );
+    // The file path, not the site URL: `public/` is NOT stripped, because nothing serves it there.
+    expect(previewFileSrc("content/posts/images/my photo.png")).toBe(
+      "https://studio.example.com/p/o/r/main/raw/content/posts/images/my%20photo.png",
+    );
   });
 });
 

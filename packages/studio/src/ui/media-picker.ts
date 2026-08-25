@@ -30,7 +30,7 @@ import { previewAssetSrc } from "../canvas/asset-refs";
 import {
   IMAGE_EXTENSIONS,
   MEDIA_EXTENSIONS,
-  UPLOAD_ACCEPT,
+  uploadAccept,
   extensionOf,
   uploadAssets,
 } from "../files/media-upload";
@@ -393,7 +393,7 @@ function pickAndUpload(onCommit: (val: string) => void) {
   const input = document.createElement("input");
   input.type = "file";
   input.multiple = true;
-  input.accept = UPLOAD_ACCEPT;
+  input.accept = uploadAccept();
   input.addEventListener("change", () => {
     if (input.files?.length) {
       void uploadAndAssign(input.files, onCommit);

@@ -164,6 +164,22 @@ describe("devserver platform basics", () => {
     expect(p.projectRoot).toBe("");
   });
 
+  /**
+   * THIS ASSERTION IS THE IDENTITY GUARANTEE.
+   *
+   * `assetSpace` absent means `"site"`, and `"site"` is exactly what shipped: the dev server IS the
+   * published site URL space (`serveProjectFile` in `@jxsuite/server`), so `/hero.jpg` already
+   * resolves and Studio must not touch it. A value here — any value — would put the canvas on a
+   * resolution path this host has never needed.
+   */
+  test("declares NO assetSpace: the dev server already serves the site URL space", () => {
+    // Read through the INTERFACE, so the assertion is about what a host may declare rather than
+    // About what this factory's inferred type happens to contain.
+    const p = createDevServerPlatform() as unknown as StudioPlatform;
+    expect(p.assetSpace).toBeUndefined();
+    expect(p.documentBaseUrl).toBeUndefined();
+  });
+
   test("setting projectRoot fires activate POST with the root", async () => {
     route("/__studio/activate", () => json({ ok: true }));
     const p = createDevServerPlatform();

@@ -431,8 +431,17 @@ function canvasStyleUrls(value: string): string {
   });
 }
 
-/** A style scalar as the canvas wants it written: assets resolved, then viewport units transposed. */
-function canvasStyleValue(value: string): string {
+/**
+ * A style scalar as the canvas wants it written: assets resolved, then viewport units transposed.
+ *
+ * Exported because the canvas emits some CSS itself — the site-level `style` block, which never
+ * passes through {@link applyStyle} — and a second implementation of "what the canvas does to a
+ * style value" is a second thing to keep in step.
+ *
+ * @param {string} value - A CSS declaration value
+ * @returns {string} The value as the canvas should write it
+ */
+export function canvasStyleValue(value: string): string {
   return transposeCanvasUnits(canvasStyleUrls(value));
 }
 
@@ -2797,20 +2806,27 @@ function renderCustomElementWithProps(
     if (refusePrivateProp(key, "$props")) {
       continue;
     }
+    /* The same resolution `bindProperty` gives an ordinary element. A `$props: { src }` on a custom
+       element is an asset reference authored at the USAGE site, so it belongs to the document that
+       wrote it — a media prop the component forwards into its own `<img>` is resolved separately,
+       inside the component's render, against the same context. */
+    const write = (resolved: unknown): void => {
+      (el as unknown as Record<string, unknown>)[key] =
+        typeof resolved === "string" ? canvasAssetValue(el.tagName, key, resolved) : resolved;
+    };
     if (isRefObj(val)) {
       const refVal = val;
-      const resolved = resolveRef(refVal.$ref, state);
-      (el as unknown as Record<string, unknown>)[key] = resolved;
+      write(resolveRef(refVal.$ref, state));
       // Reactive forwarding: re-set the property when the source changes
       effect(() => {
-        (el as unknown as Record<string, unknown>)[key] = resolveRef(refVal.$ref, state);
+        write(resolveRef(refVal.$ref, state));
       });
     } else if (isTemplateString(val)) {
       effect(() => {
-        (el as unknown as Record<string, unknown>)[key] = evaluateTemplate(val, state);
+        write(evaluateTemplate(val, state));
       });
     } else {
-      (el as unknown as Record<string, unknown>)[key] = val;
+      write(val);
     }
   }
 

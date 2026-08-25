@@ -382,6 +382,25 @@ describe("setCanvasAssetResolver", () => {
     expect(toCSSText({ maskImage: "url(/m.svg)" })).toBe("mask-image: url(/m.svg)");
   });
 
+  /* `$props` writes a JS property straight onto a custom element, bypassing `bindProperty`
+     entirely — so `<x-image $props: { src }>` was the one spelling of an asset reference the hook
+     did not see. A media prop the component FORWARDS into its own `<img>` is resolved separately,
+     inside the component's own render, against the same context. */
+  test("a $props asset key on a custom element is resolved", async () => {
+    setCanvasAssetResolver(prefixResolver);
+    const { defineElement } = await import("../src/runtime");
+    await defineElement({
+      children: [{ src: "${state.src}", tagName: "img" }],
+      state: { src: { default: "" } },
+      tagName: "canvas-props-img",
+    } as never);
+    const el = renderNode(
+      { $props: { src: "/hero.jpg" }, tagName: "canvas-props-img" } as never,
+      reactive({}),
+    );
+    expect((el as unknown as { src: string }).src).toBe("/raw/hero.jpg");
+  });
+
   test("a non-URL attribute is never resolved, however it is written", () => {
     setCanvasAssetResolver(prefixResolver);
     const el = renderNode(

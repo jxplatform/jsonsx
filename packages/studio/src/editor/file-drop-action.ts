@@ -27,6 +27,7 @@ import type { DropPreview, FileDropHit } from "../canvas/iframe-protocol";
 import type { JxPath } from "../state";
 import type { Tab } from "../tabs/tab";
 import type { JxMutableNode } from "@jxsuite/schema/types";
+import { isMediaFormat } from "../utils/studio-utils";
 
 /** Where an asset's URL goes when it replaces an existing element's picture. */
 const REPLACE_ATTRS: Record<string, "src" | "poster"> = {
@@ -71,7 +72,7 @@ export function resolveFileDropTarget(
   }
   if (hit.tagName.includes("-")) {
     const entry = registry.find((c) => c.tagName === hit.tagName);
-    const imageProps = (entry?.props ?? []).filter((p) => p.format === "image");
+    const imageProps = (entry?.props ?? []).filter((p) => isMediaFormat(p.format));
     if (imageProps.length === 1) {
       return { mode: "replace-prop", path: hit.path as JxPath, prop: imageProps[0]!.name };
     }

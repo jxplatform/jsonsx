@@ -570,6 +570,36 @@ describe("commits and reactivity", () => {
     expect(row("hero").querySelector(".media-picker")).toBeTruthy();
     expect(row("hero").querySelector('sp-action-button[title="Browse media"]')).toBeTruthy();
   });
+
+  /* `"uri-reference"` is the spelling the SPEC uses and the one the content loader keys its asset
+     rewrite on, so a schema written against the documentation declared its media field that way —
+     and got a plain text box here, while the very same declaration got a media picker in the
+     properties panel. One predicate now decides, so a media field is one everywhere. */
+  test("a uri-reference field is a media field too, not a text box", async () => {
+    invalidateMediaCache();
+    installMockPlatform({}, { "public/hero.jpg": "img-bytes" });
+    resetStudioState({
+      projectConfig: {
+        content: {
+          posts: {
+            format: "json",
+            schema: { properties: { hero: { format: "uri-reference", type: "string" } } },
+            source: "./posts",
+          },
+        },
+      },
+    });
+    const tab = resetWorkspaceWithTab(undefined, {
+      documentPath: "posts/hello.json",
+      id: "fm-uri-ref",
+    }) as any;
+    tab.doc.mode = "content";
+    tab.doc.content.frontmatter = { hero: "/hero.jpg" };
+
+    await mountAndFlush();
+    await flush(6);
+    expect(row("hero").querySelector(".media-picker")).toBeTruthy();
+  });
 });
 
 describe("the other commit path and the disclosure state", () => {

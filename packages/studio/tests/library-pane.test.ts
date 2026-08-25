@@ -50,7 +50,7 @@ void mock.module("../src/files/files.js", () => ({
 }));
 void mock.module("../src/files/media-upload.js", () => ({
   MEDIA_EXTENSIONS: new Set([".png", ".jpg", ".svg"]),
-  UPLOAD_ACCEPT: "image/*",
+  uploadAccept: () => "image/*",
   extensionOf: (name: string) => {
     const dot = name.lastIndexOf(".");
     return dot === -1 ? "" : name.slice(dot).toLowerCase();

@@ -19,7 +19,13 @@
  * already knows a preview is in flight without this module declaring an idle source of its own.
  */
 
-import { buildScope, renderNode, setSkipServerFunctions } from "@jxsuite/runtime";
+import {
+  buildScope,
+  renderNode,
+  setCanvasAssetResolver,
+  setSkipServerFunctions,
+} from "@jxsuite/runtime";
+import { assetContextFor, hostAssetDeclarations, resolveAssetRef } from "../canvas/asset-refs";
 import { componentRegistry } from "../files/components";
 import { getPlatform } from "../platform";
 import { loadFormats, formatForPath } from "../format/format-host";
@@ -115,6 +121,7 @@ export async function renderDocPreview(filePath: string): Promise<HTMLElement | 
   try {
     const content = await getPlatform().readFile(filePath);
     setSkipServerFunctions(true);
+    const assets = assetContextFor(filePath, hostAssetDeclarations());
     await loadFormats();
     let document_: JxDocument;
     if (formatForPath(filePath)) {
@@ -124,8 +131,17 @@ export async function renderDocPreview(filePath: string): Promise<HTMLElement | 
       document_ = JSON.parse(content) as JxDocument;
     }
     const scope = await buildScope(document_, {}, location.href);
-    const element = renderNode(document_, scope);
-    return element instanceof HTMLElement ? element : null;
+    /* This render lands in the PARENT document, so an `<img src="/hero.jpg">` inside it resolves
+       against `index.html` — which is the shell, not the site. Same hook the canvas installs, same
+       context, restored afterwards because the next preview is a different document and a stale
+       `documentDir` would resolve its relative refs against the wrong entry. */
+    setCanvasAssetResolver((value) => resolveAssetRef(value, assets));
+    try {
+      const element = renderNode(document_, scope);
+      return element instanceof HTMLElement ? element : null;
+    } finally {
+      setCanvasAssetResolver(null);
+    }
   } catch {
     return null;
   }

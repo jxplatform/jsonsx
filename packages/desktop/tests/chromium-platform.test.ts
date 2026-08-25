@@ -1,5 +1,6 @@
 // oxlint-disable typescript/await-thenable -- bun test .resolves/.rejects matchers are typed `void` but return real Promises at runtime; the await is required.
 import { afterAll, beforeAll, describe, expect, mock, test } from "bun:test";
+import type { StudioPlatform } from "@jxsuite/studio/types";
 
 // ─── Embedded mock RPC server ──────────────────────────────────────────────
 
@@ -230,6 +231,20 @@ describe("chromium desktop platform", () => {
 
   test("has correct id", () => {
     expect(platform.id).toBe("desktop");
+  });
+  /**
+   * THIS ASSERTION IS THE IDENTITY GUARANTEE.
+   *
+   * `assetSpace` absent means `"site"`, and `"site"` is exactly what shipped: the desktop loopback
+   * IS the published site URL space (`serveProjectFile` in `@jxsuite/server`), so `/hero.jpg`
+   * already resolves and Studio must not touch it. A value here — any value — would put the canvas
+   * on a resolution path this host has never needed.
+   */
+  test("declares NO assetSpace: the loopback already serves the site URL space", () => {
+    // Through the INTERFACE: the factory returns an INFERRED type (see `platform.ts`), so a
+    // Property it deliberately does not set is not on that type at all. The assertion is about
+    // What a host MAY declare, and this one declaring nothing.
+    expect((platform as unknown as StudioPlatform).assetSpace).toBeUndefined();
   });
 
   test("canvasUrl carries the per-process rpcToken read from the shell URL", () => {

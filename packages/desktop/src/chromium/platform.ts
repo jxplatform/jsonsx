@@ -267,7 +267,10 @@ export function createDesktopPlatform() {
     // The WS transport JSON-serializes params, so binary must be base64 before it goes on the wire
     // (a File/Blob would serialize to `{}`); the backend base64-decodes. A string passes through.
     async uploadFile(path: string, data: string | File | Blob | ArrayBuffer) {
-      return request("uploadFile", { data: await toBase64(data), path }) as Promise<unknown>;
+      return (await request("uploadFile", { data: await toBase64(data), path })) as {
+        path: string;
+        size: number;
+      };
     },
 
     async deleteFile(path: string) {

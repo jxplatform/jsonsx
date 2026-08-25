@@ -17,6 +17,7 @@ import {
   mediaKind,
   setMediaChangedHandler,
   uniqueName,
+  uploadAccept,
   uploadAssets,
   uploadDirFor,
 } from "../src/files/media-upload";
@@ -236,5 +237,77 @@ describe("uploadAssets", () => {
 
     expect(await uploadAssets([testFile("a.png")])).toEqual([]);
     expect(changed).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * What the backend ANSWERS, and what it will accept.
+ *
+ * The upload response used to be `Promise<unknown>` and every caller used the path it had ASKED
+ * for. A backend that stores the bytes anywhere else — de-duplicating by content hash, appending a
+ * collision suffix, normalizing a name — therefore produced a document referencing a file that is
+ * not there, with no error anywhere.
+ */
+describe("the backend's answer", () => {
+  test("a renaming store is honoured end to end", async () => {
+    installMockPlatform({
+      // A content-addressed store: the name asked for is not the name written.
+      uploadFile: () =>
+        Promise.resolve({ path: joinDir("public", "sha256-deadbeef.png"), size: 12 }),
+    });
+
+    const [asset] = await uploadAssets([testFile("hero.png")]);
+
+    expect(asset?.path).toBe("public/sha256-deadbeef.png");
+    // And the reference written into the document names the file that exists.
+    expect(asset?.ref).toBe("/sha256-deadbeef.png");
+  });
+
+  test("a backend that reports nothing keeps the requested path", async () => {
+    installMockPlatform({ uploadFile: (path: string) => Promise.resolve({ path }) });
+    const [asset] = await uploadAssets([testFile("hero.png")]);
+    expect(asset?.path).toBe("public/hero.png");
+  });
+});
+
+describe("assetCapabilities", () => {
+  /* A DECLARED limit only. Studio must not invent one — a limit it made up is a file the user
+     cannot upload for no reason anyone can name. */
+  test("with no declared limit, size is never checked", async () => {
+    const { state } = installMockPlatform();
+    const big = testFile("huge.png");
+    Object.defineProperty(big, "size", { value: 999_999_999 });
+    const assets = await uploadAssets([big]);
+    expect(assets).toHaveLength(1);
+    expect(state.calls).toContainEqual(["uploadFile", "public/huge.png", big]);
+  });
+
+  test("an oversized file is refused before the round trip, naming the limit", async () => {
+    const { state } = installMockPlatform({
+      assetCapabilities: { maxUploadBytes: 1024 },
+    } as never);
+    const big = testFile("huge.png");
+    Object.defineProperty(big, "size", { value: 4096 });
+
+    expect(await uploadAssets([big])).toEqual([]);
+    // Never sent: the point of a declared limit is that the client does not spend the request.
+    expect(state.calls.filter(([call]) => call === "uploadFile")).toEqual([]);
+  });
+
+  test("the rest of the batch still lands", async () => {
+    installMockPlatform({ assetCapabilities: { maxUploadBytes: 1024 } } as never);
+    const big = testFile("huge.png");
+    Object.defineProperty(big, "size", { value: 4096 });
+
+    const assets = await uploadAssets([big, testFile("small.png")]);
+
+    expect(assets.map((a) => a.name)).toEqual(["small.png"]);
+  });
+
+  test("a declared accept narrows the picker; absent, Studio's own default stands", () => {
+    installMockPlatform();
+    expect(uploadAccept()).toContain("image/*");
+    installMockPlatform({ assetCapabilities: { accept: "image/png" } } as never);
+    expect(uploadAccept()).toBe("image/png");
   });
 });

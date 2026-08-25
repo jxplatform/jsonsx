@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
+import type { StudioPlatform } from "@jxsuite/studio/types";
 
 try {
   GlobalRegistrator.register();
@@ -297,6 +298,20 @@ describe("platform methods", () => {
     expect(platform.createDestination).toBe("path");
     await platform.activate();
   });
+  /**
+   * THIS ASSERTION IS THE IDENTITY GUARANTEE.
+   *
+   * `assetSpace` absent means `"site"`, and `"site"` is exactly what shipped: the desktop loopback
+   * IS the published site URL space (`serveProjectFile` in `@jxsuite/server`), so `/hero.jpg`
+   * already resolves and Studio must not touch it. A value here — any value — would put the canvas
+   * on a resolution path this host has never needed.
+   */
+  test("declares NO assetSpace: the loopback already serves the site URL space", () => {
+    // Through the INTERFACE: the factory returns an INFERRED type (see `platform.ts`), so a
+    // Property it deliberately does not set is not on that type at all. The assertion is about
+    // What a host MAY declare, and this one declaring nothing.
+    expect((platform as unknown as StudioPlatform).assetSpace).toBeUndefined();
+  });
 
   test("activate stores the loopback canvasUrl returned by getCanvasUrl", async () => {
     impls.set("getCanvasUrl", () => ({
@@ -536,6 +551,19 @@ describe("platform methods", () => {
 
   // The RPC transport JSON-serializes params, so a File/Blob would arrive as `{}`. The platform
   // Base64-encodes binary before the call; a string (already base64) passes through untouched.
+  /* The path the backend REPORTS, not the one asked for. A store that de-duplicates by content
+     hash, appends a suffix, or normalizes a name writes somewhere else, and the reference Studio
+     puts in the document has to name what is really there. The RPC used to answer `void`. */
+  test("uploadFile reports where the bytes landed", async () => {
+    impls.set("uploadFile", () => ({ path: "public/sha256-deadbeef.png", size: 2 }));
+    try {
+      const result = await platform.uploadFile("img.png", new File(["hi"], "img.png"));
+      expect(result).toEqual({ path: "public/sha256-deadbeef.png", size: 2 });
+    } finally {
+      impls.delete("uploadFile");
+    }
+  });
+
   test("uploadFile base64-encodes a File before the RPC", async () => {
     await platform.uploadFile("img.png", new File(["hi"], "img.png"));
     expect(lastCall("uploadFile")!.args[0]).toEqual({ data: "aGk=", path: "img.png" });

@@ -43,7 +43,7 @@ import { confirmFileDelete, renamePromptMessage } from "../files/file-ops";
 import { createFileIn, openFileInTab } from "../files/files";
 import { createEntry } from "../content/entry-commands";
 import { entryCollections } from "../content/entry-model";
-import { UPLOAD_ACCEPT, uploadAssets } from "../files/media-upload";
+import { uploadAccept, uploadAssets } from "../files/media-upload";
 import { localeLabel } from "@jxsuite/schema/locale";
 import {
   LIBRARY_CATEGORIES,
@@ -760,7 +760,7 @@ function toolbarTpl(panel: ActiveLibraryPane, files: readonly LibraryFile[]) {
       <input
         type="file"
         multiple
-        accept=${UPLOAD_ACCEPT}
+        accept=${uploadAccept()}
         class="library-upload-input"
         @change=${(e: Event) => {
           const input = e.target as HTMLInputElement;

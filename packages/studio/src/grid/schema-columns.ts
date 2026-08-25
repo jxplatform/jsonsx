@@ -10,6 +10,7 @@
  */
 import type { GridCellValue, GridColumn, GridColumnKind } from "./grid-source";
 import type { JsonSchema } from "../ui/schema-form";
+import { isMediaFormat } from "../utils/studio-utils";
 
 /** JSON-Schema property as it appears in content-type schemas (superset of ui JsonSchema). */
 interface PropSchema extends JsonSchema {
@@ -44,7 +45,7 @@ export function kindForProp(prop: PropSchema): GridColumnKind {
     return "enum";
   }
   const format = prop.type === "array" ? undefined : prop.format;
-  if (format === "image") {
+  if (isMediaFormat(format)) {
     return "image";
   }
   if (format === "date" || format === "date-time") {

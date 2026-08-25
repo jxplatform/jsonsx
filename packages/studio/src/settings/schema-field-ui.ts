@@ -5,7 +5,7 @@
  */
 
 import { html, nothing } from "lit-html";
-import { camelToLabel } from "../utils/studio-utils";
+import { camelToLabel, isMediaFormat } from "../utils/studio-utils";
 
 export interface SchemaProperty {
   type?: string;
@@ -483,7 +483,7 @@ export function yamlDefault(type: string, format?: string) {
   if (format === "date") {
     return new Date().toISOString().split("T")[0];
   }
-  if (format === "image") {
+  if (isMediaFormat(format)) {
     return '""';
   }
   switch (type) {

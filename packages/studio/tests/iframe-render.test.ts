@@ -20,6 +20,9 @@ import {
   syncEditModeCss,
   syncStylebookCss,
 } from "../src/canvas/iframe-render";
+import { BUILD_LANES } from "@jxsuite/schema/asset-paths";
+import { SITE_STYLE_ID } from "../src/canvas/site-style-css";
+import type { AssetContext } from "../src/canvas/asset-refs";
 import type { PathMapCtx } from "../src/canvas/path-mapping";
 import { serializeJxPath } from "../src/canvas/path-mapping";
 
@@ -986,5 +989,121 @@ describe("component islands and the document inside them", () => {
     stamp(child, ["children", 0], { tagName: "p" });
     expect(root.getAttribute("contenteditable")).toBeNull();
     expect(child.getAttribute("contenteditable")).toBeNull();
+  });
+});
+
+/**
+ * Asset resolution inside the canvas.
+ *
+ * The context arrives as PLAIN DATA — the resolver is a function and functions do not cross a realm
+ * — and `renderResolvedDocument` is what turns it back into one and installs it on the runtime. It
+ * must do so on EVERY render, including to null: the hook is module-global, so a document rendered
+ * after a content entry would otherwise resolve its references against that entry's directory.
+ */
+describe("asset context", () => {
+  const REPO: AssetContext = {
+    documentDir: "content/posts",
+    fileBaseUrl: "https://studio.example.com/p/o/r/main/raw/",
+    lanes: BUILD_LANES,
+    mounts: [{ dir: "content/posts", urlPrefix: "/content/posts" }],
+    space: "repo",
+  };
+
+  test("a repo-space context resolves both shapes an author writes", async () => {
+    const container = document.createElement("div");
+    const handle = await renderResolvedDocument({
+      assets: REPO,
+      container,
+      doc: {
+        children: [
+          { attributes: { src: "./images/hero.png" }, tagName: "img" },
+          { attributes: { src: "/logo.png" }, tagName: "img" },
+        ],
+        tagName: "div",
+      } as never,
+      docBase: "https://studio.example.com/p/o/r/main/raw/content/posts/hello.md",
+      mapperCtx: ctx,
+      mode: "design",
+    });
+    const [entryRelative, rooted] = [...container.querySelectorAll("img")];
+    expect(entryRelative?.getAttribute("src")).toBe(
+      "https://studio.example.com/p/o/r/main/raw/content/posts/images/hero.png",
+    );
+    // `/logo.png` is the SITE URL of `public/logo.png` — the file the build publishes there.
+    expect(rooted?.getAttribute("src")).toBe(
+      "https://studio.example.com/p/o/r/main/raw/public/logo.png",
+    );
+    handle.dispose();
+  });
+
+  test("with NO context the reference is left verbatim, and a stale one never leaks", async () => {
+    const container = document.createElement("div");
+    const doc = {
+      children: [{ attributes: { src: "./images/hero.png" }, tagName: "img" }],
+      tagName: "div",
+    };
+    const withCtx = await renderResolvedDocument({
+      assets: REPO,
+      container,
+      doc: doc as never,
+      docBase: "http://localhost:3000/page.json",
+      mapperCtx: ctx,
+      mode: "design",
+    });
+    withCtx.dispose();
+    // The very next render says nothing about assets — so nothing may be resolved.
+    const plain = await renderResolvedDocument({
+      container,
+      doc: doc as never,
+      docBase: "http://localhost:3000/page.json",
+      mapperCtx: ctx,
+      mode: "design",
+    });
+    expect(container.querySelector("img")?.getAttribute("src")).toBe("./images/hero.png");
+    plain.dispose();
+  });
+
+  test("$head resolves a rooted stylesheet and never claims a bare specifier", () => {
+    for (const el of document.head.querySelectorAll("link")) {
+      el.remove();
+    }
+    injectHead(
+      {
+        $head: [
+          { attributes: { href: "/styles/main.css", rel: "stylesheet" }, tagName: "link" },
+          { attributes: { href: "some-head-pkg/x.css", rel: "stylesheet" }, tagName: "link" },
+        ],
+      } as never,
+      REPO,
+    );
+    expect(
+      document.head.querySelector(
+        'link[href="https://studio.example.com/p/o/r/main/raw/public/styles/main.css"]',
+      ),
+    ).toBeTruthy();
+    // `/node_modules/<pkg>` is the HOST's URL space; there is nothing in the repo to resolve it to.
+    expect(
+      document.head.querySelector('link[href="/node_modules/some-head-pkg/x.css"]'),
+    ).toBeTruthy();
+  });
+
+  /* The site style block is CSS the canvas emits ITSELF — it never passes through the runtime's
+     `applyStyle` — so it needs the resolver installed before it is built, which is why
+     `renderResolvedDocument` sets the hook as its very first act. */
+  test("a url() in the site style block is resolved too", async () => {
+    document.head.querySelector(`#${SITE_STYLE_ID}`)?.remove();
+    const handle = await renderResolvedDocument({
+      assets: REPO,
+      container: document.createElement("div"),
+      doc: { tagName: "div" } as never,
+      docBase: "http://localhost:3000/page.json",
+      mapperCtx: ctx,
+      mode: "design",
+      siteStyle: { backgroundImage: "url(/bg.png)" },
+    });
+    expect(document.head.querySelector(`#${SITE_STYLE_ID}`)?.textContent).toContain(
+      "url(https://studio.example.com/p/o/r/main/raw/public/bg.png)",
+    );
+    handle.dispose();
   });
 });

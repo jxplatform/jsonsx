@@ -13,6 +13,7 @@ import type {
 
 import type {
   AppInfo,
+  AssetCapabilities,
   CfConnection,
   CodeServiceResult,
   ComponentMeta,
@@ -43,6 +44,7 @@ import type {
   SecretsSetRequest,
   SecretsSetResponse,
   StarterInfo,
+  UploadResult,
 } from "@jxsuite/protocol";
 
 export type {
@@ -200,6 +202,33 @@ export interface StudioPlatform {
    * trailing `/` is added: without it `new URL` drops the last segment.
    */
   documentBaseUrl?: string;
+  /**
+   * What the canvas ORIGIN answers for a SITE URL — and therefore how Studio must address media.
+   *
+   * `"site"` (the default when absent): the canvas origin already serves the published site URL
+   * space, so `/hero.jpg` and `/styles/main.css` resolve on their own and Studio touches neither.
+   * The dev server and the desktop loopback both do — `serveProjectFile` in `@jxsuite/server` IS
+   * that URL space — so neither declares anything here and both stay byte-identical.
+   *
+   * `"repo"`: the host serves PROJECT-RELATIVE paths under {@link documentBaseUrl}, and nothing
+   * answers the site URL space. Studio resolves each authored reference to the project file it
+   * names and rebases that path onto `documentBaseUrl`. Inert without one — a host that says its
+   * site URLs are wrong without saying what is right has told Studio nothing it can act on.
+   *
+   * This is about the ORIGIN, not the backend: a host whose files are perfectly reachable can still
+   * be `"repo"` space, because what decides it is what answers `GET /hero.jpg` on the document the
+   * canvas is running in.
+   */
+  assetSpace?: "site" | "repo";
+  /**
+   * What this backend will accept as an upload, when it says.
+   *
+   * Absent, or any field absent, means "no declared limit", and Studio must not invent one — a
+   * limit it made up is a file the user cannot upload for no reason anyone can name. A DECLARED
+   * limit is different: Studio refuses before spending the round trip and names the number in the
+   * refusal, and narrows the file picker's `accept` to match.
+   */
+  assetCapabilities?: AssetCapabilities;
   activate: (root?: string) => Promise<void>;
   openProject: () => Promise<{
     config: ProjectConfig;
@@ -224,7 +253,16 @@ export interface StudioPlatform {
   listDirectory: (dir: string) => Promise<DirEntry[]>;
   readFile: (path: string) => Promise<string>;
   writeFile: (path: string, content: string) => Promise<void>;
-  uploadFile: (path: string, data: string | File | Blob | ArrayBuffer) => Promise<unknown>;
+  /**
+   * Store bytes at a project path, and report where they really landed.
+   *
+   * The result's `path` is the ANSWER, not an echo: a backend may de-duplicate by content hash,
+   * append a collision suffix, or normalize a name, and the reference Studio writes into the
+   * document has to name what was actually written. This was `Promise<unknown>` and every caller
+   * used the REQUESTED path, so any such backend produced documents pointing at files that are not
+   * there.
+   */
+  uploadFile: (path: string, data: string | File | Blob | ArrayBuffer) => Promise<UploadResult>;
   deleteFile: (path: string) => Promise<void>;
   renameFile: (from: string, to: string) => Promise<RenameResult>;
   /**

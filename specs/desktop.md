@@ -2,7 +2,7 @@
 
 ## Platform Abstraction, Project Loading, and Component Scoping
 
-**Version:** 0.3.23-draft
+**Version:** 0.3.24-draft
 **Status:** Pending
 **Updated:** 2026-08-25
 **License:** MIT
@@ -90,7 +90,7 @@ The canonical `StudioPlatform` interface is `packages/studio/src/types.ts` — r
 | **Publish / identity**   | `getUser?`, `getAccountStatus?`, `listRepos?`, `importProject?`, `cfConnection?`, `cfConnect?`, `cfApi?`                                                                                                                       |
 | **Code services / AI**   | `codeService` (§5.3), `resolveClass?`, `aiChatUrl`                                                                                                                                                                             |
 | **Multi-window / shell** | `openProjectInNewWindow?`, `pickProject?`, `newWindow?`, `setWindowProject?`, `getProjectRoot?`, `getAppInfo?`, backend-persisted settings                                                                                     |
-| **Canvas**               | `canvasUrl?`, `canvasUrlDeferred?`, `documentBaseUrl?`                                                                                                                                                                         |
+| **Canvas**               | `canvasUrl?`, `canvasUrlDeferred?`, `documentBaseUrl?`, `assetSpace?`, `assetCapabilities?`                                                                                                                                    |
 
 **The canvas needs project files at a URL, not behind `readFile`.** It renders in an iframe, and the
 renderer resolves a component `$ref` by fetching it, so a platform must be able to say where the
@@ -103,6 +103,16 @@ root-relative value is resolved against the canvas origin, because the canvas co
 canvas MOUNT, not one fetch. A host that answers a missing file with a
 single-page fallback compounds a wrong base rather than exposing it: the shell arrives at HTTP 200,
 so the fetch succeeds and the failure surfaces from the JSON parser instead.
+
+**A platform also declares what its ORIGIN answers.** `documentBaseUrl` says where the project tree
+is served; `assetSpace` says whether the canvas document's own origin serves the published SITE URL
+space as well. They are different questions, and only the first has a default that is usually right.
+A backend serving the tree from its web root answers both by construction — the dev server and the
+desktop loopback do, and declare nothing. A platform on a shared editor origin declares
+`assetSpace: "repo"` **together with** `documentBaseUrl`, and Studio then addresses every media
+reference as a project file under that base rather than as a site URL (`studio.md` §3.4). Neither
+declaration is discoverable: a single-page fallback answers a missing asset with the shell at HTTP
+200, so there is nothing for the canvas to detect.
 
 **Core vs. optional, and degradation.** Required members are the minimal backend every platform implements. Optional members (marked `?` in the interface) each back an optional protocol route; Studio feature-detects them and degrades gracefully when they are absent — hiding the corresponding UI or falling back to a client-side path. Each optional route's `degradation` note in `STUDIO_ROUTES` records exactly what turns off (e.g. no `collab` → Studio edits solo with file-level saves; no `importSite` → the New Project modal hides its Import tab).
 
@@ -1067,11 +1077,10 @@ Because a cloud project _is_ a repository, the adapter sets `createDestination: 
 
 ### 10.2 Storage Backend
 
-> **Status: Pending.** One possible mapping, and not the one that shipped. The deployed backend is
-> **git-backed** — a cloud project IS a repository, which is why the adapter sets
-> `createDestination: "repo"` and carries the whole git family. The table below is kept because the
-> equivalence it draws is the useful part: whatever a backend stores projects in, the PAL is what
-> Studio sees.
+> **Status: Partial.** The mapping below is one possible one and not the one that shipped — the
+> deployed backend is **git-backed**, a cloud project IS a repository, which is why the adapter sets
+> `createDestination: "repo"` and carries the whole git family. What IS settled, and what this
+> section now states, is the part a backend must DECLARE rather than the part it may choose.
 
 The cloud backend stores projects in a database with an abstraction equivalent to the filesystem:
 
@@ -1083,6 +1092,27 @@ The cloud backend stores projects in a database with an abstraction equivalent t
 | Component discovery | Query files table by naming convention |
 
 The same PAL interface means Studio code doesn't change — only the adapter implementation.
+
+#### What a storage backend MUST declare
+
+Whatever it stores projects in, a backend cannot leave these implicit: none is discoverable from the
+client, and each one fails silently when guessed.
+
+- **Where a project file is served, and in which URL space.** `documentBaseUrl` plus `assetSpace`
+  (§3.1). A backend whose files are perfectly readable through `readFile` can still be `"repo"`
+  space, because what decides it is what answers `GET /hero.jpg` on the canvas document's origin.
+- **Where an upload actually landed.** `uploadFile` answers `UploadResult { path, size? }`, and the
+  `path` is the ANSWER (`studio.md` §9.3). A backend that de-duplicates by content hash, suffixes a
+  collision, or normalizes a name MUST report the path it wrote, or the reference Studio writes into
+  the document names a file that is not there.
+- **What it will accept.** `assetCapabilities` — `maxUploadBytes`, `accept`. Optional, and absence
+  means no declared limit; a declared one lets Studio refuse before the round trip and name the
+  number.
+
+A backend that stores bytes MUST return them losslessly. Reading a stored blob through a text
+decoder is not a display concern: a lenient UTF-8 decode is TOTAL — it answers every input,
+substituting U+FFFD for each byte it cannot represent, and reports nothing — so a backend that
+re-encodes what it read destroys the file on the next write that touches it.
 
 ### 10.3 Collaboration
 
@@ -1185,6 +1215,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.3.24-draft** (2026-08-25) — §3.1: a platform declares assetSpace beside documentBaseUrl; §10.2 (Pending → Partial): what a storage backend must declare, including that stored bytes come back losslessly.
 - **0.3.23-draft** (2026-08-25) — 10.1 removes discoverComponents from the cloud adapter's omissions: deriving component metadata from a JSON document executes nothing, and returning an empty registry left the canvas unable to register or fetch any component at all.
 - **0.3.22-draft** (2026-08-24) — §7 records the ElectroBun 2 toolchain boundary: the electrobun npm devDependency selects Hutch, Cottontail and ElectroBun together (no machine-wide install and no release pin in hutch.config.ts), the SDK is projected into .hutch/devkit, the main process is pinned to bun explicitly, and stable installers drop the channel prefix that the updater feed keeps.
 - **0.3.21-draft** (2026-08-24) — 3.1 states that documentBaseUrl may be absolute or root-relative, and that a root-relative value is resolved against the canvas origin because the canvas composes it as new URL(path, base) — a relative base throws and fails the whole canvas mount.
@@ -1227,4 +1258,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx Studio Desktop Architecture Specification v0.3.23-draft_
+_Jx Studio Desktop Architecture Specification v0.3.24-draft_

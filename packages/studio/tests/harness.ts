@@ -202,7 +202,7 @@ export function installMockPlatform(
         .filter((path) => path.includes(query))
         .map((path) => ({ name: path.split("/").pop()!, path, type: "file" }) satisfies DirEntry),
     ),
-    uploadFile: log("uploadFile", async () => ({})),
+    uploadFile: log("uploadFile", async (path: string) => ({ path })),
     writeFile: log("writeFile", async (path, content) => {
       state.files.set(path, content);
     }),

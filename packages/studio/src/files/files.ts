@@ -36,7 +36,7 @@ import { maybePromptJxsuiteUpdate } from "../packages/jxsuite-update";
 import { autoSyncProjectOnOpen } from "../packages/pull-package-sync";
 import { markLocalMutation } from "./fs-events";
 import { registerPanel } from "../panels/panel-registry";
-import { UPLOAD_ACCEPT, isImage, uploadAssets } from "./media-upload";
+import { isImage, uploadAccept, uploadAssets } from "./media-upload";
 import { isCollabPath } from "../collab/collab-state";
 import {
   draggable,
@@ -994,7 +994,7 @@ export function pickAndUploadTo(dir: string, renderLeftPanel: () => void): void 
   const input = document.createElement("input");
   input.type = "file";
   input.multiple = true;
-  input.accept = UPLOAD_ACCEPT;
+  input.accept = uploadAccept();
   input.addEventListener("change", () => {
     if (input.files?.length) {
       void uploadFilesToDir(input.files, dir, renderLeftPanel);

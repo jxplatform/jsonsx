@@ -5,8 +5,10 @@ import {
   attrLabel,
   camelToKebab,
   camelToLabel,
+  findContentTypeSchema,
   friendlyNameToVar,
   inferInputType,
+  isMediaFormat,
   kebabToLabel,
   propLabel,
   varDisplayName,
@@ -147,9 +149,39 @@ describe("abbreviateValue", () => {
   });
 });
 
+// ─── isMediaFormat ───────────────────────────────────────────────────────────
+
+/**
+ * Two spellings for one thing, and both are real: `"uri-reference"` is JSON Schema's own and the
+ * one the SPEC uses (it is what `rewriteEntryAssets` keys its asset rewrite on), while `"image"` is
+ * Studio's shorthand for component props and settings schemas.
+ *
+ * They used to be accepted in DIFFERENT places, so which editor a field got depended on which panel
+ * was asking: a frontmatter field declared the documented way got a plain text box while the same
+ * declaration in the properties panel got a media picker.
+ */
+describe("isMediaFormat", () => {
+  test("accepts both spellings", () => {
+    expect(isMediaFormat("image")).toBe(true);
+    expect(isMediaFormat("uri-reference")).toBe(true);
+  });
+
+  test("and nothing else", () => {
+    for (const format of ["color", "date", "date-time", "uri", "", undefined, null, 0]) {
+      expect(isMediaFormat(format)).toBe(false);
+    }
+  });
+});
+
 // ─── inferInputType ──────────────────────────────────────────────────────────
 
 describe("inferInputType", () => {
+  test("media, in either spelling", () => {
+    expect(inferInputType({ format: "image" })).toBe("media");
+    expect(inferInputType({ format: "uri-reference" })).toBe("media");
+    expect(inferInputType({ $input: "media" })).toBe("media");
+  });
+
   test("shorthand", () => {
     expect(inferInputType({ $shorthand: true })).toBe("shorthand");
   });
@@ -262,5 +294,51 @@ describe("varDisplayName", () => {
 
   test("returns original if prefix doesn't match", () => {
     expect(varDisplayName("--color-blue", "--font-")).toBe("Color Blue");
+  });
+});
+
+// ─── findContentTypeSchema ───────────────────────────────────────────────────
+
+/**
+ * Which content type owns a document, and therefore which schema its frontmatter is edited against.
+ *
+ * A `{locale}` source is N directories and ONE content type — a translation is the same post, with
+ * the same schema. The placeholder used to be compared literally, so `content/posts/{locale}` was
+ * tested as a path prefix nobody has ever had and a translated entry showed no frontmatter fields
+ * at all.
+ */
+describe("findContentTypeSchema", () => {
+  const SCHEMA = { properties: { hero: { format: "uri-reference", type: "string" } } };
+  const config = (source: string) => ({
+    content: { posts: { format: "json", schema: SCHEMA, source } },
+  });
+
+  test("a plain directory source", () => {
+    expect(findContentTypeSchema("content/posts/hello.json", config("./content/posts"))).toEqual({
+      name: "posts",
+      schema: SCHEMA,
+    });
+    expect(findContentTypeSchema("pages/index.json", config("./content/posts"))).toBeNull();
+  });
+
+  test("a localized source matches any locale directory under it", () => {
+    const c = config("./content/posts/{locale}");
+    expect(findContentTypeSchema("content/posts/fr/hello.json", c)?.name).toBe("posts");
+    expect(findContentTypeSchema("content/posts/en-US/hello.json", c)?.name).toBe("posts");
+  });
+
+  test("and not the collection root, which holds no entries", () => {
+    expect(
+      findContentTypeSchema("content/posts/hello.json", config("./content/posts/{locale}")),
+    ).toBeNull();
+  });
+
+  test("a single-file source is matched as a file, not as a prefix", () => {
+    expect(findContentTypeSchema("data/site.json", config("./data/site.json"))?.name).toBe("posts");
+  });
+
+  test("no document and no content section answer nothing", () => {
+    expect(findContentTypeSchema(null, config("./content/posts"))).toBeNull();
+    expect(findContentTypeSchema("content/posts/a.json", {})).toBeNull();
   });
 });

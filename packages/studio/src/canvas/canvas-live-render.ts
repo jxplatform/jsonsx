@@ -20,6 +20,7 @@ import {
   resolveLayoutDoc,
 } from "../site-context";
 import { documentBase } from "./canvas-origin";
+import { getPlatform, hasPlatform } from "../platform";
 import { componentRegistry, computeRelativePath } from "../files/components";
 import { prepareForEditMode } from "../utils/edit-display";
 import {
@@ -28,8 +29,9 @@ import {
   substitutePreviewParams,
 } from "../page-params";
 import { isComponentDoc, substitutePreviewProps } from "../component-props";
-import { assetContextFor, rewriteAssetRefs } from "./asset-refs";
+import { assetContextFor } from "./asset-refs";
 
+import type { AssetContext } from "./asset-refs";
 import type { JxElement, JxMutableNode, JxPath } from "@jxsuite/schema/types";
 import type { ComponentEntry } from "../files/components.js";
 import type { LayoutMarker } from "./path-mapping";
@@ -137,6 +139,8 @@ export async function resolveCanvasDocument(
 ): Promise<{
   renderDoc: JxMutableNode;
   docBase: string | undefined;
+  /** How the canvas must address project media, or null when its origin serves the site URL space. */
+  assets: AssetContext | null;
   mapperCtx: WireMapperCtx;
   siteStyle: Record<string, unknown> | null;
 }> {
@@ -178,9 +182,23 @@ export async function resolveCanvasDocument(
     }
   }
 
-  const docBase = S.documentPath
-    ? new URL(S.documentPath, documentBase(projectState?.projectRoot)).href
-    : undefined;
+  const fileBase = documentBase(projectState?.projectRoot);
+  const docBase = S.documentPath ? new URL(S.documentPath, fileBase).href : undefined;
+  /*
+   * How this render addresses media, as PLAIN DATA — the resolver itself is a function and cannot
+   * cross into the canvas realm, so the iframe rebuilds it from this.
+   *
+   * It replaces a walk over the render document that used to sit further down this function. A walk
+   * can only ever see LITERAL values: `applyAttributes` resolves a `{"$ref": …}` or `"${…}"` src
+   * inside a reactive effect, so at walk time a bound image src is not a string at all. That is why
+   * a collection listing of thirty bound card images broke all at once in preview and nowhere else
+   * — design and edit swap every bound src for a transparent pixel, so they never reached the
+   * network to fail.
+   */
+  const assets = assetContextFor(S.documentPath, {
+    fileBaseUrl: fileBase,
+    ...(hasPlatform() ? { space: getPlatform().assetSpace } : {}),
+  });
 
   // Substitute chosen dynamic route params ({$ref: "#/$params/x"} → literal), inject state.$page,
   // And bake the substituted class-prototype state entries via the backend resolver — in every
@@ -208,12 +226,6 @@ export async function resolveCanvasDocument(
       renderDoc = substitutePreviewProps(renderDoc, previewProps);
     }
   }
-
-  // A content entry references its media relative to ITSELF; the built site serves those files from
-  // The content type's asset mount. Studio opens the entry standalone, so the collection loader that
-  // Normally performs that mapping never runs — do it here, on the RENDER doc only, so the canvas
-  // Previews the URL production serves while the source doc keeps the authored relative ref.
-  renderDoc = rewriteAssetRefs(renderDoc, assetContextFor(S.documentPath));
 
   const arrayPaths = new Set<string>();
   if (canvasMode === "design" || canvasMode === "edit") {
@@ -316,6 +328,7 @@ export async function resolveCanvasDocument(
   }
 
   return {
+    assets,
     docBase,
     mapperCtx: {
       arrayPaths: [...arrayPaths],

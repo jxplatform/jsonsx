@@ -173,7 +173,20 @@ describe("content-mode component discovery with irregular children", () => {
 
 // ─── Content-relative asset resolution ───────────────────────────────────────
 
-describe("content-entry asset mapping", () => {
+/**
+ * What the parent hands the canvas about media.
+ *
+ * It used to hand over a REWRITTEN document: a walk mapped every literal `./images/hero.png` onto
+ * the content type's mount before the doc crossed into the iframe. That walk is gone, because a
+ * walk can only ever see literal values — `applyAttributes` resolves a `{"$ref": …}` or `"${…}"`
+ * src inside a reactive effect, so at walk time a bound image src is not a string at all, and a
+ * collection listing of bound card images broke all at once in preview.
+ *
+ * So the parent's job is now to hand over the CONTEXT, and the resolution happens at render time
+ * (`resolveAssetRef` in `canvas/asset-refs`, installed on the runtime by `iframe-render`). These
+ * tests assert the context; the mapping itself is asserted in `asset-refs.test.ts`.
+ */
+describe("content-entry asset context", () => {
   const POSTS = { posts: { format: "Markdown", source: "./content/posts/" } };
 
   const entryDoc = () =>
@@ -185,53 +198,48 @@ describe("content-entry asset mapping", () => {
       tagName: "div",
     }) as unknown as JxMutableNode;
 
-  test("an entry's relative media is mapped onto the content type's mount for rendering", async () => {
+  async function resolveFor(documentPath: string, mode?: "preview") {
     resetStudioState({ isSiteProject: true, projectConfig: { content: POSTS } });
-    const tab = resetWorkspaceWithTab(entryDoc(), {
-      documentPath: "content/posts/hello.md",
-    }) as Tab;
+    const tab = resetWorkspaceWithTab(entryDoc(), { documentPath }) as Tab;
+    if (mode) {
+      tab.session.ui.canvasMode = mode;
+    }
+    return {
+      result: await resolveCanvasDocument(tab.doc.document as JxMutableNode, tab),
+      tab,
+    };
+  }
 
-    const result = await resolveCanvasDocument(tab.doc.document as JxMutableNode, tab);
-    const kids = result.renderDoc.children as Record<string, any>[];
-
-    // The URL the built site serves — not `./images/hero.png` resolved against canvas.html.
-    expect(kids[0]!.attributes.src).toBe("/content/posts/images/hero.png");
-    // A root-absolute ref already names a public/ file and keeps its meaning.
-    expect(kids[1]!.attributes.src).toBe("/logo.png");
+  test("an entry carries its content type's mount and its own directory", async () => {
+    const { result } = await resolveFor("content/posts/hello.md");
+    expect(result.assets).toMatchObject({
+      documentDir: "content/posts",
+      mounts: [{ dir: "content/posts", urlPrefix: "/content/posts" }],
+      space: "site",
+    });
   });
 
   test("the tab's SOURCE document keeps the authored ref — it is what gets serialized", async () => {
-    resetStudioState({ isSiteProject: true, projectConfig: { content: POSTS } });
-    const tab = resetWorkspaceWithTab(entryDoc(), {
-      documentPath: "content/posts/hello.md",
-    }) as Tab;
-
-    await resolveCanvasDocument(tab.doc.document as JxMutableNode, tab);
-
-    const source = tab.doc.document as unknown as { children: Record<string, any>[] };
-    expect(source.children[0]!.attributes.src).toBe("./images/hero.png");
+    const { result, tab } = await resolveFor("content/posts/hello.md");
+    const source = tab.doc.document as unknown as { children: Record<string, unknown>[] };
+    expect((source.children[0]!.attributes as Record<string, string>).src).toBe(
+      "./images/hero.png",
+    );
+    // And so does the RENDER document: nothing rewrites a value any more.
+    const kids = result.renderDoc.children as Record<string, Record<string, string>>[];
+    expect(kids[0]!.attributes!.src).toBe("./images/hero.png");
+    expect(kids[1]!.attributes!.src).toBe("/logo.png");
   });
 
-  test("a page document is left alone — only content entries carry entry-relative media", async () => {
-    resetStudioState({ isSiteProject: true, projectConfig: { content: POSTS } });
-    const tab = resetWorkspaceWithTab(entryDoc(), { documentPath: "pages/index.json" }) as Tab;
-
-    const result = await resolveCanvasDocument(tab.doc.document as JxMutableNode, tab);
-    const kids = result.renderDoc.children as Record<string, any>[];
-
-    expect(kids[0]!.attributes.src).toBe("./images/hero.png");
+  /* In site space the mount is the only thing that needs doing, so a page — which has none — needs
+     no context at all, and the canvas installs no resolver. */
+  test("a page document carries NO context on a host that serves site URLs", async () => {
+    const { result } = await resolveFor("pages/index.json");
+    expect(result.assets).toBeNull();
   });
 
-  test("preview mode maps too — the preview is what the built page will look like", async () => {
-    resetStudioState({ isSiteProject: true, projectConfig: { content: POSTS } });
-    const tab = resetWorkspaceWithTab(entryDoc(), {
-      documentPath: "content/posts/hello.md",
-    }) as Tab;
-    tab.session.ui.canvasMode = "preview";
-
-    const result = await resolveCanvasDocument(tab.doc.document as JxMutableNode, tab);
-    const kids = result.renderDoc.children as Record<string, any>[];
-
-    expect(kids[0]!.attributes.src).toBe("/content/posts/images/hero.png");
+  test("preview mode carries the same context — a preview is what the built page will look like", async () => {
+    const { result } = await resolveFor("content/posts/hello.md", "preview");
+    expect(result.assets).toMatchObject({ documentDir: "content/posts", space: "site" });
   });
 });

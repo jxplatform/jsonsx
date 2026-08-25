@@ -115,6 +115,25 @@ describe("STUDIO_ROUTES", () => {
     expect(STUDIO_ROUTES.secretsList.summary).toContain("never values");
   });
 
+  /**
+   * `/raw` is the mount a canvas renders against, and it was a seam neither side of the cloud
+   * conformance check could see: the session DO answers it with a `startsWith` arm rather than an
+   * exact match, and the adapter never calls it — it hands the base to the canvas and the runtime
+   * fetches against it from inside the iframe. Invisible, and load-bearing. Naming it here is what
+   * turns a pair of textual assertions into a contract.
+   */
+  test("the raw-document mount is a declared route, and a PREFIX", () => {
+    expect(STUDIO_ROUTES.documentRaw.path).toBe("/__studio/raw/");
+    expect(STUDIO_ROUTES.documentRaw.method).toBe("GET");
+    // The only route whose path ends in a slash: the project-relative path is appended to it.
+    const trailing = Object.entries(STUDIO_ROUTES).filter(([, r]) => r.path.endsWith("/"));
+    expect(trailing.map(([name]) => name)).toEqual(["documentRaw"]);
+  });
+
+  test("the upload route documents that its path is an answer, not an echo", () => {
+    expect(STUDIO_ROUTES.fileUpload.summary).toContain("UploadResult");
+  });
+
   test("file routes share one path across GET/PUT/DELETE", () => {
     expect(STUDIO_ROUTES.fileRead.path).toBe(STUDIO_ROUTES.fileWrite.path);
     expect(STUDIO_ROUTES.fileRead.path).toBe(STUDIO_ROUTES.fileDelete.path);

@@ -58,6 +58,7 @@ import { getExtensions, loadExtensions } from "../format/format-host";
 import { optionalStringArg, stringProperty } from "../commands/command-args";
 import type { TemplateResult } from "lit-html";
 import type { AnyCommand, CommandRegistry } from "../commands/registry";
+import { isMediaFormat } from "../utils/studio-utils";
 
 interface SignalsPanelState {
   document: JxMutableNode;
@@ -915,7 +916,7 @@ function renderSignalEditorTemplate(
           : nothing
       }
       ${
-        def.format === "image"
+        isMediaFormat(def.format)
           ? renderFieldRow({
               hasValue: false,
               label: "Default",

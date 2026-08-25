@@ -38,6 +38,7 @@ import type {
   StarterInfo,
 } from "../types";
 import { problemDetail, problemMessage } from "@jxsuite/protocol";
+import type { UploadResult } from "@jxsuite/protocol";
 
 /** A directory entry from the server, tolerating extra wire fields. */
 type WireDirEntry = DirEntry & Record<string, unknown>;
@@ -391,7 +392,10 @@ export function createDevServerPlatform() {
       if (!res.ok) {
         throw new Error(`Upload failed: ${path}`);
       }
-      return await res.json();
+      const body = (await res.json()) as Partial<UploadResult>;
+      // The dev server echoes the path today; falling back to the request keeps a backend that says
+      // Nothing working rather than writing `undefined` into a document.
+      return { path: body.path ?? path, ...(body.size === undefined ? {} : { size: body.size }) };
     },
 
     /** @param {string} path */

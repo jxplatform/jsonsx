@@ -112,7 +112,34 @@ export const STUDIO_ROUTES = {
   fileRead: route("GET", "/__studio/file", "Read a file's text content"),
   fileWrite: route("PUT", "/__studio/file", "Write a file's text content"),
   fileDelete: route("DELETE", "/__studio/file", "Delete a file"),
-  fileUpload: route("POST", "/__studio/file/upload", "Upload binary content to a path"),
+  fileUpload: route(
+    "POST",
+    "/__studio/file/upload",
+    "Upload binary content to a path → UploadResult {path, size?}. `path` is the answer, not an " +
+      "echo: a store that de-duplicates, suffixes, or normalizes names reports what it really wrote",
+  ),
+  /**
+   * A project file as its own BYTES, at its own URL.
+   *
+   * `fileRead` answers `{ path, content }`, which is right for the editor and useless to the
+   * renderer: `@jxsuite/runtime` resolves a component `$ref` with `fetch(url).then(r => r.json())`
+   * and expects the DOCUMENT, and an `<img src>` cannot be a JSON envelope at all. So a backend
+   * whose origin does not serve the site's own URL space serves this instead, declares `assetSpace:
+   * "repo"`, and Studio addresses every project file under it.
+   *
+   * The path is appended to the prefix, so this is the one route whose `path` is a PREFIX rather
+   * than a whole path. It was a textual assertion on both sides of the cloud seam before it was a
+   * route; naming it here is what makes that assertion a contract.
+   */
+  documentRaw: route(
+    "GET",
+    "/__studio/raw/",
+    "A project file as its own bytes, at its own URL — the mount a canvas renders against when " +
+      "the editor origin does not serve the site's URL space. The project-relative path is " +
+      "appended to this prefix",
+    "The canvas cannot address project files by URL, so a host whose origin does not serve the " +
+      "site URL space renders no component $refs and no images.",
+  ),
   fileRename: route("POST", "/__studio/file/rename", "Rename/move (+ refactor report)"),
   references: route(
     "GET",

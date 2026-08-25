@@ -384,7 +384,7 @@ export function createDesktopPlatform() {
     // The RPC transport JSON-serializes params, so binary must be base64 before it goes on the wire
     // (a File/Blob would serialize to `{}`); the backend base64-decodes. A string passes through.
     async uploadFile(path: string, data: string | File | Blob | ArrayBuffer) {
-      return rpc.request.uploadFile({ data: await toBase64(data), path });
+      return await rpc.request.uploadFile({ data: await toBase64(data), path });
     },
 
     async deleteFile(path: string) {
