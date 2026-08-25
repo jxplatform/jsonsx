@@ -111,8 +111,7 @@ Two tags are added automatically: `<link rel="canonical">` (built from `url` in 
 
 ## Package files in `$head`
 
-A `$head` entry can point at a file inside an installed package by its bare specifier instead of a
-URL:
+A `$head` entry can point at a file inside an installed package by its bare specifier instead of a URL:
 
 ```json
 {
@@ -128,21 +127,16 @@ URL:
 }
 ```
 
-The build resolves the specifier against your project root and copies the file into `/assets/`,
-rewriting the tag to point there. The name is derived from the specifier, so it is the same on every
-build:
+The build resolves the specifier against your project root and copies the file into `/assets/`, rewriting the tag to point there. The name is derived from the specifier, so it is the same on every build:
 
 ```html
 <link rel="stylesheet" href="/assets/shoelace-style-shoelace-dist-themes-light.css" />
 ```
 
-`$elements` entries are handled the same way except that they are bundled rather than copied —
-a component package imports its own dependencies, and those imports have to be resolved before the
-browser sees them.
+`$elements` entries are handled the same way except that they are bundled rather than copied — a component package imports its own dependencies, and those imports have to be resolved before the browser sees them.
 
 :::doc-note
-If the package is not installed, the build fails and names the specifier. It does not emit a link
-and hope: a dead stylesheet URL looks identical to a working one until the site is deployed.
+If the package is not installed, the build fails and names the specifier. It does not emit a link and hope: a dead stylesheet URL looks identical to a working one until the site is deployed.
 :::
 
 ## Structured data

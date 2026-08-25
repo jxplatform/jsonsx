@@ -90,20 +90,11 @@ What it resolves _with_ comes from the two controls beside it. The **Context** p
 
 Its button says how many you have set, so you can tell at a glance whether the canvas is showing defaults.
 
-**Preview does not edit.** While it is on, clicking the page selects nothing, no outlines are drawn,
-the insertion **+** and the canvas menu give way to your browser's own, nothing can be dropped in,
-and the keys that change the document do nothing. Anything you had selected is still selected when
-you switch Preview back off. Save, Undo and Redo keep working throughout.
+**Preview does not edit.** While it is on, clicking the page selects nothing, no outlines are drawn, the insertion **+** and the canvas menu give way to your browser's own, nothing can be dropped in, and the keys that change the document do nothing. Anything you had selected is still selected when you switch Preview back off. Save, Undo and Redo keep working throughout.
 
-**Preview scrolls like a real page.** Instead of the open surface you pan around in Design, Preview
-puts one page-sized frame in the pane and lets it scroll itself — so sticky headers stick, elements
-that animate as they come into view actually do, and anything that reacts to scrolling behaves the
-way it will for a visitor. There is no zoom control in Preview for the same reason: it is showing
-you the page at its real size.
+**Preview scrolls like a real page.** Instead of the open surface you pan around in Design, Preview puts one page-sized frame in the pane and lets it scroll itself — so sticky headers stick, elements that animate as they come into view actually do, and anything that reacts to scrolling behaves the way it will for a visitor. There is no zoom control in Preview for the same reason: it is showing you the page at its real size.
 
-**And at the size you picked.** Preview is as wide as the breakpoint chosen in the **Context**
-popover — the same width Edit gives its column and Design gives that artboard — so the same page at
-`md` is the same page whichever view the toggle is over. With no breakpoint chosen it fills the pane.
+**And at the size you picked.** Preview is as wide as the breakpoint chosen in the **Context** popover — the same width Edit gives its column and Design gives that artboard — so the same page at `md` is the same page whichever view the toggle is over. With no breakpoint chosen it fills the pane.
 
 Switch **Preview** off to go back to editing, in whichever view you were in.
 

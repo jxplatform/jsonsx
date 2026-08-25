@@ -3,8 +3,7 @@
 </p>
 
 <p align="center">
-  A full-stack web framework with a visual editor, built on plain JSON and Markdown.<br>
-  Pages, styles, state, data, and server logic are all declarative documents — edit them in code, on a canvas, or with an agent.
+  A full-stack web framework with a visual editor, built on plain JSON and Markdown.<br> Pages, styles, state, data, and server logic are all declarative documents — edit them in code, on a canvas, or with an agent.
 </p>
 
 <p align="center">
@@ -20,10 +19,7 @@
 
 ## What is Jx?
 
-A Jx project is a directory of JSON and Markdown files. Routes come from the filesystem. Components
-are JSON documents whose property names mirror the DOM API. Reactivity is
-[`@vue/reactivity`](https://github.com/vuejs/core/tree/main/packages/reactivity). State entries
-marked `timing: "server"` run on the server.
+A Jx project is a directory of JSON and Markdown files. Routes come from the filesystem. Components are JSON documents whose property names mirror the DOM API. Reactivity is [`@vue/reactivity`](https://github.com/vuejs/core/tree/main/packages/reactivity). State entries marked `timing: "server"` run on the server.
 
 ```json
 {
@@ -40,10 +36,7 @@ marked `timing: "server"` run on the server.
 }
 ```
 
-Every document validates against a JSON Schema 2020-12 meta-schema generated from the live web
-platform, so the same file is legible to a person, a visual editor, and a model. The full format —
-state shapes, bindings, repeaters, props, statements, styling — is documented under
-[Framework](https://jxsuite.com/docs/framework).
+Every document validates against a JSON Schema 2020-12 meta-schema generated from the live web platform, so the same file is legible to a person, a visual editor, and a model. The full format — state shapes, bindings, repeaters, props, statements, styling — is documented under [Framework](https://jxsuite.com/docs/framework).
 
 ## The stack
 
@@ -60,9 +53,7 @@ state shapes, bindings, repeaters, props, statements, styling — is documented 
 | **Assets**  | Responsive image pipeline (WebP/AVIF), sitemap, robots, redirects                                   |
 | **Output**  | Static HTML by default; adapters for `cloudflare-workers`, `cloudflare-pages`, `node`, and `bun`    |
 
-Pages are prerendered at build time and interactivity hydrates as islands — static pages ship no
-JavaScript. The generated worker serves `/_jx/*` (server functions, data, auth) and your static
-assets; it does not render pages per request.
+Pages are prerendered at build time and interactivity hydrates as islands — static pages ship no JavaScript. The generated worker serves `/_jx/*` (server functions, data, auth) and your static assets; it does not render pages per request.
 
 ## Quick start
 
@@ -83,24 +74,17 @@ jx validate   # validate project.json, documents, classes, and extension fragmen
 jx db push    # sync data tables to their connections (additive only)
 ```
 
-Start from a blank project or one of 13 starters. Publishing is git-push-driven — commit, and your
-host builds. See [Build output and adapters](https://jxsuite.com/docs/framework/site/deployment).
+Start from a blank project or one of 13 starters. Publishing is git-push-driven — commit, and your host builds. See [Build output and adapters](https://jxsuite.com/docs/framework/site/deployment).
 
 ## Studio
 
-Jx Studio is a desktop application for editing Jx projects — the visual editor runs as the desktop
-app, and there is no hosted, sign-in version. Contributors working in this repository can also run
-it in the browser via the dev server.
+Jx Studio is a desktop application for editing Jx projects — the visual editor runs as the desktop app, and there is no hosted, sign-in version. Contributors working in this repository can also run it in the browser via the dev server.
 
 <p align="center">
   <img src="docs/images/hero.png" alt="Jx Studio editing the jxsuite.com homepage — layers panel, live canvas, and element inspector" width="800">
 </p>
 
-Four modes over the same files: **Manage** (project explorer, content models, media), **Edit**
-(inline WYSIWYG authoring that saves as Markdown), **Design** (canvas, breakpoints, CSS inspector,
-tokens), and **Script** (state, data, events, and a Monaco editor for functions). Git is built in —
-stage, diff, commit, branch, and push without leaving the app. Multiple people can co-edit one
-project in real time against a shared backend.
+Four modes over the same files: **Manage** (project explorer, content models, media), **Edit** (inline WYSIWYG authoring that saves as Markdown), **Design** (canvas, breakpoints, CSS inspector, tokens), and **Script** (state, data, events, and a Monaco editor for functions). Git is built in — stage, diff, commit, branch, and push without leaving the app. Multiple people can co-edit one project in real time against a shared backend.
 
 [Download Jx Studio](https://jxsuite.com/download) for macOS, Windows, or Linux.
 
@@ -113,16 +97,13 @@ The document format is the contract, so a model works on exactly the artifact a 
 - **`jx validate`** is a deterministic pass/fail over the whole project, which makes it a usable CI
   gate for machine-written documents.
 - **Studio's assistant** edits through the same document operations a person uses, so an AI change
-  lands in the undo stack and in your git diff like any other edit. Bring your own key; Studio ships
-  no account and no hosted model, and sends nothing anywhere until you connect a provider.
+  lands in the undo stack and in your git diff like any other edit. Bring your own key; Studio ships no account and no hosted model, and sends nothing anywhere until you connect a provider.
 - **[`.claude/commands/jx.md`](.claude/commands/jx.md)** is a ready-made `/jx` authoring command for
   coding agents working in a Jx project.
 
 ## Extending
 
-An extension is an npm package with a `jx-extension.json` manifest contributing classes, JSON Schema
-fragments, and capability methods. Core packages never depend on extensions — a CI rule enforces it
-— so the first-party extensions below use the same public hooks yours would.
+An extension is an npm package with a `jx-extension.json` manifest contributing classes, JSON Schema fragments, and capability methods. Core packages never depend on extensions — a CI rule enforces it — so the first-party extensions below use the same public hooks yours would.
 
 ## Packages
 
@@ -161,9 +142,7 @@ bun run all-the-things # build, test, lint, typecheck
 bun run desktop        # launch the desktop app
 ```
 
-Behavior is specified in [`specs/`](specs) and documented in [`docs/`](docs); both travel with the
-code in the same change set. See
-[Working in the monorepo](https://jxsuite.com/docs/extending/contributing/monorepo).
+Behavior is specified in [`specs/`](specs) and documented in [`docs/`](docs); both travel with the code in the same change set. See [Working in the monorepo](https://jxsuite.com/docs/extending/contributing/monorepo).
 
 ## License
 
