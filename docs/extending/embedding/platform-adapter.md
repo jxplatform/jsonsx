@@ -80,13 +80,15 @@ Studio always checks for presence before calling an optional member, so an omitt
 
 :::doc-tip
 **`buildSite` may build or may render, and it says which.** The contract is "produce something
-browsable at real routes on an origin of your own, and name it in `url`" — not "run the compiler".
+browsable at real routes on an origin of your own, and name it in `url`", not "run the compiler".
 An adapter that cannot build at all (a hosted backend runs no project JS and has no bundler, image
 pipeline or filesystem) can still serve the working tree as a site and let `@jxsuite/runtime`
 assemble each page in the reader's browser. Report `mode: "live"` when it does, and Studio's toast
-tells the author what they are looking at; omit `mode`, or send `"built"`, for compiler output. A
-live preview carries no prerendered HTML, optimized images, islands, emitted `sitemap.xml`/`_headers`
-or `timing: "server"` results — and, uniquely, it carries edits nobody has saved yet.
+tells the author what they are looking at; omit `mode`, or send `"built"`, for compiler output.
+
+A live preview carries none of what the compiler emits: no prerendered HTML, no optimized images, no
+islands, no `sitemap.xml` or `_headers`, no `timing: "server"` results. It carries one thing a build
+cannot, which is the working tree as it stands, including edits nobody has saved.
 :::
 
 :::doc-note
