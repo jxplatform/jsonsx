@@ -711,6 +711,71 @@ function evaluateTemplate(str: string, state: JxScope): string {
   return fn(state, $map, $map?.item, $map?.index);
 }
 
+/**
+ * Whether a template is ONE expression end to end — `"${a.b}"` rather than `"a ${b}"` or
+ * `"${a}${b}"`.
+ *
+ * Depth-counted rather than pattern-matched. A greedy `/^\$\{(.+)\}$/` also matched `"${a} /
+ * ${b}"`, spliced the interior into `return (a} / ${b)`, and the SyntaxError became a silent null:
+ * the node rendered empty and a `$head` entry shipped its own template text. A brace scan is exact
+ * where a tightened regex is not — `"${`${a}-x`}"` is still one expression, and must keep its raw
+ * value.
+ *
+ * Lives here rather than in the compiler because both renderers must draw the line in the same
+ * place. It is what decides whether a value keeps its own type, and a value that is a boolean in
+ * one renderer and the string `"false"` in the other is a page that changes meaning as it
+ * hydrates.
+ *
+ * @param {string} str - Template source
+ * @returns {boolean} True when the whole string is a single `${…}`
+ */
+export function isSingleExpression(str: string): boolean {
+  if (!str.startsWith("${") || !str.endsWith("}")) {
+    return false;
+  }
+  let depth = 0;
+  for (let i = 1; i < str.length; i += 1) {
+    const c = str[i];
+    if (c === "{") {
+      depth += 1;
+    } else if (c === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return i === str.length - 1;
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Evaluate a template for an ATTRIBUTE, keeping the expression's own type.
+ *
+ * `evaluateTemplate` interpolates into a string, which is what text wants and what an attribute
+ * cannot afford: `"${state.expanded}"` has to arrive as the boolean `false`, or `booleanAttrValue`
+ * never sees a boolean, `open="false"` is written, and HTML reads that as open. Only a single
+ * expression can carry a type at all — `"a ${b}"` is text by construction — which is the same line
+ * `evaluateStaticTemplate` draws in the compiler, and drawing it identically is what keeps a
+ * prerendered page and the same document rendered live in agreement.
+ *
+ * @param {string} str - Template source
+ * @param {JxScope} state - Reactive scope
+ * @returns {unknown} The expression's value, or the interpolated string
+ */
+function evaluateAttrTemplate(str: string, state: JxScope): unknown {
+  if (!isSingleExpression(str)) {
+    return evaluateTemplate(str, state);
+  }
+  const $map = state?.$map as { item?: unknown; index?: number } | undefined;
+  const fn = new Function("state", "$map", "item", "index", `return (${str.slice(2, -1)})`) as (
+    state: JxScope,
+    $map: unknown,
+    item: unknown,
+    index: number | undefined,
+  ) => unknown;
+  return fn(state, $map, $map?.item, $map?.index);
+}
+
 // ─── Step 2b: Function resolution (Shape 4) ─────────────────────────────────
 
 /** Shape of a dynamically imported module: named exports plus an optional default. */
@@ -1363,6 +1428,45 @@ export function reapplyStyle(
   applyStyle(el, styleDef ?? {}, mediaQueries, state);
 }
 
+/*
+ * HTML carries a boolean two incompatible ways, and writing one as the other inverts it in silence.
+ *
+ * A *boolean attribute* — `open`, `disabled`, `hidden`, `required` — is read by PRESENCE. Any value
+ * at all counts as true, `"false"` included, so `<details open="false">` is an OPEN `<details>`.
+ * The value must never be written; absence is the only way to say false.
+ *
+ * An *enumerated* attribute carries the word in its own text and reads an empty value as unset, so
+ * the presence form is the broken one here: bare `aria-hidden` is NOT hidden, and a dropped
+ * `contenteditable` means "inherit from the parent" rather than `false`. Every `aria-*` is in this
+ * family — ARIA has no presence attributes at all — along with the three HTML attributes below.
+ *
+ * @docs framework/concepts/elements
+ */
+const ENUMERATED_ATTRS = new Set(["contenteditable", "draggable", "spellcheck"]);
+
+/**
+ * The text an attribute's boolean value must be written with, or `null` when saying it means
+ * removing the attribute instead.
+ *
+ * An empty string is the bare form: `setAttribute(name, "")` is how the DOM spells the `open` that
+ * HTML source writes with no `=`.
+ *
+ * Shared rather than restated because two renderers must agree. The compiler writes attributes into
+ * a string of HTML and this file writes them onto live elements; were they to disagree about which
+ * family an attribute belongs to, a prerendered page would change meaning as it hydrated.
+ *
+ * @param {string} name - Attribute name, already resolved to what will be written
+ * @param {boolean} value - The resolved boolean
+ * @returns {string | null} Text to write, or null to omit the attribute
+ */
+export function booleanAttrValue(name: string, value: boolean): string | null {
+  const lower = name.toLowerCase();
+  if (lower.startsWith("aria-") || ENUMERATED_ATTRS.has(lower)) {
+    return String(value);
+  }
+  return value ? "" : null;
+}
+
 /**
  * @param {HTMLElement} el
  * @param {Record<string, import("@jxsuite/schema/types").JxAttributeValue>} attrs
@@ -1374,12 +1478,25 @@ function applyAttributes(el: HTMLElement, attrs: Record<string, JxAttributeValue
     /* Inside the effects, not before them. A `$ref` or `${…}` value is not a string until the
        effect runs — which is exactly why the document walk this replaced could never see it. */
     const write = (resolved: unknown) => {
+      if (typeof resolved === "boolean") {
+        const text = booleanAttrValue(attr, resolved);
+        /* `removeAttribute`, not `setAttribute(attr, "false")`. A binding that flips back has to
+           take the attribute WITH it: the element is being re-used, so anything left behind is the
+           state the page just said it had left. Asset rewriting is skipped because a boolean names
+           no asset — `canvasAssetValue` reads `src`/`href` values, which are never booleans. */
+        if (text === null) {
+          el.removeAttribute(attr);
+        } else {
+          el.setAttribute(attr, text);
+        }
+        return;
+      }
       el.setAttribute(attr, canvasAssetValue(el.tagName, k, String(resolved ?? "")));
     };
     if (isRefObj(v)) {
       effect(() => write(resolveRef(v.$ref, state)));
     } else if (isTemplateString(v)) {
-      effect(() => write(evaluateTemplate(v, state)));
+      effect(() => write(evaluateAttrTemplate(v, state)));
     } else {
       write(v);
     }

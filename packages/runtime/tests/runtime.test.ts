@@ -1177,6 +1177,75 @@ describe("renderNode", () => {
     expect(el.getAttribute("aria-label")).toBe("hello");
   });
 
+  /*
+   * The two attribute families (see `booleanAttrValue`). These render through `renderNode` rather
+   * than calling the helper, because the defect being guarded is the WRITE — a false that reaches
+   * `setAttribute` as the string "false" is present, and present is true.
+   */
+  test("a true boolean attribute is written bare, not as text", () => {
+    const el = renderNode({ attributes: { open: true }, tagName: "details" }, reactive({}));
+    expect(el.getAttribute("open")).toBe("");
+    expect(el.outerHTML).toContain("<details open");
+  });
+
+  test("a false boolean attribute is absent, because presence would mean true", () => {
+    const el = renderNode({ attributes: { open: false }, tagName: "details" }, reactive({}));
+    expect(el.hasAttribute("open")).toBe(false);
+  });
+
+  test("an aria-* boolean is written as text, because bare aria-hidden is not hidden", () => {
+    const el = renderNode({ attributes: { "aria-hidden": true }, tagName: "div" }, reactive({}));
+    expect(el.getAttribute("aria-hidden")).toBe("true");
+  });
+
+  test("an aria-* false is written rather than dropped", () => {
+    const el = renderNode({ attributes: { "aria-expanded": false }, tagName: "div" }, reactive({}));
+    expect(el.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  test("contenteditable is enumerated: false is explicit, not inherit", () => {
+    const el = renderNode({ attributes: { contenteditable: false }, tagName: "div" }, reactive({}));
+    expect(el.getAttribute("contenteditable")).toBe("false");
+  });
+
+  /*
+   * The reactive half, and the reason a plain `setAttribute` could not have been left in place: an
+   * element is re-used across renders, so a binding that flips back has to REMOVE the attribute.
+   * Writing "false" leaves `<details open="false">`, which is an open `<details>`.
+   */
+  test("a boolean binding that flips to false removes the attribute", async () => {
+    const state = reactive({ expanded: true });
+    const el = renderNode({ attributes: { open: "${state.expanded}" }, tagName: "details" }, state);
+    expect(el.hasAttribute("open")).toBe(true);
+    state.expanded = false;
+    await wait();
+    expect(el.hasAttribute("open")).toBe(false);
+    state.expanded = true;
+    await wait();
+    expect(el.getAttribute("open")).toBe("");
+  });
+
+  test("an aria-* binding that flips writes the word both ways", async () => {
+    const state = reactive({ open: false });
+    const el = renderNode(
+      { attributes: { "aria-expanded": "${state.open}" }, tagName: "button" },
+      state,
+    );
+    expect(el.getAttribute("aria-expanded")).toBe("false");
+    state.open = true;
+    await wait();
+    expect(el.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  test('a string "false" is never reinterpreted as the boolean', () => {
+    const el = renderNode(
+      { attributes: { "aria-current": "false", "data-flag": "false" }, tagName: "div" },
+      reactive({}),
+    );
+    expect(el.getAttribute("aria-current")).toBe("false");
+    expect(el.dataset.flag).toBe("false");
+  });
+
   // Template string ${} tests
   test("${} template string in textContent renders reactively", async () => {
     const state = reactive({ count: 5 });
