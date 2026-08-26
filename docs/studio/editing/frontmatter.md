@@ -19,7 +19,7 @@ Two surfaces show these fields: the **Page** panel in the Navigator, and the **D
 
 ## The Page panel
 
-Click **Page** in the **Document** group of the Navigator rail, or press :kbd[⌘6]. Its header reads **PAGE · document**, and its sections, top to bottom, depend on the file you have open:
+Click **Page** in the **Document** group of the Navigator rail, or press :kbd[⌘5]. Its header reads **PAGE · document**, and its sections, top to bottom, depend on the file you have open:
 
 ![The Page panel showing Frontmatter, Page, and OpenGraph sections for a blog post](../../images/document-panel.png)
 

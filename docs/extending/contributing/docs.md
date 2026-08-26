@@ -60,7 +60,7 @@ The point of every rule below is that a reader should be able to hear a person b
 
 **Sentence length.** Aim under thirty words. A long sentence is fine when it is carrying a real chain of reasoning, and a short one is fine for emphasis, but a page where every sentence lands on the same medium-length beat reads like a machine. Vary it.
 
-**A quoted UI message is quoted verbatim**, dash and all. When a page shows what Studio says, the point is that a reader can match it against their screen, so the dash rule does not reach inside the quotation marks. Add an allow entry to `scripts/docs/prose.json` instead. Paraphrasing is fine where the message is templated and no fixed string exists.
+**A quoted UI message is quoted verbatim**, dash and all. When a page shows what Studio says, the point is that a reader can match it against their screen, so the dash rule does not reach inside the quotation marks. Add an allow entry to `scripts/docs/prose.json` instead. Paraphrasing is fine where the message is templated and no fixed string exists. A rendered label inside a code span needs no allow entry, because the segmenter masks code spans before any rule runs: `` `h1 — Latest posts` `` on [The workspace](/docs/studio/interface) is what `nodeLabel()` really prints, and it stays.
 
 **Say it once.** Do not follow a heading with a sentence that only repeats it. A definition sentence is different and is required on a surface page, but it has to add the where and the what for: "Grid is for tabular data" earns its place; "Grid mode is a mode for grids" does not. No more than two sections in a row may open with the same frame.
 

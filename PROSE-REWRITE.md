@@ -8,15 +8,17 @@ The vocabulary is already clean. Across 163,533 words there is not one hit for d
 
 What the corpus has instead is punctuation and cadence:
 
-| Signature                                  | Count                                   |
-| ------------------------------------------ | --------------------------------------- |
-| Em dashes in hand-authored prose           | 2,846, about one every forty-four words |
-| ...on a line carrying two or more          | 954                                     |
-| ...opening the line's final clause         | 791 lines                               |
-| `rather than`, plus `X, not Y.` enders     | 212 and 94                              |
-| Headings restated by their first paragraph | 130 of 1,210                            |
-| Sentences over thirty words                | 845 of 5,807                            |
-| Title Case headings                        | about 26, nearly all in `framework/`    |
+| Signature                                  | Count                                       |
+| ------------------------------------------ | ------------------------------------------- |
+| Em dashes in hand-authored prose           | 2,846, about one every forty-four words     |
+| ...on a line carrying two or more          | 954                                         |
+| ...opening the line's final clause         | 791 lines                                   |
+| `rather than`, plus `X, not Y.` enders     | 212 and 94, and they went UP to 240 and 100 |
+| Headings restated by their first paragraph | 130 of 1,210                                |
+| Sentences over thirty words                | 845 of 5,807                                |
+| Title Case headings                        | about 26, nearly all in `framework/`        |
+
+**The dash rewrite has its own failure mode, and it is measured.** A dash and a contrast are the same gesture, so the obvious substitution keeps the gesture: `rather than` rose from 212 to 240 and the `X, not Y.` ender from 94 to 100 while the dashes fell to zero. No count is wrong. A page holding ten of them is, and the totals hide exactly that, so `check-prose.ts --report` ranks the two frames per thousand words and the consistency pass reads the top of that list. Neither frame is gated, because a budget would have to claim the fifth instance is wrong while the fourth was fine.
 
 And two failure modes, not one. `start/` and `studio/` are over-cadenced: confident, aphoristic, and rhythmically identical page after page. `framework/concepts/` is under-written, because it is a transcription of `specs/spec.md` with the spec's headings title-cased on the way in.
 
@@ -97,7 +99,7 @@ An anchor is minted from a heading's rendered text, lowercased, so `## How It Wo
 Two consequences worth knowing:
 
 - **The whole branch pays one full test matrix, once.** `package.json` and `.github/workflows/test.yml` are both in `affected.ts`'s `GLOBAL` list, and two commits touch them to register `docs:links` and `docs:prose`. Everything else here is `checks`-only, so splitting the work would have paid that cost repeatedly for no gain.
-- **Package and extension READMEs are still deferred to their own commit at the end.** Each one seeds its workspace and that workspace's whole dependent closure, and `packages/README.md`, `extensions/README.md` and `scripts/README.md` match no rule in `affected.ts` at all, so they fail open. Landing them together keeps that to one union rather than one fan-out per commit.
+- **All twenty-six package, extension and meta READMEs land in one commit.** Each one seeds its workspace and that workspace's whole dependent closure, and `packages/README.md`, `extensions/README.md` and `scripts/README.md` match no rule in `affected.ts` at all, so they fail open. Landing them together keeps that to a single union instead of one fan-out per commit.
 
 Verify a commit before making it, and the branch before opening the pull request. `docs:verify` needs a clean tree, so it runs after the commit rather than before.
 
@@ -121,6 +123,7 @@ This work happens in a git worktree, and **a shell's working directory can rever
 
 A rewrite must never guess at a fact. Anything below gets recorded here and decided by a person.
 
+- **Settled, and recorded so nobody re-opens it:** the jump bar really does print `h1 — Latest posts`. `nodeLabel()` in `packages/studio/src/state.ts` returns `` `${tag} — ${textContent.slice(0, 24)}` ``, so the em dash in that example on [The workspace](/docs/studio/interface) is verbatim UI, inside a code span, and the gate never saw it.
 - **Two pages describe the same screenshot differently.** `docs/images/mode-manage.png` was captioned "Jx Studio Manage Files modal with live previews of every project file" on `start/first-project.md` and "The Library open in a Studio pane, listing a project's pages and components as cards with live previews" on `studio/projects/browse.md`, which owns the shot. Both now use the owning page's wording, which narrows the claim from every project file to pages and components and changes modal to pane. Someone who can see the image should confirm it.
 - **`navigator-panels.ts` still comments that the Bottom dock's tabs are "Problems · Diff · Logic · Activity".** The code below it registers three. The style guide has been corrected; the comment has not.
 - **Two dangling paths in `CLAUDE.md`**: `STANDARDS-ADOPTION.md`, which agents are told to read before picking up any `gap:` id, and `packages/studio/UX-REDESIGN-PLAN.md` §13, cited as the design authority for the shot contract. Neither exists in the tree.
@@ -128,6 +131,9 @@ A rewrite must never guess at a fact. Anything below gets recorded here and deci
 - **`packages/compiler/README.md` and `specs/compiler.md` now disagree cosmetically.** The README's route table reads `0: Class`, `1: Static`, and so on; the same table in `specs/compiler.md` §2 still reads `0 — Class`. Specs are out of scope for this campaign, so the spec was left alone. Whoever next releases that spec should decide whether it follows.
 - **`packages/runtime/README.md` carries two unsourced bundle-size figures** (`@vue/reactivity` ~7 kB gzip, `lit-html` ~3 kB gzip). `docs:claims` gates marketing copy and the root README, not package READMEs, so nothing checks them.
 - **One fenced block was edited deliberately.** The style guide's own callout sample said `Neutral context — including …`, so the page teaching the dash rule was breaking it inside its worked example. The comma is the only fence edit on the branch; every other fence is byte for byte.
+- **`platform-adapter.md` mixes British and American spelling.** `optimisation` sits beside `normalizes` and `serializes` on the same page. The corpus is American English by the style guide, so this is a one-word fix that nobody has made; it was left verbatim rather than guessed at.
+- **The same notification is worded two ways upstream, and both reached the docs.** `platform-adapter.md` quotes "**Open in Browser** reports that this **target** cannot build a preview" from the `degradation` string in `packages/protocol/src/routes.ts`, and "this **backend** could not build a preview" from the toast in `packages/studio/src/panels/toolbar.ts`. Each page is faithful to a real string; the two strings disagree. Whoever owns the protocol route text picks a word.
+- **`schema-composition.md`'s remaining fenced dash is generator output.** The `$comment` in the sample is the literal string `jx schema` writes, so removing it means changing `packages/schema`'s generator.
 - **Whether a docs page should transcribe a spec at all.** `framework/concepts/` is a copy of `specs/spec.md`. This campaign fixes the prose; the information architecture is a larger question.
 
 ## Terminology, as ruled

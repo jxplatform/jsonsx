@@ -55,7 +55,7 @@ You should now see a button labeled **Add one** with an empty paragraph after it
 
 The component needs somewhere to keep its number. That's a state entry:
 
-1. Press :kbd[⌘7] for the **Data** panel.
+1. Press :kbd[⌘6] for the **Data** panel.
 2. Click the **+ Add…** picker at the bottom of the panel and choose **Value**. The new entry appears with a placeholder name and its editor open.
 3. Rename it first: type `count` into the **Name** field and press :kbd[Enter].
 4. Set **Type** to `integer`, then type `0` into **Default**. A new entry starts with an empty default, and an empty string is not something you can add one to.
@@ -98,7 +98,7 @@ You should see the number climb with every click. That's the whole reactive loop
 
 ## 9. Watch the value resolve
 
-Click **Data** in the **Document** group of the Navigator rail, or press :kbd[⌘7]. It lists the same entries as the Data panel, but with what each one is worth _right now_, so your `count` row shows the current number. Stay in Preview, click **Add one**, and watch the row change; **Refresh** re-renders the canvas and reads the values again.
+Click **Data** in the **Document** group of the Navigator rail, or press :kbd[⌘6]. It lists the same entries as the Data panel, but with what each one is worth _right now_, so your `count` row shows the current number. Stay in Preview, click **Add one**, and watch the row change; **Refresh** re-renders the canvas and reads the values again.
 
 ![The Data panel with the count entry showing its live value](../images/counter-data-explorer.png)
 

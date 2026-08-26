@@ -79,7 +79,7 @@ export function registerNavigatorPanels(): void {
   // ── Off-rail: reachable by command and palette, no rail button ──────────────
   registerInsertPanel();
 
-  // ── The Bottom dock's tabs (§3.2 ⑪): Problems · Diff · Logic · Activity ──────
+  // ── The Bottom dock's tabs (§3.2 ⑪): Problems · Logic · Activity ────────────
   // Composed here, in the one place panel records are gathered, so the shell has ONE composition
   // Site rather than one per dock. Importing the module is also what attaches the dock to the
   // Shell's mount lifecycle — see its `registerShellSurface` call. Problems arrives with them and
@@ -110,12 +110,13 @@ export function navigatorPanelSet(): readonly PanelRecord[] {
  * The roster `panel.focus.*` is generated from: rail order first, then the rail-less Navigator
  * panels.
  *
- * Not `railPanelSet()`: Insert and State have no rail button and no chord, and they still need a
- * `Show …` command and a palette row, which is the whole point of `rail: false` (a surface
- * reachable by name, not by number).
+ * Not `railPanelSet()`: Insert and Languages have no rail button and no chord, and they still need
+ * a `Show …` command and a palette row, which is the whole point of `rail: false` (a surface
+ * reachable by name, not by number). State used to be the third of them and is gone: its editor is
+ * the Data panel's now, so there is no second record to roster.
  *
- * The Bottom dock's four tabs are deliberately absent — Problems as of this change, and Diff, Logic
- * and Activity all along. Each is `rail: false` AND hosted there, so each is addressed by
+ * The Bottom dock's three tabs are deliberately absent — Problems as of this change, and Logic and
+ * Activity all along. Each is `rail: false` AND hosted there, so each is addressed by
  * `view.setBottomTab`: one verb per surface, and the dock's own strip is how a human picks between
  * them. That is also why the filter here is by DOCK and not merely by `rail`, and why Problems
  * leaving the rail removed `panel.focus.problems` rather than demoting it to a chordless row.
