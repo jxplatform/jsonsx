@@ -2,7 +2,7 @@
 
 ## Static HTML Compiler, Custom Element Emitter, and Island Detector
 
-**Version:** 0.3.2-draft
+**Version:** 0.3.3-draft
 **Status:** Partial
 **Updated:** 2026-08-26
 **License:** MIT
@@ -613,14 +613,17 @@ In `site-build`, the pipeline integrates at step 6 (per-route compilation):
 
 When `isDynamic()` returns false for an entire document, the compiler emits plain HTML/CSS with zero JavaScript.
 
-**A boolean attribute is presence, not text.** An attribute whose value resolves to `false` is
-omitted from the emitted HTML; one that resolves to `true` is emitted bare — `open`, never
-`open="true"`. HTML reads a boolean attribute by presence alone, so stringifying the value inverted
-it, and `<details open="false">` was an OPEN `<details>`. Absence has to be expressible at the
-emitter because it cannot be expressed before it: a template that resolves to nothing falls back to
-its own source text, which is what keeps an unresolvable binding alive for the client. A _string_
-`"false"` is untouched — an enumerated attribute such as `aria-current` carries its value in the
-text, and dropping it would be the same defect facing the other way.
+**A boolean attribute is emitted by family, not stringified.** `buildAttrs()` defers to
+`booleanAttrValue()` in `@jxsuite/runtime` (spec.md §8.3): a presence attribute resolving to `false`
+is omitted and one resolving to `true` is emitted bare — `open`, never `open="true"` — while every
+`aria-*` and the three enumerated HTML attributes keep the written word in both directions.
+
+Two things are specific to the static emitter. Absence has to be expressible HERE because it cannot
+be expressed before it: a template that resolves to nothing falls back to its own source text, which
+is what keeps an unresolvable binding alive for the client, so `false` is the only value that can
+mean "omit". And the emitter shares the rule with the runtime rather than restating it, because the
+same document is rendered both ways — a page whose `<details>` is closed when built and open when
+hydrated is the defect this prevents.
 
 **An empty expansion is not a collapse.** A repeater is expanded into static markup only when the
 expansion actually produces nodes. When `items` resolves to an empty array at build time there is
@@ -848,6 +851,7 @@ is doing the only size work in the pipeline.
 
 ## Changelog
 
+- **0.3.3-draft** (2026-08-26) — §8: the boolean-attribute rule is shared with the runtime rather than restated, and covers the enumerated family.
 - **0.3.2-draft** (2026-08-26) — Static output omits a false boolean attribute and emits a true one bare.
 - **0.3.1-draft** (2026-08-18) — §4.3: separate the emitted-JavaScript accessor form from the pointer grammar it lowers.
 - **0.3.0-draft** (2026-08-17) — §4.3: ref lowering goes through the shared tokenizer — identifier segments dot, all others bracket, so every emitted ref parses.
@@ -885,4 +889,4 @@ is doing the only size work in the pipeline.
 
 ---
 
-_`@jxsuite/compiler` Specification v0.3.2-draft_
+_`@jxsuite/compiler` Specification v0.3.3-draft_

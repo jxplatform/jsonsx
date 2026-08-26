@@ -793,6 +793,42 @@ describe("buildAttrs", () => {
     const open = "${state.url.startsWith('/docs/studio/')}";
     expect(buildAttrs({ attributes: { open } }, scope)).toBe(" open");
   });
+
+  /*
+   * The other family. ARIA has no presence attributes at all — every `aria-*` is enumerated and
+   * reads an empty value as unset, so a bare `aria-hidden` is NOT hidden and writing one that way
+   * is the `open="false"` defect pointed the other direction.
+   */
+  test("an aria-* boolean is written as text, both ways", () => {
+    expect(buildAttrs({ attributes: { "aria-hidden": true } }, null)).toBe(' aria-hidden="true"');
+    expect(buildAttrs({ attributes: { "aria-expanded": false } }, null)).toBe(
+      ' aria-expanded="false"',
+    );
+  });
+
+  test("the enumerated HTML three are text, so false stays explicit", () => {
+    // `contenteditable` absent means "inherit"; only the written word means false.
+    expect(buildAttrs({ attributes: { contenteditable: false } }, null)).toBe(
+      ' contenteditable="false"',
+    );
+    expect(buildAttrs({ attributes: { draggable: false } }, null)).toBe(' draggable="false"');
+    expect(buildAttrs({ attributes: { spellcheck: true } }, null)).toBe(' spellcheck="true"');
+  });
+
+  test("an aria-* template resolving to a boolean keeps the word", () => {
+    const scope = buildInitialScope({ url: "/docs/studio/" });
+    const expanded = "${state.url.startsWith('/docs/studio/')}";
+    expect(buildAttrs({ attributes: { "aria-expanded": expanded } }, scope)).toBe(
+      ' aria-expanded="true"',
+    );
+  });
+
+  test("attribute names are matched case-insensitively", () => {
+    expect(buildAttrs({ attributes: { "ARIA-HIDDEN": true } }, null)).toBe(' ARIA-HIDDEN="true"');
+    expect(buildAttrs({ attributes: { contentEditable: false } }, null)).toBe(
+      ' contentEditable="false"',
+    );
+  });
 });
 
 // ─── buildInner ────────────────────────────────────────────────────────────
