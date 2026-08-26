@@ -1,11 +1,11 @@
 ---
 title: "Install Jx Studio"
-description: "Download the Jx Studio desktop app for macOS, Windows, or Linux — the only way to run the visual editor."
+description: "Download the Jx Studio desktop app for macOS, Windows, or Linux: the only way to run the visual editor."
 ---
 
 # Install Jx Studio
 
-Jx Studio is a desktop application. There is no hosted, sign-in version — you run it on your own machine, against your own files.
+Jx Studio is a desktop application. There is no hosted, sign-in version; you run it on your own machine, against your own files.
 
 ## Download the app
 
@@ -18,7 +18,7 @@ Grab an installer for your platform from the [latest release](https://github.com
 | Linux (x64)           | [`JxStudio.tar.gz`](https://github.com/jxsuite/jx/releases/latest/download/linux-x64-JxStudio-Setup.tar.gz)   |
 | Linux (ARM64)         | [`JxStudio.tar.gz`](https://github.com/jxsuite/jx/releases/latest/download/linux-arm64-JxStudio-Setup.tar.gz) |
 
-The macOS build is notarized, so it opens without a Gatekeeper prompt. The Windows installer is not yet code-signed — SmartScreen will warn on first run; choose **More info → Run anyway**. The [Download page](/download) has the same links plus checksums and release notes.
+The macOS build is notarized, so it opens without a Gatekeeper prompt. The Windows installer is not yet code-signed, so SmartScreen warns on first run. Choose **More info → Run anyway**. The [Download page](/download) has the same links plus checksums and release notes.
 
 :::doc-note
 Jx Studio is Apple Silicon only. Intel Macs can still run the last release built before Jx Studio moved to Electrobun 2, which publishes no macOS x64 build; that older release no longer receives automatic updates.
@@ -40,11 +40,11 @@ To install it rather than run it once:
 nix profile install github:jxsuite/jx/release
 ```
 
-Either form takes an optional project directory — `nix run github:jxsuite/jx/release -- ~/sites/my-site` — and opens the project picker without one.
+Either form takes an optional project directory, as in `nix run github:jxsuite/jx/release -- ~/sites/my-site`, and opens the project picker without one.
 
 ### Fetch it instead of building it
 
-Released builds are published to a public [Cachix](https://cachix.org) cache, so the commands above can download Studio rather than compile the monorepo on your machine. The rest of the closure — Chromium, Bun — already comes from `cache.nixos.org`.
+Released builds are published to a public [Cachix](https://cachix.org) cache, so the commands above can download Studio rather than compile the monorepo on your machine. The rest of the closure, Chromium and Bun, already comes from `cache.nixos.org`.
 
 The flake names the cache itself, so Nix offers to use it the first time you run one of the commands above. Answer `y`, or pass `--accept-flake-config` to skip the prompt:
 
@@ -69,16 +69,16 @@ nix.settings = {
 
 Off NixOS, the same two keys go in `/etc/nix/nix.conf`, or run `cachix use jxsuite` to write them for you.
 
-Once installed, open Studio and either **create a new project**, **open an existing folder**, or **clone a repository** — see [Your first project](/docs/start/first-project).
+Once installed, open Studio and either **create a new project**, **open an existing folder**, or **clone a repository**. [Your first project](/docs/start/first-project) walks through it.
 
 ## Updating
 
-Studio checks your project's `@jxsuite/*` dependencies against each package's own newest published version and offers to update them when one is behind, and prompts when a newer release of the app itself is available. Studio's own copy of those packages is separate — your project's ranges govern `jx build` and your project's types, not the running app, so there's no reason for them to match Studio's version.
+Studio checks your project's `@jxsuite/*` dependencies against each package's own newest published version and offers to update them when one is behind, and prompts when a newer release of the app itself is available. Studio's own copy of those packages is separate. Your project's ranges govern `jx build` and your project's types rather than the running app, so there is no reason for them to match Studio's version.
 
 ## For developers: scaffolding from a terminal
 
-The visual editor only runs as the desktop app above — the Nix commands build and launch that same app, and there's no way to serve Studio itself as a headless web app. If you'd rather generate a project's files from a terminal before opening them in Studio, see [CLI commands](/docs/framework/build/cli) for `bun create @jxsuite` and the `jx` CLI.
+The visual editor only runs as the desktop app above. The Nix commands build and launch that same app, and there is no way to serve Studio itself as a headless web app. If you'd rather generate a project's files from a terminal before opening them in Studio, see [CLI commands](/docs/framework/build/cli) for `bun create @jxsuite` and the `jx` CLI.
 
 ## Next
 
-Ready to build something? Continue to **[Your first project](/docs/start/first-project)**.
+Continue to **[Your first project](/docs/start/first-project)**.
