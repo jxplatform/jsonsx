@@ -48,6 +48,12 @@
   "exclude": ["node_modules", "**/node_modules", "**/dist", "**/assets", "packages/desktop"],
   "include": [
     "types.d.ts",
+    /* Not a package, but not exempt either. Two transpilers load it without typechecking —
+       cosmiconfig-typescript-loader (jiti) for the commit hook, Bun for
+       `scripts/check-changelog-safety.ts` — so naming it here is the only thing that proves its
+       annotations. It is also why it is no longer in .oxlintrc.typecheck.json's no-unsafe-* waiver:
+       that waiver exists for root-level files with no program at all. */
+    "commitlint.config.ts",
     "packages/**/src/**/*",
     "packages/**/tests/**/*",
     "packages/schema/types.ts",

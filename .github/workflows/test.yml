@@ -368,7 +368,7 @@ jobs:
       # release-please DROP that package from its own release — silently, exit 0. That is how
       # `schema` and `starters` fell out of three consecutive releases and `npm i @jxsuite/create`
       # became unresolvable. `.husky/commit-msg` runs the same rule, but a hook is skippable with
-      # `--no-verify`, which is how the offending subject reached main. See commitlint.config.js.
+      # `--no-verify`, which is how the offending subject reached main. See commitlint.config.ts.
       #
       # Pull-request-only, and it names the two shas explicitly rather than using HEAD: `checks`
       # runs on the merge commit, whose own subject is not a conventional commit.

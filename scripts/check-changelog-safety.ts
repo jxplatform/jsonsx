@@ -1,6 +1,6 @@
 /**
  * The CI half of the changelog-safety gate. The rule, the reasoning, and the failure it prevents
- * are all in `commitlint.config.js` — read that first; this file only applies it to a commit
+ * are all in `commitlint.config.ts` — read that first; this file only applies it to a commit
  * range.
  *
  * Both halves exist because they fail at different moments and neither covers the other:
@@ -11,7 +11,7 @@
  *   releases.
  * - This runs in the `checks` job over the pull request's own commits, where nothing can skip it.
  *
- * It reads the rule from `commitlint.config.js` rather than restating it, so the hook and the gate
+ * It reads the rule from `commitlint.config.ts` rather than restating it, so the hook and the gate
  * cannot drift into disagreeing about which subjects are safe.
  *
  * Merge commits are skipped: release-please cannot parse them as conventional commits (its log is
@@ -22,7 +22,7 @@
  *     bun scripts/check-changelog-safety.ts --from <sha> --to <sha>
  */
 
-import { changelogSafetyAdvice, findChangelogUnsafeParts } from "../commitlint.config.js";
+import { changelogSafetyAdvice, findChangelogUnsafeParts } from "../commitlint.config.ts";
 
 export interface UnsafeCommit {
   sha: string;

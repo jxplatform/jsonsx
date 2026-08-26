@@ -6,7 +6,7 @@
  * lose a release, both of which exit 0:
  *
  * 1. Release-please drops a component whose changelog contains a raw `<tag>` (the defect written up in
- *    `commitlint.config.js`). It logs "Pull request contains releases, but not for component:
+ *    `commitlint.config.ts`). It logs "Pull request contains releases, but not for component:
  *    starters", creates the other 18, and succeeds. The manifest still says 1.5.0.
  * 2. The `release-please` job dies PART WAY THROUGH — a GitHub 5xx while it backfills file lists,
  *    which is exactly what a component with no tag provokes, because it forces a walk back through
@@ -144,7 +144,7 @@ export function report(gaps: ReleaseGap[]): string {
     fixes.push(
       "A missing GitHub release means release-please skipped the component. Check the " +
         "`release-please` job log for “Pull request contains releases, but not for component” " +
-        "and read the header of `commitlint.config.js`.",
+        "and read the header of `commitlint.config.ts`.",
     );
   }
 
