@@ -143,48 +143,6 @@
     "docs/framework/reference.md": {
       "em-dash": 4
     },
-    "docs/framework/site.md": {
-      "em-dash": 13
-    },
-    "docs/framework/site/content-collections.md": {
-      "em-dash": 28
-    },
-    "docs/framework/site/deployment.md": {
-      "em-dash": 36
-    },
-    "docs/framework/site/feeds.md": {
-      "em-dash": 9
-    },
-    "docs/framework/site/i18n.md": {
-      "em-dash": 34
-    },
-    "docs/framework/site/images.md": {
-      "em-dash": 26
-    },
-    "docs/framework/site/jx-markdown.md": {
-      "em-dash": 17
-    },
-    "docs/framework/site/layouts.md": {
-      "em-dash": 15
-    },
-    "docs/framework/site/project-json.md": {
-      "em-dash": 23
-    },
-    "docs/framework/site/redirects.md": {
-      "em-dash": 12
-    },
-    "docs/framework/site/relationships.md": {
-      "em-dash": 10
-    },
-    "docs/framework/site/routing.md": {
-      "em-dash": 12
-    },
-    "docs/framework/site/search.md": {
-      "em-dash": 13
-    },
-    "docs/framework/site/seo.md": {
-      "em-dash": 21
-    },
     "docs/studio/ai.md": {
       "em-dash": 26
     },

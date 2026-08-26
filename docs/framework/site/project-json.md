@@ -1,6 +1,6 @@
 ---
 title: "project.json"
-description: "Every key in a Jx site's project.json — identity, defaults, head entries, style tokens, content types, redirects, build — and what cascades into pages."
+description: "Every key in a Jx site's project.json: identity, defaults, head entries, style tokens, content types, redirects, build, and what cascades into pages."
 spec:
   - site-architecture.md#3
   - site-architecture.md#10
@@ -13,7 +13,7 @@ code:
 
 # project.json
 
-> **Studio writes this file for you** — [Project settings](/docs/studio/projects/settings) edits the identity, defaults, and build keys; the [content-type builder](/docs/studio/projects/content-types) writes `content`; the [design-token editor](/docs/studio/design/tokens) writes `style`.
+> **Studio writes this file for you.** [Project settings](/docs/studio/projects/settings) edits the identity, defaults, and build keys; the [content-type builder](/docs/studio/projects/content-types) writes `content`; the [design-token editor](/docs/studio/design/tokens) writes `style`.
 
 `project.json` at the project root is the only required configuration file in a Jx site. A minimal real one (abbreviated from jxsuite.com):
 
@@ -30,32 +30,32 @@ code:
 
 ## Key reference
 
-| Key          | Type     | Purpose                                                                                  |
-| ------------ | -------- | ---------------------------------------------------------------------------------------- |
-| `name`       | `string` | Site name — the default `<title>` and `$site.name`                                       |
-| `url`        | `string` | Production URL, used for canonical URLs and the sitemap                                  |
-| `defaults`   | `object` | `layout`, `lang`, and `charset` applied to every page                                    |
-| `$head`      | `array`  | Global `<head>` entries injected into every page                                         |
-| `$media`     | `object` | Named breakpoints available in every style object                                        |
-| `style`      | `object` | Design tokens (`--` keys) and global element rules                                       |
-| `state`      | `object` | Site-wide state, merged read-only into every page                                        |
-| `$defs`      | `object` | Shared JSON Schema type definitions for the whole project                                |
-| `content`    | `object` | Content types — see [Content collections](/docs/framework/site/content-collections)      |
-| `imports`    | `object` | `$prototype` name → class path, cascaded to all pages                                    |
-| `extensions` | `array`  | Extension packages providing formats, sections, and classes                              |
-| `redirects`  | `object` | Source path → destination — see [Redirects](/docs/framework/site/redirects)              |
-| `copy`       | `object` | Extra source → destination file mappings copied into the build output                    |
-| `build`      | `object` | `outDir`, `trailingSlash`, `adapter` — see [Deployment](/docs/framework/site/deployment) |
-| `images`     | `object` | Image optimization settings — see [Images](/docs/framework/site/images)                  |
+| Key          | Type     | Purpose                                                                                 |
+| ------------ | -------- | --------------------------------------------------------------------------------------- |
+| `name`       | `string` | Site name, the default `<title>` and `$site.name`                                       |
+| `url`        | `string` | Production URL, used for canonical URLs and the sitemap                                 |
+| `defaults`   | `object` | `layout`, `lang`, and `charset` applied to every page                                   |
+| `$head`      | `array`  | Global `<head>` entries injected into every page                                        |
+| `$media`     | `object` | Named breakpoints available in every style object                                       |
+| `style`      | `object` | Design tokens (`--` keys) and global element rules                                      |
+| `state`      | `object` | Site-wide state, merged read-only into every page                                       |
+| `$defs`      | `object` | Shared JSON Schema type definitions for the whole project                               |
+| `content`    | `object` | Content types; see [Content collections](/docs/framework/site/content-collections)      |
+| `imports`    | `object` | `$prototype` name → class path, cascaded to all pages                                   |
+| `extensions` | `array`  | Extension packages providing formats, sections, and classes                             |
+| `redirects`  | `object` | Source path → destination; see [Redirects](/docs/framework/site/redirects)              |
+| `copy`       | `object` | Extra source → destination file mappings copied into the build output                   |
+| `build`      | `object` | `outDir`, `trailingSlash`, `adapter`; see [Deployment](/docs/framework/site/deployment) |
+| `images`     | `object` | Image optimization settings; see [Images](/docs/framework/site/images)                  |
 
 Enabled extensions add sections of their own alongside these. The first-party ones:
 
-| Key           | Type     | Contributed by       | Purpose                                                                                    |
-| ------------- | -------- | -------------------- | ------------------------------------------------------------------------------------------ |
-| `connections` | `object` | `@jxsuite/connector` | Named database connections — see [Connections](/docs/studio/data/connections)              |
-| `data`        | `object` | `@jxsuite/connector` | Dynamic tables served over `/_jx/data` — see [Data tables](/docs/studio/data/tables)       |
-| `auth`        | `object` | `@jxsuite/auth`      | Visitor accounts and sessions — see [Auth and secrets](/docs/studio/data/auth-and-secrets) |
-| `search`      | `object` | `@jxsuite/search`    | Build-time search index — see [Search](/docs/framework/site/search)                        |
+| Key           | Type     | Contributed by       | Purpose                                                                                   |
+| ------------- | -------- | -------------------- | ----------------------------------------------------------------------------------------- |
+| `connections` | `object` | `@jxsuite/connector` | Named database connections; see [Connections](/docs/studio/data/connections)              |
+| `data`        | `object` | `@jxsuite/connector` | Dynamic tables served over `/_jx/data`; see [Data tables](/docs/studio/data/tables)       |
+| `auth`        | `object` | `@jxsuite/auth`      | Visitor accounts and sessions; see [Auth and secrets](/docs/studio/data/auth-and-secrets) |
+| `search`      | `object` | `@jxsuite/search`    | Build-time search index; see [Search](/docs/framework/site/search)                        |
 
 ## Identity and defaults
 
@@ -81,7 +81,7 @@ A page's own `$head` appends to (and, for singletons like `<title>`, overrides) 
 
 ## Breakpoints and style tokens
 
-`$media` names media queries once so every component can respond to `"@--md"` without redeclaring the query. `style` holds the global stylesheet: `--`-prefixed keys compile to `:root {}` custom properties, plain camelCase properties style the page root, and nested objects are element selectors applied site-wide. Declaring a scheme query like `"--dark": "(prefers-color-scheme: dark)"` additionally enables the visitor-forced [color-scheme contract](/docs/framework/concepts/color-schemes) — `@--dark` token overrides in `style` become the dark variant of the design.
+`$media` names media queries once so every component can respond to `"@--md"` without redeclaring the query. `style` holds the global stylesheet: `--`-prefixed keys compile to `:root {}` custom properties, plain camelCase properties style the page root, and nested objects are element selectors applied site-wide. Declaring a scheme query like `"--dark": "(prefers-color-scheme: dark)"` additionally enables the visitor-forced [color-scheme contract](/docs/framework/concepts/color-schemes), so `@--dark` token overrides in `style` become the dark variant of the design.
 
 ```json
 {
@@ -100,7 +100,7 @@ Every component in the project can reference `var(--color-accent)` and use `"@--
 
 ## Site state and shared types
 
-`state` declares site-wide data. Every page receives it two ways: merged directly into the page's own `state` (the page wins when it declares the same key), and under the read-only `$site` entry — `$site.name`, `$site.url`, plus each site state key.
+`state` declares site-wide data. Every page receives it two ways: merged directly into the page's own `state` (the page wins when it declares the same key), and under the read-only `$site` entry as `$site.name`, `$site.url`, plus each site state key.
 
 ```json
 {
@@ -111,11 +111,11 @@ Every component in the project can reference `var(--color-accent)` and use `"@--
 }
 ```
 
-`$defs` holds reusable [JSON Schema type definitions](/docs/framework/concepts/documents) — shapes for API responses, CMS payloads, or shared value types — that any document in the project can reference, the project-wide counterpart of a document's own `$defs`.
+`$defs` holds reusable [JSON Schema type definitions](/docs/framework/concepts/documents), such as shapes for API responses, CMS payloads, or shared value types, that any document in the project can reference, the project-wide counterpart of a document's own `$defs`.
 
 ## Content types
 
-The `content` section defines content collections — folders of Markdown, JSON, or CSV entries with a schema (abbreviated from jxsuite.com, which publishes these docs from the repo's `docs/` folder):
+The `content` section defines content collections: folders of Markdown, JSON, or CSV entries with a schema (abbreviated from jxsuite.com, which publishes these docs from the repo's `docs/` folder):
 
 ```json
 {
@@ -134,7 +134,7 @@ The keys and query prototypes are covered in [Content collections](/docs/framewo
 
 ## Redirects
 
-`redirects` maps old paths to new ones — a plain string for a 301, an object to pick the status, or an object with `rewrite: true` to serve the destination's content without redirecting:
+`redirects` maps old paths to new ones, taking a plain string for a 301, an object to pick the status, or an object with `rewrite: true` to serve the destination's content without redirecting:
 
 ```json
 {
@@ -150,7 +150,7 @@ The status must be one of `301`, `302`, `303`, `307`, `308`. Patterns, rewrites 
 
 ## Copying extra files
 
-`copy` maps files from anywhere in the repository into the build output — useful for publishing artifacts that live outside `public/`:
+`copy` maps files from anywhere in the repository into the build output, which suits artifacts that live outside `public/`:
 
 ```json
 {
@@ -204,13 +204,13 @@ An extension can own a whole top-level key. Listing the package in `extensions` 
 Two rules run through all of them:
 
 - **Names, never values.** Sections carry identifiers and env-var _names_ (`urlEnv`, `secretEnv`, `clientIdEnv`); the secret values live in the git-ignored `.dev.vars` locally and your host's secret store in production. See [Auth and secrets](/docs/studio/data/auth-and-secrets).
-- **A section served at runtime needs an adapter.** `connections`/`data` and `auth` are served by extension mounts under `/_jx/`, so `build.adapter` must name a server-capable target — the build fails on static. See [Build output and adapters](/docs/framework/site/deployment).
+- **A section served at runtime needs an adapter.** `connections`/`data` and `auth` are served by extension mounts under `/_jx/`, so `build.adapter` must name a server-capable target; the build fails on static. See [Build output and adapters](/docs/framework/site/deployment).
 
-Studio writes these sections for you from _Settings > Connections_, _Data Tables_, and _Authentication_ — see [Databases](/docs/studio/data).
+Studio writes these sections for you from _Settings > Connections_, _Data Tables_, and _Authentication_; see [Databases](/docs/studio/data).
 
 ## What documents inherit
 
-Site-level declarations cascade into every page automatically — no imports needed:
+Site-level declarations cascade into every page automatically, with no imports needed:
 
 - `$head` entries are prepended to every page's `<head>`.
 - `$media` breakpoints and `style` tokens are available in every component.
@@ -218,4 +218,4 @@ Site-level declarations cascade into every page automatically — no imports nee
 - `state` merges into page state (page wins) and is exposed as `$site`.
 - `imports` and `$elements` merge with page-level entries (page wins on collision).
 
-Everything else is deliberate: files in `data/` load via an explicit [`$ref`](/docs/framework/concepts/references), collection data requires `ContentCollection` or `ContentEntry` declarations, and components receive outside data only through [`$props`](/docs/framework/concepts/props-and-scope) — scope never leaks across a component boundary.
+Everything else is deliberate: files in `data/` load via an explicit [`$ref`](/docs/framework/concepts/references), collection data requires `ContentCollection` or `ContentEntry` declarations, and components receive outside data only through [`$props`](/docs/framework/concepts/props-and-scope); scope never leaks across a component boundary.

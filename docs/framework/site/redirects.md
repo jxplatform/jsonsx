@@ -9,7 +9,7 @@ code:
 
 # Redirects
 
-When a page moves, the old URL should keep working. Declare redirects once in `project.json` and the build emits them in two forms — an HTML fallback that works on any static host, and a `_redirects` file for hosts that do server-side redirects.
+When a page moves, the old URL should keep working. Declare redirects once in `project.json` and the build emits them in two forms: an HTML fallback that works on any static host, and a `_redirects` file for hosts that do server-side redirects.
 
 ## The redirects map
 
@@ -44,7 +44,7 @@ The string form defaults to `301` (permanent). The full set is `301`, `302`, `30
 
 ## Rewrites
 
-A **rewrite** serves the destination's content _at_ the source URL, with no redirect at all — the visitor's address bar does not change:
+A **rewrite** serves the destination's content _at_ the source URL, with no redirect at all, so the visitor's address bar does not change:
 
 ```json
 {
@@ -54,7 +54,7 @@ A **rewrite** serves the destination's content _at_ the source URL, with no redi
 }
 ```
 
-This only works on hosts that process `_redirects` (Netlify, Cloudflare Pages). It is written as `rewrite: true` rather than as a status code, because a rewrite is not a redirect — the `200` you may have seen in other tools' config is that host's shorthand, and the build writes it for you.
+This only works on hosts that process `_redirects` (Netlify, Cloudflare Pages). It is written as `rewrite: true` rather than as a status code, because a rewrite is not a redirect. The `200` you may have seen in other tools' config is that host's shorthand, and the build writes it for you.
 
 ## What the build emits
 
@@ -68,33 +68,33 @@ For a static source path, the build may also write an HTML page at that path (`/
 
 | Status       | HTML fallback              | Why                                                                                                                                  |
 | ------------ | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `301`        | yes, with a canonical link | Permanent — a canonical link points crawlers at the destination                                                                      |
-| `302`, `303` | yes, with `noindex`        | Temporary — a canonical link would claim a permanence the status denies                                                              |
+| `301`        | yes, with a canonical link | Permanent; a canonical link points crawlers at the destination                                                                       |
+| `302`, `303` | yes, with `noindex`        | Temporary; a canonical link would claim a permanence the status denies                                                               |
 | `307`, `308` | **no**                     | They exist to preserve the request method; a meta refresh would turn a POST into a GET                                               |
 | rewrite      | **no**                     | A file at the source URL would shadow the rewrite on hosts that honour `_redirects`, and turn it into a redirect on hosts that don't |
 
-It also writes a single `dist/_redirects` file — the Netlify/Cloudflare format, one rule per line:
+It also writes a single `dist/_redirects` file in the Netlify and Cloudflare format, one rule per line:
 
 ```text
 /old-page /new-page 301
 /blog/:slug /posts/:slug 301
 ```
 
-Pattern sources using `:param` or `*` wildcards go into `_redirects` only — a wildcard can't be expressed as files on disk, so no HTML fallback is emitted for them.
+Pattern sources using `:param` or `*` wildcards go into `_redirects` only, because a wildcard can't be expressed as files on disk, so no HTML fallback is emitted for them.
 
 ## Platform behavior
 
-- **Netlify and Cloudflare Pages** read `_redirects` and answer with a true server-side redirect and your configured status code — including pattern rules. The HTML fallbacks are shadowed and harmless.
+- **Netlify and Cloudflare Pages** read `_redirects` and answer with a true server-side redirect and your configured status code, including pattern rules. The HTML fallbacks are shadowed and harmless.
 - **GitHub Pages and other plain static hosts** ignore `_redirects`; the meta-refresh HTML serves as the redirect. Static `301`, `302` and `303` sources work; pattern rules, `307`, `308` and rewrites don't.
 
 Redirect sources are not pages: they never appear in the [sitemap](/docs/framework/site/seo), and the canonical link on each fallback page points crawlers at the destination.
 
 :::doc-warning
-A redirect source that collides with a real page overwrites it in `dist/`. The build warns when this happens, naming the source — but it is a warning, not an error, so read the build output. Studio's redirect editor reports the same collision as a Problem.
+A redirect source that collides with a real page overwrites it in `dist/`. The build warns when this happens, naming the source, but it is a warning rather than an error, so read the build output. Studio's redirect editor reports the same collision as a Problem.
 :::
 
 ## Related
 
-- [Build output and adapters](/docs/framework/site/deployment) — where `_redirects` fits in the `dist/` contract
-- [Routing](/docs/framework/site/routing) — how real pages claim their URLs
-- [Other hosts](/docs/studio/publish/other-hosts) — per-host publishing recipes
+- [Build output and adapters](/docs/framework/site/deployment): where `_redirects` fits in the `dist/` contract
+- [Routing](/docs/framework/site/routing): how real pages claim their URLs
+- [Other hosts](/docs/studio/publish/other-hosts): per-host publishing recipes

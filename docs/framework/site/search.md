@@ -13,7 +13,7 @@ code:
 
 # Site search
 
-Jx sites get full-text search from the `@jxsuite/search` extension: the build emits a JSON index from your content collections, and a small headless client (MiniSearch under the hood, ~7 kB) answers queries entirely in the browser. No server, no third-party service — results work on any static host, and section matches deep-link straight to the heading (`/docs/framework/site/#assets`).
+Jx sites get full-text search from the `@jxsuite/search` extension: the build emits a JSON index from your content collections, and a small headless client (MiniSearch under the hood, ~7 kB) answers queries entirely in the browser. No server and no third-party service: results work on any static host, and section matches deep-link straight to the heading (`/docs/framework/site/#assets`).
 
 ## Enabling the section
 
@@ -40,9 +40,9 @@ Per collection:
 | `sections`     | `true`                         | Also index one document per heading, with `#anchor` deep links |
 | `sectionDepth` | `3`                            | Deepest heading level that gets its own section document       |
 
-Top-level: `output` (default `/search-index.json`) sets where the index is written; `engine` is `minisearch` (the only engine today — the field exists so future engines slot in without reshaping the section).
+Top-level: `output` (default `/search-index.json`) sets where the index is written; `engine` is `minisearch` (the only engine today; the field exists so future engines slot in without reshaping the section).
 
-`bunx jx build` then emits the index into `dist/` alongside your pages. The index holds two kinds of documents per entry: the whole page, and one per heading section — so a query can land on "the _Assets_ section of _Site architecture_" rather than just the page.
+`bunx jx build` then emits the index into `dist/` alongside your pages. The index holds two kinds of documents per entry: the whole page, and one per heading section, so a query can land on "the _Assets_ section of _Site architecture_" rather than just the page.
 
 ## Querying from page state
 
@@ -67,21 +67,21 @@ Bind an input to `state.q` and map over `state.results`. Each result group is a 
 }
 ```
 
-In compiled sites the def lowers to plain client code that lazily loads the bundled client and fetches the index on first use — nothing is downloaded until the visitor actually searches. Options: `limit` (max rows, default 8), `group` (set `false` for the flat row list described below), `index` (override the index URL), `locale` (see below).
+In compiled sites the def lowers to plain client code that lazily loads the bundled client and fetches the index on first use, so nothing is downloaded until the visitor actually searches. Options: `limit` (max rows, default 8), `group` (set `false` for the flat row list described below), `index` (override the index URL), `locale` (see below).
 
 ### On a multilingual site
 
-A collection kept [one directory per locale](/docs/framework/site/i18n#content-in-one-directory-per-locale) is indexed once per language, and the search box **searches the page's own language** with no configuration — it reads `<html lang>`, which the build wrote from the route's locale. Results link into that language's URL space.
+A collection kept [one directory per locale](/docs/framework/site/i18n#content-in-one-directory-per-locale) is indexed once per language, and the search box **searches the page's own language** with no configuration, because it reads `<html lang>`, which the build wrote from the route's locale. Results link into that language's URL space.
 
 Set `locale` to override it: a tag to search one named language, or `null` to search every one.
 
 :::doc-note
-Without that default, a reader searching a French page would be handed the English copy of the page they're already on — ranked first, because it matched the same words.
+Without that default, a reader searching a French page would be handed the English copy of the page they're already on, ranked first because it matched the same words.
 :::
 
 ## Building a search UI component
 
-Interactive components aren't lowered, so inside a compiled component you use the headless client directly through its `$src` state conventions — the export names double as state keys:
+Interactive components aren't lowered, so inside a compiled component you use the headless client directly through its `$src` state conventions, where the export names double as state keys:
 
 ```json
 "state": {
@@ -96,15 +96,15 @@ Interactive components aren't lowered, so inside a compiled component you use th
 ```
 
 - `searchInit(state)` preloads the index and flips `state.searchReady` (re-running any pending query).
-- `runSearch(state, e)` reads the input event, stores flat rows on `state.searchResults`, publishes the row count as `state.searchCount`, and resets `state.searchActive` — wire it to your input's `oninput`.
+- `runSearch(state, e)` reads the input event, stores flat rows on `state.searchResults`, publishes the row count as `state.searchCount`, and resets `state.searchActive`. Wire it to your input's `oninput`.
 
-The build bundles `npm:@jxsuite/search/client` (MiniSearch included) into `/assets/` automatically — declare the dependency in your project's `package.json` and import it like any module.
+The build bundles `npm:@jxsuite/search/client` (MiniSearch included) into `/assets/` automatically. Declare the dependency in your project's `package.json` and import it like any module.
 
 For full control, import the core API from the same module: `preload(indexUrl?)`, `isReady()`, and the synchronous `query(text, { limit, group, pageCap })`.
 
 ## Rendering a result row
 
-Flat rows (`group: false`, what `runSearch` uses) arrive presentation-ready. Each row is one page **or** one of its heading sections, and carries a breadcrumb plus pre-highlighted text — so a component can render matches without doing any string work of its own:
+Flat rows (`group: false`, what `runSearch` uses) arrive presentation-ready. Each row is one page **or** one of its heading sections, and carries a breadcrumb plus pre-highlighted text, so a component can render matches without doing any string work of its own:
 
 ```json
 {
@@ -122,7 +122,7 @@ Flat rows (`group: false`, what `runSearch` uses) arrive presentation-ready. Eac
 }
 ```
 
-A token's `m` flag marks a run that matched a query term — whole words, so a prefix search for `intro` highlights `introduction`. Map over the tokens and style the matched runs; nothing is injected as HTML:
+A token's `m` flag marks a run that matched a query term, whole words, so a prefix search for `intro` highlights `introduction`. Map over the tokens and style the matched runs; nothing is injected as HTML:
 
 ```json
 {
@@ -139,9 +139,9 @@ A token's `m` flag marks a run that matched a query term — whole words, so a p
 `crumbs` is the slug's ancestor trail, with the page title appended on a section row. `excerptTokens` cover a ~160-character window around the first body match, elided with `…` when it doesn't reach an edge. At most `pageCap` rows (default 3) come from any one page, so a long page can't flood the list.
 
 :::doc-tip
-Grouped results (`group: true`, the default and what the `Search` prototype returns) keep the older nested shape — a page with a `hits` array of its matching sections. Use flat rows for a search palette, grouped for a results page organized by document.
+Grouped results (`group: true`, the default and what the `Search` prototype returns) keep the older nested shape: a page with a `hits` array of its matching sections. Use flat rows for a search palette, grouped for a results page organized by document.
 :::
 
 :::doc-note
-One index per site is the assumption: the first `preload` wins the in-page singleton. Multiple collections are fine — they share the one index and results carry their `collection` name.
+One index per site is the assumption: the first `preload` wins the in-page singleton. Multiple collections are fine; they share the one index and results carry their `collection` name.
 :::

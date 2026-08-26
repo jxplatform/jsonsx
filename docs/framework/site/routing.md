@@ -9,7 +9,7 @@ code:
 
 # Routing
 
-Every file in the `pages/` directory automatically becomes a route — there is no routing configuration. `.json` pages are native; other extensions become routable when an enabled extension claims them, which is how jxsuite.com serves `pages/index.md` as its front page (see [Jx Markdown](/docs/framework/site/jx-markdown)).
+Every file in the `pages/` directory automatically becomes a route, and there is no routing configuration. `.json` pages are native; other extensions become routable when an enabled extension claims them, which is how jxsuite.com serves `pages/index.md` as its front page (see [Jx Markdown](/docs/framework/site/jx-markdown)).
 
 ## Static routes
 
@@ -23,7 +23,7 @@ The file path determines the URL path:
 | `pages/blog/index.json`      | `/blog`            |
 | `pages/blog/first-post.json` | `/blog/first-post` |
 
-`index` files map to their parent directory, so `pages/about.json` and `pages/about/index.json` produce the same URL — use whichever keeps the folder tidy, but not both.
+`index` files map to their parent directory, so `pages/about.json` and `pages/about/index.json` produce the same URL. Use whichever keeps the folder tidy, but not both.
 
 Files and directories whose names start with `_` are excluded from routing entirely. That's the convention for co-locating components next to the pages that use them: `pages/blog/_blog-card.json` is available for `$ref` but never becomes `/blog/_blog-card`.
 
@@ -37,11 +37,11 @@ Bracket syntax in filenames creates parameterized routes:
 | `pages/[category]/[id].json` | `/:category/:id` | `/products/42`              |
 | `pages/docs/[...path].json`  | `/docs/*`        | `/docs/api/runtime/install` |
 
-`[param]` matches exactly one path segment. `[...param]` is a catch-all: it matches the whole remaining path, slashes included — one catch-all page can serve an entire subtree.
+`[param]` matches exactly one path segment. `[...param]` is a catch-all: it matches the whole remaining path, slashes included, so one catch-all page can serve an entire subtree.
 
 ## Generating pages with $paths
 
-A static build has to know every URL in advance, so a dynamic page declares which paths it generates with a top-level `$paths`. The most common shape drives the route from a [content collection](/docs/framework/site/content-collections) — this is (abbreviated) how the docs page you are reading is generated, from `pages/docs/[...slug].json`:
+A static build has to know every URL in advance, so a dynamic page declares which paths it generates with a top-level `$paths`. The most common shape drives the route from a [content collection](/docs/framework/site/content-collections). This is, abbreviated, how the docs page you are reading is generated, from `pages/docs/[...slug].json`:
 
 ```json
 {
@@ -83,16 +83,16 @@ A JSON array file, one page per item, with `field` selecting the property to use
 For catch-all routes the parameter value may itself contain slashes: nested content entries get path-based ids (like `framework/site/routing`), so a single `[...slug]` page fans out into the whole tree of URLs.
 
 :::doc-tip
-Your project's generated `document.schema.json` validates `$paths` against exactly these shapes plus any your extensions contribute, so a misspelled key or a source belonging to an extension you have not enabled is flagged in the editor and by `jx validate` — rather than building zero pages and warning at the end of the log. Run [`jx schema`](/docs/framework/build/cli) after changing `extensions` to keep that set current.
+Your project's generated `document.schema.json` validates `$paths` against exactly these shapes plus any your extensions contribute, so a misspelled key or a source belonging to an extension you have not enabled is flagged in the editor and by `jx validate`, rather than building zero pages and warning at the end of the log. Run [`jx schema`](/docs/framework/build/cli) after changing `extensions` to keep that set current.
 :::
 
 ## Route priority
 
 When several routes could match the same URL, the more specific one wins:
 
-1. Static routes beat dynamic routes — `/about` beats `/[slug]`.
-2. Named parameters beat catch-alls — `/blog/[slug]` beats `/blog/[...path]`.
-3. More specific paths beat less specific ones — `/blog/[slug]` beats `/[...path]`.
+1. Static routes beat dynamic routes: `/about` beats `/[slug]`.
+2. Named parameters beat catch-alls: `/blog/[slug]` beats `/blog/[...path]`.
+3. More specific paths beat less specific ones: `/blog/[slug]` beats `/[...path]`.
 
 ## Params at runtime
 
@@ -102,7 +102,7 @@ Inside a dynamic page, the current route's parameters are addressable as `#/$par
 { "id": { "$ref": "#/$params/slug" } }
 ```
 
-Each generated page resolves the reference to its own concrete value — `/blog/hello-world` sees `slug` as `"hello-world"`. The compiler also injects a read-only `$page` state entry carrying `params`, `title`, and `url`, alongside the site-level `$site` context (see [project.json](/docs/framework/site/project-json)). In static builds all of this resolves at compile time; nothing route-related ships to the browser.
+Each generated page resolves the reference to its own concrete value, so `/blog/hello-world` sees `slug` as `"hello-world"`. The compiler also injects a read-only `$page` state entry carrying `params`, `title`, and `url`, alongside the site-level `$site` context (see [project.json](/docs/framework/site/project-json)). In static builds all of this resolves at compile time; nothing route-related ships to the browser.
 
 :::doc-tip
 In Studio, opening a dynamic page puts a picker per parameter in the context bar's **resolving with** popover, so the canvas previews a real entry instead of a placeholder.
@@ -110,6 +110,6 @@ In Studio, opening a dynamic page puts a picker per parameter in the context bar
 
 ## Related
 
-- [Content collections](/docs/framework/site/content-collections) — the entries that drive `$paths`
-- [Layouts](/docs/framework/site/layouts) — the shells dynamic pages render into
-- [Deployment](/docs/framework/site/deployment) — how generated routes are served
+- [Content collections](/docs/framework/site/content-collections): the entries that drive `$paths`
+- [Layouts](/docs/framework/site/layouts): the shells dynamic pages render into
+- [Deployment](/docs/framework/site/deployment): how generated routes are served
