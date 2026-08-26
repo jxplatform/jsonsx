@@ -41,7 +41,7 @@ All properties are optional; these are the defaults:
 | `widths`        | Pixel widths for the responsive variants                                                      |
 | `formats`       | Output formats (`"webp"`, `"avif"`, `"jpeg"`, `"png"`)                                        |
 | `quality`       | Per-format compression quality (0–100)                                                        |
-| `sizes`         | Default CSS `sizes` attribute injected alongside `srcset`                                     |
+| `sizes`         | Fallback CSS `sizes`, used only when neither the tag nor its container says (below)           |
 | `lazyLoad`      | Adds `loading="lazy"` and `decoding="async"`, whether or not `optimize` is on                 |
 | `picture`       | Wrap a multi-format image in a `<picture>`, one `<source>` per format (default `true`)        |
 | `service`       | `"build"` = Sharp at build time; `"cloudflare"` = transform URLs served by Cloudflare (below) |
@@ -51,9 +51,9 @@ All properties are optional; these are the defaults:
 
 For each eligible image, the pipeline (powered by [Sharp](https://sharp.pixelplumbing.com/)):
 
-1. **Filters widths** to those at or below the image's natural width. There is no upscaling, and the original width is always included as a breakpoint.
+1. **Filters widths** to those at or below the image's natural width. There is no upscaling. The image's own width is added as an extra breakpoint only when it is _smaller_ than your largest configured width. Otherwise your largest width is the ceiling you asked for, and a 3840 px screenshot would quietly emit a 3840 px variant in every format that no layout would ever request.
 2. **Generates one variant per width × format** and writes it to `dist/images/_optimized/{stem}-{width}-{hash}.{format}` (e.g. `hero-640-a1b2c3d4.webp`).
-3. **Rewrites the markup.** With one configured format, the `<img>` gets a `srcset` of those variants plus `sizes` from config (unless the node already sets one). With two or more, it is wrapped in a `<picture>`:
+3. **Rewrites the markup.** With one configured format, the `<img>` gets a `srcset` of those variants plus a `sizes` (below). With two or more, it is wrapped in a `<picture>`:
 
 ```html
 <picture>
@@ -63,7 +63,22 @@ For each eligible image, the pipeline (powered by [Sharp](https://sharp.pixelplu
 </picture>
 ```
 
-The `<img>` keeps the original `src` and carries no `srcset`, which is what makes it a real fallback. A bare `srcset` says nothing about format, so a browser that can't decode AVIF picks an AVIF candidate anyway and shows nothing; `<source type>` is the only markup that lets it decline. Set `"picture": false` if you'd rather have the flat `<img>` and accept that.
+The `<img>` carries no `srcset`, which is what makes it a real fallback. A bare `srcset` says nothing about format, so a browser that can't decode AVIF picks an AVIF candidate anyway and shows nothing; `<source type>` is the only markup that lets it decline. Set `"picture": false` if you'd rather have the flat `<img>` and accept that.
+
+Its `src` is the largest variant in a universally decodable format (`jpeg` or `png`) when your `formats` include one, and the original file otherwise. `src` is only ever reached by a client that understood neither `srcset` nor any `<source type>`, so it has to stay decodable; but the original is the _unresized_ source, and a resized variant of the same format is strictly better. With `formats: ["webp", "avif"]` there is nothing safe to point at, so the original stays: a smaller image nobody can decode is not an improvement.
+
+## How `sizes` is chosen
+
+`sizes` is a promise about layout, and the browser keeps it absolutely: it picks a candidate from that string before any layout has happened and never revisits the choice. One project-wide string therefore can't be right for every image on a site. `(max-width: 768px) 100vw, 50vw` describes a half-width image, and on a hero that renders full-width inside a 960 px column it is too small on a wide screen and too large on a narrow one.
+
+So the build asks, in order:
+
+1. **A `sizes` you wrote on the tag.** Always wins.
+2. **The container.** The narrowest literal `max-width` or `width` in `px`/`rem` on the image or any ancestor, emitted as `(max-width: 960px) 100vw, 960px`. This is layout the build already knows, so it beats a project-wide guess.
+3. **`images.sizes`**, if you set one.
+4. **Nothing**, so the browser assumes `100vw`.
+
+Only literal lengths count. A `clamp()`, a percentage, or a `var()` is a real constraint too, but not one the build can resolve, and a wrong `sizes` is worse than none. Write `sizes` on the tag when your layout is one of those.
 
 Images embedded in pre-rendered Markdown content go through the same transformation, so a `![hero](./images/hero.jpg)` in a blog post is optimized like any hand-placed `<img>`.
 

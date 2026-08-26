@@ -16,19 +16,28 @@
 name: Deploy jxsuite.com
 
 on:
-  # Build-only. Same paths as before — a schema/compiler/runtime change that alters the rendered
-  # output won't trigger this, and doesn't need to, because nothing here publishes.
+  # Build-only; nothing here publishes.
+  #
+  # `packages/compiler/**` is in the list because `perf:budget` runs in this job, and the compiler is
+  # where every regression it exists to catch actually lives: unminified bundles, a stylesheet link
+  # per component, an oversized image variant. A budget that cannot see the code it guards is
+  # decoration. The cost is a site build on compiler pull requests, which the image cache keeps
+  # cheap; the alternative is finding out on release day.
   pull_request:
     paths:
       - "sites/jxsuite.com/**"
       - "docs/**"
       - "scripts/docs/**"
+      - "packages/compiler/**"
+      - "scripts/check-site-perf-budget.ts"
   push:
     branches: [main]
     paths:
       - "sites/jxsuite.com/**"
       - "docs/**"
       - "scripts/docs/**"
+      - "packages/compiler/**"
+      - "scripts/check-site-perf-budget.ts"
   workflow_call:
     inputs:
       ref:
@@ -100,6 +109,9 @@ jobs:
       - run: bun run build:compiler
 
       - run: bun run --cwd sites/jxsuite.com build
+
+      # After the build, because it measures the emitted bytes rather than the source.
+      - run: bun run perf:budget
 
       - if: inputs.ref
         uses: actions/configure-pages@v6

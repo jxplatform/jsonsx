@@ -2,7 +2,7 @@
 
 ## Static HTML Compiler, Custom Element Emitter, and Island Detector
 
-**Version:** 0.3.3-draft
+**Version:** 0.4.0-draft
 **Status:** Partial
 **Updated:** 2026-08-26
 **License:** MIT
@@ -523,7 +523,7 @@ Image optimization is configured via `project.json` under the `images` key. All 
 | `widths`        | `number[]` | `[320, 640, 960, 1280, 1920]`               | Pixel widths for responsive `srcset` variants                                            |
 | `formats`       | `string[]` | `["webp", "avif"]`                          | Output formats (also supports `"jpeg"`, `"png"`)                                         |
 | `quality`       | `object`   | `{ webp: 80, avif: 65, jpeg: 80, png: 80 }` | Per-format compression quality (0–100)                                                   |
-| `sizes`         | `string`   | `"(max-width: 768px) 100vw, 50vw"`          | Default CSS `sizes` attribute for responsive layout hints                                |
+| `sizes`         | `string`   | `"(max-width: 768px) 100vw, 50vw"`          | Fallback CSS `sizes`, used only when neither the tag nor its container says (§7.2.1)     |
 | `lazyLoad`      | `boolean`  | `true`                                      | Adds `loading="lazy"` and `decoding="async"` to `<img>` tags                             |
 | `service`       | `string`   | `"build"`                                   | `"build"` = Sharp at build time; `"cloudflare"` = `/cdn-cgi/image` transform URLs (§7.6) |
 | `remoteDomains` | `string[]` | `[]`                                        | Allowlisted https hostnames optimized via transform URLs (`service: "cloudflare"` only)  |
@@ -532,14 +532,31 @@ Image optimization is configured via `project.json` under the `images` key. All 
 
 During page compilation, `transformImageNodes()` walks the document tree and mutates eligible `<img>` nodes. For each image:
 
-1. **Process** — `processImage()` reads the source via Sharp, filters `widths` to ≤ the original width (always including the original), and generates one variant per width × format combination. Variants are written to `dist/images/_optimized/{stem}-{width}-{hash}.{format}`.
+1. **Process** — `processImage()` reads the source via Sharp, filters `widths` to ≤ the original width, and generates one variant per width × format combination. Variants are written to `dist/images/_optimized/{stem}-{width}-{hash}.{format}`.
+
+   The source's own width is added only when it is **below** the largest configured width: a source smaller than every rung would otherwise produce no variants at all, and one falling between rungs would never be offered at its native resolution. A source larger than the top rung does not get one — the largest configured width is the ceiling the project chose. (Adding it unconditionally meant a 3840 px screenshot emitted a 3840 px variant in every format, encoded on every cold build and offered as a `3840w` candidate no real viewport would select.)
+
 2. **Inject attributes** — The `<img>` node is mutated in-place:
    - `srcset` — responsive variant list with widths (e.g., `hero-320-a1b2.avif 320w, hero-640-a1b2.avif 640w`)
-   - `sizes` — from config, unless the node already has one
+   - `sizes` — see §7.2.1
+   - `src` — the largest emitted variant in a universally decodable format (`jpeg`/`png`) when the project emits one; otherwise the original file. `src` is reached only by a client that understood neither `srcset` nor any `<source type>`, so it has to stay decodable — but the original is the **unresized** source, and a resized variant of the same format is strictly better. A project emitting only `webp`/`avif` keeps the original: a smaller image nobody can decode is not an improvement.
    - `width` and `height` — original image dimensions (prevents CLS)
    - `loading="lazy"` and `decoding="async"` — when `lazyLoad: true`, unless `loading="eager"` is already set
 
 Up to 4 variants are processed concurrently per image.
+
+#### 7.2.1 `sizes`
+
+`sizes` is a promise about layout that the browser keeps absolutely: it selects a candidate from the string before layout exists, and never revisits the choice. A single project-wide default therefore cannot be right for every image on a site — `(max-width: 768px) 100vw, 50vw` describes a half-width image, and applied to a hero that renders full-width inside a 960 px column it is too small on a wide screen and too large on a narrow one.
+
+Resolution order, first match wins:
+
+1. A `sizes` written on the tag.
+2. **Derived from the container** — the narrowest literal `max-width`/`width` in `px` or `rem` declared on the image or any ancestor, emitted as `(max-width: Npx) 100vw, Npx`. This is layout the compiler already holds, so it outranks a project-wide guess.
+3. `images.sizes`, when the project sets one.
+4. Nothing — the browser assumes `100vw`.
+
+Only literal lengths derive. A `clamp()`, a percentage or a custom property is a real constraint too, but not one the build can resolve, and a wrong `sizes` is worse than none.
 
 ### 7.3 Eligibility
 
@@ -676,7 +693,22 @@ that declaration is the author saying the data is build-time only.
 
 All static `style` definitions are extracted into a single `<style>` block in `<head>`.
 
-> **Status: Implemented.** `compile-static.js` handles zero-JS output.
+Component stylesheets are extracted the same way. A page inlines the CSS of every light-DOM
+component it uses, appended after the page block so the cascade is unchanged, and emits no
+`<link rel="stylesheet">` for them — one render-blocking request per component was a page's entire
+critical request chain, for sheets averaging about 2 kB. The sheets are still written to
+`dist/components/<tag>.css` for anything that references them directly. A component in shadow mode
+is unaffected: its sheet is linked from inside the declarative shadow root.
+
+The trade is deliberate. Inlined CSS repeats on every page instead of caching across navigations;
+it is small, it compresses against the markup around it, and a round trip on a phone costs more
+than the bytes do.
+
+CSS inlined into a `<style>` element has `</style` escaped as `<\/style` — an HTML parser ends the
+element at that sequence wherever it appears, and style values are author data.
+
+> **Status: Implemented.** `compile-static.js` handles zero-JS output; `site-build`'s
+> `injectComponentScripts` inlines the component sheets.
 
 ---
 
@@ -807,16 +839,22 @@ The site build bundles Function-def `$src` modules for the browser
   when some page actually carries an import map.
 - **Backends**: `Bun.build` when the build runs under Bun; esbuild
   (dynamically imported, a `@jxsuite/compiler` dependency) under plain Node.
-  Options are minimal and identical (`format: esm`, browser target, no
-  minify). Browser bundles define `process.env.NODE_ENV` as `"production"`:
+  Options are minimal and identical (`format: esm`, browser target). Browser
+  bundles are **minified**; `build.minify: false` opts out, and non-browser
+  targets stay readable because their output is read off a stack trace rather
+  than parsed on a phone. Browser bundles define `process.env.NODE_ENV` as `"production"`:
   the substitution matters (a browser has no `process`) but the resolution
   matters more, because that value decides which `exports` condition a package
   offers. Bun reads it from the build's own `define` and assumes development
   without it, so the two backends were resolving different files —
   `lit-html`'s 31 kB development build under Bun against its 10 kB production
   build under esbuild. `JX_BUNDLER=esbuild` forces the fallback. Byte-level
-  output may still differ between backends — a repo tracking `dist/` should
-  build with one backend consistently.
+  output may still differ between backends — the two minifiers agree on
+  semantics, not on bytes — so a repo tracking `dist/` should build with one
+  backend consistently.
+
+  Component modules (`dist/components/<tag>.js`) are emitted source rather than
+  bundles and are **not** minified; only what passes through the bundler is.
 
 > **Status: Implemented** via `site-build` steps 6d (bundling) and 6e
 > (extension `emit`, extensions.md §8.4).
@@ -837,20 +875,26 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 ## Appendix A — Production Dependency Stack
 
 Served from the site under `/assets/` (§12), not from a CDN. Sizes are the bundles this build
-actually emits — un-minified ESM, since `minify: false` — measured with `gzip -9`:
+actually emits — minified ESM — measured with `gzip -9`:
 
 | Package           | Raw       | gzip        | Purpose                                |
 | ----------------- | --------- | ----------- | -------------------------------------- |
-| `@vue/reactivity` | 48.7 kB   | 11.1 kB     | `reactive()`, `computed()`, `effect()` |
-| `lit-html`        | 10.6 kB   | 3.7 kB      | `html`, `render()`                     |
-| **Total**         | **59 kB** | **14.8 kB** |                                        |
+| `@vue/reactivity` | 20.7 kB   | 7.8 kB      | `reactive()`, `computed()`, `effect()` |
+| `lit-html`        | 7.3 kB    | 3.3 kB      | `html`, `render()`                     |
+| **Total**         | **28 kB** | **11.1 kB** |                                        |
 
-The previous figures here (~7 kB and ~3 kB, ~10 kB total) described neither of these files. They
-are also the _un-minified_ sizes: the bundler does not minify, so a host that compresses on the fly
-is doing the only size work in the pipeline.
+Un-minified the same two bundles were 48.7 kB and 10.6 kB raw (59 kB, 14.8 kB gzip). The raw
+column is the one that matters most: it is the source a low-end phone parses and compiles before
+anything can paint, and compression does nothing for that. Minified, `@vue/reactivity` lands within
+a kilobyte of the `reactivity.esm-browser.prod.js` build Vue ships itself, so no export-condition
+change is needed to reach it.
+
+An earlier revision of this table claimed ~7 kB and ~3 kB (~10 kB total); those figures described
+neither file.
 
 ## Changelog
 
+- **0.4.0-draft** (2026-08-26) — Browser bundles are minified (§12); component CSS is inlined rather than linked (§8.2); image sizes derives from the container and variants stop at the configured ceiling (§7.2, §7.2.1).
 - **0.3.3-draft** (2026-08-26) — §8: the boolean-attribute rule is shared with the runtime rather than restated, and covers the enumerated family.
 - **0.3.2-draft** (2026-08-26) — Static output omits a false boolean attribute and emits a true one bare.
 - **0.3.1-draft** (2026-08-18) — §4.3: separate the emitted-JavaScript accessor form from the pointer grammar it lowers.
@@ -889,4 +933,4 @@ is doing the only size work in the pipeline.
 
 ---
 
-_`@jxsuite/compiler` Specification v0.3.3-draft_
+_`@jxsuite/compiler` Specification v0.4.0-draft_

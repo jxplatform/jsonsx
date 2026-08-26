@@ -93,6 +93,14 @@ export interface BundleOptions {
   /** Resolution hooks, applied before the bundler's own resolution. */
   resolver?: BundleResolver;
   /**
+   * Whether to minify the bundle.
+   *
+   * Defaults to true for `target: "browser"` and false everywhere else: browser output is parsed on
+   * someone else's phone, server output is read off a stack trace. Callers override it — the site
+   * build from `build.minify`, and `jx dev` to keep a breakpoint on a line somebody wrote.
+   */
+  minify?: boolean;
+  /**
    * Called with the absolute path of every file the bundler loads.
    *
    * The only way to ask a backend where a bare specifier _actually_ lands: resolution depends on
@@ -161,6 +169,21 @@ export function workerBundleOptions(adapter: string): BundleOptions {
  */
 const BROWSER_DEFINE = { "process.env.NODE_ENV": '"production"' } as const;
 
+/**
+ * Whether this bundle is minified.
+ *
+ * Browser output defaults to minified and everything else to readable. Measured on jxsuite.com's
+ * own deployed bytes, the six scripts a page loads go from 155,254 B to 64,994 B — and it is the 90
+ * kB of source a phone no longer has to parse, not the 16 kB it no longer downloads, that moves
+ * Total Blocking Time.
+ *
+ * This widens the backend divergence {@link BROWSER_DEFINE} warns about: the two minifiers agree on
+ * semantics, not on bytes. A build that diffs `dist/` must pin one backend (`JX_BUNDLER=esbuild`).
+ */
+function shouldMinify(opts: BundleOptions): boolean {
+  return opts.minify ?? opts.target === "browser";
+}
+
 /** Map a bundle target to esbuild's platform (conditions carry the workerd specifics). */
 function esbuildPlatform(target: BundleTargetName): "browser" | "node" {
   return target === "node" || target === "bun" ? "node" : "browser";
@@ -193,7 +216,7 @@ export async function bundleEntry(request: BundleRequest, opts: BundleOptions): 
       external,
       format: "esm",
       logLevel: "silent",
-      minify: false,
+      minify: shouldMinify(opts),
       outfile: request.outfile,
       platform: esbuildPlatform(opts.target),
       plugins: plugins as unknown as NonNullable<Parameters<typeof esbuild.build>[0]["plugins"]>,
@@ -207,7 +230,7 @@ export async function bundleEntry(request: BundleRequest, opts: BundleOptions): 
     entrypoints: [request.entryPath],
     external,
     format: "esm",
-    minify: false,
+    minify: shouldMinify(opts),
     plugins,
     target: bunTarget(opts.target),
     throw: false,
@@ -254,7 +277,8 @@ export async function resolveThroughBundler(
     await bundleSource(
       `export * from ${JSON.stringify(specifier)};\n`,
       { outfile, resolveDir },
-      { ...opts, onFileLoaded: (path) => loaded.push(path) },
+      // The output is deleted in `finally` — this only wants the resolution, so never pay to minify.
+      { ...opts, minify: false, onFileLoaded: (path) => loaded.push(path) },
     );
   } catch {
     return undefined;
@@ -286,7 +310,7 @@ export async function bundleSource(
       external: opts.external ?? [],
       format: "esm",
       logLevel: "silent",
-      minify: false,
+      minify: shouldMinify(opts),
       outfile,
       platform: esbuildPlatform(opts.target),
       stdin: { contents: source, loader: "js", resolveDir, sourcefile: "jx-entry.js" },

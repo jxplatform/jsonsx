@@ -111,9 +111,24 @@ export function emitFormulaFn(def: { parameters?: unknown[] }, compiledBody: str
  * @returns {string}
  */
 export function srcImportBinding(key: string, def: unknown) {
-  const declared = (def as { $export?: unknown } | null | undefined)?.$export;
-  const exportName = typeof declared === "string" && declared !== "" ? declared : key;
+  const exportName = srcExportName(key, def);
   return exportName === key ? key : `${exportName} as ${key}`;
+}
+
+/**
+ * The export a Function-def `$src` entry names inside its module: `$export`, or the state key.
+ *
+ * Separate from {@link srcImportBinding} because a lazily loaded `$src` has no import clause to
+ * alias in — it reaches the export off the module namespace object a dynamic `import()` resolves
+ * to, where the local name is chosen by the generated code and only the export name is fixed.
+ *
+ * @param {string} key - State key
+ * @param {unknown} def - The Function definition
+ * @returns {string}
+ */
+export function srcExportName(key: string, def: unknown): string {
+  const declared = (def as { $export?: unknown } | null | undefined)?.$export;
+  return typeof declared === "string" && declared !== "" ? declared : key;
 }
 
 /**
@@ -1230,7 +1245,20 @@ export function compileStyles(
   if (rules.length === 0) {
     return "";
   }
-  return `<style>\n${rules.join("\n")}\n</style>`;
+  return `<style>\n${escapeStyleText(rules.join("\n"))}\n</style>`;
+}
+
+/**
+ * Make CSS safe to sit inside a `<style>` element.
+ *
+ * An HTML parser ends a `<style>` at the first `</style` in the text, wherever it appears — inside
+ * a CSS string, inside a comment, anywhere. Since a project's style values are author data
+ * (`content: "</style>"` is a legal declaration), inlining them unescaped would let content close
+ * the element and the rest of the stylesheet would render as markup. `\/` is a valid CSS escape for
+ * `/`, so the declaration keeps its meaning.
+ */
+export function escapeStyleText(css: string): string {
+  return css.replaceAll(/<\/(?=style)/gi, String.raw`<\/`);
 }
 
 /**

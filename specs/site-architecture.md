@@ -2,7 +2,7 @@
 
 ## File-Based Routing, Content Collections, Layouts, and Static Site Generation
 
-**Version:** 0.5.18-draft
+**Version:** 0.6.0-draft
 **Status:** Partial
 **Updated:** 2026-08-26
 **License:** MIT
@@ -1761,8 +1761,9 @@ The build system tracks dependencies between files. When a content entry changes
 
 Static assets are emitted per component, with page styles inlined:
 
-- **CSS:** Page and layout styles are inlined into each page's `<style>` block; each compiled component ships its own `dist/components/<tag>.css`, linked only by pages that use it
+- **CSS:** Page and layout styles are inlined into each page's `<style>` block, and so is the CSS of every light-DOM component the page uses — appended after the page block, so the cascade matches the `<link>` order it replaces (compiler.md §8.2). Each compiled component still ships its own `dist/components/<tag>.css` for anything that references it directly. A shadow-mode component's sheet is linked from inside its declarative shadow root instead
 - **JS:** Each interactive component ships its own module (`dist/components/<tag>.js`), loaded via `<script type="module">` only by pages that use it; fully static components ship no script. A page "uses" a component when its tag appears in the prerendered HTML **or** in one of the page's island modules — an island builds its markup in the browser, so a component it renders needs its module even when the component is fully static, because no prerendered markup exists for that instance
+- **Preload hints:** A page emits `<link rel="modulepreload">` in `<head>` for every component module it loads and every client-runtime asset its import map names. An import map declares where a bare specifier lives; it does not ask for it. Without the hints `/assets/vue-reactivity.js` is discovered only after a component module has been fetched **and parsed** — a three-deep request chain on the critical path, where every hop is a round trip. The hints name only what **this** page loads, never the build-wide set, and never a module reached through a dynamic `import()` (spec.md §5.3 `$lazy`), which by definition is not part of the first visit
 - **Images:** Optimized variants are written to `dist/images/_optimized/` with content-hash-suffixed filenames for caching
 - **Fonts:** Copied verbatim from `public/`
 
@@ -2303,6 +2304,21 @@ Two cache rules, and the reasoning is the whole design.
   either immutable is a year-long cache-poisoning bug visible only to visitors who came before the
   edit. Content-hashing those filenames is the prerequisite, not a config flag.
 
+**Which hosts read it.** `_headers` is a Cloudflare/Netlify convention, not a web standard.
+**Cloudflare Pages, Cloudflare Workers assets and Netlify** read it; **GitHub Pages and most other
+plain static hosts ignore it entirely** and serve their own `Cache-Control` — 10 minutes, in GitHub
+Pages' case, applied to everything including the content-addressed images the file marks immutable
+for a year. The build cannot know where a `dist/` is going, so it says what it can:
+
+- Under the `node` or `bun` adapter, which serves no static assets at all, the build warns that the
+  file is documentation rather than configuration — apply the headers at the reverse proxy.
+- With no adapter and a `public/CNAME` — GitHub Pages' custom-domain marker, and nothing else's —
+  the build warns that the file will be ignored.
+- Otherwise a verbose-only note names the hosts that read it.
+
+The warnings exist because the failure is silent in the worst way: the build writes a caching policy,
+reports success, and the site ships with none.
+
 **Ordering.** The file is written _after_ the `public/` copy, like the `robots.txt` edit — but it
 **prepends** rather than appends. On both Cloudflare Pages and Netlify a later matching rule wins
 for a duplicate header name, so a hand-authored `public/_headers` has to come last to override, and
@@ -2654,6 +2670,7 @@ This spec builds on existing Jx primitives wherever possible:
 
 ## Changelog
 
+- **0.6.0-draft** (2026-08-26) — §12.4: component CSS inlined and modulepreload hints emitted; §14.3: name the hosts that read _headers, and warn when one will not.
 - **0.5.18-draft** (2026-08-26) — Standards evidence follows head-merger to @jxsuite/schema.
 - **0.5.17-draft** (2026-08-25) — §9.3: an editor whose host does not serve the site URL space MUST resolve references to the project files they name; §9.4: a parent-realm preview resolves in the same space, and an authored reference is not a file path.
 - **0.5.16-draft** (2026-08-19) — §13.5: a translation key may name its route's parameters, so a collection's URLs can be localized; §13.3: a ContentEntry lookup is scoped to the route's language and a locale directory is matched case-insensitively; §6.7: a localized collection publishes one feed per language.

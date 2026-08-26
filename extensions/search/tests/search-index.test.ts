@@ -74,8 +74,11 @@ describe("SearchIndex.emit", () => {
     expect(page.title).toBe("Site architecture");
     expect(page.description).toBe("How sites are built");
     expect(page.heading).toBe("");
-    expect(page.text).toContain("Sites are folders of pages.");
-    expect(page.text).toContain("Bundled sidecars land in /assets/.");
+    // The page document carries the preamble ONLY — the sections index the rest, and emitting both
+    // Stored the whole corpus twice.
+    expect(page.text).toBe("Sites are folders of pages.");
+    expect(page.text).not.toContain("File-based routes map to URLs.");
+    expect(page.text).not.toContain("Bundled sidecars land in /assets/.");
 
     const section = envelope.documents[1]!;
     expect(section.url).toBe("/docs/framework/site/#routing");
@@ -84,6 +87,28 @@ describe("SearchIndex.emit", () => {
 
     // Entries without a title fall back to their id.
     expect(envelope.documents[3]!.title).toBe("Install");
+    // An entry that produced no sections keeps its full text: nothing else would index it.
+    expect(envelope.documents[3]!.text).toBe("Install with bun install.");
+  });
+
+  test("the preamble and the sections partition the entry, losing no text", () => {
+    const files = SearchIndex.emit(SECTION, { projectConfig: {}, sections: sections() });
+    const envelope = JSON.parse(files[0]!.content) as SearchIndexEnvelope;
+    const entry = envelope.documents.filter((d) => d.id.startsWith("docs:framework/site"));
+
+    const indexed = entry
+      .map((d) => d.text)
+      .filter(Boolean)
+      .join(" ");
+    for (const sentence of [
+      "Sites are folders of pages.",
+      "File-based routes map to URLs.",
+      "Bundled sidecars land in /assets/.",
+    ]) {
+      expect(indexed).toContain(sentence);
+      // Exactly once across the whole entry — the duplication this replaced stored each twice.
+      expect(indexed.split(sentence)).toHaveLength(2);
+    }
   });
 
   test("honors trailingSlash never and a custom output path", () => {

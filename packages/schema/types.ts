@@ -171,6 +171,13 @@ export interface JxFunctionDef {
   $src?: string;
   /** Named export within `$src`; defaults to the state key. */
   $export?: string;
+  /**
+   * Load `$src` on first call rather than importing it with the module.
+   *
+   * The function returns a promise once lazy, so it may only be called — never bound as a computed
+   * value. Meant for code most visitors never reach.
+   */
+  $lazy?: boolean;
   /** Legacy alias for `parameters` (bare names only). */
   arguments?: string[];
   timing?: "compiler" | "server" | "client";
@@ -648,6 +655,13 @@ export interface ProjectConfig {
     deploy?: DeployConfig;
     sitemap?: boolean;
     headers?: HeadersConfig;
+    /**
+     * Minify emitted browser JavaScript. Defaults to true.
+     *
+     * Set false to ship readable bundles — debugging a deployed page, or diffing `dist/` where the
+     * two bundler backends agree on semantics but not on minified bytes.
+     */
+    minify?: boolean;
     [key: string]: unknown;
   };
   images?: ImageConfig;

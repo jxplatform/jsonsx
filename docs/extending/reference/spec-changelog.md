@@ -38,6 +38,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `compiler.md`
 
+- **0.4.0-draft** (2026-08-26) — Browser bundles are minified (§12); component CSS is inlined rather than linked (§8.2); image sizes derives from the container and variants stop at the configured ceiling (§7.2, §7.2.1).
 - **0.3.3-draft** (2026-08-26) — §8: the boolean-attribute rule is shared with the runtime rather than restated, and covers the enumerated family.
 - **0.3.2-draft** (2026-08-26) — Static output omits a false boolean attribute and emits a true one bare.
 - **0.3.1-draft** (2026-08-18) — §4.3: separate the emitted-JavaScript accessor form from the pointer grammar it lowers.
@@ -123,6 +124,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `extensions.md`
 
+- **0.4.0-draft** (2026-08-26) — §8.4: an emitter must not emit the same content twice — the search index carries page preamble plus sections, not the corpus twice.
 - **0.3.11-draft** (2026-08-25) — §8.5: record that a host which cannot execute extension code sees only content-section mounts.
 - **0.3.10-draft** (2026-08-20) — §5.1 records the first-party fragment $id shape, https://jxsuite.com/schema/ext/<extension>/<kind>/v<n>.
 - **0.3.9-draft** (2026-08-16) — §13.1 auth session cookies: __Host- prefix derived from the origin's scheme, rate limiting on everywhere, session lifetime stated, Partitioned never set. Closes gap:cookie-prefixes.
@@ -258,6 +260,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `site-architecture.md`
 
+- **0.6.0-draft** (2026-08-26) — §12.4: component CSS inlined and modulepreload hints emitted; §14.3: name the hosts that read _headers, and warn when one will not.
 - **0.5.18-draft** (2026-08-26) — Standards evidence follows head-merger to @jxsuite/schema.
 - **0.5.17-draft** (2026-08-25) — §9.3: an editor whose host does not serve the site URL space MUST resolve references to the project files they name; §9.4: a parent-realm preview resolves in the same space, and an authored reference is not a file path.
 - **0.5.16-draft** (2026-08-19) — §13.5: a translation key may name its route's parameters, so a collection's URLs can be localized; §13.3: a ContentEntry lookup is scoped to the route's language and a locale directory is matched case-insensitively; §6.7: a localized collection publishes one feed per language.
@@ -334,6 +337,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `spec.md`
 
+- **0.5.8-draft** (2026-08-26) — §5.3: $lazy on a $src Function defers the module to first call.
 - **0.5.7-draft** (2026-08-26) — §8.3: a boolean attribute value is emitted by family — presence for HTML boolean attributes, the written word for aria-* and the enumerated three.
 - **0.5.6-draft** (2026-08-25) — Clarify that the parentheses in an @(condition) style key belong to the query, so a bare media type emits without them (§9).
 - **0.5.5-draft** (2026-08-24) — 13.2 states that the runtime takes a prop from an instance only where the instance genuinely carries one — an own property or an attribute — because a state key colliding with a reflected DOM property otherwise reports an empty string and beats the component's declared default.

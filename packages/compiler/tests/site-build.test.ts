@@ -921,10 +921,12 @@ describe("buildSite — component CSS generation", () => {
     expect(css).toContain("my-button");
   });
 
-  it("injects component CSS link and JS script into page HTML", async () => {
+  it("inlines component CSS and injects the JS script into page HTML", async () => {
     await buildSite(COMP_TMP);
     const html = readFileSync(resolve(COMP_TMP, "dist/index.html"), "utf8");
-    expect(html).toContain('href="/components/my-button.css"');
+    expect(html).toContain("my-button {");
+    expect(html).toContain("display: inline-block");
+    expect(html).not.toContain('rel="stylesheet"');
     // Component JS is bundled as app.js or per-component module
     expect(html).toContain('src="./app.js"');
   });
@@ -2065,10 +2067,13 @@ describe("buildSite — static component optimization", () => {
   it("skips JS injection for fully static components", async () => {
     await buildSite(STATIC_TMP);
     const html = readFileSync(resolve(STATIC_TMP, "dist/index.html"), "utf8");
-    // CSS should still be injected
-    expect(html).toContain('href="/components/my-card.css"');
-    // JS should NOT be injected for fully static components
+    // CSS should still be injected — inlined into the head style block.
+    expect(html).toContain("my-card {");
+    expect(html).toContain("padding: 16px");
+    // JS should NOT be injected for fully static components, and neither should a preload hint for
+    // A module the page never loads.
     expect(html).not.toContain('src="/components/my-card.js"');
+    expect(html).not.toContain("modulepreload");
   });
 });
 

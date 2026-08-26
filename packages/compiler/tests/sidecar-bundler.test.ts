@@ -10,7 +10,7 @@
  */
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   bundleEntry,
@@ -232,7 +232,10 @@ describe("buildSite sidecar bundling + emit", () => {
       resolve(TMP, "dist/assets/components-demo-widget-helpers.js"),
       "utf8",
     );
-    expect(bundled).toContain("count += 1");
+    // Bundles are minified, so identifiers are renamed: assert the export name the importer binds
+    // To and the property access, both of which minification must preserve.
+    expect(bundled).toMatch(/as bump\b/);
+    expect(bundled).toContain(".count");
   });
 
   test("compiled component imports the /assets/ bundles, not the raw specifiers", () => {
@@ -252,7 +255,8 @@ describe("buildSite sidecar bundling + emit", () => {
     const appJs = readFileSync(resolve(TMP, "dist/app.js"), "utf8");
     expect(appJs).toContain("from '/assets/pages-page-helpers.js'");
     const bundled = readFileSync(resolve(TMP, "dist/assets/pages-page-helpers.js"), "utf8");
-    expect(bundled).toContain("state.who");
+    expect(bundled).toMatch(/as pgHelper\b/);
+    expect(bundled).toContain(".who");
   });
 
   test("$bundle hints from lowered defs register bundles without an importing document", () => {
@@ -508,5 +512,176 @@ describe("compiled element onMount/onUnmount", () => {
     const connectedAt = module.indexOf("connectedCallback()");
     const mountAt = module.indexOf("queueMicrotask(() => this.state.onMount");
     expect(mountAt).toBeGreaterThan(connectedAt);
+  });
+});
+
+// ─── Minification (compiler.md §12) ──────────────────────────────────────────
+
+describe("bundle minification", () => {
+  const SRC = `export function longNameNobodyShortens(someArgument) {
+  const anotherLocal = someArgument.value + 1;
+  return anotherLocal;
+}
+`;
+  const MIN_DIR = resolve(import.meta.dir, "__test-minify__");
+
+  beforeAll(() => {
+    rmSync(MIN_DIR, { force: true, recursive: true });
+    mkdirSync(MIN_DIR, { recursive: true });
+    writeFileSync(resolve(MIN_DIR, "entry.js"), SRC, "utf8");
+  });
+  afterAll(() => rmSync(MIN_DIR, { force: true, recursive: true }));
+
+  async function bundle(opts: Parameters<typeof bundleEntry>[1], name: string): Promise<string> {
+    const outfile = resolve(MIN_DIR, name);
+    await bundleEntry({ entryPath: resolve(MIN_DIR, "entry.js"), outfile }, opts);
+    return readFileSync(outfile, "utf8");
+  }
+
+  test("browser bundles are minified by default", async () => {
+    const out = await bundle({ target: "browser" }, "browser.js");
+    // The exported name is the contract and survives; locals do not.
+    expect(out).toMatch(/as longNameNobodyShortens\b/);
+    expect(out).not.toContain("anotherLocal");
+    expect(out).not.toContain("someArgument");
+  });
+
+  test("non-browser targets stay readable by default — output is read off a stack trace", async () => {
+    const out = await bundle({ target: "node" }, "node.js");
+    expect(out).toContain("anotherLocal");
+    expect(out).toContain("someArgument");
+  });
+
+  test("minify: false opts a browser bundle back out", async () => {
+    const out = await bundle({ minify: false, target: "browser" }, "browser-readable.js");
+    expect(out).toContain("anotherLocal");
+    expect(out).toContain("someArgument");
+  });
+
+  test("minify: true forces a non-browser target on", async () => {
+    const out = await bundle({ minify: true, target: "node" }, "node-min.js");
+    expect(out).not.toContain("anotherLocal");
+  });
+
+  test("build.minify: false reaches the bundler end to end", async () => {
+    // A copy of the fixture project, so the opt-out is proven through the real config path rather
+    // Than through the bundler API the tests above already cover.
+    const readable = resolve(import.meta.dir, "__test-minify-off__");
+    rmSync(readable, { force: true, recursive: true });
+    cpSync(TMP, readable, { recursive: true });
+    rmSync(resolve(readable, "dist"), { force: true, recursive: true });
+    writeFileSync(
+      resolve(readable, "project.json"),
+      JSON.stringify({ ...PROJECT, build: { ...PROJECT.build, minify: false } }, null, 2),
+      "utf8",
+    );
+    try {
+      await buildSite(readable, { clean: true, verbose: false });
+      const bundled = readFileSync(
+        resolve(readable, "dist/assets/components-demo-widget-helpers.js"),
+        "utf8",
+      );
+      expect(bundled).toContain("count += 1");
+    } finally {
+      rmSync(readable, { force: true, recursive: true });
+    }
+  });
+
+  test("buildSite minifies the sidecars it emits", () => {
+    // The default path the fixture project above already built: proves the wiring, not just the API.
+    const bundled = readFileSync(
+      resolve(TMP, "dist/assets/components-demo-widget-helpers.js"),
+      "utf8",
+    );
+    expect(bundled).not.toContain("count += 1");
+    expect(bundled).not.toMatch(/\n\n/);
+  });
+});
+
+// ─── Lazy $src (spec.md §5.3) ────────────────────────────────────────────────
+
+describe("$lazy $src", () => {
+  function lazyDoc(extra: Record<string, unknown> = {}): JxDocument {
+    return {
+      children: [{ tagName: "p", textContent: "x" }],
+      state: {
+        onMount: { $lazy: true, $prototype: "Function", $src: "/lib/search.js" },
+        ...extra,
+      },
+      tagName: "lazy-el",
+    } as unknown as JxDocument;
+  }
+
+  test("emits a memoized dynamic import instead of a static one", async () => {
+    const result = await compileElement(lazyDoc());
+    const module = result.files[0]!.content;
+    expect(module).not.toContain("import { onMount }");
+    expect(module).toContain("import('/lib/search.js')");
+    // Memoized: the second call reuses the first promise rather than re-entering the module graph.
+    expect(module).toMatch(/\?\?=\s*import\('\/lib\/search\.js'\)/);
+  });
+
+  test("the local binding keeps its name, so call sites are unchanged", async () => {
+    const result = await compileElement(lazyDoc());
+    const module = result.files[0]!.content;
+    expect(module).toContain("const onMount = (...args) =>");
+    expect(module).toContain("this.state.onMount(this.state)");
+  });
+
+  test("$export still selects the export, off the module namespace", async () => {
+    const doc = {
+      children: [{ tagName: "p", textContent: "x" }],
+      state: {
+        onMount: {
+          $export: "boot",
+          $lazy: true,
+          $prototype: "Function",
+          $src: "/lib/search.js",
+        },
+      },
+      tagName: "lazy-alias",
+    } as unknown as JxDocument;
+    const result = await compileElement(doc);
+    const module = result.files[0]!.content;
+    expect(module).toContain("m.boot(...args)");
+    expect(module).toContain("const onMount =");
+  });
+
+  test("two entries from one module share a single dynamic import", async () => {
+    const doc = {
+      children: [{ tagName: "p", textContent: "x" }],
+      state: {
+        onMount: { $lazy: true, $prototype: "Function", $src: "/lib/search.js" },
+        onUnmount: { $lazy: true, $prototype: "Function", $src: "/lib/search.js" },
+      },
+      tagName: "lazy-pair",
+    } as unknown as JxDocument;
+    const result = await compileElement(doc);
+    const module = result.files[0]!.content;
+    expect(module.match(/import\('\/lib\/search\.js'\)/g)).toHaveLength(1);
+    expect(module).toContain("const onMount =");
+    expect(module).toContain("const onUnmount =");
+  });
+
+  test("a static $src is still a static import — $lazy is opt-in", async () => {
+    const doc = {
+      children: [{ tagName: "p", textContent: "x" }],
+      state: { onMount: { $prototype: "Function", $src: "/lib/search.js" } },
+      tagName: "eager-el",
+    } as unknown as JxDocument;
+    const result = await compileElement(doc);
+    const module = result.files[0]!.content;
+    expect(module).toContain("import { onMount } from '/lib/search.js';");
+    expect(module).not.toContain("import('/lib/search.js')");
+  });
+
+  test("$lazy on a value-bound entry is a build error, not a promise in the DOM", async () => {
+    const doc = {
+      // `total` is bound as a value, so it classifies as a computed — which cannot await.
+      children: [{ tagName: "p", textContent: "${state.total}" }],
+      state: { total: { $lazy: true, $prototype: "Function", $src: "/lib/sum.js" } },
+      tagName: "lazy-computed",
+    } as unknown as JxDocument;
+    expect(compileElement(doc)).rejects.toThrow(/\$lazy/);
   });
 });

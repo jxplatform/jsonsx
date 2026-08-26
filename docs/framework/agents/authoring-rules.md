@@ -119,7 +119,8 @@ Only `tagName` is required. A `tagName` containing a hyphen makes the document a
 ```json
 "increment": { "$prototype": "Function", "body": "state.count++" },
 "handleInput": { "$prototype": "Function", "arguments": ["event"], "body": "state.value = event.target.value" },
-"validate": { "$prototype": "Function", "$src": "./validators.js", "$export": "validateEmail" }
+"validate": { "$prototype": "Function", "$src": "./validators.js", "$export": "validateEmail" },
+"openSearch": { "$prototype": "Function", "$src": "npm:@jxsuite/search/client", "$lazy": true }
 ```
 
 **5. Data source**: `$prototype: <ClassName>`:
@@ -377,10 +378,11 @@ Two rules bind all three. **Secrets are never values in `project.json`**: the fi
 6. `$defs` holds JSON Schema type definitions only: no functions, no defaults, no runtime artifacts.
 7. Template strings (`${}`) are pure expressions, with no statements and no assignments.
 8. Function `body` strings are raw JavaScript where `state` is in scope; a sidecar export takes `state` as its first parameter.
-9. `$head` entries are `{ tagName, attributes }` objects, never HTML strings.
-10. Layouts inject content with `{ "tagName": "slot" }`. There is no `$slot` or `$content`.
-11. All state entries are reactive by default; no `signal: true` flag exists.
-12. `timing` (`"compiler"`, `"server"`, `"client"`) decides where a data source resolves. `"client"` is the default.
+9. `"$lazy": true` on a `$src` Function loads the module on first call instead of importing it with the page. The function then returns a promise, so only use it for entries you **call** from a handler or lifecycle hook, never for one bound as a value; the compiler rejects the latter. Reach for it when the module is large and most visitors never trigger it.
+10. `$head` entries are `{ tagName, attributes }` objects, never HTML strings.
+11. Layouts inject content with `{ "tagName": "slot" }`. There is no `$slot` or `$content`.
+12. All state entries are reactive by default; no `signal: true` flag exists.
+13. `timing` (`"compiler"`, `"server"`, `"client"`) decides where a data source resolves. `"client"` is the default.
 
 ## Check your work
 
