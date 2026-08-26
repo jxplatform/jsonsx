@@ -10,7 +10,7 @@ code:
 
 # Breakpoints
 
-A breakpoint is a named screen-size condition — Tablet, Desktop — at which your design is allowed to change. In Design mode every breakpoint gets its own live canvas panel, labeled with its name and width, all showing the same page at once. The responsive rules evaluate for real in each panel, so you never wonder what the phone view looks like — it's right there next to the desktop one.
+A breakpoint is a named screen-size condition (Tablet, Desktop) at which your design is allowed to change. In Design mode every breakpoint gets its own live canvas panel, labeled with its name and width, all showing the same page at once. The responsive rules evaluate for real in each panel, so you never wonder what the phone view looks like. It's right there next to the desktop one.
 
 ![Jx Studio design canvas showing one component across four responsive breakpoints with a style inspector](../../images/mode-design.png)
 
@@ -18,12 +18,12 @@ A breakpoint is a named screen-size condition — Tablet, Desktop — at which y
 
 Styling always targets one breakpoint at a time. Two controls choose it, and they are the same setting:
 
-- The pane's **Context** control — its **Size** group lists **Base** plus one button per breakpoint.
-- The **panel headers** on the canvas — click a panel's header to make its breakpoint active.
+- The pane's **Context** control: its **Size** group lists **Base** plus one button per breakpoint.
+- The **panel headers** on the canvas: click a panel's header to make its breakpoint active.
 
-Pick **Base** to edit the styles that apply everywhere; pick a breakpoint to edit that screen size's overrides. Whichever you use, the [Style tab](/docs/studio/design/style-inspector)'s Target Line states the answer — `⌖ h1 · @Tablet` — so the breakpoint you're editing is on screen beside the fields you're editing it with.
+Pick **Base** to edit the styles that apply everywhere; pick a breakpoint to edit that screen size's overrides. Whichever you use, the [Style tab](/docs/studio/design/style-inspector)'s Target Line states the answer (`⌖ h1 · @Tablet`), so the breakpoint you're editing is on screen beside the fields you're editing it with.
 
-**In Edit mode the choice resizes the page.** Design shows every breakpoint at once, so there the Size group marks which panel is active. Edit shows one column, and the column becomes as wide as the breakpoint you picked — the same width Design gives that panel. The page is genuinely that narrow, so your own media queries fire and the layout reflows; it isn't a scaled-down picture. Writing at **Sm** and writing at **Base** are two real views of the same document.
+**In Edit mode the choice resizes the page.** Design shows every breakpoint at once, so there the Size group marks which panel is active. Edit shows one column, and the column becomes as wide as the breakpoint you picked, the same width Design gives that panel. The page is genuinely that narrow, so your own media queries fire and the layout reflows; it isn't a scaled-down picture. Writing at **Sm** and writing at **Base** are two real views of the same document.
 
 **Preview follows it too**, at that same width, so switching Preview on doesn't jump you back to a full-width page. With no breakpoint chosen, Preview fills the pane.
 
@@ -32,7 +32,7 @@ Pick **Base** to edit the styles that apply everywhere; pick a breakpoint to edi
 Base is the design; breakpoints are exceptions to it:
 
 1. Values set at **Base** apply at every size.
-2. On a breakpoint, everything inherited from earlier in the cascade shows as a dimmed placeholder — nothing is duplicated.
+2. On a breakpoint, everything inherited from earlier in the cascade shows as a dimmed placeholder. Nothing is duplicated.
 3. Every inherited value **names the breakpoint it came from**: the field's chip reads **from Base**, or **from Tablet**, and clicking it switches to that breakpoint so you can edit the value at its source.
 4. Set a value while a breakpoint is active and it becomes an override for that breakpoint only, marked with an accent dot.
 5. Click the dot to remove the override; the inherited value shows through again, and its chip says where from.
@@ -41,28 +41,28 @@ Breakpoints layer in the same order a browser applies their media queries, so wh
 
 ## Define your breakpoints
 
-Breakpoints are defined in one place: **Settings › Contexts**. Press :kbd[⌘K] and run **Open Settings** — or pick it from the **⬢ menu** in the Command Bar — then choose **Contexts** in the section list. From the canvas, the context bar's **Context** popover has a **Manage contexts…** button at the bottom that lands on the same section without losing your element selection.
+Breakpoints are defined in one place: **Settings › Contexts**. Press :kbd[⌘K] and run **Open Settings**, or pick it from the **⬢ menu** in the Command Bar, then choose **Contexts** in the section list. From the canvas, the context bar's **Context** popover has a **Manage contexts…** button at the bottom that lands on the same section without losing your element selection.
 
 The section holds three groups, because all three are the same thing on disk and only differ in what their condition asks about:
 
-- **Size breakpoints** — width conditions like `(max-width: 768px)`. These are the ones that get their own canvas panel.
-- **Colour schemes** — a Light/Dark picker that writes the `prefers-color-scheme` query for you, so a scheme can never be mistyped into something else.
-- **Feature queries** — anything else a media query can ask: reduced motion, print, hover, orientation. These appear as toggles in the **Context** popover rather than as canvas panels.
+- **Size breakpoints** are width conditions like `(max-width: 768px)`. These are the ones that get their own canvas panel.
+- **Colour schemes** give you a Light/Dark picker that writes the `prefers-color-scheme` query for you, so a scheme can never be mistyped into something else.
+- **Feature queries** cover anything else a media query can ask: reduced motion, print, hover, orientation. These appear as toggles in the **Context** popover rather than as canvas panels.
 
-Above them sits **Base width** — how wide the Base canvas panel renders when no other context applies.
+Above them sits **Base width**, which sets how wide the Base canvas panel renders when no other context applies.
 
-Name a context in plain language; Studio derives the stored name ("Wide screen" becomes `--wide-screen`). Every change is schema-checked and then written to `project.json`. If the schema refuses the value or the write fails, the reason appears under the control that caused it and the stored value stays as it was — a refused edit never looks like the field forgetting what you typed. Settings is a document like any other, so :kbd[⌘Z] takes a context change back.
+Name a context in plain language; Studio derives the stored name ("Wide screen" becomes `--wide-screen`). Every change is schema-checked and then written to `project.json`. If the schema refuses the value or the write fails, the reason appears under the control that caused it and the stored value stays as it was, so a refused edit never looks like the field forgetting what you typed. Settings is a document like any other, so :kbd[⌘Z] takes a context change back.
 
 Whatever you declare here is also what a [design token](/docs/studio/design/tokens) can carry a different value in: declare a Dark scheme and every color token gains a **Dark** row, declare a breakpoint and any token can be given a value at it.
 
-The same popover carries a **Language** control on a [multilingual project](/docs/studio/interface/languages), which sets the language the artboard renders in — its `lang` and direction, not which file is open.
+The same popover carries a **Language** control on a [multilingual project](/docs/studio/interface/languages), which sets the language the artboard renders in: its `lang` and direction, not which file is open.
 
-A colour scheme is what turns on the **Auto / Light / Dark** control in the context bar's **Context** popover. Auto follows your OS preference; Light and Dark force that scheme on the canvas — exactly what a visitor's [color-scheme switcher](/docs/framework/concepts/color-schemes) does on the published site. The control appears only once the project declares a scheme.
+A colour scheme is what turns on the **Auto / Light / Dark** control in the context bar's **Context** popover. Auto follows your OS preference; Light and Dark force that scheme on the canvas, exactly what a visitor's [color-scheme switcher](/docs/framework/concepts/color-schemes) does on the published site. The control appears only once the project declares a scheme.
 
-Forcing a scheme while the size is **Base** points your edits at that scheme's overrides, and the Target Line grows a segment to say so — `⌖ h1 · Base · Dark variant`. Base values show through as inherited, their chips reading **from Base**, and clicking one sets the control back to **Auto** so you can edit the value where it lives. A size breakpoint is always breakpoint-scoped: schemes and sizes don't compound into a single block.
+Forcing a scheme while the size is **Base** points your edits at that scheme's overrides, and the Target Line grows a segment to say so: `⌖ h1 · Base · Dark variant`. Base values show through as inherited, their chips reading **from Base**, and clicking one sets the control back to **Auto** so you can edit the value where it lives. A size breakpoint is always breakpoint-scoped: schemes and sizes don't compound into a single block.
 
 :::doc-note
-**Definition and selection are separate.** Settings › Contexts is the only place a context is created, renamed or deleted. The context bar's **Context** popover only _chooses_ among what is defined there, and the Style tab's Target Line only _states_ what was chosen — clicking its breakpoint segment takes you to Settings › Contexts rather than offering a third list to disagree with.
+**Definition and selection are separate.** Settings › Contexts is the only place a context is created, renamed or deleted. The context bar's **Context** popover only _chooses_ among what is defined there, and the Style tab's Target Line only _states_ what was chosen. Clicking its breakpoint segment takes you to Settings › Contexts rather than offering a third list to disagree with.
 
 Every choice in that popover is also a command, so you can make it without reaching for the mouse: press :kbd[⌘K] and run **Set Breakpoint**, **Set Color Scheme** or **Show Layout Elements**. Each one asks for the value it needs, and Set Breakpoint lists the breakpoints this page can actually render under if you name one it can't.
 :::
@@ -73,5 +73,5 @@ Breakpoints are stored as a `$media` map in `project.json`. A single document ma
 
 ## Next
 
-- See which breakpoint an edit lands in while you style — **[Style inspector](/docs/studio/design/style-inspector)**
-- Element defaults respond to breakpoints too — **[Project Styles](/docs/studio/design/stylebook)**
+- See which breakpoint an edit lands in while you style, with the **[Style inspector](/docs/studio/design/style-inspector)**.
+- Element defaults respond to breakpoints too, in **[Project Styles](/docs/studio/design/stylebook)**.

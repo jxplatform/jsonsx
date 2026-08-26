@@ -13,7 +13,7 @@ One `Y.Doc` per open file:
 
 | Root type            | Purpose                                                                                                                                     |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `source: Y.Text`     | **The authoritative file content.** Providers persist `getText("source").toString()` — nothing else.                                        |
+| `source: Y.Text`     | **The authoritative file content.** Providers persist `getText("source").toString()` and nothing else.                                      |
 | `structure: Y.Map`   | The `JxMutableNode` tree, projected by Studio. Only `children` nests (`Y.Array`); every other key is a plain-JSON value merged whole (LWW). |
 | `frontmatter: Y.Map` | Per-field plain-JSON values.                                                                                                                |
 | `meta: Y.Map`        | `schemaVersion`, `structureSeeded`, `canonical`, `canonicalRev`, `sourceFormat`.                                                            |
@@ -24,16 +24,16 @@ The CRDT granularity deliberately equals Studio's op-log granularity: mutators e
 **Seeding contract.** Providers seed only `source` from file bytes; they never parse or serialize
 Jx documents. Clients derive `structure` on first sync via `seedStructure()`, which is safe under
 concurrent seeders because it only performs whole-key `Y.Map` sets (per-key LWW keeps one seeder's
-subtrees wholesale — never array inserts, which would duplicate). A client's `Y.Doc` must start
-empty; never seed locally before the provider's sync completes.
+subtrees wholesale; it never uses array inserts, which would duplicate). A client's `Y.Doc` must
+start empty; never seed locally before the provider's sync completes.
 
 ## The op bridge
 
 - `applyDocOpsToY(doc, ops, origin)` replays Studio's recorded forward `JxDocOp`s onto the Y tree
   in one origin-tagged transaction (`LOCAL_ORIGIN` for user edits, `MIRROR_ORIGIN` for derived
   writes, `SEED_ORIGIN` for bootstraps).
-- `yEventsToDocOps(events)` converts a remote transaction's deep events back into `JxDocOp`s —
-  call it **inside** the `observeDeep` callback. It returns `null` for shapes it cannot convert
+- `yEventsToDocOps(events)` converts a remote transaction's deep events back into `JxDocOp`s.
+  Call it **inside** the `observeDeep` callback. It returns `null` for shapes it cannot convert
   safely; reconcile by diffing instead.
 - `diffDocs(a, b)` produces ops transforming `a` into `b` (invariant: `apply(clone(a), diff(a,b))
 ≡ b`); returns `null` past `maxOps`, in which case `replaceYStructure()` hard-replaces and bumps
@@ -68,19 +68,19 @@ one `error{read-only}`.
 ## Awareness (`./awareness-types`)
 
 One project-level `Awareness` per connection. State shape:
-`{ user: {login, name?, avatarUrl?, color}, focusedPath, mode?, structuralSelection?, selection? }` —
-file-tree presence (the plain `selection` field is the code view's in-buffer cursor)
-and per-document cursor overlays both filter the same states. Identity comes from the server
-`hello`; colors are deterministic (`colorForKey`).
+`{ user: {login, name?, avatarUrl?, color}, focusedPath, mode?, structuralSelection?, selection? }`.
+File-tree presence (the plain `selection` field is the code view's in-buffer cursor) and
+per-document cursor overlays both filter the same states. Identity comes from the server `hello`;
+colors are deterministic (`colorForKey`).
 
 ## Provider contract (`./provider`, type-only)
 
 `StudioPlatform.collab?: (docPath) => Promise<CollabHandle | null>` where a handle carries
 `{doc, awareness, whenSynced, identity(), flush(), onStatus(), onReset(), destroy()}`. `onReset`
-fires on a `doc-reset`: the handle is dead — destroy it and re-acquire.
+fires on a `doc-reset`: the handle is dead, so destroy it and re-acquire.
 
 ## Versioning
 
-Published to npm as `@jxsuite/collab` — TypeScript source, like every `@jxsuite`
-package, following the monorepo's release train. Within the monorepo, other
-packages (`@jxsuite/server`, `@jxsuite/studio`) depend on it via `workspace:^`.
+Published to npm as `@jxsuite/collab`, following the monorepo's release train. Like every `@jxsuite`
+package, it ships TypeScript source. Within the monorepo, other packages (`@jxsuite/server`,
+`@jxsuite/studio`) depend on it via `workspace:^`.

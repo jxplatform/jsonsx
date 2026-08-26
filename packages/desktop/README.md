@@ -19,12 +19,12 @@
 Just `bun install` at the repo root. Electrobun 2 builds through **Hutch**, its native build CLI,
 but nothing needs installing by hand: the `electrobun` devDependency is a dependency-free bootstrap
 whose version selects the whole toolchain. Its first command downloads the paired Hutch, verifies it
-against the release's published digest, and caches it under `~/.hutch` — so the Hutch, Cottontail
+against the release's published digest, and caches it under `~/.hutch`, so the Hutch, Cottontail
 and Electrobun versions all ride the workspace lockfile instead of a machine-wide install.
 
 The Electrobun SDK is not on npm either. It is projected out of the release archive into a
 generated, gitignored `.hutch/devkit` directory, which is where every `electrobun/*` import
-resolves from — and why there is no `electrobun` entry under `dependencies`. Builds project it
+resolves from, and why there is no `electrobun` entry under `dependencies`. Builds project it
 implicitly; a fresh clone needs `bun run sync` once before `bun run typecheck` will pass.
 
 ## Development
@@ -49,7 +49,7 @@ Electrobun webview  ←→  BrowserView RPC  ←→  Bun process (src/index.ts)
    (@jxsuite/studio)                          (filesystem, Git, packages)
 ```
 
-The Bun backend registers all RPC handlers at startup. Studio communicates with it through the [Platform Abstraction Layer](../studio/README.md) — the same interface used by `@jxsuite/server` in dev mode and cloud APIs in the future.
+The Bun backend registers all RPC handlers at startup. Studio communicates with it through the [Platform Abstraction Layer](../studio/README.md). That is the same interface `@jxsuite/server` uses in dev mode, and the one cloud APIs will use in the future.
 
 ### RPC categories
 
@@ -69,7 +69,7 @@ The Bun backend registers all RPC handlers at startup. Studio communicates with 
 | `dbus-ts`         | D-Bus integration (Linux) |
 
 Electrobun itself is deliberately absent: it is not an npm package here but a Hutch-managed product
-pinned in `hutch.config.ts` — see [Prerequisites](#prerequisites).
+pinned in `hutch.config.ts`. See [Prerequisites](#prerequisites).
 
 ## License
 

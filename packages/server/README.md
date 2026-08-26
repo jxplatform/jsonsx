@@ -26,19 +26,19 @@ await createDevServer({
 
 ## Endpoints
 
-### Live reload — `GET /__reload`
+### Live reload: `GET /__reload`
 
 SSE endpoint. `chokidar` watches the project root and pushes change events to connected browsers, triggering automatic page reload.
 
-### `$prototype`/`$src` proxy — `POST /__jx_resolve__`
+### `$prototype`/`$src` proxy: `POST /__jx_resolve__`
 
 Resolves external `$prototype` data sources server-side. Supports `.js` modules and `.class.json` schemas. Avoids browser CORS issues and enables Node.js-only dependencies (`fs`, `glob`, etc.).
 
-### Server functions — `POST /__jx_server__`
+### Server functions: `POST /__jx_server__`
 
 Executes `timing: "server"` function entries during development. The runtime sends `{ $src, $export, arguments }` and receives the return value as JSON.
 
-### Studio filesystem API — `/__studio/*`
+### Studio filesystem API: `/__studio/*`
 
 REST API for the Studio visual builder:
 
@@ -53,7 +53,7 @@ REST API for the Studio visual builder:
 
 All file operations are constrained to the project root (path traversal is rejected).
 
-### Code services — `/__studio/code/*`
+### Code services: `/__studio/code/*`
 
 OXC-powered tools for the Studio function body editor:
 

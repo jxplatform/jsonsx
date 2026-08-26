@@ -13,13 +13,13 @@ code:
 
 # Hosting the Studio assets
 
-[Writing a platform adapter](/docs/extending/embedding/platform-adapter) covers the half of embedding that answers Studio's questions. This page covers the other half: putting the editor on a screen. They are independent — you can serve the assets and reuse a stock adapter, or write an adapter and let the desktop app serve it.
+[Writing a platform adapter](/docs/extending/embedding/platform-adapter) covers the half of embedding that answers Studio's questions. This page covers the other half: putting the editor on a screen. They are independent: you can serve the assets and reuse a stock adapter, or write an adapter and let the desktop app serve it.
 
 `@jxsuite/studio` ships a tree whose parts already know how to find each other. The entry reaches its own chunks and workers, the bundle stylesheet reaches Monaco's icon font, and the chrome stylesheet reaches the vendored webfonts. Your job is to keep those relationships intact and tell Studio where the tree ended up.
 
 ## The manifest
 
-`@jxsuite/studio/hosting/layout` says what ships. It is pure — no filesystem, no DOM — so it reads the same from a Cloudflare Worker build, a Vite plugin, a Deno host or a Nix derivation.
+`@jxsuite/studio/hosting/layout` says what ships. It is pure (no filesystem, no DOM), so it reads the same from a Cloudflare Worker build, a Vite plugin, a Deno host or a Nix derivation.
 
 ```ts
 import { STUDIO_ASSETS } from "@jxsuite/studio/hosting/layout";
@@ -35,7 +35,7 @@ for (const asset of STUDIO_ASSETS) {
 If your build cannot import TypeScript at all, the same data is emitted as `dist/manifest.json`.
 
 :::doc-warning
-Do not write your own list. Every host that has done so has shipped an incomplete one — including this project's own desktop app, which for months omitted `dist/codicon.ttf` and drew empty boxes wherever Monaco draws an icon. Nothing errored, because a missing font is not an error.
+Do not write your own list. Every host that has done so has shipped an incomplete one, including this project's own desktop app, which for months omitted `dist/codicon.ttf` and drew empty boxes wherever Monaco draws an icon. Nothing errored, because a missing font is not an error.
 :::
 
 ## Two layouts, one rule
@@ -67,7 +67,7 @@ const { base } = await stageStudioAssets("./public/studio-assets", {
 });
 ```
 
-It returns the `base` it staged at — hand that straight to the document generator below, so the two cannot disagree about where the files went. It skips source maps by default (the chunk maps alone are about 24 MB), and it refuses rather than staging an incomplete tree, naming both the missing entry and what its absence costs.
+It returns the `base` it staged at. Hand that straight to the document generator below, so the two cannot disagree about where the files went. It skips source maps by default (the chunk maps alone are about 24 MB), and it refuses rather than staging an incomplete tree, naming both the missing entry and what its absence costs.
 
 This module is a convenience, and the only one that touches the filesystem. A host in another runtime reads the manifest and moves the bytes itself.
 
@@ -83,10 +83,10 @@ const editor = studioShellHtml({ base, boot: ["/my-platform-init.js"] });
 const canvas = await canvasDocument({ base });
 ```
 
-`studioShellHtml` emits the editor document with every asset reference rebased and the chrome stylesheets linked in cascade order. `canvasDocument` reads the package's canvas document and rebases its one entry reference — that document stays hand-authored, because the `<style>` block in it establishes the sizing container the canvas measures against and has to apply before the first paint.
+`studioShellHtml` emits the editor document with every asset reference rebased and the chrome stylesheets linked in cascade order. `canvasDocument` reads the package's canvas document and rebases its one entry reference. That document stays hand-authored, because the `<style>` block in it establishes the sizing container the canvas measures against and has to apply before the first paint.
 
 :::doc-note
-Serve the editor document for **every** path the editor lives at. If your editor URL contains the project — `/edit/:owner/:repo` — the document is served from a deep path, and any document-relative reference in it would resolve into the wrong directory. Generating it with an absolute `base` is what makes that a non-issue.
+Serve the editor document for **every** path the editor lives at. If your editor URL contains the project (`/edit/:owner/:repo`), the document is served from a deep path, and any document-relative reference in it would resolve into the wrong directory. Generating it with an absolute `base` is what makes that a non-issue.
 :::
 
 ## Where your adapter plugs in
@@ -98,7 +98,7 @@ Serve the editor document for **every** path the editor lives at. If your editor
 <script type="module" src="/studio-assets/dist/studio.js"></script>
 ```
 
-Your boot module registers the platform, exactly as [Writing a platform adapter](/docs/extending/embedding/platform-adapter) describes — and it must do so **synchronously, before its first `await`**. A module script with top-level `await` does not block a later `<script>` tag, and the Studio entry reads the global as it evaluates.
+Your boot module registers the platform, exactly as [Writing a platform adapter](/docs/extending/embedding/platform-adapter) describes. It must do so **synchronously, before its first `await`**. A module script with top-level `await` does not block a later `<script>` tag, and the Studio entry reads the global as it evaluates.
 
 ```ts
 // my-platform-init.ts
@@ -108,12 +108,12 @@ registerPlatform(createMyPlatform()); // first, before anything async
 
 ## Two things hosts get wrong
 
-**Serving the package's own `index.html` as well as your generated one.** If your generated editor lives at `/edit/*` and the package's copy is also reachable under your asset prefix, that second document boots Studio with the _default_ adapter — the dev-server one — which then fetches `/__studio/*` against your origin. Under a single-page-application fallback those fetches answer with your marketing page at HTTP 200, so nothing errors and nothing logs. Pass `exclude: ["document"]` to `stageStudioAssets` and generate both documents yourself.
+**Serving the package's own `index.html` as well as your generated one.** If your generated editor lives at `/edit/*` and the package's copy is also reachable under your asset prefix, that second document boots Studio with the _default_ adapter (the dev-server one), which then fetches `/__studio/*` against your origin. Under a single-page-application fallback those fetches answer with your marketing page at HTTP 200, so nothing errors and nothing logs. Pass `exclude: ["document"]` to `stageStudioAssets` and generate both documents yourself.
 
 **Resolving `canvasUrl` asynchronously without saying so.** If your adapter learns its canvas URL after `activate()`, set `canvasUrlDeferred: true` on it. Studio then waits instead of mounting the bundle-relative default into your shell's origin.
 
 ## Related
 
-- [Writing a platform adapter](/docs/extending/embedding/platform-adapter) — the interface your boot module registers
-- [The backend protocol](/docs/extending/embedding/backend-protocol) — what the stock adapters speak
-- [Embedding overview](/docs/extending/embedding) — which layer to implement
+- [Writing a platform adapter](/docs/extending/embedding/platform-adapter): the interface your boot module registers
+- [The backend protocol](/docs/extending/embedding/backend-protocol): what the stock adapters speak
+- [Embedding overview](/docs/extending/embedding): which layer to implement

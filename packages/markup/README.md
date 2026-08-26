@@ -2,16 +2,16 @@
 
 Browser-safe markup conversion utilities shared by the Jx core packages:
 
-- `@jxsuite/markup/html-to-jx` — `htmlToJx(html)` converts an HTML string into
+- `@jxsuite/markup/html-to-jx`: `htmlToJx(html)` converts an HTML string into
   an array of Jx tree nodes (`JxElement | string`), mapping attributes through
   `property-information` and inline `style` strings into style objects.
-- `@jxsuite/markup/md-html` — `markdownToHtml(markdown)` renders untrusted
+- `@jxsuite/markup/md-html`: `markdownToHtml(markdown)` renders untrusted
   markdown (GFM tables/strikethrough/task lists) to a **sanitized** HTML
-  string: raw HTML is dropped, event handlers and `javascript:` URLs are
+  string. Raw HTML is dropped, event handlers and `javascript:` URLs are
   stripped.
 
-Both pipelines are DOM-free and node-free — no `node:*` imports — so they are
-safe for any bundle target (Jx Studio, Cloudflare Workers, node/Bun CLIs).
+Both pipelines are DOM-free and node-free, with no `node:*` imports, so they
+are safe for any bundle target (Jx Studio, Cloudflare Workers, node/Bun CLIs).
 The package root re-exports both functions.
 
 ```ts
@@ -25,7 +25,7 @@ markdownToHtml("# Hi\n\n**bold**");
 ```
 
 For markdown → Jx _document_ transpilation (frontmatter, directives, Jx
-markdown), use `@jxsuite/parser` — this package deliberately stays a thin,
+markdown), use `@jxsuite/parser`. This package deliberately stays a thin,
 dependency-light conversion layer.
 
 ## Versioning

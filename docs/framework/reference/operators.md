@@ -8,7 +8,7 @@ generated: true
 
 # Operator reference
 
-Declarative expressions (`$expression`) admit a closed set of operators, enforced by the Jx schema. This page enumerates that set straight from `packages/schema/schema.json`. The expression model itself is documented in the [Framework concepts](/docs/framework/) section; named-formula composition is cataloged in the [formula catalog](/docs/framework/reference/formulas/).
+Declarative expressions (`$expression`) admit a closed set of operators, enforced by the Jx schema. This page enumerates that set straight from `packages/schema/schema.json`. The expression model itself is documented in the [Framework concepts](/docs/framework) section; named-formula composition is cataloged in the [formula catalog](/docs/framework/reference/formulas).
 
 ## Unary operators
 

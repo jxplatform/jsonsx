@@ -14,7 +14,7 @@ code:
 
 # Custom classes
 
-An extension's classes are ordinary Jx `.class.json` descriptors: JSON Schema 2020-12 documents that describe a class — its constructor parameters, fields, and methods — with an optional `$implementation` key pointing at the JavaScript module that implements it. Hosts read the descriptor to learn everything about the class; they import the implementation only to invoke it.
+An extension's classes are ordinary Jx `.class.json` descriptors: JSON Schema 2020-12 documents describing a class's constructor parameters, fields, and methods, plus an optional `$implementation` key pointing at the JavaScript module that implements it. Hosts read the descriptor to learn everything about the class; they import the implementation only to invoke it.
 
 Each class named in the [manifest](/docs/extending/extensions/anatomy)'s `classes` map becomes a `$prototype`-visible name in any project that enables the extension. A page can then use it as state with no `$src`:
 
@@ -70,23 +70,23 @@ The `$defs` object is organized into well-known categories:
 
 ## The external class contract
 
-Every class — extension-shipped or project-local — satisfies the same runtime contract:
+Every class, extension-shipped or project-local, satisfies the same runtime contract:
 
 - **Constructor** receives a single `config` object containing all `state` properties except the reserved keywords (`$prototype`, `$src`, `$export`, `timing`, `default`, `description`). For the state entry above, `config` is `{ src: "./content/about.md" }`.
 - **Value resolution** is checked in order: `instance.resolve()` (async, awaited) → `instance.value` (getter or property) → the instance itself.
 - **Reactivity is optional**: implement `subscribe(callback)` / `unsubscribe()` and the runtime re-renders when you notify.
 
-Methods declare their output shape with a JSON Schema in `returnType` (often a `$ref` into `$defs/returnTypes`). Tooling uses this to reason about a class without executing it — a `resolve` whose `returnType` is an array marks instances as valid sources for mapped iteration, so Studio offers the class in repeater pickers.
+Methods declare their output shape with a JSON Schema in `returnType` (often a `$ref` into `$defs/returnTypes`). Tooling uses this to reason about a class without executing it. A `resolve` whose `returnType` is an array marks instances as valid sources for mapped iteration, so Studio offers the class in repeater pickers.
 
 ## `$implementation`
 
 `$implementation` is resolved relative to the `.class.json` file and names the module exporting the class; the export is named by the descriptor's `title`. The parser ships TypeScript in `src/` and points `$implementation` at the built neighbor (`./markdown.js`).
 
-When `$implementation` is **absent**, the class is self-contained: the compiler generates an ES class from the schema itself — constructor (with `super()` support), private `#fields`, getters/setters, async methods, and the `extends` clause all come from the descriptor. This is how small classes ship with no JavaScript at all; structured `body` statements are covered in [Functions](/docs/framework/concepts/functions).
+When `$implementation` is **absent**, the class is self-contained: the compiler generates an ES class from the schema itself. Constructor (with `super()` support), private `#fields`, getters/setters, async methods, and the `extends` clause all come from the descriptor. This is how small classes ship with no JavaScript at all; structured `body` statements are covered in [Functions](/docs/framework/concepts/functions).
 
 ## Admission blocks
 
-A plain class with nothing but the contract above is a state prototype — construct, `resolve()`, done. A class additionally participates in **host dispatch** through one or more top-level admission blocks:
+A plain class with nothing but the contract above is a state prototype: construct, `resolve()`, done. A class additionally participates in **host dispatch** through one or more top-level admission blocks:
 
 | Block       | Grants                                                                                      | Covered in                                                      |
 | ----------- | ------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
@@ -99,7 +99,7 @@ A plain class with nothing but the contract above is a state prototype — const
 
 ## How hosts introspect
 
-Hosts follow a strict JSON-first contract — the registry (`buildExtensionRegistry()` in `@jxsuite/schema/extension-registry`) implements it once for node and browser hosts:
+Hosts follow a strict JSON-first contract, and the registry (`buildExtensionRegistry()` in `@jxsuite/schema/extension-registry`) implements it once for node and browser hosts:
 
 1. Resolve each `extensions` entry to a package root; read the manifest named by its `"jx"` field; read each listed `.class.json`.
 2. Detect participation via the admission blocks.
@@ -107,15 +107,15 @@ Hosts follow a strict JSON-first contract — the registry (`buildExtensionRegis
 4. To invoke: import `$implementation`, take the export named by the class `title`, call `Export[identifier](...args)`.
 5. Respect `timing`: if the host's environment is not listed, delegate to the dev server.
 
-Step 4 is the only point where extension code runs in a host. Everything Studio shows — settings forms, format icons, capability option UIs — comes from steps 1–3.
+Step 4 is the only point where extension code runs in a host. Everything Studio shows comes from steps 1–3: settings forms, format icons, capability option UIs.
 
 ## Capability methods
 
-Capabilities are the static methods step 3 discovers: `parse`, `load`, `projectData`, `mount`, `lower`, and the rest of the well-known roles. Their contract — timing, options-as-parameters, and the compile-away `lower` hook — is the subject of [Capability methods](/docs/extending/extensions/capabilities).
+Capabilities are the static methods step 3 discovers: `parse`, `load`, `projectData`, `mount`, `lower`, and the rest of the well-known roles. Their contract (timing, options-as-parameters, and the compile-away `lower` hook) is the subject of [Capability methods](/docs/extending/extensions/capabilities).
 
 ## Related
 
-- [Capability methods](/docs/extending/extensions/capabilities) — the static method contract in depth
-- [Custom formats](/docs/extending/extensions/formats) — the `format` admission block
-- [Data prototypes](/docs/framework/concepts/data-prototypes) — the built-in classes yours sit beside
-- [Tutorial: a TOML format extension](/docs/extending/extensions/tutorial-toml-format) — a full descriptor built from scratch
+- [Capability methods](/docs/extending/extensions/capabilities): the static method contract in depth
+- [Custom formats](/docs/extending/extensions/formats): the `format` admission block
+- [Data prototypes](/docs/framework/concepts/data-prototypes): the built-in classes yours sit beside
+- [Tutorial: a TOML format extension](/docs/extending/extensions/tutorial-toml-format): a full descriptor built from scratch

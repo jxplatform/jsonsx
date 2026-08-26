@@ -1,12 +1,12 @@
 # `@jxsuite/create`
 
-> Project scaffolder for Jx — the package behind `bun create @jxsuite`.
+> Project scaffolder for Jx, the package behind `bun create @jxsuite`.
 
 ## Overview
 
 `@jxsuite/create` turns an empty directory into a working Jx project. It is two things at once: an
 interactive CLI, and the library whose `generateProject()` is the single generation engine shared by
-every creation surface in the monorepo — the CLI imports it directly, and the dev server's Studio
+every creation surface in the monorepo. The CLI imports it directly, and the dev server's Studio
 API and the packaged desktop backend dynamic-import it (`packages/server/src/studio-api.ts`,
 `packages/desktop/src/project-session.ts`).
 
@@ -22,16 +22,16 @@ bun create @jxsuite <directory> [--template <id>]
 
 The first argument that is not part of `--template` is the destination directory; it is required (a
 bare invocation prints usage and exits 1). `--template <id>` and `--template=<id>` are both accepted,
-and no other flag is recognized — an unrecognized one is taken as the destination.
+and no other flag is recognized. An unrecognized one is taken as the destination.
 
-Prompts, in order — everything except the destination is asked interactively:
+Everything except the destination is asked interactively. The prompts, in order:
 
 | Prompt                                   | Default when blank                                    |
 | ---------------------------------------- | ----------------------------------------------------- |
 | `Project name (<dir>): `                 | basename of the destination directory                 |
 | `Description: `                          | `""`                                                  |
-| `Production URL (https://example.com): ` | `""` — `generateProject` writes `https://example.com` |
-| `Template [1]: `                         | Blank — skipped entirely when `--template` is given   |
+| `Production URL (https://example.com): ` | `""` (`generateProject` writes `https://example.com`) |
+| `Template [1]: `                         | Blank (skipped entirely when `--template` is given)   |
 | `Adapter [1]: `                          | `static`                                              |
 
 The template menu numbers the four built-in templates 1-4, then the starters from
@@ -42,7 +42,7 @@ default.
 ## Templates and starters
 
 Two disjoint id namespaces feed `--template`. A **built-in template id wins**; otherwise a starter id
-is matched; an id in neither namespace **silently falls back to blank** rather than erroring.
+is matched; an id in neither namespace **silently falls back to blank** instead of erroring.
 
 | Built-in id     | What it produces                                                                      |
 | --------------- | ------------------------------------------------------------------------------------- |
@@ -51,22 +51,22 @@ is matched; an id in neither namespace **silently falls back to blank** rather t
 | `mobile-first`  | Same files, mobile-first `$media` (min-width queries, 375px base)                     |
 | `mobile-app`    | Mobile-first `$media`, `viewport-fit=cover`, a `theme-color` meta, and a file overlay |
 
-`template/` (singular) is the shared skeleton copied on every non-starter scaffold — `gitignore` →
+`template/` (singular) is the shared skeleton copied on every non-starter scaffold: `gitignore` →
 `.gitignore`, `layouts/`, `pages/`. `templates/` (plural) holds per-template overlay trees copied
 **after** the skeleton with `force: true`, and today contains exactly one: `mobile-app/`, which
 replaces `layouts/base.json` with an app shell (bottom nav bar, safe-area insets) and
 `pages/index.md` with an app-flavored home page, and adds `pages/explore.md` and
 `pages/profile.md`. So `blank`, `desktop-first` and `mobile-first` differ only in the generated
-`project.json` — zero file differences. Breakpoint maps live in `templates.ts`
+`project.json` (zero file differences). Breakpoint maps live in `templates.ts`
 (`mediaForTemplate`).
 
-Starter ids come from [`@jxsuite/starters`](../starters/README.md) — its `registry.json` is the
+Starter ids come from [`@jxsuite/starters`](../starters/README.md). Its `registry.json` is the
 current list. A starter clone copies the starter tree verbatim except `node_modules`, `dist`,
 `.cache`, `.jx-cache`, `.git`, and `images.json`, then re-stamps `project.json` in place: `name`
 always, `url` only when non-empty, `build.adapter` only when the adapter is not `static`, and the
 `<meta name="description">` content only when a description was given. The starter's design tokens,
-content collections, image pipeline, and the rest of `$head` survive; its `package.json` does not —
-it is rebuilt from scratch (see below).
+content collections, image pipeline, and the rest of `$head` survive; its `package.json` does not,
+because it is rebuilt from scratch (see below).
 
 ## What gets generated
 
@@ -98,7 +98,7 @@ await generateProject("/abs/path/to/my-site", {
 });
 ```
 
-`design` (optional) applies a colors/fonts/logo/breakpoints quickstart on top of the scaffold — see
+`design` (optional) applies a colors/fonts/logo/breakpoints quickstart on top of the scaffold. See
 `DesignOptions` in `generate.ts`.
 
 | Export                                   | Description                                                                                   |
@@ -110,13 +110,13 @@ await generateProject("/abs/path/to/my-site", {
 
 `scaffold.ts` has **zero node imports** by design, so it runs in a browser and against a Git Data
 API. `@jxsuite/studio` imports `updateWranglerConfig` for its Cloudflare Pages publish flow, and
-`@jxsuite/compiler` imports `applyBindingFragments` for `jx db push` — adding `node:fs` there breaks
+`@jxsuite/compiler` imports `applyBindingFragments` for `jx db push`. Adding `node:fs` there breaks
 both. `isTemplateId` is used server-side as request validation: the Studio API rejects an unknown
 template with a 400 before generating.
 
 ## Dependency ranges
 
-Every `@jxsuite/*` range a scaffold emits — including a starter clone's rebuilt `package.json` —
+Every `@jxsuite/*` range a scaffold emits, including a starter clone's rebuilt `package.json`,
 comes from `template-versions.json`, never from a literal in code. A test asserts exactly that, so a
 future hardcoded range fails there.
 
@@ -130,16 +130,16 @@ that were never published, so `bun install` in a fresh scaffold could not resolv
 
 ## Surprises worth knowing
 
-- **Generation refuses a non-empty destination** — `Directory "<path>" is not empty`. An existing but
-  empty directory is fine.
+- **Generation refuses a non-empty destination.** It throws `Directory "<path>" is not empty`. An
+  existing but empty directory is fine.
 - **`$schema` points at a file this package does not write.** `project.schema.json` comes from
   `jx schema` (specs/extensions.md §5.2), so a fresh scaffold has a dangling reference until that
   runs.
-- **A starter's `package.json` is rebuilt, not copied** — anything its manifest declared beyond
+- **A starter's `package.json` is rebuilt, not copied.** Anything its manifest declared beyond
   name/scripts/deps is lost by design.
 - **The design quickstart is best-effort on a starter**: an override only lands on a key the
   starter's style already declares, and `--color-primary-hover` is deliberately left alone. Two of
-  them fall back rather than give up — `text` and `bodyFont` try `--color-text-primary` and
+  them fall back rather than give up: `text` and `bodyFont` try `--color-text-primary` and
   `--font-body` first, then the plain `color` / `fontFamily` keys. On a blank scaffold values are
   written directly. A non-empty `design.media` replaces `$media` wholesale;
   an empty one is treated as absent.
@@ -169,7 +169,7 @@ Per-file coverage thresholds live in `packages/create/bunfig.toml`.
 ## Docs
 
 User-facing documentation for this surface is `docs/framework/build/cli.md`, whose `code:`
-frontmatter already lists `index.ts`, `cli-args.ts`, `templates.ts` and `generate.ts` — a behavior
+frontmatter already lists `index.ts`, `cli-args.ts`, `templates.ts` and `generate.ts`. A behavior
 change here trips `bun run docs:sync`.
 
 ## License

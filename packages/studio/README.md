@@ -6,7 +6,7 @@
 
 Jx Studio is a browser-based visual IDE for Jx applications. It renders a live canvas via `@jxsuite/runtime`, provides a layer tree for structural editing, an inspector for property/style/state management, and a Monaco-powered code editor for function bodies. The UI is built with [Adobe Spectrum Web Components](https://opensource.adobe.com/spectrum-web-components/).
 
-At the site level, Studio acts as a CMS — providing a project explorer, content collection browser, schema-driven entry editors, and media management.
+At the site level, Studio acts as a CMS. It provides a project explorer, content collection browser, schema-driven entry editors, and media management.
 
 ## Development usage
 
@@ -72,10 +72,10 @@ createStudio(document.getElementById("root"));
 
 ## Design principles
 
-1. **JSON is the source of truth** — Studio reads and writes `.json` files directly.
-2. **Canvas is the runtime** — Preview renders via `@jxsuite/runtime`, pixel-identical to production.
-3. **Zero lock-in** — Studio edits produce standard Jx files that any editor can open.
-4. **Self-hosting** — Studio is itself a Jx application.
+1. **JSON is the source of truth.** Studio reads and writes `.json` files directly.
+2. **Canvas is the runtime.** Preview renders via `@jxsuite/runtime`, pixel-identical to production.
+3. **Zero lock-in.** Studio edits produce standard Jx files that any editor can open.
+4. **Self-hosting.** Studio is itself a Jx application.
 
 ## License
 
