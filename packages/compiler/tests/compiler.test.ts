@@ -252,7 +252,7 @@ describe("compile — static nodes", () => {
   });
 
   /*
-   * A boolean is the attribute's PRESENCE, not its text (compiler spec §6). `data-flag="false"`
+   * A boolean is the attribute's PRESENCE, not its text (compiler spec §8). `data-flag="false"`
    * would read as present to every HTML boolean attribute, so the emitter spells absence with
    * `false` and presence with a bare name.
    */
