@@ -1,15 +1,15 @@
 # Jx Sites
 
-First-party Jx projects that are neither published packages nor user-facing templates. Each subdirectory is a real Jx project — a `project.json` plus JSON/Markdown documents, laid out per [specs/site-architecture.md](../specs/site-architecture.md) §2 — consumed by this repo's own tooling rather than by users. `scripts/check-dep-rules.ts` classifies `sites/*` as **leaf apps** ("exempt consumers, like user projects"), so the core/extension dependency rules of [specs/extensions.md](../specs/extensions.md) §2 do not apply here; nothing in the monorepo imports code out of this directory.
+First-party Jx projects that are neither published packages nor user-facing templates. Each subdirectory is a real Jx project (a `project.json` plus JSON/Markdown documents, laid out per [specs/site-architecture.md](../specs/site-architecture.md) §2) consumed by this repo's own tooling rather than by users. `scripts/check-dep-rules.ts` classifies `sites/*` as **leaf apps** ("exempt consumers, like user projects"), so the core/extension dependency rules of [specs/extensions.md](../specs/extensions.md) §2 do not apply here; nothing in the monorepo imports code out of this directory.
 
 | Site                           | Purpose                                                                                  |
 | ------------------------------ | ---------------------------------------------------------------------------------------- |
-| [`jxsuite.com`](./jxsuite.com) | The public marketing + docs site, built by Jx itself — the monorepo's dogfooding surface |
+| [`jxsuite.com`](./jxsuite.com) | The public marketing + docs site, built by Jx itself (the monorepo's dogfooding surface) |
 | [`test-blank`](./test-blank)   | A deliberately minimal fixture site: Studio's default AI-eval canvas, never shipped      |
 
 ## jxsuite.com
 
-The only Bun workspace member here (`@jxsuite/site-jxsuite.com`, private). Edit it as Jx content — JSON documents and Markdown with parser directives — not as TypeScript. Its `project.json` enables `@jxsuite/parser` and `@jxsuite/search`, sources the repo's own [`../../docs`](../docs/README.md) tree as a content collection ([specs/site-architecture.md](../specs/site-architecture.md) §6) with `../../docs/nav.json` alongside it, renders every docs entry from the single dynamic route `pages/docs/[...slug].json` (the `/docs/` landing page itself is the static `pages/docs/index.json`), and republishes the canonical Jx JSON Schemas at stable `/schema/**` URLs via `copy`.
+The only Bun workspace member here (`@jxsuite/site-jxsuite.com`, private). Edit it as Jx content, not as TypeScript. That means JSON documents and Markdown with parser directives. Its `project.json` enables `@jxsuite/parser` and `@jxsuite/search`, sources the repo's own [`../../docs`](../docs/README.md) tree as a content collection ([specs/site-architecture.md](../specs/site-architecture.md) §6) with `../../docs/nav.json` alongside it, renders every docs entry from the single dynamic route `pages/docs/[...slug].json` (the `/docs/` landing page itself is the static `pages/docs/index.json`), and republishes the canonical Jx JSON Schemas at stable `/schema/**` URLs via `copy`.
 
 ```sh
 bun run generate:schema && bun run build:parser && bun run build:compiler
@@ -48,7 +48,7 @@ Deployment is [.github/workflows/deploy-site.yml](../.github/workflows/deploy-si
 | Command                     | Enforces                                                                              |
 | --------------------------- | ------------------------------------------------------------------------------------- |
 | bun run docs:claims         | Marketing copy, download links, starter counts and card slugs, screenshot references  |
-| bun run docs:check          | Docs `code:` frontmatter resolves — several pages name files in `jxsuite.com` by path |
+| bun run docs:check          | Docs `code:` frontmatter resolves (several pages name files in `jxsuite.com` by path) |
 | bun run schema:validate-all | Every project root here validates end-to-end against its composed schema              |
 | bun run schema:verify       | Every committed schema matches its generator (`schema:sync` fixes; CI pushes the fix) |
 
@@ -58,14 +58,14 @@ Deployment is [.github/workflows/deploy-site.yml](../.github/workflows/deploy-si
 
 - **No site here is in the CI coverage matrix.** `scripts/lib/workspaces.ts` restricts
   `WORKSPACE_ROOTS` to `packages` and `extensions`, and no site here has a `bunfig.toml`, so CLAUDE.md's per-file coverage ratchet does not reach here. `jxsuite.com/tests/placeholder.test.js` exists only so `bun run test:workspaces` does not fail on a workspace with a `test` script and no test file.
-- **`test-blank` is not a workspace member** despite the `sites/*` glob in the root `package.json` — it
+- **`test-blank` is not a workspace member** despite the `sites/*` glob in the root `package.json`. It
   has no `package.json` at all, and no entry in `bun.lock`.
 - **Editing pages triggers zero test workspaces.** `scripts/ci/affected.ts` lists `sites/**` under
   `NO_TESTS`; only a change to a `project.json` or anywhere under `test-blank/` seeds `packages/studio`, via an `EXTRA_EDGES` entry whose cited evidence files are `existsSync`-asserted by the `changes` job that builds the matrix. The claims and docs gates live in the ungated `checks` job and still run.
 - **Core-package changes do not redeploy the site.** `deploy-site.yml` fires only on pushes to `main`
   touching `sites/jxsuite.com/**`, `docs/**`, or `scripts/docs/**`; a schema, compiler, or runtime change that alters rendered output needs a manual `workflow_dispatch`.
 - **`bunx jx build` runs the prebuilt compiler** (`packages/compiler/bin/jx.js` → `../dist/cli.js`).
-  Building locally without `bun run build:compiler` first silently uses stale compiler output. The extensions are exempt — `@jxsuite/parser` and `@jxsuite/search` export `./src/*.ts` directly.
+  Building locally without `bun run build:compiler` first silently uses stale compiler output. The extensions are exempt because `@jxsuite/parser` and `@jxsuite/search` export `./src/*.ts` directly.
 - **Renaming a file named in docs `code:` frontmatter reds `bun run docs:check`**:
   `jxsuite.com/components/site-search.json`, `jxsuite.com/project.json`, and `jxsuite.com/project.schema.json` are named in the `code:` frontmatter of [docs/framework/site/search.md](../docs/framework/site/search.md), [docs/framework/agents/machine-readable.md](../docs/framework/agents/machine-readable.md), and [docs/extending/extensions/schema-composition.md](../docs/extending/extensions/schema-composition.md).
 - **`jxsuite.com/concept_homepage.md` is not scanned.** It sits outside `pages/`, so the claims gate

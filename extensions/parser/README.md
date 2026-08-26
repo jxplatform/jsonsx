@@ -1,6 +1,6 @@
 # `@jxsuite/parser`
 
-> Content & Markdown extension for Jx — file-based content collections with Markdown and CSV formats.
+> Content & Markdown extension for Jx: file-based content collections with Markdown and CSV formats.
 
 ## Overview
 
@@ -23,7 +23,7 @@ Built on the [`unified`](https://unifiedjs.com/) / remark ecosystem.
 bun add @jxsuite/parser
 ```
 
-Registration is manifest-based — add the package to `project.json`:
+Registration is manifest-based. Add the package to `project.json`:
 
 ```json
 {
@@ -31,7 +31,7 @@ Registration is manifest-based — add the package to `project.json`:
 }
 ```
 
-That one entry registers the `.md`/`.csv` formats, the `content` project section, and the classes: `$prototype: "ContentEntry"` (etc.) resolves by name through the project's extension registry — no `$src` or imports wiring. There are no implicit defaults: a project without the extension supports only `.json` documents.
+That one entry registers the `.md`/`.csv` formats, the `content` project section, and the classes: `$prototype: "ContentEntry"` (etc.) resolves by name through the project's extension registry, with no `$src` or imports wiring. There are no implicit defaults: a project without the extension supports only `.json` documents.
 
 ## Content collections
 
@@ -79,10 +79,10 @@ Query them from any page or component:
 
 One class carries every format capability:
 
-- **static `parse`** — Jx Markdown source → Jx document (browser-safe; Studio opens `.md` files with it)
-- **static `serialize`** — Jx document → markdown, `roundtrip` (lossless, default) or `export` (lossy clean markdown)
-- **static `discover` / `load`** — compile-time content access: frontmatter → `data`, source preserved as `body`, parsed `$children`, and `_meta` (excerpt, toc, reading time, word count)
-- **instance `resolve`** — runtime on-demand access for a `$prototype: "Markdown"` state entry
+- **static `parse`**: Jx Markdown source → Jx document (browser-safe; Studio opens `.md` files with it)
+- **static `serialize`**: Jx document → markdown, `roundtrip` (lossless, default) or `export` (lossy clean markdown)
+- **static `discover` / `load`** give compile-time content access: frontmatter → `data`, source preserved as `body`, parsed `$children`, and `_meta` (excerpt, toc, reading time, word count)
+- **instance `resolve`**: runtime on-demand access for a `$prototype: "Markdown"` state entry
 
 ```json
 {
@@ -107,7 +107,7 @@ One class carries every format capability:
 
 ### Directives
 
-`:::name{attrs}` container syntax converts directly to Jx element nodes — `:::my-card{title="Hello"}` becomes a `my-card` element with its attributes routed to the right Jx locations (props, `$`-annotations, styles). Capitalized directives (e.g. `:::Array`) become tagName-less `$prototype` nodes. A content type's `$elements` list declares which components its entries may use.
+`:::name{attrs}` container syntax converts directly to Jx element nodes. `:::my-card{title="Hello"}` becomes a `my-card` element with its attributes routed to the right Jx locations (props, `$`-annotations, styles). Capitalized directives (e.g. `:::Array`) become tagName-less `$prototype` nodes. A content type's `$elements` list declares which components its entries may use.
 
 ## `Csv`
 

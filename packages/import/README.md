@@ -52,7 +52,7 @@ const result = await importSite(
 ```
 
 Lower-level building blocks (capture, style diffing, crawling, layout detection, componentization,
-emit, verify) are exported from the package root — see `src/index.ts`.
+emit, verify) are exported from the package root. See `src/index.ts`.
 
 Verification (`verify` option / `--verify`) additionally needs `@jxsuite/compiler` (an optional
 dependency) to build the emitted project before screenshot-diffing it.
