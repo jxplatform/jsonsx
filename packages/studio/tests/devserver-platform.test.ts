@@ -808,16 +808,14 @@ describe("packages", () => {
     expect(await p.dependenciesNeedInstall!()).toBe(false);
   });
 
-  test("outdatedPackages returns the list, or [] on failure", async () => {
-    route("/__studio/packages/outdated", () =>
+  test("packageVersions returns the list, or [] on failure", async () => {
+    route("/__studio/packages/versions", () =>
       json([{ current: "^1.0.0", latest: "2.0.0", name: "a" }]),
     );
     const p = createDevServerPlatform();
-    expect(await p.outdatedPackages!()).toEqual([
-      { current: "^1.0.0", latest: "2.0.0", name: "a" },
-    ]);
-    route("/__studio/packages/outdated", () => json({}, 500));
-    expect(await p.outdatedPackages!()).toEqual([]);
+    expect(await p.packageVersions!()).toEqual([{ current: "^1.0.0", latest: "2.0.0", name: "a" }]);
+    route("/__studio/packages/versions", () => json({}, 500));
+    expect(await p.packageVersions!()).toEqual([]);
   });
 
   test("setPackageVersions posts the updates, returning the result or a failure log", async () => {

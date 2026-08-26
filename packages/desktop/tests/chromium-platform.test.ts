@@ -48,7 +48,7 @@ const responses: Record<string, unknown> = {
   listPackages: [{ name: "lodash", version: "^4.0.0" }],
   dependenciesNeedInstall: true,
   installDependencies: { ok: true },
-  outdatedPackages: [{ current: "^4.0.0", latest: "4.17.21", name: "lodash" }],
+  packageVersions: [{ current: "^4.0.0", latest: "4.17.21", name: "lodash" }],
   setPackageVersions: { ok: true },
   locateFile: "found/file.json",
   openProject: {
@@ -675,8 +675,8 @@ describe("chromium desktop platform", () => {
     expect(await platform.dependenciesNeedInstall!()).toBe(true);
   });
 
-  test("outdatedPackages returns the outdated list", async () => {
-    const out = await platform.outdatedPackages!();
+  test("packageVersions returns each dependency's latest", async () => {
+    const out = await platform.packageVersions!();
     expect(out).toEqual([{ current: "^4.0.0", latest: "4.17.21", name: "lodash" }]);
   });
 

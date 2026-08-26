@@ -82,7 +82,7 @@ const TWO_DEPS = {
     { dev: true, name: "@jxsuite/compiler", version: "^0.19.0" },
     { name: "hono", version: "^4.0.0" },
   ],
-  outdatedPackages: async () => [{ current: "^4.0.0", latest: "4.6.0", name: "hono" }],
+  packageVersions: async () => [{ current: "^4.0.0", latest: "4.6.0", name: "hono" }],
 };
 
 describe("dependencies editor gaps", () => {
@@ -98,10 +98,10 @@ describe("dependencies editor gaps", () => {
     expect(c.querySelector(".about-muted")?.textContent).toContain("No dependencies");
   });
 
-  test("outdatedPackages failure keeps the table without latest versions", async () => {
+  test("packageVersions failure keeps the table without latest versions", async () => {
     installMockPlatform({
       listPackages: TWO_DEPS.listPackages,
-      outdatedPackages: async () => {
+      packageVersions: async () => {
         throw new Error("registry unreachable");
       },
     });
@@ -110,9 +110,11 @@ describe("dependencies editor gaps", () => {
     await flush();
     const rows = [...c.querySelectorAll("sp-table-row")];
     expect(rows).toHaveLength(2);
-    // Hono has no registry latest; only the embedded-version @jxsuite update remains.
+    // The rows still list; with no registry answer every Latest cell reads — and nothing is
+    // Offered as an update. A best-effort lookup that fails must not invent a target.
     const cells = [...c.querySelectorAll("sp-table-row sp-table-cell")];
     expect(cells.some((cell) => cell.textContent?.includes("4.6.0"))).toBe(false);
+    expect(c.querySelector('sp-action-button[title^="Update to"]')).toBeNull();
   });
 
   test("update, update all, and reinstall are no-ops without platform capabilities", async () => {
@@ -160,7 +162,7 @@ describe("dependencies editor gaps", () => {
         { name: "hono", version: "^4.0.0" },
         { name: "left-pad", version: "^1.3.0" },
       ],
-      outdatedPackages: async () => [{ current: "^4.0.0", latest: "4.6.0", name: "hono" }],
+      packageVersions: async () => [{ current: "^4.0.0", latest: "4.6.0", name: "hono" }],
       setPackageVersions: async (updates) => {
         received = updates;
         return { ok: false };
@@ -251,7 +253,7 @@ describe("dependencies editor gaps", () => {
 describe("jxsuite-update dismissal storage", () => {
   test("the prompt still shows when localStorage access throws (never remembered)", async () => {
     installMockPlatform({
-      outdatedPackages: async () => [
+      packageVersions: async () => [
         { current: "^0.1.0", latest: "0.4.0", name: "@jxsuite/runtime" },
       ],
       setPackageVersions: async () => ({ ok: true }),

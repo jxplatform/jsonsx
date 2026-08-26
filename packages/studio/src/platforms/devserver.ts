@@ -627,8 +627,8 @@ export function createDevServerPlatform() {
       return Boolean(data.needsInstall);
     },
 
-    async outdatedPackages() {
-      const res = await fetch("/__studio/packages/outdated");
+    async packageVersions() {
+      const res = await fetch("/__studio/packages/versions");
       if (!res.ok) {
         return [];
       }

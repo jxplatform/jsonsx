@@ -90,11 +90,12 @@ Reusable descriptions of a piece of data (an API response, a shared record type)
 
 ## Packages
 
-The npm packages your project uses, as a table of name, current version, and the latest available version:
+The npm packages your project uses, as a table of name, current version, and latest version:
 
+- **Latest** is that package's newest version on npm. Every row carries one, whether or not you're behind, and Jx's own packages are treated the same as any other. A row reads `—` only when there's no npm version to name: a local or workspace package, or a lookup npm didn't answer.
 - Type a package name and click **Add** to install one.
-- A refresh icon appears on any row with an update available; **Update all** takes every row to its latest at once.
-- **Reinstall** re-installs everything from scratch, the fix-it button if packages ever end up in a bad state.
+- A refresh icon appears on any row that's actually behind, and never on one you've pinned ahead of npm on purpose. **Update all** takes every behind row to its own latest at once.
+- **Reinstall** re-installs everything from scratch: the fix-it button if packages ever end up in a bad state.
 
 Adding packages and choosing which of their components your site uses is covered in **[Dependencies and imports](/docs/studio/projects/dependencies)**.
 

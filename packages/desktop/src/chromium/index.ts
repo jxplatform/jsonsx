@@ -67,7 +67,7 @@ import {
   dependenciesNeedInstall,
   installDependencies,
   listPackages,
-  outdatedPackages,
+  packageVersions,
   removePackage,
   setPackageVersions,
 } from "../packages";
@@ -261,7 +261,7 @@ export const handlers: Record<string, (params: unknown) => Promise<unknown>> = {
   listPackages: () => listPackages(),
   locateFile: (params) => locateFile(params as { name: string }),
   searchFiles: (params) => searchFiles(params as { query: string; extensions?: string[] }),
-  outdatedPackages: () => outdatedPackages(),
+  packageVersions: () => packageVersions(),
   setPackageVersions: (params) =>
     setPackageVersions(params as { updates: { name: string; version: string; dev?: boolean }[] }),
   openProject: () => openProject(),

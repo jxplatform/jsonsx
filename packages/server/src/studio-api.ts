@@ -28,7 +28,7 @@ import {
   bunExecutable,
   dependenciesNeedInstall,
   installDependencies,
-  outdatedPackages,
+  packageVersions,
   setPackageVersions,
 } from "./packages.ts";
 import type { ExtensionRegistry } from "@jxsuite/schema/extension-registry";
@@ -1046,12 +1046,12 @@ export async function handleStudioApi(
     return Response.json({ needsInstall: dependenciesNeedInstall(scanRoot) });
   }
 
-  // Dependencies with a newer version available
-  if (path === "/__studio/packages/outdated" && req.method === "GET") {
+  // The newest published version of each dependency (whether or not it is behind)
+  if (path === "/__studio/packages/versions" && req.method === "GET") {
     try {
       const dir = url.searchParams.get("dir") || activeProjectRoot || root;
       const scanRoot = isAbsolute(dir) ? dir : resolve(root, dir);
-      return Response.json(await outdatedPackages(scanRoot));
+      return Response.json(await packageVersions(scanRoot));
     } catch (error) {
       return problem("internalError", errorMessage(error));
     }
