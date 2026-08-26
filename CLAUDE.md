@@ -83,55 +83,112 @@ No secret is involved. On a Dependabot event `secrets.*` resolves against the se
 
 ## Releases, and the two ways one silently does not happen
 
-release-please owns every version, tag, changelog and npm publish (`release-please-config.json`, `.release-please-manifest.json`, `.github/workflows/release-please.yml`). Both of its failure modes exit 0, which is why each now has a gate.
+release-please owns every version, tag, changelog and npm publish (`release-please-config.json`,
+`.release-please-manifest.json`, `.github/workflows/release-please.yml`). Both of its failure modes
+exit 0, which is why each now has a gate.
 
 ### A raw `<tag>` in a commit subject deletes that package from its own release
 
-release-please writes the release pull request body with changelog text HTML-escaped, then on merge parses that body and **re-serialises it** (`PullRequestBody.parse(...).toString()`) before parsing it a second time in `buildRelease()`. The round trip DECODES the entities, so `&lt;picture&gt;` comes back as a live `<picture>` element; node-html-parser then swallows the `</details>` that should have closed the section, the component is no longer found in the parsed release data, and release-please logs `Pull request contains releases, but not for component: <name>` and skips it — no tag, no GitHub release, no npm publish, green run.
+release-please writes the release pull request body with changelog text HTML-escaped, then on merge
+parses that body and **re-serialises it** (`PullRequestBody.parse(...).toString()`) before parsing
+it a second time in `buildRelease()`. The round trip DECODES the entities, so `&lt;picture&gt;`
+comes back as a live `<picture>` element; node-html-parser then swallows the `</details>` that
+should have closed the section, the component is no longer found in the parsed release data, and
+release-please logs `Pull request contains releases, but not for component: <name>` and skips it —
+no tag, no GitHub release, no npm publish, green run.
 
-`feat(compiler): responsive images — <picture> per format…` did exactly that: `schema` and `starters` fell out of three consecutive releases, and `@jxsuite/starters` sat at 1.2.2 on npm while `@jxsuite/create@1.3.2` shipped depending on `^1.5.0`, so `npm install @jxsuite/create` was unresolvable. The bug is upstream and still present in release-please 17.11.1, so the defence is to keep the text out of the changelog. **Backticks do not help** — the escaping happens on raw text.
+`feat(compiler): responsive images — <picture> per format…` did exactly that: `schema` and
+`starters` fell out of three consecutive releases, and `@jxsuite/starters` sat at 1.2.2 on npm while
+`@jxsuite/create@1.3.2` shipped depending on `^1.5.0`, so `npm install @jxsuite/create` was
+unresolvable. The bug is upstream and still present in release-please 17.11.1, so the defence is to
+keep the text out of the changelog. **Backticks do not help** — the escaping happens on raw text.
 
 - The rule and the full write-up live in `commitlint.config.js` (`changelog-safe-angle-brackets`).
 - `.husky/commit-msg` applies it as you commit; `checks` runs
-  `bun scripts/check-changelog-safety.ts` over the pull request's commits, because a hook is skippable with `--no-verify` and that is how the subject landed.
+  `bun scripts/check-changelog-safety.ts` over the pull request's commits, because a hook is
+  skippable with `--no-verify` and that is how the subject landed.
 - Only the **subject** and `BREAKING CHANGE:` notes are judged — nothing else reaches a changelog,
   so a commit body may still contain markup.
 
 ### A crashed `release-please` job disables the whole pipeline on the re-run
 
-The job creates the GitHub releases first and builds the next pull request second. If it dies in between — a GitHub 5xx during its commit-history walk, which an un-tagged component provokes by forcing a 500-commit backfill — the releases exist but the run failed. **Re-running it is not idempotent in the way that matters**: the pull request is already labelled `autorelease: tagged`, so `releases_created` comes back `false` and `publish`, all four desktop bundlers, `nix-build` and `deploy-site` all skip. That is how `desktop-v2.2.0` shipped with no installers.
+The job creates the GitHub releases first and builds the next pull request second. If it dies in
+between — a GitHub 5xx during its commit-history walk, which an un-tagged component provokes by
+forcing a 500-commit backfill — the releases exist but the run failed. **Re-running it is not
+idempotent in the way that matters**: the pull request is already labelled `autorelease: tagged`, so
+`releases_created` comes back `false` and `publish`, all four desktop bundlers, `nix-build` and
+`deploy-site` all skip. That is how `desktop-v2.2.0` shipped with no installers.
 
-`verify-release-integrity` is the answer: `if: always()`, gated on nothing, it asserts every version in `.release-please-manifest.json` has a GitHub release at its tag and — for publishable workspaces — that exact version on npm (`bun run release:integrity`, `--no-npm` to skip the registry). It fails the run and opens ONE `release-incomplete` issue. Nothing `needs:` it, so a red X there blocks nothing else. The daily schedule on the workflow makes it a standing sweep.
+`verify-release-integrity` is the answer: `if: always()`, gated on nothing, it asserts every version
+in `.release-please-manifest.json` has a GitHub release at its tag and — for publishable
+workspaces — that exact version on npm (`bun run release:integrity`, `--no-npm` to skip the
+registry). It fails the run and opens ONE `release-incomplete` issue. Nothing `needs:` it, so a red
+X there blocks nothing else. The daily schedule on the workflow makes it a standing sweep.
 
-To backfill npm after a skip, `publish.yml` has a `workflow_dispatch` entry point and is idempotent — the failure report prints the exact `gh workflow run` invocation.
+To backfill npm after a skip, `publish.yml` has a `workflow_dispatch` entry point and is
+idempotent — the failure report prints the exact `gh workflow run` invocation.
 
 ## Starter Roots and the Shadowed Core
 
-Iterating a starter inside Studio runs `bun install` in that starter's root, and a starter pins **published** `@jxsuite/*` versions because it is a template a user scaffolds from. The install therefore materialises a real `@jxsuite/schema` beside a workspace that is far ahead of it, and anything resolving from that root reads the published copy. This silently produced a starter entry schema narrower than the starter's own content for six weeks.
+Iterating a starter inside Studio runs `bun install` in that starter's root, and a starter pins
+**published** `@jxsuite/*` versions because it is a template a user scaffolds from. The install
+therefore materialises a real `@jxsuite/schema` beside a workspace that is far ahead of it, and
+anything resolving from that root reads the published copy. This silently produced a starter entry
+schema narrower than the starter's own content for six weeks.
 
 - **`bun run schema:generate-all` cleans first** (`schema:clean-roots` →
-  `scripts/check-shadowed-core.ts --fix`). It removes only `node_modules/@jxsuite/*` and the stray lockfile; third-party dependencies stay, because the install is what makes the starter preview. A workspace **symlink** is never removed — that is `examples/`, a workspace member, and it is the correct answer.
+  `scripts/check-shadowed-core.ts --fix`). It removes only `node_modules/@jxsuite/*` and the stray
+  lockfile; third-party dependencies stay, because the install is what makes the starter preview.
+  A workspace **symlink** is never removed — that is `examples/`, a workspace member, and it is the
+  correct answer.
 - **Never put the cleanup in a starter's `package.json`.** `@jxsuite/starters` publishes `sites/`,
-  so those manifests ship to users; a `postinstall` there would delete the dependencies they just installed. The monorepo has the workspace being shadowed, so the monorepo owns the cleanup.
+  so those manifests ship to users; a `postinstall` there would delete the dependencies they just
+  installed. The monorepo has the workspace being shadowed, so the monorepo owns the cleanup.
 - `packages/compiler`'s schema loader is independently hermetic — a first-party `*.json` schema
-  resolves from the host or throws — so schema composition is safe regardless. The cleanup defends everything else that resolves normally.
+  resolves from the host or throws — so schema composition is safe regardless. The cleanup defends
+  everything else that resolves normally.
 - `bun run schema:verify` proves the committed core **and** all 52 per-project entry documents match
-  their generators. `schema:validate-all` answers a different question (documents against schemas) and cannot see a stale schema.
+  their generators. `schema:validate-all` answers a different question (documents against schemas)
+  and cannot see a stale schema.
 
 ## Stale schemas fix themselves
 
-Every committed schema in this repository is a build output — the seven core artifacts `bun run generate:schema` writes under `packages/schema/`, and the `project.schema.json` / `document.schema.json` pair `bun run schema:generate-all` composes into each of the 26 project roots. They are committed because editors, `jx validate` and every published `@jxsuite/schema` consumer read them off disk, not because anybody authors them. So the policy is the screenshot policy: **a generator produces the bytes, and you review the meaning.**
+Every committed schema in this repository is a build output — the seven core artifacts
+`bun run generate:schema` writes under `packages/schema/`, and the `project.schema.json` /
+`document.schema.json` pair `bun run schema:generate-all` composes into each of the 26 project
+roots. They are committed because editors, `jx validate` and every published `@jxsuite/schema`
+consumer read them off disk, not because anybody authors them. So the policy is the screenshot
+policy: **a generator produces the bytes, and you review the meaning.**
 
 - **`bun run schema:verify` is the gate** (`scripts/check-schema-freshness.ts`), and
-  **`bun run schema:sync` is the fixer.** The gate regenerates, reports drift as the JSON Pointers that moved, and puts the working tree back exactly as it found it; `--fix` leaves the result on disk. Never hand-edit a committed schema — the fix belongs in the generator or the source it reads.
+  **`bun run schema:sync` is the fixer.** The gate regenerates, reports drift as the JSON Pointers
+  that moved, and puts the working tree back exactly as it found it; `--fix` leaves the result on
+  disk. Never hand-edit a committed schema — the fix belongs in the generator or the source it
+  reads.
 - **The file set is DERIVED, not listed.** It is every tracked `*schema.json`. The gate this
-  replaced was a shell one-liner whose two `git diff` pathspecs were each narrower than the generator they followed: it regenerated all seven core artifacts and looked at ONE, so a stale `class-schema.json`, `project-schema.json` or `schemas/project.core.schema.json` passed green. Verified by stamping a marker into `class-schema.json` and watching the old `schema:verify` exit 0.
+  replaced was a shell one-liner whose two `git diff` pathspecs were each narrower than the
+  generator they followed: it regenerated all seven core artifacts and looked at ONE, so a stale
+  `class-schema.json`, `project-schema.json` or `schemas/project.core.schema.json` passed green.
+  Verified by stamping a marker into `class-schema.json` and watching the old `schema:verify`
+  exit 0.
 - **`.github/workflows/schemas.yml` backfills it**, exactly as `screenshots.yml` does for pictures:
-  it regenerates on every pull request, pushes the result to the branch, and posts one comment saying which pointers moved. Four things differ from that lane deliberately — no `paths:` filter (the whole job is under 30 seconds), Dependabot is **not** excluded (a `@webref/*` bump rewrites the core schema by construction, and there is no human on that branch), no `github.actor` refusal (the generators are deterministic, so the run its own push triggers pushes nothing — termination is a fixed point, not a guard), and a changed schema is **not** neutral, because a contract change is exactly the kind of thing a reviewer must read.
+  it regenerates on every pull request, pushes the result to the branch, and posts one comment
+  saying which pointers moved. Four things differ from that lane deliberately — no `paths:` filter
+  (the whole job is under 30 seconds), Dependabot is **not** excluded (a `@webref/*` bump rewrites
+  the core schema by construction, and there is no human on that branch), no `github.actor` refusal
+  (the generators are deterministic, so the run its own push triggers pushes nothing — termination
+  is a fixed point, not a guard), and a changed schema is **not** neutral, because a contract change
+  is exactly the kind of thing a reviewer must read.
 - **The trunk leg is not decoration.** Two branches can each be green alone and stale together: one
-  moves the core, the other adds or regenerates a project root before it lands. Git merges that without a conflict, no per-branch check can see it, and `main` is stale from the second merge onward. `main` requires a pull request, so the lane opens one on a single reused `chore/schema-drift` branch. When the report says _nothing in this diff explains it_, that is what happened.
+  moves the core, the other adds or regenerates a project root before it lands. Git merges that
+  without a conflict, no per-branch check can see it, and `main` is stale from the second merge
+  onward. `main` requires a pull request, so the lane opens one on a single reused
+  `chore/schema-drift` branch. When the report says _nothing in this diff explains it_, that is
+  what happened.
 - **`schema:verify` stays a hard red X in `checks`** even though the lane fixes the same drift. The
-  lane cannot push to a fork, and a required check is what keeps a stale schema off `main` when it cannot. The red X naming the problem and the lane fixing it is the intended sequence, not a duplicate.
+  lane cannot push to a fork, and a required check is what keeps a stale schema off `main` when it
+  cannot. The red X naming the problem and the lane fixing it is the intended sequence, not a
+  duplicate.
 
 ## Specs & User-Documentation Policy
 

@@ -86,10 +86,10 @@ A short list has more than one cause, and the Library distinguishes them instead
 
 - **Scanning the project…** — the scan is still running. Nothing is claimed yet.
 - **This project has no files yet** — the scan finished and found nothing. The fix is **New**.
-- **No files match "hero" in Content** — your filter matched nothing, with the project's total beside it and a **Clear filters** button.
+- **No files match “hero” in Content** — your filter matched nothing, with the project's total beside it and a **Clear filters** button.
 - **Nothing to show, and the scan did not finish** — Studio could not read one or more of your project's directories, so the list is incomplete rather than empty. It offers **Retry**.
 
-That last one also shows up as a banner above a partial list ("This list is incomplete — 1 directory could not be read") and as a Problem in the bottom dock naming the directory and the error, with the same retry attached. A scan slow enough to look like a hang gets an **Activity** row while it runs. See **[Problems and progress](/docs/studio/interface/problems-and-progress)**.
+That last one also shows up as a banner above a partial list (“This list is incomplete — 1 directory could not be read”) and as a Problem in the bottom dock naming the directory and the error, with the same retry attached. A scan slow enough to look like a hang gets an **Activity** row while it runs. See **[Problems and progress](/docs/studio/interface/problems-and-progress)**.
 
 :::doc-warning
 An unreadable directory and an empty one mean very different things — one is a project you have not filled in yet, the other is a listing you should not trust. If you see the incomplete banner, fix the directory (or press **Retry**) before concluding a file is missing.

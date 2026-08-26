@@ -62,7 +62,7 @@ Inside a project, prefer the generated local copies over the network: `jx schema
 
 ## Project structure
 
-```text
+```
 my-site/
   project.json       # Required. Site config, global styles, collections, build settings
   pages/             # File-based routing. Each file = a route. [slug].json = dynamic
@@ -394,7 +394,7 @@ jx build      # only once validate is clean
 
 `jx validate` prints one block per failing file:
 
-```text
+```
 pages/about.json:
   - /children/0: must NOT have additional properties
 ```

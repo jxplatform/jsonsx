@@ -57,7 +57,7 @@ Closing a document with unsaved changes asks first, and the question has three a
 Undo and redo are per document as well: each keeps its own history, so :kbd[⌘Z] in one never unwinds work in another.
 
 :::doc-note
-Saving writes the file in place, in your project folder — plain Markdown, JSON, or CSV. Nothing is held in a database; what you save is what git sees. See [Publish](/docs/studio/publish).
+Saving writes the file in place, in your project folder — plain Markdown, JSON, or CSV. Nothing is held in a database; what you save is what git sees. See [Git & publish](/docs/studio/publish).
 :::
 
 ## Each document remembers its view

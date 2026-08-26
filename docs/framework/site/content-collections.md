@@ -14,7 +14,7 @@ code:
 
 # Content collections
 
-> **Studio writes this format for you** — the [content-type builder](/docs/studio/projects/content-types) edits the `content` section visually, and entries show up in [The Library](/docs/studio/projects/browse) with schema-driven forms.
+> **Studio writes this format for you** — the [content-type builder](/docs/studio/projects/content-types) edits the `content` section visually, and entries show up in [Browse your project](/docs/studio/projects/browse) with schema-driven forms.
 
 Content collections are the data layer for content-driven sites: they turn folders of Markdown, JSON, or CSV files into typed, queryable data with JSON Schema validation. Each collection is a **content type**, declared in the `content` section of `project.json`.
 
@@ -169,7 +169,7 @@ Date-times are converted to UTC because otherwise they don't sort: `2025-03-04T0
 
 You can write a `Date` from YAML, a full RFC 3339 timestamp, or a bare `YYYY-MM-DD`. Anything else is left exactly as you wrote it and reported as a warning naming the entry and field:
 
-```text
+```
 Content dates: "blog/my-post" field "pubDate" is "03/04/2025", which is not an
 unambiguous date. Write it as YYYY-MM-DD — a form like "03/04/2025" means two
 different days depending on who reads it, so it is left as authored rather than guessed.

@@ -89,7 +89,7 @@ For bigger moves, drag the **⠿** handle — which appears on any row you hover
 
 Right-clicking a row opens the same context menu as the canvas — **Copy**, **Duplicate**, **Copy styles**, **Wrap in Div**, **Repeat...**, **Convert to Component**, **Delete**, and more. The full list is in **[The canvas](/docs/studio/interface/canvas)**. **Set Title** in that menu starts the same rename as double-clicking.
 
-In **Project Styles** the Outline panel switches to the element catalog instead of the document tree — see **[Project Styles](/docs/studio/design/stylebook)**.
+In **Stylebook** the Outline panel switches to the element catalog instead of the document tree — see **[Stylebook](/docs/studio/design/stylebook)**.
 
 ## Next
 

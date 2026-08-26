@@ -71,7 +71,7 @@ In compiled sites the def lowers to plain client code that lazily loads the bund
 
 ### On a multilingual site
 
-A collection kept [one directory per locale](/docs/framework/site/i18n#content-in-one-directory-per-locale) is indexed once per language, and the search box **searches the page's own language** with no configuration — it reads `<html lang>`, which the build wrote from the route's locale. Results link into that language's URL space.
+A collection kept [one directory per locale](./i18n.md#content-in-one-directory-per-locale) is indexed once per language, and the search box **searches the page's own language** with no configuration — it reads `<html lang>`, which the build wrote from the route's locale. Results link into that language's URL space.
 
 Set `locale` to override it: a tag to search one named language, or `null` to search every one.
 

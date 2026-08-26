@@ -25,11 +25,11 @@ The auth extension's section class, `extensions/auth/src/Auth.class.json`, decla
 "server": { "basePath": "/_jx/auth", "order": 10, "module": "@jxsuite/auth/worker" }
 ```
 
-| Key        | Meaning                                                                                                |
-| ---------- | ------------------------------------------------------------------------------------------------------ |
-| `basePath` | The route subtree this mount owns. Must be under `/_jx/`. Conflicts are a registry error.              |
-| `order`    | Mount order (ascending). Earlier mounts run first and may populate the shared context.                 |
-| `module`   | Bare specifier the generated worker imports, which survives bundling; falls back to `$implementation`. |
+| Key        | Meaning                                                                                               |
+| ---------- | ----------------------------------------------------------------------------------------------------- |
+| `basePath` | The route subtree this mount owns. Must be under `/_jx/`. Conflicts are a registry error.             |
+| `order`    | Mount order (ascending). Earlier mounts run first and may populate the shared context.                |
+| `module`   | Bare specifier the generated worker imports (robust under bundlers); falls back to `$implementation`. |
 
 Every mount lives under `/_jx/` — the reserved subtree for extension routes on a running site — and each `basePath` has exactly one owner. Two extensions claiming the same subtree fail the registry build instead of shadowing each other.
 
@@ -93,7 +93,7 @@ The first-party extensions demonstrate the choreography: the auth mount (order 1
 
 The connector's data mount is the canonical consumer, serving the wire contract every table rides on:
 
-```text
+```
 GET    /_jx/data/:table        ?filter=<json>&sort=<json>&limit=&offset=&include=
 GET    /_jx/data/:table/:id
 POST   /_jx/data/:table
@@ -109,7 +109,7 @@ The dev server constructs mounts the same way the generated worker does, so `jx 
 
 Connector classes declare a `deploySchema` capability to sync tables ([Connectors](/docs/extending/extensions/connectors)). A **non-connector** [project-section class](/docs/extending/extensions/project-sections) may declare one too, letting its section contribute steps to the schema push (`jx db push`, the Studio push button). The signature differs — there is no single connection definition to hand over:
 
-```text
+```
 deploySchema(sectionValue, projectConfig, { env, dryRun?, connection?, connectors? })
   → { steps, applied, warnings, connection }
 ```

@@ -34,7 +34,7 @@ A condition node swaps what renders in one spot based on a value — a wizard st
 - **Cases** — one row per case. Edit a case's key in place to rename it, click **→** to select that case and edit what it renders, or click the accent dot on its label to remove it. **+ Add case** adds another.
 
 :::doc-note
-Studio has no gesture for creating a condition node yet. Add one in the **[Code editor](/docs/studio/logic/code)** — the format is described in **[Switching](/docs/framework/concepts/switching)** — and the Logic tab edits it from then on.
+Studio has no gesture for creating a condition node yet. Add one in **[Code mode](/docs/studio/logic/code)** — the format is described in **[Switching](/docs/framework/concepts/switching)** — and the Logic tab edits it from then on.
 :::
 
 ## Events
@@ -64,7 +64,7 @@ Handlers can read from the event that triggered them. In expression and statemen
 - `event#/target/value` — what the visitor has typed into the field. The classic `oninput` pattern is one step: set `$searchText` to `event#/target/value`.
 - `event#/detail` — the data a component sent along when it dispatched a custom event.
 
-An `event#/` reference can point at any property of the event — `event#/key` for the pressed key, for example — by writing the reference in the **[Code editor](/docs/studio/logic/code)**; the pickers offer the two common ones.
+An `event#/` reference can point at any property of the event — `event#/key` for the pressed key, for example — by writing the reference in **[Code mode](/docs/studio/logic/code)**; the pickers offer the two common ones.
 
 ### Component events
 

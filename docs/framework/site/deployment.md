@@ -22,7 +22,7 @@ Run it from the project root (or pass the root as an argument). `--verbose` prin
 
 Everything lands in one directory:
 
-```text
+```
 dist/
 ├── index.html                # One HTML file per route
 ├── about/index.html
@@ -44,7 +44,7 @@ Pages only load JavaScript for components that actually need it — a fully stat
 
 The build writes `dist/_headers` because cacheability is something only the build can decide — it chose the filenames, so it is the only party that knows which of them contain a content hash:
 
-```text
+```
 /*
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
@@ -89,7 +89,7 @@ Also off by default, and also on purpose. Turn it on with one line:
 
 The build then derives the policy from the pages it just produced:
 
-```text
+```
 Content-Security-Policy: base-uri 'self'; default-src 'self'; font-src 'self'; form-action 'self';
   frame-ancestors 'self'; frame-src 'self'; img-src 'self' data:; object-src 'none';
   script-src 'self' 'sha256-…' 'sha256-…'; style-src 'self' 'unsafe-inline'

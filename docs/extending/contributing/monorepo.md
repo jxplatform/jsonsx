@@ -16,7 +16,7 @@ The Jx monorepo ([github.com/jxsuite/jx](https://github.com/jxsuite/jx)) is a Bu
 - `extensions/` — extension packages built on the public hooks: parser (Markdown/CSV formats and content), connector (databases), auth, search, feed.
 - `specs/` — the numbered specifications. These are the living source of truth: consult and update them **before** implementing a feature.
 - `sites/` — real sites built with Jx, including jxsuite.com.
-- `docs/` — this documentation (see [Contributing to these docs](/docs/extending/contributing/docs)).
+- `docs/` — this documentation (see [Contributing to these docs](/docs/extending/contributing/docs/)).
 
 ## Everyday commands
 
@@ -79,31 +79,60 @@ Three things make a schema go stale, and only one of them is forgetting to run t
 
 ## Releases, branches, and template versions
 
-Versions are release-please's job. Every publishable workspace is a component in `release-please-config.json` with a matching `.release-please-manifest.json` entry, and both lists are **derived-checked** by `scripts/release-config.test.ts` — a package that is publishable but unlisted is never versioned, tagged or published, and nothing else in the pipeline can notice. Two extensions sat in exactly that state before the check existed.
+Versions are release-please's job. Every publishable workspace is a component in
+`release-please-config.json` with a matching `.release-please-manifest.json` entry, and both lists
+are **derived-checked** by `scripts/release-config.test.ts` — a package that is publishable but
+unlisted is never versioned, tagged or published, and nothing else in the pipeline can notice. Two
+extensions sat in exactly that state before the check existed.
 
 Two branches:
 
 - **`main`** is the trunk. Every PR targets it, and it is the tip of development.
 - **`release`** holds only released code. CI fast-forwards it to each `desktop-v*` release commit,
-  but only after that release's installers are attached and `nix build` succeeds at the tag. It is what a NixOS user pins (`nix run github:jxsuite/jx/release`), so it must never point at a tree that does not build. Nothing pushes to it by hand.
+  but only after that release's installers are attached and `nix build` succeeds at the tag. It is
+  what a NixOS user pins (`nix run github:jxsuite/jx/release`), so it must never point at a tree
+  that does not build. Nothing pushes to it by hand.
 
-  The release builds the flake on **two** architectures. Only the x86_64 leg gates the branch; the aarch64 leg is advisory, because it had never been built before and a failure there must not strand the users who do have a working architecture. Promoting it is a one-line change to `advance-release-branch`'s `needs`, and it should happen once arm has been green for a few releases.
+  The release builds the flake on **two** architectures. Only the x86_64 leg gates the branch; the
+  aarch64 leg is advisory, because it had never been built before and a failure there must not
+  strand the users who do have a working architecture. Promoting it is a one-line change to
+  `advance-release-branch`'s `needs`, and it should happen once arm has been green for a few
+  releases.
 
-  **`release` is also what jxsuite.com serves.** The site deploys from the released tree rather than from the trunk, so the documentation a visitor reads always describes the app they can actually download. The trade is deliberate and worth knowing before you write docs: a page merged to `main` is not public until the desktop component next releases. Pull requests and `main` still build the site — breakage surfaces when you cause it, not on release day — they just publish nothing. To ship documentation ahead of a release, dispatch **Deploy jxsuite.com** manually with `ref: main`.
+  **`release` is also what jxsuite.com serves.** The site deploys from the released tree rather than
+  from the trunk, so the documentation a visitor reads always describes the app they can actually
+  download. The trade is deliberate and worth knowing before you write docs: a page merged to
+  `main` is not public until the desktop component next releases. Pull requests and `main` still
+  build the site — breakage surfaces when you cause it, not on release day — they just publish
+  nothing. To ship documentation ahead of a release, dispatch **Deploy jxsuite.com** manually with
+  `ref: main`.
 
-  Neither the release deploy nor the `release` push is triggered by watching the branch. CI moves `release` with a plain `GITHUB_TOKEN` push, and pushes made with that token do not start workflows — so `deploy-site.yml` is a `workflow_call` that release-please invokes, exactly like the npm publish and the desktop bundlers. An `on: push: branches: [release]` trigger would look correct and never fire once.
+  Neither the release deploy nor the `release` push is triggered by watching the branch. CI moves
+  `release` with a plain `GITHUB_TOKEN` push, and pushes made with that token do not start
+  workflows — so `deploy-site.yml` is a `workflow_call` that release-please invokes, exactly like
+  the npm publish and the desktop bundlers. An `on: push: branches: [release]` trigger would look
+  correct and never fire once.
 
 ### Template dependency ranges are generated
 
-Two places ship `@jxsuite/*` version ranges to people outside this repo, and neither is a workspace, so `bun install` never resolves them:
+Two places ship `@jxsuite/*` version ranges to people outside this repo, and neither is a workspace,
+so `bun install` never resolves them:
 
 - `packages/starters/sites/*/package.json` — `@jxsuite/starters` publishes `sites/`, so these are the
   ranges a scaffolded project installs, and the ones Studio installs when it iterates a starter.
 - `packages/create/template-versions.json` — the ranges `create` stamps into every project it
   generates, including starter clones, whose `package.json` it rebuilds from scratch.
 
-Both are **generated**. `bun run templates:check` blocks in CI; `bun run templates:sync` is the fixer. Never hand-edit `template-versions.json`.
+Both are **generated**. `bun run templates:check` blocks in CI; `bun run templates:sync` is the
+fixer. Never hand-edit `template-versions.json`.
 
-Keeping them current at release time is release-please's `extra-files`, which rewrites both surfaces **inside the release commit**, so the tree that gets published already carries the right ranges. A jsonpath addressing a scoped key must use the `[?(@property === '@jxsuite/x')]` filter form — the bracket form throws when a section exists without that key, which aborts the run and produces no release PR for any package. A test pins the spelling.
+Keeping them current at release time is release-please's `extra-files`, which rewrites both surfaces
+**inside the release commit**, so the tree that gets published already carries the right ranges.
+A jsonpath addressing a scoped key must use the `[?(@property === '@jxsuite/x')]` filter form — the
+bracket form throws when a section exists without that key, which aborts the run and produces no
+release PR for any package. A test pins the spelling.
 
-Left to drift, these ranges do more than annoy: a starter naming a version that was never published is one a user cannot install at all, and opening it in Studio raises a dependency-update dialog whose underlay covers the canvas — which is how that dialog ended up baked into 33 committed screenshots.
+Left to drift, these ranges do more than annoy: a starter naming a version that was never
+published is one a user cannot install at all, and opening it in Studio raises a dependency-update
+dialog whose underlay covers the
+canvas — which is how that dialog ended up baked into 33 committed screenshots.

@@ -33,7 +33,7 @@ The items source is what makes a repeater useful. It can be:
 - **A content collection** — every blog post, product, or team member in your project's content. See **[Content types](/docs/studio/projects/content-types)**.
 - **A data source** — anything that produces a list, like a `Request` fetching from an API.
 
-Declaring and feeding these lives in **[Logic](/docs/studio/logic)**. With the repeater selected, the Inspector's **[Logic tab](/docs/studio/logic/events)** (:kbd[⌘⇧3]) shows a **Repeating list** section where you can rebind **Items** and add or change **Filter** and **Sort** after the fact — binding a list and binding a click handler are the same job, so they share a tab.
+Declaring and feeding these lives in **[Script & logic](/docs/studio/logic)**. With the repeater selected, the Inspector's **[Logic tab](/docs/studio/logic/events)** (:kbd[⌘⇧3]) shows a **Repeating list** section where you can rebind **Items** and add or change **Filter** and **Sort** after the fact — binding a list and binding a click handler are the same job, so they share a tab.
 
 All three are ordinary Inspector rows. Each carries a **value source** chip offering **Fixed value** or **From data…** — the same vocabulary every bindable row in Studio uses, described in **[Formulas and expressions](/docs/studio/logic/formulas)** — and a provenance dot you can click to clear **Filter** or **Sort** again. Filter and Sort are always drawn, empty until you fill them: type into one and it is set, clear it and it is gone. **Items** is the one row a repeater cannot do without, so it has nothing to clear.
 

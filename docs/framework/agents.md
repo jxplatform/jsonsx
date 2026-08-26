@@ -59,7 +59,7 @@ The deterministic gate, run after every edit. It walks the project in five passe
 
 Clean runs print `Project is valid (N files checked in <root>)`. Failures print `Project is INVALID`, then one block per file:
 
-```text
+```
 pages/about.json:
   - /children/0: must NOT have additional properties
 ```

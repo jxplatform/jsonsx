@@ -1,6 +1,6 @@
 ---
 title: "Code editing"
-description: "Drop down to real code when you need it — Monaco for function bodies, sidecar files, and the Code editor for a document's raw source."
+description: "Drop down to real code when you need it — Monaco for function bodies, sidecar files, and Code mode for a document's raw source."
 code:
   - packages/studio/src/panels/editors.ts
   - packages/studio/src/panels/formula-workspace.ts
@@ -43,7 +43,7 @@ Inside a body, `state` holds your entries (`state.$count += 1` is the code twin 
 
 A function body normally lives inside the component's JSON. When one grows large enough to deserve its own file, it can live in a separate `.js` file instead: the function entry then shows **Source** (the file's path) and **Export** (which function to use from it) in the Data panel, in place of a body. The format is documented in **[Components](/docs/framework/concepts/components)**.
 
-## The Code editor: the whole file as source
+## Code mode: the whole file as source
 
 The **Code** entry in the context bar's **Editor** control shows the open file itself as raw source — JSON for pages and components, Markdown for content — as introduced in **[Modes and views](/docs/studio/interface/modes)**. It's the same document the visual surfaces edit, from the other side:
 
@@ -65,16 +65,16 @@ Your project's configuration is a document like any other, so it has a Code edit
 ## When to drop down
 
 - A handler needs a loop, error handling, or an API the structured editors don't cover.
-- You're doing a bulk edit — renaming a state entry everywhere it's referenced is a find-and-replace in the Code editor.
+- You're doing a bulk edit — renaming a state entry everywhere it's referenced is a find-and-replace in Code mode.
 - You want to add parameters to a named formula, or make other edits the panels don't surface.
-- You're learning the format: build something visually, then read it in the Code editor. It's the fastest way to understand what Studio writes.
+- You're learning the format: build something visually, then read it in Code mode. It's the fastest way to understand what Studio writes.
 
 :::doc-tip
-Everything the visual editors do lands in the same file you see in the Code editor — there is no hidden layer. If you can express a change in either surface, the result on disk is the same kind of JSON.
+Everything the visual editors do lands in the same file you see in Code mode — there is no hidden layer. If you can express a change in either surface, the result on disk is the same kind of JSON.
 :::
 
 ## Next
 
-- The file format you're reading in the Code editor: **[Components](/docs/framework/concepts/components)** and **[Reactivity](/docs/framework/concepts/reactivity)**
+- The file format you're reading in Code mode: **[Components](/docs/framework/concepts/components)** and **[Reactivity](/docs/framework/concepts/reactivity)**
 - Prefer structure when it fits: **[Statements](/docs/studio/logic/statements)**
 - Ship your work with **[Source control](/docs/studio/publish/source-control)**

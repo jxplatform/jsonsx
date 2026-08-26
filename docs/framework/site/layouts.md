@@ -9,7 +9,7 @@ code:
 
 # Layouts
 
-> **Studio writes this format for you** — layouts appear alongside pages and components in [Pages, layouts, components](/docs/studio/projects/pages-layouts-components), and you edit them on the same canvas.
+> **Studio writes this format for you** — layouts appear alongside pages and components in [Browse your project](/docs/studio/projects/pages-layouts-components), and you edit them on the same canvas.
 
 A layout is an ordinary Jx document that provides the shell shared across pages — navigation, footer, wrappers — with HTML `<slot>` elements marking where page content is injected. It is the same slot mechanism [components](/docs/framework/concepts/components) use, run at compile time instead of DOM time.
 

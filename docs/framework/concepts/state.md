@@ -121,7 +121,11 @@ A `#` prefix marks an entry as private — internal workings that are never expo
 }
 ```
 
-Private is enforced, not just conventional. A parent that names one in `$props` — or passes it as a `props.#cache` attribute or a JS property — has the write **ignored**, with a console warning naming the entry. The instance still renders: a private key in `$props` is a mistake worth pointing at, not a reason to blank the component. The custom element also gets no `#cache` property, so there is no back door around the check.
+Private is enforced, not just conventional. A parent that names one in `$props` — or passes it as a
+`props.#cache` attribute or a JS property — has the write **ignored**, with a console warning naming
+the entry. The instance still renders: a private key in `$props` is a mistake worth pointing at, not
+a reason to blank the component. The custom element also gets no `#cache` property, so there is no
+back door around the check.
 
 Rename the entry without the `#` if you meant it to be part of the component's interface.
 

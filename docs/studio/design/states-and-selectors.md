@@ -56,4 +56,4 @@ Each state is saved as a nested rule inside the element's `style` object — rea
 ## Next
 
 - Combine states with screen sizes in **[Breakpoints](/docs/studio/design/breakpoints)**
-- Give every link and button a default hover in the **[Project Styles](/docs/studio/design/stylebook)**
+- Give every link and button a default hover in the **[Stylebook](/docs/studio/design/stylebook)**

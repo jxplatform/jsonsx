@@ -7,7 +7,7 @@ spec:
 
 # Dynamic switching
 
-> **Studio writes this format for you.** Add the node in the [Code editor](/docs/studio/logic/code); from then on the Inspector's **[Logic tab](/docs/studio/logic/events)** (:kbd[⌘⇧3]) shows a **Condition** section for it — the value it switches on, and a row per case.
+> **Studio writes this format for you.** Add the node in [Code mode](/docs/studio/logic/code); from then on the Inspector's **[Logic tab](/docs/studio/logic/events)** (:kbd[⌘⇧3]) shows a **Condition** section for it — the value it switches on, and a row per case.
 
 A `$switch` node swaps what renders in one spot based on a state value: the node binds `$switch` to a [reference](/docs/framework/concepts/references), and `cases` maps each possible value to what should render. When the state changes, the old case is torn down and the new one renders in its place — view switching, wizard steps, or a client-side router in pure JSON.
 
@@ -80,7 +80,7 @@ Select the node and open the **[Logic tab](/docs/studio/logic/events)** (:kbd[�
 - **Expression** — what the node switches on. Its value-source chip offers **From data…** (a signal) and **Mixed text**; there is no fixed-value rung, because a literal `$switch` does not render.
 - **Cases** — one row per key. Edit a row's text to rename that case, click **→** to select what it renders, click the dot on its label to remove it, and **+ Add case** appends another.
 
-The section is drawn for a node that already carries a `$switch`, so the node itself is added in the [Code editor](/docs/studio/logic/code). The [Outline](/docs/studio/design/layers) lists the cases as child rows of the node, and each case is selectable there.
+The section is drawn for a node that already carries a `$switch`, so the node itself is added in [Code mode](/docs/studio/logic/code). The [Outline](/docs/studio/design/layers) lists the cases as child rows of the node, and each case is selectable there.
 
 On the canvas, **Edit** mode stands in the first case so the node has something to show — an external first case draws a dashed `[$switch: home | about]` marker naming the keys instead. Switch the canvas to **Preview** to watch the real selector drive it.
 

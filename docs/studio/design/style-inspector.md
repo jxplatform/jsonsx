@@ -91,7 +91,7 @@ Shorthand rows like **Padding** and **Margin** take a combined value, or expand 
 Beside each property's label sits a **value source** control naming how that value is produced. For a CSS declaration there are two rungs, because two is what the style format accepts:
 
 - **Fixed value** — the value you type, the same every time.
-- **Mixed text** — text with `${…}` placeholders that fill in from your signals, so a property can follow your data. See **[Logic](/docs/studio/logic)**.
+- **Mixed text** — text with `${…}` placeholders that fill in from your signals, so a property can follow your data. See **[Script & logic](/docs/studio/logic)**.
 
 Click it and a picker opens listing both, each with a line explaining it, and one click puts you on either — there is no cycle to walk through. The same control, with the same words, appears on every bindable field in the Inspector, and each field offers exactly the rungs the document format allows there, which is why fields on the **[Content](/docs/studio/design/properties)** tab also offer **From data…**. Switching back remembers what you had on the rung you left, so a detour costs you nothing.
 
@@ -112,5 +112,5 @@ Everything here writes plain CSS into the element's `style` object in the open f
 
 ## Next
 
-- Set element-wide defaults instead of styling one element at a time — **[Project Styles](/docs/studio/design/stylebook)**
+- Set element-wide defaults instead of styling one element at a time — **[Stylebook](/docs/studio/design/stylebook)**
 - Name your colors, fonts, and sizes in **[Design tokens](/docs/studio/design/tokens)**

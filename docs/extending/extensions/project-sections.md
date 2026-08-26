@@ -40,7 +40,7 @@ The section's **value schema is not duplicated here** — it lives in the packag
 
 Behavior attaches through [capability methods](/docs/extending/extensions/capabilities) on the same class. The `projectData` capability turns the raw section value into loaded data:
 
-```text
+```
 projectData(sectionValue, { projectConfig, root, registry, io }) → unknown
 ```
 
@@ -60,7 +60,7 @@ dispatches to `Content.resolvePaths(pathsDef, { data, projectConfig, root })`, w
 
 If your section reads from directories, the `assets` capability publishes them at a site URL so the files beside its sources are reachable:
 
-```text
+```
 assets(sectionValue, { projectConfig, root }) → [{ urlPrefix: "/content/blog", dir: "/abs/content/blog" }]
 ```
 

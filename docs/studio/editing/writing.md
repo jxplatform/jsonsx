@@ -39,7 +39,9 @@ Your writing is saved into the document as you pause, so :kbd[⌘S] (macOS) / :k
 
 ## What you can click into
 
-Anything that holds text: headings, paragraphs, list items, table cells, captions, definition lists, a disclosure's summary. Which ones those are comes from the page's own format rather than a fixed list, so a Markdown page and a component page each get the right answer.
+Anything that holds text: headings, paragraphs, list items, table cells, captions, definition
+lists, a disclosure's summary. Which ones those are comes from the page's own format rather than a
+fixed list, so a Markdown page and a component page each get the right answer.
 
 Two cases where the cursor lands somewhere you might not expect, and both are deliberate:
 
@@ -95,7 +97,7 @@ Text that a component fills from data can't be edited this way — typing over i
 
 The same goes for an option that holds a **number or a yes/no value** rather than text: it shows as text on the page, but editing it here would turn it into text and break anything that counts or compares it. Use the properties sidebar, which knows what kind of value the option takes.
 
-An option the page already sets some other way — as a plain attribute, or straight on the component tag rather than in its options — is also left to the Inspector's **Content** tab. Editing it here would quietly create a second copy of the same value: sometimes the page keeps showing the first one and your change appears to do nothing, and otherwise the old copy sits there unused and comes back the day the option is cleared.
+An option the page already sets some other way — as a plain attribute, or straight on the component tag rather than in its options — is also left to the sidebar. Editing it here would quietly create a second copy of the same value: sometimes the page keeps showing the first one and your change appears to do nothing, and otherwise the old copy sits there unused and comes back the day the option is cleared.
 
 Clicking a component's text and clicking away again changes nothing — an option only gets set on that instance when you actually edit it. :kbd[Esc] is a real cancel, including after Studio has already saved a pause mid-edit.
 

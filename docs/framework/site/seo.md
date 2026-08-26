@@ -82,7 +82,7 @@ Links carry that fourth part because `rel` and `href` alone are not enough to te
 
 A `<link>` with a typo'd relation is a special kind of frustrating: it's still valid HTML, it still renders, and it does nothing.
 
-```text
+```
 <link rel="stylshet"> — "stylshet" is not an IANA link relation, and a relation nobody
 recognizes does nothing. Check the spelling, or use an absolute URI if it is an extension
 relation (RFC 8288 §2.1.2).
@@ -107,11 +107,12 @@ Two tags are added automatically: `<link rel="canonical">` (built from `url` in 
 }
 ```
 
-`dir` is omitted entirely when neither is set, rather than being guessed. On a site with [locales](/docs/framework/site/i18n) configured, both are derived from the route's language — and translated pages also gain `rel="alternate"` links pointing at each other.
+`dir` is omitted entirely when neither is set, rather than being guessed. On a site with [locales](./i18n.md) configured, both are derived from the route's language — and translated pages also gain `rel="alternate"` links pointing at each other.
 
 ## Package files in `$head`
 
-A `$head` entry can point at a file inside an installed package by its bare specifier instead of a URL:
+A `$head` entry can point at a file inside an installed package by its bare specifier instead of a
+URL:
 
 ```json
 {
@@ -127,16 +128,21 @@ A `$head` entry can point at a file inside an installed package by its bare spec
 }
 ```
 
-The build resolves the specifier against your project root and copies the file into `/assets/`, rewriting the tag to point there. The name is derived from the specifier, so it is the same on every build:
+The build resolves the specifier against your project root and copies the file into `/assets/`,
+rewriting the tag to point there. The name is derived from the specifier, so it is the same on every
+build:
 
 ```html
 <link rel="stylesheet" href="/assets/shoelace-style-shoelace-dist-themes-light.css" />
 ```
 
-`$elements` entries are handled the same way except that they are bundled rather than copied — a component package imports its own dependencies, and those imports have to be resolved before the browser sees them.
+`$elements` entries are handled the same way except that they are bundled rather than copied —
+a component package imports its own dependencies, and those imports have to be resolved before the
+browser sees them.
 
 :::doc-note
-If the package is not installed, the build fails and names the specifier. It does not emit a link and hope: a dead stylesheet URL looks identical to a working one until the site is deployed.
+If the package is not installed, the build fails and names the specifier. It does not emit a link
+and hope: a dead stylesheet URL looks identical to a working one until the site is deployed.
 :::
 
 ## Structured data

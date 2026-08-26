@@ -10,11 +10,11 @@ code:
 
 # Styling
 
-> **Studio writes this format for you.** The [Design](/docs/studio/design) inspector and **Project Styles** produce everything below. This page documents the style model for hand-editing and reference.
+> **Studio writes this format for you.** The [Design](/docs/studio/design) inspector and Stylebook produce everything below — this page documents the style model for hand-editing and reference.
 
-Styles are JSON objects. Property names are the CSS ones in camelCase, the same spelling the CSSOM uses, so `background-color` is written `backgroundColor`.
+Jx uses JSON objects for styling with camelCase CSS property names, nested selectors, and named media breakpoints.
 
-## Inline styles
+## Inline Styles
 
 The `style` property accepts a JSON object:
 
@@ -30,7 +30,7 @@ The `style` property accepts a JSON object:
 }
 ```
 
-## Nested CSS selectors
+## Nested CSS Selectors
 
 Keys beginning with `:`, `.`, `&`, or `[` are treated as nested selectors:
 
@@ -48,7 +48,7 @@ Keys beginning with `:`, `.`, `&`, or `[` are treated as nested selectors:
 }
 ```
 
-Inline properties apply directly to the element. Nested rules are emitted as a scoped `<style>` block keyed on a **generated class**, `.<tagName>-<n>`, which the build also puts on the element:
+Inline properties apply directly to the element. Nested rules are emitted as a scoped `<style>` block keyed on a **generated class** — `.<tagName>-<n>`, which the build also puts on the element:
 
 ```html
 <div class="sty-card-0">…</div>
@@ -62,7 +62,7 @@ Inline properties apply directly to the element. Nested rules are emitted as a s
 
 (You'll also see `data-jx-static` and `data-jx-prerendered` in compiled output. Those mark hydration state and are never used as CSS selectors.)
 
-## Named media breakpoints
+## Named Media Breakpoints
 
 Declare breakpoints at root level with `$media`:
 
@@ -94,15 +94,15 @@ Use `@--name` keys in any style object:
 parentheses are the query's own: a feature query keeps them (`@(min-width: 1280px)`), while a
 bare media type does not, so `@(print)` emits `@media print`.
 
-## Color-scheme variants
+## Color-Scheme Variants
 
 A `$media` entry whose value is exactly a `prefers-color-scheme` query (like `--dark` above) is a _scheme query_: its `@--dark` blocks respond both to the OS preference and to a visitor-forced scheme, and the compiler wires up `color-scheme` and no-flash persistence automatically. See [Color schemes](/docs/framework/concepts/color-schemes) for the full contract and how to build a switcher.
 
-## Static style extraction
+## Static Style Extraction
 
-The compiler extracts every static `style` definition into a single `<style>` block in the document `<head>`, so a page carries one stylesheet rather than a rule per element.
+The compiler extracts all static `style` definitions into a single `<style>` block in the document `<head>`, producing clean, efficient CSS output.
 
-## Design tokens as CSS custom properties
+## Design Tokens with CSS Custom Properties
 
 Define tokens in your `project.json` `style` block and use them everywhere:
 
@@ -129,4 +129,4 @@ Components reference tokens with standard `var()`:
 }
 ```
 
-CSS custom properties cascade through the DOM, so every component can use them without importing anything.
+CSS custom properties cascade naturally through the DOM — every component can use them without importing anything.

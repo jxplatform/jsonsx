@@ -33,17 +33,29 @@ The interpreting runtime — the dev server, the Studio canvas, and `@jxsuite/ru
 
 ## Trusted Types
 
-Jx takes the half of [Trusted Types](https://www.w3.org/TR/trusted-types/) that applies to it and declines the half that cannot.
+Jx takes the half of [Trusted Types](https://www.w3.org/TR/trusted-types/) that applies to it and
+declines the half that cannot.
 
-**Nothing Jx ships writes `innerHTML`.** The runtime and the compiled element modules clear elements with `replaceChildren()` instead — identical behavior, and not a DOM injection sink. That is a smaller surface in every site you build, whether or not any policy is enforcing.
+**Nothing Jx ships writes `innerHTML`.** The runtime and the compiled element modules clear elements
+with `replaceChildren()` instead — identical behavior, and not a DOM injection sink. That is a
+smaller surface in every site you build, whether or not any policy is enforcing.
 
-**Studio's markdown goes through a policy that refuses.** The assistant's rendered markdown is the one place a string becomes markup in Studio's own window, and it passes a policy whose `createHTML` throws — naming what it found — if anything script-shaped survived sanitization. Its `createScript` and `createScriptURL` refuse outright.
+**Studio's markdown goes through a policy that refuses.** The assistant's rendered markdown is the
+one place a string becomes markup in Studio's own window, and it passes a policy whose `createHTML`
+throws — naming what it found — if anything script-shaped survived sanitization. Its `createScript`
+and `createScriptURL` refuse outright.
 
 :::doc-note
-**Enforcement is declined, not pending.** `require-trusted-types-for 'script'` gates `eval` and `new Function` as well as DOM injection — and the interpreter _is_ those calls, in the canvas and in Studio's window alike. Enforcing would mean a policy that passes scripts through, which satisfies the API and defends nothing. Studio's remaining injection sinks belong to the libraries it bundles, which no policy of Jx's can route.
+**Enforcement is declined, not pending.** `require-trusted-types-for 'script'` gates `eval` and
+`new Function` as well as DOM injection — and the interpreter _is_ those calls, in the canvas and in
+Studio's window alike. Enforcing would mean a policy that passes scripts through, which satisfies
+the API and defends nothing. Studio's remaining injection sinks belong to the libraries it bundles,
+which no policy of Jx's can route.
 :::
 
-This is why the canvas and the shell keep separate policies permanently — and it works only because the canvas is a real page with its own response: a frame loaded over `http` gets its own policy, while a `srcdoc` frame inherits its parent's.
+This is why the canvas and the shell keep separate policies permanently — and it works only because
+the canvas is a real page with its own response: a frame loaded over `http` gets its own policy,
+while a `srcdoc` frame inherits its parent's.
 
 ## Treat documents as code
 

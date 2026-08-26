@@ -28,7 +28,7 @@ An extension contributes up to four kinds of things, all declared in JSON before
 
 The parser is the reference extension — its layout is the template:
 
-```text
+```
 extensions/
   parser/                    # @jxsuite/parser — content collections, markdown, CSV
     package.json             # "jx": "./jx-extension.json"; exports manifest, schemas, classes

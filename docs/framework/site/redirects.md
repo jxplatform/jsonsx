@@ -75,7 +75,7 @@ For a static source path, the build may also write an HTML page at that path (`/
 
 It also writes a single `dist/_redirects` file — the Netlify/Cloudflare format, one rule per line:
 
-```text
+```
 /old-page /new-page 301
 /blog/:slug /posts/:slug 301
 ```

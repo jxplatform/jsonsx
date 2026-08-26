@@ -93,4 +93,4 @@ Every field writes a key on the selected element in the open file — attributes
 
 - Style the same selection in the **[Style inspector](/docs/studio/design/style-inspector)**
 - Give it behavior in the **[Logic tab](/docs/studio/logic/events)**
-- Bind attributes and props to real data in **[Logic](/docs/studio/logic)**
+- Bind attributes and props to real data in **[Script & logic](/docs/studio/logic)**
