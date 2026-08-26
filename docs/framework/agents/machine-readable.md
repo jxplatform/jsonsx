@@ -32,7 +32,8 @@ A plain-text index in the [llms.txt convention](https://llmstxt.org): a one-para
 - [Your first project](https://jxsuite.com/docs/start/first-project/): …
 ```
 
-Each section's landing page comes first, then its children, exactly as the sidebar orders them.
+Each section's landing page comes first, then the rest of that section's own pages, then each of
+its groups in turn — exactly as the sidebar orders them.
 
 It carries no page bodies — roughly 27 KB against `full-docs.json`'s ~680 KB — which makes it the cheap first fetch: point an agent at it, let it read the titles and descriptions, and let it pull only the pages it needs.
 

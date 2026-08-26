@@ -4,564 +4,688 @@
     {
       "path": "start",
       "label": "Start here",
-      "children": [
+      "pages": [
         {
-          "path": "start/install",
-          "label": "Install Jx Studio"
+          "path": "start",
+          "label": "Overview"
+        }
+      ],
+      "groups": [
+        {
+          "label": "Get started",
+          "pages": [
+            {
+              "path": "start/install",
+              "label": "Install Jx Studio"
+            },
+            {
+              "path": "start/first-project",
+              "label": "Your first project"
+            },
+            {
+              "path": "start/studio-tour",
+              "label": "A tour of Jx Studio"
+            }
+          ]
         },
         {
-          "path": "start/first-project",
-          "label": "Your first project"
+          "label": "Tutorials",
+          "pages": [
+            {
+              "path": "start/first-component",
+              "label": "Tutorial: interactive component"
+            },
+            {
+              "path": "start/first-collection",
+              "label": "Tutorial: blog with collections"
+            },
+            {
+              "path": "start/videos",
+              "label": "Video tutorials"
+            }
+          ]
         },
         {
-          "path": "start/studio-tour",
-          "label": "A tour of Jx Studio"
-        },
-        {
-          "path": "start/first-component",
-          "label": "Tutorial: interactive component"
-        },
-        {
-          "path": "start/first-collection",
-          "label": "Tutorial: blog with collections"
-        },
-        {
-          "path": "start/coming-from-wordpress",
-          "label": "Coming from WordPress"
-        },
-        {
-          "path": "start/coming-from-webflow",
-          "label": "Coming from Webflow or Framer"
-        },
-        {
-          "path": "start/coming-from-wix",
-          "label": "Coming from Wix or Squarespace"
-        },
-        {
-          "path": "start/coming-from-ai-builders",
-          "label": "Coming from AI builders"
-        },
-        {
-          "path": "start/videos",
-          "label": "Video tutorials"
+          "label": "Coming from another tool",
+          "pages": [
+            {
+              "path": "start/coming-from-wordpress",
+              "label": "Coming from WordPress"
+            },
+            {
+              "path": "start/coming-from-webflow",
+              "label": "Coming from Webflow or Framer"
+            },
+            {
+              "path": "start/coming-from-wix",
+              "label": "Coming from Wix or Squarespace"
+            },
+            {
+              "path": "start/coming-from-ai-builders",
+              "label": "Coming from AI builders"
+            }
+          ]
         }
       ]
     },
     {
       "path": "studio",
       "label": "Studio",
-      "children": [
+      "pages": [
         {
-          "path": "studio/interface",
-          "label": "The workspace"
-        },
-        {
-          "path": "studio/interface/welcome-screen",
-          "label": "Welcome screen"
-        },
-        {
-          "path": "studio/interface/modes",
-          "label": "Modes and preview"
-        },
-        {
-          "path": "studio/interface/canvas",
-          "label": "The canvas"
-        },
-        {
-          "path": "studio/interface/tabs",
-          "label": "Documents and panes"
-        },
-        {
-          "path": "studio/interface/quick-access",
-          "label": "Quick Access"
-        },
-        {
-          "path": "studio/interface/shortcuts",
-          "label": "Keyboard shortcuts"
-        },
-        {
-          "path": "studio/interface/preferences",
-          "label": "Preferences"
-        },
-        {
-          "path": "studio/interface/languages",
-          "label": "Languages"
-        },
-        {
-          "path": "studio/interface/problems-and-progress",
-          "label": "Problems and progress"
-        },
-        {
-          "path": "studio/interface/commands",
-          "label": "Commands"
-        },
-        {
-          "path": "studio/projects",
-          "label": "Projects"
-        },
-        {
-          "path": "studio/projects/create",
-          "label": "Create a project"
-        },
-        {
-          "path": "studio/projects/pages-layouts-components",
-          "label": "Pages, layouts, components"
-        },
-        {
-          "path": "studio/projects/browse",
-          "label": "The Library"
-        },
-        {
-          "path": "studio/projects/starters",
-          "label": "Starter templates"
-        },
-        {
-          "path": "studio/projects/media",
-          "label": "Media"
-        },
-        {
-          "path": "studio/projects/content-types",
-          "label": "Content types"
-        },
-        {
-          "path": "studio/projects/settings",
-          "label": "Project settings"
-        },
-        {
-          "path": "studio/projects/dependencies",
-          "label": "Dependencies and imports"
-        },
-        {
-          "path": "studio/editing",
-          "label": "Edit mode"
-        },
-        {
-          "path": "studio/editing/writing",
-          "label": "Writing and formatting"
-        },
-        {
-          "path": "studio/editing/slash-commands",
-          "label": "Slash commands"
-        },
-        {
-          "path": "studio/editing/frontmatter",
-          "label": "Frontmatter and metadata"
-        },
-        {
-          "path": "studio/editing/grid",
-          "label": "Grid mode"
-        },
-        {
-          "path": "studio/design",
-          "label": "Design mode"
-        },
-        {
-          "path": "studio/design/layers",
-          "label": "Outline"
-        },
-        {
-          "path": "studio/design/elements",
-          "label": "Insert"
-        },
-        {
-          "path": "studio/design/properties",
-          "label": "Properties"
-        },
-        {
-          "path": "studio/design/style-inspector",
-          "label": "Style inspector"
-        },
-        {
-          "path": "studio/design/breakpoints",
-          "label": "Breakpoints"
-        },
-        {
-          "path": "studio/design/states-and-selectors",
-          "label": "States and selectors"
-        },
-        {
-          "path": "studio/design/tokens",
-          "label": "Design tokens"
-        },
-        {
-          "path": "studio/design/stylebook",
-          "label": "Project Styles"
-        },
-        {
-          "path": "studio/design/components",
-          "label": "Working with components"
-        },
-        {
-          "path": "studio/design/repeaters",
-          "label": "Repeaters"
-        },
-        {
-          "path": "studio/logic",
-          "label": "Logic"
-        },
-        {
-          "path": "studio/logic/formulas",
-          "label": "Formulas and expressions"
-        },
-        {
-          "path": "studio/logic/formula-workspace",
-          "label": "Formula workspace"
-        },
-        {
-          "path": "studio/logic/statements",
-          "label": "Statements"
-        },
-        {
-          "path": "studio/logic/events",
-          "label": "Logic tab"
-        },
-        {
-          "path": "studio/logic/data",
-          "label": "Data"
-        },
-        {
-          "path": "studio/logic/data-sources",
-          "label": "Data sources"
-        },
-        {
-          "path": "studio/logic/code",
-          "label": "Code editing"
-        },
-        {
-          "path": "studio/data",
-          "label": "Databases"
-        },
-        {
-          "path": "studio/data/connections",
-          "label": "Connections"
-        },
-        {
-          "path": "studio/data/tables",
-          "label": "Data tables"
-        },
-        {
-          "path": "studio/data/grid",
-          "label": "Data grid"
-        },
-        {
-          "path": "studio/data/auth-and-secrets",
-          "label": "Auth and secrets"
-        },
-        {
-          "path": "studio/ai",
-          "label": "AI assistant"
-        },
-        {
-          "path": "studio/ai/chat",
-          "label": "The AI assistant"
-        },
-        {
-          "path": "studio/ai/document-assistant",
-          "label": "Document assistant"
-        },
-        {
-          "path": "studio/publish",
-          "label": "Publish"
-        },
-        {
-          "path": "studio/publish/source-control",
-          "label": "Source control"
-        },
-        {
-          "path": "studio/publish/github",
-          "label": "GitHub"
-        },
-        {
-          "path": "studio/publish/cloudflare",
-          "label": "Cloudflare Pages"
-        },
-        {
-          "path": "studio/publish/other-hosts",
-          "label": "Other hosts"
-        },
-        {
-          "path": "studio/publish/redirects",
-          "label": "Redirects"
-        },
-        {
-          "path": "studio/publish/collaboration",
-          "label": "Real-time collaboration"
+          "path": "studio",
+          "label": "Overview"
         },
         {
           "path": "studio/desktop",
           "label": "The desktop app"
+        }
+      ],
+      "groups": [
+        {
+          "label": "The workspace",
+          "pages": [
+            {
+              "path": "studio/interface",
+              "label": "Overview"
+            },
+            {
+              "path": "studio/interface/welcome-screen",
+              "label": "Welcome screen"
+            },
+            {
+              "path": "studio/interface/modes",
+              "label": "Modes and preview"
+            },
+            {
+              "path": "studio/interface/canvas",
+              "label": "The canvas"
+            },
+            {
+              "path": "studio/interface/tabs",
+              "label": "Documents and panes"
+            },
+            {
+              "path": "studio/interface/quick-access",
+              "label": "Quick Access"
+            },
+            {
+              "path": "studio/interface/shortcuts",
+              "label": "Keyboard shortcuts"
+            },
+            {
+              "path": "studio/interface/preferences",
+              "label": "Preferences"
+            },
+            {
+              "path": "studio/interface/languages",
+              "label": "Languages"
+            },
+            {
+              "path": "studio/interface/problems-and-progress",
+              "label": "Problems and progress"
+            },
+            {
+              "path": "studio/interface/commands",
+              "label": "Commands"
+            }
+          ]
+        },
+        {
+          "label": "Projects",
+          "pages": [
+            {
+              "path": "studio/projects",
+              "label": "Overview"
+            },
+            {
+              "path": "studio/projects/create",
+              "label": "Create a project"
+            },
+            {
+              "path": "studio/projects/pages-layouts-components",
+              "label": "Pages, layouts, components"
+            },
+            {
+              "path": "studio/projects/browse",
+              "label": "The Library"
+            },
+            {
+              "path": "studio/projects/starters",
+              "label": "Starter templates"
+            },
+            {
+              "path": "studio/projects/media",
+              "label": "Media"
+            },
+            {
+              "path": "studio/projects/content-types",
+              "label": "Content types"
+            },
+            {
+              "path": "studio/projects/settings",
+              "label": "Project settings"
+            },
+            {
+              "path": "studio/projects/dependencies",
+              "label": "Dependencies and imports"
+            }
+          ]
+        },
+        {
+          "label": "Edit mode",
+          "pages": [
+            {
+              "path": "studio/editing",
+              "label": "Overview"
+            },
+            {
+              "path": "studio/editing/writing",
+              "label": "Writing and formatting"
+            },
+            {
+              "path": "studio/editing/slash-commands",
+              "label": "Slash commands"
+            },
+            {
+              "path": "studio/editing/frontmatter",
+              "label": "Frontmatter and metadata"
+            },
+            {
+              "path": "studio/editing/grid",
+              "label": "Grid mode"
+            }
+          ]
+        },
+        {
+          "label": "Design mode",
+          "pages": [
+            {
+              "path": "studio/design",
+              "label": "Overview"
+            },
+            {
+              "path": "studio/design/layers",
+              "label": "Outline"
+            },
+            {
+              "path": "studio/design/elements",
+              "label": "Insert"
+            },
+            {
+              "path": "studio/design/properties",
+              "label": "Properties"
+            },
+            {
+              "path": "studio/design/style-inspector",
+              "label": "Style inspector"
+            },
+            {
+              "path": "studio/design/breakpoints",
+              "label": "Breakpoints"
+            },
+            {
+              "path": "studio/design/states-and-selectors",
+              "label": "States and selectors"
+            },
+            {
+              "path": "studio/design/tokens",
+              "label": "Design tokens"
+            },
+            {
+              "path": "studio/design/stylebook",
+              "label": "Project Styles"
+            },
+            {
+              "path": "studio/design/components",
+              "label": "Working with components"
+            },
+            {
+              "path": "studio/design/repeaters",
+              "label": "Repeaters"
+            }
+          ]
+        },
+        {
+          "label": "Logic",
+          "pages": [
+            {
+              "path": "studio/logic",
+              "label": "Overview"
+            },
+            {
+              "path": "studio/logic/formulas",
+              "label": "Formulas and expressions"
+            },
+            {
+              "path": "studio/logic/formula-workspace",
+              "label": "Formula workspace"
+            },
+            {
+              "path": "studio/logic/statements",
+              "label": "Statements"
+            },
+            {
+              "path": "studio/logic/events",
+              "label": "Logic tab"
+            },
+            {
+              "path": "studio/logic/data",
+              "label": "Data"
+            },
+            {
+              "path": "studio/logic/data-sources",
+              "label": "Data sources"
+            },
+            {
+              "path": "studio/logic/code",
+              "label": "Code editing"
+            }
+          ]
+        },
+        {
+          "label": "Databases",
+          "pages": [
+            {
+              "path": "studio/data",
+              "label": "Overview"
+            },
+            {
+              "path": "studio/data/connections",
+              "label": "Connections"
+            },
+            {
+              "path": "studio/data/tables",
+              "label": "Data tables"
+            },
+            {
+              "path": "studio/data/grid",
+              "label": "Data grid"
+            },
+            {
+              "path": "studio/data/auth-and-secrets",
+              "label": "Auth and secrets"
+            }
+          ]
+        },
+        {
+          "label": "AI assistant",
+          "pages": [
+            {
+              "path": "studio/ai",
+              "label": "Overview"
+            },
+            {
+              "path": "studio/ai/chat",
+              "label": "The AI assistant"
+            },
+            {
+              "path": "studio/ai/document-assistant",
+              "label": "Document assistant"
+            }
+          ]
+        },
+        {
+          "label": "Publish",
+          "pages": [
+            {
+              "path": "studio/publish",
+              "label": "Overview"
+            },
+            {
+              "path": "studio/publish/source-control",
+              "label": "Source control"
+            },
+            {
+              "path": "studio/publish/github",
+              "label": "GitHub"
+            },
+            {
+              "path": "studio/publish/cloudflare",
+              "label": "Cloudflare Pages"
+            },
+            {
+              "path": "studio/publish/other-hosts",
+              "label": "Other hosts"
+            },
+            {
+              "path": "studio/publish/redirects",
+              "label": "Redirects"
+            },
+            {
+              "path": "studio/publish/collaboration",
+              "label": "Real-time collaboration"
+            }
+          ]
         }
       ]
     },
     {
       "path": "framework",
       "label": "Framework",
-      "children": [
+      "pages": [
         {
-          "path": "framework/concepts/documents",
-          "label": "Documents"
+          "path": "framework",
+          "label": "Overview"
+        }
+      ],
+      "groups": [
+        {
+          "label": "Concepts",
+          "pages": [
+            {
+              "path": "framework/concepts/documents",
+              "label": "Documents"
+            },
+            {
+              "path": "framework/concepts/elements",
+              "label": "Elements"
+            },
+            {
+              "path": "framework/concepts/components",
+              "label": "Components"
+            },
+            {
+              "path": "framework/concepts/props-and-scope",
+              "label": "Props and scope"
+            },
+            {
+              "path": "framework/concepts/state",
+              "label": "State"
+            },
+            {
+              "path": "framework/concepts/reactivity",
+              "label": "Reactivity"
+            },
+            {
+              "path": "framework/concepts/references",
+              "label": "References"
+            },
+            {
+              "path": "framework/concepts/expressions",
+              "label": "Expressions"
+            },
+            {
+              "path": "framework/concepts/statements",
+              "label": "Statements"
+            },
+            {
+              "path": "framework/concepts/functions",
+              "label": "Functions and sidecars"
+            },
+            {
+              "path": "framework/concepts/styling",
+              "label": "Styling"
+            },
+            {
+              "path": "framework/concepts/color-schemes",
+              "label": "Color schemes"
+            },
+            {
+              "path": "framework/concepts/lists",
+              "label": "Lists and iteration"
+            },
+            {
+              "path": "framework/concepts/data-prototypes",
+              "label": "Data prototypes"
+            },
+            {
+              "path": "framework/concepts/timing",
+              "label": "Timing"
+            },
+            {
+              "path": "framework/concepts/switching",
+              "label": "Dynamic switching"
+            },
+            {
+              "path": "framework/concepts/security",
+              "label": "Security"
+            }
+          ]
         },
         {
-          "path": "framework/concepts/elements",
-          "label": "Elements"
+          "label": "Site architecture",
+          "pages": [
+            {
+              "path": "framework/site",
+              "label": "Overview"
+            },
+            {
+              "path": "framework/site/project-json",
+              "label": "project.json"
+            },
+            {
+              "path": "framework/site/routing",
+              "label": "Routing"
+            },
+            {
+              "path": "framework/site/layouts",
+              "label": "Layouts"
+            },
+            {
+              "path": "framework/site/content-collections",
+              "label": "Content collections"
+            },
+            {
+              "path": "framework/site/jx-markdown",
+              "label": "Jx Markdown"
+            },
+            {
+              "path": "framework/site/relationships",
+              "label": "Relationships"
+            },
+            {
+              "path": "framework/site/seo",
+              "label": "SEO and metadata"
+            },
+            {
+              "path": "framework/site/i18n",
+              "label": "Locales and languages"
+            },
+            {
+              "path": "framework/site/images",
+              "label": "Images"
+            },
+            {
+              "path": "framework/site/redirects",
+              "label": "Redirects"
+            },
+            {
+              "path": "framework/site/feeds",
+              "label": "Feeds"
+            },
+            {
+              "path": "framework/site/search",
+              "label": "Site search"
+            },
+            {
+              "path": "framework/site/deployment",
+              "label": "Build output and adapters"
+            }
+          ]
         },
         {
-          "path": "framework/concepts/components",
-          "label": "Components"
+          "label": "How compilation works",
+          "pages": [
+            {
+              "path": "framework/build",
+              "label": "Overview"
+            },
+            {
+              "path": "framework/build/dev-server",
+              "label": "The dev server"
+            },
+            {
+              "path": "framework/build/cli",
+              "label": "CLI commands"
+            }
+          ]
         },
         {
-          "path": "framework/concepts/props-and-scope",
-          "label": "Props and scope"
+          "label": "Working with agents",
+          "pages": [
+            {
+              "path": "framework/agents",
+              "label": "Overview"
+            },
+            {
+              "path": "framework/agents/authoring-rules",
+              "label": "Authoring rules for agents"
+            },
+            {
+              "path": "framework/agents/machine-readable",
+              "label": "Machine-readable docs"
+            }
+          ]
         },
         {
-          "path": "framework/concepts/state",
-          "label": "State"
-        },
-        {
-          "path": "framework/concepts/reactivity",
-          "label": "Reactivity"
-        },
-        {
-          "path": "framework/concepts/references",
-          "label": "References"
-        },
-        {
-          "path": "framework/concepts/expressions",
-          "label": "Expressions"
-        },
-        {
-          "path": "framework/concepts/statements",
-          "label": "Statements"
-        },
-        {
-          "path": "framework/concepts/functions",
-          "label": "Functions and sidecars"
-        },
-        {
-          "path": "framework/concepts/styling",
-          "label": "Styling"
-        },
-        {
-          "path": "framework/concepts/color-schemes",
-          "label": "Color schemes"
-        },
-        {
-          "path": "framework/concepts/lists",
-          "label": "Lists and iteration"
-        },
-        {
-          "path": "framework/concepts/data-prototypes",
-          "label": "Data prototypes"
-        },
-        {
-          "path": "framework/concepts/timing",
-          "label": "Timing"
-        },
-        {
-          "path": "framework/concepts/switching",
-          "label": "Dynamic switching"
-        },
-        {
-          "path": "framework/concepts/security",
-          "label": "Security"
-        },
-        {
-          "path": "framework/site",
-          "label": "Site architecture"
-        },
-        {
-          "path": "framework/site/project-json",
-          "label": "project.json"
-        },
-        {
-          "path": "framework/site/routing",
-          "label": "Routing"
-        },
-        {
-          "path": "framework/site/layouts",
-          "label": "Layouts"
-        },
-        {
-          "path": "framework/site/content-collections",
-          "label": "Content collections"
-        },
-        {
-          "path": "framework/site/jx-markdown",
-          "label": "Jx Markdown"
-        },
-        {
-          "path": "framework/site/relationships",
-          "label": "Relationships"
-        },
-        {
-          "path": "framework/site/seo",
-          "label": "SEO and metadata"
-        },
-        {
-          "path": "framework/site/i18n",
-          "label": "Locales and languages"
-        },
-        {
-          "path": "framework/site/images",
-          "label": "Images"
-        },
-        {
-          "path": "framework/site/redirects",
-          "label": "Redirects"
-        },
-        {
-          "path": "framework/site/feeds",
-          "label": "Feeds"
-        },
-        {
-          "path": "framework/site/search",
-          "label": "Site search"
-        },
-        {
-          "path": "framework/site/deployment",
-          "label": "Build output and adapters"
-        },
-        {
-          "path": "framework/build",
-          "label": "How compilation works"
-        },
-        {
-          "path": "framework/build/dev-server",
-          "label": "The dev server"
-        },
-        {
-          "path": "framework/build/cli",
-          "label": "CLI commands"
-        },
-        {
-          "path": "framework/agents",
-          "label": "Working with agents"
-        },
-        {
-          "path": "framework/agents/authoring-rules",
-          "label": "Authoring rules for agents"
-        },
-        {
-          "path": "framework/agents/machine-readable",
-          "label": "Machine-readable docs"
-        },
-        {
-          "path": "framework/reference",
-          "label": "Reference"
-        },
-        {
-          "path": "framework/reference/formulas",
-          "label": "Formula catalog"
-        },
-        {
-          "path": "framework/reference/operators",
-          "label": "Operator reference"
+          "label": "Reference",
+          "pages": [
+            {
+              "path": "framework/reference",
+              "label": "Overview"
+            },
+            {
+              "path": "framework/reference/formulas",
+              "label": "Formula catalog"
+            },
+            {
+              "path": "framework/reference/operators",
+              "label": "Operator reference"
+            }
+          ]
         }
       ]
     },
     {
       "path": "extending",
       "label": "Extending",
-      "children": [
+      "pages": [
         {
-          "path": "extending/extensions/anatomy",
-          "label": "Extension anatomy"
+          "path": "extending",
+          "label": "Overview"
+        }
+      ],
+      "groups": [
+        {
+          "label": "Extensions",
+          "pages": [
+            {
+              "path": "extending/extensions/anatomy",
+              "label": "Extension anatomy"
+            },
+            {
+              "path": "extending/extensions/schema-composition",
+              "label": "Schema composition"
+            },
+            {
+              "path": "extending/extensions/classes",
+              "label": "Custom classes"
+            },
+            {
+              "path": "extending/extensions/formats",
+              "label": "Custom formats"
+            },
+            {
+              "path": "extending/extensions/capabilities",
+              "label": "Capability methods"
+            },
+            {
+              "path": "extending/extensions/project-sections",
+              "label": "Project sections"
+            },
+            {
+              "path": "extending/extensions/server",
+              "label": "Server mounts"
+            },
+            {
+              "path": "extending/extensions/connectors",
+              "label": "Connectors"
+            },
+            {
+              "path": "extending/extensions/search",
+              "label": "Search indexes"
+            },
+            {
+              "path": "extending/extensions/security",
+              "label": "Security and secrets"
+            },
+            {
+              "path": "extending/extensions/tutorial-toml-format",
+              "label": "Tutorial: a TOML format"
+            },
+            {
+              "path": "extending/extensions/tutorial-guestbook",
+              "label": "Tutorial: a guestbook"
+            },
+            {
+              "path": "extending/extensions/first-party",
+              "label": "First-party extensions"
+            }
+          ]
         },
         {
-          "path": "extending/extensions/schema-composition",
-          "label": "Schema composition"
+          "label": "Embedding",
+          "pages": [
+            {
+              "path": "extending/embedding",
+              "label": "Overview"
+            },
+            {
+              "path": "extending/embedding/hosting",
+              "label": "Hosting the Studio assets"
+            },
+            {
+              "path": "extending/embedding/platform-adapter",
+              "label": "Writing a platform adapter"
+            },
+            {
+              "path": "extending/embedding/backend-protocol",
+              "label": "The backend protocol"
+            },
+            {
+              "path": "extending/embedding/dev-server",
+              "label": "Dev server internals"
+            }
+          ]
         },
         {
-          "path": "extending/extensions/classes",
-          "label": "Custom classes"
+          "label": "Reference",
+          "pages": [
+            {
+              "path": "extending/reference/studio-routes",
+              "label": "Protocol routes"
+            },
+            {
+              "path": "extending/reference/implementation-status",
+              "label": "Implementation status"
+            },
+            {
+              "path": "extending/reference/spec-changelog",
+              "label": "Spec changelog"
+            },
+            {
+              "path": "extending/reference/standards",
+              "label": "Standards alignment"
+            }
+          ]
         },
         {
-          "path": "extending/extensions/formats",
-          "label": "Custom formats"
-        },
-        {
-          "path": "extending/extensions/capabilities",
-          "label": "Capability methods"
-        },
-        {
-          "path": "extending/extensions/project-sections",
-          "label": "Project sections"
-        },
-        {
-          "path": "extending/extensions/server",
-          "label": "Server mounts"
-        },
-        {
-          "path": "extending/extensions/connectors",
-          "label": "Connectors"
-        },
-        {
-          "path": "extending/extensions/search",
-          "label": "Search indexes"
-        },
-        {
-          "path": "extending/extensions/security",
-          "label": "Security and secrets"
-        },
-        {
-          "path": "extending/extensions/tutorial-toml-format",
-          "label": "Tutorial: a TOML format"
-        },
-        {
-          "path": "extending/extensions/tutorial-guestbook",
-          "label": "Tutorial: a guestbook"
-        },
-        {
-          "path": "extending/extensions/first-party",
-          "label": "First-party extensions"
-        },
-        {
-          "path": "extending/embedding",
-          "label": "Embedding overview"
-        },
-        {
-          "path": "extending/embedding/hosting",
-          "label": "Hosting the Studio assets"
-        },
-        {
-          "path": "extending/embedding/platform-adapter",
-          "label": "Writing a platform adapter"
-        },
-        {
-          "path": "extending/embedding/backend-protocol",
-          "label": "The backend protocol"
-        },
-        {
-          "path": "extending/embedding/dev-server",
-          "label": "Dev server internals"
-        },
-        {
-          "path": "extending/reference/studio-routes",
-          "label": "Protocol routes"
-        },
-        {
-          "path": "extending/reference/implementation-status",
-          "label": "Implementation status"
-        },
-        {
-          "path": "extending/reference/spec-changelog",
-          "label": "Spec changelog"
-        },
-        {
-          "path": "extending/reference/standards",
-          "label": "Standards alignment"
-        },
-        {
-          "path": "extending/contributing/monorepo",
-          "label": "Working in the monorepo"
-        },
-        {
-          "path": "extending/contributing/docs",
-          "label": "Contributing to these docs"
-        },
-        {
-          "path": "extending/contributing/ai-evals",
-          "label": "AI assistant evals"
+          "label": "Contributing",
+          "pages": [
+            {
+              "path": "extending/contributing/monorepo",
+              "label": "Working in the monorepo"
+            },
+            {
+              "path": "extending/contributing/docs",
+              "label": "Contributing to these docs"
+            },
+            {
+              "path": "extending/contributing/ai-evals",
+              "label": "AI assistant evals"
+            }
+          ]
         }
       ]
     }

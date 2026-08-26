@@ -37,6 +37,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `compiler.md`
 
+- **0.3.2-draft** (2026-08-26) — Static output omits a false boolean attribute and emits a true one bare.
 - **0.3.1-draft** (2026-08-18) — §4.3: separate the emitted-JavaScript accessor form from the pointer grammar it lowers.
 - **0.3.0-draft** (2026-08-17) — §4.3: ref lowering goes through the shared tokenizer — identifier segments dot, all others bracket, so every emitted ref parses.
 - **0.2.1-draft** (2026-08-15) — §3 Implemented — the tiers' inline blocks are hash-nameable and the site build emits the policy.
