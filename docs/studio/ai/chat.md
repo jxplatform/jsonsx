@@ -1,7 +1,9 @@
 ---
 title: "The AI assistant"
-description: "The assistant's chat — open it, attach context, watch its edits land, manage chat history, and review or undo what it changed."
+description: "The assistant's chat — open it, attach context, watch its edits land, answer a question it stops to ask, and review or undo what it changed."
 code:
+  - packages/studio/src/services/ai-ask.ts
+  - packages/studio/src/services/import-run.ts
   - packages/studio/src/panels/ai-chat/composer.ts
   - packages/studio/src/panels/ai-chat/chat-view.ts
   - packages/studio/src/panels/ai-chat/sessions-view.ts
@@ -57,6 +59,28 @@ Under the chips, a reply that changed anything carries a one-line summary — "C
 Document edits land on the canvas as they happen, so for canvas work you can literally watch the page change. If something goes wrong mid-request — a lost connection, a provider error — the chat shows the error with advice on how to recover, and a **Retry** button that sends your last message again.
 
 A long request that reaches the assistant's per-message limit on tool calls is not an error: it finishes with a note saying it ran out of rounds and listing what it did apply, and everything it changed stays changed. Send another message to continue.
+
+## When the assistant asks you something
+
+Some decisions aren't the assistant's to make. Which pages of a site actually matter, whether to keep a design or replace it, whether a page that came out at 61% of the original is close enough — those are yours. When the assistant hits one, it **stops and asks**, right in the conversation, and waits.
+
+A question appears as a card in the reply. If there's a short list of sensible answers it offers them as buttons; you can always ignore them and type your own instead — the composer beneath is live, and its placeholder changes to **Answer the assistant…** so you can see the difference. Whatever you send goes back as the answer to that question, not as a new message, and the assistant carries straight on from there.
+
+Three things worth knowing:
+
+- **You can decline.** Every question has a **You decide** button. The assistant takes its best guess and tells you what it chose.
+- **Waiting doesn't cost the assistant anything.** A reply that stops to ask you three questions still has its full budget of work left — the limit is on how much it does on its own, and it isn't doing anything while it waits for you. If you'd rather it stopped altogether, **Stop** ends the whole reply.
+- **A question doesn't survive a reload.** Reload Studio while one is open and the card stays in the transcript but goes quiet, with a line saying so. Just send a message to pick the thread back up.
+
+:::doc-tip
+The assistant is told to ask sparingly: only for things that are genuinely your judgement, only one at a time, and never for something it could have looked up itself. If it's asking, it's because the answer changes what it builds.
+:::
+
+## Watching a long job
+
+Some work takes minutes rather than seconds — cloning a site with **[Import](/docs/studio/projects/create)** is the main one. It runs as one of those chips, with a live line beneath it: the phase it's in, what it's doing right now, and the last few lines of its log. When it lands, the chip's summary says what the run found — how many pages, what it skipped, and which pages didn't render faithfully if you asked it to check.
+
+That report is there so the assistant can act on it, and so it can ask you about the parts that were genuinely ambiguous.
 
 ## Review and undo edits
 

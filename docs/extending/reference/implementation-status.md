@@ -14,22 +14,22 @@ This page is generated from the `> **Status: …**` markers in the specification
 
 | Spec                      | Version      | Status      | Updated    |
 | ------------------------- | ------------ | ----------- | ---------- |
-| `ai.md`                   | 0.1.8-draft  | Partial     | 2026-08-23 |
+| `ai.md`                   | 0.1.9-draft  | Partial     | 2026-08-26 |
 | `collab.md`               | 0.2.5-draft  | Partial     | 2026-08-20 |
 | `compiler.md`             | 0.3.1-draft  | Partial     | 2026-08-18 |
-| `desktop.md`              | 0.4.0-draft  | Pending     | 2026-08-25 |
+| `desktop.md`              | 0.4.1-draft  | Pending     | 2026-08-26 |
 | `extensions.md`           | 0.3.11-draft | Partial     | 2026-08-25 |
 | `imports.md`              | 0.1.9-draft  | Partial     | 2026-08-15 |
 | `jx-markdown.md`          | 0.1.8-draft  | Partial     | 2026-08-15 |
 | `parser.md`               | 0.2.9-draft  | Partial     | 2026-08-16 |
 | `relationships.md`        | 0.1.4-draft  | Partial     | 2026-08-15 |
 | `schema.md`               | 0.4.8-draft  | Partial     | 2026-08-16 |
-| `server.md`               | 0.2.12       | Implemented | 2026-08-25 |
+| `server.md`               | 0.2.13       | Implemented | 2026-08-26 |
 | `site-architecture.md`    | 0.5.17-draft | Partial     | 2026-08-25 |
 | `spec.md`                 | 0.5.6-draft  | Partial     | 2026-08-25 |
 | `standards.md`            | 0.1.15-draft | Partial     | 2026-08-17 |
 | `studio-ui-guidelines.md` | 0.3.14       | Implemented | 2026-08-22 |
-| `studio.md`               | 0.9.45-draft | Partial     | 2026-08-25 |
+| `studio.md`               | 0.9.46-draft | Partial     | 2026-08-26 |
 
 ## Sections not yet implemented
 

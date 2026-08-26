@@ -5,6 +5,8 @@ code:
   - packages/studio/src/new-project/new-project-modal.ts
   - packages/studio/src/new-project/location-fields.ts
   - packages/studio/src/new-project/import-tab.ts
+  - packages/studio/src/services/ai-import-tools.ts
+  - packages/studio/src/services/import-seed.ts
 ---
 
 # Create a project
@@ -19,7 +21,7 @@ The first screen — **Choose a starting point** — opens on the starter galler
 
 - **Starters** — complete, themed websites (restaurant, shop, portfolio, blog, and more) that Studio copies in as plain files you own. The first one is selected for you. Browse the full gallery in **[Starter templates](/docs/studio/projects/starters)**.
 - **Start from scratch** — the last card in the gallery: an empty site with one page, for when you already know what you want to build.
-- **Import** — recreate an existing website as a Jx project. Give Studio the site's URL and how many pages to crawl; the import is AI-assisted, so this tab asks you to connect AI before it unlocks. Not every Studio platform offers this tab.
+- **Import** — recreate an existing website as a Jx project. Give Studio the site's URL, how many pages to crawl, which model to use, and — optionally — a sentence about what you want done with the site once it's cloned. The import is AI-assisted, so this tab asks you to connect AI before it unlocks. Not every Studio platform offers this tab.
 - **Agent** — describe the site you want in a sentence or two and the AI assistant builds it in the editor while you watch. Like Import, it needs AI connected first.
 
 Both AI tabs unlock the moment AI is available, by whichever route your Studio offers — the same options the [AI assistant](/docs/studio/ai) sidebar gives you:
@@ -70,9 +72,26 @@ Because the new project is a git repository from its first minute, every later c
 There is no default location. Studio never picks a folder for you and never falls back to whatever directory it happens to be running in — if the **Location** is empty, nothing is created.
 :::
 
+### What the Import tab asks for
+
+Beyond the site's URL, the Import tab has four options:
+
+1. **Crawl Depth** — how far from the starting page to follow links. `0` imports that one page and nothing else, on a much faster path that skips the crawl entirely.
+2. **Max Pages** — the ceiling on how many pages to capture.
+3. **AI component naming** — let the model name the repeated pieces it finds (a `Card`, a `PricingRow`) instead of numbering them. It costs one model call per component found, so it's worth turning off on a wide crawl.
+4. **Check fidelity against the original** — after the import, build the new project, screenshot every page, and compare it against the site it came from. It roughly doubles the run, and it's the only thing that tells you how well the clone actually came out rather than what got skipped. Off by default.
+
+Under those, a **Model** picker and a box asking what the assistant should do with the site. Both are optional. The model here is for this import only — it doesn't change the model the assistant uses for everything else. Leave the box empty and the assistant simply gets the site ready for you to work on; fill it in ("keep the layout but modernise the typography") and it carries straight on into that once the import lands.
+
 ### While an import runs
 
-The Import tab streams a live log — one line per phase, with the current step at the top. A garbled line in that stream doesn't stop the import; the pages already crawled are kept. But it isn't ignored either: when the run finishes, Studio counts the lines it couldn't read and posts a warning saying so, because an import that quietly skipped a step looks exactly like one that didn't.
+**The dialog closes as soon as you click Import Site.** The import doesn't happen in the wizard — it happens in the [AI assistant](/docs/studio/ai), which opens on the right and reports as it goes: the phase it's in, the page it's on, and the last few lines of its log. When it finishes, the project opens in the same window and the assistant tells you what it found — how many pages, what it had to skip, which pages didn't render faithfully.
+
+That's also why it can stop and ask you something. An import guesses at a lot: which pages matter, whether three similar blocks are one component, what to do about a page robots.txt kept it out of. When one of those is genuinely your call, the assistant asks it in the sidebar and waits — see **[When the assistant asks you something](/docs/studio/ai/chat)**.
+
+If you want to stop a running import, use **Stop** in the assistant, or run **Assistant: Stop Responding** from the command palette.
+
+A garbled line in the import's stream doesn't stop the run; the pages already crawled are kept. But it isn't ignored either: Studio counts the lines it couldn't read and posts a warning saying so, because an import that quietly skipped a step looks exactly like one that didn't.
 
 ## Next
 
