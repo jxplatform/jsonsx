@@ -11,7 +11,7 @@ code:
 
 The document assistant is what the **[AI sidebar](/docs/studio/ai/chat)** becomes when a page or component is open on the canvas: the same chat, now scoped to that document. It isn't a separate panel — opening a document simply hands the assistant that page's full structure and a set of precise editing abilities it doesn't have otherwise. This is the mode to use when you want to _see_ the assistant work and be able to take it back.
 
-The sidebar starts closed and stays however you last left it, so open it with **Toggle Assistant** first; provider setup lives in its **Assistant: Settings…** dialog rather than in the column itself.
+The assistant is the fourth tab of the right panel — show it with :kbd[Cmd+Shift+4] or by clicking **Assistant**. Provider setup lives in **[Preferences › Assistant](/docs/studio/interface/preferences)**, not in the panel: a provider key is an application setting, and the panel that needs one is the wrong place to fix it being missing.
 
 ![The sidebar with an assistant reply carrying edit chips beside the open page on the canvas](../../images/ai-document-assistant.png)
 

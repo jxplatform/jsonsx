@@ -29,6 +29,12 @@ interface BuildSystemPromptOptions {
    * prompt-shape tests — advertises the same list it always did.
    */
   treeEditable?: boolean | undefined;
+  /**
+   * Whether the platform can import a site. Defaults TRUE so this stays a pure function of what it
+   * is given — a caller that knows nothing about the platform gets the full list, and only
+   * `document-assistant.ts`, which does know, narrows it.
+   */
+  canImport?: boolean | undefined;
   /** Project-relative file paths for the inventory section (project modes; capped). */
   fileInventory?: string[] | undefined;
 }
@@ -52,13 +58,21 @@ const FILE_INVENTORY_CAP = 100;
  * a weaker test than `structurallyEditable`, so a repeater template or `$switch` case was removable
  * by the agent and not by the person.
  */
-export type AiToolTier = "no-project" | "project" | "document" | "document-tree";
+export type AiToolTier = "always" | "no-project" | "project" | "document" | "document-tree";
 
 export interface AiToolInfo {
   name: string;
   tier: AiToolTier;
   /** One-line signature + purpose shown in the system prompt's tool list. */
   blurb: string;
+  /**
+   * A PAL member the tool needs, beyond whatever its tier requires.
+   *
+   * The tier answers "what is open"; this answers "can this backend do it at all". Cloud ships no
+   * `importSite`, so `import_site` must not be advertised there — and a tier cannot express that,
+   * because "no project is open" is exactly as true on cloud as anywhere else.
+   */
+  capability?: "importSite";
 }
 
 /**
@@ -67,7 +81,25 @@ export interface AiToolInfo {
  * list cannot drift (a test asserts the names match the registered tools).
  */
 export const AI_TOOL_TIERS: AiToolInfo[] = [
+  // Always — a question is not gated on what happens to be open
+  {
+    name: "ask_user",
+    tier: "always",
+    blurb:
+      "ask_user(question, options?, context?) — pause and put a question to the user; the turn " +
+      "waits for their reply and resumes with it. Only for a judgement that is genuinely theirs.",
+  },
   // Bootstrap (no project open)
+  {
+    name: "import_site",
+    tier: "no-project",
+    capability: "importSite",
+    blurb:
+      "import_site(url, directory?, depth?, maxPages?, aiComponents?) — clone a live website into " +
+      "a new Jx project and open it: pages, styles, assets, a shared layout and recurring " +
+      "components. When the user came through the New Project Import form the destination and " +
+      "options are already settled — pass the url alone.",
+  },
   {
     name: "create_project",
     tier: "no-project",
@@ -174,6 +206,8 @@ export const AI_TOOL_TIERS: AiToolInfo[] = [
 export interface AiToolState {
   hasProject: boolean;
   hasDocument: boolean;
+  /** Whether the platform implements `importSite`. Cloud does not. */
+  canImport?: boolean;
   /**
    * The open document is an element tree the canvas is editing — `editor.kind === "canvas"`.
    *
@@ -189,6 +223,9 @@ export interface AiToolState {
  * tools need an active document (even in single-file mode without a project).
  */
 export function tierActive(tier: AiToolTier, state: AiToolState): boolean {
+  if (tier === "always") {
+    return true;
+  }
   if (tier === "no-project") {
     return !state.hasProject;
   }
@@ -201,12 +238,56 @@ export function tierActive(tier: AiToolTier, state: AiToolState): boolean {
   return state.hasDocument;
 }
 
+/**
+ * Whether a tool is active: its tier, AND any capability it declares.
+ *
+ * The one predicate the prompt's tool list and the gating registry both run, which is the whole
+ * point of {@link AI_TOOL_TIERS} — a tool the model is told about and then refused is a surprise to
+ * it, and one it is refused without being told is invisible.
+ *
+ * @param {AiToolInfo} tool
+ * @param {AiToolState} state
+ * @returns {boolean}
+ */
+export function toolActive(tool: AiToolInfo, state: AiToolState): boolean {
+  if (tool.capability === "importSite" && state.canImport === false) {
+    return false;
+  }
+  return tierActive(tool.tier, state);
+}
+
 // ─── Jx Schema Reference (condensed) ────────────────────────────────────────
 
 /**
  * Condensed reference of Jx document structure rules. Included inline in the system prompt so the
  * LLM understands the schema without consuming excessive tokens.
  */
+/**
+ * When to stop and ask, and — more importantly — when not to.
+ *
+ * Rendered into the closing section of every prompt, because `ask_user` is an `always` tier tool.
+ * The prohibitions carry most of the weight: a tool that suspends a turn on a human is only worth
+ * having if the questions are ones a human actually wants. A model that asks what it could have
+ * read, or asks about a knob its answer cannot reach, trains the author to stop reading the
+ * questions.
+ */
+const ASKING_THE_USER = `## Asking the user
+
+You can stop and ask with ask_user; the turn waits and resumes with the reply. Waiting on a person
+is not free, so ask only when all three hold:
+
+1. It is genuinely THEIR judgement — taste, priority, or intent. "Which of these pages matter?",
+ "keep their brand colours or restyle?", "is this page close enough?"
+2. You could not answer it yourself with another tool. Read the file, list the directory, look at
+ the document. Asking what you could have discovered is the commonest way to waste the question.
+3. You can ACT on any answer they give. Never ask about an option you have no way to change.
+
+Ask one question at a time. Offer options when the sensible answers are a short list; the user can
+always reply in their own words instead. If they decline, decide yourself and say what you chose.
+
+Prefer doing to asking. On a vague prompt, make a defensible choice, do the work, and say what you
+assumed — one good question beats five, and beats none only when it changes what you build.`;
+
 const JX_SCHEMA_REFERENCE = `## Jx Document Format
 
 A Jx document is a JSON object. Key top-level fields:
@@ -560,6 +641,7 @@ export function buildSystemPrompt({
   projectRoot,
   hasProject = Boolean(projectRoot),
   treeEditable = true,
+  canImport = true,
   fileInventory,
 }: BuildSystemPromptOptions = {}) {
   const hasDocument = Boolean(document);
@@ -568,7 +650,7 @@ export function buildSystemPrompt({
   // The list the model is TOLD about and the list the gate will honour are the same filter, so a
   // Refusal is never a surprise to it.
   const toolList = AI_TOOL_TIERS.filter((t) =>
-    tierActive(t.tier, { hasDocument, hasProject, treeEditable }),
+    toolActive(t, { canImport, hasDocument, hasProject, treeEditable }),
   )
     .map((t) => `- ${t.blurb}`)
     .join("\n");
@@ -607,6 +689,8 @@ Your document edits apply to the live canvas immediately and are individually un
   }
 
   const closing = `You have a limited number of tool-call rounds per message. On vague or open-ended prompts ("make it look better", "improve this"), prefer a small number of targeted, high-impact changes over attempting to rebuild the entire page. Explain what you changed and offer to do more.
+
+${ASKING_THE_USER}
 
 Be concise. Don't explain what Jx is unless asked. Just build.`;
 

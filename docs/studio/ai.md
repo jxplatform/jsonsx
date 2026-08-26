@@ -3,6 +3,8 @@ title: "AI assistant"
 description: "What the Studio AI assistant can do with a project or page open, how to connect an AI provider, and exactly what leaves your machine when you chat."
 code:
   - packages/studio/src/panels/chat-panel.ts
+  - packages/studio/src/services/ai-ask.ts
+  - packages/studio/src/services/ai-import-tools.ts
   - packages/studio/src/services/ai-system-prompt.ts
   - packages/studio/src/services/ai-settings.ts
   - packages/studio/src/services/tool-executor.ts
@@ -21,7 +23,7 @@ The assistant is the **fourth tab of the right panel**, beside Content, Style an
 
 ## What it can do
 
-**With nothing open** — the assistant bootstraps. Describe a site and it creates a project for you: name, folders, starter pages, and a design quickstart (colors and fonts) derived from your description, then keeps building inside it. It will ask you where to put the project before creating anything — tell it a folder (or, on the cloud, a GitHub account or organization). The **[New Project](/docs/studio/projects/create)** dialog's **Agent** tab is the same idea as a form: describe the site you want, and the assistant builds it in the editor while you watch.
+**With nothing open** — the assistant bootstraps. Describe a site and it creates a project for you: name, folders, starter pages, and a design quickstart (colors and fonts) derived from your description, then keeps building inside it. It will ask you where to put the project before creating anything — tell it a folder (or, on the cloud, a GitHub account or organization). It can also **clone a live site**: point it at a URL and it crawls the pages, extracts the styles and assets, finds the shared layout and the repeating components, and opens the result — reporting as it goes, and asking you about the calls it can't make on its own. The **[New Project](/docs/studio/projects/create)** dialog's **Agent** and **Import** tabs are the same two things as a form.
 
 **With a project open** — the assistant works across files. It can list and read any project file, find files by name, create new pages and components, and rewrite files whole. Anything it writes as a Jx document is validated before it touches disk. It can also open a page on the canvas to continue there.
 

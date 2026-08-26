@@ -33,7 +33,7 @@
     "build": "bun run prepare",
     "test": "bun test --isolate",
     "test:coverage": "bun test --isolate --coverage",
-    "upgrade": "bunx npm-check-updates -u && bun install"
+    "upgrade": "bun update --latest && bun install"
   },
   "dependencies": {
     "@jxsuite/schema": "workspace:^",

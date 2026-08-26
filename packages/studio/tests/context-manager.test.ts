@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { createChatState } from "@jxsuite/ai";
 import type { Message } from "@jxsuite/ai/chat-state";
-import { trimContext } from "../src/services/context-manager";
+import { pruneOrphanToolMessages, trimContext } from "../src/services/context-manager";
 
 function longContent(tokens: number) {
   return "x".repeat(tokens * 4);
@@ -177,5 +177,120 @@ describe("context-manager — trimContext", () => {
     expect(result!.droppedCount).toBe(0);
     expect(cs.contextWarning).toBe(true);
     expect(cs.messages.length).toBe(2); // Nothing dropped
+  });
+});
+
+describe("context-manager — pruneOrphanToolMessages", () => {
+  /** An assistant turn that requested one tool call, and the reply that answers it. */
+  function pair(callId: string): Omit<Message, "id" | "timestamp">[] {
+    return [
+      {
+        role: "assistant",
+        content: "Working on it",
+        toolCalls: [{ id: callId, name: "read_file", arguments: "{}" }],
+      },
+      { role: "tool", content: '{"success":true}', toolCallId: callId },
+    ];
+  }
+
+  test("a well-formed history is left exactly as it is", () => {
+    const cs = createChatState({ model: "gpt-4" });
+    pushMessages(cs, [{ role: "user", content: "Read it" }, ...pair("call_1")]);
+
+    expect(pruneOrphanToolMessages(cs)).toEqual({ dropped: 0, sealed: 0 });
+    expect(cs.messages.length).toBe(3);
+  });
+
+  test("a request with no reply is sealed with a failure, keeping the assistant's text", () => {
+    const cs = createChatState({ model: "gpt-4" });
+    pushMessages(cs, [
+      { role: "user", content: "Ask me" },
+      {
+        role: "assistant",
+        content: "Which pages matter?",
+        toolCalls: [{ id: "call_ask", name: "ask_user", arguments: "{}" }],
+      },
+    ]);
+
+    expect(pruneOrphanToolMessages(cs)).toEqual({ dropped: 0, sealed: 1 });
+    expect(cs.messages.length).toBe(3);
+    // Sealed IMMEDIATELY after its request — the only position toMessagesArray emits as a pair.
+    expect(cs.messages[2]!.role).toBe("tool");
+    expect(cs.messages[2]!.toolCallId).toBe("call_ask");
+    expect(cs.messages[1]!.content).toBe("Which pages matter?");
+    expect(JSON.parse(cs.messages[2]!.content)).toMatchObject({ success: false });
+  });
+
+  test("a reply with no request is dropped", () => {
+    const cs = createChatState({ model: "gpt-4" });
+    // What front-truncation leaves behind: the tail of a pair whose head was sliced off.
+    pushMessages(cs, [
+      { role: "tool", content: '{"success":true}', toolCallId: "call_gone" },
+      { role: "user", content: "Carry on" },
+    ]);
+
+    expect(pruneOrphanToolMessages(cs)).toEqual({ dropped: 1, sealed: 0 });
+    expect(cs.messages.length).toBe(1);
+    expect(cs.messages[0]!.role).toBe("user");
+  });
+
+  test("a reply carrying no tool_call_id at all is dropped", () => {
+    const cs = createChatState({ model: "gpt-4" });
+    pushMessages(cs, [{ role: "tool", content: "{}" }]);
+
+    expect(pruneOrphanToolMessages(cs)).toEqual({ dropped: 1, sealed: 0 });
+    expect(cs.messages.length).toBe(0);
+  });
+
+  test("seals every unanswered call of a multi-call turn, in order", () => {
+    const cs = createChatState({ model: "gpt-4" });
+    pushMessages(cs, [
+      {
+        role: "assistant",
+        content: "Two at once",
+        toolCalls: [
+          { id: "call_a", name: "read_file", arguments: "{}" },
+          { id: "call_b", name: "read_file", arguments: "{}" },
+        ],
+      },
+      { role: "tool", content: '{"success":true}', toolCallId: "call_b" },
+    ]);
+
+    expect(pruneOrphanToolMessages(cs)).toEqual({ dropped: 0, sealed: 1 });
+    expect(cs.messages.map((m) => m.toolCallId)).toEqual([undefined, "call_a", "call_b"]);
+  });
+
+  test("repairs both shapes at once and leaves toMessagesArray well-formed", () => {
+    const cs = createChatState({ model: "gpt-4" });
+    pushMessages(cs, [
+      { role: "tool", content: '{"success":true}', toolCallId: "call_sliced" },
+      ...pair("call_ok"),
+      {
+        role: "assistant",
+        content: "Still waiting",
+        toolCalls: [{ id: "call_open", name: "ask_user", arguments: "{}" }],
+      },
+    ]);
+
+    expect(pruneOrphanToolMessages(cs)).toEqual({ dropped: 1, sealed: 1 });
+
+    // The property that matters: every tool reply follows the assistant request that declared it.
+    const wire = cs.toMessagesArray() as {
+      role: string;
+      tool_calls?: { id: string }[];
+      tool_call_id?: string;
+    }[];
+    const open = new Set<string>();
+    for (const msg of wire) {
+      if (msg.tool_calls) {
+        for (const call of msg.tool_calls) {
+          open.add(call.id);
+        }
+      } else if (msg.role === "tool") {
+        expect(open.has(msg.tool_call_id!)).toBe(true);
+        open.delete(msg.tool_call_id!);
+      }
+    }
+    expect(open.size).toBe(0);
   });
 });

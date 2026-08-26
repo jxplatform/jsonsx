@@ -52,7 +52,7 @@
     "lint:styles": "bun run scripts/check-styles.ts",
     "test": "bun run lint:styles && bun test --isolate",
     "test:coverage": "bun test --isolate --coverage",
-    "upgrade": "bunx npm-check-updates -u && bun install"
+    "upgrade": "bun update --latest && bun install"
   },
   "dependencies": {
     "@atlaskit/pragmatic-drag-and-drop": "^3.0.0",

@@ -8,6 +8,7 @@ import { createTab, disposeTab } from "../src/tabs/tab";
 import type { Tab } from "../src/tabs/tab";
 import { registerAiTools } from "../src/services/ai-tools";
 import { runAgentLoop } from "../src/services/tool-executor";
+import { answerAsk, pendingAsk, registerAskTool, resetAsk } from "../src/services/ai-ask";
 
 /**
  * A scripted streaming client: each entry in `rounds` is the sequence of StreamEvents to yield on
@@ -244,5 +245,143 @@ describe("cross-tab batching", () => {
     expect(second.history.snapshots.length).toBeGreaterThan(beforeSecond);
     disposeTab(first);
     disposeTab(second);
+  });
+});
+
+describe("ai agent loop — the interactive round budget", () => {
+  /**
+   * A registry holding just `ask_user`, plus a hook that answers each question as it appears.
+   *
+   * @param {(n: number) => string} reply - The nth answer, so a test can vary them.
+   */
+  function askHarness(reply: (n: number) => string = () => "yes") {
+    const chatState = createChatState({ model: "test" });
+    const toolRegistry = createToolRegistry();
+    registerAskTool(toolRegistry);
+    // `read_document` is the "work" tool below: a real, registered call that really succeeds, so
+    // The budget is measured against work rather than against a tool that was never there.
+    const tab = makeTab();
+    registerAiTools(toolRegistry, { getTab: () => tab, validate: async () => [] });
+
+    let answered = 0;
+    // Settle each question on the microtask after it registers, standing in for a fast reader.
+    const tick = setInterval(() => {
+      if (pendingAsk()) {
+        answered += 1;
+        answerAsk(reply(answered));
+      }
+    }, 0);
+    return {
+      answered: () => answered,
+      chatState,
+      stop: () => {
+        clearInterval(tick);
+        disposeTab(tab);
+        resetAsk();
+      },
+      toolRegistry,
+    };
+  }
+
+  test("a round that only asked does not spend the work budget", async () => {
+    /* MAX_ROUNDS bounds AUTONOMOUS work. A round that ends by blocking on a person cannot advance
+       without them, which is the property the cap was ever a proxy for — so a conversation that
+       asks three questions must still have its five rounds of work left. */
+    const h = askHarness();
+    const client = fakeClient([
+      toolCallRound("a1", "ask_user", { question: "Which?" }),
+      toolCallRound("a2", "ask_user", { question: "And then?" }),
+      toolCallRound("a3", "ask_user", { question: "Sure?" }),
+      ...Array.from({ length: 10 }, (_, i) => toolCallRound(`w${i}`, "read_document", {})),
+    ]);
+
+    h.chatState.sendMessage("ask me things");
+    await runAgentLoop({
+      chatState: h.chatState,
+      streamingClient: client,
+      systemPrompt: "",
+      toolRegistry: h.toolRegistry as ToolRegistry,
+    });
+    h.stop();
+
+    expect(h.answered()).toBe(3);
+    // Three interactive rounds plus five that did work.
+    expect(client.calls()).toBe(8);
+  });
+
+  test("a round that asked AND worked spends the budget", async () => {
+    // The exemption is for rounds that only wait; a round that also edited is ordinary work.
+    const h = askHarness();
+    const client = fakeClient(
+      Array.from({ length: 10 }, (_, i) => [
+        { type: "tool_call_start", id: `a${i}`, name: "ask_user" },
+        { type: "tool_call_delta", id: `a${i}`, args: JSON.stringify({ question: "Which?" }) },
+        { type: "tool_call_end", id: `a${i}` },
+        { type: "tool_call_start", id: `w${i}`, name: "read_document" },
+        { type: "tool_call_delta", id: `w${i}`, args: "{}" },
+        { type: "tool_call_end", id: `w${i}` },
+        { type: "done", stopReason: "tool_calls" },
+      ]) as StreamEvent[][],
+    );
+
+    h.chatState.sendMessage("ask and work");
+    await runAgentLoop({
+      chatState: h.chatState,
+      streamingClient: client,
+      systemPrompt: "",
+      toolRegistry: h.toolRegistry as ToolRegistry,
+    });
+    h.stop();
+
+    expect(client.calls()).toBe(5);
+  });
+
+  test("a model that only ever asks still terminates", async () => {
+    // The human is the real backstop, but the loop must be provably terminating without them.
+    const h = askHarness();
+    const client = fakeClient(
+      Array.from({ length: 40 }, (_, i) => toolCallRound(`a${i}`, "ask_user", { question: "?" })),
+    );
+
+    h.chatState.sendMessage("ask forever");
+    await runAgentLoop({
+      chatState: h.chatState,
+      streamingClient: client,
+      systemPrompt: "",
+      toolRegistry: h.toolRegistry as ToolRegistry,
+    });
+    h.stop();
+
+    expect(client.calls()).toBe(25); // MAX_TOTAL_ROUNDS
+  });
+
+  test("stopping the turn settles the question instead of hanging the loop", async () => {
+    /* The loop AWAITS toolRegistry.execute, and `ask_user`'s promise is resolved by a human. If
+       Stop did not reach it, the turn would wait forever on a reader who has left. */
+    const chatState = createChatState({ model: "test" });
+    const toolRegistry = createToolRegistry();
+    registerAskTool(toolRegistry);
+    const controller = new AbortController();
+    const client = fakeClient([toolCallRound("a1", "ask_user", { question: "Which?" })]);
+
+    chatState.sendMessage("ask me");
+    const running = runAgentLoop({
+      chatState,
+      signal: controller.signal,
+      streamingClient: client,
+      systemPrompt: "",
+      toolRegistry: toolRegistry as ToolRegistry,
+    });
+
+    // Let the round reach the tool, then stop the turn the way `assistant.stop` does.
+    await new Promise((r) => {
+      setTimeout(r, 0);
+    });
+    expect(pendingAsk()).not.toBeNull();
+    controller.abort();
+
+    await running;
+    expect(pendingAsk()).toBeNull();
+    resetAsk();
   });
 });

@@ -72,6 +72,8 @@ export interface LiveContextSources {
    * private, so there is nothing to read yet; the caller passes a probe when one exists.
    */
   aiStreaming?: () => boolean;
+  /** Whether a turn is suspended on an `ask_user` question (`panels/ai-panel.ts`). */
+  aiWaiting?: () => boolean;
 }
 
 /** `capability.*` is presence-of-method on the PAL — the check every call site does by hand today. */
@@ -187,6 +189,7 @@ export function createLiveContext(sources: LiveContextSources): () => CommandCon
 
     ctx.ai.configured = sources.aiConfigured();
     ctx.ai.streaming = sources.aiStreaming?.() ?? false;
+    ctx.ai.waiting = sources.aiWaiting?.() ?? false;
     ctx.capability = capabilities(sources.platform());
     return ctx;
   };

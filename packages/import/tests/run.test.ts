@@ -434,7 +434,45 @@ describe("importSite — single-page mode", () => {
     const verifyOpts = verifyProject.mock.calls[0]?.[0] as { threshold: number; browser?: unknown };
     expect(verifyOpts.threshold).toBe(0.2);
     expect(verifyOpts.browser).toBe(fakeBrowser);
-    expect(result.verify).toEqual({ averageFidelity: 97.5, reportDir: "/tmp/report" });
+    /* Per page, not just the average: "average fidelity 97.5%" is a fact nobody can act on, and
+       "the pricing page renders at 61%" is a decision. */
+    expect(result.verify).toEqual({
+      averageFidelity: 97.5,
+      pages: [{ fidelity: 97.5, route: "pages/index.json" }],
+      reportDir: "/tmp/report",
+    });
+  });
+
+  test("a page the verifier could not render carries its reason", async () => {
+    // A page at 0% because it failed to build is a different finding from one that rendered badly.
+    verifyProject.mockImplementationOnce(() =>
+      Promise.resolve({
+        averageFidelity: 0,
+        pages: [
+          {
+            diffImagePath: "d",
+            error: "Navigation failed",
+            fidelity: 0,
+            mismatchedPixels: 0,
+            originalScreenshotPath: "o",
+            renderedScreenshotPath: "r",
+            route: "pages/about.json",
+            sourceUrl: "https://site.example/about",
+            totalPixels: 0,
+          },
+        ],
+        reportDir: "/tmp/report",
+      }),
+    );
+    const result = await importSite({
+      url: "https://site.example/",
+      outDir: freshOutDir(),
+      maxDepth: 0,
+      verify: {},
+    });
+    expect(result.verify!.pages).toEqual([
+      { error: "Navigation failed", fidelity: 0, route: "pages/about.json" },
+    ]);
   });
 
   test("an aborted signal stops the pipeline and still closes the browser", async () => {

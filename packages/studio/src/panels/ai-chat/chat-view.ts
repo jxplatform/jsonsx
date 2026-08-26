@@ -41,6 +41,8 @@ import { renderMarkdown } from "./chat-markdown";
 import { summarizeWrites, writesForTurn } from "../../services/ai-writes";
 import { activeRegistry } from "../../commands/active-registry";
 
+import type { ImportRunRecord } from "../../services/import-run";
+
 // ─── Helpers (moved from ai-panel.ts) ────────────────────────────────────────
 
 /**
@@ -255,15 +257,70 @@ function renderUserMessage(msg: Message): TemplateResult {
   `;
 }
 
+/** The tool whose chip is a question card rather than a chip. */
+const ASK_TOOL = "ask_user";
+
+/** The tool whose chip grows a live progress line while it runs. */
+const IMPORT_TOOL = "import_site";
+
+/** Log lines drawn under a running import. The tail is what a reader wants. */
+const IMPORT_LOG_LINES = 6;
+
+/** What `ask_user` was called with, as far as the arguments actually parse. */
+interface AskArgs {
+  question: string;
+  options: string[];
+  context: string;
+}
+
 /**
- * What became of one tool call: `"pending"` while the loop has not reported, else ok/failed.
+ * Read a question out of a tool call's arguments.
+ *
+ * Tolerant on purpose: the arguments are assembled from streamed fragments, so a chip can be asked
+ * to render a call whose JSON is still half-written. A card with an empty question renders as an
+ * ordinary chip rather than as an empty box.
  *
  * @param {ToolCallRecord} tc
- * @returns {"pending" | "ok" | "failed"}
+ * @returns {AskArgs | null}
  */
-export function toolOutcome(tc: ToolCallRecord): "pending" | "ok" | "failed" {
+export function parseAsk(tc: ToolCallRecord): AskArgs | null {
+  let parsed: { question?: unknown; options?: unknown; context?: unknown };
+  try {
+    parsed = tc.arguments ? (JSON.parse(tc.arguments) as typeof parsed) : {};
+  } catch {
+    return null; // Still streaming, or malformed — the generic chip is the honest fallback.
+  }
+  if (typeof parsed.question !== "string" || !parsed.question.trim()) {
+    return null;
+  }
+  return {
+    context: typeof parsed.context === "string" ? parsed.context : "",
+    options: Array.isArray(parsed.options)
+      ? parsed.options.filter((o): o is string => typeof o === "string" && o.trim().length > 0)
+      : [],
+    question: parsed.question,
+  };
+}
+
+/**
+ * What became of one tool call.
+ *
+ * `"unanswered"` is the fourth value and it exists for `ask_user`. A question's promise lives in
+ * memory, so a reload kills it while the transcript survives: without this the restored card is
+ * indistinguishable from a live one and spins forever waiting for a loop that is gone. It is a
+ * property of the RUN, not of the record, so the caller supplies whether this call is still live.
+ *
+ * @param {ToolCallRecord} tc
+ * @param {boolean} [live] - Whether the loop is still waiting on this call. Only consulted for a
+ *   result-less interactive call; every other pending call belongs to a turn still in flight.
+ * @returns {"pending" | "unanswered" | "ok" | "failed"}
+ */
+export function toolOutcome(
+  tc: ToolCallRecord,
+  live = true,
+): "pending" | "unanswered" | "ok" | "failed" {
   if (!tc.result) {
-    return "pending";
+    return tc.name === ASK_TOOL && !live ? "unanswered" : "pending";
   }
   return tc.result.success ? "ok" : "failed";
 }
@@ -286,27 +343,162 @@ export function toolOutcomeText(tc: ToolCallRecord): string {
   return (result.success ? result.summary : result.error) ?? "";
 }
 
-function renderToolChips(toolCalls: ToolCallRecord[]): TemplateResult | typeof nothing {
+/**
+ * A running import, under the chip that started it.
+ *
+ * An import takes minutes and says a line at a time. Rendering it here rather than in the modal it
+ * used to live in is what stops a successful run destroying its own account of what it did: the
+ * chip and the progress are one thing, joined by the tool-call id.
+ */
+function renderImportProgress(record: ImportRunRecord): TemplateResult {
+  const determinate = record.total !== null && record.current !== null;
+  const tail = record.log.slice(-IMPORT_LOG_LINES);
+  return html`
+    <div class="ai-import-progress">
+      <div class="ai-import-head">
+        ${
+          determinate
+            ? html`<sp-progress-circle
+                size="s"
+                progress=${Math.round((record.current! / Math.max(record.total!, 1)) * 100)}
+              ></sp-progress-circle>`
+            : html`<sp-progress-circle indeterminate size="s"></sp-progress-circle>`
+        }
+        <span class="ai-import-phase">${record.phase}</span>
+        <span class="ai-import-message">${record.message}</span>
+      </div>
+      <div class="ai-import-log">
+        ${tail.map(
+          (evt) => html`
+            <div class="ai-import-log-line">
+              <span class="ai-import-phase">${evt.phase}</span>${evt.message}
+            </div>
+          `,
+        )}
+      </div>
+    </div>
+  `;
+}
+
+/** How a question card reaches the store that resolves it. */
+export interface AskHandlers {
+  /** The id of the question the loop is still waiting on, or null. */
+  pendingId?: string | null;
+  onAnswer?: (text: string) => void;
+  onSkip?: () => void;
+  /** The live record for an `import_site` call, if this renderer's host has one. */
+  importRun?: (id: string) => ImportRunRecord | null;
+}
+
+/**
+ * A question, as the last thing in the transcript, waiting on the reader.
+ *
+ * The card IS the tool chip rather than a row beside it: the question, its options and its answer
+ * are all facts about one tool call, and rendering them anywhere else would give the transcript two
+ * accounts of the same event that can disagree after a reload.
+ *
+ * The options are a shortcut, never the whole answer — the composer is always live beneath, and its
+ * placeholder says so. A question whose real answer is "neither, do this instead" must stay
+ * answerable.
+ */
+function renderAskCard(
+  tc: ToolCallRecord,
+  ask: AskArgs,
+  outcome: ReturnType<typeof toolOutcome>,
+  handlers: AskHandlers,
+): TemplateResult {
+  const answered = tc.result?.success
+    ? ((tc.result.data as { answer?: string | null; skipped?: boolean } | undefined) ?? null)
+    : null;
+  return html`
+    <div class="ai-ask" data-outcome=${outcome}>
+      <div class="ai-ask-question">${ask.question}</div>
+      ${ask.context ? html`<div class="ai-ask-context">${ask.context}</div>` : nothing}
+      ${
+        outcome === "pending"
+          ? html`
+              <div class="ai-ask-options">
+                ${ask.options.map(
+                  (option) => html`
+                    <sp-button
+                      size="s"
+                      variant="secondary"
+                      treatment="outline"
+                      @click=${() => handlers.onAnswer?.(option)}
+                    >
+                      ${option}
+                    </sp-button>
+                  `,
+                )}
+                <sp-action-button
+                  size="s"
+                  quiet
+                  class="ai-ask-skip"
+                  title="Let the assistant decide"
+                  @click=${() => handlers.onSkip?.()}
+                >
+                  You decide
+                </sp-action-button>
+              </div>
+            `
+          : nothing
+      }
+      ${
+        outcome === "unanswered"
+          ? html`<div class="ai-ask-outcome">
+              This question was still open when the session was reloaded — reply below to carry on.
+            </div>`
+          : nothing
+      }
+      ${
+        answered
+          ? html`<div class="ai-ask-answer">
+              ${answered.skipped ? "You decide" : answered.answer}
+            </div>`
+          : nothing
+      }
+      ${
+        outcome === "failed"
+          ? html`<div class="ai-ask-outcome">${toolOutcomeText(tc)}</div>`
+          : nothing
+      }
+    </div>
+  `;
+}
+
+function renderToolChips(
+  toolCalls: ToolCallRecord[],
+  handlers: AskHandlers = {},
+): TemplateResult | typeof nothing {
   if (toolCalls.length === 0) {
     return nothing;
   }
   return html`
     <div class="ai-msg-tools">
       ${toolCalls.map((tc) => {
-        const outcome = toolOutcome(tc);
+        const ask = tc.name === ASK_TOOL ? parseAsk(tc) : null;
+        const outcome = toolOutcome(tc, tc.id === handlers.pendingId || Boolean(tc.result));
+        if (ask) {
+          return renderAskCard(tc, ask, outcome, handlers);
+        }
         const text = toolOutcomeText(tc);
+        const run =
+          tc.name === IMPORT_TOOL && outcome === "pending"
+            ? (handlers.importRun?.(tc.id) ?? null)
+            : null;
         return html`
           <span class="ai-tool-chip" data-outcome=${outcome} title=${text || formatToolLabel(tc)}>
             <sp-icon-gears size="xs"></sp-icon-gears>
             <span class="ai-tool-chip-name">${formatToolLabel(tc)}</span>
             ${
-              outcome === "pending"
+              outcome === "pending" || outcome === "unanswered"
                 ? nothing
                 : html`<span class="ai-tool-chip-outcome"
                     >${outcome === "ok" ? "✓" : "✗"} ${text}</span
                   >`
             }
           </span>
+          ${run ? renderImportProgress(run) : nothing}
         `;
       })}
     </div>
@@ -373,6 +565,7 @@ function renderChangedFiles(
 function renderAssistantMessage(
   msg: Message,
   onRestore?: (messageId: string) => void,
+  ask: AskHandlers = {},
 ): TemplateResult | typeof nothing {
   const toolCalls = msg.toolCalls ?? [];
   if (!msg.content && toolCalls.length === 0) {
@@ -380,8 +573,8 @@ function renderAssistantMessage(
   }
   return html`
     <div class="ai-msg-assistant">
-      ${msg.content ? renderMarkdown(msg.id, msg.content) : nothing} ${renderToolChips(toolCalls)}
-      ${renderChangedFiles(msg, onRestore)}
+      ${msg.content ? renderMarkdown(msg.id, msg.content) : nothing}
+      ${renderToolChips(toolCalls, ask)} ${renderChangedFiles(msg, onRestore)}
     </div>
   `;
 }
@@ -396,7 +589,7 @@ function renderToolMessage(msg: Message): TemplateResult | typeof nothing {
   return html`<div class="ai-msg-tool-error">⚠️ ${parsed.error || "Tool call failed"}</div>`;
 }
 
-function renderStreamingTail(msg: Message): TemplateResult {
+function renderStreamingTail(msg: Message, ask: AskHandlers = {}): TemplateResult {
   if (!msg.content) {
     return html`
       <div class="ai-msg-typing">
@@ -409,7 +602,7 @@ function renderStreamingTail(msg: Message): TemplateResult {
   return html`
     <div class="ai-msg-assistant">
       <span class="ai-msg-streaming">${msg.content}</span>
-      ${renderToolChips(msg.toolCalls ?? [])}
+      ${renderToolChips(msg.toolCalls ?? [], ask)}
     </div>
   `;
 }
@@ -426,11 +619,19 @@ export interface MessageListOptions {
   listRef: (el: Element | undefined) => void;
   /** Undo everything one turn changed. Offered only for turns whose changes are all transactional. */
   onRestore?: ((messageId: string) => void) | undefined;
+  /**
+   * The outstanding question and how to settle it.
+   *
+   * Passed down rather than read from the store here, because this module renders templates and
+   * holds no state — the same reason the three header buttons are command records.
+   */
+  ask?: AskHandlers | undefined;
 }
 
 /** The scrollable message list — THE scroller of the chat view. */
 export function renderMessageList(opts: MessageListOptions): TemplateResult {
   const { messages, status } = opts;
+  const ask = opts.ask ?? {};
   const lastIdx = messages.length - 1;
   return html`
     <div class="ai-chat-messages" ${ref(opts.listRef)} @scroll=${opts.onScroll}>
@@ -462,9 +663,9 @@ export function renderMessageList(opts: MessageListOptions): TemplateResult {
           }
           if (msg.role === "assistant") {
             if (status === "streaming" && i === lastIdx) {
-              return renderStreamingTail(msg);
+              return renderStreamingTail(msg, ask);
             }
-            return renderAssistantMessage(msg, opts.onRestore);
+            return renderAssistantMessage(msg, opts.onRestore, ask);
           }
           return nothing;
         },

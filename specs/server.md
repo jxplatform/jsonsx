@@ -2,9 +2,9 @@
 
 ## Development Server with Live Reload, Proxy Resolution, and Studio API
 
-**Version:** 0.2.12
+**Version:** 0.2.13
 **Status:** Implemented
-**Updated:** 2026-08-25
+**Updated:** 2026-08-26
 **License:** MIT
 
 ---
@@ -144,7 +144,7 @@ The reference implementation of the Studio Backend Protocol, serving Studio's Pl
 
 The canonical endpoint list is the `STUDIO_ROUTES` table in `@jxsuite/protocol` (`packages/protocol/src/routes.ts`) — roughly 60 routes, each with method, path, core-vs-optional flag, contract summary, and degradation note. A generated reference lives in the docs (`docs/extending/embedding/backend-protocol.md`). This spec no longer enumerates them; the families are:
 
-- **Session / project** — activate, project metadata/probing, site enumeration, project creation, directory location (placing a `showDirectoryPicker()` handle on disk by the id it wrote into a hidden `.jx-loc-id`, so the New Project **Location** field gets a real folder chooser in the browser — specs/desktop.md §8.2.1), starters, AI-guided site import (NDJSON progress stream)
+- **Session / project** — activate, project metadata/probing, site enumeration, project creation, directory location (placing a `showDirectoryPicker()` handle on disk by the id it wrote into a hidden `.jx-loc-id`, so the New Project **Location** field gets a real folder chooser in the browser — specs/desktop.md §8.2.1), starters, AI-guided site import (NDJSON progress stream, whose terminal line carries what the run found)
 - **Filesystem** — directory listing and project-wide search on one route (`files?dir=` / `files?glob=`), file CRUD, upload, rename (with refactor report), locate
 - **Realtime co-editing** — `GET /__studio/collab`: a WebSocket upgrade speaking the `@jxsuite/collab` wire envelope (one socket per project, documents multiplexed by path); a plain GET answers the capability probe. Implemented in `src/collab.ts`: rooms seed from the file on disk, persistence is explicit (flush on save, plus graceful shutdown), and genuinely external file changes bump the doc epoch and reset subscribers.
 - **Documents / components / formats** — component discovery, CEM extraction, the project's format/extension registry, generated project schemas, format parse/serialize dispatch, plugin schemas, code services (§5)
@@ -173,6 +173,8 @@ Both server entry points share one set of primitives (`src/net-guard.ts`), appli
 - **Origin/Host gate** on every privileged surface — the RCE-capable `/__jx_resolve__` / `/__jx_server__` routes (both do dynamic `import()`), the `/_jx/` extension mounts, and the whole `/__studio/*` API: a loopback (or absent) Origin is accepted, a non-loopback Origin or Host is rejected (anti-CSRF, anti-DNS-rebinding). The browser Studio and the served site are same-origin, so they pass; an external page does not. No token is used — same-origin does not need one
 - **File containment**: every static path and every caller-supplied relative or absolute `$src` / `$base` / `$implementation` resolved before a dynamic `import()` passes a lexical `relative()` check **plus a realpath re-check** (`containedPath`), so a `../` or absolute path cannot escape and a symlink cannot point outside the tree; over-encoded paths are rejected after a single decode. A **bare-specifier** `$src` is exempt: it resolves only through Node's `node_modules` lookup (an installed package), so the class file — and the sibling `$implementation` it names, even one above the class directory — is trusted as that package's own code; the containment check still binds a project-local relative `$src`
 - **Two-root activation**: filesystem operations go through `assertAccessible(filePath, root, activeProjectRoot)` — the path must sit under the server root **or** the active project root Studio bound via `POST /__studio/activate`, which itself only accepts a root contained under the server root, an explicit `allowedRoots` entry, a project this server just created (below), or **a project the account already owns** — an absolute directory holding a `project.json` somewhere under the user's home directory (`isOwnedProjectDir`). That last clause is what makes an _existing_ project openable at all: projects live outside the server root as a matter of course, so `?project=/abs/path`, the Open Project picker and the recent-projects list would otherwise be able to bind nothing but a project inside the served checkout. Requiring both the `project.json` and home containment keeps a hostile page on the loopback origin from binding the server to `/etc` or to another account's files. A refused activation is an **error the client must surface**, never a silent fallback: the endpoints that take no `dir` (the git surface especially) resolve against `activeProjectRoot || root`, so a swallowed refusal would silently run against whatever tree the server is serving
+- **The import stream's terminal line reports the run, not just its location.** `POST /__studio/import-site` streams progress and ends with the new root, the project configuration, AND a summary of what the pipeline produced: the pages it emitted, the file count, the soft failures it recorded, and — when `verify` was requested — a per-page fidelity score against the original. Every field is optional, so a backend that sends none is conformant and an older client ignores them; no protocol version moves. It matters because the pipeline computed all of it and the endpoint used to discard it, leaving a caller able to say that an import had happened and nothing about what it found. `verify` is opt-in: it compiles the emitted project and drives a second browser pass, roughly doubling the run.
+
 - **Project creation is the one deliberate exception to root containment.** A new project belongs wherever the user pointed the New Project modal's Location field (specs/desktop.md §4.5), which is normally _outside_ the server root — containing it there would mean scaffolding into whatever tree the dev server happens to serve. `POST /__studio/create-project` and `POST /__studio/import-site` therefore take an explicit absolute parent and check it with `assertCreatableParent(parent, root, allowedRoots)` instead of `assertAccessible`. That guard **requires** an absolute path (a request without a destination is a 400 — the server never falls back to its own root) and admits only the server root, a configured `allowedRoots` entry, or the account's home directory, so a hostile page on the loopback origin cannot scaffold into system paths. Roots created this way are remembered for the duration of the process so the very next `/__studio/activate` can open them; the create response reports a root-relative path when the project landed under the server root and an absolute one otherwise
 
 **Fetch Metadata.** `Sec-Fetch-Site` states the requester's intent directly, which `Origin` cannot: a same-origin GET omits `Origin` entirely, so the gate has to accept an absent one — a hole `Sec-Fetch-Site` does not have. The predicate is folded into `originHostGate`, so it reaches every gated surface without a single new call site.
@@ -334,6 +336,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.2.13** (2026-08-26) — the import stream's done line carries the run summary, and accepts an opt-in verify pass (§4).
 - **0.2.12** (2026-08-25) — §3: the static-file order now matches a build — public/ precedes the project root, which survives as a compatibility lane that warns.
 - **0.2.11** (2026-08-22) — §3.1: watch-policy.ts — watchers watch only directories and regular files, and contain symlinks to the root, so a socket cannot throw and a link out cannot walk the filesystem.
 - **0.2.10** (2026-08-20) — The loopback project server's RPC socket carries server-initiated frames (ProjectServerHandle.push) — the loopback twin of the dev server's named fs SSE event, and the channel a desktop launcher raises a window over (§4.2).
@@ -360,4 +363,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/server` Specification v0.2.12_
+_`@jxsuite/server` Specification v0.2.13_
