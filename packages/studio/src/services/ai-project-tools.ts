@@ -21,7 +21,7 @@ import type { JxMutableNode, ProjectConfig } from "@jxsuite/schema/types";
 import { getPlatform } from "../platform";
 import { workspace } from "../workspace/workspace";
 import type { Tab } from "../tabs/tab";
-import { beginBatch, endBatch, isBatching } from "../tabs/transact";
+import { adoptCreatedProject } from "./project-adoption";
 import { translateValidationError } from "./ai-tools";
 import { validateDoc, validateProjectConfig } from "./jx-validate";
 import { recordWrite } from "./ai-writes";
@@ -585,30 +585,15 @@ export function registerProjectTools(
         }
 
         /*
-         * Adoption runs the full project-open flow (closes all tabs, opens the home page). The
-         * agent loop may hold an undo batch on the pre-adoption tab — flush it first and re-open
-         * one on whatever tab adoption leaves active, mirroring open_document's batch dance.
+         * Git init, then the full project-open flow, then a check that it landed — all three in
+         * `services/project-adoption.ts`, because `import_site` is the same act with a different
+         * backend. Git init in particular was missing here: `specs/desktop.md` §4.5 promises every
+         * create path initialises a repository, and only the New Project modal was keeping it.
          */
-        const wasBatching = isBatching();
-        if (wasBatching) {
-          endBatch();
-        }
-        let adoptionError: string | null = null;
-        try {
-          await adoptProject(result.root);
-        } catch (error) {
-          adoptionError = error instanceof Error ? error.message : String(error);
-        }
-        if (wasBatching) {
-          beginBatch(getTab());
-        }
-
-        /*
-         * The adopter (openRecentProject) swallows failures into a status message, so a resolved
-         * promise is not proof of adoption — verify against the workspace before re-keying the
-         * chat session.
-         */
-        const adopted = workspace.projectRoot === result.root;
+        const { adopted, error: adoptionError } = await adoptCreatedProject(result.root, {
+          adopt: adoptProject,
+          getTab,
+        });
         if (adopted) {
           onProjectAdopted?.(result.root);
           return {

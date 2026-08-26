@@ -5,7 +5,7 @@
   "license": "MIT",
   "scripts": {
     "build": "bunx jx build && bun ../../scripts/docs/build-llm-export.ts",
-    "upgrade": "bunx npm-check-updates -u && bun install",
+    "upgrade": "bun update --latest && bun install",
     "test": "bun test --isolate",
     "test:coverage": "bun test --isolate --coverage"
   },

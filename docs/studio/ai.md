@@ -3,6 +3,8 @@ title: "AI assistant"
 description: "What the Studio AI assistant can do with a project or page open, how to connect an AI provider, and exactly what leaves your machine when you chat."
 code:
   - packages/studio/src/panels/chat-panel.ts
+  - packages/studio/src/services/ai-ask.ts
+  - packages/studio/src/services/ai-import-tools.ts
   - packages/studio/src/services/ai-system-prompt.ts
   - packages/studio/src/services/ai-settings.ts
   - packages/studio/src/services/tool-executor.ts
@@ -13,15 +15,15 @@ code:
 
 # AI assistant
 
-Studio has a built-in AI assistant: a chat panel that works on your project rather than talking about it. It creates pages and components, edits the page on the canvas while you watch, and answers questions about what it finds in your files. It runs against an AI provider **you** connect; Studio ships no account, no hosted AI, and sends nothing anywhere until you do.
+Studio has a built-in AI assistant: a chat panel that answers questions about your project and changes it for you. It creates pages and components, edits the page on the canvas while you watch, and tells you what it finds in your files. It runs against an AI provider **you** connect; Studio ships no account, no hosted AI, and sends nothing anywhere until you do.
 
 ![The assistant open beside a page on the canvas, mid-conversation](../images/ai-sidebar.png)
 
-The assistant is the **fourth tab of the Inspector**, beside Content, Style and Logic. Show it with :kbd[Cmd+Shift+4], or by clicking the tab. Because it shares the Inspector's width, showing it costs the canvas nothing. It's available in every state: before you open a project, with a project open, and with a page on the canvas. What the assistant can do grows with each of those.
+The assistant is the **fourth tab of the Inspector**, beside Content, Style and Logic. Show it with :kbd[⌘⇧4] (macOS) / :kbd[Ctrl+Shift+4] (Windows/Linux), or by clicking the tab. Because it shares the Inspector's width, showing it costs the canvas nothing. It's available in every state: before you open a project, with a project open, and with a page on the canvas. What the assistant can do grows with each of those.
 
 ## What it can do
 
-**With nothing open**, the assistant bootstraps. Describe a site and it creates a project for you: name, folders, starter pages, and a design quickstart (colors and fonts) derived from your description, then keeps building inside it. It will ask you where to put the project before creating anything. Tell it a folder (or, on the cloud, a GitHub account or organization). The **[New Project](/docs/studio/projects/create)** dialog's **Agent** tab is the same idea as a form: describe the site you want, and the assistant builds it in the editor while you watch.
+**With nothing open**, the assistant bootstraps. Describe a site and it creates a project for you: name, folders, starter pages, and a design quickstart (colors and fonts) derived from your description, then keeps building inside it. It will ask you where to put the project before creating anything. Tell it a folder (or, on the cloud, a GitHub account or organization). It can also clone a live site. Point it at a URL and it crawls the pages, extracts the styles and assets, finds the shared layout and the repeating components, and opens the result. It reports each phase as it goes, and stops to ask you about the judgement calls that are yours to make. The **[New Project](/docs/studio/projects/create)** dialog's **Agent** and **Import** tabs are these same two jobs as a form you fill in.
 
 **With a project open**, the assistant works across files. It can list and read any project file, find files by name, create new pages and components, and rewrite files whole. Anything it writes as a Jx document is validated before it touches disk. It can also open a page on the canvas to continue there.
 
@@ -33,7 +35,7 @@ Each request gets five working rounds: five turns of thinking and calling tools 
 
 ## Connect a provider
 
-Until AI is connected, the tab shows the chat as usual with one line beneath it (_No AI provider is connected yet_) and an **Open Preferences…** button. A provider key is something you set once for the whole app, so it lives in **[Preferences](/docs/studio/interface/preferences)** › **Assistant** (:kbd[Cmd+,]) rather than occupying the panel. That is also where you can see it listed and disconnect it later.
+Until AI is connected, the tab shows the chat as usual with one line beneath it (_No AI provider is connected yet_) and an **Open Preferences…** button. A provider key is something you set once for the whole app, so it lives in **[Preferences](/docs/studio/interface/preferences)** › **Assistant** (:kbd[⌘,]) rather than occupying the panel. That is also where you can see it listed and disconnect it later.
 
 ### Connect Cloudflare (Jx Cloud)
 
@@ -84,7 +86,7 @@ Requests travel through Studio's own local proxy straight to the endpoint you co
 
 ## Learn the two surfaces
 
-- **[The AI assistant](/docs/studio/ai/chat)**: the chat itself, covering attaching context, watching edits land, chat history, and reviewing or undoing what the assistant changed.
+- **[The AI assistant](/docs/studio/ai/chat)**: the chat itself, covering attaching context, watching edits land, answering a question it stops to ask, following a long job, chat history, and reviewing or undoing what the assistant changed.
 - **[Document assistant](/docs/studio/ai/document-assistant)**: how the assistant works when a page is open on the canvas, and when to use that instead of project-wide edits.
 
 ## Next

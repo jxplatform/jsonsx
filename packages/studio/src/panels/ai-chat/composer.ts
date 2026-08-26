@@ -17,26 +17,17 @@
 import { html, nothing } from "lit-html";
 import { displayTagName } from "@jxsuite/schema/guards";
 import type { TemplateResult } from "lit-html";
-import { live } from "lit-html/directives/live.js";
 import { ref } from "lit-html/directives/ref.js";
 import { getNodeAtPath } from "../../state";
-import {
-  aiConnection,
-  cachedModels,
-  fetchAvailableModels,
-  preferredModel,
-} from "../../services/ai-models";
-import { setModel } from "../../services/ai-settings";
+import { createModelPicker } from "../../ui/ai-model-picker";
 import { activeTab } from "../../workspace/workspace";
 import { primarySelection } from "../../tabs/selection";
 import { buildMessageWithContext } from "./attached-context";
 import type { ContextChip } from "./attached-context";
-import type { AiCredentials } from "../../services/ai-models";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
 /** Tallest the textarea auto-grows before it scrolls internally. */
 const MAX_INPUT_HEIGHT = 120;
-const RETRY_MODELS = "__retry_models__";
 
 export interface ComposerOptions {
   /** Receives the full message content (typed text + serialized context). */
@@ -45,6 +36,13 @@ export interface ComposerOptions {
   /** Opens the credentials form. */
   onOpenSettings: () => void;
   isStreaming: () => boolean;
+  /**
+   * Whether the turn is suspended on a question. The composer becomes the answer field: Enter still
+   * sends, but the host routes it to the pending question instead of opening a new turn.
+   *
+   * Optional so the evals harness and tests that predate `ask_user` keep compiling.
+   */
+  isAwaiting?: () => boolean;
   /** Host re-render scheduler — called whenever composer state changes. */
   requestRender: () => void;
 }
@@ -76,89 +74,10 @@ export function createComposer(opts: ComposerOptions): Composer {
   let hasText = false;
   let chips: ContextChip[] = [];
 
-  /** Null until the first fetch settles; kept on error so the picker can offer Retry. */
-  let modelsLoading = false;
-  let modelsError = "";
-
-  /**
-   * The connection the last fetch was made for, so a failure is not retried on every render.
-   *
-   * The list itself is NOT held here. A private copy is how the picker came to show one provider's
-   * catalogue while another was configured: it was filled once and never reconsidered. Reading it
-   * from `cachedModels(connection)` means a list can only ever be shown for the credentials it was
-   * listed under, and a credential change makes it unavailable rather than stale.
-   */
-  let attempted: AiCredentials | null = null;
-
-  // ── Model picker ──────────────────────────────────────────────────────
-
-  function sameConnection(a: AiCredentials | null, b: AiCredentials): boolean {
-    return a !== null && a.apiKey === b.apiKey && a.baseUrl === b.baseUrl;
-  }
-
-  function ensureModels(force = false) {
-    const credentials = aiConnection();
-    const settled = cachedModels(credentials) !== null || sameConnection(attempted, credentials);
-    if (modelsLoading || (settled && !force)) {
-      return;
-    }
-    modelsLoading = true;
-    modelsError = "";
-    attempted = credentials;
-    fetchAvailableModels({ credentials, force })
-      .catch((error: unknown) => {
-        modelsError = (error as Error).message || "Failed to fetch models";
-      })
-      .finally(() => {
-        modelsLoading = false;
-        opts.requestRender();
-      });
-  }
-
-  function onModelChange(e: Event) {
-    const { value } = e.target as HTMLInputElement;
-    if (value === RETRY_MODELS) {
-      attempted = null;
-      ensureModels(true);
-      // Re-render so the picker snaps back to the stored model instead of "Retry".
-      opts.requestRender();
-      return;
-    }
-    if (value) {
-      setModel(value);
-    }
-  }
-
-  function renderModelPicker(): TemplateResult {
-    ensureModels();
-    const current = preferredModel();
-    const listed = cachedModels(aiConnection()) ?? [];
-    const items = listed.some((m) => m.id === current)
-      ? listed
-      : [{ id: current, name: current }, ...listed];
-    return html`
-      <sp-picker
-        size="s"
-        quiet
-        class="ai-model-picker"
-        title=${modelsError ? `Couldn't load models: ${modelsError}` : "Model"}
-        .value=${live(current)}
-        @change=${onModelChange}
-      >
-        ${items.map((m) => html`<sp-menu-item value=${m.id}>${m.name}</sp-menu-item>`)}
-        ${
-          modelsLoading
-            ? html`<sp-menu-item disabled value="__loading__">Loading models…</sp-menu-item>`
-            : nothing
-        }
-        ${
-          modelsError
-            ? html`<sp-menu-item value=${RETRY_MODELS}>Retry loading models</sp-menu-item>`
-            : nothing
-        }
-      </sp-picker>
-    `;
-  }
+  /* The model picker is `ui/ai-model-picker.ts` now, not forty lines here: the New Project Import
+     source chooses a model too, and the "never hold the list privately" invariant is the kind that
+     only breaks in the copy nobody looked at. */
+  const modelPicker = createModelPicker({ requestRender: opts.requestRender });
 
   // ── Context attach ────────────────────────────────────────────────────
 
@@ -317,13 +236,18 @@ export function createComposer(opts: ComposerOptions): Composer {
 
   function render(): TemplateResult {
     const streaming = opts.isStreaming();
+    const awaiting = opts.isAwaiting?.() ?? false;
     return html`
-      <div class="ai-composer">
+      <div class="ai-composer" ?data-awaiting=${awaiting}>
         ${renderChips()}
         <textarea
           class="ai-composer-input"
           rows="1"
-          placeholder="Ask the assistant… (Enter to send)"
+          placeholder=${
+            awaiting
+              ? "Answer the assistant… (Enter to reply)"
+              : "Ask the assistant… (Enter to send)"
+          }
           ${ref((el) => {
             textareaEl = (el as HTMLTextAreaElement | null) || null;
           })}
@@ -331,7 +255,7 @@ export function createComposer(opts: ComposerOptions): Composer {
           @keydown=${onKeydown}
         ></textarea>
         <div class="ai-composer-row">
-          ${renderAttachMenu()} ${renderModelPicker()}
+          ${renderAttachMenu()} ${modelPicker.render()}
           <span class="ai-header-spacer"></span>
           <sp-action-button size="s" quiet title="API key & endpoint" @click=${opts.onOpenSettings}>
             <sp-icon-settings slot="icon"></sp-icon-settings>
@@ -347,7 +271,7 @@ export function createComposer(opts: ComposerOptions): Composer {
                   <sp-action-button
                     size="s"
                     class="ai-send-btn"
-                    title="Send"
+                    title=${awaiting ? "Answer" : "Send"}
                     ?disabled=${!hasText}
                     @click=${trySend}
                   >

@@ -10,6 +10,7 @@
       "devDependencies": {
         "@commitlint/cli": "^21.2.2",
         "@commitlint/config-conventional": "^21.2.2",
+        "@commitlint/types": "^21.2.0",
         "@ttsc/graph": "^0.28.2",
         "@types/bun": "1.4.0",
         "bun-types": "^1.4.0",
@@ -43,7 +44,7 @@
     },
     "extensions/auth": {
       "name": "@jxsuite/auth",
-      "version": "0.5.2",
+      "version": "0.5.5",
       "dependencies": {
         "@jxsuite/connector": "workspace:^",
         "@jxsuite/schema": "workspace:^",
@@ -57,7 +58,7 @@
     },
     "extensions/connector": {
       "name": "@jxsuite/connector",
-      "version": "0.5.2",
+      "version": "0.5.5",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
         "kysely": "^0.29.5",
@@ -73,7 +74,7 @@
     },
     "extensions/feed": {
       "name": "@jxsuite/feed",
-      "version": "0.3.1",
+      "version": "0.3.3",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
       },
@@ -83,7 +84,7 @@
     },
     "extensions/parser": {
       "name": "@jxsuite/parser",
-      "version": "1.5.4",
+      "version": "1.5.6",
       "dependencies": {
         "@jxsuite/markup": "workspace:^",
         "@jxsuite/schema": "workspace:^",
@@ -111,7 +112,7 @@
     },
     "extensions/search": {
       "name": "@jxsuite/search",
-      "version": "0.2.2",
+      "version": "0.2.4",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
         "minisearch": "^7.2.0",
@@ -122,7 +123,7 @@
     },
     "packages/ai": {
       "name": "@jxsuite/ai",
-      "version": "0.36.2",
+      "version": "0.36.4",
       "dependencies": {
         "@jxsuite/protocol": "workspace:^",
         "@vue/reactivity": "3.5.41",
@@ -133,7 +134,7 @@
     },
     "packages/collab": {
       "name": "@jxsuite/collab",
-      "version": "0.8.1",
+      "version": "0.8.3",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
         "lib0": "^0.2.117",
@@ -143,7 +144,7 @@
     },
     "packages/compiler": {
       "name": "@jxsuite/compiler",
-      "version": "2.0.5",
+      "version": "2.0.8",
       "bin": {
         "jx": "./bin/jx.js",
       },
@@ -166,7 +167,7 @@
     },
     "packages/create": {
       "name": "@jxsuite/create",
-      "version": "1.3.5",
+      "version": "1.3.7",
       "bin": {
         "create-jxsuite": "./index.ts",
       },
@@ -176,7 +177,7 @@
     },
     "packages/desktop": {
       "name": "@jxsuite/desktop",
-      "version": "2.3.3",
+      "version": "4.0.0",
       "dependencies": {
         "@jxsuite/compiler": "workspace:^",
         "@jxsuite/create": "workspace:^",
@@ -201,7 +202,7 @@
     },
     "packages/formulas": {
       "name": "@jxsuite/formulas",
-      "version": "0.0.11",
+      "version": "0.0.14",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
       },
@@ -211,7 +212,7 @@
     },
     "packages/import": {
       "name": "@jxsuite/import",
-      "version": "0.39.5",
+      "version": "0.39.8",
       "bin": {
         "jx-import": "./src/cli.ts",
       },
@@ -232,7 +233,7 @@
     },
     "packages/markup": {
       "name": "@jxsuite/markup",
-      "version": "0.4.5",
+      "version": "0.4.7",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
         "hast-util-from-html": "^2.0.3",
@@ -251,14 +252,14 @@
     },
     "packages/protocol": {
       "name": "@jxsuite/protocol",
-      "version": "1.2.0",
+      "version": "2.0.0",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
       },
     },
     "packages/runtime": {
       "name": "@jxsuite/runtime",
-      "version": "2.0.4",
+      "version": "2.1.0",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
         "@vue/reactivity": "3.5.41",
@@ -269,7 +270,7 @@
     },
     "packages/schema": {
       "name": "@jxsuite/schema",
-      "version": "1.8.0",
+      "version": "1.9.0",
       "dependencies": {
         "@webref/css": "^8.7.2",
         "@webref/elements": "^2.7.1",
@@ -283,7 +284,7 @@
     },
     "packages/server": {
       "name": "@jxsuite/server",
-      "version": "2.2.5",
+      "version": "3.0.0",
       "dependencies": {
         "@jxsuite/collab": "workspace:^",
         "@jxsuite/compiler": "workspace:^",
@@ -305,7 +306,7 @@
     },
     "packages/starters": {
       "name": "@jxsuite/starters",
-      "version": "1.6.2",
+      "version": "1.6.4",
       "devDependencies": {
         "@jxsuite/parser": "workspace:^",
         "@jxsuite/runtime": "workspace:^",
@@ -316,7 +317,7 @@
     },
     "packages/studio": {
       "name": "@jxsuite/studio",
-      "version": "2.4.1",
+      "version": "3.0.0",
       "dependencies": {
         "@atlaskit/pragmatic-drag-and-drop": "^3.0.0",
         "@atlaskit/pragmatic-drag-and-drop-hitbox": "^2.1.0",
@@ -1929,7 +1930,7 @@
 
     "media-typer": ["media-typer@1.1.0", "", {}, "sha512-aisnrDP4GNe06UcKFnV5bfMNPBUw4jsLGaWwWfnH3v02GnBuXX2MCVn5RbrWo0j3pczUilYblq7fQ7Nw2t5XKw=="],
 
-    "meow": ["meow@8.1.2", "", { "dependencies": { "@types/minimist": "^1.2.0", "camelcase-keys": "^6.2.2", "decamelize-keys": "^1.1.0", "hard-rejection": "^2.1.0", "minimist-options": "4.1.0", "normalize-package-data": "^3.0.0", "read-pkg-up": "^7.0.1", "redent": "^3.0.0", "trim-newlines": "^3.0.0", "type-fest": "^0.18.0", "yargs-parser": "^20.2.3" } }, "sha512-r85E3NdZ+mpYk1C6RjPFEMSE+s1iZMuHtsHAqY0DT3jZczl0diWUZ8g6oU7h0M9cD2EL+PzaYghhCLzR0ZNn5Q=="],
+    "meow": ["meow@14.1.0", "", {}, "sha512-EDYo6VlmtnumlcBCbh1gLJ//9jvM/ndXHfVXIFrZVr6fGcwTUyCTFNTLCKuY3ffbK8L/+3Mzqnd58RojiZqHVw=="],
 
     "merge-descriptors": ["merge-descriptors@2.0.0", "", {}, "sha512-Snk314V5ayFLhp3fkUREub6WtjBfPdCPY1Ln8/8munuLuiYhsABgBVWsozAG+MWMbVEvcdcpbi9R7ww22l9Q3g=="],
 
@@ -2619,9 +2620,9 @@
 
     "cliui/strip-ansi": ["strip-ansi@7.2.0", "", { "dependencies": { "ansi-regex": "^6.2.2" } }, "sha512-yDPMNjp4WyfYBkHnjIRLfca1i6KMyGCtsVgoKe/z1+6vukgaENdgGBZt+ZmKPc4gavvEZ5OgHfHdrazhgNyG7w=="],
 
-    "conventional-changelog-writer/semver": ["semver@7.8.4", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-rUCObTnP32Q08R2uuIrt7r9PlEonuTmtuXYcW6s5kjdlj3xbnwe+21yXptAUYcMAABLkYYTtnmzb3w3EDZfueA=="],
+    "conventional-changelog-writer/meow": ["meow@8.1.2", "", { "dependencies": { "@types/minimist": "^1.2.0", "camelcase-keys": "^6.2.2", "decamelize-keys": "^1.1.0", "hard-rejection": "^2.1.0", "minimist-options": "4.1.0", "normalize-package-data": "^3.0.0", "read-pkg-up": "^7.0.1", "redent": "^3.0.0", "trim-newlines": "^3.0.0", "type-fest": "^0.18.0", "yargs-parser": "^20.2.3" } }, "sha512-r85E3NdZ+mpYk1C6RjPFEMSE+s1iZMuHtsHAqY0DT3jZczl0diWUZ8g6oU7h0M9cD2EL+PzaYghhCLzR0ZNn5Q=="],
 
-    "conventional-commits-parser/meow": ["meow@14.1.0", "", {}, "sha512-EDYo6VlmtnumlcBCbh1gLJ//9jvM/ndXHfVXIFrZVr6fGcwTUyCTFNTLCKuY3ffbK8L/+3Mzqnd58RojiZqHVw=="],
+    "conventional-changelog-writer/semver": ["semver@7.8.4", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-rUCObTnP32Q08R2uuIrt7r9PlEonuTmtuXYcW6s5kjdlj3xbnwe+21yXptAUYcMAABLkYYTtnmzb3w3EDZfueA=="],
 
     "cosmiconfig/env-paths": ["env-paths@2.2.1", "", {}, "sha512-+h1lkLKhZMTYjog1VEpJNG7NZJWcuc2DDk/qsqSTRRCOXiLjeQ1d1/udrUGhqMxUgAlwKNZ0cf2uqan5GLuS2A=="],
 
@@ -2718,10 +2719,6 @@
     "mdast-util-frontmatter/escape-string-regexp": ["escape-string-regexp@5.0.0", "", {}, "sha512-/veY75JbMK4j1yjvuUxuVsiS/hr/4iHs9FTT6cgTexxdE0Ly/glccBAkloH/DofkjRbZU3bnoj38mOmhkZ0lHw=="],
 
     "mdast-util-to-hast/@types/hast": ["@types/hast@3.0.4", "", { "dependencies": { "@types/unist": "*" } }, "sha512-WPs+bbQw5aCj+x6laNGWLH3wviHtoCv/P3+otBhbOhJgG8qtpdAMlTCxLtsTWA7LH1Oh/bFCHsBn0TPS5m30EQ=="],
-
-    "meow/type-fest": ["type-fest@0.18.1", "", {}, "sha512-OIAYXk8+ISY+qTOwkHtKqzAuxchoMiD9Udx+FSGQDuiRR+PJKJHc2NJAXlbhkGwTt/4/nKZxELY1w3ReWOL8mw=="],
-
-    "meow/yargs-parser": ["yargs-parser@20.2.9", "", {}, "sha512-y11nGElTIV+CT3Zv9t7VKl+Q3hTQoT9a1Qzezhhl6Rp21gJ/IVTW7Z3y9EWXhuUBC2Shnf+DX0antecpAwSP8w=="],
 
     "minimist-options/is-plain-obj": ["is-plain-obj@1.1.0", "", {}, "sha512-yvkRyxmFKEOQ4pNXCmJG5AEQNlXJS5LaONXo5/cLdTZdWvsZ1ioJEonLGAosKlMWE8lwUy/bJzMjcw8az73+Fg=="],
 
@@ -2852,6 +2849,10 @@
     "class-utils/define-property/is-descriptor": ["is-descriptor@0.1.8", "", { "dependencies": { "is-accessor-descriptor": "^1.0.1", "is-data-descriptor": "^1.0.1" } }, "sha512-SceYGWXvdqlWa/OnQ5FQuV+NxvNmMRhMw/w9AHkH71hTzveND4BTYgvp16g+oITK47qbOl/3D0bl0iygehWAWQ=="],
 
     "cliui/strip-ansi/ansi-regex": ["ansi-regex@6.2.2", "", {}, "sha512-Bq3SmSpyFHaWjPk8If9yc6svM8c56dB5BAtW4Qbw5jHTwwXXcTLoRMkpDJp6VL0XzlWaCHTXrkFURMYmD0sLqg=="],
+
+    "conventional-changelog-writer/meow/type-fest": ["type-fest@0.18.1", "", {}, "sha512-OIAYXk8+ISY+qTOwkHtKqzAuxchoMiD9Udx+FSGQDuiRR+PJKJHc2NJAXlbhkGwTt/4/nKZxELY1w3ReWOL8mw=="],
+
+    "conventional-changelog-writer/meow/yargs-parser": ["yargs-parser@20.2.9", "", {}, "sha512-y11nGElTIV+CT3Zv9t7VKl+Q3hTQoT9a1Qzezhhl6Rp21gJ/IVTW7Z3y9EWXhuUBC2Shnf+DX0antecpAwSP8w=="],
 
     "create-jest-runner/chalk/ansi-styles": ["ansi-styles@3.2.1", "", { "dependencies": { "color-convert": "^1.9.0" } }, "sha512-VT0ZI6kZRdTh8YyJw3SMbYm/u+NqfsAxEpWO0Pf9sq8/e94WxxOpPKx9FR1FlyCtOVDNOQ+8ntlqFxiRc+r5qA=="],
 

@@ -28,8 +28,23 @@ import type { ToolRegistry } from "@jxsuite/ai/tools";
 import type { Tab } from "../tabs/tab";
 import { batchTab, beginBatch, endBatch } from "../tabs/transact";
 import { beginTurn, endTurn } from "./ai-writes";
+import { beginToolCall, beginTurnSignal, endTurnSignal } from "./ai-turn-signal";
 
 const MAX_ROUNDS = 5;
+
+/**
+ * Hard ceiling on rounds of every kind, so the loop terminates whatever the model does.
+ *
+ * {@link MAX_ROUNDS} bounds AUTONOMOUS work, and a round that ends by blocking on a person is the
+ * opposite of runaway — it cannot advance without them, which is the property the cap was ever a
+ * proxy for. So an interactive round does not spend that budget. This one is the backstop that
+ * keeps `runAgentLoop` provably terminating anyway; a human answering ten questions will have
+ * stopped it long before.
+ */
+const MAX_TOTAL_ROUNDS = 25;
+
+/** Tools that suspend the turn on a human rather than doing work. */
+const INTERACTIVE_TOOLS = new Set(["ask_user"]);
 
 interface RunAgentLoopOptions {
   chatState: ReturnType<typeof createChatState>;
@@ -59,6 +74,11 @@ export async function runAgentLoop({
   const turnId = () => chatState.messages.at(-1)?.id ?? "";
   beginTurn(`turn:${chatState.messages.length}`);
 
+  /* The signal, published for the tools rather than passed to them: `ToolRegistry.execute` takes
+     none. Without it a tool that waits for a human never learns the turn was stopped, and the
+     `await` below is the whole loop. See services/ai-turn-signal.ts. */
+  beginTurnSignal(signal);
+
   // Batch all tool-call mutations into a single undo step, anchored on the tab being edited.
   if (getTab) {
     beginBatch(getTab());
@@ -83,7 +103,9 @@ export async function runAgentLoop({
   };
 
   try {
-    for (let round = 1; round <= MAX_ROUNDS; round++) {
+    /* Rounds that DID something, which is what MAX_ROUNDS bounds — see MAX_TOTAL_ROUNDS. */
+    let workRounds = 0;
+    for (let round = 1; round <= MAX_TOTAL_ROUNDS && workRounds < MAX_ROUNDS; round++) {
       const messages = chatState.toMessagesArray();
       const tools = toolRegistry.listForLLM();
 
@@ -144,8 +166,11 @@ export async function runAgentLoop({
         return;
       }
 
+      let didWork = false;
       for (const [id, call] of toolCalls) {
         let result;
+        // Published, not passed: `ToolRegistry.execute` takes the args and nothing else.
+        beginToolCall(id);
         try {
           const args = call.arguments ? (JSON.parse(call.arguments) as object) : {};
           result = await toolRegistry.execute(call.name, args);
@@ -154,6 +179,9 @@ export async function runAgentLoop({
             success: false,
             error: `Failed to parse arguments: ${(error as Error).message}`,
           };
+        }
+        if (!INTERACTIVE_TOOLS.has(call.name)) {
+          didWork = true;
         }
         reanchorBatch();
         if (!result.success && result.error) {
@@ -166,7 +194,10 @@ export async function runAgentLoop({
         chatState.pushToolResultMessage(id, JSON.stringify(result));
       }
 
-      if (round < MAX_ROUNDS) {
+      if (didWork) {
+        workRounds += 1;
+      }
+      if (workRounds < MAX_ROUNDS && round < MAX_TOTAL_ROUNDS) {
         chatState.beginAssistantTurn();
       }
     }
@@ -196,6 +227,7 @@ export async function runAgentLoop({
     }
     chatState.setError(tail);
   } finally {
+    endTurnSignal();
     endBatch();
     endTurn(turnId());
   }

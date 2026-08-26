@@ -2,9 +2,9 @@
 
 ## Platform Abstraction, Project Loading, and Component Scoping
 
-**Version:** 0.4.0-draft
+**Version:** 0.4.1-draft
 **Status:** Pending
-**Updated:** 2026-08-25
+**Updated:** 2026-08-26
 **License:** MIT
 
 ---
@@ -397,7 +397,7 @@ projectState = {
 
 A new project is written **only** where the user said to put it. No backend picks a destination on its own, and none falls back to its own root — an unspecified destination is an error, not a default.
 
-**The wizard is two steps, and the second collects identity only.** Step 1 (_Choose a starting point_) offers the starter gallery — with one **Start from scratch** card at its end for the minimal scaffold — plus the Import and Agent sources on their own tabs. Step 2 (_Name your project_) collects the project name and the destination, and nothing else: the site's URL, its deployment adapter and its design tokens are project settings, editable for the life of the project, so they are not creation-time decisions. **Cancel is available on both steps**, alongside the underlay, `Escape` and the header close button; dismissing the modal while an import is streaming aborts the run rather than trapping the user behind it.
+**The wizard is two steps, and the second collects identity only.** Step 1 (_Choose a starting point_) offers the starter gallery — with one **Start from scratch** card at its end for the minimal scaffold — plus the Import and Agent sources on their own tabs. Step 2 (_Name your project_) collects the project name and the destination, and nothing else: the site's URL, its deployment adapter and its design tokens are project settings, editable for the life of the project, so they are not creation-time decisions. **Cancel is available on both steps**, alongside the underlay, `Escape` and the header close button.
 
 `StudioPlatform.createDestination` declares which kind of destination the platform takes, and the New Project modal renders the matching fields on its Name step:
 
@@ -437,7 +437,9 @@ A live preview under the fields shows the resolved destination (`/home/you/Sites
 
 **Every created project is a git repository.** A scaffold that is not under version control has no undo for its first destructive action, and nothing in the app says so. On the create path — every source, including Import and Agent — Studio therefore binds the backend to the new root (`activate`), reads `gitStatus`, and runs `gitInit` when the tree is not already a repository. It is skipped entirely on `createDestination: "repo"` platforms, where the project _is_ a repository by construction, and a git failure is reported without failing the create: the project that was written stays written.
 
-**Import shares this destination.** The Import tab is one of the three New Project sources, so it collects the same Location field and sends the resolved absolute path as `ImportSiteOptions.directory`. A relative directory reaching a backend means a caller skipped the field and is refused.
+**The obligation belongs to whatever creates the project, not to the wizard.** The assistant's bootstrap tools create projects too, and for a release only the wizard was keeping this promise — a project the agent scaffolded was not a repository and nothing said so. Both tools now run the same adoption sequence: version control, then the open flow, then a check that the workspace really moved, because the adopter reports its failures rather than raising them and a resolved promise is not proof of adoption.
+
+**Import shares this destination, and hands it to the assistant.** The Import tab is one of the three New Project sources, so it collects the same Location field; the resolved absolute path reaches the backend as `ImportSiteOptions.directory`, and a relative directory arriving there means a caller skipped the field and is refused. The wizard no longer runs the pipeline: it gathers the URL, the crawl options, a model and a brief, then closes without having created anything, and the assistant runs the import as a tool call (`specs/ai.md` §3.5). That is what makes the run watchable and questionable — the wizard's progress log was destroyed at the moment a successful import handed off, taking every phase line and every warning with it. **Stop in the assistant aborts the run**, in place of the wizard's Cancel Import.
 
 ---
 
@@ -1234,6 +1236,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.4.1-draft** (2026-08-26) — the Import source hands its brief to the assistant, which runs the import; the git-init obligation moves to whatever creates the project (§4.5).
 - **0.4.0-draft** (2026-08-25) — StudioPlatform writes user settings as patches (set/remove) rather than replacing the whole map, so one window cannot clear another's; and §3.6 states which store a credential belongs in.
 - **0.3.24-draft** (2026-08-25) — §3.1: a platform declares assetSpace beside documentBaseUrl; §10.2 (Pending → Partial): what a storage backend must declare, including that stored bytes come back losslessly.
 - **0.3.23-draft** (2026-08-25) — 10.1 removes discoverComponents from the cloud adapter's omissions: deriving component metadata from a JSON document executes nothing, and returning an empty registry left the canvas unable to register or fetch any component at all.
@@ -1278,4 +1281,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx Studio Desktop Architecture Specification v0.4.0-draft_
+_Jx Studio Desktop Architecture Specification v0.4.1-draft_

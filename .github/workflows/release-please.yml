@@ -425,7 +425,7 @@ jobs:
   #
   #   1. release-please skips a component whose changelog carries a raw `<tag>` — it logs
   #      "Pull request contains releases, but not for component: starters", creates the other 18,
-  #      and exits 0. The manifest still claims the version. (commitlint.config.js has the full
+  #      and exits 0. The manifest still claims the version. (commitlint.config.ts has the full
   #      mechanism; `checks` now blocks the commit subjects that cause it.)
   #   2. The `release-please` job dies PART WAY THROUGH after creating some releases — a GitHub 5xx
   #      during its commit-history walk, which is precisely what an un-tagged component provokes.

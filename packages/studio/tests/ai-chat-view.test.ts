@@ -17,10 +17,12 @@ import {
   formatToolLabel,
   renderChatHeader,
   renderMessageList,
+  parseAsk,
   toolOutcome,
   toolOutcomeText,
   tryParseToolResult,
 } from "../src/panels/ai-chat/chat-view";
+import type { AskHandlers } from "../src/panels/ai-chat/chat-view";
 import { beginTurn, endTurn, recordWrite, resetAiWrites } from "../src/services/ai-writes";
 import { ATTACHED_CONTEXT_DELIMITER } from "../src/panels/ai-chat/attached-context";
 import { setActiveRegistry } from "../src/commands/active-registry";
@@ -96,6 +98,7 @@ function list(
     status?: string;
     error?: string | null;
     onRestore?: (id: string) => void;
+    ask?: AskHandlers;
   } = {},
 ) {
   return renderMessageList({
@@ -104,7 +107,26 @@ function list(
     messages,
     onScroll: () => {},
     status: opts.status ?? "idle",
+    ...(opts.ask ? { ask: opts.ask } : {}),
     ...(opts.onRestore ? { onRestore: opts.onRestore } : {}),
+  });
+}
+
+/** An assistant turn whose only tool call is a question. */
+function asking(
+  id: string,
+  args: object,
+  result?: { success: boolean; data?: unknown; error?: string },
+): Message {
+  return msg("assistant", "", {
+    toolCalls: [
+      {
+        arguments: JSON.stringify(args),
+        id,
+        name: "ask_user",
+        ...(result ? { result: result as never } : {}),
+      },
+    ],
   });
 }
 
@@ -472,5 +494,222 @@ describe("every id this file names is one the real app declares", () => {
     const named = [...source.matchAll(/commandButton\("([\w.]+)"/g)].map((m) => m[1] as string);
     expect(named).toEqual(["assistant.history", "assistant.newChat", "assistant.retry"]);
     expect(named.filter((id) => !declared.has(id))).toEqual([]);
+  });
+});
+
+describe("the question card", () => {
+  test("renders the question, its context and its options", async () => {
+    const el = await renderInto(
+      list(
+        [asking("q1", { context: "3 look alike", options: ["Merge", "Keep"], question: "Which?" })],
+        {
+          ask: { pendingId: "q1" },
+        },
+      ),
+    );
+    expect(el.querySelector(".ai-ask-question")?.textContent?.trim()).toBe("Which?");
+    expect(el.querySelector(".ai-ask-context")?.textContent?.trim()).toBe("3 look alike");
+    const buttons = [...el.querySelectorAll(".ai-ask-options sp-button")];
+    expect(buttons.map((b) => b.textContent?.trim())).toEqual(["Merge", "Keep"]);
+    // A gears chip would be the wrong shape for the one row that will not proceed without a reader.
+    expect(el.querySelector(".ai-tool-chip")).toBeNull();
+  });
+
+  test("an option button answers with its own text", async () => {
+    const onAnswer = mock((_t: string) => {});
+    const el = await renderInto(
+      list([asking("q1", { options: ["Merge", "Keep"], question: "Which?" })], {
+        ask: { onAnswer, pendingId: "q1" },
+      }),
+    );
+    pointer(el.querySelectorAll(".ai-ask-options sp-button")[1] as HTMLElement, "click");
+    expect(onAnswer).toHaveBeenCalledWith("Keep");
+  });
+
+  test("You decide is always offered, even with no options", async () => {
+    const onSkip = mock(() => {});
+    const el = await renderInto(
+      list([asking("q1", { question: "Which?" })], { ask: { onSkip, pendingId: "q1" } }),
+    );
+    expect(el.querySelectorAll(".ai-ask-options sp-button")).toHaveLength(0);
+    pointer(el.querySelector(".ai-ask-skip") as HTMLElement, "click");
+    expect(onSkip).toHaveBeenCalled();
+  });
+
+  test("an answered question shows the answer and offers no buttons", async () => {
+    const el = await renderInto(
+      list([
+        asking(
+          "q1",
+          { options: ["Merge"], question: "Which?" },
+          { data: { answer: "Neither", skipped: false }, success: true },
+        ),
+      ]),
+    );
+    expect(el.querySelector(".ai-ask-answer")?.textContent?.trim()).toBe("Neither");
+    expect(el.querySelector(".ai-ask-options")).toBeNull();
+  });
+
+  test("a skipped question says so rather than showing an empty answer", async () => {
+    const el = await renderInto(
+      list([
+        asking(
+          "q1",
+          { question: "Which?" },
+          { data: { answer: null, skipped: true }, success: true },
+        ),
+      ]),
+    );
+    expect(el.querySelector(".ai-ask-answer")?.textContent?.trim()).toBe("You decide");
+  });
+
+  test("a failed question renders its reason", async () => {
+    const el = await renderInto(
+      list([
+        asking("q1", { question: "Which?" }, { error: "the turn was stopped", success: false }),
+      ]),
+    );
+    expect(el.querySelector(".ai-ask-outcome")?.textContent).toContain("the turn was stopped");
+  });
+
+  test("a question left open by a reload is inert, and says why", async () => {
+    /* The promise lives in memory and the transcript does not. Without this the restored card is
+       indistinguishable from a live one and waits on a loop that is gone. */
+    const el = await renderInto(
+      list([asking("q1", { options: ["Merge"], question: "Which?" })], {
+        ask: { pendingId: null },
+      }),
+    );
+    expect((el.querySelector(".ai-ask") as HTMLElement | null)?.dataset.outcome).toBe("unanswered");
+    expect(el.querySelector(".ai-ask-options")).toBeNull();
+    expect(el.querySelector(".ai-ask-outcome")?.textContent).toContain("reloaded");
+  });
+
+  test("a half-streamed question falls back to an ordinary chip", async () => {
+    // Arguments arrive as fragments, so a chip can be asked to draw a call whose JSON is unfinished.
+    const half = msg("assistant", "Let me check", {
+      toolCalls: [{ arguments: '{"question":"Whi', id: "q1", name: "ask_user" }],
+    });
+    const el = await renderInto(list([half], { status: "streaming" }));
+    expect(el.querySelector(".ai-ask")).toBeNull();
+    expect(el.querySelector(".ai-tool-chip")).not.toBeNull();
+  });
+
+  test("the streaming tail draws a completed question too", async () => {
+    /* In the real loop `finishStream` runs BEFORE tools execute, so a live question is drawn by the
+       settled-message path. The tail still has to handle one: the model may write text, emit the
+       call, and have the round end while this row is the tail. */
+    const tail = msg("assistant", "One thing first.", {
+      toolCalls: [
+        { arguments: JSON.stringify({ question: "Which?" }), id: "q1", name: "ask_user" },
+      ],
+    });
+    const el = await renderInto(list([tail], { ask: { pendingId: "q1" }, status: "streaming" }));
+    expect(el.querySelector(".ai-ask-question")?.textContent?.trim()).toBe("Which?");
+  });
+});
+
+describe("parseAsk", () => {
+  /** Read a question out of the arguments an `ask_user` call would carry. */
+  function ask(args: object | string) {
+    const encoded = typeof args === "string" ? args : JSON.stringify(args);
+    return parseAsk({ arguments: encoded, id: "q", name: "ask_user" });
+  }
+
+  test("reads a question, its options and its context", () => {
+    expect(ask({ context: "c", options: ["a"], question: "Q" })).toEqual({
+      context: "c",
+      options: ["a"],
+      question: "Q",
+    });
+  });
+
+  test("tolerates unfinished and malformed JSON", () => {
+    expect(ask('{"question":"Q')).toBeNull();
+    expect(ask("")).toBeNull();
+  });
+
+  test("refuses a call with no question to show", () => {
+    expect(ask({})).toBeNull();
+    expect(ask({ question: "   " })).toBeNull();
+    expect(ask({ question: 42 })).toBeNull();
+  });
+
+  test("drops non-string options and a non-array options field", () => {
+    expect(ask({ options: ["a", 1, ""], question: "Q" })?.options).toEqual(["a"]);
+    expect(ask({ options: "nope", question: "Q" })?.options).toEqual([]);
+    expect(ask({ context: 9, question: "Q" })?.context).toBe("");
+  });
+});
+
+describe("a running import, under the chip that started it", () => {
+  /** An assistant turn whose tool call is an import, optionally already settled. */
+  function importing(result?: { success: boolean; summary?: string }): Message {
+    return msg("assistant", "", {
+      toolCalls: [
+        {
+          arguments: JSON.stringify({ url: "https://example.com" }),
+          id: "run1",
+          name: "import_site",
+          ...(result ? { result: result as never } : {}),
+        },
+      ],
+    });
+  }
+
+  const RECORD = {
+    current: null,
+    directory: "/home/dev/Sites/example",
+    error: "",
+    id: "run1",
+    log: [
+      { message: "Launching browser...", phase: "launch" },
+      { message: "Crawled 3 pages", phase: "crawl" },
+    ],
+    message: "Crawled 3 pages",
+    phase: "crawl",
+    status: "running" as const,
+    total: null,
+    url: "https://example.com/",
+    warnings: [],
+  };
+
+  test("draws the phase, the latest line and a tail of log", async () => {
+    /* An import reports for minutes. It used to report into the New Project modal, which meant a
+       successful run destroyed its own account of what it did at the moment it handed off. */
+    const el = await renderInto(
+      list([importing()], { ask: { importRun: () => RECORD, pendingId: null } }),
+    );
+    expect(el.querySelector(".ai-import-message")?.textContent?.trim()).toBe("Crawled 3 pages");
+    expect(el.querySelectorAll(".ai-import-log-line")).toHaveLength(2);
+    expect(el.querySelector("sp-progress-circle")?.hasAttribute("indeterminate")).toBe(true);
+  });
+
+  test("a phase that counts draws a determinate bar", async () => {
+    const el = await renderInto(
+      list([importing()], {
+        ask: { importRun: () => ({ ...RECORD, current: 5, total: 20 }), pendingId: null },
+      }),
+    );
+    const circle = el.querySelector("sp-progress-circle")!;
+    expect(circle.hasAttribute("indeterminate")).toBe(false);
+    expect(circle.getAttribute("progress")).toBe("25");
+  });
+
+  test("a settled import draws its outcome and no progress", async () => {
+    const el = await renderInto(
+      list([importing({ success: true, summary: "Imported example.com" })], {
+        ask: { importRun: () => RECORD },
+      }),
+    );
+    expect(el.querySelector(".ai-import-progress")).toBeNull();
+    expect(el.querySelector(".ai-tool-chip-outcome")?.textContent).toContain("Imported");
+  });
+
+  test("a host with no run record simply draws the chip", async () => {
+    // The evals runner and the screenshot seeder render transcripts with no import store at all.
+    const el = await renderInto(list([importing()]));
+    expect(el.querySelector(".ai-import-progress")).toBeNull();
+    expect(el.querySelector(".ai-tool-chip")).not.toBeNull();
   });
 });

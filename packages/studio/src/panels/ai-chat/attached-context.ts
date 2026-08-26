@@ -15,7 +15,12 @@
 export const ATTACHED_CONTEXT_DELIMITER = "---- attached context ----";
 
 export interface ContextChip {
-  kind: "page" | "selection";
+  /**
+   * `"import"` is not attachable from the composer's menu — it is stamped by the New Project Import
+   * hand-off, which needs the same channel for a different reason: the run's parameters must reach
+   * the model, and message content is the only thing the streaming payload carries.
+   */
+  kind: "page" | "selection" | "import";
   /** Short chip label, e.g. the page path or `<h1>`. */
   label: string;
   /** The context line embedded into the message content. */

@@ -9,7 +9,7 @@
  * Stream protocol (one JSON object per line):
  *   {"type":"progress","phase":"...","message":"...","current":n,"total":n}
  *   {"type":"heartbeat"}                       — keep-alives during silent phases
- *   {"type":"done","root":"...","config":{…}}  — terminal success
+ *   {"type":"done","root":"...","config":{…},"result":{…}}  — terminal success
  *   {"type":"error","error":"..."}             — terminal failure
  *
  * LLM key flow (matches ai-api.ts): X-Api-Key / Authorization: Bearer header, falling back to the
@@ -44,6 +44,8 @@ interface ImportRequestBody {
   maxNodesPerPage?: number;
   aiComponents?: boolean;
   aiModel?: string;
+  verify?: boolean;
+  verifyThreshold?: number;
 }
 
 /** Seconds between keep-alive lines while a phase is silent (browser launch is the longest gap). */
@@ -51,6 +53,10 @@ const HEARTBEAT_INTERVAL_MS = 15_000;
 
 const MAX_DEPTH = 5;
 const MAX_PAGES = 100;
+
+/** Pixelmatch threshold bounds for the optional verify pass. */
+const MIN_THRESHOLD = 0.01;
+const MAX_THRESHOLD = 1;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, Math.trunc(value)));
@@ -102,6 +108,20 @@ async function handleImportSite(req: Request, opts: ImportApiOptions): Promise<R
   }
 
   const depth = clamp(body.depth ?? 1, 0, MAX_DEPTH);
+  /*
+   * `verify` builds the emitted project and screenshot-diffs every page, so it roughly doubles the
+   * run — opt-in, and never a default. It is worth the option because it produces the one number
+   * the caller can act on: every other finding is a count of things that were skipped, and "the
+   * pricing page renders at 61%" is a question worth putting to a person.
+   */
+  const verify: false | { threshold: number } = body.verify
+    ? {
+        threshold: Math.min(
+          MAX_THRESHOLD,
+          Math.max(MIN_THRESHOLD, Number(body.verifyThreshold ?? 0.15) || 0.15),
+        ),
+      }
+    : false;
   const maxPages = clamp(body.maxPages ?? 20, 1, MAX_PAGES);
   const maxNodesPerPage = clamp(body.maxNodesPerPage ?? 5000, 100, 50_000);
   const { apiKey, baseUrl } = getAiConfig(req);
@@ -151,6 +171,7 @@ async function handleImportSite(req: Request, opts: ImportApiOptions): Promise<R
             maxPages,
             maxNodesPerPage,
             ai,
+            verify,
             signal: req.signal,
             ...(opts.chromePath === undefined ? {} : { chromePath: opts.chromePath }),
           },
@@ -160,7 +181,23 @@ async function handleImportSite(req: Request, opts: ImportApiOptions): Promise<R
         const config = JSON.parse(
           await readFile(resolve(result.outDir, "project.json"), "utf8"),
         ) as Record<string, unknown>;
-        writeLine({ type: "done", root: toRoot(result.outDir), config });
+        /*
+         * The result travels with the `done` line. It used to be discarded here: the pipeline had
+         * computed the page list, the file count, the warnings and (with verify) a per-page
+         * fidelity score, and the caller learned only that an import had happened. A caller that
+         * cannot see what a run found cannot report it, and cannot ask about it either.
+         */
+        writeLine({
+          type: "done",
+          root: toRoot(result.outDir),
+          config,
+          result: {
+            pages: result.pages,
+            fileCount: result.fileCount,
+            warnings: result.warnings,
+            ...(result.verify ? { verify: result.verify } : {}),
+          },
+        });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         writeLine({ type: "error", error: message });

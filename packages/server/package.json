@@ -35,7 +35,7 @@
     "lint:errors": "bun run scripts/check-error-shapes.ts",
     "test": "bun run lint:errors && bun test --isolate",
     "test:coverage": "bun run lint:errors && bun test --isolate --coverage",
-    "upgrade": "bunx npm-check-updates -u && bun install"
+    "upgrade": "bun update --latest && bun install"
   },
   "dependencies": {
     "@jxsuite/collab": "workspace:^",

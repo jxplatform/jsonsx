@@ -91,7 +91,7 @@ release-please writes the release pull request body with changelog text HTML-esc
 
 `feat(compiler): responsive images — <picture> per format…` did exactly that: `schema` and `starters` fell out of three consecutive releases, and `@jxsuite/starters` sat at 1.2.2 on npm while `@jxsuite/create@1.3.2` shipped depending on `^1.5.0`, so `npm install @jxsuite/create` was unresolvable. The bug is upstream and still present in release-please 17.11.1, so the defence is to keep the text out of the changelog. **Backticks do not help** — the escaping happens on raw text.
 
-- The rule and the full write-up live in `commitlint.config.js` (`changelog-safe-angle-brackets`).
+- The rule and the full write-up live in `commitlint.config.ts` (`changelog-safe-angle-brackets`).
 - `.husky/commit-msg` applies it as you commit; `checks` runs
   `bun scripts/check-changelog-safety.ts` over the pull request's commits, because a hook is skippable with `--no-verify` and that is how the subject landed.
 - Only the **subject** and `BREAKING CHANGE:` notes are judged — nothing else reaches a changelog,

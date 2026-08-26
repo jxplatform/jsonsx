@@ -11,9 +11,9 @@ code:
 
 The document assistant is what the **[AI assistant](/docs/studio/ai/chat)** becomes when a page or component is open on the canvas: the same chat, now scoped to that document. It isn't a separate panel. Opening a document simply hands the assistant that page's full structure and a set of precise editing abilities it doesn't have otherwise. This is the mode to use when you want to _see_ the assistant work and be able to take it back.
 
-The sidebar starts closed and stays however you last left it, so open it with **Toggle Assistant** first; provider setup lives in its **Assistant: Settings…** dialog rather than in the column itself.
+The assistant is the fourth tab of the Inspector: show it with :kbd[⌘⇧4] (macOS) or :kbd[Ctrl+Shift+4] (Windows/Linux), or by clicking **Assistant**. Provider setup lives in **[Preferences › Assistant](/docs/studio/interface/preferences)**, not in the panel itself. A provider key belongs to Studio rather than to one panel, and the panel that is missing one is the wrong place to go looking for it.
 
-![The sidebar with an assistant reply carrying edit chips beside the open page on the canvas](../../images/ai-document-assistant.png)
+![The Inspector with an assistant reply carrying edit chips beside the open page on the canvas](../../images/ai-document-assistant.png)
 
 The assistant uses the model you picked in **[Preferences](/docs/studio/interface/preferences)**. If you have not picked one, it uses whatever your provider says it prefers.
 
@@ -60,6 +60,6 @@ A simple habit: if you'd want to press undo afterwards, open the page before you
 
 ## Next
 
-- The chat itself, with composer, history and reviewing edits: **[The AI assistant](/docs/studio/ai/chat)**
+- The chat itself, with composer, history and reviewing edits: **[The assistant's chat](/docs/studio/ai/chat)**
 - What the assistant can do in every state, and provider setup: **[AI assistant](/docs/studio/ai)**
 - The state entries it adds are explained in the **[Data panel](/docs/studio/logic/data)**

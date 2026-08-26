@@ -1,22 +1,27 @@
 /**
  * The New Project modal's Import source step: an AI-guided clone of an existing site. Gated behind
  * the AI credentials gate (key form + the keyless Cloudflare option) until AI is usable — a local
- * key, or a backend holding its own; otherwise a URL + crawl-options form. The name/directory
- * parameters live on the modal's shared Parameters step; the running pipeline streams its progress
- * into a log here and resolves the modal with the imported project.
+ * key, or a backend holding its own; otherwise a URL, crawl options, a model and a brief. The
+ * name/directory parameters live on the modal's shared Parameters step.
+ *
+ * **This form no longer runs the import.** It gathers a brief and hands it to the assistant, which
+ * runs the pipeline as a tool call. The wizard used to own the run, and the consequence was that a
+ * successful import destroyed its own account of itself: every phase line and every warning lived
+ * in a log that vanished with the modal at the moment it handed off. In the transcript the run
+ * survives, the model can read what the crawl actually found, and it can stop and ask about
+ * anything the pipeline had to guess at.
  */
 
 import { html } from "lit-html";
+import { live } from "lit/directives/live.js";
 import { getPlatform } from "../platform";
-import { getBaseUrl, getOpenAiKey } from "../services/ai-settings";
 import { preferredModel } from "../services/ai-models";
-import { IMPORT_WARNING_PHASE } from "../services/import-client";
-import { notify } from "../services/notify";
-import { errorMessage } from "@jxsuite/schema/parse";
+import { createModelPicker } from "../ui/ai-model-picker";
 import { destinationPath } from "./location-fields";
 import type { TemplateResult } from "lit-html";
-import type { ProjectConfig } from "@jxsuite/schema/types";
-import type { CreateProjectDestination, ImportProgressEvent } from "../types";
+import type { CreateProjectDestination } from "../types";
+import { setPendingImportBrief } from "../services/import-seed";
+import type { ImportBrief } from "../services/import-seed";
 
 /** Structural view of src/ui/ai-credentials-form's controller (what this tab renders when gated). */
 export interface CredsFormLike {
@@ -40,8 +45,11 @@ export interface ImportTabCtx {
    */
   resolveDestination: () => CreateProjectDestination | null;
   rerender: () => void;
-  /** Called with the imported project; the modal resolves and closes. */
-  onDone: (result: { root: string; config: ProjectConfig }) => void;
+  /**
+   * Called with the brief the form gathered. The modal closes WITHOUT a project — the assistant
+   * runs the import as a tool call and creates it.
+   */
+  onHandoff: (brief: ImportBrief) => void;
   /** The modal's shared credentials-form instance, rendered while the gate is closed. */
   credsForm: CredsFormLike;
   /**
@@ -57,10 +65,27 @@ let _url = "";
 let _depth = 1;
 let _maxPages = 20;
 let _aiNaming = true;
-let _status: "idle" | "running" | "error" = "idle";
-let _log: ImportProgressEvent[] = [];
+/**
+ * The model this import will run its AI passes on. Empty means "whatever the assistant would use",
+ * which is what the tab did silently before there was a picker.
+ *
+ * A DRAFT, not the `jx.ai.model` preference: choosing a model for one import must not retarget the
+ * assistant for every later conversation. `startImport` falls back to {@link preferredModel} so an
+ * untouched picker behaves exactly as the tab did before.
+ */
+let _model = "";
+/** What the user wants done with the site once it is imported. Handed to the assistant. */
+let _prompt = "";
+/**
+ * Build the result and screenshot-diff it against the original.
+ *
+ * Off by default because it roughly doubles the run: a full compile plus a second browser pass.
+ * Worth offering because it produces the only finding that says how WELL the clone came out — every
+ * other one is a count of things that were skipped, and a page at 61% fidelity is a question the
+ * assistant can put to a person.
+ */
+let _verify = false;
 let _errorMsg = "";
-let _abort: AbortController | null = null;
 let _dirManual = false;
 
 /** Reset the tab's state when the modal opens. */
@@ -69,11 +94,35 @@ export function resetImportTab() {
   _depth = 1;
   _maxPages = 20;
   _aiNaming = true;
-  _status = "idle";
-  _log = [];
+  _model = "";
+  _prompt = "";
+  _verify = false;
   _errorMsg = "";
-  _abort = null;
   _dirManual = false;
+}
+
+/**
+ * The tab's model picker, and the scheduler it repaints through.
+ *
+ * Created once and kept: `createModelPicker` holds the in-flight fetch and the failed-connection
+ * record, and a picker rebuilt per render would re-fetch the catalogue on every keystroke. The
+ * scheduler is a SLOT rather than a captured closure because `ImportTabCtx` is rebuilt per render
+ * (see `importCtxFor`), so the picker must reach whichever one is current.
+ */
+let _rerender: (() => void) | null = null;
+let _picker: ReturnType<typeof createModelPicker> | null = null;
+
+function modelPicker() {
+  _picker ??= createModelPicker({
+    className: "new-project-import-model",
+    getModel: () => _model || preferredModel(),
+    // A draft, deliberately not `setModel` — see `_model`.
+    onChange: (id) => {
+      _model = id;
+    },
+    requestRender: () => _rerender?.(),
+  });
+  return _picker;
 }
 
 function slugOf(name: string): string {
@@ -81,19 +130,6 @@ function slugOf(name: string): string {
     .toLowerCase()
     .replaceAll(/[^a-z0-9]+/g, "-")
     .replaceAll(/^-|-$/g, "");
-}
-
-/** True while an import stream is active (the modal disables tab switching and close). */
-export function isImportRunning(): boolean {
-  return _status === "running";
-}
-
-/** Abort the running import (the footer's Cancel Import button). */
-export function cancelImport(ctx: ImportTabCtx) {
-  _abort?.abort();
-  _abort = null;
-  _status = "idle";
-  ctx.rerender();
 }
 
 /**
@@ -116,89 +152,75 @@ export function validateImportSource(ctx: ImportTabCtx): boolean {
   return true;
 }
 
-/** Validate and kick off the import. Wired to the modal footer's primary button. */
-export async function startImport(ctx: ImportTabCtx) {
-  const platform = getPlatform();
-  if (_status === "running" || !platform.importSite) {
-    return;
-  }
+/**
+ * The brief this form has gathered, or null when something is still missing (the modal has already
+ * rendered the reason inline).
+ *
+ * Exported so a test can read what the form would hand over without driving the assistant.
+ *
+ * @param {ImportTabCtx} ctx
+ * @returns {ImportBrief | null}
+ */
+export function importBriefFor(ctx: ImportTabCtx): ImportBrief | null {
   let parsed: URL;
   try {
     parsed = new URL(_url.trim());
   } catch {
     _errorMsg = "Enter a valid URL (e.g. https://example.com)";
     ctx.rerender();
-    return;
+    return null;
   }
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
     _errorMsg = "The URL must start with http:// or https://";
     ctx.rerender();
-    return;
+    return null;
   }
   const destination = ctx.resolveDestination();
   if (!destination || destination.kind !== "path") {
-    return;
+    return null;
   }
-
-  _status = "running";
-  _errorMsg = "";
-  _log = [];
-  _abort = new AbortController();
-  ctx.rerender();
-
-  try {
-    const key = getOpenAiKey();
-    const baseUrl = getBaseUrl();
-    const model = preferredModel();
-    const result = await platform.importSite(
-      {
-        url: parsed.href,
-        name: ctx.form.name.trim(),
-        directory: destinationPath(destination, ctx.form.directory),
-        depth: _depth,
-        maxPages: _maxPages,
-        aiComponents: _aiNaming,
-        ...(key ? { apiKey: key } : {}),
-        ...(baseUrl ? { baseUrl } : {}),
-        ...(model ? { model } : {}),
-      },
-      (evt) => {
-        _log = [..._log, evt];
-        // The log is destroyed the moment a successful import hands off, so the one line the client
-        // Emits about lines it could not read is re-posted where it will outlive that.
-        if (evt.phase === IMPORT_WARNING_PHASE) {
-          notify.warn(evt.message);
-        }
-        ctx.rerender();
-        requestAnimationFrame(() => {
-          const el = document.querySelector(".new-project-import-log");
-          if (el) {
-            el.scrollTop = el.scrollHeight;
-          }
-        });
-      },
-      _abort.signal,
-    );
-    _status = "idle";
-    _abort = null;
-    ctx.onDone(result);
-  } catch (error) {
-    if (_status !== "running") {
-      return; // Cancelled by the user — cancelImport already reset the tab.
-    }
-    _abort = null;
-    _status = "error";
-    _errorMsg = errorMessage(error);
-    ctx.rerender();
-  }
+  return {
+    aiComponents: _aiNaming,
+    depth: _depth,
+    directory: destinationPath(destination, ctx.form.directory),
+    maxPages: _maxPages,
+    model: _model,
+    name: ctx.form.name.trim(),
+    prompt: _prompt.trim(),
+    url: parsed.href,
+    verify: _verify,
+  };
 }
 
-/** The footer's primary-button label for the Import tab's current state. */
-export function importButtonLabel(): string {
-  if (_status === "running") {
-    return "Importing…";
+/**
+ * Hand the brief to the assistant and close the wizard. Wired to the modal footer's primary button.
+ *
+ * **The wizard does not run the import any more.** It used to, and the run's whole account of
+ * itself — every phase line, every warning — was destroyed the moment it succeeded and the modal
+ * handed off. It is a tool call now (`services/ai-import-tools.ts`), so the progress lives in the
+ * transcript, the model can read what the crawl actually found, and it can stop and ask about
+ * anything the pipeline had to guess at.
+ *
+ * @param {ImportTabCtx} ctx
+ */
+export function handoffImport(ctx: ImportTabCtx) {
+  if (!getPlatform().importSite) {
+    return;
   }
-  return _status === "error" ? "Retry Import" : "Import Site";
+  const brief = importBriefFor(ctx);
+  if (!brief) {
+    return;
+  }
+  /* Stored HERE, by the form that gathered it, rather than inside the assistant's hand-off: two
+     readers need it — the turn that gets composed now, and `import_site` minutes later for the
+     destination — and the producer is the one place both can be sure it was written. */
+  setPendingImportBrief(brief);
+  ctx.onHandoff(brief);
+}
+
+/** The footer's primary-button label. One state: the wizard hands off and closes. */
+export function importButtonLabel(): string {
+  return "Import Site";
 }
 
 function onUrlInput(ctx: ImportTabCtx) {
@@ -222,59 +244,9 @@ function onUrlInput(ctx: ImportTabCtx) {
   };
 }
 
-function renderProgress(): TemplateResult {
-  const latest = _log.at(-1);
-  return html`
-    <div class="new-project-import-progress">
-      <sp-progress-circle indeterminate size="s"></sp-progress-circle>
-      <span class="new-project-import-phase">${latest ? latest.phase : "starting"}</span>
-      <span>${latest ? latest.message : "Starting import…"}</span>
-    </div>
-    <div class="new-project-import-log">
-      ${_log.map(
-        (evt) => html`
-          <div class="new-project-import-log-line">
-            <span class="new-project-import-phase">${evt.phase}</span>
-            ${evt.message}
-          </div>
-        `,
-      )}
-    </div>
-  `;
-}
-
-/** The streaming progress view shown (in place of the Parameters step) while a run is active. */
-export function renderImportProgress(): TemplateResult {
-  return renderProgress();
-}
-
-/** Inline error + retained log, rendered on the Parameters step after a failed run. */
-export function renderImportStatus(): TemplateResult {
-  if (_status !== "error") {
-    return html``;
-  }
-  return html`
-    ${_errorMsg ? html`<div class="new-project-error">${_errorMsg}</div>` : ""}
-    ${
-      _log.length > 0
-        ? html`
-            <div class="new-project-import-log">
-              ${_log.map(
-                (evt) => html`
-                  <div class="new-project-import-log-line">
-                    <span class="new-project-import-phase">${evt.phase}</span>
-                    ${evt.message}
-                  </div>
-                `,
-              )}
-            </div>
-          `
-        : ""
-    }
-  `;
-}
-
 export function renderImportSource(ctx: ImportTabCtx): TemplateResult {
+  // `ctx` is rebuilt per render, so the picker's scheduler has to be re-pointed at the current one.
+  _rerender = ctx.rerender;
   if (!ctx.aiGateOpen()) {
     return html`
       <div class="new-project-tab-intro">
@@ -297,7 +269,7 @@ export function renderImportSource(ctx: ImportTabCtx): TemplateResult {
       <span class="new-project-label">Site URL *</span>
       <sp-textfield
         placeholder="https://example.com"
-        .value=${_url}
+        .value=${live(_url)}
         @input=${onUrlInput(ctx)}
         style="width: 100%"
       ></sp-textfield>
@@ -308,7 +280,7 @@ export function renderImportSource(ctx: ImportTabCtx): TemplateResult {
         <sp-number-field
           min="0"
           max="2"
-          .value=${_depth}
+          .value=${live(_depth)}
           @change=${(e: Event) => {
             _depth = Math.trunc(Number((e.target as HTMLInputElement).value)) || 0;
           }}
@@ -319,7 +291,7 @@ export function renderImportSource(ctx: ImportTabCtx): TemplateResult {
         <sp-number-field
           min="1"
           max="100"
-          .value=${_maxPages}
+          .value=${live(_maxPages)}
           @change=${(e: Event) => {
             _maxPages = Math.trunc(Number((e.target as HTMLInputElement).value)) || 1;
           }}
@@ -327,29 +299,37 @@ export function renderImportSource(ctx: ImportTabCtx): TemplateResult {
       </label>
     </div>
     <sp-switch
-      ?checked=${_aiNaming}
+      .checked=${live(_aiNaming)}
       @change=${(e: Event) => {
         _aiNaming = (e.target as HTMLInputElement).checked;
       }}
     >
       AI component naming
     </sp-switch>
+    <sp-switch
+      .checked=${live(_verify)}
+      @change=${(e: Event) => {
+        _verify = (e.target as HTMLInputElement).checked;
+      }}
+    >
+      Check fidelity against the original (slower)
+    </sp-switch>
+    <label class="new-project-field">
+      <span class="new-project-label">Model</span>
+      ${modelPicker().render()}
+    </label>
+    <label class="new-project-field">
+      <span class="new-project-label">What should the assistant do with it?</span>
+      <sp-textfield
+        multiline
+        class="new-project-import-prompt"
+        placeholder="Keep the layout but modernise the typography, and turn the news list into a content collection…"
+        .value=${live(_prompt)}
+        @input=${(e: Event) => {
+          _prompt = (e.target as HTMLInputElement).value;
+        }}
+      ></sp-textfield>
+    </label>
     ${_errorMsg ? html`<div class="new-project-error">${_errorMsg}</div>` : ""}
-    ${
-      _status === "error" && _log.length > 0
-        ? html`
-            <div class="new-project-import-log">
-              ${_log.map(
-                (evt) => html`
-                  <div class="new-project-import-log-line">
-                    <span class="new-project-import-phase">${evt.phase}</span>
-                    ${evt.message}
-                  </div>
-                `,
-              )}
-            </div>
-          `
-        : ""
-    }
   `;
 }

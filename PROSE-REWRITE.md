@@ -18,6 +18,8 @@ What the corpus has instead is punctuation and cadence:
 | Sentences over thirty words                | 845 of 5,807                                |
 | Title Case headings                        | about 26, nearly all in `framework/`        |
 
+**A ban can rewrite a claim out of true.** The `neg-parallel` rule fires on "doesn't just X but Y", and the obvious fix inverts it: `studio/ai.md` went from "a chat panel that doesn't just talk about your project but works on it" to "works on your project rather than talking about it", which denies the first half and contradicts the same page twelve lines down. "Not just X" asserts BOTH halves. State both, or state the stronger one; never keep the shape and drop a half. The verification pass caught this one and no gate could have.
+
 **The dash rewrite has its own failure mode, and it is measured.** A dash and a contrast are the same gesture, so the obvious substitution keeps the gesture: `rather than` rose from 212 to 240 and the `X, not Y.` ender from 94 to 100 while the dashes fell to zero. No count is wrong. A page holding ten of them is, and the totals hide exactly that, so `check-prose.ts --report` ranks the two frames per thousand words and the consistency pass reads the top of that list. Neither frame is gated, because a budget would have to claim the fifth instance is wrong while the fourth was fine.
 
 And two failure modes, not one. `start/` and `studio/` are over-cadenced: confident, aphoristic, and rhythmically identical page after page. `framework/concepts/` is under-written, because it is a transcription of `specs/spec.md` with the spec's headings title-cased on the way in.
@@ -134,6 +136,10 @@ A rewrite must never guess at a fact. Anything below gets recorded here and deci
 - **`platform-adapter.md` mixes British and American spelling.** `optimisation` sits beside `normalizes` and `serializes` on the same page. The corpus is American English by the style guide, so this is a one-word fix that nobody has made; it was left verbatim rather than guessed at.
 - **The same notification is worded two ways upstream, and both reached the docs.** `platform-adapter.md` quotes "**Open in Browser** reports that this **target** cannot build a preview" from the `degradation` string in `packages/protocol/src/routes.ts`, and "this **backend** could not build a preview" from the toast in `packages/studio/src/panels/toolbar.ts`. Each page is faithful to a real string; the two strings disagree. Whoever owns the protocol route text picks a word.
 - **`schema-composition.md`'s remaining fenced dash is generator output.** The `$comment` in the sample is the literal string `jx schema` writes, so removing it means changing `packages/schema`'s generator.
+- **Two pages carry near-identical titles.** `docs/studio/ai.md` is "AI assistant" and `docs/studio/ai/chat.md` is "The AI assistant", and `nav.json` repeats the pair. A related-links list that names both cannot tell a reader which is which, which is why `document-assistant.md` now says "the assistant's chat" for the child page instead of its title. Renaming one is an information-architecture decision, not a prose one.
+- **`create.md` documents the Import tab's form fields after the create-button callouts.** `### What the Import tab asks for` describes Step 1 but sits under `## Create it`, below three callouts. That is main's own ordering, shipped with the feature, and a merge commit is the wrong place to rearrange a page.
+- **`bunfig.toml` coverage-ignores a file that no longer exists.** It names `./commitlint.config.js`, which PR #215 renamed to `commitlint.config.ts`; `.oxlintrc.typecheck.json` was updated in that rename and `bunfig.toml` was not. Found while merging, and outside this campaign.
+
 - **Whether a docs page should transcribe a spec at all.** `framework/concepts/` is a copy of `specs/spec.md`. This campaign fixes the prose; the information architecture is a larger question.
 
 ## Terminology, as ruled

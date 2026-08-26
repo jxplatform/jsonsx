@@ -448,6 +448,74 @@ describe("ai-project-tools — create_project", () => {
     expect(onProjectAdopted).toHaveBeenCalledWith("/abs/new-site");
   });
 
+  test("initialises a git repository, before adopting", async () => {
+    /* `specs/desktop.md` §4.5: "every source, including Import and Agent" initialises a repository.
+       `initProjectRepo` had two call sites, both in the New Project modal, so a project the AGENT
+       bootstrapped was not under version control and nothing said so. */
+    const order: string[] = [];
+    const adoptProject = mock(async (root: string) => {
+      order.push("adopt");
+      setWorkspaceProject(root, { name: "New Site" });
+    });
+    const createProject = mock(async (opts: CreateOpts) => ({
+      config: { name: opts.name },
+      root: `/abs/${opts.directory}`,
+    }));
+    const { registry, state } = makeHarness({}, { adoptProject }, { createProject });
+
+    const res = await registry.execute("create_project", {
+      location: "/home/dev/Sites",
+      name: "New Site",
+    });
+    expect(res.success).toBe(true);
+
+    const gitCalls = state.calls.filter(([name]) => name === "gitInit" || name === "activate");
+    expect(gitCalls.map(([name]) => name)).toEqual(["activate", "gitInit"]);
+    // `activate` is what binds the backend to the new root, so it must precede the open flow.
+    expect(state.calls.findIndex(([name]) => name === "gitInit")).toBeGreaterThan(-1);
+    expect(order).toEqual(["adopt"]);
+  });
+
+  test("a tree that is already a repository is not re-initialised", async () => {
+    const createProject = mock(async (opts: CreateOpts) => ({
+      config: { name: opts.name },
+      root: `/abs/${opts.directory}`,
+    }));
+    const { registry, state } = makeHarness(
+      {},
+      { adoptProject: async (root) => setWorkspaceProject(root, { name: "New Site" }) },
+      { createProject, gitStatus: async () => ({ files: [], isRepo: true }) },
+    );
+
+    await registry.execute("create_project", { location: "/home/dev/Sites", name: "New Site" });
+    expect(state.calls.some(([name]) => name === "gitInit")).toBe(false);
+  });
+
+  test("a git failure is reported without failing the create", async () => {
+    // A project that was written stays written — version control is a safety net, not a gate.
+    const createProject = mock(async (opts: CreateOpts) => ({
+      config: { name: opts.name },
+      root: `/abs/${opts.directory}`,
+    }));
+    const { registry } = makeHarness(
+      {},
+      { adoptProject: async (root) => setWorkspaceProject(root, { name: "New Site" }) },
+      {
+        createProject,
+        gitInit: async () => {
+          throw new Error("git is not installed");
+        },
+      },
+    );
+
+    const res = await registry.execute("create_project", {
+      location: "/home/dev/Sites",
+      name: "New Site",
+    });
+    expect(res.success).toBe(true);
+    expect(res.summary).toContain("opened it");
+  });
+
   test("trailing slashes are trimmed off the location parent", async () => {
     const createProject = mock(async (opts: CreateOpts) => ({
       config: { name: opts.name },
