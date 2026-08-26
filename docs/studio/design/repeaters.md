@@ -29,7 +29,7 @@ The command needs an element with a sibling position to repeat into, and refuses
 
 The items source is what makes a repeater useful. It can be:
 
-- **A plain list in state**: start with `Create new…` and fill in items later in the **State** panel.
+- **A plain list in state**: start with `Create new…` and fill in items later in the **Data** panel.
 - **A content collection**: every blog post, product, or team member in your project's content. See **[Content types](/docs/studio/projects/content-types)**.
 - **A data source**: anything that produces a list, like a `Request` fetching from an API.
 

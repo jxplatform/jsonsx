@@ -36,7 +36,7 @@
     {
       "id": "neg-parallel",
       "tier": "ban",
-      "regex": "[Ii]t's not (just|only|merely)|[Nn]ot only\\b[^.]{0,60},\\s*but\\b|isn't (just )?about[^.]{0,40}\\.\\s*It's about|^No \\w+\\.\\s*No \\w+\\.",
+      "regex": "[Ii]t's not (just|only|merely)|\\b(does|do|did|is|are|was|were)n't (just|only|merely)\\b[^.]{0,70}\\bbut\\b|[Nn]ot only\\b[^.]{0,60},\\s*but\\b|isn't (just )?about[^.]{0,40}\\.\\s*It's about|^No \\w+\\.\\s*No \\w+\\.",
       "hint": "Negative parallelism (\"it's not just X, it's Y\") is the most-cited AI structure there is. State the claim directly."
     },
     {

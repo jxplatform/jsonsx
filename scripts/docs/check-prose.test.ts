@@ -168,6 +168,10 @@ describe("rules flag", () => {
 
   test("negative parallelism", () => {
     expect(hits("neg-parallel", "It's not just a builder, it's a format.")).toHaveLength(1);
+    // The auxiliary form is the same figure and the openings scan found one of it in the corpus:
+    // "a chat panel that doesn't just talk about your project but works on it".
+    expect(hits("neg-parallel", "A panel that doesn't just talk but works.")).toHaveLength(1);
+    expect(hits("neg-parallel", "It isn't only a viewer, but an editor too.")).toHaveLength(1);
   });
 
   test("chatbot residue", () => {
@@ -202,6 +206,17 @@ describe("rules leave alone", () => {
     ["the app's own hex glyph", "emoji", "The **⬢ menu** holds the commands"],
     ["a close control", "emoji", "Click **✕** to dismiss it."],
     ["a direct negative claim", "neg-parallel", "The API is not thread-safe."],
+    // "just" negated without a contrasting clause is a plain limit, not the figure.
+    [
+      "a negated adverb with no second half",
+      "neg-parallel",
+      "The panel doesn't just open on load.",
+    ],
+    [
+      "a long sentence between the halves",
+      "neg-parallel",
+      "It isn't just a cache, and the reason is that the index, the manifest and the lockfile each answer a different question, but that is a separate page.",
+    ],
     ["a real section heading", "stock-heading", "## Overview"],
     ["an introduction heading", "stock-heading", "## Introduction"],
     ["a hyphenated compound", "ai-vocab", "The bundler-robust specifier."],

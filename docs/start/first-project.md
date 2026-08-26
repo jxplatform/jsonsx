@@ -37,7 +37,7 @@ Open a content page and switch to **[Edit mode](/docs/studio/editing)** to write
 
 Websites do things. In Studio, interactivity comes from three surfaces working together, with no separate "code mode" required:
 
-- The **State** panel declares a value or a computed one: a counter, a total, a fetched list.
+- The **Data** panel declares a value or a computed one: a counter, a total, a fetched list.
 - The Inspector's **Logic** tab binds a handler to a click, input, or submit with the structured expression editor.
 - The **Code** editor is where you drop into Monaco when a handler needs JavaScript.
 

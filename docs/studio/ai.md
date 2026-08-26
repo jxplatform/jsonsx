@@ -13,7 +13,7 @@ code:
 
 # AI assistant
 
-Studio has a built-in AI assistant: a chat panel that doesn't just talk about your project but works on it. It creates pages and components, edits the page on the canvas while you watch, and answers questions about what it finds in your files. It runs against an AI provider **you** connect; Studio ships no account, no hosted AI, and sends nothing anywhere until you do.
+Studio has a built-in AI assistant: a chat panel that works on your project rather than talking about it. It creates pages and components, edits the page on the canvas while you watch, and answers questions about what it finds in your files. It runs against an AI provider **you** connect; Studio ships no account, no hosted AI, and sends nothing anywhere until you do.
 
 ![The assistant open beside a page on the canvas, mid-conversation](../images/ai-sidebar.png)
 

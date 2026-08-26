@@ -9,7 +9,7 @@ code:
 
 # Reactivity
 
-> **Studio writes this format for you.** The **State** and **Data** panels and the Inspector's **Logic** tab ([Logic](/docs/studio/logic)) generate everything below. This page documents the model if you want to hand-edit or understand it.
+> **Studio writes this format for you.** The **Data** panel and the Inspector's **Logic** tab ([Logic](/docs/studio/logic)) generate everything below. This page documents the model if you want to hand-edit or understand it.
 
 Template literal syntax `${}` is valid **anywhere a string value appears** in the document tree, not only inside `state`. Wherever you write one, the value recomputes when the state it reads changes. All reactivity is powered by `@vue/reactivity`.
 
