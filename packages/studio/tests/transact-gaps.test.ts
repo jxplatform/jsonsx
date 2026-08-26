@@ -531,12 +531,7 @@ describe("mutateUpdateMediaNestedStylePath cleaning up after a delete", () => {
     disposeTab(tab);
   });
 
-  /* The walk deletes the FIRST empty level it finds and stops, so a segment left empty ABOVE that
-     one survives. Pinning it rather than asserting the tidier answer: this is what the writer does
-     today, and the emptied `table` here is why a single-segment path is the only one that reliably
-     ends with `style` absent (see the sibling case above and `mutateUpdateNestedStylePath`, which
-     has the identical loop). */
-  test("a segment left empty ABOVE the deleted one survives the walk", () => {
+  test("emptying the deepest level takes every level it emptied with it", () => {
     const tab = makeTab({
       children: [
         { style: { "@sm": { table: { th: { color: "red" } } } }, tagName: "p", textContent: "Hi" },
@@ -548,9 +543,79 @@ describe("mutateUpdateMediaNestedStylePath cleaning up after a delete", () => {
       mutateUpdateMediaNestedStylePath(t, ["children", 0], "sm", ["table", "th"], "color", ""),
     );
 
-    expect(child(tab).style).toEqual({ "@sm": { table: {} } });
+    // `th`, then `table`, then the media block, then `style` — nothing empty is left behind.
+    expect(child(tab).style).toBeUndefined();
     undo(tab);
     expect(child(tab).style).toEqual({ "@sm": { table: { th: { color: "red" } } } });
+    disposeTab(tab);
+  });
+
+  test("writing then deleting a path a node never had leaves it with no style", () => {
+    /* `ensureNestedStyle` creates the intermediates on the way in, so a write-then-delete round
+       trip is the shortest route to a style the author never asked for. */
+    const tab = makeTab();
+
+    transactDoc(tab, (t) =>
+      mutateUpdateMediaNestedStylePath(t, ["children", 0], "sm", ["table", "th"], "color", "red"),
+    );
+    transactDoc(tab, (t) =>
+      mutateUpdateMediaNestedStylePath(t, ["children", 0], "sm", ["table", "th"], "color", ""),
+    );
+
+    expect(child(tab).style).toBeUndefined();
+    disposeTab(tab);
+  });
+
+  test("the same walk, without a media block", () => {
+    // `mutateUpdateNestedStylePath` carried the identical loop and the identical defect.
+    const tab = makeTab({
+      children: [{ style: { table: { th: { color: "red" } } }, tagName: "p", textContent: "Hi" }],
+      tagName: "div",
+    });
+
+    transactDoc(tab, (t) =>
+      mutateUpdateNestedStylePath(t, ["children", 0], ["table", "th"], "color", ""),
+    );
+
+    expect(child(tab).style).toBeUndefined();
+    disposeTab(tab);
+  });
+
+  test("a level with a surviving sibling stops the ascent", () => {
+    /* The prune walks up only as far as the emptying goes: `th` empties and goes, `table` still
+       holds `td`, so it stays and so does everything above it. */
+    const tab = makeTab({
+      children: [
+        {
+          style: { table: { td: { color: "blue" }, th: { color: "red" } } },
+          tagName: "p",
+          textContent: "Hi",
+        },
+      ],
+      tagName: "div",
+    });
+
+    transactDoc(tab, (t) =>
+      mutateUpdateNestedStylePath(t, ["children", 0], ["table", "th"], "color", ""),
+    );
+
+    expect(child(tab).style).toEqual({ table: { td: { color: "blue" } } });
+    disposeTab(tab);
+  });
+
+  test("a scalar declaration sharing a segment name is never pruned", () => {
+    /* The prune deletes empty NESTED blocks. A scalar under the same key is a declaration, and
+       `getNestedStyle` refusing it is what keeps it out of the walk. */
+    const tab = makeTab({
+      children: [{ style: { color: "red", table: { th: { size: "1px" } } }, tagName: "p" }],
+      tagName: "div",
+    });
+
+    transactDoc(tab, (t) =>
+      mutateUpdateNestedStylePath(t, ["children", 0], ["table", "th"], "size", ""),
+    );
+
+    expect(child(tab).style).toEqual({ color: "red" });
     disposeTab(tab);
   });
 

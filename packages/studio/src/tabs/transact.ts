@@ -1136,6 +1136,46 @@ export function mutateUpdateMediaNestedStyle(
 }
 
 /**
+ * Drop every level of `stylePath` a deletion has just left empty, DEEPEST FIRST.
+ *
+ * Emptying the leaf usually empties its parent with it — `["table", "th"]` losing its last
+ * declaration leaves `table` holding nothing — and an empty object still serialises, so it reaches
+ * the file, the diff, and every equality check the collab layer makes. Every other style writer in
+ * this module is careful about that; these two were not.
+ *
+ * The walk this replaces went top-down and stopped at the first empty level it found, which is the
+ * one order that cannot work: on the way down the shallow levels are still non-empty _because_ the
+ * leaf it is looking for is inside them, so it deleted the leaf and returned with every ancestor
+ * left behind. Writing then deleting `["table", "th"]` on a node with no style at all produced `{
+ * table: {} }` — a style the author never wrote, on a node that should have had none, because
+ * `ensureNestedStyle` creates the intermediates on the way in.
+ *
+ * @param {JxStyle} root - The object `stylePath[0]` is a key of: a node's `style`, or a media
+ *   block.
+ * @param {string[]} stylePath
+ */
+function pruneEmptyStylePath(root: JxStyle, stylePath: string[]) {
+  // Each entry holds the segment at its own index; an absent (or scalar) one ends the descent.
+  const owners: JxStyle[] = [root];
+  for (const seg of stylePath) {
+    const next = getNestedStyle(owners.at(-1), seg);
+    if (!next) {
+      break;
+    }
+    owners.push(next);
+  }
+  for (let i = owners.length - 2; i >= 0; i--) {
+    const owner = owners[i]!;
+    const seg = stylePath[i]!;
+    const block = getNestedStyle(owner, seg);
+    // Re-read rather than reuse `owners[i + 1]`: the level below may have gone this same loop.
+    if (block && Object.keys(block).length === 0) {
+      delete owner[seg];
+    }
+  }
+}
+
+/**
  * Update a style property at a nested style path (e.g., ["table", "th"]). Creates intermediate
  * objects as needed.
  *
@@ -1163,16 +1203,7 @@ export function mutateUpdateNestedStylePath(
   }
   if (value === undefined || value === "") {
     delete obj[prop];
-    // Clean up empty parent objects
-    let cur: JxStyle | undefined = node.style;
-    for (let i = 0; i < stylePath.length && cur; i++) {
-      const child = getNestedStyle(cur, stylePath[i]!);
-      if (child && Object.keys(child).length === 0) {
-        delete cur[stylePath[i]!];
-        break;
-      }
-      cur = child;
-    }
+    pruneEmptyStylePath(node.style, stylePath);
   } else {
     obj[prop] = value;
   }
@@ -1214,15 +1245,7 @@ export function mutateUpdateMediaNestedStylePath(
   }
   if (value === undefined || value === "") {
     delete obj[prop];
-    let cur: JxStyle | undefined = media;
-    for (let i = 0; i < stylePath.length && cur; i++) {
-      const child = getNestedStyle(cur, stylePath[i]!);
-      if (child && Object.keys(child).length === 0) {
-        delete cur[stylePath[i]!];
-        break;
-      }
-      cur = child;
-    }
+    pruneEmptyStylePath(media, stylePath);
     if (Object.keys(media).length === 0) {
       delete node.style[key];
     }
