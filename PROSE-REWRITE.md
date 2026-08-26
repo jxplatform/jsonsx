@@ -37,7 +37,7 @@ For each page:
    the `:::doc-*` directive lines, image paths, `title`/`spec:`/`code:` frontmatter, the canonical UI names, and the protected heading slugs below. Alt text may change only to drop a dash or a banned word, because you cannot see the image.
 4. `description` frontmatter is prose and should be rewritten too, but it is capped at 155
    characters and `docs:check` enforces it.
-5. Answer both questions in the pull request body, per page. To "what still sounds AI-generated?", "nothing" is never a true answer. To "did the rewrite add or remove any fact, name, number, date, quote, citation or claim?", paste the fact delta and adjudicate every line of it.
+5. Answer both questions in the commit message, per section. To "what still sounds AI-generated?", "nothing" is never a true answer. To "did the rewrite add or remove any fact, name, number, date, quote, citation or claim?", paste the fact delta and adjudicate every line of it.
 
 Commands, in this order, because `oxfmt` realigns tables and moves the offsets everything else reports on:
 
@@ -50,18 +50,18 @@ bun scripts/docs/check-prose.ts docs/<path>.md
 bun scripts/docs/check-prose-facts.ts --base <branch point> docs/<path>.md
 ```
 
-The fact differ compares the working tree against the branch point and blocks on a LOSS: a removed code fence, link, keystroke or image. Everything else it prints is advisory and gets adjudicated line by line in the pull request body. Point `--base` at the branch point rather than at `main`, or a stacked change reads as a loss.
+The fact differ compares the working tree against a base and blocks on a LOSS: a removed code fence, link, keystroke or image. Everything else it prints is advisory and gets adjudicated line by line in the commit message. **Point `--base` at the previous commit, not at `main`.** Later commits build on earlier ones, so a rename this branch already made reads as a loss when compared against the branch point.
 
 The gate holds new prose to zero em dashes and holds each existing page to the count it already had, so a rewrite that removes some must lower that page's entry in `scripts/docs/prose.json`. `bun scripts/docs/check-prose.ts --ratchet` prints the corrected map. Delete a page's entry when it reaches zero.
 
-Then, per pull request, after committing, because `docs:verify` regenerates and diffs and so needs a clean tree:
+Then, per commit, after committing, because `docs:verify` regenerates and diffs and so needs a clean tree:
 
 ```sh
 bun run docs:verify
 bun run docs:links && bun run docs:prose
 bun run docs:claims && bun run docs:markdown && bun run docs:standards && bun run docs:spec-release
-git diff --name-only origin/main... | bun scripts/ci/affected.ts --stdin   # expect an empty matrix
-git diff --word-diff=color origin/main... -- docs/
+git diff --name-only origin/main... | bun scripts/ci/affected.ts --stdin
+git diff --word-diff=color HEAD~1 -- docs/
 ```
 
 ## Headings you may re-case but must not reword
@@ -89,6 +89,21 @@ An anchor is minted from a heading's rendered text, lowercased, so `## How It Wo
 - `studio/logic/code#code-mode-the-whole-file-as-source` (1 inbound) from docs/studio/interface/modes.md:49
 - `studio/projects/content-types#drafts` (1 inbound) from docs/studio/projects/browse.md:32
 - `studio/projects/pages-layouts-components#before-you-delete-or-rename` (1 inbound) from docs/studio/projects/browse.md:63
+
+## How this ships
+
+**One pull request, off `docs/humanize`, with one commit per meaningful step.** The commit is the unit a reviewer reads: a section rewrite, a gate, a ruling applied. Read the branch with `git log -p --reverse` or a commit at a time, not as one 4,000-line diff.
+
+Two consequences worth knowing:
+
+- **The whole branch pays one full test matrix, once.** `package.json` and `.github/workflows/test.yml` are both in `affected.ts`'s `GLOBAL` list, and two commits touch them to register `docs:links` and `docs:prose`. Everything else here is `checks`-only, so splitting the work would have paid that cost repeatedly for no gain.
+- **Package and extension READMEs are still deferred to their own commit at the end.** Each one seeds its workspace and that workspace's whole dependent closure, and `packages/README.md`, `extensions/README.md` and `scripts/README.md` match no rule in `affected.ts` at all, so they fail open. Landing them together keeps that to one union rather than one fan-out per commit.
+
+Verify a commit before making it, and the branch before opening the pull request. `docs:verify` needs a clean tree, so it runs after the commit rather than before.
+
+## Working in a worktree
+
+This work happens in a git worktree, and **a shell's working directory can revert between commands**. It did, and seven commits landed on an unrelated branch and reached the remote before anyone noticed; they were reverted in `b73b0ef3`. Start every command with an explicit `cd` to the worktree rather than trusting the shell to have stayed there, and check `git status -sb` names the right branch before any command that writes history.
 
 ## Out of scope
 
@@ -133,16 +148,16 @@ The style guide gained what it was missing: **Languages** (Project group, off th
 
 ## Status
 
-| Step                                                       | State       |
-| ---------------------------------------------------------- | ----------- |
-| One line per paragraph, and `unwrap-prose.ts`              | done        |
-| The link and anchor gate, and the 13 links it found broken | done        |
-| The style guide, and this brief                            | done        |
-| The prose gate                                             | not started |
-| Pilot rewrite and the reference set                        | not started |
-| Stale surface names, titles, code fences                   | not started |
-| The rewrite, by section                                    | not started |
-| Marketing copy, and the README pass                        | not started |
-| Consistency pass, and the gate goes absolute               | not started |
+| Step                                                       | State                                             |
+| ---------------------------------------------------------- | ------------------------------------------------- |
+| One line per paragraph, and `unwrap-prose.ts`              | done                                              |
+| The link and anchor gate, and the 13 links it found broken | done                                              |
+| The style guide, and this brief                            | done                                              |
+| The prose gate                                             | done: 8 bans at zero, em-dash debt written down   |
+| Pilot rewrite and the reference set                        | done: 7 pages, nothing lost                       |
+| Stale surface names, titles, code fences                   | done: 14 rulings applied, 44 fences labelled      |
+| The rewrite, section by section                            | `start/` done. 114 files and 2,502 em dashes left |
+| Marketing copy, and the README pass                        | not started                                       |
+| Consistency pass, and the gate goes absolute               | not started                                       |
 
-The pilot freezes the voice every later page is written against. Until it lands, there is no reference set.
+The seven pilot pages are the reference set. Read them before rewriting anything else: `framework.md`, `framework/concepts/reactivity.md`, `framework/concepts/styling.md`, `extending/extensions/first-party.md`, `studio.md`, `studio/interface/modes.md`, `start/first-project.md`.
