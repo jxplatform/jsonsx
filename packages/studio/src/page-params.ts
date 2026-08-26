@@ -10,6 +10,7 @@
  * matching built page.
  */
 
+import { documentUrlPattern as routePattern } from "@jxsuite/schema/routes";
 import { getPlatform } from "./platform";
 import { loadExtensions } from "./format/format-host";
 import type { JxMutableNode, JxPathsDef } from "@jxsuite/schema/types";
@@ -17,54 +18,17 @@ import type { JxMutableNode, JxPathsDef } from "@jxsuite/schema/types";
 /** Param name → candidate values, in `$paths` declaration order. */
 export type ParamValues = Record<string, string[]>;
 
-/** Bracket route segments: `[param]` (named) and `[...param]` (catch-all). */
-const PARAM_SEGMENT = /\[\.\.\.(\w+)\]|\[(\w+)\]/g;
-
 /**
- * Param names declared by a document path's bracket segments, e.g. `pages/products/[sku].json` →
- * `["sku"]`. Mirrors the compiler's `fileToRoute` parsing.
+ * Route derivation is `@jxsuite/schema/routes`, re-exported so this module stays the studio's one
+ * import for everything `$params`.
  *
- * @param {string | null | undefined} documentPath
- * @returns {string[]}
+ * These two used to be written out here, under a docblock admitting they mirrored the compiler's
+ * `fileToRoute`. A mirror is a copy that nothing checks, and a route is the worst place to keep
+ * one: a disagreement is a page that renders on the canvas and 404s in a browser. The studio cannot
+ * import `@jxsuite/compiler` (its graph carries `sharp` and `esbuild`, and this bundles for a
+ * browser), so the rules moved down to the package both CAN import.
  */
-export function dynamicRouteParams(documentPath: string | null | undefined) {
-  if (!documentPath) {
-    return [];
-  }
-  const params: string[] = [];
-  for (const match of documentPath.matchAll(PARAM_SEGMENT)) {
-    params.push((match[1] ?? match[2])!);
-  }
-  return params;
-}
-
-/**
- * URL pattern for a page document path, mirroring the compiler's `fileToRoute`:
- * `pages/products/[sku].json` → `/products/:sku`, `pages/index.json` → `/`.
- *
- * @param {string | null | undefined} documentPath
- * @returns {string}
- */
-export function documentUrlPattern(documentPath: string | null | undefined) {
-  if (!documentPath) {
-    return "/";
-  }
-  let urlPath = documentPath
-    .replace(/^\.\//, "")
-    .replace(/^pages\//, "")
-    .replace(/\.[^/.]+$/, "");
-  if (urlPath.endsWith("/index")) {
-    urlPath = urlPath.slice(0, -6) || "/";
-  } else if (urlPath === "index") {
-    urlPath = "/";
-  }
-  if (!urlPath.startsWith("/")) {
-    urlPath = `/${urlPath}`;
-  }
-  return urlPath.replaceAll(PARAM_SEGMENT, (_match, spread: string, named: string) =>
-    spread ? "*" : `:${named}`,
-  );
-}
+export { documentUrlPattern, dynamicRouteParams } from "@jxsuite/schema/routes";
 
 /**
  * The `$paths` declaration of an open document. JSON pages carry it on the document root;
@@ -289,7 +253,7 @@ export function substitutePreviewParams(
   doc.state.$page = {
     params: { ...params },
     title: typeof doc.title === "string" ? doc.title : "",
-    url: documentUrlPattern(documentPath),
+    url: routePattern(documentPath),
   };
   return doc;
 }

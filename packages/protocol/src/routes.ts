@@ -235,11 +235,16 @@ export const STUDIO_ROUTES = {
    * these paths mean the project's SOURCES, and a built page addresses its own OUTPUT by the same
    * paths (`/components/x.js` is the formula module here and the custom element there), so a
    * backend serves the built site somewhere of its own and says where.
+   *
+   * A backend that cannot run the compiler at all — a hosted one executes no project JS and has no
+   * bundler, image pipeline or filesystem — may instead serve the working tree as a site and let
+   * the runtime assemble each page in the reader's browser. `mode` reports which happened, and an
+   * absent `mode` means `built`, so a backend predating the field keeps its meaning.
    */
   buildSite: route(
     "POST",
     "/__studio/build",
-    "Build the site to its output directory → {routes, files, errors, url}",
+    "Build or render the site → {routes, files, errors, mode?, url}",
     "Open in Browser reports that this target cannot build a preview.",
   ),
 

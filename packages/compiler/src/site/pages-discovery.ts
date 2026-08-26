@@ -9,10 +9,16 @@
  * pages/about/index.json → /about pages/blog/[slug].json → /blog/:slug (dynamic)
  * pages/docs/[...path].json → /docs/* (catch-all) pages/_component.json → NOT routed (underscore
  * prefix)
+ *
+ * The conventions themselves live in `@jxsuite/schema/routes`, not here. The studio and the cloud
+ * preview both have to answer "what URL is this file" and neither can import this package — its
+ * dependency graph carries `sharp` and `esbuild` — so what remains in this file is the part that
+ * genuinely needs a filesystem: the walk, the `$layout` peek, and `$paths` expansion.
  */
 
 import { readFileSync, readdirSync } from "node:fs";
 import { parseJxDocument } from "@jxsuite/schema/parse";
+import { compareRoutes, fileToRoute as routeShape } from "@jxsuite/schema/routes";
 import { extname, join, relative, resolve } from "node:path";
 import type { ExtensionRegistry } from "@jxsuite/schema/extension-registry";
 import type { FormatRegistry } from "@jxsuite/schema/format-registry";
@@ -176,16 +182,8 @@ export async function discoverPages(pagesDir: string, registry?: FormatRegistry)
   const pageExtensions = new Set([".json", ...(registry?.documentExtensions("page") ?? [])]);
   await walkDir(pagesDir, pagesDir, routes, pageExtensions, registry);
 
-  // Sort: static routes first, then by specificity (more segments = more specific)
-  routes.sort((a, b) => {
-    if (a.isDynamic !== b.isDynamic) {
-      return a.isDynamic ? 1 : -1;
-    }
-    if (a.isCatchAll !== b.isCatchAll) {
-      return a.isCatchAll ? 1 : -1;
-    }
-    return a.urlPattern.localeCompare(b.urlPattern);
-  });
+  // Static routes first, then dynamic, then catch-all (spec §4.4) — the shared ordering.
+  routes.sort(compareRoutes);
 
   return routes;
 }
@@ -248,45 +246,7 @@ async function walkDir(
  * @returns {Promise<Route>}
  */
 async function fileToRoute(relativePath: string, absolutePath: string, registry?: FormatRegistry) {
-  // Remove the source extension
-  const ext = extname(relativePath);
-  let urlPath = ext ? relativePath.slice(0, -ext.length) : relativePath;
-
-  // Normalize path separators
-  urlPath = urlPath.split("\\").join("/");
-
-  // Index files map to their parent directory
-  if (urlPath.endsWith("/index")) {
-    urlPath = urlPath.slice(0, -6) || "/";
-  } else if (urlPath === "index") {
-    urlPath = "/";
-  }
-
-  // Ensure leading slash
-  if (!urlPath.startsWith("/")) {
-    urlPath = `/${urlPath}`;
-  }
-
-  // Extract parameters from bracket syntax
-  const params: string[] = [];
-  let isDynamic = false;
-  let isCatchAll = false;
-
-  // Convert [param] → :param and [...param] → *
-  const urlPattern = urlPath.replaceAll(
-    /\[\.\.\.(\w+)\]|\[(\w+)\]/g,
-    (_match: string, spread: string, named: string) => {
-      if (spread) {
-        isCatchAll = true;
-        isDynamic = true;
-        params.push(spread);
-        return "*";
-      }
-      isDynamic = true;
-      params.push(named);
-      return `:${named}`;
-    },
-  );
+  const { isCatchAll, isDynamic, params, urlPattern } = routeShape(relativePath);
 
   // Peek at the page to extract $layout if present
   let $layout: string | null = null;
