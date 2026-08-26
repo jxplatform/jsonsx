@@ -51,6 +51,8 @@ interface RegistryOpts {
   refusePreferences?: boolean;
   /** Make a run reject asynchronously. */
   reject?: boolean;
+  /** Add a fourth record, as an extension contributing to the placement would. */
+  contributed?: boolean;
 }
 
 function installRegistry(opts: RegistryOpts = {}): CommandRegistry {
@@ -94,6 +96,13 @@ function installRegistry(opts: RegistryOpts = {}): CommandRegistry {
       requires: "an open project",
       enablement: (ctx: CommandContext) => ctx.project.open,
     }),
+    /* A fourth record, the shape an extension contributing to the placement takes. It is what
+       makes "a command goes away while its submenu is open" expressible: the built-in three
+       never leave. `app.preferences` is the only id `SECTION_SOURCES` knows besides
+       `settings.open`, so this one gets no submenu, which is the other thing it pins. */
+    ...(opts.contributed
+      ? [record("ext.configure", "Configure Extension", "project", { group: "8_ext" })]
+      : []),
   ] as never);
   setActiveRegistry(registry);
   return registry;
@@ -615,6 +624,85 @@ describe("dismissal", () => {
     expect(calls).toBe(1);
     dismissSettingsMenu();
     expect(calls).toBe(2);
+  });
+});
+
+// ─── When the world changes underneath an open menu ───────────────────────────
+
+/*
+ * A menu is a popover held open across time, and the app does not stop while it is up. Closing a
+ * project tears the command registry down and rebuilds it, and an extension being disabled takes
+ * its records and its settings sections with it. Every one of these is a real event that can land
+ * between the frame that drew a row and the click that runs it.
+ */
+describe("the world changing underneath it", () => {
+  test("a row clicked after the registry went away does nothing", () => {
+    // Closing a project drops the registry. The menu is still on screen, so its rows are still
+    // Clickable, and they must decline rather than throw at a caller that no longer exists.
+    installRegistry();
+    openSettingsMenu(anchor);
+    setActiveRegistry(null);
+    pointer(rowFor("settings.open"), "click");
+    expect(ran).toEqual([]);
+  });
+
+  test("a section registering after the registry went away redraws nothing", () => {
+    /* The subscription outlives the registry by a moment: `onSettingsDocumentChanged` is held for
+       as long as the submenu is up, and the sections can move for reasons that have nothing to do
+       with the menu. Rebuilding rows from a registry that is gone is what it must not do. */
+    installRegistry();
+    openSettingsMenu(anchor);
+    rowFor("settings.open").dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
+    expect(subKeys()).toEqual(["overview", "contexts", "cssVars"]);
+    setActiveRegistry(null);
+    registerSettingsSection({ key: "locales", label: "Locales", order: 25, render: () => {} });
+    // Unchanged: the rows are the ones the live registry last gave, not a half-built set.
+    expect(subKeys()).toEqual(["overview", "contexts", "cssVars"]);
+    unregisterSettingsSection("locales");
+  });
+
+  test("the command owning the open submenu going away leaves the menu standing", () => {
+    /* An extension being disabled takes its records with it. The submenu belongs to a row that no
+       longer exists, so there is nothing to redraw — and the redraw is what must not reach for
+       `_rows[_subIdx]` and find nothing. */
+    installRegistry({ contributed: true });
+    openSettingsMenu(anchor);
+    expect(rootIds()).toContain("ext.configure");
+    // Drive the caret onto the contributed row and open Preferences' sections from it, so the
+    // Submenu is owned by an index the next rebuild will not have.
+    rowFor("app.preferences").dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
+    expect(subItems().length).toBeGreaterThan(0);
+    installRegistry();
+    notifySettingsDocument();
+    expect(rootIds()).not.toContain("ext.configure");
+    expect(isSettingsMenuOpen()).toBe(true);
+  });
+
+  test("every section going away while the submenu is open leaves the caret with nowhere to go", () => {
+    // A project closing unregisters all of them. Moving the caret through an empty list must be a
+    // No-op rather than a subscript of nothing.
+    installRegistry();
+    openSettingsMenu(anchor);
+    menuKey("ArrowDown");
+    menuKey("ArrowRight");
+    expect(focusedKey()?.sectionKey).toBe("overview");
+    for (const key of ["overview", "contexts", "cssVars"]) {
+      unregisterSettingsSection(key);
+    }
+    expect(subItems()).toHaveLength(0);
+    expect(menuKey("ArrowDown").defaultPrevented).toBe(true);
+    expect(isSettingsMenuOpen()).toBe(true);
+  });
+
+  test("a contributed row whose command takes no section offers none", () => {
+    // `SECTION_SOURCES` is keyed by command id, so a record it does not know gets an empty list
+    // Rather than a guess. That is what keeps the submenu the ARGUMENT's enumeration.
+    installRegistry({ contributed: true });
+    openSettingsMenu(anchor);
+    const row = rowFor("ext.configure");
+    expect(row.hasAttribute("aria-haspopup")).toBe(false);
+    row.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
+    expect(subItems()).toHaveLength(0);
   });
 });
 
