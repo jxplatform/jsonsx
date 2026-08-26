@@ -168,6 +168,6 @@ The style guide gained what it was missing: **Languages** (Project group, off th
 | The rewrite, section by section                            | done: all 131 hand-authored pages at zero        |
 | Marketing copy, and the README pass                        | done: 8 marketing pages, 26 READMEs              |
 | The gate goes absolute                                     | done: `em-dash` is a ban, the budget map is gone |
-| Consistency pass                                           | in progress                                      |
+| Consistency pass                                           | done: tics thinned, ten wrong chords repaired    |
 
 The seven pilot pages are the reference set. Read them before rewriting anything else: `framework.md`, `framework/concepts/reactivity.md`, `framework/concepts/styling.md`, `extending/extensions/first-party.md`, `studio.md`, `studio/interface/modes.md`, `start/first-project.md`.
