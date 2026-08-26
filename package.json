@@ -93,7 +93,7 @@
     "oxlint": "^1.80.0",
     "oxlint-tsgolint": "^7.0.2001",
     "puppeteer-core": "^25.8.0",
-    "release-please": "^17.11.1",
+    "release-please": "^17.11.2",
     "ts-migrate": "^0.1.35",
     "ts-migrate-plugins": "^0.1.35",
     "ttsc": "^0.28.2",
