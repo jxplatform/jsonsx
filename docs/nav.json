@@ -39,7 +39,7 @@
         },
         {
           "path": "start/coming-from-ai-builders",
-          "label": "Coming from AI builders"
+          "label": "Coming from Lovable or Builder.io"
         },
         {
           "path": "start/videos",
@@ -61,7 +61,7 @@
         },
         {
           "path": "studio/interface/modes",
-          "label": "Modes and preview"
+          "label": "Editors and views"
         },
         {
           "path": "studio/interface/canvas",
@@ -165,7 +165,7 @@
         },
         {
           "path": "studio/design/properties",
-          "label": "Properties"
+          "label": "Content tab"
         },
         {
           "path": "studio/design/style-inspector",

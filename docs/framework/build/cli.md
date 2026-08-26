@@ -24,7 +24,7 @@ Jx has two command-line surfaces: `bun create @jxsuite`, which scaffolds a new p
 
 Scaffold a new Jx project.
 
-```
+```bash
 bun create @jxsuite <directory> [--template <id>]
 ```
 
@@ -51,7 +51,7 @@ A scaffold that fails partway cleans up after itself, so a retry sees the destin
 
 Build the site to the configured `outDir` (default `dist/`). See [How compilation works](/docs/framework/build) for what happens inside.
 
-```
+```bash
 jx build [root] [--verbose] [--no-clean]
 ```
 
@@ -66,7 +66,7 @@ Prints a summary (`Done: 12 routes → 34 files`) on success; lists route errors
 
 Start the dev server for a project: builds the site, serves the built pages with live reload (edits rebuild before the browser refreshes), and exposes the Studio backend API. Requires [Bun](https://bun.sh) and `@jxsuite/server` in the project's devDependencies — both part of every scaffolded project; `jx dev` prints an install hint when either is missing.
 
-```
+```bash
 jx dev [root] [--port <n>]
 ```
 
@@ -80,7 +80,7 @@ See [The dev server](/docs/framework/build/dev-server) for what runs underneath.
 
 Serve an already-built `dist/` directory — a dependency-free static server for checking the production build locally. Run `jx build` first.
 
-```
+```bash
 jx preview [root] [--port <n>]
 ```
 
@@ -94,7 +94,7 @@ Directory URLs map to their `index.html` (with or without a trailing slash) and 
 
 Generate the project's JSON Schema entry documents — `project.schema.json` and `document.schema.json` — by composing the core schemas with the fragments shipped by each extension in `project.json`'s `extensions`. The outputs are written into the project root as committed, **self-contained** artifacts: the core and fragment resources are embedded under `$defs` keyed by their canonical `$id`s, so editors resolve them offline with no `node_modules`, network, or editor configuration. No flags.
 
-```
+```bash
 jx schema [root]
 ```
 
@@ -104,7 +104,7 @@ Re-run it whenever you change the `extensions` list so editors and `jx validate`
 
 Validate the whole project tree (run `jx schema` first). No flags.
 
-```
+```bash
 jx validate [root]
 ```
 
@@ -122,7 +122,7 @@ The output shape is meant to be read by whatever wrote the file — a person or 
 
 Additively sync the tables declared in `project.json`'s `data` section to their `connections` databases, through each connection's connector. Credentials come from the environment merged with the project's `.dev.vars` file. After a real (non-dry-run) apply, each connector's binding fragments are merged into `wrangler.jsonc`, preserving your keys.
 
-```
+```bash
 jx db push [root] [--dry-run] [--connection <name>]
 ```
 

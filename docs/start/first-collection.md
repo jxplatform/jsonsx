@@ -40,13 +40,13 @@ You should now see three field rows in the schema. These become the form every p
 
 ## 3. Create your first post
 
-1. Press :kbd[⌘K] and run **Manage Files**.
+1. Press :kbd[⌘⇧E] to open **The Library**.
 2. Click **New** — the menu now lists an item for the type you just defined. Pick **Posts**.
 3. Name the entry `hello-world`.
 
-![Jx Studio Manage Files modal with live previews of every project file](../images/mode-manage.png)
+![The Library open in a Studio pane, listing a project's pages and components as cards with live previews](../images/mode-manage.png)
 
-Studio creates the file in `content/posts/` with every schema field pre-filled with a sensible blank, and opens it. Back in Manage, the entry appears under the **Content** filter, labeled with its type.
+Studio creates the file in `content/posts/` with every schema field pre-filled with a sensible blank, and opens it. Back in The Library, the entry appears under the **Content** filter, labeled with its type.
 
 ## 4. Fill it in
 
@@ -66,7 +66,7 @@ You should see the frontmatter form filled in and your words on the page. The sa
 
 Repeat step 3 twice — **New** > **Posts**, named `grid-mode-rocks` and `hello-again` (or anything you like). This time skip the fields on purpose; you'll fill them in bulk next.
 
-You should now have three entries under Manage's **Content** filter, two of them with empty frontmatter.
+You should now have three entries under The Library's **Content** filter, two of them with empty frontmatter.
 
 ## 6. Open the collection as a grid
 
@@ -93,7 +93,7 @@ Saving a collection row rewrites that file's frontmatter block — which is exac
 
 ## 8. Create the Blog page
 
-1. Run **Manage Files** again, then **New** > **Page**, and name it `Blog`. Studio writes the page and opens it — this is your site's `/blog` address.
+1. Open **The Library** again, then **New** > **Page**, and name it `Blog`. Studio writes the page and opens it — this is your site's `/blog` address.
 2. In the **View** control on the pane's context bar, click **Design**.
 
 You should see the empty page on the design canvas, once per breakpoint.
@@ -163,7 +163,7 @@ The listing links nowhere yet, and that's deliberate: one page per post is the j
 
 A complete content pipeline, end to end:
 
-- A **content type** (`posts`) — schema-backed entries with one-click creation from Manage.
+- A **content type** (`posts`) — schema-backed entries with one-click creation from The Library.
 - **Three entries**, edited both one at a time (the Document Header card) and in bulk (**Grid mode**).
 - A **ContentCollection** state entry — the collection as live, sorted data on a page.
 - A **repeater** whose template binds `item.data` fields — one designed card, rendered per post.
@@ -177,4 +177,4 @@ On disk this is all plain files: your types in the `content` section of `project
 - Turn the post card into a reusable component — **[Working with components](/docs/studio/design/components)**.
 - Add an author type and point posts at it with a **reference** field — **[Content types](/docs/studio/projects/content-types)** and **[Relationships](/docs/framework/site/relationships)**.
 - Give posts their own pages with a dynamic route — **[Routing](/docs/framework/site/routing)**.
-- Publish it — **[Git & publish](/docs/studio/publish)**.
+- Publish it — **[Publish](/docs/studio/publish)**.

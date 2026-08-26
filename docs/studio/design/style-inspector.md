@@ -112,5 +112,5 @@ Everything here writes plain CSS into the element's `style` object in the open f
 
 ## Next
 
-- Set element-wide defaults instead of styling one element at a time — **[Stylebook](/docs/studio/design/stylebook)**
+- Set element-wide defaults instead of styling one element at a time — **[Project Styles](/docs/studio/design/stylebook)**
 - Name your colors, fonts, and sizes in **[Design tokens](/docs/studio/design/tokens)**

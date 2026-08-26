@@ -43,7 +43,7 @@ Auth is an extension package, and it keeps its accounts in a database, so it bui
 
 1. **Have a connection.** Add one in **[Connections](/docs/studio/data/connections)** if the project has none — the account tables live on one of them.
 2. **Install the package.** Type `@jxsuite/auth` into _Settings > Dependencies_ and click **Add** (see **[Dependencies and imports](/docs/studio/projects/dependencies)**).
-3. **List it as an extension.** Open `project.json` and add `"@jxsuite/auth"` to its `extensions` array — that list is what switches the section on. Studio has no field for it yet, so this one edit happens in **[Code mode](/docs/studio/logic/code)**; the array is described in **[project.json](/docs/framework/site/project-json)**.
+3. **List it as an extension.** Open `project.json` and add `"@jxsuite/auth"` to its `extensions` array — that list is what switches the section on. Studio has no field for it yet, so this one edit happens in the **[Code editor](/docs/studio/logic/code)**; the array is described in **[project.json](/docs/framework/site/project-json)**.
 4. **Pick a server-capable adapter.** In **[Project settings](/docs/studio/projects/settings)**, set the deployment target to Cloudflare Pages, Cloudflare Workers, Node, or Bun. A site with accounts is no longer purely static, and the build says so if you leave it on Static.
 
 Reopen Settings and an **Authentication** section is waiting. Filling it in writes an `auth` section into `project.json`.
@@ -113,7 +113,7 @@ An input named anything else is invisible to the handler, and the attempt goes o
 On success a handler stops the browser's own form submission, refreshes the session, re-runs the page's table queries — so a list scoped to `owner` fills in the moment someone signs in — and sends the visitor to the matching **redirect** if you configured one. On failure (wrong password, an address that already has an account) the page is simply left as it was; surfacing a message is up to you.
 
 :::doc-note
-The wiring is two state entries and one property on the form. The **[Events](/docs/studio/logic/events)** section of the Inspector's **Logic** tab (:kbd[⌘⇧3]) lists plain functions in its handler picker, and an auth handler is one key inside a state entry rather than a function of its own — so point the form at it in **[Code mode](/docs/studio/logic/code)**:
+The wiring is two state entries and one property on the form. The **[Events](/docs/studio/logic/events)** section of the Inspector's **Logic** tab (:kbd[⌘⇧3]) lists plain functions in its handler picker, and an auth handler is one key inside a state entry rather than a function of its own — so point the form at it in the **[Code editor](/docs/studio/logic/code)**:
 
 ```json
 {

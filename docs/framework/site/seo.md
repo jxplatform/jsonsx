@@ -82,7 +82,7 @@ Links carry that fourth part because `rel` and `href` alone are not enough to te
 
 A `<link>` with a typo'd relation is a special kind of frustrating: it's still valid HTML, it still renders, and it does nothing.
 
-```
+```text
 <link rel="stylshet"> — "stylshet" is not an IANA link relation, and a relation nobody
 recognizes does nothing. Check the spelling, or use an absolute URI if it is an extension
 relation (RFC 8288 §2.1.2).

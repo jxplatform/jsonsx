@@ -39,8 +39,10 @@ import { relative, resolve } from "node:path";
 const ROOT = resolve(import.meta.dir, "../..");
 
 export interface Facts {
-  /** Fenced blocks, content and all. A prose pass must not touch one. */
+  /** Fenced block BODIES, without the info string. A prose pass must not touch one. */
   fences: string[];
+  /** The info strings themselves, which a docs fix may legitimately add. */
+  fenceLangs: string[];
   /** Every link and image target. */
   targets: string[];
   /** `:kbd[⌘S]` and friends. */
@@ -58,7 +60,7 @@ export interface Facts {
   words: number;
 }
 
-const FENCE_BLOCK = /^```[\S ]*\n[\s\S]*?^```$/gm;
+const FENCE_BLOCK = /^```([\S ]*)\n([\s\S]*?)^```$/gm;
 const IMAGE = /!\[[^\]]*\]\(([^)\s]+)/g;
 const LINK = /(?<!!)\[[^\]]*\]\(([^)\s]+)/g;
 const KBD = /:kbd\[[^\]]*\]/g;
@@ -74,13 +76,18 @@ const MODALITY =
  * @returns {Facts}
  */
 export function factsOf(source: string): Facts {
-  const fences = source.match(FENCE_BLOCK) ?? [];
+  // The body and the info string are separated deliberately: adding a missing language tag is a
+  // Docs FIX, and comparing the whole block would report all 44 of them as lost code.
+  const blocks = [...source.matchAll(FENCE_BLOCK)];
+  const fences = blocks.map((m) => m[2] ?? "");
+  const fenceLangs = blocks.map((m) => (m[1] ?? "").trim());
   const prose = source.replaceAll(FENCE_BLOCK, "");
   const all = (re: RegExp, group = 0) => [...prose.matchAll(re)].map((m) => m[group] ?? "");
   const codeless = prose.replaceAll(CODE_SPAN, " ");
   return {
     bold: all(BOLD, 1),
     code: all(CODE_SPAN, 1),
+    fenceLangs,
     fences,
     images: all(IMAGE, 1),
     keys: all(KBD),
@@ -129,7 +136,7 @@ export function compare(file: string, before: string, after: string): FileReport
   const advisory: string[] = [];
 
   const band1: [string, keyof Facts][] = [
-    ["fenced code block", "fences"],
+    ["fenced code body", "fences"],
     ["link or image target", "targets"],
     ["keystroke", "keys"],
     ["image", "images"],
@@ -141,6 +148,7 @@ export function compare(file: string, before: string, after: string): FileReport
   }
 
   const band2: [string, keyof Facts][] = [
+    ["fence language", "fenceLangs"],
     ["identifier", "code"],
     ["bold label", "bold"],
     ["number", "numbers"],

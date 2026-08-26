@@ -266,7 +266,7 @@ An expression lowers to the same target a `body` string would — but the functi
 
 References inside a node resolve in a fixed order:
 
-```
+```text
 1. $map/       — iteration context
 2. $reduce/acc — fold accumulator (reduce only)
 3. $args/      — named-formula parameters

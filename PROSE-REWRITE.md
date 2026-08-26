@@ -106,18 +106,30 @@ An anchor is minted from a heading's rendered text, lowercased, so `## How It Wo
 
 A rewrite must never guess at a fact. Anything below gets recorded here and decided by a person.
 
-- **Stale Studio surface names, about eighty occurrences.** `Script & logic` is link text thirteen
-  times for a page the app and the nav both call **Logic**, and the string appears nowhere in `packages/studio/src`. Also `Manage` and `Browse your project` for **The Library**, `Stylebook` for **Project Styles**, and `right panel` for the **Inspector**. The same screenshot carries two different alt texts, one calling The Library a "Manage Files modal".
-- **17 pages whose frontmatter `title` disagrees with their `nav.json` label**, and one whose H1
-  disagrees with its own title (`start/install.md`: "Install Jx Studio" against "Get Studio").
-- **44 code fences with no language tag**, across 17 files.
-- **Two dangling paths in `CLAUDE.md`**: `STANDARDS-ADOPTION.md`, which agents are told to read
-  before picking up any `gap:` id, and `packages/studio/UX-REDESIGN-PLAN.md` §13, cited as the design authority for the shot contract. Neither exists in the tree.
-- **`packages/README.md`, `extensions/README.md` and `scripts/README.md` match no rule in
-  `affected.ts`** and fail open to a full test matrix.
-- **Two pages describe the same screenshot differently.** `docs/images/mode-manage.png` was captioned "Jx Studio Manage Files modal with live previews of every project file" on `start/first-project.md` and "The Library open in a Studio pane, listing a project's pages and components as cards with live previews" on `studio/projects/browse.md`, which owns the shot. The pilot adopted the owning page's wording, which narrows the claim from every project file to pages and components and changes modal to pane. Someone who can see the image should settle which is right.
-- **Whether a docs page should transcribe a spec at all.** `framework/concepts/` is a copy of
-  `specs/spec.md`. This campaign fixes the prose; the information architecture is a larger question.
+- **Two pages describe the same screenshot differently.** `docs/images/mode-manage.png` was captioned "Jx Studio Manage Files modal with live previews of every project file" on `start/first-project.md` and "The Library open in a Studio pane, listing a project's pages and components as cards with live previews" on `studio/projects/browse.md`, which owns the shot. Both now use the owning page's wording, which narrows the claim from every project file to pages and components and changes modal to pane. Someone who can see the image should confirm it.
+- **`navigator-panels.ts` still comments that the Bottom dock's tabs are "Problems · Diff · Logic · Activity".** The code below it registers three. The style guide has been corrected; the comment has not.
+- **Two dangling paths in `CLAUDE.md`**: `STANDARDS-ADOPTION.md`, which agents are told to read before picking up any `gap:` id, and `packages/studio/UX-REDESIGN-PLAN.md` §13, cited as the design authority for the shot contract. Neither exists in the tree.
+- **`packages/README.md`, `extensions/README.md` and `scripts/README.md` match no rule in `affected.ts`** and fail open to a full test matrix.
+- **Whether a docs page should transcribe a spec at all.** `framework/concepts/` is a copy of `specs/spec.md`. This campaign fixes the prose; the information architecture is a larger question.
+
+## Terminology, as ruled
+
+Fourteen Studio names were checked against what the app registers. The rulings:
+
+| Was                       | Now                         | Why                                                                                |
+| ------------------------- | --------------------------- | ---------------------------------------------------------------------------------- |
+| Run **Manage Files** (⌘K) | Open **The Library** (⌘⇧E)  | No command by that name exists. Three tutorial steps sent readers nowhere.         |
+| Script & logic            | Logic                       | The page title and nav label; the old string is in no source file.                 |
+| Stylebook                 | Project Styles              | Renamed in spec 0.6.0-draft, name only. The `stylebook` slug stays the wire value. |
+| Browse your project       | The Library                 | The page's own title and H1.                                                       |
+| Git & publish             | Publish                     | The nav label.                                                                     |
+| Tabs and files            | Documents and panes         | The nav label.                                                                     |
+| the right panel           | the Inspector               | A shell region with a canonical name.                                              |
+| Code mode                 | the Code editor             | _Mode_ belongs to the View control; Code is an Editor kind.                        |
+| the sidebar               | the Inspector's Content tab | Studio has no sidebar.                                                             |
+| the State panel           | the Data panel              | State folded into Data. Removed from the guide.                                    |
+
+The style guide gained what it was missing: **Languages** (Project group, off the rail, multilingual projects only), a declared but unbuilt **Search** panel, the **jump bar**, and the **Command Center** pill. **The palette** is now explicitly allowed as a collective for the Command Center and Quick Access.
 
 ## Status
 

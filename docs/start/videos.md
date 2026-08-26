@@ -12,7 +12,7 @@ Video walkthroughs of Jx Studio are planned, and this page is where they'll live
 | Video               | What it will cover                                      | Status      |
 | ------------------- | ------------------------------------------------------- | ----------- |
 | Your first project  | New project, starter templates, editing, and going live | Coming soon |
-| Design basics       | The canvas, style inspector, tokens, and Stylebook      | Coming soon |
+| Design basics       | The canvas, style inspector, tokens, and Project Styles | Coming soon |
 | Content collections | Content types, entries, and listing pages               | Coming soon |
 | Publishing          | GitHub, choosing a host, and the publish flow           | Coming soon |
 

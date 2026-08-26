@@ -92,7 +92,7 @@ Library formulas are **copied in**, not linked: picking one writes its full defi
 
 ## Named formulas
 
-An **Expression** entry in the Data panel is a formula with a name. Once it declares parameters, it becomes callable from any other formula via the `call` operator — the palette lists it under **Formulas**, and its argument rows are labeled with the parameter names. Library formulas arrive with their parameters declared; to add parameters to a formula of your own, edit its entry in **[Code mode](/docs/studio/logic/code)**. That's how you build a vocabulary: define `discountedPrice` once, call it everywhere.
+An **Expression** entry in the Data panel is a formula with a name. Once it declares parameters, it becomes callable from any other formula via the `call` operator — the palette lists it under **Formulas**, and its argument rows are labeled with the parameter names. Library formulas arrive with their parameters declared; to add parameters to a formula of your own, edit its entry in the **[Code editor](/docs/studio/logic/code)**. That's how you build a vocabulary: define `discountedPrice` once, call it everywhere.
 
 ## Next
 

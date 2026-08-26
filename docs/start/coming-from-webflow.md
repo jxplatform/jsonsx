@@ -13,7 +13,7 @@ You already think in boxes, breakpoints, reusable components, and CMS collection
 | --------------------- | --------------------------------- | --------------------------------------------------------- |
 | Style panel + classes | Style inspector                   | [Style inspector](/docs/studio/design/style-inspector)    |
 | Variables             | Design tokens                     | [Design tokens](/docs/studio/design/tokens)               |
-| Tag-level styles      | Stylebook                         | [Stylebook](/docs/studio/design/stylebook)                |
+| Tag-level styles      | Project Styles                    | [Project Styles](/docs/studio/design/stylebook)           |
 | Symbols / components  | Components                        | [Working with components](/docs/studio/design/components) |
 | CMS collections       | Content types                     | [Content types](/docs/studio/projects/content-types)      |
 | Collection lists      | Repeaters                         | [Repeaters](/docs/studio/design/repeaters)                |
@@ -25,7 +25,7 @@ You already think in boxes, breakpoints, reusable components, and CMS collection
 
 In Webflow, every style is a class you name, combine, and manage forever. Jx spreads the same work across layers, so most elements never need a class at all:
 
-- The **[Stylebook](/docs/studio/design/stylebook)** sets what _every_ heading, button, link, and form control looks like — your baseline, in one catalog.
+- The **[Project Styles](/docs/studio/design/stylebook)** sets what _every_ heading, button, link, and form control looks like — your baseline, in one catalog.
 - **Component styles** cover "this card looks like this wherever it's used."
 - **Per-element styles** from the [Style inspector](/docs/studio/design/style-inspector) are reserved for true one-offs.
 - **[Design tokens](/docs/studio/design/tokens)** sit underneath all three — named colors, fonts, and sizes that every picker offers, like Webflow's Variables.

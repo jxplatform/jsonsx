@@ -108,5 +108,5 @@ You only ever upload one copy of an image, at full quality. When your site is bu
 
 ## Next
 
-- **[Browse your project](/docs/studio/projects/browse)** — the rest of the Library
+- **[The Library](/docs/studio/projects/browse)** — the rest of the Library
 - **[Publish](/docs/studio/publish)** — how the optimized site goes live

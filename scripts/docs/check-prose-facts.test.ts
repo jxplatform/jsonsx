@@ -71,6 +71,16 @@ describe("compare blocks on a loss", () => {
     });
   }
 
+  test("adding a missing language tag is a fix, not a lost code block", () => {
+    // All 44 unlabelled fences in the corpus were labelled at once. Comparing whole blocks,
+    // Info string included, would have reported every one of them as removed code.
+    const bare = "Run it:\n\n```\njx build [root]\n```\n";
+    const tagged = "Run it:\n\n```bash\njx build [root]\n```\n";
+    const report = compare("docs/a.md", bare, tagged);
+    expect(report.blocking).toEqual([]);
+    expect(report.advisory.join(" ")).toContain("fence language");
+  });
+
   test("an edited fence counts as a loss, because a prose pass does not touch code", () => {
     const after = before.replace('{ "a": 1 }', '{ "a": 2 }');
     expect(compare("docs/a.md", before, after).blocking).not.toEqual([]);
