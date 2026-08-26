@@ -128,7 +128,12 @@ import { invalidateLibrary } from "./browse/library-pane";
 import { invalidateMediaCache } from "./ui/media-picker";
 import { setMediaChangedHandler } from "./files/media-upload";
 import { applyFileDrop } from "./editor/file-drop-action";
-import { assistantCommands, isAssistantStreaming, seedAssistantMessages } from "./panels/ai-panel";
+import {
+  assistantCommands,
+  isAssistantStreaming,
+  isAssistantWaiting,
+  seedAssistantMessages,
+} from "./panels/ai-panel";
 import { seedPublishConnected } from "./publish/publish-panel";
 
 import { getPlatform, hasPlatform, registerPlatform } from "./platform";
@@ -1402,6 +1407,7 @@ const commandRegistry = createCommandRegistry({
     // The probe `live-context.ts` declared optional and nobody ever passed, so `ctx.ai.streaming`
     // Read false forever. `assistant.stop` is gated on it.
     aiStreaming: isAssistantStreaming,
+    aiWaiting: isAssistantWaiting,
     canvasMode: getCanvasMode,
     isCaretActive,
     isModalOpen,

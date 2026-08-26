@@ -20,6 +20,7 @@ import type { Tab } from "../tabs/tab";
 import { componentRegistry } from "../files/components";
 import { activeRegistry } from "../commands/active-registry";
 import { registerAiTools } from "./ai-tools";
+import { cancelAsk, registerAskTool, resetAsk } from "./ai-ask";
 import { registerProjectTools } from "./ai-project-tools";
 import { createGatedToolRegistry } from "./gated-registry";
 import type { ToolAvailability } from "./gated-registry";
@@ -77,6 +78,8 @@ export function createDocumentAssistant() {
   };
 
   const innerRegistry = createToolRegistry();
+  // Ungated: a question is not a function of what happens to be open.
+  registerAskTool(innerRegistry);
   registerAiTools(innerRegistry, {
     getTab: () => activeTab.value,
     saveFile: async (relPath: string, content: string) => {
@@ -126,6 +129,9 @@ export function createDocumentAssistant() {
    * every agent-loop round, so a mid-loop create_project unlocks the higher tiers immediately.
    */
   const TIER_REQUIREMENTS = {
+    /* Never refused, so the sentence is unreachable — it exists because the map is derived from
+       the tier union, and a tier without one would not compile. */
+    always: "nothing",
     "no-project": "no project to be open (it bootstraps one)",
     project: "an open project",
     document: "an open document (use open_document first)",
@@ -253,11 +259,16 @@ export function createDocumentAssistant() {
 
   function stop() {
     controller?.abort();
+    /* The abort settles an outstanding question through the turn signal, but only when the turn
+       HAS one — the evals runner and several tests drive the loop without. Settling here as well
+       is what makes Stop terminal in every case rather than in most of them. */
+    cancelAsk();
     chatState.cancelStream();
   }
 
   function newChat() {
     stop();
+    resetAsk();
     chatState.clearChat();
     sessionId = null;
     sessionStore.setActiveSession(projectRoot(), null);
@@ -277,6 +288,7 @@ export function createDocumentAssistant() {
       return;
     }
     stop();
+    resetAsk();
     chatState.clearChat();
     pushRestoredMessages(msgs);
     sessionId = id;
@@ -288,6 +300,7 @@ export function createDocumentAssistant() {
     sessionStore.deleteSession(projectRoot(), id);
     if (sessionId === id) {
       stop();
+      resetAsk();
       chatState.clearChat();
       sessionId = null;
     }

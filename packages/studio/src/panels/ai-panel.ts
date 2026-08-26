@@ -34,6 +34,7 @@ import { undo } from "../tabs/transact";
 import { activeTab } from "../workspace/workspace";
 import { setOpenAiKey } from "../services/ai-settings";
 import { hasAiCredentials } from "../services/ai-models";
+import { answerAsk, isAwaitingAnswer, pendingAsk, skipAsk } from "../services/ai-ask";
 import { openPreferences } from "../settings/preferences-dialog";
 import { onCredentialsChanged } from "../settings/preferences-accounts";
 import { setDockCollapsed } from "../shell";
@@ -109,6 +110,10 @@ function watchAssistant() {
       void last?.toolCalls?.length;
       void cs.status;
       void cs.error;
+      // The question is not chat state — it lives in `services/ai-ask.ts` — but it is drawn into
+      // This panel, so the same effect has to track it or a question would appear a frame late
+      // (and its ANSWER would never repaint the card at all).
+      void pendingAsk();
       scheduleAiRender();
     });
   });
@@ -179,9 +184,21 @@ function renderSetupNotice(): TemplateResult {
 
 // ─── Sending ────────────────────────────────────────────────────────────────
 
-/** Send a message through the document assistant agent loop. */
+/**
+ * Send a message through the document assistant agent loop — or answer the question it is waiting
+ * on, which is the same keystroke and a different act.
+ *
+ * The answer must NOT become a user message. `toMessagesArray` serialises the array verbatim and a
+ * provider requires a `tool` reply to follow its `tool_calls` request; a user turn spliced between
+ * them is a 400. It travels as the tool result instead, and the question's own card renders it.
+ */
 async function handleAssistantSend(text: string) {
   if (!text.trim() || assistant.chatState.status === "streaming") {
+    return;
+  }
+  if (answerAsk(text.trim())) {
+    stickToBottom = true;
+    scheduleAiRender();
     return;
   }
   // A send always lands in the chat view, pinned to the newest message.
@@ -332,6 +349,17 @@ export function revealAssistant(): void {
 }
 
 /**
+ * Whether a turn is suspended on the reader.
+ *
+ * Not the same as streaming and not the opposite of idle: no tokens are moving, but the loop is
+ * alive and holding a tool open. `assistant.stop` is enabled on the union of the two, because a
+ * turn waiting forever on a question nobody wants to answer is exactly what Stop is for.
+ */
+export function isAssistantWaiting(): boolean {
+  return isAwaitingAnswer();
+}
+
+/**
  * Whether a turn is in flight — the probe `commands/live-context.ts` declares as `aiStreaming` and
  * projects onto `ctx.ai.streaming`.
  *
@@ -388,6 +416,7 @@ function activeSessionTitle(): string | null {
 // ─── Composer ───────────────────────────────────────────────────────────────
 
 const composer = createComposer({
+  isAwaiting: isAssistantWaiting,
   isStreaming: isAssistantStreaming,
   onOpenSettings: () => {
     void openPreferences("assistant");
@@ -533,7 +562,10 @@ export function assistantCommands(): AnyCommand[] {
       menus: ["palette"],
       group: "2_turn",
       requires: "a turn in flight",
-      enablement: (ctx: CommandContext) => ctx.ai.streaming,
+      /* The union, not just `streaming`. A turn suspended on `ask_user` moves no tokens, so
+         `ctx.ai.streaming` reads false — and that is precisely the turn a reader who does not want
+         to answer needs to end. */
+      enablement: (ctx: CommandContext) => ctx.ai.streaming || ctx.ai.waiting,
       run: stop,
     },
   ];
@@ -565,6 +597,16 @@ export function renderAiPanelTemplate(): TemplateResult {
         tokens: cs.tokenCount,
       })}
       ${renderMessageList({
+        ask: {
+          onAnswer: (text) => {
+            void handleAssistantSend(text);
+          },
+          onSkip: () => {
+            skipAsk();
+            scheduleAiRender();
+          },
+          pendingId: pendingAsk()?.id ?? null,
+        },
         error: cs.error,
         listRef: onMessagesListRef,
         messages: cs.messages,

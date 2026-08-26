@@ -232,6 +232,14 @@ export interface CommandContext {
   ai: {
     configured: boolean;
     streaming: boolean;
+    /**
+     * A turn is suspended on an `ask_user` question.
+     *
+     * Distinct from `streaming` rather than folded into it: no tokens are moving, so a surface that
+     * paints a spinner on `streaming` must not paint one here — but the turn is alive and holding a
+     * tool open, so Stop is enabled on the union of the two.
+     */
+    waiting: boolean;
   };
   capability: Record<Capability, boolean>;
 }
@@ -287,7 +295,7 @@ export function emptyContext(): CommandContext {
     focus: { region: "pane" },
     modal: { open: false },
     collab: { attached: false, readOnly: false, sourceCanonical: false },
-    ai: { configured: false, streaming: false },
+    ai: { configured: false, streaming: false, waiting: false },
     capability: {
       gitClone: false,
       importSite: false,

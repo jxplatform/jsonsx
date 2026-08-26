@@ -102,6 +102,7 @@ const {
   bindAiPanelHost,
   handleRestore,
   isAssistantStreaming,
+  isAssistantWaiting,
   mountAiPanel,
   renderAiPanelTemplate,
   revealAssistant,
@@ -123,6 +124,9 @@ const { createCommandRegistry } = await import("../src/commands/registry");
 const { makeContext } = await import("../src/commands/context");
 const { setActiveRegistry } = await import("../src/commands/active-registry");
 const { hasAiCredentials } = await import("../src/services/ai-models");
+const { answerAsk, askUser, cancelAsk, pendingAsk, resetAsk } =
+  await import("../src/services/ai-ask");
+const { splitAttachedContext } = await import("../src/panels/ai-chat/attached-context");
 
 /** How many nodes the canvas has selected, as `live-context.ts` would report it. */
 let selectionCount = 0;
@@ -132,7 +136,11 @@ const registry = createCommandRegistry({
   // `chatState.status` moves `ctx.ai.streaming` without restating anything.
   getContext: () =>
     makeContext({
-      ai: { configured: hasAiCredentials(), streaming: isAssistantStreaming() },
+      ai: {
+        configured: hasAiCredentials(),
+        streaming: isAssistantStreaming(),
+        waiting: isAssistantWaiting(),
+      },
       editor: { kind: "canvas" },
       selection: { count: selectionCount },
     }),
@@ -756,5 +764,89 @@ describe("the Assistant command family", () => {
     expect(stopMock).toHaveBeenCalledTimes(1);
     chatState.status = "idle";
     await flush(3);
+  });
+});
+
+describe("a turn suspended on a question", () => {
+  /** Put a question on screen the way the tool does, and settle the panel's rAF render. */
+  async function raiseQuestion(options: string[] = []) {
+    pushMessage("assistant", "", {
+      toolCalls: [
+        {
+          arguments: JSON.stringify({ options, question: "Which pages matter?" }),
+          id: "q1",
+          name: "ask_user",
+        },
+      ],
+    });
+    /* Wrapped, NOT returned bare: `await raiseQuestion()` would unwrap a returned promise and
+       wait for the answer this helper exists to set up. */
+    const settled = askUser({ context: "", id: "q1", options, question: "Which pages matter?" });
+    await flush(3);
+    return { settled };
+  }
+
+  beforeEach(() => {
+    resetAsk();
+    chatState.messages.length = 0;
+    sendMessage.mockClear();
+  });
+
+  test("the composer becomes the answer field", async () => {
+    const settled = await raiseQuestion();
+    expect(isAssistantWaiting()).toBe(true);
+    expect(q("textarea")!.getAttribute("placeholder")).toContain("Answer the assistant");
+    expect(q(".ai-ask-question")!.textContent!.trim()).toBe("Which pages matter?");
+
+    answerAsk("done");
+    await settled;
+    await flush(3);
+    expect(q("textarea")!.getAttribute("placeholder")).toContain("Ask the assistant");
+  });
+
+  test("a send answers the question instead of opening a new turn", async () => {
+    /* The answer must NOT become a user message: `toMessagesArray` serialises verbatim and a
+       provider requires the `tool` reply to follow its `tool_calls` request. */
+    const { settled } = await raiseQuestion();
+    setValue(q("textarea") as HTMLTextAreaElement, "the pricing page only");
+    key(q("textarea")!, "Enter");
+    await flush(3);
+
+    /* The BODY, because the composer's attach chips ride along on an answer exactly as they do
+       on a message — this file is one ordered scenario and an earlier test attached one. What is
+       under test is where the text went, not what else was stapled to it. */
+    const { answer, skipped } = await settled;
+    expect(splitAttachedContext(answer!).body).toBe("the pricing page only");
+    expect(skipped).toBe(false);
+    expect(sendMessage).not.toHaveBeenCalled();
+    expect(pendingAsk()).toBeNull();
+  });
+
+  test("an option button answers it", async () => {
+    const { settled } = await raiseQuestion(["All of them", "Just the marketing pages"]);
+    pointer([...host.querySelectorAll(".ai-ask-options sp-button")][1] as HTMLElement, "click");
+    await flush(3);
+    expect(await settled).toEqual({ answer: "Just the marketing pages", skipped: false });
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  test("You decide settles it as skipped", async () => {
+    const { settled } = await raiseQuestion();
+    pointer(q(".ai-ask-skip")!, "click");
+    await flush(3);
+    expect(await settled).toEqual({ answer: null, skipped: true });
+  });
+
+  test("`assistant.stop` is enabled on a waiting turn, not just a streaming one", async () => {
+    /* A suspended turn moves no tokens, so `ctx.ai.streaming` reads false — and that is exactly
+       the turn a reader who does not want to answer needs to end. */
+    const { settled } = await raiseQuestion();
+    expect(isAssistantStreaming()).toBe(false);
+    expect(registry.isEnabled("assistant.stop")).toBe(true);
+
+    cancelAsk();
+    expect(await settled).toEqual({ answer: null, skipped: false });
+    await flush(3);
+    expect(registry.isEnabled("assistant.stop")).toBe(false);
   });
 });

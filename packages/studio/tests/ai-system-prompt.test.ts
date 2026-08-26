@@ -167,8 +167,10 @@ describe("ai-system-prompt — tool-table/gating consistency", () => {
     const { createToolRegistry } = await import("@jxsuite/ai");
     const { registerAiTools } = await import("../src/services/ai-tools");
     const { registerProjectTools } = await import("../src/services/ai-project-tools");
+    const { registerAskTool } = await import("../src/services/ai-ask");
 
     const registry = createToolRegistry();
+    registerAskTool(registry);
     registerAiTools(registry, { getTab: () => null, validate: async () => [] });
     registerProjectTools(registry, {
       adoptProject: async () => {},

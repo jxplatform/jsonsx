@@ -36,6 +36,13 @@ export interface ComposerOptions {
   /** Opens the credentials form. */
   onOpenSettings: () => void;
   isStreaming: () => boolean;
+  /**
+   * Whether the turn is suspended on a question. The composer becomes the answer field: Enter still
+   * sends, but the host routes it to the pending question instead of opening a new turn.
+   *
+   * Optional so the evals harness and tests that predate `ask_user` keep compiling.
+   */
+  isAwaiting?: () => boolean;
   /** Host re-render scheduler — called whenever composer state changes. */
   requestRender: () => void;
 }
@@ -229,13 +236,18 @@ export function createComposer(opts: ComposerOptions): Composer {
 
   function render(): TemplateResult {
     const streaming = opts.isStreaming();
+    const awaiting = opts.isAwaiting?.() ?? false;
     return html`
-      <div class="ai-composer">
+      <div class="ai-composer" ?data-awaiting=${awaiting}>
         ${renderChips()}
         <textarea
           class="ai-composer-input"
           rows="1"
-          placeholder="Ask the assistant… (Enter to send)"
+          placeholder=${
+            awaiting
+              ? "Answer the assistant… (Enter to reply)"
+              : "Ask the assistant… (Enter to send)"
+          }
           ${ref((el) => {
             textareaEl = (el as HTMLTextAreaElement | null) || null;
           })}
@@ -259,7 +271,7 @@ export function createComposer(opts: ComposerOptions): Composer {
                   <sp-action-button
                     size="s"
                     class="ai-send-btn"
-                    title="Send"
+                    title=${awaiting ? "Answer" : "Send"}
                     ?disabled=${!hasText}
                     @click=${trySend}
                   >

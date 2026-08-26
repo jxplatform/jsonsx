@@ -596,6 +596,57 @@
   color: var(--fg-dim);
   font-family: var(--font-mono);
 }
+/* A question the assistant is waiting on. Deliberately louder than a tool chip and quieter than
+   an error: it is the one thing in the transcript that will not proceed without the reader. */
+.ai-ask {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-self: stretch;
+  background: var(--hover-bg);
+  border-left: 2px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+}
+.ai-ask[data-outcome="ok"],
+.ai-ask[data-outcome="unanswered"],
+.ai-ask[data-outcome="failed"] {
+  border-left-color: var(--border);
+}
+.ai-ask-question {
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--fg);
+  line-height: 1.5;
+}
+.ai-ask-context {
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+  line-height: 1.5;
+}
+.ai-ask-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.ai-ask-skip {
+  margin-inline-start: auto;
+}
+.ai-ask-answer {
+  align-self: flex-start;
+  max-width: 100%;
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-radius: var(--radius);
+  padding: 3px 8px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  overflow-wrap: anywhere;
+}
+.ai-ask-outcome {
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg-dim);
+  line-height: 1.5;
+}
 .ai-msg-tool-error {
   background: var(--hover-bg);
   border-left: 2px solid var(--danger);
