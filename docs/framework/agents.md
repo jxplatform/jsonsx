@@ -18,7 +18,7 @@ This page explains why that shape suits a model, where agents plug in, and the l
 Prompt-to-code tools produce programs. A program is "correct" only in the sense that it runs, and finding out whether it runs means executing it, in an environment, with a browser attached. A Jx document is a different kind of output:
 
 - **The shape is bounded.** Every Jx file validates against one of three published JSON Schemas: one for documents, one for `project.json`, one for `.class.json`. A key either exists in the schema or it does not, and an invented `"styles"` where the schema says `"style"` is caught by a validator rather than by a blank page.
-- **Edits are structural, not textual.** A page is a tree of addressable nodes, so "add a button to the header" is an insertion at a path, not a search-and-replace over source text. That is how Studio's assistant edits the canvas live, and why an external agent can change one property without touching the rest of the file.
+- **Edits are structural, not textual.** A page is a tree of addressable nodes, so "add a button to the header" is an insertion at a path. That is how Studio's assistant edits the canvas live, and why an external agent can change one property without touching the rest of the file.
 - **Every change is a reviewable diff.** JSON diffs on property boundaries, so a small change in `git diff` is a small change in the page. Machine-written work needs review more than hand-written work does, and this is the format that makes review cheap.
 
 None of this makes a model correct. It makes a model **checkable**, and that is the property you can build a workflow on.
@@ -27,7 +27,7 @@ None of this makes a model correct. It makes a model **checkable**, and that is 
 
 ### Studio's built-in assistant
 
-A chat sidebar inside the editor that works on your project rather than talking about it: it creates pages and components, edits the document on the canvas while you watch, and answers questions by reading your files. It runs against an AI provider you connect, and everything it writes as a Jx document is validated before it lands. See **[AI assistant](/docs/studio/ai)**.
+A chat sidebar inside the editor that works on your project instead of talking about it: it creates pages and components, edits the document on the canvas while you watch, and answers questions by reading your files. It runs against an AI provider you connect, and everything it writes as a Jx document is validated before it lands. See **[AI assistant](/docs/studio/ai)**.
 
 ### An external coding agent
 
@@ -69,7 +69,7 @@ pages/about.json:
 Each line already names the file, the JSON pointer into it, and what is wrong: a complete fix instruction with nothing left to infer. Loop until validation is clean, then run `jx build`.
 
 :::doc-tip
-Wire steps 1 and 3 into the agent's own instructions ("run `jx validate` after every file you write; do not report success until it passes") rather than running them yourself. An agent that can check its own work will, and the loop closes without you in it.
+Wire steps 1 and 3 into the agent's own instructions ("run `jx validate` after every file you write; do not report success until it passes") and leave the running to it. An agent that can check its own work will, and the loop closes without you in it.
 :::
 
 ## What an agent can build

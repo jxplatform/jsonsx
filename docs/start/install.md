@@ -34,7 +34,7 @@ nix run github:jxsuite/jx/release
 
 Pin the `release` branch, not `main`: `release` holds only released code, and it advances to a release only after that release has built. `main` is the development trunk, so it will sometimes be ahead of anything that has shipped.
 
-To install it rather than run it once:
+To install it instead of running it once:
 
 ```bash
 nix profile install github:jxsuite/jx/release
@@ -44,7 +44,7 @@ Either form takes an optional project directory, as in `nix run github:jxsuite/j
 
 ### Fetch it instead of building it
 
-Released builds are published to a public [Cachix](https://cachix.org) cache, so the commands above can download Studio rather than compile the monorepo on your machine. The rest of the closure, Chromium and Bun, already comes from `cache.nixos.org`.
+Released builds are published to a public [Cachix](https://cachix.org) cache, so the commands above can download Studio without compiling the monorepo on your machine. The rest of the closure, Chromium and Bun, already comes from `cache.nixos.org`.
 
 The flake names the cache itself, so Nix offers to use it the first time you run one of the commands above. Answer `y`, or pass `--accept-flake-config` to skip the prompt:
 

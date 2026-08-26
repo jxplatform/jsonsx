@@ -34,7 +34,7 @@ output at `/examples/dist/` alongside Studio at `/packages/studio/index.html`. I
 (`server.js`'s `builds` array covers only the runtime and the Studio entrypoints), so on a fresh checkout
 those routes 404 until `jx build` has run. The banner `server.js` prints scans `examples/dist` for
 `index.html` files instead of listing routes, so it names exactly the two tiers that were built.
-On a fresh checkout it says the directory is empty rather than advertising routes that 404.
+On a fresh checkout it says the directory is empty instead of advertising routes that 404.
 
 ## Rules
 

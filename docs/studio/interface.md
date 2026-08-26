@@ -38,7 +38,7 @@ From left to right:
 
 In the desktop app, the window's minimize, maximize and close controls also live in this row.
 
-**Open in Browser** (:kbd[⇧⌘O] on macOS, :kbd[Ctrl+Shift+O] on Windows/Linux) opens the page you're editing in your own browser, the fastest way to check the actual page rather than the canvas's approximation of it. Studio **builds the site first**, so what opens is what you are looking at, and the page opens **at the route it will be published at** on a local address of its own (a small server that serves your built site and nothing else). Styles, scripts and images load the way they will in production, and every link on the page goes where it will go once the site is live, so you can click through the whole thing. If the build reports problems the page still opens and the problems are named beside it.
+**Open in Browser** (:kbd[⇧⌘O] on macOS, :kbd[Ctrl+Shift+O] on Windows/Linux) opens the page you're editing in your own browser, the fastest way to check the actual page instead of the canvas's approximation of it. Studio **builds the site first**, so what opens is what you are looking at, and the page opens **at the route it will be published at** on a local address of its own (a small server that serves your built site and nothing else). Styles, scripts and images load the way they will in production, and every link on the page goes where it will go once the site is live, so you can click through the whole thing. If the build reports problems the page still opens and the problems are named beside it.
 
 It is always there. When the open file has no route it's disabled and its tooltip says why: a component isn't a page, a `[slug]` route needs a value picked in the pane context bar's **resolving with** popover first, and a project that doesn't build a site has nothing to serve.
 
@@ -62,11 +62,11 @@ The vertical strip on the far left. Every button carries a **text label under it
 - **Data** (:kbd[⌘6]): the values, data sources and functions the document knows about, with what each one currently resolves to. See [Logic](/docs/studio/logic).
 - **Packages** (:kbd[⌘7]): the components and packages the open document pulls in.
 
-Clicking the button of the panel that's already open collapses the Navigator; clicking any button brings it back. A document-level panel with no document open says what it needs rather than showing an empty box.
+Clicking the button of the panel that's already open collapses the Navigator; clicking any button brings it back. A document-level panel with no document open says what it needs.
 
-**Insert**, the palette of elements and components you can add to a page, is not on the rail, because it is something you reach for at the moment you're placing something rather than a view you sit in. Run **Show Insert** from the palette (:kbd[⌘K]) to open it in the Navigator.
+**Insert**, the palette of elements and components you can add to a page, is not on the rail, because you reach for it at the moment you're placing something, and it is not a view you sit in. Run **Show Insert** from the palette (:kbd[⌘K]) to open it in the Navigator.
 
-At the foot of the rail sit **About** (the app version, its release channel and the update status) and **Settings**, which opens this project's settings: breakpoints and color schemes, data shapes, content types, dependencies. See [Project settings](/docs/studio/projects/settings). The settings that belong to Studio itself rather than to a project are in **[Preferences](/docs/studio/interface/preferences)** (:kbd[⌘,]): the theme, the AI provider, your accounts, the keyboard sheet.
+At the foot of the rail sit **About** (the app version, its release channel and the update status) and **Settings**, which opens this project's settings: breakpoints and color schemes, data shapes, content types, dependencies. See [Project settings](/docs/studio/projects/settings). The settings that belong to Studio itself are in **[Preferences](/docs/studio/interface/preferences)** (:kbd[⌘,]): the theme, the AI provider, your accounts, the keyboard sheet.
 
 ## Navigator dock
 
@@ -85,7 +85,7 @@ There is one creation flow, and every surface that makes a file uses it: **New F
 The new file is written with the starting content its type calls for: a content entry is seeded from its content type's fields, so it is valid the moment it exists. Creating from the Library or from a collection opens the new file for you as well.
 
 :::doc-note
-If the write itself fails, the reason arrives as a **Problem** in the [Bottom dock](#bottom-dock) carrying the path, rather than as a toast that scrolls away, because the thing you have to do next is about that path.
+If the write itself fails, the reason arrives as a **Problem** in the [Bottom dock](#bottom-dock) carrying the path. A toast would scroll away, and the thing you have to do next is about that path.
 :::
 
 ## Panes and the canvas
@@ -104,7 +104,7 @@ The last segment is where you are, named the way the [Outline](/docs/studio/desi
 
 - **Every segment is a button**, and each one runs a real Studio command, so the tooltip carries that command's own name and shortcut. The project opens your recents, the file opens file search, an element segment selects that element.
 - **A segment with siblings carries a ⌄.** It lists the other children of the same parent, under their Outline names, with the one you're on marked. A step whose parent has only one child shows no chevron: one alternative is not a choice.
-- **A step you can't take stays on the bar as plain text** rather than disappearing. An address with a hole in it would be a lie about what contains what.
+- **A step you can't take stays on the bar as plain text.** An address with a hole in it would be a lie about what contains what.
 - With a formula or a function open in the Bottom dock's **Logic** tab, the address ends there (`fx total`, `ƒ onSubmit`) because a definition has no element under it.
 
 The bar names the **primary** selection. Select several elements and the count is in the status bar; the bar keeps naming the one the Inspector is pointed at.
@@ -116,7 +116,7 @@ The dock on the right inspects whatever is selected, in four tabs:
 - **Content** (:kbd[⌘⇧1]): the selected element's settings, including its text, links, images and component options.
 - **Style** (:kbd[⌘⇧2]): the visual inspector for spacing, typography, color, layout and more. See [Design mode](/docs/studio/design).
 - **Logic** (:kbd[⌘⇧3]): what the element does on click, input, submit and other interactions. See [Logic](/docs/studio/logic).
-- **Assistant** (:kbd[⌘⇧4]): the [AI assistant](/docs/studio/ai), as a tab in this dock rather than a column of its own, so showing it never narrows the canvas.
+- **Assistant** (:kbd[⌘⇧4]): the [AI assistant](/docs/studio/ai), which lives in this dock as a tab, so showing it never narrows the canvas.
 
 Every tab renders under a header naming the tab and what it is pointed at: the selected element, or the open document when nothing is selected. Resize the dock by dragging its inner edge, or collapse it with :kbd[⌘⌥B].
 

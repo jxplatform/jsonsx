@@ -25,7 +25,7 @@ Every surface here appears only once `project.json` declares more than one local
 | Prefix every locale but the default | English     | French            |
 | Prefix every locale                 | nothing     | French            |
 
-Tags are [BCP 47](https://www.rfc-editor.org/info/bcp47) and validated as you type, by the same parser the build uses, so a tag Studio accepts is a tag that builds. `en_US` is refused with a sentence rather than written and discovered later.
+Tags are [BCP 47](https://www.rfc-editor.org/info/bcp47) and validated as you type, by the same parser the build uses, so a tag Studio accepts is a tag that builds. `en_US` is refused with a sentence, so you never write it and find out later.
 
 :::doc-tip
 :kbd[⌘K] → **Add Language** does the same write. It is the one language command available in a project that has none yet. That is exactly where you need it.
@@ -41,7 +41,7 @@ Tags are [BCP 47](https://www.rfc-editor.org/info/bcp47) and validated as you ty
 | **stale**   | it is there, and older than the page it was translated from | opens it                 |
 | **missing** | it is not there, and this is where it would go              | creates it, and opens it |
 
-A page whose URL is translated still counts as one page: the panel reads the same `$translationKey` the build does, so `pages/fr-ca/a-propos.json` sits in the French column of `pages/about.json`'s row rather than starting a row of its own.
+A page whose URL is translated still counts as one page: the panel reads the same `$translationKey` the build does, so `pages/fr-ca/a-propos.json` sits in the French column of `pages/about.json`'s row instead of starting a row of its own.
 
 This is the one thing the rest of the toolchain cannot tell you. A build is perfectly happy to ship a French page that went wrong six months ago, and the `hreflang` links will dutifully advertise it. The Files panel draws `fr-ca/` the way it draws any folder, and a page nobody has translated is invisible precisely because the file that would prove it doesn't exist.
 

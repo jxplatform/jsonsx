@@ -40,25 +40,25 @@ It answers `UploadResult` (`{ path, size? }`), and **`path` is the answer, not a
 
 `documentBaseUrl` is the other declaration worth knowing about. The canvas renders in an iframe and resolves a component `$ref` by fetching it (`readFile` is not reachable from that realm), so **project files have to exist at a URL**. The default base is `<canvas origin>/<projectRoot>/`, which is already correct for any backend that serves the project tree from its web root: the dev server does, and so does the desktop's loopback server.
 
-Set `documentBaseUrl` when your `projectRoot` is an **identifier rather than a served path**. Jx Cloud's is `owner/repo@branch`, so the default addressed nothing and every `$ref` fetch missed. Point it at whatever route serves your project tree, ending in `/`; Studio appends the project-relative path to it.
+Set `documentBaseUrl` when your `projectRoot` is an **identifier instead of a served path**. Jx Cloud's is `owner/repo@branch`, so the default addressed nothing and every `$ref` fetch missed. Point it at whatever route serves your project tree, ending in `/`; Studio appends the project-relative path to it.
 
 :::doc-warning
-If your host answers a missing file with a single-page fallback (the app shell at **HTTP 200** rather than a 404), a wrong base does not fail cleanly. The fetch succeeds, and the renderer reports `Unexpected token '<', "<!doctype "…` from the JSON parser. Studio now names that case explicitly, but the cure is a base that resolves.
+If your host answers a missing file with a single-page fallback (the app shell at **HTTP 200** where a 404 belongs), a wrong base does not fail cleanly. The fetch succeeds, and the renderer reports `Unexpected token '<', "<!doctype "…` from the JSON parser. Studio now names that case explicitly, but the cure is a base that resolves.
 :::
 
-`assetSpace` says what your ORIGIN answers for a **site URL**. It is about the origin, not about the backend. A host whose files are perfectly reachable through `readFile` can still need this, because what decides it is what answers `GET /hero.jpg` on the document the canvas is running in.
+`assetSpace` says what your ORIGIN answers for a **site URL**. A host whose files are perfectly reachable through `readFile` can still need this, because what decides it is what answers `GET /hero.jpg` on the document the canvas is running in.
 
 Leave it absent when that origin already serves the published site URL space. The dev server and the desktop loopback both do, so neither declares anything and `/hero.jpg` resolves natively.
 
 Set it to `"repo"` when nothing does, and set `documentBaseUrl` with it. `"repo"` is inert on its own, because a host that says its site URLs are wrong without saying what is right has told Studio nothing it can act on. Studio then resolves every authored reference to the **project file** it names and addresses that file under your base: `/hero.jpg` is `public/hero.jpg`, and a content entry's `./images/hero.png` is `content/posts/images/hero.png`. Both are real repository paths, so you need no `public/`→root mapping, no asset-mount mapping, and no route beyond the one already serving project files.
 
 :::doc-note
-A site URL is resolved the way a **build** would resolve it, not the way the editing servers do. The two differ: `serveProjectFile` tries the project root before `public/`, so a file at `<root>/hero.jpg` loads at `/hero.jpg` in a dev preview and 404s on the deployed site. With no filesystem to probe, the canvas has to pick one answer, and the one that makes the preview agree with production is the build's.
+A site URL is resolved the way a **build** would resolve it. The editing servers do it differently: `serveProjectFile` tries the project root before `public/`, so a file at `<root>/hero.jpg` loads at `/hero.jpg` in a dev preview and 404s on the deployed site. With no filesystem to probe, the canvas has to pick one answer, and the one that makes the preview agree with production is the build's.
 :::
 
 `assetCapabilities` declares what your backend will accept as an upload: `maxUploadBytes` and an `accept` string in `<input accept>` syntax. Both are optional and absence means "no declared limit": Studio will not invent one, because a limit it made up is a file the user cannot upload for no reason anyone can name. Declare a limit and Studio refuses oversized files before spending the round trip, naming the number, and narrows the file picker to your `accept`. Nothing widens it.
 
-`createDestination` is a declaration, not a method: set it to `"path"` if your backend writes projects to a filesystem, or `"repo"` if a project is a remote repository. Studio uses it to decide which destination fields the New Project modal collects, and hands the answer back to `createProject` as `opts.destination`. **Your adapter must honor that destination and must not substitute one of its own**. A create with no usable destination is an error, not a cue to fall back to a default directory or account.
+`createDestination` is a value your adapter declares: set it to `"path"` if your backend writes projects to a filesystem, or `"repo"` if a project is a remote repository. Studio uses it to decide which destination fields the New Project modal collects, and hands the answer back to `createProject` as `opts.destination`. **Your adapter must honor that destination and must not substitute one of its own**. A create with no usable destination is an error, not a cue to fall back to a default directory or account.
 
 ### Optional members and degradation
 
@@ -96,7 +96,7 @@ export function createMyPlatform() {
 }
 ```
 
-A browser-hosted adapter can still offer `pickDirectory`: `@jxsuite/studio/directory-picker` exports `canPickDirectory()` and `pickDirectoryPath(locate)`, which drive `showDirectoryPicker()` and hand you the picked folder's `name` plus the random id it wrote into a hidden `.jx-loc-id` there. Your `locate` callback resolves that pair to an absolute path (the dev server does it with `GET /__studio/locate-directory`). Omit the member when `canPickDirectory()` is false rather than defining one that always returns null, so Studio hides the button instead of showing a dead one.
+A browser-hosted adapter can still offer `pickDirectory`: `@jxsuite/studio/directory-picker` exports `canPickDirectory()` and `pickDirectoryPath(locate)`, which drive `showDirectoryPicker()` and hand you the picked folder's `name` plus the random id it wrote into a hidden `.jx-loc-id` there. Your `locate` callback resolves that pair to an absolute path (the dev server does it with `GET /__studio/locate-directory`). Omit the member when `canPickDirectory()` is false, so Studio hides the button. One that always returns null leaves a dead button on screen.
 
 ## Registration
 
@@ -164,7 +164,7 @@ if (!match) {
 
 ### Desktop (`packages/desktop/src/platform.ts`)
 
-**Settings are written as patches.** `patchSettings({ set, remove })` changes only the keys it names and answers with the store as it then stands; a key named by neither must be left alone. That is a correctness rule rather than an optimisation: a whole-map write means every writer implicitly claims the whole store, so a second window holding a different view of it silently overwrites the first. It also means a key your adapter has never heard of survives a write.
+**Settings are written as patches.** `patchSettings({ set, remove })` changes only the keys it names and answers with the store as it then stands; a key named by neither must be left alone. That is a correctness rule and not an optimisation. A whole-map write means every writer implicitly claims the whole store, so a second window holding a different view of it silently overwrites the first. It also means a key your adapter has never heard of survives a write.
 
 The desktop adapter translates the same interface into ElectroBun RPC: each member is a one-line `rpc.request.*` call into Bun-side handlers (`openProject()` is literally `return await rpc.request.openProject()`, backed by a native file dialog in the Bun process). Beyond the mapping, it patches `window.fetch` so the runtime's dev-proxy endpoints (`/__jx_resolve__`, `/__jx_server__`) also ride the RPC bridge, and it implements the desktop-only families: multi-window, backend-persisted recents and settings, `getAppInfo`.
 
@@ -174,10 +174,10 @@ The NixOS build runs Studio in a Chromium `--app` window and talks to its launch
 
 Two lessons from it generalize to any adapter:
 
-- **A member you do not implement is a feature the user does not get, silently.** Studio probes for methods rather than asking what kind of host you are, so the launcher answered `buildSite` over RPC for months while its adapter never exposed the method. **Open in Browser** reported that this backend could not build a preview. If you add a backend handler, add the member in the same change.
+- **A member you do not implement is a feature the user does not get, silently.** Studio probes for methods and does not ask what kind of host you are, so the launcher answered `buildSite` over RPC for months while its adapter never exposed the method. **Open in Browser** reported that this backend could not build a preview. If you add a backend handler, add the member in the same change.
 - **Not every absent member is a gap.** This adapter deliberately omits the updater family (the system package manager owns updates, so there is no feed to report on) and `windowControls` (the desktop environment decorates the window, so Studio must not draw its own buttons). Omission is how you say "not here"; the alternative is a control that does nothing.
 
-Its transport also carries messages the launcher sends **unprompted**: a frame with a `method` and no request id. That is how `subscribeFileEvents` is fed, and how another window asks this one to come forward. If your host can push, a subscription member is a local handler plus a dispatch line, not a poll.
+Its transport also carries messages the launcher sends **unprompted**: a frame with a `method` and no request id. That is how `subscribeFileEvents` is fed, and how another window asks this one to come forward. If your host can push, a subscription member is a local handler plus a dispatch line. No polling needed.
 
 ## Related
 

@@ -18,7 +18,7 @@ documentation for the Studio feature lives at [`docs/studio/ai.md`](../../docs/s
 | `@jxsuite/ai/chat-state`       | `createChatState`, `ChatStore`, `Message`, `ToolCallRecord`, `ChatState`, `MessageRole`                                                     |
 
 `toolSuccess` / `toolError` are **not** re-exported by the barrel. Import them from
-`@jxsuite/ai/tools`. Importing the subpaths rather than the root is also what makes the package
+`@jxsuite/ai/tools`. Importing the subpaths instead of the root is also what makes the package
 tree-shakeable.
 
 ## The streaming client
@@ -36,7 +36,7 @@ Every implementation yields the same discriminated union, whose type strings are
 contract a third-party Studio backend must satisfy for the `ai/chat` route (see
 [`packages/protocol/README.md`](../protocol/README.md)); `@jxsuite/server` emits the same format
 without depending on this package. `StreamEvent` and each member are exported, so an implementer can
-import the type rather than reconstruct it.
+import the type instead of reconstructing it.
 
 ```ts
 import { createProxyStreamingClient } from "@jxsuite/ai";
@@ -117,7 +117,7 @@ registry.register(
   registry's own argument validation. `llmStrict` (default `false`) is the only one that reaches the
   wire, adding OpenAI's `strict: true` to the emitted function schema. OpenAI strict mode demands
   `additionalProperties: false` and every property in `required`, which Jx's own tools deliberately
-  violate, so GPT-5.x rejects such a request outright (again, committed rationale rather than a test).
+  violate, so GPT-5.x rejects such a request outright (again, committed rationale and no test).
 - **`validate()` is a lightweight structural check, not a JSON Schema validator.** It reads only
   `type`, `properties` and `required`: nested schemas, `enum`, `pattern`, `minimum` and every other
   keyword are ignored. Unknown properties are ignored too (the model may send extra); a required key

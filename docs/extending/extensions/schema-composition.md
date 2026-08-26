@@ -55,7 +55,7 @@ The parser's project fragment contributes the `content` section, abbreviated her
 }
 ```
 
-Note the one non-local reference: field-schema positions point at the canonical URI `https://jxsuite.com/schema/project/fields/v2` rather than a local shape. That is the open recursion point described below.
+Note the one non-local reference: field-schema positions point at the canonical URI `https://jxsuite.com/schema/project/fields/v2`. That is the open recursion point described below.
 
 ## Generated entry documents
 
@@ -114,7 +114,7 @@ An entry embed **shadows** the shipped default rather than extending it, so it r
 - Where a client fetches the canonical URLs instead (they are served from jxsuite.com), it gets the shipped defaults. The degradation is _under-suggestion_ of extension field extras, never false errors.
 
 :::doc-note
-Root pointers rather than a `$id`-keyed compound document, because VS Code's JSON language service (which Monaco embeds, so this covers Studio too) implements neither half of compound-document resolution. It resolves `#/…` against the document root instead of the enclosing `$id`, and it fetches anything with a URI before the `#` over the network rather than matching the resource embedded in the same file. Root pointers sidestep both and cost nothing under ajv.
+Root pointers, in place of a `$id`-keyed compound document, because VS Code's JSON language service (which Monaco embeds, so this covers Studio too) implements neither half of compound-document resolution. It resolves `#/…` against the document root instead of the enclosing `$id`. It fetches anything with a URI before the `#` over the network, leaving the resource embedded in the same file unmatched. Root pointers sidestep both and cost nothing under ajv.
 :::
 
 ## Where core comes from
@@ -128,7 +128,7 @@ That refusal is deliberate. A starter pins published `@jxsuite/*` versions, so o
 :::doc-tip
 If composition fails with _"must resolve from the host workspace and does not"_, read which package the message names.
 
-- **`@jxsuite/schema` or another core package**: you are running the generator somewhere that has no core on its resolution path. Install it in the workspace you are running from, rather than in the project being generated.
+- **`@jxsuite/schema` or another core package**: you are running the generator somewhere that has no core on its resolution path. Install it in the workspace you are running from, and not in the project being generated.
 - **An extension** (`@jxsuite/parser` and friends): the host does not ship that extension. Installing it into the project will not fix it, because the loader refuses to read a first-party schema from there. Either use a host build that includes the extension, or drop it from the project's `extensions` list.
 
 In Studio the failure is not fatal: it falls back to the bundled core schemas and says so in the log. `project.json` and your documents still validate against core; what you lose is the fields each enabled extension contributes.

@@ -26,7 +26,7 @@ Every document you open in Jx Studio belongs to a **pane**. A pane is one editor
 
 Open documents from the **Files** panel, the **[Library](/docs/studio/projects/browse)**, or the Command Center (:kbd[⌘K], or :kbd[⌘P] straight into file search). Click a document in the strip to switch to it; the Files tree follows along, so the strip and the tree never disagree about where you are.
 
-- Switch back and forth with :kbd[⌃Tab] / :kbd[⌃⇧Tab], which walk your documents in the order you last used them rather than left to right.
+- Switch back and forth with :kbd[⌃Tab] / :kbd[⌃⇧Tab], which walk your documents in most-recently-used order.
 - Close one with its **×**, by middle-clicking it, or with :kbd[⌘W].
 - Reopen the last one you closed with :kbd[⌘⇧T].
 - Drag to reorder. When more are open than fit, scroll the mouse wheel over the strip, or use the **⌄** button at its right edge to pick from the ones currently out of view.
@@ -52,7 +52,7 @@ Jx Studio does **not** auto-save. Edits live in the open document until you save
 
 Closing a document with unsaved changes asks first, and the question has three answers: **Save** writes the file and then closes, **Close Without Saving** throws the edits away, and **Cancel** leaves the tab where it was. A save that fails leaves the tab open and still unsaved, with the reason in [Problems](/docs/studio/interface/problems-and-progress). The close never outruns the write. :kbd[⌘W] and the tab's **×** ask the same question. Studio skips it only when a collaborator is still in the document, because the shared session keeps the edits.
 
-**Text still in a code editor counts.** Closing settles whatever you have typed in a [Code view or a function body](/docs/studio/logic/code) before it decides whether to ask, so a document whose only unsaved change is the word you were halfway through still gets the question rather than closing quietly.
+**Text still in a code editor counts.** Closing settles whatever you have typed in a [Code view or a function body](/docs/studio/logic/code) before it decides whether to ask, so a document whose only unsaved change is the word you were halfway through still gets the question.
 
 Undo and redo are per document as well: each keeps its own history, so :kbd[⌘Z] in one never unwinds work in another.
 
@@ -96,7 +96,7 @@ The new one carries a small **↳** marker, and hovering it names the document y
 
 - **Drag the divider** to change the split. Double-click it to go back to even; the ratio is remembered with the rest of your layout.
 - **Click into a pane to work in it.** The Inspector, the Outline, the block action bar and every keyboard shortcut follow the pane you last clicked in: its canvas, its bars, its editor, anywhere. :kbd[⌘⌥0] focuses the side pane without the mouse, and **Focus Primary Pane** in the palette goes back.
-- **Unsplit** collapses the split. Closing a pane never closes documents. They move back into the pane that remains, and a pane you empty collapses on its own rather than standing there with nothing in it.
+- **Unsplit** collapses the split. Closing a pane never closes documents. They move back into the pane that remains, and a pane you empty collapses on its own instead of standing there empty.
 
 The two panes are independent in everything a document owns: each keeps its own view, breakpoint, colour scheme, zoom and selection, and editing in one leaves the other exactly as it was.
 
@@ -111,25 +111,25 @@ A second pane does not have to hold a document you picked. The **⟲** button on
 - **Same page at ⟨breakpoint⟩**: one more size of the page you are already looking at.
 - **Same page in ⟨language⟩**: the same page's file in another language, on a [multilingual project](/docs/studio/interface/languages). A translation is a different file, so this one _opens_ that file rather than redrawing this one; if it doesn't exist yet the pane says so and names the fix.
 
-The pane then **follows**: switch documents in the first pane and the Code, the diff and the layout follow along; select a different component and the definition changes with it. Its strip shows what it is about rather than a filename (`Code · /blog`), with a **✕** that ends the following.
+The pane then **follows**: switch documents in the first pane and the Code, the diff and the layout follow along; select a different component and the definition changes with it. Its strip shows what it is about (`Code · /blog`) in place of a filename, with a **✕** that ends the following.
 
 **Pin** it (in the ⟲ menu) to stop following and keep what is on screen as an ordinary document, in an ordinary tab, with the strip and history that come with one.
 
-A preset that this document cannot supply is not offered, and it says why: **Layout** on a page that declares none, **Diff** on a file with no changes. If a rule stops resolving while you work (you remove the page's layout, or deselect the component), the pane says so and offers to keep what it has, rather than going blank.
+A preset that this document cannot supply is not offered, and it says why: **Layout** on a page that declares none, **Diff** on a file with no changes. If a rule stops resolving while you work (you remove the page's layout, or deselect the component), the pane says so and offers to keep what it has. It does not go blank.
 
 ## The jump bar
 
-Under the strip, one line names where you are (`◈ project › file › the element you have selected`), and every segment is a button that takes you to that step. A segment whose parent has other children carries a **⌄** listing them, so moving to a sibling element is a click rather than a hunt through the Outline. The full behaviour is in **[The workspace](/docs/studio/interface#the-jump-bar)**.
+Under the strip, one line names where you are (`◈ project › file › the element you have selected`), and every segment is a button that takes you to that step. A segment whose parent has other children carries a **⌄** listing them, so you can move to a sibling element with a click, without hunting through the Outline. The full behaviour is in **[The workspace](/docs/studio/interface#the-jump-bar)**.
 
 ## The pane context bar
 
 Under the jump bar, a labelled row states three things about the document in that pane, and only those three:
 
-- **Editor** is which editor is open on it: **Canvas**, **Code**, **Grid**, **Diff**, **Entry**, **Library** or **Project Styles**. It offers only the editors this file actually supports, so it never holds an entry that cannot be picked, and a document with one editor prints its name as text rather than as a dropdown that goes nowhere. Those are the same names the [status bar](/docs/studio/interface#status-bar) prints, read from one list.
+- **Editor** is which editor is open on it: **Canvas**, **Code**, **Grid**, **Diff**, **Entry**, **Library** or **Project Styles**. It offers only the editors this file actually supports, so it never holds an entry that cannot be picked, and a document with one editor prints its name as text, with no dropdown to open. Those are the same names the [status bar](/docs/studio/interface#status-bar) prints, read from one list.
 - **View**, for the Canvas editor, offers **Edit │ Design** with a **Preview** toggle beside them. See [Modes and views](/docs/studio/interface/modes).
 - **Context** is what the page is being rendered _with_: the breakpoint, the color scheme, any feature queries, the rendering [language](/docs/studio/interface/languages) on a multilingual project, and whether the layout's own elements are shown. The summary reads at a glance (`Base · Auto`); open it for the full set, and for **Manage contexts…**, which takes you to where breakpoints and schemes are defined. Beside it, a second popover headed **resolving with** carries the document's own data, stacked one per line: a picker per URL parameter on a dynamic page, a small field per option on a component. Its summary counts the values you have set (`2 set`, or `Defaults` when you have set none).
 
-Opening a formula or a function body in the Bottom dock's **[Logic](/docs/studio/logic/formula-workspace)** tab changes nothing here. The bar keeps its three controls and the zoom pod, because the document they describe is still on the stage above the dock. The only way out of the editor is the **Close** in its own header. There is one exit and one address, not two of each.
+Opening a formula or a function body in the Bottom dock's **[Logic](/docs/studio/logic/formula-workspace)** tab changes nothing here. The bar keeps its three controls and the zoom pod, because the document they describe is still on the stage above the dock. The only way out of the editor is the **Close** in its own header. There is one exit and one address.
 
 **Zoom floats over the canvas**, bottom-right, rather than sitting in the bar: the zoom buttons, the percentage (click it for 100%), and a **fit** picker (**Fit page**, **Fit width**, **Actual size**, **No fit**), remembered per document, so coming back to a file frames it the way you left it. There is no zoom in **Preview**, which shows the page at its real size in a frame that scrolls itself.
 

@@ -26,14 +26,14 @@ Studio has three ways of telling you something happened, and which one it uses d
 ## Toasts
 
 :::doc-note
-**Everything Studio reports is also spoken.** A screen reader is told about every notification the moment it is posted: errors interrupt whatever is being read, and everything else waits for a pause. That matters most for failures, which live in **Problems** rather than in a passing toast: before this, a failure was shown in a panel and announced nowhere, so a reader who was not looking at that panel had no way to know anything had gone wrong. The message is prefixed with where it came from, since a listener has none of the visual grouping the panel's own column provides.
+**Everything Studio reports is also spoken.** A screen reader is told about every notification the moment it is posted: errors interrupt whatever is being read, and everything else waits for a pause. That matters most for failures, which live in **Problems** instead of a passing toast: before this, a failure was shown in a panel and announced nowhere, so a reader who was not looking at that panel had no way to know anything had gone wrong. The message is prefixed with where it came from, since a listener has none of the visual grouping the panel's own column provides.
 :::
 
 A toast is one line in the bottom-right corner of the window: an icon, the message, and a **×** to send it away early. It never covers the canvas and never takes the keyboard, so you can keep working while it's up.
 
 **It retires itself.** A success or an informational note rests for about four seconds; a warning gets about eight, because it's the one you're most likely to have looked away from. At most four are on screen at once. The oldest steps aside to make room for a new one.
 
-Some toasts carry a button, and it's a real Studio command rather than a one-off: it wears that command's own name, and if the command isn't available right now the button is disabled with a tooltip saying what it needs.
+Some toasts carry a button, and the button is a real Studio command: it wears that command's own name, and if the command isn't available right now the button is disabled with a tooltip saying what it needs.
 
 Toasts are for outcomes you don't have to act on. Anything you _do_ have to act on becomes a Problem instead, so it can't disappear while you're looking somewhere else.
 
@@ -54,7 +54,7 @@ Each row gives you:
 - the message;
 - **the file it came from**, as a button that opens it;
 - **a detail** you can unfold, when there's captured output behind the message (a validator's report, a command's log);
-- **a recovery button** when there's something to run, either a **Retry** or a **Fix**, again labeled with the command's own name. A Problem with nothing to run shows no button rather than a dead one;
+- **a recovery button** when there's something to run, either a **Retry** or a **Fix**, again labeled with the command's own name. A Problem with nothing to run shows no button at all;
 - a **×** that dismisses that row alone.
 
 Rows are grouped under where they came from (**Save**, **Source Control**, **Canvas**, **Assistant**) in the order they arrived, so a new Problem never shuffles the ones you're reading. Something that keeps failing replaces its own row instead of stacking up sixty copies of itself. **Clear n** at the top of the list empties it.
@@ -80,7 +80,7 @@ Being a dock tab rather than a full-screen surface is the whole point: **the pag
 - The dock reveals itself **once per thing you open**. Close the dock over an open formula and it stays closed until you open another.
 
 :::doc-note
-There is no **Diff** tab here. Reviewing a change is a **Diff** editor on a document at full pane size rather than a panel in a strip along the bottom. See [Source control](/docs/studio/publish/source-control).
+There is no **Diff** tab here. Reviewing a change is a **Diff** editor on a document at full pane size. See [Source control](/docs/studio/publish/source-control).
 :::
 
 ## Activity
@@ -95,7 +95,7 @@ There is no **Diff** tab here. Reviewing a change is a **Diff** editor on a docu
 
 The tab also carries the **[Deploy checklist](/docs/studio/publish)** above the run log. A deploy is a long operation with a log, so it belongs with the others, and the checklist is readable before anything has started because its job is to say what is missing _first_.
 
-**A finished operation stays on the list**, with its log, so "what did that import actually do?" is a question you can answer afterward rather than only while it's running. **Clear n finished** tidies them away; anything still running is kept.
+**A finished operation stays on the list**, with its log, so "what did that import actually do?" is a question you can answer long after the run ends. **Clear n finished** tidies them away; anything still running is kept.
 
 When an operation fails, the row records the failure and **raises a Problem carrying the log**, so the account of what went wrong outlives the operation and can carry a Retry.
 

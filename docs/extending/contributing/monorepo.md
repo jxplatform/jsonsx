@@ -31,7 +31,7 @@ Every package keeps full unit-test coverage, enforced per file by each package's
 
 ## What CI runs, and when
 
-A pull request runs the checks its diff can actually fail. The test matrix is **derived** from the workspace dependency graph rather than listed by hand, so adding a package cannot leave it untested.
+A pull request runs the checks its diff can actually fail. The test matrix is **derived** from the workspace dependency graph, with no hand-written list behind it, so adding a package cannot leave it untested.
 
 To see what your working diff would trigger, before pushing:
 
@@ -47,7 +47,7 @@ Three rules decide the scope:
 
 Pushes to `main`, the nightly cron, and manual dispatch are never gated: they always run the full matrix. That is the safety net if a rule above has gone stale, and it keeps each package's coverage baseline current.
 
-`lint`, both typechecks and all the docs and schema gates run **unconditionally**, in one `checks` job. Each is a few seconds and a fresh CI job costs longer than that to start, so gating them would cost time rather than save it.
+`lint`, both typechecks and all the docs and schema gates run **unconditionally**, in one `checks` job. Each is a few seconds and a fresh CI job costs longer than that to start, so gating them would spend more time than it saves.
 
 :::doc-note
 `ci` is the aggregate job. It passes when every other job either succeeded or was skipped, and fails if any failed or was cancelled. A job your diff never reached leaves the run green.
@@ -55,12 +55,12 @@ Pushes to `main`, the nightly cron, and manual dispatch are never gated: they al
 
 ## Generated files are fixed for you, not failed at you
 
-Two things in this repository are build outputs that happen to be committed: the screenshots under `docs/images/`, and every `*schema.json` (the core schemas under `packages/schema/`, plus the `project.schema.json` / `document.schema.json` pair in each project root). They are committed because editors, `jx validate` and published npm packages read them off disk, not because anybody writes them by hand.
+Two things in this repository are build outputs that happen to be committed: the screenshots under `docs/images/`, and every `*schema.json` (the core schemas under `packages/schema/`, plus the `project.schema.json` / `document.schema.json` pair in each project root). They are committed because editors, `jx validate` and published npm packages read them off disk. Nobody writes them by hand.
 
 Both have a CI lane that **regenerates and pushes the result to your branch** rather than turning red and waiting for you:
 
 - **Screenshots**: `.github/workflows/screenshots.yml` re-captures and comments with before/after thumbnails and the docs pages each changed image appears on.
-- **Schemas**: `.github/workflows/schemas.yml` runs the generators and comments with the JSON Pointers that moved, naming `+ /$defs/ClassMethodDef/properties/role/enum/mount` rather than leaving 500 KB of diff to read.
+- **Schemas**: `.github/workflows/schemas.yml` runs the generators and comments with the JSON Pointers that moved, naming `+ /$defs/ClassMethodDef/properties/role/enum/mount` instead of leaving 500 KB of diff to read.
 
 Locally the same two commands do the same work:
 
@@ -89,7 +89,7 @@ Two branches:
 
   The release builds the flake on **two** architectures. Only the x86_64 leg gates the branch; the aarch64 leg is advisory, because it had never been built before and a failure there must not strand the users who do have a working architecture. Promoting it is a one-line change to `advance-release-branch`'s `needs`, and it should happen once arm has been green for a few releases.
 
-  **`release` is also what jxsuite.com serves.** The site deploys from the released tree rather than from the trunk, so the documentation a visitor reads always describes the app they can actually download. The trade is deliberate and worth knowing before you write docs: a page merged to `main` is not public until the desktop component next releases. Pull requests and `main` still build the site; they just publish nothing. Breakage surfaces when you cause it, not on release day. To ship documentation ahead of a release, dispatch **Deploy jxsuite.com** manually with `ref: main`.
+  **`release` is also what jxsuite.com serves.** The site deploys from the released tree, so the documentation a visitor reads always describes the app they can actually download. The trade is deliberate and worth knowing before you write docs: a page merged to `main` is not public until the desktop component next releases. Pull requests and `main` still build the site; they just publish nothing. Breakage surfaces when you cause it, not on release day. To ship documentation ahead of a release, dispatch **Deploy jxsuite.com** manually with `ref: main`.
 
   Neither the release deploy nor the `release` push is triggered by watching the branch. CI moves `release` with a plain `GITHUB_TOKEN` push, and pushes made with that token do not start workflows. So `deploy-site.yml` is a `workflow_call` that release-please invokes, exactly like the npm publish and the desktop bundlers. An `on: push: branches: [release]` trigger would look correct and never fire once.
 

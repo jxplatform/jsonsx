@@ -25,4 +25,4 @@ Every planned topic already has a written counterpart you can follow today:
 - **[A tour of Jx Studio](/docs/start/studio-tour)** walks the workspace, surface by surface.
 - **[Design mode](/docs/studio/design)** and **[Publish](/docs/studio/publish)** are the full guides behind the design and publishing videos.
 
-The written docs stay the reference either way. Videos will complement them rather than replace them.
+The written docs stay the reference either way. Videos will complement them, never replace them.

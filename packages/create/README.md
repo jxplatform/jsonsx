@@ -42,7 +42,7 @@ default.
 ## Templates and starters
 
 Two disjoint id namespaces feed `--template`. A **built-in template id wins**; otherwise a starter id
-is matched; an id in neither namespace **silently falls back to blank** rather than erroring.
+is matched; an id in neither namespace **silently falls back to blank** instead of erroring.
 
 | Built-in id     | What it produces                                                                      |
 | --------------- | ------------------------------------------------------------------------------------- |

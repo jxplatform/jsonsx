@@ -107,7 +107,7 @@ Two tags are added automatically: `<link rel="canonical">` (built from `url` in 
 }
 ```
 
-`dir` is omitted entirely when neither is set, rather than being guessed. On a site with [locales](/docs/framework/site/i18n) configured, both are derived from the route's language, and translated pages also gain `rel="alternate"` links pointing at each other.
+`dir` is omitted entirely when neither is set. Nothing is guessed. On a site with [locales](/docs/framework/site/i18n) configured, both are derived from the route's language, and translated pages also gain `rel="alternate"` links pointing at each other.
 
 ## Package files in `$head`
 
@@ -133,7 +133,7 @@ The build resolves the specifier against your project root and copies the file i
 <link rel="stylesheet" href="/assets/shoelace-style-shoelace-dist-themes-light.css" />
 ```
 
-`$elements` entries are handled the same way except that they are bundled rather than copied, because a component package imports its own dependencies and those imports have to be resolved before the browser sees them.
+`$elements` entries are handled the same way except that they are bundled instead of copied, because a component package imports its own dependencies and those imports have to be resolved before the browser sees them.
 
 :::doc-note
 If the package is not installed, the build fails and names the specifier. It does not emit a link and hope: a dead stylesheet URL looks identical to a working one until the site is deployed.
