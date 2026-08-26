@@ -14,9 +14,9 @@ pathIgnorePatterns = ["**/result/**"]
 coverageReporter = ["text"]
 coverageSkipTestFiles = true
 coveragePathIgnorePatterns = [
-	"./commitlint.config.js",
-	"./result/**",
-	"**/dist/**",
-	"**/tests/**",
-	"**/tmp/**",
+  "./commitlint.config.js",
+  "./result/**",
+  "**/dist/**",
+  "**/tests/**",
+  "**/tmp/**",
 ]
