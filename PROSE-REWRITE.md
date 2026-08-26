@@ -125,6 +125,9 @@ A rewrite must never guess at a fact. Anything below gets recorded here and deci
 - **`navigator-panels.ts` still comments that the Bottom dock's tabs are "Problems · Diff · Logic · Activity".** The code below it registers three. The style guide has been corrected; the comment has not.
 - **Two dangling paths in `CLAUDE.md`**: `STANDARDS-ADOPTION.md`, which agents are told to read before picking up any `gap:` id, and `packages/studio/UX-REDESIGN-PLAN.md` §13, cited as the design authority for the shot contract. Neither exists in the tree.
 - **`packages/README.md`, `extensions/README.md` and `scripts/README.md` match no rule in `affected.ts`** and fail open to a full test matrix.
+- **`packages/compiler/README.md` and `specs/compiler.md` now disagree cosmetically.** The README's route table reads `0: Class`, `1: Static`, and so on; the same table in `specs/compiler.md` §2 still reads `0 — Class`. Specs are out of scope for this campaign, so the spec was left alone. Whoever next releases that spec should decide whether it follows.
+- **`packages/runtime/README.md` carries two unsourced bundle-size figures** (`@vue/reactivity` ~7 kB gzip, `lit-html` ~3 kB gzip). `docs:claims` gates marketing copy and the root README, not package READMEs, so nothing checks them.
+- **One fenced block was edited deliberately.** The style guide's own callout sample said `Neutral context — including …`, so the page teaching the dash rule was breaking it inside its worked example. The comma is the only fence edit on the branch; every other fence is byte for byte.
 - **Whether a docs page should transcribe a spec at all.** `framework/concepts/` is a copy of `specs/spec.md`. This campaign fixes the prose; the information architecture is a larger question.
 
 ## Terminology, as ruled
@@ -148,16 +151,17 @@ The style guide gained what it was missing: **Languages** (Project group, off th
 
 ## Status
 
-| Step                                                       | State                                             |
-| ---------------------------------------------------------- | ------------------------------------------------- |
-| One line per paragraph, and `unwrap-prose.ts`              | done                                              |
-| The link and anchor gate, and the 13 links it found broken | done                                              |
-| The style guide, and this brief                            | done                                              |
-| The prose gate                                             | done: 8 bans at zero, em-dash debt written down   |
-| Pilot rewrite and the reference set                        | done: 7 pages, nothing lost                       |
-| Stale surface names, titles, code fences                   | done: 14 rulings applied, 44 fences labelled      |
-| The rewrite, section by section                            | `start/` done. 114 files and 2,502 em dashes left |
-| Marketing copy, and the README pass                        | not started                                       |
-| Consistency pass, and the gate goes absolute               | not started                                       |
+| Step                                                       | State                                            |
+| ---------------------------------------------------------- | ------------------------------------------------ |
+| One line per paragraph, and `unwrap-prose.ts`              | done                                             |
+| The link and anchor gate, and the 13 links it found broken | done                                             |
+| The style guide, and this brief                            | done                                             |
+| The prose gate                                             | done: 8 bans at zero, em-dash debt written down  |
+| Pilot rewrite and the reference set                        | done: 7 pages, nothing lost                      |
+| Stale surface names, titles, code fences                   | done: 14 rulings applied, 44 fences labelled     |
+| The rewrite, section by section                            | done: all 131 hand-authored pages at zero        |
+| Marketing copy, and the README pass                        | done: 8 marketing pages, 26 READMEs              |
+| The gate goes absolute                                     | done: `em-dash` is a ban, the budget map is gone |
+| Consistency pass                                           | in progress                                      |
 
 The seven pilot pages are the reference set. Read them before rewriting anything else: `framework.md`, `framework/concepts/reactivity.md`, `framework/concepts/styling.md`, `extending/extensions/first-party.md`, `studio.md`, `studio/interface/modes.md`, `start/first-project.md`.
