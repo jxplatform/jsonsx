@@ -22,11 +22,13 @@ import { activeRegistry } from "../commands/active-registry";
 import { registerAiTools } from "./ai-tools";
 import { cancelAsk, registerAskTool, resetAsk } from "./ai-ask";
 import { registerProjectTools } from "./ai-project-tools";
+import { registerImportTools, resetImportGuard } from "./ai-import-tools";
 import { createGatedToolRegistry } from "./gated-registry";
 import type { ToolAvailability } from "./gated-registry";
 import { adoptProject } from "./project-adoption";
+import { abortImportRun, resetImportRuns } from "./import-run";
 import { runAgentLoop } from "./tool-executor";
-import { AI_TOOL_TIERS, buildSystemPrompt, tierActive } from "./ai-system-prompt";
+import { AI_TOOL_TIERS, buildSystemPrompt, toolActive } from "./ai-system-prompt";
 import { getBaseUrl, getOpenAiKey } from "./ai-settings";
 import { preferredModel } from "./ai-models";
 import { pruneOrphanToolMessages, trimContext } from "./context-manager";
@@ -93,6 +95,17 @@ export function createDocumentAssistant() {
     getProjectStyle,
     findOpenTab,
     reloadTab: reloadFileInTab,
+  });
+  registerImportTools(innerRegistry, {
+    adoptProject,
+    getTab: () => activeTab.value,
+    // Same re-keying as `create_project`: an import bootstraps a project, so the bootstrap
+    // Conversation has to follow it out of the unscoped store.
+    onProjectAdopted: (root: string) => {
+      if (sessionId) {
+        sessionStore.moveSession("", root, sessionId);
+      }
+    },
   });
   registerProjectTools(innerRegistry, {
     getTab: () => activeTab.value,
@@ -161,12 +174,18 @@ export function createDocumentAssistant() {
       t.name,
       {
         when: () =>
-          tierActive(t.tier, {
+          toolActive(t, {
+            /* The platform's own answer, read live rather than captured: the assistant is
+               constructed at module load, before a platform is registered in some hosts. */
+            canImport: Boolean(getPlatform().importSite),
             hasDocument: Boolean(activeTab.value),
             hasProject: Boolean(workspace.projectRoot),
             treeEditable: treeEditable(),
           }),
-        requires: TIER_REQUIREMENTS[t.tier],
+        requires:
+          t.capability === "importSite"
+            ? "a platform with a site-import backend"
+            : TIER_REQUIREMENTS[t.tier],
       },
     ]),
   );
@@ -188,6 +207,7 @@ export function createDocumentAssistant() {
       components: componentRegistry.length > 0 ? componentRegistry : undefined,
       projectRoot: workspace.projectRoot || undefined,
       hasProject: Boolean(workspace.projectRoot),
+      canImport: Boolean(getPlatform().importSite),
       ...(inventory && inventory.length > 0 ? { fileInventory: inventory } : {}),
     });
   }
@@ -263,12 +283,15 @@ export function createDocumentAssistant() {
        HAS one — the evals runner and several tests drive the loop without. Settling here as well
        is what makes Stop terminal in every case rather than in most of them. */
     cancelAsk();
+    abortImportRun();
     chatState.cancelStream();
   }
 
   function newChat() {
     stop();
     resetAsk();
+    resetImportRuns();
+    resetImportGuard();
     chatState.clearChat();
     sessionId = null;
     sessionStore.setActiveSession(projectRoot(), null);

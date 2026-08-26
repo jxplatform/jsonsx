@@ -101,11 +101,13 @@ const {
   assistantCommands,
   bindAiPanelHost,
   handleRestore,
+  buildImportTurn,
   isAssistantStreaming,
   isAssistantWaiting,
   mountAiPanel,
   renderAiPanelTemplate,
   revealAssistant,
+  revealImportHandoff,
   seedAssistantMessages,
   seedAssistantPrompt,
 } = await import("../src/panels/ai-panel");
@@ -848,5 +850,54 @@ describe("a turn suspended on a question", () => {
     expect(await settled).toEqual({ answer: null, skipped: false });
     await flush(3);
     expect(registry.isEnabled("assistant.stop")).toBe(false);
+  });
+});
+
+describe("the New Project Import hand-off", () => {
+  const BRIEF = {
+    aiComponents: true,
+    depth: 1,
+    directory: "/home/dev/Sites/example",
+    maxPages: 20,
+    model: "o3-import",
+    name: "Example",
+    prompt: "Modernise the typography",
+    url: "https://example.com/",
+  };
+
+  test("the turn reads as the user's own brief, with the parameters attached", () => {
+    /* The attach-context convention, because message content is the only channel the streaming
+       payload carries — and because the reader should see what they asked for rather than a form
+       submission. */
+    const turn = buildImportTurn(BRIEF);
+    const { body, contextLines } = splitAttachedContext(turn);
+    expect(body).toBe("Modernise the typography");
+    expect(contextLines.join(" ")).toContain("url: https://example.com/");
+    expect(contextLines.join(" ")).toContain("destination: /home/dev/Sites/example");
+    expect(contextLines.join(" ")).toContain("Call import_site with the url");
+  });
+
+  test("an empty brief still says what to do", () => {
+    // The prompt field is optional; "import it" is a complete instruction on its own.
+    const { body } = splitAttachedContext(buildImportTurn({ ...BRIEF, prompt: "   " }));
+    expect(body).toContain("Import https://example.com/");
+  });
+
+  test("starts a fresh chat and sends the turn", async () => {
+    pushMessage("user", "a conversation about the previous project");
+    newChatMock.mockClear();
+    sendMessage.mockClear();
+
+    await revealImportHandoff(BRIEF);
+    await flush(3);
+
+    /* A fresh chat, deliberately: an import is the start of a project, and another project's
+       document context in front of the model on its first decision is the wrong context. */
+    expect(newChatMock).toHaveBeenCalled();
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendMessage.mock.calls[0]![0]).toContain("Modernise the typography");
+    // It does NOT store the brief — the form that gathered it did, so `import_site` can read the
+    // Destination whether or not this hand-off is what started the run.
+    expect(sendMessage.mock.calls[0]![0]).toContain("/home/dev/Sites/example");
   });
 });

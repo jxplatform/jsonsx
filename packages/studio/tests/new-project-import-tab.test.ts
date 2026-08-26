@@ -16,14 +16,15 @@ import {
   npType,
   seedSettings,
 } from "./harness";
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { resetModelCache } from "../src/services/ai-models";
 import type { ImportTabCtx } from "../src/new-project/import-tab";
 import type { ImportProgressEvent } from "../src/types";
 
 const { closeNewProjectModal, openNewProjectModal } =
   await import("../src/new-project/new-project-modal");
-const { importButtonLabel, startImport } = await import("../src/new-project/import-tab");
+const { handoffImport, importButtonLabel } = await import("../src/new-project/import-tab");
+const { clearPendingImportBrief, pendingImportBrief } = await import("../src/services/import-seed");
 const { initLayers } = await import("../src/ui/layers");
 
 mountOverlayLayers(document.body);
@@ -53,7 +54,7 @@ function inlineError(): string {
 }
 
 /**
- * A hand-built ImportTabCtx for driving startImport directly (the modal only ever hands it a
+ * A hand-built ImportTabCtx for driving handoffImport directly (the modal only ever hands it a
  * filesystem destination), paired with a counter for the rerenders it requests.
  */
 function directCtx(resolveDestination: ImportTabCtx["resolveDestination"]) {
@@ -63,7 +64,7 @@ function directCtx(resolveDestination: ImportTabCtx["resolveDestination"]) {
     credsForm: { render: () => "" as never, startEdit: () => {} },
     form: { directory: "site", name: "Site" },
     managedConnect: { canOffer: () => false, render: () => "" },
-    onDone: () => {},
+    onHandoff: mock(() => {}),
     rerender: () => {
       counter.rerenders += 1;
     },
@@ -85,12 +86,6 @@ function switchTab(value: string) {
   const tabs: any = document.querySelector("#layer-modal sp-tabs");
   tabs.selected = value;
   tabs.dispatchEvent(new Event("change", { bubbles: true }));
-}
-
-function logLines(): string[] {
-  return [...document.querySelectorAll("#layer-modal .new-project-import-log-line")].map(
-    (el) => el.textContent?.replaceAll(/\s+/g, " ").trim() ?? "",
-  );
 }
 
 interface CapturedImport {
@@ -141,6 +136,7 @@ let proxyState: { configured: boolean; managed: boolean } = { configured: false,
   Response.json({ models: [], ...proxyState }, { status: 200 });
 
 beforeEach(() => {
+  clearPendingImportBrief();
   captured = null;
   localStorage.clear();
   clearSeededSettings();
@@ -228,8 +224,8 @@ describe("Import source step", () => {
   });
 });
 
-describe("Import — parameters validation", () => {
-  test("an empty project name blocks the import and shows the inline name error", async () => {
+describe("Import — the brief the form hands over", () => {
+  test("an empty project name blocks the hand-off and shows the inline name error", async () => {
     setKey();
     importPlatform();
     void reachParams();
@@ -237,26 +233,26 @@ describe("Import — parameters validation", () => {
     npType(npName(), ""); // Clear the prefilled name.
     clickFooter("Import Site");
     await flush();
-    expect(captured).toBeNull();
-    // The modal — not the tab — owns identity validation now, so the message lands on the field.
+    expect(pendingImportBrief()).toBeNull();
+    // The modal — not the tab — owns identity validation, so the message lands on the field.
     expect(nameError()).toBe("Project name is required");
   });
 
-  test("a missing Location blocks the import before importSite is called", async () => {
+  test("a missing Location blocks the hand-off", async () => {
     setKey();
     importPlatform();
     void reachParams();
     // Location left empty: the name and slug are prefilled, so only the destination is missing.
     clickFooter("Import Site");
     await flush();
-    expect(captured).toBeNull();
+    expect(pendingImportBrief()).toBeNull();
     expect(inlineError()).toContain("Choose a location for the project folder");
     // Still on the Parameters step, ready for the user to choose one.
     expect(npLocation()).toBeTruthy();
     expect(importButtonLabel()).toBe("Import Site");
   });
 
-  test("importSite receives the Location joined with the slug", async () => {
+  test("the brief carries the Location joined with the slug", async () => {
     setKey();
     importPlatform();
     void reachParams();
@@ -266,7 +262,7 @@ describe("Import — parameters validation", () => {
     expect(npPreview()).toContain("/home/dev/Sites/clone-dir");
     clickFooter("Import Site");
     await flush();
-    expect(captured!.opts.directory).toBe("/home/dev/Sites/clone-dir");
+    expect(pendingImportBrief()!.directory).toBe("/home/dev/Sites/clone-dir");
   });
 
   test("a blank directory defaults to the name's slug", async () => {
@@ -278,13 +274,13 @@ describe("Import — parameters validation", () => {
     npType(npSlug(), ""); // Clear the derived directory.
     clickFooter("Import Site");
     await flush();
-    expect(captured!.opts).toMatchObject({
+    expect(pendingImportBrief()).toMatchObject({
       directory: "/home/dev/Sites/coffee-cream",
       name: "Coffee & Cream",
     });
   });
 
-  test("crawl options and the AI-naming switch thread into importSite", async () => {
+  test("crawl options, the AI-naming switch and the prompt all reach the brief", async () => {
     setKey();
     importPlatform();
     void openNewProjectModal();
@@ -303,22 +299,33 @@ describe("Import — parameters validation", () => {
     };
     aiSwitch.checked = false;
     aiSwitch.dispatchEvent(new Event("change", { bubbles: true }));
+    npType(
+      document.querySelector("#layer-modal .new-project-import-prompt") as HTMLInputElement,
+      "Modernise the typography",
+    );
 
     clickFooter("Next");
     npFillLocation();
     clickFooter("Import Site");
     await flush();
-    expect(captured!.opts).toMatchObject({ aiComponents: false, depth: 2, maxPages: 50 });
+    expect(pendingImportBrief()).toMatchObject({
+      aiComponents: false,
+      depth: 2,
+      maxPages: 50,
+      prompt: "Modernise the typography",
+      url: "https://clone.example/",
+    });
   });
 
   test("Import Site is a no-op when the platform lacks importSite", async () => {
     installMockPlatform();
     const { counter, ctx } = directCtx(() => ({ kind: "path", parent: "/home/dev/Sites" }));
-    await startImport(ctx);
+    handoffImport(ctx);
     expect(counter.rerenders).toBe(0);
+    expect(ctx.onHandoff).not.toHaveBeenCalled();
   });
 
-  test("a repository destination never starts an import", async () => {
+  test("a repository destination never hands off", async () => {
     setKey();
     importPlatform();
     void openNewProjectModal();
@@ -331,8 +338,8 @@ describe("Import — parameters validation", () => {
       private: true,
       repo: "site",
     }));
-    await startImport(ctx);
-    expect(captured).toBeNull();
+    handoffImport(ctx);
+    expect(ctx.onHandoff).not.toHaveBeenCalled();
     expect(counter.rerenders).toBe(0);
   });
 
@@ -348,21 +355,21 @@ describe("Import — parameters validation", () => {
     });
 
     // No URL at all (the source step never validated one).
-    await startImport(ctx);
-    expect(captured).toBeNull();
+    handoffImport(ctx);
+    expect(ctx.onHandoff).not.toHaveBeenCalled();
     expect(counter.rerenders).toBe(1);
 
     // Parsable, but not an http(s) site.
     npType(urlField(), "ftp://files.example/");
-    await startImport(ctx);
-    expect(captured).toBeNull();
+    handoffImport(ctx);
+    expect(ctx.onHandoff).not.toHaveBeenCalled();
     expect(counter.rerenders).toBe(2);
     expect(resolved).toBe(0);
   });
 });
 
 describe("Import — the model picker", () => {
-  test("a chosen model reaches importSite without retargeting the assistant", async () => {
+  test("a chosen model reaches the brief without retargeting the assistant", async () => {
     /* The picker writes a DRAFT, not `jx.ai.model`: choosing a model for one import must not
        silently change which model every later chat turn runs on. */
     setKey();
@@ -383,12 +390,12 @@ describe("Import — the model picker", () => {
     clickFooter("Import Site");
     await flush();
 
-    expect(captured!.opts.model).toBe("o3-import");
+    expect(pendingImportBrief()!.model).toBe("o3-import");
     // The application preference is untouched.
     expect(globalThis.localStorage.getItem("jx.ai.model")).toBe("test-model");
   });
 
-  test("an untouched picker falls back to the assistant's own model", async () => {
+  test("an untouched picker leaves the model empty, and the tool falls back", async () => {
     setKey();
     importPlatform();
     void reachParams();
@@ -397,119 +404,42 @@ describe("Import — the model picker", () => {
     clickFooter("Import Site");
     await flush();
 
-    expect(captured!.opts.model).toBe("test-model");
+    expect(pendingImportBrief()!.model).toBe("");
   });
 });
 
-describe("Import — streaming flow", () => {
-  test("threads options + stored credentials into importSite and streams the log", async () => {
+describe("Import — the hand-off", () => {
+  test("the wizard closes with no project, because it created none", async () => {
+    /* `import_site` is `no-project` tiered and does the creating — including the git init every
+       create path owes. The wizard's promise resolves null, the same as a dismissal. */
     setKey();
     importPlatform();
     const promise = reachParams();
     npFillLocation();
     npType(npName(), "Cloned Site");
     clickFooter("Import Site");
+
+    expect(await promise).toBeNull();
+    expect(modal()).toBeNull();
+    // Nothing was imported by the wizard itself.
+    expect(captured).toBeNull();
+  });
+
+  test("the brief is left for the tool to read, not consumed on hand-off", async () => {
+    setKey();
+    importPlatform();
+    void reachParams();
+    npFillLocation();
+    npType(npName(), "Cloned Site");
+    clickFooter("Import Site");
     await flush();
 
-    expect(captured).not.toBeNull();
-    expect(captured!.opts).toMatchObject({
-      aiComponents: true,
-      apiKey: "sk-import-test",
-      baseUrl: "http://llm.local/v1",
+    expect(pendingImportBrief()).toMatchObject({
       depth: 1,
       directory: "/home/dev/Sites/cloned-site",
       maxPages: 20,
-      model: "test-model",
       name: "Cloned Site",
       url: "https://clone.example/",
     });
-
-    // Progress lines stream into the log; the footer swaps to Cancel Import.
-    captured!.onProgress({ message: "Capturing page...", phase: "capture" });
-    captured!.onProgress({ message: "Wrote 12 files", phase: "emit" });
-    await flush();
-    expect(logLines()).toEqual(["capture Capturing page...", "emit Wrote 12 files"]);
-    const labels = footerButtons().map((b) => b.textContent?.trim());
-    expect(labels).toEqual(["Cancel Import"]);
-
-    // Success resolves the modal promise with the imported project.
-    captured!.resolve({ config: { name: "Cloned Site" }, root: "/home/dev/Sites/cloned-site" });
-    const result = await promise;
-    expect(result).toEqual({
-      config: { name: "Cloned Site" },
-      root: "/home/dev/Sites/cloned-site",
-    } as never);
-    expect(modal()).toBeNull();
-  });
-
-  test("the primary-button label reads Importing… while a run is active", async () => {
-    setKey();
-    importPlatform();
-    void reachParams();
-    npFillLocation();
-    expect(importButtonLabel()).toBe("Import Site");
-    clickFooter("Import Site");
-    await flush();
-    expect(importButtonLabel()).toBe("Importing…");
-  });
-
-  test("a failing import shows the error, keeps the log, and offers Retry", async () => {
-    setKey();
-    importPlatform();
-    void reachParams();
-    npFillLocation();
-    clickFooter("Import Site");
-    await flush();
-
-    captured!.onProgress({ message: "Launching browser...", phase: "launch" });
-    captured!.reject(new Error("Chrome not found"));
-    await flush();
-
-    expect(modal()).toBeTruthy();
-    expect(inlineError()).toContain("Chrome not found");
-    const labels = footerButtons().map((b) => b.textContent?.trim());
-    expect(labels.at(-1)).toContain("Retry Import");
-    expect(importButtonLabel()).toBe("Retry Import");
-
-    // Back on the Import source step, the error and the retained log both render.
-    clickFooter("Back");
-    expect(inlineError()).toContain("Chrome not found");
-    expect(logLines()).toEqual(["launch Launching browser..."]);
-  });
-
-  test("Cancel Import aborts the signal and returns to the Parameters step", async () => {
-    setKey();
-    importPlatform();
-    void reachParams();
-    npFillLocation();
-    clickFooter("Import Site");
-    await flush();
-
-    const [cancelBtn] = footerButtons();
-    expect(cancelBtn.textContent).toContain("Cancel Import");
-    cancelBtn.dispatchEvent(new Event("click", { bubbles: true }));
-    await flush();
-
-    expect(captured!.signal?.aborted).toBe(true);
-    expect(modal()).toBeTruthy();
-    // Back at the idle Parameters step (no error shown for a user-initiated cancel).
-    const labels = footerButtons().map((b) => b.textContent?.trim());
-    expect(labels.at(-1)).toContain("Import Site");
-    expect(document.querySelector("#layer-modal .new-project-error")).toBeNull();
-  });
-
-  test("dismissing the modal mid-import aborts the run instead of trapping the user", async () => {
-    setKey();
-    importPlatform();
-    const promise = reachParams();
-    npFillLocation();
-    clickFooter("Import Site");
-    await flush();
-    expect(captured!.signal?.aborted).toBe(false);
-
-    closeNewProjectModal();
-    expect(captured!.signal?.aborted).toBe(true);
-    expect(modal()).toBeNull();
-    expect(await promise).toBeNull();
   });
 });

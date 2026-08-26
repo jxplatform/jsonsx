@@ -29,6 +29,12 @@ interface BuildSystemPromptOptions {
    * prompt-shape tests — advertises the same list it always did.
    */
   treeEditable?: boolean | undefined;
+  /**
+   * Whether the platform can import a site. Defaults TRUE so this stays a pure function of what it
+   * is given — a caller that knows nothing about the platform gets the full list, and only
+   * `document-assistant.ts`, which does know, narrows it.
+   */
+  canImport?: boolean | undefined;
   /** Project-relative file paths for the inventory section (project modes; capped). */
   fileInventory?: string[] | undefined;
 }
@@ -59,6 +65,14 @@ export interface AiToolInfo {
   tier: AiToolTier;
   /** One-line signature + purpose shown in the system prompt's tool list. */
   blurb: string;
+  /**
+   * A PAL member the tool needs, beyond whatever its tier requires.
+   *
+   * The tier answers "what is open"; this answers "can this backend do it at all". Cloud ships no
+   * `importSite`, so `import_site` must not be advertised there — and a tier cannot express that,
+   * because "no project is open" is exactly as true on cloud as anywhere else.
+   */
+  capability?: "importSite";
 }
 
 /**
@@ -76,6 +90,16 @@ export const AI_TOOL_TIERS: AiToolInfo[] = [
       "waits for their reply and resumes with it. Only for a judgement that is genuinely theirs.",
   },
   // Bootstrap (no project open)
+  {
+    name: "import_site",
+    tier: "no-project",
+    capability: "importSite",
+    blurb:
+      "import_site(url, directory?, depth?, maxPages?, aiComponents?) — clone a live website into " +
+      "a new Jx project and open it: pages, styles, assets, a shared layout and recurring " +
+      "components. When the user came through the New Project Import form the destination and " +
+      "options are already settled — pass the url alone.",
+  },
   {
     name: "create_project",
     tier: "no-project",
@@ -182,6 +206,8 @@ export const AI_TOOL_TIERS: AiToolInfo[] = [
 export interface AiToolState {
   hasProject: boolean;
   hasDocument: boolean;
+  /** Whether the platform implements `importSite`. Cloud does not. */
+  canImport?: boolean;
   /**
    * The open document is an element tree the canvas is editing — `editor.kind === "canvas"`.
    *
@@ -210,6 +236,24 @@ export function tierActive(tier: AiToolTier, state: AiToolState): boolean {
     return state.hasDocument && state.treeEditable;
   }
   return state.hasDocument;
+}
+
+/**
+ * Whether a tool is active: its tier, AND any capability it declares.
+ *
+ * The one predicate the prompt's tool list and the gating registry both run, which is the whole
+ * point of {@link AI_TOOL_TIERS} — a tool the model is told about and then refused is a surprise to
+ * it, and one it is refused without being told is invisible.
+ *
+ * @param {AiToolInfo} tool
+ * @param {AiToolState} state
+ * @returns {boolean}
+ */
+export function toolActive(tool: AiToolInfo, state: AiToolState): boolean {
+  if (tool.capability === "importSite" && state.canImport === false) {
+    return false;
+  }
+  return tierActive(tool.tier, state);
 }
 
 // ─── Jx Schema Reference (condensed) ────────────────────────────────────────
@@ -597,6 +641,7 @@ export function buildSystemPrompt({
   projectRoot,
   hasProject = Boolean(projectRoot),
   treeEditable = true,
+  canImport = true,
   fileInventory,
 }: BuildSystemPromptOptions = {}) {
   const hasDocument = Boolean(document);
@@ -605,7 +650,7 @@ export function buildSystemPrompt({
   // The list the model is TOLD about and the list the gate will honour are the same filter, so a
   // Refusal is never a surprise to it.
   const toolList = AI_TOOL_TIERS.filter((t) =>
-    tierActive(t.tier, { hasDocument, hasProject, treeEditable }),
+    toolActive(t, { canImport, hasDocument, hasProject, treeEditable }),
   )
     .map((t) => `- ${t.blurb}`)
     .join("\n");

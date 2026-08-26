@@ -41,6 +41,8 @@ import { renderMarkdown } from "./chat-markdown";
 import { summarizeWrites, writesForTurn } from "../../services/ai-writes";
 import { activeRegistry } from "../../commands/active-registry";
 
+import type { ImportRunRecord } from "../../services/import-run";
+
 // ─── Helpers (moved from ai-panel.ts) ────────────────────────────────────────
 
 /**
@@ -258,6 +260,12 @@ function renderUserMessage(msg: Message): TemplateResult {
 /** The tool whose chip is a question card rather than a chip. */
 const ASK_TOOL = "ask_user";
 
+/** The tool whose chip grows a live progress line while it runs. */
+const IMPORT_TOOL = "import_site";
+
+/** Log lines drawn under a running import. The tail is what a reader wants. */
+const IMPORT_LOG_LINES = 6;
+
 /** What `ask_user` was called with, as far as the arguments actually parse. */
 interface AskArgs {
   question: string;
@@ -335,12 +343,51 @@ export function toolOutcomeText(tc: ToolCallRecord): string {
   return (result.success ? result.summary : result.error) ?? "";
 }
 
+/**
+ * A running import, under the chip that started it.
+ *
+ * An import takes minutes and says a line at a time. Rendering it here rather than in the modal it
+ * used to live in is what stops a successful run destroying its own account of what it did: the
+ * chip and the progress are one thing, joined by the tool-call id.
+ */
+function renderImportProgress(record: ImportRunRecord): TemplateResult {
+  const determinate = record.total !== null && record.current !== null;
+  const tail = record.log.slice(-IMPORT_LOG_LINES);
+  return html`
+    <div class="ai-import-progress">
+      <div class="ai-import-head">
+        ${
+          determinate
+            ? html`<sp-progress-circle
+                size="s"
+                progress=${Math.round((record.current! / Math.max(record.total!, 1)) * 100)}
+              ></sp-progress-circle>`
+            : html`<sp-progress-circle indeterminate size="s"></sp-progress-circle>`
+        }
+        <span class="ai-import-phase">${record.phase}</span>
+        <span class="ai-import-message">${record.message}</span>
+      </div>
+      <div class="ai-import-log">
+        ${tail.map(
+          (evt) => html`
+            <div class="ai-import-log-line">
+              <span class="ai-import-phase">${evt.phase}</span>${evt.message}
+            </div>
+          `,
+        )}
+      </div>
+    </div>
+  `;
+}
+
 /** How a question card reaches the store that resolves it. */
 export interface AskHandlers {
   /** The id of the question the loop is still waiting on, or null. */
   pendingId?: string | null;
   onAnswer?: (text: string) => void;
   onSkip?: () => void;
+  /** The live record for an `import_site` call, if this renderer's host has one. */
+  importRun?: (id: string) => ImportRunRecord | null;
 }
 
 /**
@@ -435,6 +482,10 @@ function renderToolChips(
           return renderAskCard(tc, ask, outcome, handlers);
         }
         const text = toolOutcomeText(tc);
+        const run =
+          tc.name === IMPORT_TOOL && outcome === "pending"
+            ? (handlers.importRun?.(tc.id) ?? null)
+            : null;
         return html`
           <span class="ai-tool-chip" data-outcome=${outcome} title=${text || formatToolLabel(tc)}>
             <sp-icon-gears size="xs"></sp-icon-gears>
@@ -447,6 +498,7 @@ function renderToolChips(
                   >`
             }
           </span>
+          ${run ? renderImportProgress(run) : nothing}
         `;
       })}
     </div>

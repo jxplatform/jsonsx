@@ -641,3 +641,75 @@ describe("parseAsk", () => {
     expect(ask({ context: 9, question: "Q" })?.context).toBe("");
   });
 });
+
+describe("a running import, under the chip that started it", () => {
+  /** An assistant turn whose tool call is an import, optionally already settled. */
+  function importing(result?: { success: boolean; summary?: string }): Message {
+    return msg("assistant", "", {
+      toolCalls: [
+        {
+          arguments: JSON.stringify({ url: "https://example.com" }),
+          id: "run1",
+          name: "import_site",
+          ...(result ? { result: result as never } : {}),
+        },
+      ],
+    });
+  }
+
+  const RECORD = {
+    current: null,
+    directory: "/home/dev/Sites/example",
+    error: "",
+    id: "run1",
+    log: [
+      { message: "Launching browser...", phase: "launch" },
+      { message: "Crawled 3 pages", phase: "crawl" },
+    ],
+    message: "Crawled 3 pages",
+    phase: "crawl",
+    status: "running" as const,
+    total: null,
+    url: "https://example.com/",
+    warnings: [],
+  };
+
+  test("draws the phase, the latest line and a tail of log", async () => {
+    /* An import reports for minutes. It used to report into the New Project modal, which meant a
+       successful run destroyed its own account of what it did at the moment it handed off. */
+    const el = await renderInto(
+      list([importing()], { ask: { importRun: () => RECORD, pendingId: null } }),
+    );
+    expect(el.querySelector(".ai-import-message")?.textContent?.trim()).toBe("Crawled 3 pages");
+    expect(el.querySelectorAll(".ai-import-log-line")).toHaveLength(2);
+    expect(el.querySelector("sp-progress-circle")?.hasAttribute("indeterminate")).toBe(true);
+  });
+
+  test("a phase that counts draws a determinate bar", async () => {
+    const el = await renderInto(
+      list([importing()], {
+        ask: { importRun: () => ({ ...RECORD, current: 5, total: 20 }), pendingId: null },
+      }),
+    );
+    const circle = el.querySelector("sp-progress-circle")!;
+    expect(circle.hasAttribute("indeterminate")).toBe(false);
+    expect(circle.getAttribute("progress")).toBe("25");
+  });
+
+  test("a settled import draws its outcome and no progress", async () => {
+    const el = await renderInto(
+      list([importing({ success: true, summary: "Imported example.com" })], {
+        ask: { importRun: () => RECORD },
+      }),
+    );
+    expect(el.querySelector(".ai-import-progress")).toBeNull();
+    expect(el.querySelector(".ai-tool-chip-outcome")?.textContent).toContain("Imported");
+  });
+
+  test("a host with no run record simply draws the chip", async () => {
+    // The evals runner and the screenshot seeder render transcripts with no import store at all.
+    const el = await renderInto(list([importing()]));
+    expect(el.querySelector(".ai-import-progress")).toBeNull();
+    expect(el.querySelector(".ai-tool-chip")).not.toBeNull();
+  });
+});

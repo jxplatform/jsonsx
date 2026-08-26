@@ -35,6 +35,8 @@ import { activeTab } from "../workspace/workspace";
 import { setOpenAiKey } from "../services/ai-settings";
 import { hasAiCredentials } from "../services/ai-models";
 import { answerAsk, isAwaitingAnswer, pendingAsk, skipAsk } from "../services/ai-ask";
+import { activeImportRun, importRun } from "../services/import-run";
+import type { ImportBrief } from "../services/import-seed";
 import { openPreferences } from "../settings/preferences-dialog";
 import { onCredentialsChanged } from "../settings/preferences-accounts";
 import { setDockCollapsed } from "../shell";
@@ -43,6 +45,7 @@ import { clearMarkdownCache } from "./ai-chat/chat-markdown";
 import { renderChatHeader, renderMessageList } from "./ai-chat/chat-view";
 import { createComposer } from "./ai-chat/composer";
 import { renderSessionsList } from "./ai-chat/sessions-view";
+import { buildMessageWithContext } from "./ai-chat/attached-context";
 import { setInspectorTab } from "./right-panel";
 
 import type { AnyCommand } from "../commands/registry";
@@ -114,6 +117,13 @@ function watchAssistant() {
       // This panel, so the same effect has to track it or a question would appear a frame late
       // (and its ANSWER would never repaint the card at all).
       void pendingAsk();
+      /* The run record, for the same reason: an import reports a line at a time from a store that
+         is not chat state, and its chip has to repaint on every one of them. Reading the ACTIVE
+         run tracks the whole record, so any field moving schedules a frame. */
+      const run = activeImportRun();
+      void run?.message;
+      void run?.log.length;
+      void run?.status;
       scheduleAiRender();
     });
   });
@@ -279,6 +289,54 @@ export function handleRestore(messageId: string): void {
  */
 export async function seedAssistantPrompt(text: string): Promise<void> {
   await handleAssistantSend(text);
+}
+
+/**
+ * Take the New Project Import form's brief and start the run as an assistant turn.
+ *
+ * The wizard closes without having created anything: `import_site` is `no-project` tiered and does
+ * the creating, so the window is still on the welcome screen when this runs — which is exactly the
+ * state the assistant is designed to be usable in (`specs/studio.md` §6).
+ *
+ * A fresh chat, deliberately. An import is the start of a project, and threading it onto whatever
+ * conversation the previous project left behind would put another project's document context in
+ * front of the model on its very first decision.
+ *
+ * The brief is already in `services/import-seed.ts` — the form that gathered it put it there, so
+ * `import_site` can read the destination later whether or not this hand-off is what started it.
+ *
+ * @param {ImportBrief} brief
+ */
+export async function revealImportHandoff(brief: ImportBrief): Promise<void> {
+  revealAssistant();
+  newChat();
+  await seedAssistantPrompt(buildImportTurn(brief));
+}
+
+/**
+ * The user message that opens an import turn.
+ *
+ * The parameters ride in an attached-context block — the composer's own convention for facts the
+ * model must see but the reader should not have to re-read (`ai-chat/attached-context.ts`). The
+ * body is the user's own brief, so the transcript reads as what they asked for rather than as a
+ * form submission.
+ *
+ * @param {ImportBrief} brief
+ * @returns {string}
+ */
+export function buildImportTurn(brief: ImportBrief): string {
+  const body = brief.prompt.trim() || `Import ${brief.url} and get it ready for me to work on.`;
+  return buildMessageWithContext(body, [
+    {
+      detail:
+        `Import request from the New Project form — url: ${brief.url}, ` +
+        `destination: ${brief.directory}, depth: ${brief.depth}, ` +
+        `max pages: ${brief.maxPages}, AI component naming: ${brief.aiComponents}. ` +
+        "Call import_site with the url; the destination and options above are already settled.",
+      kind: "import",
+      label: `Import ${brief.url}`,
+    },
+  ]);
 }
 
 // ─── Automation seeding (screenshot runner) ─────────────────────────────────
@@ -598,6 +656,7 @@ export function renderAiPanelTemplate(): TemplateResult {
       })}
       ${renderMessageList({
         ask: {
+          importRun,
           onAnswer: (text) => {
             void handleAssistantSend(text);
           },

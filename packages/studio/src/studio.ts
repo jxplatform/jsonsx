@@ -132,6 +132,7 @@ import {
   assistantCommands,
   isAssistantStreaming,
   isAssistantWaiting,
+  revealImportHandoff,
   seedAssistantMessages,
 } from "./panels/ai-panel";
 import { seedPublishConnected } from "./publish/publish-panel";
@@ -185,6 +186,7 @@ import * as frontmatterPanelMod from "./panels/frontmatter-panel";
 import * as rightPanelMod from "./panels/right-panel";
 import * as chatPanelMod from "./panels/chat-panel";
 import { setProjectAdopter } from "./services/project-adoption";
+import { setImportHandoff } from "./services/import-seed";
 import { tabBufferUnsaved } from "./services/monaco-buffer";
 import * as leftPanelMod from "./panels/left-panel";
 import * as tabStrip from "./panels/tab-strip";
@@ -804,6 +806,7 @@ frontmatterPanelMod.mount();
 // The assistant's create_project tool adopts freshly scaffolded projects through the same
 // Flow as the recent-projects list.
 setProjectAdopter(openRecentProject);
+setImportHandoff(revealImportHandoff);
 
 leftPanelMod.mount({
   cloneRepository: () => cloneRepository({ openRecentProject }),

@@ -647,6 +647,48 @@
   color: var(--fg-dim);
   line-height: 1.5;
 }
+/* A running import, under the chip that started it. It reports for minutes, so it gets a head
+   line that stays put and a short tail of log below it rather than an unbounded scroller. */
+.ai-import-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-self: stretch;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 8px;
+}
+.ai-import-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--spectrum-font-size-50, 11px);
+  color: var(--fg);
+}
+.ai-import-message {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ai-import-phase {
+  color: var(--fg-dim);
+  font-family: var(--font-mono);
+  flex: 0 0 auto;
+  margin-right: 4px;
+}
+.ai-import-log {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.6;
+  color: var(--fg-dim);
+}
+.ai-import-log-line {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .ai-msg-tool-error {
   background: var(--hover-bg);
   border-left: 2px solid var(--danger);

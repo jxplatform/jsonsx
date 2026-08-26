@@ -168,9 +168,11 @@ describe("ai-system-prompt — tool-table/gating consistency", () => {
     const { registerAiTools } = await import("../src/services/ai-tools");
     const { registerProjectTools } = await import("../src/services/ai-project-tools");
     const { registerAskTool } = await import("../src/services/ai-ask");
+    const { registerImportTools } = await import("../src/services/ai-import-tools");
 
     const registry = createToolRegistry();
     registerAskTool(registry);
+    registerImportTools(registry, { getTab: () => null });
     registerAiTools(registry, { getTab: () => null, validate: async () => [] });
     registerProjectTools(registry, {
       adoptProject: async () => {},
@@ -256,5 +258,53 @@ describe("the agent's gate is the human's gate", () => {
       expect([name, withoutTree.includes(`${name}(`)]).toEqual([name, false]);
     }
     expect(withoutTree).toContain("read_document(");
+  });
+});
+
+describe("the importSite capability gate", () => {
+  test("a tier cannot express it, so `import_site` carries a capability", async () => {
+    /* "No project is open" is exactly as true on cloud as anywhere else, and cloud ships no
+       `importSite` — so the tool must be gated on the PAL, not on what happens to be open. */
+    const { AI_TOOL_TIERS, toolActive } = await import("../src/services/ai-system-prompt");
+    const importTool = AI_TOOL_TIERS.find((t) => t.name === "import_site")!;
+    expect(importTool.tier).toBe("no-project");
+    expect(importTool.capability).toBe("importSite");
+
+    const bootstrapping = { hasDocument: false, hasProject: false, treeEditable: true };
+    expect(toolActive(importTool, { ...bootstrapping, canImport: true })).toBe(true);
+    expect(toolActive(importTool, { ...bootstrapping, canImport: false })).toBe(false);
+    // The tier still applies on a platform that CAN import.
+    expect(toolActive(importTool, { ...bootstrapping, canImport: true, hasProject: true })).toBe(
+      false,
+    );
+  });
+
+  test("a tool with no capability is unaffected by the platform's answer", async () => {
+    const { AI_TOOL_TIERS, toolActive } = await import("../src/services/ai-system-prompt");
+    const createTool = AI_TOOL_TIERS.find((t) => t.name === "create_project")!;
+    const state = { canImport: false, hasDocument: false, hasProject: false, treeEditable: true };
+    expect(toolActive(createTool, state)).toBe(true);
+  });
+
+  test("`ask_user` is active in every state, because a question is not gated on one", async () => {
+    const { AI_TOOL_TIERS, tierActive, toolActive } =
+      await import("../src/services/ai-system-prompt");
+    const askTool = AI_TOOL_TIERS.find((t) => t.name === "ask_user")!;
+    expect(askTool.tier).toBe("always");
+    expect(
+      tierActive("always", { hasDocument: false, hasProject: false, treeEditable: false }),
+    ).toBe(true);
+    expect(toolActive(askTool, { hasDocument: true, hasProject: true, treeEditable: true })).toBe(
+      true,
+    );
+  });
+
+  test("the prompt lists import_site only where it can be run", async () => {
+    const prompts = await import("../src/services/ai-system-prompt");
+    expect(prompts.buildSystemPrompt({})).toContain("import_site");
+    const noImport = prompts.buildSystemPrompt({ canImport: false });
+    expect(noImport).not.toContain("import_site(");
+    // And the asking guidance is in every prompt, since ask_user always is.
+    expect(noImport).toContain("Asking the user");
   });
 });
