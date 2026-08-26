@@ -22,7 +22,12 @@
     "style": "off",
     "suspicious": "off"
   },
-  "ignorePatterns": ["dist", "**/*.map", ".claude", "examples"],
+  // `vendor` is the pinned Electrobun SDK submodule. The type-aware pass reaches it in a way it
+  // never reached the Hutch projection this replaced: oxlint honours `.gitignore`, `.hutch/` is
+  // gitignored, and a submodule is tracked. So the SDK's ~120 no-unsafe-* hits in `proc/native.ts`
+  // (bun:ffi is `any` by nature) became visible only once the same sources sat at a tracked path.
+  // See .oxlintrc.json for the same entry and the fuller note.
+  "ignorePatterns": ["dist", "**/*.map", ".claude", "examples", "vendor"],
   "overrides": [
     {
       // Tests and dev scripts stub external shapes with `any` by design

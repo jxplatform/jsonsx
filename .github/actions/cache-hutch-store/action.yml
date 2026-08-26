@@ -1,0 +1,24 @@
+name: Cache the Hutch store
+description: >-
+  Warm ~/.hutch, the shared store Hutch installs the Electrobun core and CEF archives into. Only the
+  desktop BUILD lanes need this; typechecking resolves `electrobun/*` out of the pinned
+  vendor/electrobun submodule instead (see scripts/check-electrobun-vendor.ts), which is why this
+  action no longer projects anything and takes no inputs. There is deliberately no machine-wide
+  Hutch install here either: a globally installed launcher is only a fallback, and a stale one is
+  worse than none.
+
+runs:
+  using: composite
+  steps:
+    # The Hutch launcher, the Electrobun core and CEF are hundreds of MB and identical for every job
+    # on a given dependency set, so they are cached on the lockfile rather than re-downloaded per
+    # lane. Correctness never depends on a hit: everything here is verified by digest and re-fetched
+    # when the cache does not supply it. The build prepares the SDK implicitly, so warming the store
+    # is the whole job.
+    - name: Cache the Hutch store
+      uses: actions/cache@v4
+      with:
+        path: ~/.hutch
+        key: hutch-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
+        restore-keys: |
+          hutch-${{ runner.os }}-${{ runner.arch }}-

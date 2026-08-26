@@ -41,9 +41,13 @@ jobs:
           fetch-depth: 0
           filter: blob:none
       - uses: ./.github/actions/setup-bun
+      # ~2s, and it is what lets the vendored-SDK assertions in scripts/*.test.ts actually run
+      # rather than skip. `--init` never moves the gitlink, so it cannot mask a pin/submodule
+      # disagreement — the check inside it still reports one.
+      - run: bun scripts/check-electrobun-vendor.ts --init
       # The gate proves itself before it gates. This also gives scripts/*.test.ts its only home in
       # CI: scripts/ is not a coverage workspace and the matrix below only runs `bun test` with
-      # cwd INSIDE a workspace, so these five files previously ran nowhere.
+      # cwd INSIDE a workspace, so these files previously ran nowhere.
       - run: bun test --isolate scripts
       - id: affected
         env:
@@ -306,11 +310,14 @@ jobs:
       # derive an EMPTY list, which packages an app with no studio in it.
       - run: bun --cwd packages/desktop scripts/check-electrobun-config.ts
       - run: bun run typecheck
-      # packages/desktop resolves `electrobun/*` out of .hutch/devkit, which only exists once the
-      # SDK has been projected into it — Electrobun 2 publishes no SDK on npm, so `bun install`
-      # cannot supply it and the pass below would fail on every import. The desktop TEST job
-      # deliberately does not need this: it mocks the module by specifier.
-      - uses: ./.github/actions/prepare-electrobun
+      # packages/desktop resolves `electrobun/*` out of the pinned vendor/electrobun submodule, so
+      # the pass below needs it checked out. `--init` materialises and narrows it and writes the one
+      # generated file the SDK imports; it deliberately does NOT move the gitlink, so a Dependabot
+      # bump that moves the `electrobun` pin alone is still reported here rather than papered over.
+      # This replaced a `bunx electrobun prepare` network download: Electrobun 2 publishes no SDK on
+      # npm, so before the submodule existed nothing could typecheck this package without Hutch.
+      # The desktop TEST job needs neither — it mocks the module by specifier.
+      - run: bun scripts/check-electrobun-vendor.ts --init
       # packages/desktop is EXCLUDED from the root tsconfig (electrobun ships raw .ts in its SDK,
       # which the root's two strictest flags reject 165 times) so it needs its own pass — without
       # this, nothing there is typechecked at all, and an unbound identifier once shipped through.

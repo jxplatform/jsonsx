@@ -1,6 +1,7 @@
 {
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
   "ignorePatterns": [
+    "vendor/**",
     "**/_fixtures/*",
     "**/_studio_fixtures/*",
     "CHANGELOG.md",

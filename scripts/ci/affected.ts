@@ -117,6 +117,12 @@ const EXTRA_EDGES: ExtraEdge[] = [
     why: "An INVERTED edge: extensions depend on schema, yet schema's tests read parser's committed fragment and walk every extension's src for class definitions.",
   },
   {
+    patterns: [".gitmodules", "vendor/electrobun/**"],
+    seeds: ["packages/desktop"],
+    evidence: ["packages/desktop/tests/electrobun-config.test.ts"],
+    why: "vendor/electrobun is the Electrobun SDK's sources, and packages/desktop's tsconfig `paths` resolve `electrobun/*` into them — so moving the submodule (or the .gitmodules entry that places it) changes what that package typechecks against. Desktop is the only workspace that imports the SDK, so this is an edge rather than a GLOBAL: without it an unclassified path would fail open into the whole matrix.",
+  },
+  {
     patterns: ["extensions/feed/src/**", "extensions/parser/src/**"],
     seeds: ["packages/compiler"],
     evidence: [

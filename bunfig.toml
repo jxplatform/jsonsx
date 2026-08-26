@@ -8,9 +8,11 @@ linker = "hoisted"
 
 [test]
 # `result` is the Nix build output symlink (-> /nix/store/...jx-studio). Without this, a root-level
-# `bun test` follows it and runs the stale built copy's ~680 test files. CI runs tests per-package
-# (cwd inside each package), so this only affects root-level runs.
-pathIgnorePatterns = ["**/result/**"]
+# `bun test` follows it and runs the stale built copy's ~680 test files. `vendor` is the pinned
+# Electrobun SDK submodule — a dependency's sources, whose suite is not ours to run. Neither is
+# reachable from a per-package run (cwd inside each package), which is what CI does, so both of
+# these only affect root-level runs.
+pathIgnorePatterns = ["**/result/**", "**/vendor/**"]
 coverageReporter = ["text"]
 coverageSkipTestFiles = true
 coveragePathIgnorePatterns = [
