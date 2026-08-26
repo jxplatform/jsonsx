@@ -28,6 +28,7 @@ import type { ToolRegistry } from "@jxsuite/ai/tools";
 import type { Tab } from "../tabs/tab";
 import { batchTab, beginBatch, endBatch } from "../tabs/transact";
 import { beginTurn, endTurn } from "./ai-writes";
+import { beginTurnSignal, endTurnSignal } from "./ai-turn-signal";
 
 const MAX_ROUNDS = 5;
 
@@ -58,6 +59,11 @@ export async function runAgentLoop({
   /** The ledger is filed under the assistant message the turn ends on — see services/ai-writes. */
   const turnId = () => chatState.messages.at(-1)?.id ?? "";
   beginTurn(`turn:${chatState.messages.length}`);
+
+  /* The signal, published for the tools rather than passed to them: `ToolRegistry.execute` takes
+     none. Without it a tool that waits for a human never learns the turn was stopped, and the
+     `await` below is the whole loop. See services/ai-turn-signal.ts. */
+  beginTurnSignal(signal);
 
   // Batch all tool-call mutations into a single undo step, anchored on the tab being edited.
   if (getTab) {
@@ -196,6 +202,7 @@ export async function runAgentLoop({
     }
     chatState.setError(tail);
   } finally {
+    endTurnSignal();
     endBatch();
     endTurn(turnId());
   }

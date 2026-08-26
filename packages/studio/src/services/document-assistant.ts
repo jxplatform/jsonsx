@@ -28,7 +28,7 @@ import { runAgentLoop } from "./tool-executor";
 import { AI_TOOL_TIERS, buildSystemPrompt, tierActive } from "./ai-system-prompt";
 import { getBaseUrl, getOpenAiKey } from "./ai-settings";
 import { preferredModel } from "./ai-models";
-import { trimContext } from "./context-manager";
+import { pruneOrphanToolMessages, trimContext } from "./context-manager";
 import { renderCheck } from "./render-critic";
 import { openFileInTab, reloadFileInTab } from "../files/files";
 import { refreshExtensionUi } from "../format/format-host";
@@ -204,6 +204,11 @@ export function createDocumentAssistant() {
     if (trimmed) {
       chatState.setTokenCount(trimmed.estimatedTokens);
     }
+
+    /* AFTER the trim, not before: the trim splices from the front and is itself one of the three
+       ways a tool_calls request loses its reply (see pruneOrphanToolMessages). Repairing first
+       would leave the very pair the trim then broke. */
+    pruneOrphanToolMessages(chatState);
 
     // Persist after trimming so the saved history reflects what's actually sent.
     persistChat();
