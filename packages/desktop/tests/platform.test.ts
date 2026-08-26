@@ -477,7 +477,7 @@ describe("platform methods", () => {
     ["listPackages", [], "listPackages", undefined],
     ["installDependencies", [], "installDependencies", undefined],
     ["dependenciesNeedInstall", [], "dependenciesNeedInstall", undefined],
-    ["outdatedPackages", [], "outdatedPackages", undefined],
+    ["packageVersions", [], "packageVersions", undefined],
     [
       "setPackageVersions",
       [[{ name: "x", version: "^1" }]],

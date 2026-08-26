@@ -2,7 +2,7 @@
 
 ## Platform Abstraction, Project Loading, and Component Scoping
 
-**Version:** 0.4.2-draft
+**Version:** 0.4.3-draft
 **Status:** Pending
 **Updated:** 2026-08-26
 **License:** MIT
@@ -83,7 +83,7 @@ The canonical `StudioPlatform` interface is `packages/studio/src/types.ts` — r
 | **Session / project**    | `id`, `projectRoot`, `activate`, `openProject`, `openProjectPicker?`, `probeRootProject`, `createDestination`, `createProject`, `pickDirectory?`, `listStarters?`, `importSite?`, `listProjects?`, recent-projects persistence |
 | **Filesystem**           | `listDirectory`, `readFile`, `writeFile`, `uploadFile`, `deleteFile`, `renameFile`, `findReferences?`, `createDirectory`, `locateFile`, `searchFiles`, `subscribeFileEvents?`                                                  |
 | **Documents / formats**  | `discoverComponents`, `listFormats?`, `listExtensions?`, `fetchProjectSchemas?`, `formatAction?`, `fetchPluginSchema`                                                                                                          |
-| **Packages**             | `listPackages`, `addPackage`, `removePackage`, `installDependencies?`, `outdatedPackages?`, `setPackageVersions?`                                                                                                              |
+| **Packages**             | `listPackages`, `addPackage`, `removePackage`, `installDependencies?`, `packageVersions?`, `setPackageVersions?`                                                                                                               |
 | **Git**                  | `gitStatus`, `gitCommit`, `gitPush`, `gitPull`, `gitDiff`, `gitCheckout`, `gitClone?`, `createPullRequest?`, …                                                                                                                 |
 | **Collab**               | `collab?` (realtime co-editing handle per document)                                                                                                                                                                            |
 | **Data / secrets**       | `dataConnections?`, `dataRows?`, row CRUD, `dataPush?`, `listSecrets?`, `setSecrets?`                                                                                                                                          |
@@ -1247,7 +1247,8 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
-- **0.4.2-draft** (2026-08-26) — Typechecking resolves the ElectroBun SDK from the pinned vendor/electrobun submodule; .hutch/devkit stays the build sysroot.
+- **0.4.3-draft** (2026-08-26) — Typechecking resolves the ElectroBun SDK from the pinned vendor/electrobun submodule; .hutch/devkit stays the build sysroot.
+- **0.4.2-draft** (2026-08-26) — Packages capability row: the registry seam is `packageVersions?` (each dependency's own latest), not `outdatedPackages?`.
 - **0.4.1-draft** (2026-08-26) — the Import source hands its brief to the assistant, which runs the import; the git-init obligation moves to whatever creates the project (§4.5).
 - **0.4.0-draft** (2026-08-25) — StudioPlatform writes user settings as patches (set/remove) rather than replacing the whole map, so one window cannot clear another's; and §3.6 states which store a credential belongs in.
 - **0.3.24-draft** (2026-08-25) — §3.1: a platform declares assetSpace beside documentBaseUrl; §10.2 (Pending → Partial): what a storage backend must declare, including that stored bytes come back losslessly.

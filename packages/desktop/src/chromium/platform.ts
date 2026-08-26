@@ -38,9 +38,9 @@ import type {
   GitBranchesResult,
   GitLogEntry,
   GitStatusResult,
-  OutdatedInfo,
   PackageInfo,
   PackageOpResult,
+  PackageVersionInfo,
 } from "../rpc-schema";
 
 /* Inferred return type with a `satisfies` conformance check at the bottom, so callers see which of
@@ -526,8 +526,8 @@ export function createDesktopPlatform() {
       return request("dependenciesNeedInstall") as Promise<boolean>;
     },
 
-    async outdatedPackages() {
-      return request("outdatedPackages") as Promise<OutdatedInfo[]>;
+    async packageVersions() {
+      return request("packageVersions") as Promise<PackageVersionInfo[]>;
     },
 
     async setPackageVersions(updates: { name: string; version: string; dev?: boolean }[]) {

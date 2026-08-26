@@ -62,15 +62,15 @@ The canonical Studio Backend Protocol route table (protocol version 1), from `@j
 
 ## Packages
 
-| Route                  | Method | Path                               | Summary                                           | Optional | Degradation                                                               |
-| ---------------------- | ------ | ---------------------------------- | ------------------------------------------------- | -------- | ------------------------------------------------------------------------- |
-| `packages`             | GET    | `/__studio/packages`               | List dependencies (PackageInfo[])                 | no       | —                                                                         |
-| `packagesAdd`          | POST   | `/__studio/packages/add`           | Add a dependency                                  | no       | —                                                                         |
-| `packagesRemove`       | POST   | `/__studio/packages/remove`        | Remove a dependency                               | no       | —                                                                         |
-| `packagesInstall`      | POST   | `/__studio/packages/install`       | Run the package manager install                   | yes      | Install/reinstall affordances are hidden; manifest-only edits still work. |
-| `packagesNeedsInstall` | GET    | `/__studio/packages/needs-install` | Whether node_modules is stale                     | yes      | The install-on-open prompt never shows.                                   |
-| `packagesOutdated`     | GET    | `/__studio/packages/outdated`      | Dependencies with newer versions (OutdatedInfo[]) | yes      | The update affordances are hidden.                                        |
-| `packagesSetVersions`  | POST   | `/__studio/packages/set-versions`  | Rewrite dependency ranges and install             | yes      | Bulk version updates are hidden.                                          |
+| Route                  | Method | Path                               | Summary                                                            | Optional | Degradation                                                               |
+| ---------------------- | ------ | ---------------------------------- | ------------------------------------------------------------------ | -------- | ------------------------------------------------------------------------- |
+| `packages`             | GET    | `/__studio/packages`               | List dependencies (PackageInfo[])                                  | no       | —                                                                         |
+| `packagesAdd`          | POST   | `/__studio/packages/add`           | Add a dependency                                                   | no       | —                                                                         |
+| `packagesRemove`       | POST   | `/__studio/packages/remove`        | Remove a dependency                                                | no       | —                                                                         |
+| `packagesInstall`      | POST   | `/__studio/packages/install`       | Run the package manager install                                    | yes      | Install/reinstall affordances are hidden; manifest-only edits still work. |
+| `packagesNeedsInstall` | GET    | `/__studio/packages/needs-install` | Whether node_modules is stale                                      | yes      | The install-on-open prompt never shows.                                   |
+| `packagesVersions`     | GET    | `/__studio/packages/versions`      | Newest published version of each dependency (PackageVersionInfo[]) | yes      | The Latest column stays empty and the update affordances are hidden.      |
+| `packagesSetVersions`  | POST   | `/__studio/packages/set-versions`  | Rewrite dependency ranges and install                              | yes      | Bulk version updates are hidden.                                          |
 
 ## Git
 

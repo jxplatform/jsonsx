@@ -16,11 +16,19 @@ export interface PackageInfo {
   dev?: boolean;
 }
 
-export interface OutdatedInfo {
+/**
+ * A dependency's pinned range beside the newest version published for it on the registry.
+ *
+ * Every registry-range dependency gets a row, behind or not. Deciding whether a row is an upgrade
+ * needs a semver comparison against the range's base, and the caller — which has to make that
+ * comparison anyway to tell an upgrade from a project deliberately pinned ahead — is where it
+ * belongs. A backend that filtered here could only describe an up-to-date package as an absence.
+ */
+export interface PackageVersionInfo {
   name: string;
   /** The version range pinned in package.json (e.g. "^0.19.0"). */
   current: string;
-  /** The newest published version. */
+  /** The newest version published for this package on the registry. */
   latest: string;
   dev?: boolean;
 }
@@ -165,31 +173,41 @@ export async function fetchLatestVersion(
 }
 
 /**
- * List dependencies whose newest published version differs from the pinned base. Registry lookups
- * run concurrently; non-registry specs (workspace:, file:, …) and lookup failures are skipped.
+ * The newest published version of every dependency, asked of the registry package by package.
+ *
+ * Lookups run concurrently; non-registry specs (workspace:, file:, …) and lookup failures are
+ * skipped, because there is no honest answer for either and a guess is worse than a blank.
+ *
+ * This used to be `outdatedPackages`, which dropped any package whose latest matched its pinned
+ * base. Two assumptions were folded into that filter and both have since gone: that the only caller
+ * wanted a to-do list, and that `latest !== base` is the same question as "is there an upgrade" (it
+ * is not — a project pinned ahead of the registry, on a prerelease or a range bumped before the
+ * publish landed, differs from latest in the other direction). Reporting the registry's answer for
+ * every package leaves both judgements to the caller and lets the Packages table show a Latest
+ * column for rows that are already current.
  */
-export async function outdatedPackages(
+export async function packageVersions(
   root: string,
   fetchImpl: FetchLike = fetch,
-): Promise<OutdatedInfo[]> {
+): Promise<PackageVersionInfo[]> {
   const pkgs = await listPackages(root);
   const checks = await Promise.all(
-    pkgs.map(async (p): Promise<OutdatedInfo | null> => {
+    pkgs.map(async (p): Promise<PackageVersionInfo | null> => {
       if (!isRegistryRange(p.version)) {
         return null;
       }
       const latest = await fetchLatestVersion(p.name, fetchImpl);
-      if (!latest || latest === stripRange(p.version)) {
+      if (!latest) {
         return null;
       }
-      const entry: OutdatedInfo = { current: p.version, latest, name: p.name };
+      const entry: PackageVersionInfo = { current: p.version, latest, name: p.name };
       if (p.dev) {
         entry.dev = true;
       }
       return entry;
     }),
   );
-  return checks.filter((entry): entry is OutdatedInfo => entry !== null);
+  return checks.filter((entry): entry is PackageVersionInfo => entry !== null);
 }
 
 /**

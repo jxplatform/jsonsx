@@ -194,7 +194,7 @@ describe("jxsuite-update bailouts", () => {
      * VERSION is still "dev"; the check no longer cares.
      */
     installMockPlatform({
-      outdatedPackages: async () => [
+      packageVersions: async () => [
         { current: "^0.1.0", latest: "0.4.0", name: "@jxsuite/runtime" },
       ],
     });
