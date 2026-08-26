@@ -5,6 +5,7 @@ spec:
   - site-architecture.md#3
   - site-architecture.md#10
 code:
+  - packages/schema/src/context.ts
   - packages/compiler/src/site/context-injection.ts
   - packages/schema/schemas/project.core.schema.json
   - extensions/connector/schemas/project.fragment.schema.json

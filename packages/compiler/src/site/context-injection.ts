@@ -1,40 +1,39 @@
 /**
- * Context-injection.js — $page and $site context injection
+ * The build's filesystem half of context injection.
  *
- * Injects project-level and page-level context variables into a page's state before compilation.
- * These are available as $site.* and $page.* in template expressions.
- *
- * Per site-architecture spec §10: $site.name — from project.json name $site.url — from project.json
- * url $site.state.* — site-wide reactive state $page.url — current page URL path $page.title — page
- * title $page.params — dynamic route parameters (if any) $page.locale/$page.dir — the route's
- * language and writing direction (§13.4) $page.alternates — this page in every language it exists
- * in (§13.5)
+ * `injectContext` itself is `@jxsuite/schema/context` — a live renderer binds `${$site.name}` and
+ * `${$page.url}` exactly as a built page does, so the two must not be separate implementations.
+ * What is left here is the one thing that needs real directories: rebasing a project-level relative
+ * `imports` entry onto the page's own directory.
  *
  * @docs framework/site/i18n
  */
 
 import { dirname, relative, resolve } from "node:path";
-import type {
-  JxDocument,
-  JxElement,
-  JxStateDefinition,
-  ProjectConfig,
-} from "@jxsuite/schema/types";
-import { localeDirection, localeLabel } from "@jxsuite/schema/locale";
-import { localeOfRoute } from "./i18n.ts";
-import type { ResolvedI18n, TranslationMember } from "./i18n.ts";
-import type { SiteRoute } from "../types.ts";
+import { injectContext as injectContextWith } from "@jxsuite/schema/context";
+import type { ImportRebaser, SiteRoute, TranslationMember } from "@jxsuite/schema/context";
+import type { ResolvedI18n } from "@jxsuite/schema/locale";
+import type { JxDocument, ProjectConfig } from "@jxsuite/schema/types";
+
+/** An {@link ImportRebaser} over a project on disk. */
+export function nodeImportRebaser(projectRoot: string): ImportRebaser {
+  return (src, route) => {
+    if (!route.sourcePath) {
+      return src;
+    }
+    return `./${relative(dirname(route.sourcePath), resolve(projectRoot, src))}`;
+  };
+}
 
 /**
- * Inject $site and $page context into a page document's state.
+ * Inject $site and $page context for a page compiled from a project on disk.
  *
  * @param {JxDocument} doc - The page document (mutated)
  * @param {ProjectConfig} projectConfig - Loaded project configuration
  * @param {SiteRoute} route - The resolved route for this page
  * @param {string | null} [projectRoot] - Absolute path to the project root (for import rebasing)
  * @param {ResolvedI18n | null} [i18n] - Validated locale config, when the project declares one
- * @param {readonly TranslationMember[]} [translations] - This route's translation set, itself
- *   included
+ * @param {readonly TranslationMember[]} [translations] - This route's translation set
  * @returns {JxDocument} The mutated document
  */
 export function injectContext(
@@ -44,110 +43,13 @@ export function injectContext(
   projectRoot: string | null = null,
   i18n: ResolvedI18n | null = null,
   translations: readonly TranslationMember[] = [],
-) {
-  if (!doc.state) {
-    doc.state = {};
-  }
-
-  // $site context — read-only project-level data
-  doc.state.$site = {
-    name: projectConfig.name ?? "Jx Site",
-    url: projectConfig.url ?? "",
-    ...(i18n === null ? {} : { defaultLocale: i18n.defaultLocale, locales: i18n.locales }),
-    ...projectConfig.state,
-  };
-
-  /*
-   * $page context — read-only page-level data.
-   *
-   * The locale lives here rather than as a top-level `$locale` because that is what it is: a
-   * property of the route, not a third ambient namespace beside $site and $page. A document's own
-   * `$lang` still wins over the route's locale, so this is the resolved answer, not the prefix.
-   */
-  const pageLang =
-    (typeof doc.$lang === "string" ? doc.$lang : undefined) ??
-    localeOfRoute(route.urlPattern, i18n) ??
-    projectConfig.defaults?.lang;
-  /*
-   * The same translation set `<head>` advertises, in the shape a template can render: a language
-   * switcher is the one part of a multilingual site the framework cannot write for the author, and
-   * without this it could only be hand-maintained — a hardcoded list of URLs that goes stale the
-   * moment a page gains or loses a translation, silently, in the one place a reader would use it.
-   *
-   * Site-absolute URLs, not the absolute hrefs `<head>` needs: a switcher is an internal link, and
-   * it has to work before `url` is configured. `current` marks the member this route *is*, taken
-   * from the route rather than from `$page.locale`, because a document whose `$lang` disagrees with
-   * its directory is still served from that directory.
-   */
-  const alternates = translations.map((member) => ({
-    code: member.locale,
-    current: member.urlPattern === route.urlPattern,
-    dir: localeDirection(member.locale),
-    label: localeLabel(member.locale),
-    url: member.urlPattern,
-  }));
-  doc.state.$page = {
-    params: route._pathParams ?? {},
-    title: doc.title ?? doc._pageTitle ?? projectConfig.name ?? "",
-    url: route.urlPattern,
-    ...(alternates.length > 0 && { alternates }),
-    ...(pageLang === undefined ? {} : { dir: localeDirection(pageLang), locale: pageLang }),
-  };
-
-  // Merge project-level state into page state (page wins on conflicts)
-  if (projectConfig.state) {
-    for (const [key, value] of Object.entries(projectConfig.state)) {
-      if (key !== "$site" && key !== "$page" && !(key in doc.state)) {
-        doc.state[key] = value as JxStateDefinition;
-      }
-    }
-  }
-
-  // Merge project-level $media into page $media
-  if (projectConfig.$media) {
-    doc.$media = { ...projectConfig.$media, ...doc.$media };
-  }
-
-  // Merge project-level imports into page imports (page wins on collision)
-  if (projectConfig.imports && Object.keys(projectConfig.imports).length > 0) {
-    if (!doc.imports) {
-      doc.imports = {};
-    }
-    for (const [name, srcPath] of Object.entries(projectConfig.imports)) {
-      if (!(name in doc.imports)) {
-        const src = srcPath as string;
-        // Only rebase relative paths — bare/npm specifiers pass through unmodified
-        if (projectRoot && route.sourcePath && (src.startsWith("./") || src.startsWith("../"))) {
-          const abs = resolve(projectRoot, src);
-          doc.imports[name] = `./${relative(dirname(route.sourcePath), abs)}`;
-        } else {
-          doc.imports[name] = src;
-        }
-      }
-    }
-  }
-
-  // Merge project-level $elements into page $elements (union, dedup)
-  if (projectConfig.$elements?.length) {
-    if (!doc.$elements?.length) {
-      doc.$elements = [...projectConfig.$elements];
-    } else {
-      const seen = new Set<string>();
-      const merged: (string | JxElement)[] = [];
-      for (const entry of [
-        ...projectConfig.$elements,
-        ...(doc.$elements as (string | JxElement)[]),
-      ]) {
-        const key =
-          typeof entry === "string" ? entry : /** @type {{ $ref?: string }} */ entry?.$ref;
-        if (key && !seen.has(key)) {
-          seen.add(key);
-          merged.push(entry);
-        }
-      }
-      doc.$elements = merged;
-    }
-  }
-
-  return doc;
+): JxDocument {
+  return injectContextWith(
+    doc,
+    projectConfig,
+    route,
+    projectRoot === null ? null : nodeImportRebaser(projectRoot),
+    i18n,
+    translations,
+  );
 }

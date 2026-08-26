@@ -1184,3 +1184,57 @@ describe("discoverComponents", () => {
     expect(await createCloudPlatform(PROJECT).discoverComponents()).toEqual([]);
   });
 });
+
+// ─── buildSite: the cloud's live preview ─────────────────────────────────────
+
+describe("the cloud adapter's buildSite", () => {
+  test("posts to the session's /build and returns what the backend reported", async () => {
+    const reply = {
+      errors: [],
+      files: 42,
+      mode: "live" as const,
+      routes: 7,
+      url: "https://a7f3c9e2b81d4x.jxly.dev",
+    };
+    const calls = mockFetch({ "/build": { body: reply } });
+    const result = await createCloudPlatform(PROJECT).buildSite!();
+    expect(result).toEqual(reply);
+    const call = calls.find((c) => c.url.includes("/build"))!;
+    expect(call.url).toBe(`${BASE}/build`);
+    expect(call.init?.method).toBe("POST");
+    expect(call.init?.credentials).toBe("include");
+  });
+
+  test("declares itself as a live preview, not as build output", async () => {
+    /* The backend runs no project JS and has no bundler, no sharp and no disk. What it serves is
+       the working tree rendered as a site, and Open in Browser must say so. */
+    mockFetch({
+      "/build": {
+        body: { errors: [], files: 1, mode: "live", routes: 1, url: "https://x.jxly.dev" },
+      },
+    });
+    const result = await createCloudPlatform(PROJECT).buildSite!();
+    expect(result.mode).toBe("live");
+  });
+
+  test("a backend failure surfaces its own sentence", async () => {
+    mockFetch({ "/build": { body: { detail: "This preview link has expired." }, status: 410 } });
+    let failure: unknown;
+    try {
+      await createCloudPlatform(PROJECT).buildSite!();
+    } catch (error) {
+      failure = error;
+    }
+    expect((failure as Error | undefined)?.message).toContain("expired");
+  });
+
+  test("with no project open there is nothing to preview", async () => {
+    let failure: unknown;
+    try {
+      await createCloudPlatform(null).buildSite!();
+    } catch (error) {
+      failure = error;
+    }
+    expect((failure as Error | undefined)?.message).toContain("No project is open");
+  });
+});

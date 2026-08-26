@@ -28,6 +28,7 @@ import type {
   GitStatusResult,
   PackageInfo,
   ProjectListEntry,
+  SiteBuildResult,
   ProjectSchemasResponse,
   ReferencesResult,
   RenameResult,
@@ -763,6 +764,25 @@ export function createCloudPlatform(project: CloudProject | null): StudioPlatfor
 
     async gitAddRemote() {
       // The GitHub repo IS the remote; nothing to add.
+    },
+
+    /**
+     * Open in Browser, cloud edition — a LIVE preview rather than a build.
+     *
+     * The backend cannot run `jx build`: it never executes project JS, and the compiler needs
+     * `sharp`, a bundler and a filesystem, none of which exist in a Worker. What it can do is serve
+     * the working tree as a real site on an origin of its own, rendering each page with the same
+     * runtime the canvas uses — so the reply names `mode: "live"` and Studio says so, instead of
+     * letting a reader assume they are looking at build output.
+     *
+     * That it is not a build is also the best thing about it: the preview is the tree as it stands,
+     * including edits nobody has saved and edits another collaborator is making right now.
+     */
+    async buildSite() {
+      return okJson<SiteBuildResult>(
+        await api("/build", { method: "POST" }),
+        "The site could not be previewed.",
+      );
     },
 
     // ─── Project catalogue & navigation (Studio welcome / New Project UI) ──

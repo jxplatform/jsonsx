@@ -15,7 +15,7 @@ import { join, resolve } from "node:path";
 import { loadProjectConfig } from "../src/site/site-loader";
 import { discoverPages } from "../src/site/pages-discovery";
 import { resolveLayout } from "../src/site/layout-resolver";
-import { mergeHead, renderHead } from "../src/site/head-merger";
+import { mergeHead, renderHead } from "@jxsuite/schema/head-merger";
 import { injectContext } from "../src/site/context-injection";
 import { buildSite } from "../src/site/site-build";
 import { hashOf } from "../src/site/csp.ts";
@@ -111,7 +111,7 @@ afterAll(() => {
 // ── site-loader ───────────────────────────────────────────────────────────────
 
 describe("site-loader", () => {
-  it("loads project.json with defaults", () => {
+  it("loads project.json with defaults", async () => {
     const { config } = loadProjectConfig(TMP);
     expect(config.name).toBe("Test Site");
     expect(config.url).toBe("https://test.com");
@@ -120,7 +120,7 @@ describe("site-loader", () => {
     expect(config.build.outDir).toBe("./dist");
   });
 
-  it("throws on missing project.json", () => {
+  it("throws on missing project.json", async () => {
     expect(() => loadProjectConfig("/nonexistent")).toThrow("project.json not found");
   });
 });
@@ -162,13 +162,13 @@ describe("layout-resolver", () => {
     defaults: { layout: "./layouts/base.json" },
   };
 
-  it("wraps page content in layout with slot distribution", () => {
+  it("wraps page content in layout with slot distribution", async () => {
     const pageDoc = {
       children: [{ children: ["Hello"], tagName: "p" }],
       title: "Test",
     };
 
-    const result = resolveLayout(pageDoc, projectConfig, TMP) as any;
+    const result = (await resolveLayout(pageDoc, projectConfig, TMP)) as any;
 
     // Should have the layout structure
     expect(result.tagName).toBe("div");
@@ -181,9 +181,9 @@ describe("layout-resolver", () => {
     expect(main.children[0].children[0]).toBe("Hello");
   });
 
-  it("returns page as-is when no layout", () => {
+  it("returns page as-is when no layout", async () => {
     const pageDoc = { children: ["Hello"], tagName: "div" };
-    const result = resolveLayout(pageDoc, { defaults: {} }, TMP);
+    const result = await resolveLayout(pageDoc, { defaults: {} }, TMP);
     expect(result).toEqual(pageDoc);
   });
 });
@@ -191,7 +191,7 @@ describe("layout-resolver", () => {
 // ── head-merger ───────────────────────────────────────────────────────────────
 
 describe("head-merger", () => {
-  it("merges site + page heads with deduplication", () => {
+  it("merges site + page heads with deduplication", async () => {
     const siteHead = [{ attributes: { content: "Jx", name: "generator" }, tagName: "meta" }];
     const pageHead = [
       {
@@ -213,7 +213,7 @@ describe("head-merger", () => {
     expect(names).toContain("viewport");
   });
 
-  it("page-level overrides site-level for same key", () => {
+  it("page-level overrides site-level for same key", async () => {
     const siteHead = [{ attributes: { content: "Site", name: "description" }, tagName: "meta" }];
     const pageHead = [{ attributes: { content: "Page", name: "description" }, tagName: "meta" }];
 
@@ -222,7 +222,7 @@ describe("head-merger", () => {
     expect((desc as any).attributes.content).toBe("Page");
   });
 
-  it("renders to valid HTML", () => {
+  it("renders to valid HTML", async () => {
     const entries = [
       { attributes: { charset: "utf8" }, tagName: "meta" },
       { children: ["Test"], tagName: "title" },
@@ -236,7 +236,7 @@ describe("head-merger", () => {
 // ── context-injection ─────────────────────────────────────────────────────────
 
 describe("context-injection", () => {
-  it("injects $site and $page into state", () => {
+  it("injects $site and $page into state", async () => {
     const doc: any = {};
     const projectConfig = { name: "Test", url: "https://test.com" };
     const route = { _pathParams: {}, urlPattern: "/about" };
@@ -470,7 +470,7 @@ describe("buildSite — color scheme", () => {
     rmSync(SCHEME_TMP, { force: true, recursive: true });
   });
 
-  it("injects the pre-paint script exactly once, before the first <style>", () => {
+  it("injects the pre-paint script exactly once, before the first <style>", async () => {
     const html = readFileSync(resolve(SCHEME_TMP, "dist/index.html"), "utf8");
     const marker = 'localStorage.getItem("jx-color-scheme")';
     expect(html).toContain(marker);
@@ -478,7 +478,7 @@ describe("buildSite — color scheme", () => {
     expect(html.indexOf(marker)).toBeLessThan(html.indexOf("<style>"));
   });
 
-  it("dual-emits scheme token overrides and the color-scheme triplet", () => {
+  it("dual-emits scheme token overrides and the color-scheme triplet", async () => {
     const html = readFileSync(resolve(SCHEME_TMP, "dist/index.html"), "utf8");
     expect(html).toContain(
       "@media (prefers-color-scheme: dark) { :root:where(:not([data-color-scheme])) { --bg: #000 } }",

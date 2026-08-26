@@ -152,6 +152,20 @@ export interface SiteBuildResult {
   files: number;
   errors: string[];
   /**
+   * How the backend produced what {@link url} serves.
+   *
+   * `"built"` is compiler output — what the published site will literally be. `"live"` is the
+   * working tree rendered as a site: the same pages at the same routes, assembled by the runtime in
+   * the reader's browser rather than prerendered, because the backend cannot run a build at all.
+   *
+   * The distinction is reported rather than hidden because the two differ in ways a reader would
+   * otherwise be misled by — a live preview has no prerendered HTML, no optimized images, no
+   * islands and no server-timing results — and because a live preview has something a build does
+   * not: it shows the tree as it stands, unsaved edits included. Absent means `"built"`, so a
+   * backend that predates this keeps its meaning.
+   */
+  mode?: "built" | "live";
+  /**
    * Origin the built site is browsable at, e.g. `http://127.0.0.1:41234`.
    *
    * The backend names it because only the backend knows it: the built site is served on a port of

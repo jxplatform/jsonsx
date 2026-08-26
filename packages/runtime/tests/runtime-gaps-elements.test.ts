@@ -69,6 +69,47 @@ describe("registerElements", () => {
   });
 });
 
+// ─── Jx({ base }) ────────────────────────────────────────────────────────────
+
+describe("Jx base option", () => {
+  /** Register one document object and report the URL its `$elements` ref was fetched from. */
+  async function fetchedRefUrl(tagName: string, base?: string) {
+    const seen: string[] = [];
+    global.fetch = mock((url: string) => {
+      seen.push(String(url));
+      return Promise.resolve({ json: () => Promise.resolve({ children: [], tagName }), ok: true });
+    }) as any;
+    /* A ref per tag: `resolve()` memoises by resolved URL, so reusing one path would hand the
+       second call the first call's document and quietly prove nothing. */
+    await Jx(
+      {
+        $elements: [{ $ref: `./components/${tagName}.json` }],
+        tagName: "div",
+      } as unknown as JxDocument,
+      document.createElement("div"),
+      base === undefined ? undefined : { base },
+    );
+    return seen[0]!;
+  }
+
+  test("a document object resolves its refs against the given base", async () => {
+    /* The page is served deep in the site while its references stay root-relative — which is the
+       whole reason a host that composes documents server-side has to be able to say so. Without
+       the option the base is the PAGE, and every ref resolves a directory too deep. */
+    expect(await fetchedRefUrl("gaps-based-root", "http://localhost/")).toBe(
+      "http://localhost/components/gaps-based-root.json",
+    );
+    expect(await fetchedRefUrl("gaps-based-deep", "http://localhost/blog/hello/")).toBe(
+      "http://localhost/blog/hello/components/gaps-based-deep.json",
+    );
+  });
+
+  test("the element registered is the one the base pointed at", async () => {
+    await fetchedRefUrl("gaps-based-registered", "http://localhost/");
+    expect(customElements.get("gaps-based-registered")).toBeTruthy();
+  });
+});
+
 // ─── injectHead via Jx $head ─────────────────────────────────────────────────
 
 describe("injectHead", () => {

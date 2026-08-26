@@ -288,14 +288,26 @@ export async function runOpenInBrowser() {
     });
     return;
   }
+  /* A live preview is not a build and the report must not say it was: what it renders is the
+     working tree, unsaved edits and all, assembled in the reader's browser rather than compiled. */
+  const live = result.mode === "live";
   if (result.errors.length > 0) {
     /* Named, and the page still opens. A partial build produced pages, and the author can see the
        one they asked for while reading what failed — which is the whole difference between a
        preview and a build log. */
-    notify.warn(`The site built with ${result.errors.length} error(s): ${result.errors[0]}`, {
+    const verb = live ? "previewed" : "built";
+    notify.warn(`The site ${verb} with ${result.errors.length} error(s): ${result.errors[0]}`, {
       key: OPEN_IN_BROWSER,
       source: "Preview",
     });
+  } else if (live) {
+    /* Named, because the two are not the same thing and the difference is visible. A live preview
+       renders in the reader's browser from the working tree — so it carries edits nobody has saved
+       yet, and carries no prerendered HTML, optimized images or server-timing results. */
+    notify.success(
+      `Opened a live preview of ${result.routes} page(s) — rendered from your working tree, not a build.`,
+      { key: OPEN_IN_BROWSER, source: "Preview" },
+    );
   } else {
     notify.success(`Built ${result.routes} page(s).`, { key: OPEN_IN_BROWSER, source: "Preview" });
   }

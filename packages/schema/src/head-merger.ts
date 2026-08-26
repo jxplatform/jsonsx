@@ -1,5 +1,5 @@
 /**
- * Head-merger.js — $head merge pipeline
+ * $head merge pipeline — the three levels a page's `<head>` is assembled from.
  *
  * Merges <head> element arrays from three levels:
  *
@@ -12,10 +12,26 @@
  * - Later levels override earlier levels for the same element
  * - Deduplication by tagName + key attribute (name, property, rel+href)
  * - Charset and viewport are auto-injected if missing
+ *
+ * Pure tree and string work with no platform imports, and it lives here rather than in
+ * `@jxsuite/compiler` so that hosts which cannot import that package — a browser bundle, a
+ * Cloudflare Worker serving a live preview — assemble the same `<head>` the build does.
  */
 
-import type { JxHeadEntry } from "@jxsuite/schema/types";
-import type { HeadMergeContext } from "../types.ts";
+import type { JxHeadEntry } from "../types.ts";
+
+/** What a page knows about itself while its `<head>` is being merged. */
+export interface HeadMergeContext {
+  title?: string;
+  siteName?: string;
+  lang?: string;
+  charset?: string;
+  url?: string;
+  siteUrl?: string;
+  pageUrl?: string;
+  /** `rel="alternate"` links for this page's translations (site-architecture.md §13.5). */
+  alternates?: readonly { hreflang: string; href: string }[];
+}
 
 /**
  * Merge $head arrays from site, layout, and page levels.
