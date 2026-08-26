@@ -131,6 +131,7 @@ export async function writeClientRuntime(
   runtime: ClientRuntime,
   outDir: string,
   resolveDir: string = PACKAGE_DIR,
+  minify = true,
 ): Promise<{ written: number; errors: string[] }> {
   const errors: string[] = [];
   let written = 0;
@@ -150,7 +151,7 @@ export async function writeClientRuntime(
       await bundleSource(
         `export * from ${JSON.stringify(mod.specifier)};\n`,
         { outfile, resolveDir },
-        { target: "browser" },
+        { minify, target: "browser" },
       );
       written += 1;
     } catch (error) {
@@ -216,11 +217,13 @@ const MAX_SUBPATH_PASSES = 10;
  *
  * @param {string} outDir - Build output root
  * @param {string} [resolveDir] - Directory bare specifiers resolve from
+ * @param {boolean} [minify] - Minify the emitted bundles (defaults to the browser-target default)
  * @returns {Promise<{ written: number; errors: string[] }>}
  */
 export async function writeRuntimeSubpaths(
   outDir: string,
   resolveDir: string = PACKAGE_DIR,
+  minify = true,
 ): Promise<{ written: number; errors: string[] }> {
   const errors: string[] = [];
   const done = new Set<string>();
@@ -280,6 +283,7 @@ export async function writeRuntimeSubpaths(
             `export * from ${JSON.stringify(specifier)};\n`,
             { outfile, resolveDir },
             {
+              minify,
               resolver: shareRuntimeCore(mod, outfile, await coreOf(mod), mirrors),
               target: "browser",
             },

@@ -35,6 +35,7 @@
     "docs:prose": "bun scripts/docs/check-prose.ts",
     "docs:images:check": "bun scripts/check-image-lock.ts",
     "docs:claims": "bun scripts/docs/check-site-claims.ts",
+    "perf:budget": "bun scripts/check-site-perf-budget.ts sites/jxsuite.com",
     "docs:status": "bun scripts/docs/check-spec-status.ts",
     "docs:spec-release": "bun scripts/docs/check-spec-release.ts",
     "docs:standards": "bun scripts/docs/check-standards.ts",

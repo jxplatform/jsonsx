@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { createHash } from "node:crypto";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
@@ -142,6 +143,31 @@ describe("contentHash and configHash", () => {
       widths: [640],
     });
     expect(hashA).not.toBe(hashB);
+  });
+
+  /*
+   * The cache key answers "would this produce the same output?", which is only true while the code
+   * between the settings and the output is fixed. Capping variants at the largest configured width
+   * changed the answer for every already-cached image, and without a version in the key those
+   * images kept their stale manifests — oversized variants and all.
+   */
+  test("configHash carries a pipeline version, not just the settings", () => {
+    const config = {
+      formats: ["webp"],
+      lazyLoad: true,
+      optimize: true,
+      quality: { webp: 80 },
+      sizes: "100vw",
+      widths: [320],
+    };
+    const settingsOnly = createHash("md5")
+      .update(
+        JSON.stringify({ formats: config.formats, quality: config.quality, widths: config.widths }),
+      )
+      .digest("hex")
+      .slice(0, 8);
+
+    expect(configHash(config)).not.toBe(settingsOnly);
   });
 });
 
@@ -632,19 +658,47 @@ describe("processImage", () => {
     expect(manifest.original.height).toBe(600);
     expect(manifest.original.format).toBe("jpeg");
     expect(manifest.contentHash).toHaveLength(8);
-    // 320, 640, and 800 (original) each in webp = 3 variants
-    expect(manifest.variants).toHaveLength(3);
+    /*
+     * 320 and 640 in webp = 2 variants. The 800 px source is NOT added: 640 is the ceiling the
+     * project configured, and exceeding it produced variants no `sizes` would ever select while
+     * costing an encode and a copy on every build.
+     */
+    expect(manifest.variants).toHaveLength(2);
 
     const widths = manifest.variants.map((v) => v.width);
     expect(widths).toContain(320);
     expect(widths).toContain(640);
-    expect(widths).toContain(800); // Original width added
+    expect(widths).not.toContain(800);
 
     for (const v of manifest.variants) {
       expect(v.format).toBe("webp");
       expect(v.outputPath).toContain("images/_optimized/hero-");
       expect(v.absolutePath).toContain(cacheImgDir);
     }
+
+    teardown();
+  });
+
+  test("adds the native width when the source falls between two rungs", async () => {
+    const root = setup();
+    const cacheImgDir = join(root, ".cache/images");
+    mockMetadata.mockImplementationOnce(() =>
+      Promise.resolve({ format: "png", height: 700, width: 1000 }),
+    );
+    const imgPath = join(root, "mid.png");
+    writeFileSync(imgPath, "fake png data");
+
+    const manifest = await processImage(imgPath, cacheImgDir, {
+      formats: ["webp"],
+      lazyLoad: true,
+      optimize: true,
+      quality: { webp: 80 },
+      sizes: "100vw",
+      widths: [320, 640, 1920],
+    } as never);
+
+    // Below the 1920 ceiling, so the ladder cannot otherwise offer the image at full resolution.
+    expect(manifest.variants.map((v) => v.width)).toEqual([320, 640, 1000]);
 
     teardown();
   });

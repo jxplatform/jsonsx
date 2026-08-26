@@ -67,8 +67,35 @@ describe("buildSite — component modules are named after their tagName", () => 
 
   it("keeps the JS and CSS sidecars on the same name", () => {
     const html = readFileSync(resolve(TMP, "dist/index.html"), "utf8");
-    expect(html).toContain('href="/components/ls-stats.css"');
+    // The sheet is inlined rather than linked, but it is still written under the matching name for
+    // Anything that references it directly.
     expect(existsSync(resolve(TMP, "dist/components/ls-stats.css"))).toBe(true);
+    expect(html).toContain('<script type="module" src="/components/ls-stats.js">');
+    expect(html).toContain("ls-stats {");
+    expect(html).not.toContain('rel="stylesheet"');
+  });
+
+  it("preloads the runtime and component modules the import map only names", () => {
+    const html = readFileSync(resolve(TMP, "dist/index.html"), "utf8");
+    const head = html.slice(0, html.indexOf("</head>"));
+    /*
+     * An import map says where `@vue/reactivity` lives; it does not fetch it. Without these the
+     * runtime is discovered only after a component module is fetched AND parsed — three round trips
+     * deep on the critical path.
+     */
+    expect(head).toContain('<link rel="modulepreload" href="/assets/vue-reactivity.js">');
+    expect(head).toContain('<link rel="modulepreload" href="/assets/lit-html.js">');
+    expect(head).toContain('<link rel="modulepreload" href="/components/ls-stats.js">');
+    // A directory prefix key (`lit-html/`) is not a file any build writes, so it is never preloaded.
+    expect(head).not.toContain('href="/assets/lit-html/"');
+    // Every hint names a module the page actually loads.
+    const hints = [...head.matchAll(/rel="modulepreload" href="([^"]+)"/g)];
+    const hrefs = hints.map((match) => match[1] as string);
+    expect(hrefs).toHaveLength(3);
+    for (const href of hrefs) {
+      const onDisk = resolve(TMP, "dist", href.slice(1));
+      expect(existsSync(onDisk)).toBe(true);
+    }
   });
 });
 
@@ -164,9 +191,12 @@ describe("buildSite — components referenced only from an island template", () 
     expect(existsSync(resolve(TMP, "dist/components/ls-row.js"))).toBe(true);
   });
 
-  it("injects the component stylesheet too", () => {
+  it("inlines the component stylesheet too", () => {
     const html = readFileSync(resolve(TMP, "dist/index.html"), "utf8");
-    expect(html).toContain('href="/components/ls-row.css"');
+    expect(html).toContain("ls-row {");
+    expect(html).toContain("display: block");
+    // Inlined, not linked — one render-blocking request per component was the whole critical path.
+    expect(html).not.toContain('rel="stylesheet"');
   });
 });
 

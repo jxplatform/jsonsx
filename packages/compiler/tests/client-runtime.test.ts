@@ -284,8 +284,9 @@ describe("package subpaths (site-architecture.md §8.7)", () => {
         join(dir, "assets", "lit-html", "directives", "class-map.js"),
         "utf8",
       );
-      // Left external exactly as lit-html's own source wrote it…
-      expect(subpath).toContain('from "../lit-html.js"');
+      // Left external exactly as lit-html's own source wrote it — the SPECIFIER is the contract;
+      // Minification is free to close the space after `from`.
+      expect(subpath).toContain('"../lit-html.js"');
       // …and that is where the stub lands, re-exporting the bare specifier the import map resolves.
       expect(readFileSync(join(dir, "assets", "lit-html", "lit-html.js"), "utf8")).toBe(
         'export * from "lit-html";\n',

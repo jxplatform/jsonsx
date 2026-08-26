@@ -60,6 +60,12 @@ Only the optimized images are cached forever, because their filenames embed a ha
 
 **Cloudflare Pages, Cloudflare Workers and Netlify** read this file. The `node` and `bun` adapters serve no static assets, so there it is a description of what the reverse proxy in front of them should send, and the build says so when you use one.
 
+:::doc-warning
+`_headers` is a Cloudflare/Netlify convention, not a web standard. **GitHub Pages and most other plain static hosts ignore it entirely** and serve their own `Cache-Control`. On GitHub Pages that is ten minutes, applied to everything including the optimized images this file marks immutable for a year. The security headers are not sent either.
+
+The build cannot see where your `dist/` is going, so it warns when it can: with no adapter and a `public/CNAME` (GitHub Pages' custom-domain marker), it tells you the file will be ignored. If you need these headers applied, deploy behind a host that reads them.
+:::
+
 To add your own rules, or turn parts off:
 
 ```json
@@ -220,13 +226,14 @@ Leave `false` in place for as long as you think old visitors might come back. De
 
 The `build` section of `project.json`:
 
-| Property        | Default    | What it does                                                       |
-| --------------- | ---------- | ------------------------------------------------------------------ |
-| `outDir`        | `"./dist"` | Output directory                                                   |
-| `trailingSlash` | `"always"` | URL shape: `"always"` or `"never"` (below)                         |
-| `sitemap`       | `true`     | Set `false` to skip [sitemap generation](/docs/framework/site/seo) |
-| `adapter`       | _(none)_   | `"cloudflare-workers"`, `"cloudflare-pages"`, `"node"`, or `"bun"` |
-| `headers`       | _(on)_     | Response headers written to `_headers` (below)                     |
+| Property        | Default    | What it does                                                        |
+| --------------- | ---------- | ------------------------------------------------------------------- |
+| `outDir`        | `"./dist"` | Output directory                                                    |
+| `trailingSlash` | `"always"` | URL shape: `"always"` or `"never"` (below)                          |
+| `sitemap`       | `true`     | Set `false` to skip [sitemap generation](/docs/framework/site/seo)  |
+| `adapter`       | _(none)_   | `"cloudflare-workers"`, `"cloudflare-pages"`, `"node"`, or `"bun"`  |
+| `headers`       | _(on)_     | Response headers written to `_headers` (below)                      |
+| `minify`        | `true`     | Minify emitted browser JavaScript; set `false` for readable bundles |
 
 ### trailingSlash
 

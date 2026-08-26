@@ -280,6 +280,44 @@ describe("buildSite — _headers under an adapter that serves no static assets",
   });
 });
 
+describe("buildSite — _headers on a plain static host", () => {
+  const DIR = resolve(import.meta.dir, "__test-site-headers-pages__");
+
+  beforeAll(() => {
+    scaffold(DIR, { name: "Paged" });
+    // GitHub Pages' custom-domain marker, and nothing else's.
+    mkdirSync(resolve(DIR, "public"), { recursive: true });
+    writeFileSync(resolve(DIR, "public/CNAME"), "example.com\n", "utf8");
+  });
+  afterAll(() => rmSync(DIR, { force: true, recursive: true }));
+
+  /*
+   * The build wrote a caching policy and had no idea the host would discard it — an `immutable`
+   * rule for content-addressed images that in practice served ten minutes.
+   */
+  it("says GitHub Pages will ignore it", async () => {
+    const { warnings } = await captured(() => buildSite(DIR));
+
+    expect(warnings.some((w) => w.includes("GitHub Pages ignores dist/_headers"))).toBe(true);
+    expect(existsSync(resolve(DIR, "dist/_headers"))).toBe(true);
+  });
+});
+
+describe("buildSite — _headers with no host marker", () => {
+  const DIR = resolve(import.meta.dir, "__test-site-headers-plain__");
+
+  beforeAll(() => scaffold(DIR, { name: "Plain" }));
+  afterAll(() => rmSync(DIR, { force: true, recursive: true }));
+
+  // Most static builds go somewhere that does read the file; warning on all of them is noise.
+  it("stays quiet when nothing says which host it is", async () => {
+    const { warnings } = await captured(() => buildSite(DIR));
+
+    expect(warnings.some((w) => w.includes("GitHub Pages"))).toBe(false);
+    expect(warnings.some((w) => w.includes("serves no static assets"))).toBe(false);
+  });
+});
+
 describe("buildSite — a component prerendered into a declarative shadow root", () => {
   const DIR = resolve(import.meta.dir, "__test-site-shadow-prerender__");
 

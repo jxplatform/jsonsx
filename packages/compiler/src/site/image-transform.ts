@@ -25,7 +25,7 @@ import { imgLoadingAttrs } from "./img-loading.ts";
 import { resolveAssetUrl } from "@jxsuite/schema/asset-paths";
 
 import type { AssetMount } from "@jxsuite/schema/asset-paths";
-import type { ImageConfig, ImageManifest } from "./image-optimizer.ts";
+import type { ImageConfig, ImageManifest, ImageVariant } from "./image-optimizer.ts";
 import type { JxDocument, JxMutableNode } from "@jxsuite/schema/types";
 import type { CacheManifest } from "./image-cache.ts";
 
@@ -267,13 +267,23 @@ async function walkAndTransform(
   metaCache: ImageMetaCache,
   imageRefs: Map<string, ImageManifest>,
   mounts: readonly AssetMount[],
+  containerWidth: number | null = null,
 ) {
   if (!node || typeof node !== "object") {
     return;
   }
 
   if (node.tagName === "img") {
-    await transformImgNode(node, config, projectRoot, cache, metaCache, imageRefs, mounts);
+    await transformImgNode(
+      node,
+      config,
+      projectRoot,
+      cache,
+      metaCache,
+      imageRefs,
+      mounts,
+      containerWidth,
+    );
     // Wrapping rewrote this node into a `<picture>` whose children this pass just authored.
     // Descending into them would find the `<img>` and wrap it again, forever.
     if (node.tagName !== "img") {
@@ -294,11 +304,22 @@ async function walkAndTransform(
   }
 
   if (Array.isArray(node.children)) {
+    // Every descendant is bounded by the narrowest literal max-width above it.
+    const inner = containerWidthOf(node, containerWidth);
     for (const child of node.children) {
       if (typeof child === "string") {
         continue;
       }
-      await walkAndTransform(child, config, projectRoot, cache, metaCache, imageRefs, mounts);
+      await walkAndTransform(
+        child,
+        config,
+        projectRoot,
+        cache,
+        metaCache,
+        imageRefs,
+        mounts,
+        inner,
+      );
     }
   }
 }
@@ -327,6 +348,8 @@ interface ResolvedVariants {
   dims: { width: number; height: number } | null;
   /** One entry per additional format, when the image is to be wrapped in a `<picture>`. */
   sources: PictureSource[];
+  /** Resized last-resort `src`, when a universally decodable format was emitted. */
+  fallbackSrc?: string | undefined;
 }
 
 /**
@@ -417,7 +440,43 @@ async function resolveVariants(
    * format information, so a browser that cannot decode AVIF would still pick an AVIF candidate.
    */
   const wrap = config.picture !== false && available.length > 1;
-  return { dims, sources: wrap ? available : [], srcset: available[0]?.srcset ?? "" };
+  return {
+    dims,
+    fallbackSrc: fallbackVariant(manifest.variants, config.formats),
+    sources: wrap ? available : [],
+    srcset: available[0]?.srcset ?? "",
+  };
+}
+
+/**
+ * Formats an `<img src>` may point at without narrowing who can see the image.
+ *
+ * `src` is the last resort — reached only by a client that understood neither `srcset` nor any
+ * `<source type>`, which in practice means it understands JPEG and PNG and little else.
+ */
+const UNIVERSAL_FORMATS: readonly string[] = ["jpeg", "png"];
+
+/**
+ * The largest emitted variant a `src` can safely fall back to, or `undefined` to keep the original.
+ *
+ * The original is a correct fallback and a terrible one: it is the unresized source, so a 3840 px
+ * screenshot leaves a 1.7 MB PNG on the end of the chain. A resized variant of the same universally
+ * decodable format is strictly better. When the project emits no such format — `["webp", "avif"]`
+ * is a common and reasonable choice — there is nothing safe to point at, and the original stays: a
+ * smaller image nobody can decode is not an improvement.
+ */
+function fallbackVariant(variants: ImageVariant[], formats: readonly string[]): string | undefined {
+  const format = UNIVERSAL_FORMATS.find((candidate) => formats.includes(candidate));
+  if (format === undefined) {
+    return undefined;
+  }
+  let best: ImageVariant | undefined;
+  for (const variant of variants) {
+    if (variant.format === format && (best === undefined || variant.width > best.width)) {
+      best = variant;
+    }
+  }
+  return best?.outputPath;
 }
 
 /**
@@ -429,6 +488,61 @@ async function resolveVariants(
  * @param {Map<string, ImageManifest>} imageRefs
  * @param {readonly AssetMount[]} mounts
  */
+const CSS_LENGTH = /^(\d+(?:\.\d+)?)(px|rem)$/;
+
+/** A CSS length in px, but only when it is a plain `px`/`rem` literal. `null` for anything else. */
+function pxLength(value: unknown): number | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const match = CSS_LENGTH.exec(value.trim());
+  if (!match) {
+    return null;
+  }
+  const n = Number(match[1]);
+  return match[2] === "rem" ? n * 16 : n;
+}
+
+/**
+ * The narrowest px `max-width`/`width` an element at this point in the tree sits inside.
+ *
+ * Only literal lengths count. A `clamp()`, a percentage or a custom property is a real constraint
+ * too, but not one the build can resolve — and a wrong `sizes` is worse than none, because the
+ * browser trusts it completely and picks its candidate before layout exists to contradict it.
+ */
+function containerWidthOf(
+  node: JxMutableNode | JxDocument,
+  inherited: number | null,
+): number | null {
+  const style = node.style as Record<string, unknown> | undefined;
+  if (!style || typeof style !== "object") {
+    return inherited;
+  }
+  const declared = pxLength(style.maxWidth) ?? pxLength(style.width);
+  if (declared === null) {
+    return inherited;
+  }
+  return inherited === null ? declared : Math.min(inherited, declared);
+}
+
+/**
+ * The `sizes` an image in a `max-width` container needs.
+ *
+ * `sizes` is a promise about layout, and the browser keeps the browser's side of it absolutely: it
+ * picks a candidate from this string before any layout has happened, and never revisits the choice.
+ * A single project-wide string therefore cannot be right — jxsuite.com's `(max-width: 768px) 100vw,
+ * 50vw` describes a half-width image, while its hero renders full-width inside a 960 px column, so
+ * the same string is too small on a wide screen and too large on a narrow one. The container width
+ * is layout the compiler already holds, so it is the better answer wherever it exists.
+ */
+function sizesForContainer(containerWidth: number | null): string | undefined {
+  if (containerWidth === null) {
+    return undefined;
+  }
+  const width = Math.round(containerWidth);
+  return `(max-width: ${width}px) 100vw, ${width}px`;
+}
+
 async function transformImgNode(
   node: JxMutableNode | JxDocument,
   config: ImageConfig,
@@ -437,6 +551,7 @@ async function transformImgNode(
   metaCache: ImageMetaCache,
   imageRefs: Map<string, ImageManifest>,
   mounts: readonly AssetMount[],
+  containerWidth: number | null = null,
 ) {
   if (!node.attributes) {
     node.attributes = {};
@@ -465,10 +580,24 @@ async function transformImgNode(
       )
     : null;
 
+  /*
+   * Precedence: what the author wrote, then what the layout says, then the project-wide default.
+   * The project default is a guess that cannot see the container; the container width is not a
+   * guess, so it outranks it — and an image with neither keeps whatever the project chose.
+   */
+  const ownWidth = containerWidthOf(node, containerWidth);
+  const resolvedSizes =
+    (attrs.sizes as string | undefined) ?? sizesForContainer(ownWidth) ?? config.sizes;
+
   if (variants) {
     if (variants.srcset !== "") {
       attrs.srcset = variants.srcset;
-      attrs.sizes ??= config.sizes;
+      if (resolvedSizes !== undefined) {
+        attrs.sizes = resolvedSizes;
+      }
+      if (variants.fallbackSrc !== undefined) {
+        attrs.src = variants.fallbackSrc;
+      }
     }
     // Intrinsic dimensions prevent layout shift; author-supplied values win.
     if (variants.dims && attrs.width === undefined && attrs.height === undefined) {
@@ -480,7 +609,7 @@ async function transformImgNode(
   Object.assign(attrs, imgLoadingAttrs(attrs, config.lazyLoad));
 
   if (variants && variants.sources.length > 0) {
-    wrapInPicture(node, variants.sources, config.sizes);
+    wrapInPicture(node, variants.sources, resolvedSizes ?? "");
   }
 }
 
@@ -515,7 +644,12 @@ function wrapInPicture(
   node.attributes = {};
   node.children = [
     ...sources.map((source) => ({
-      attributes: { sizes: inheritedSizes, srcset: source.srcset, type: source.type },
+      attributes: {
+        // An empty `sizes` is not a neutral default — omit it and let the browser assume 100vw.
+        ...(inheritedSizes === "" ? {} : { sizes: inheritedSizes }),
+        srcset: source.srcset,
+        type: source.type,
+      },
       tagName: "source",
     })),
     img,

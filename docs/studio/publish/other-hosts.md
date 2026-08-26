@@ -30,6 +30,11 @@ Netlify then builds and publishes on every push, with a free site address until 
 
 GitHub Pages serves files but doesn't take a build command directly, so the build runs in a GitHub Actions workflow instead. In your repository, set Pages to deploy from GitHub Actions, and add a workflow that runs `bunx jx build` on every push and publishes the `dist` folder with GitHub's Pages deploy action. GitHub's own Pages documentation covers the workflow setup; the only Jx-specific parts are the command and the folder.
 
+Two things GitHub Pages does not do, both of which it shares with most plain static hosts:
+
+- It **ignores `dist/_headers`**, the same way it ignores `_redirects`. The caching and security headers the build wrote are not sent, and everything is served with a ten-minute `Cache-Control`, including the content-addressed images the build marked immutable for a year. The build warns about this when it sees a `public/CNAME`. See [Response headers](/docs/framework/site/deployment#response-headers).
+- It runs **no server**, so a project with a database, sign-ins, or `timing: "server"` state needs a host that does.
+
 ## Anywhere else
 
 The same two values (build with `bunx jx build`, serve `dist`) fit Vercel, Render, a plain web server, or your own CI. If a host can't run the build, you can even run `bunx jx build` yourself and upload the `dist` folder by hand: for a site of pages and content, that folder _is_ the site. A project with a database, sign-ins, or server functions has one of the server-capable adapters set, so its `dist/` carries a worker beside the pages, and that needs a host which actually runs it.

@@ -2,9 +2,9 @@
 
 ## Extension Packages, Schema Composition, and the Capability Contract
 
-**Version:** 0.3.11-draft
+**Version:** 0.4.0-draft
 **Status:** Partial
-**Updated:** 2026-08-25
+**Updated:** 2026-08-26
 **License:** MIT
 
 Supersedes v1 ("Format-Extension Classes and the Capability Contract"). The
@@ -631,6 +631,20 @@ emit(sectionValue, { projectConfig, root, sections, routes })
   parser's content collections keyed by collection name), `routes` the
   expanded route table. Emitters derive their output from this loaded data
   rather than re-reading source files.
+- **An emitted artifact is downloaded and parsed by a visitor**, so an emitter
+  owes it the same care as any other output — and above all must not emit the
+  same content twice. `@jxsuite/search` did: it wrote one document per page
+  carrying the full page text **and** one per heading section carrying its own
+  slice of that same text. On jxsuite.com that was 922,007 characters of page
+  text against 899,502 of section text, of which only ~22,505 (2.4%) was
+  preamble no section already covered — an index twice the size it needed to
+  be, and twice the tokenising cost on every visitor's main thread.
+
+  With sections on, the page document now carries only the text **before** the
+  first section-starting heading; the sections partition the rest. An entry
+  that yielded no sections keeps its full text, because nothing else would
+  index it. No word leaves the index, and a body-text match now surfaces the
+  section that contains it rather than competing with it.
 
 ### 8.5 `assets`
 
@@ -1130,6 +1144,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.4.0-draft** (2026-08-26) — §8.4: an emitter must not emit the same content twice — the search index carries page preamble plus sections, not the corpus twice.
 - **0.3.11-draft** (2026-08-25) — §8.5: record that a host which cannot execute extension code sees only content-section mounts.
 - **0.3.10-draft** (2026-08-20) — §5.1 records the first-party fragment $id shape, https://jxsuite.com/schema/ext/<extension>/<kind>/v<n>.
 - **0.3.9-draft** (2026-08-16) — §13.1 auth session cookies: __Host- prefix derived from the origin's scheme, rate limiting on everywhere, session lifetime stated, Partitioned never set. Closes gap:cookie-prefixes.
@@ -1156,4 +1171,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx Extensions Specification v0.3.11-draft_
+_Jx Extensions Specification v0.4.0-draft_
