@@ -9,7 +9,7 @@
  * honors both the OS preference and the preview toggle.
  */
 
-import { pureSchemeOf, schemeSelectors, camelToKebab } from "@jxsuite/runtime";
+import { pureSchemeOf, resolveAtQuery, schemeSelectors, camelToKebab } from "@jxsuite/runtime";
 
 /** Id of the injected site-style tag (replace-in-place, never accumulate). */
 export const SITE_STYLE_ID = "jx-site-style";
@@ -70,11 +70,7 @@ export function buildSiteStyleCSS(
   }
 
   for (const [atKey, block] of condBlocks) {
-    const query = atKey.startsWith("@--")
-      ? (mediaQueries[atKey.slice(1)] ?? atKey.slice(1))
-      : atKey.startsWith("@(")
-        ? atKey.slice(1)
-        : null;
+    const query = resolveAtQuery(atKey, mediaQueries);
     if (query === null) {
       continue;
     }

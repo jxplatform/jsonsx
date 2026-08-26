@@ -593,7 +593,15 @@ export function emitElementModule(
   // Declarations emitted inside `template()`, above the `return` — inside it, so they are rebuilt
   // Per render and read the same `s` the template does.
   const hoistScope = createHoistScope();
-  const templateBody = emitLitChildren(doc.children, doc.style, "      ", false, false, hoistScope);
+  /*
+   * A component whose content is root-level `textContent` has no `children`, and emitLitChildren
+   * returns "" for that — so the element rendered nothing, matching a prerender that dropped the
+   * same shape. spec.md §17.2 recommends `textContent` whenever every child is a bare string.
+   */
+  const templateBody =
+    !Array.isArray(doc.children) && doc.textContent !== undefined
+      ? `      ${toLitTextContent(doc.textContent)}`
+      : emitLitChildren(doc.children, doc.style, "      ", false, false, hoistScope);
 
   lines.push(
     // Template method

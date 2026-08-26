@@ -57,6 +57,16 @@ describe("buildSiteStyleCSS", () => {
     expect(css).not.toContain("@supports");
   });
 
+  /*
+   * A media TYPE is bare. `@media (print)` reads as a boolean media feature named `print`, which
+   * does not exist, so the canvas silently dropped every print rule.
+   */
+  test("@(print) emits the bare media type", () => {
+    const css = buildSiteStyleCSS({ "@(print)": { color: "#000" } }, {}, id);
+    expect(css).toContain("@media print");
+    expect(css).not.toContain("@media (print)");
+  });
+
   test("declares color-scheme when the media map has a scheme query even without blocks", () => {
     const css = buildSiteStyleCSS(
       { "--bg": "#fff" },

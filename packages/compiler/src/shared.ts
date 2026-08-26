@@ -12,6 +12,7 @@ import {
   RESERVED_KEYS,
   camelToKebab,
   pureSchemeOf,
+  resolveAtQuery,
   schemeSelectors,
   toCSSText,
 } from "@jxsuite/runtime";
@@ -780,6 +781,37 @@ function readsRuntimeOnlyState(str: string, scope: Record<string, unknown>) {
 }
 
 /**
+ * Whether the whole string is exactly ONE `${…}` — the interpolation that opens at index 0 also
+ * closes at the final character.
+ *
+ * A greedy `/^\$\{(.+)\}$/` also matched `"${a} / ${b}"`, spliced the interior into `return (a} /
+ * ${b)`, and the SyntaxError became a silent null: the node rendered empty, and a `$head` entry
+ * shipped its own template text. A brace-depth scan is exact where a tightened regex is not —
+ * `"${`${a}-x`}"` is still one expression, and must keep returning a raw value.
+ *
+ * @param {string} str
+ * @returns {boolean}
+ */
+export function isSingleExpression(str: string): boolean {
+  if (!str.startsWith("${") || !str.endsWith("}")) {
+    return false;
+  }
+  let depth = 0;
+  for (let i = 1; i < str.length; i += 1) {
+    const c = str[i];
+    if (c === "{") {
+      depth += 1;
+    } else if (c === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return i === str.length - 1;
+      }
+    }
+  }
+  return false;
+}
+
+/**
  * @param {string} str
  * @param {Record<string, unknown>} scope
  * @returns {unknown}
@@ -799,8 +831,7 @@ export function evaluateStaticTemplate(str: string, scope: Record<string, unknow
   const args = ["state", "$map", "$site", "$page"] as const;
   const values = [scope, scope?.$map, scope?.$site, scope?.$page];
   try {
-    const singleExprMatch = str.match(/^\$\{(.+)\}$/s);
-    const body = singleExprMatch ? `return (${singleExprMatch[1]})` : `return \`${str}\``;
+    const body = isSingleExpression(str) ? `return (${str.slice(2, -1)})` : `return \`${str}\``;
     const fn = new Function(...args, body) as (...a: unknown[]) => unknown;
     return fn(...values);
   } catch {
@@ -1013,11 +1044,7 @@ function conditionalRuleEmitter(
   mediaQueries: Record<string, string>,
   rules: string[],
 ): (selector: string, props: string) => void {
-  const query = atKey.startsWith("@--")
-    ? (mediaQueries[atKey.slice(1)] ?? atKey.slice(1))
-    : atKey.startsWith("@(")
-      ? atKey.slice(1)
-      : null;
+  const query = resolveAtQuery(atKey, mediaQueries);
   const atRule = query === null ? atKey : `@media ${query}`;
   const scheme = query === null ? null : pureSchemeOf(query);
   return (selector: string, props: string) => {
@@ -1514,6 +1541,40 @@ export function resolveStaticTagName(
 }
 
 /**
+ * The content of one node: `textContent`, else `innerHTML`, else rendered `children`.
+ *
+ * Shared with `preRenderComponentHtml`, which returns a component's innerHTML and so cannot call
+ * `renderStaticNode` (that would wrap the result in the host tag). It used to look at `children`
+ * alone and return "" for anything else, so a component whose content is root-level `textContent` —
+ * the shape spec.md §17.2 recommends when every child is a bare string — prerendered to nothing.
+ *
+ * @param {JxElement | JxMutableNode} node
+ * @param {Record<string, unknown> | null} scope
+ * @param {string | null} slotContent
+ * @returns {string}
+ */
+function renderInner(
+  node: JxElement | JxMutableNode,
+  scope: Record<string, unknown> | null,
+  slotContent: string | null,
+): string {
+  if (node.textContent !== undefined) {
+    const val = resolveStaticValue(node.textContent, scope);
+    return val != null ? escapeHtml(String(val)) : "";
+  }
+  if (node.innerHTML) {
+    const val = resolveStaticValue(node.innerHTML, scope);
+    return val != null ? String(val) : (node.innerHTML as string);
+  }
+  if (Array.isArray(node.children)) {
+    return node.children
+      .map((c: JxElement | JxMutableNode | string) => renderStaticNode(c, scope, slotContent))
+      .join("\n");
+  }
+  return "";
+}
+
+/**
  * Recursively render a Jx node tree to static HTML for pre-rendering.
  *
  * @param {JxElement | JxMutableNode | string} node
@@ -1587,20 +1648,7 @@ export function renderStaticNode(
     return `<${tag}${attrs}>`;
   }
 
-  let inner = "";
-  if (node.textContent !== undefined) {
-    const val = resolveStaticValue(node.textContent, scope);
-    inner = val != null ? escapeHtml(String(val)) : "";
-  } else if (node.innerHTML) {
-    const val = resolveStaticValue(node.innerHTML, scope);
-    inner = val != null ? String(val) : (node.innerHTML as string);
-  } else if (Array.isArray(node.children)) {
-    inner = node.children
-      .map((c: JxElement | JxMutableNode | string) => renderStaticNode(c, scope, slotContent))
-      .join("\n");
-  }
-
-  return `<${tag}${attrs}>${inner}</${tag}>`;
+  return `<${tag}${attrs}>${renderInner(node, scope, slotContent)}</${tag}>`;
 }
 
 /**
@@ -1636,12 +1684,7 @@ export function preRenderComponentHtml(
     }
   }
   const scope = buildInitialScope(stateDefs, null);
-  if (!Array.isArray(doc.children)) {
-    return "";
-  }
-  return doc.children
-    .map((c: JxElement | JxMutableNode | string) => renderStaticNode(c, scope, slotContent))
-    .join("\n");
+  return renderInner(doc, scope, slotContent);
 }
 
 /**

@@ -425,6 +425,30 @@ describe("evaluateStaticTemplate", () => {
   test("returns null on error", () => {
     expect(evaluateStaticTemplate("${invalidSyntax.}", {})).toBe(null);
   });
+
+  /*
+   * A greedy single-expression test matched a string that merely STARTED and ENDED with an
+   * interpolation, spliced its interior into `return (a} / ${b)`, and turned the SyntaxError into a
+   * silent null — so the node rendered empty and a $head entry shipped its own template text.
+   * specs/spec.md §351 and site-architecture.md §996 both teach exactly this shape.
+   */
+  test("interpolates a string that both opens and closes with an expression", () => {
+    expect(evaluateStaticTemplate("${state.num} / ${state.total}", { num: 2, total: 24 })).toBe(
+      "2 / 24",
+    );
+    expect(
+      evaluateStaticTemplate("${$site.url}/blog/${$page.params.slug}", {
+        $page: { params: { slug: "hello" } },
+        $site: { url: "https://example.com" },
+      }),
+    ).toBe("https://example.com/blog/hello");
+  });
+
+  test("a lone expression still returns the raw value, nested braces included", () => {
+    expect(evaluateStaticTemplate("${state.n}", { n: 5 })).toBe(5);
+    expect(evaluateStaticTemplate('${state.a ? "{x}" : "y"}', { a: true })).toBe("{x}");
+    expect(evaluateStaticTemplate("${`${state.a}-x`}", { a: 1 })).toBe("1-x");
+  });
 });
 
 describe("getPathValue", () => {
@@ -1127,9 +1151,34 @@ describe("renderStaticNode", () => {
 // ─── preRenderComponentHtml ────────────────────────────────────────────────
 
 describe("preRenderComponentHtml", () => {
-  test("returns empty for doc with no children", () => {
+  test("returns empty for doc with no content at all", () => {
     expect(preRenderComponentHtml({})).toBe("");
     expect(preRenderComponentHtml({ state: {} })).toBe("");
+  });
+
+  /*
+   * Spec.md §17.2 recommends `textContent` over `children` whenever every child would be a bare
+   * string, and this dropped exactly that shape — it looked at `children` alone. jxsuite.com ships
+   * the result today: five empty section-label elements on /features/, marked static so no module
+   * ever loads to fill them.
+   */
+  test("renders root-level textContent when the definition has no children", () => {
+    expect(preRenderComponentHtml({ state: { text: "Label" }, textContent: "${state.text}" })).toBe(
+      "Label",
+    );
+  });
+
+  test("root-level textContent takes the instance prop override", () => {
+    expect(
+      preRenderComponentHtml(
+        { state: { text: "Label" }, textContent: "${state.text}" },
+        { text: "Features" },
+      ),
+    ).toBe("Features");
+  });
+
+  test("renders root-level innerHTML when the definition has no children", () => {
+    expect(preRenderComponentHtml({ innerHTML: "<b>hi</b>" })).toBe("<b>hi</b>");
   });
 
   test("renders children with state", () => {
@@ -1183,6 +1232,33 @@ describe("preRenderComponentHtml", () => {
 // ─── @starting-style and non-media at-rules ─────────────────────────────────
 
 describe("compileStyles — non-media at-rules", () => {
+  /*
+   * A media TYPE is bare — `@media print`. Wrapping it in the parentheses `@(…)` carries would
+   * make it read as a boolean media FEATURE named `print`, which does not exist, so the query
+   * evaluates false and the rule silently never applies. Feature queries keep their parentheses.
+   */
+  test("@(print) emits a media type, not a parenthesised feature", () => {
+    const doc = {
+      children: [],
+      id: "sheet",
+      style: { "@(print)": { display: "none" } },
+      tagName: "div",
+    };
+    const result = compileStyles(doc);
+    expect(result).toContain("@media print");
+    expect(result).not.toContain("@media (print)");
+  });
+
+  test("@(feature: value) keeps its parentheses", () => {
+    const doc = {
+      children: [],
+      id: "sheet",
+      style: { "@(prefers-reduced-motion: reduce)": { transition: "none" } },
+      tagName: "div",
+    };
+    expect(compileStyles(doc)).toContain("@media (prefers-reduced-motion: reduce)");
+  });
+
   test("@starting-style emits without @media wrapper", () => {
     const doc = {
       children: [],

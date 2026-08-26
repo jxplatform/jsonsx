@@ -52,6 +52,78 @@ describe("Custom Elements", () => {
     el.remove();
   });
 
+  /*
+   * A definition's content can be root-level `textContent` rather than `children` — the shape
+   * spec.md §17.2 recommends when every child would be a bare string. The interpreter looked at
+   * `children` alone, so such a component upgraded to an empty element.
+   */
+  test("renders root-level textContent when the definition has no children", async () => {
+    const tag = uniqueTag();
+    await defineElement({
+      state: { text: "Label" },
+      tagName: tag,
+      textContent: "${state.text}",
+    });
+
+    const el = document.createElement(tag);
+    document.body.append(el);
+    await new Promise((r) => {
+      setTimeout(r, 100);
+    });
+
+    expect(el.textContent).toBe("Label");
+    el.remove();
+  });
+
+  /*
+   * The static build emits markup text, so the HTML parser applied foreign-content rules and SVG
+   * worked there. The runtime built every node with createElement, which is HTML-only, so the same
+   * document rendered blank in the Studio canvas — the editor wrong and the deployed site right.
+   */
+  test("renders svg children in the SVG namespace, class included", () => {
+    const el = renderNode(
+      {
+        children: [
+          {
+            attributes: { viewBox: "0 0 32 32" },
+            children: [{ className: "plate", tagName: "rect" }],
+            tagName: "svg",
+          },
+        ],
+        tagName: "div",
+      },
+      reactive({}) as never,
+    );
+
+    const svg = el.querySelector("svg") as Element;
+    const rect = el.querySelector("rect") as Element;
+    expect(svg.namespaceURI).toBe("http://www.w3.org/2000/svg");
+    // The namespace is inherited by descendants, not re-derived per tag.
+    expect(rect.namespaceURI).toBe("http://www.w3.org/2000/svg");
+    // `className` is a read-only SVGAnimatedString, so the property write would have thrown.
+    expect(rect.getAttribute("class")).toBe("plate");
+  });
+
+  test("foreignObject returns its descendants to HTML", () => {
+    const el = renderNode(
+      {
+        children: [
+          {
+            children: [{ children: [{ tagName: "p" }], tagName: "foreignObject" }],
+            tagName: "svg",
+          },
+        ],
+        tagName: "div",
+      },
+      reactive({}) as never,
+    );
+
+    expect((el.querySelector("foreignObject") as Element).namespaceURI).toBe(
+      "http://www.w3.org/2000/svg",
+    );
+    expect((el.querySelector("p") as Element).namespaceURI).toBe("http://www.w3.org/1999/xhtml");
+  });
+
   test("$props override state defaults", async () => {
     const tag = uniqueTag();
     await defineElement({

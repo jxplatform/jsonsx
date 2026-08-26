@@ -18,6 +18,7 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
+import { createHash } from "node:crypto";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { isMappedArray, isRef } from "@jxsuite/schema/guards";
 import { isNpmSpecifier, npmAssetPath, sidecarAssetPath } from "@jxsuite/schema/asset-paths";
@@ -63,6 +64,7 @@ import {
   colorSchemePrePaintScript,
   evaluateStaticTemplate,
   isComponentFullyStatic,
+  isSingleExpression,
   isTemplateString,
   preRenderComponentHtml,
   pureSchemeOf,
@@ -180,7 +182,11 @@ export async function buildSite(
   const elementBundles = new Map<string, string[]>();
   const registerElementBundle = (specifiers: string[]): string => {
     const sorted = specifiers.toSorted();
-    const key = Bun.hash(sorted.join("\u0000")).toString(36);
+    /*
+     * `node:crypto` rather than `Bun.hash`: the jx bin runs under Node, where the Bun global does
+     * not exist, and this line is reached by any page registering npm `$elements`.
+     */
+    const key = createHash("sha1").update(sorted.join("\u0000")).digest("hex").slice(0, 12);
     const assetPath = `/assets/elements-${key}.js`;
     elementBundles.set(assetPath, sorted);
     return assetPath;
@@ -1739,15 +1745,8 @@ function evaluateMapTemplate(str: string, scope: Record<string, unknown>) {
   try {
     const item = (scope.$map as Record<string, unknown>)?.item;
     const index = (scope.$map as Record<string, unknown>)?.index;
-    const singleExprMatch = str.match(/^\$\{(.+)\}$/s);
-    if (singleExprMatch) {
-      const fn = new Function(
-        "state",
-        "$map",
-        "item",
-        "index",
-        `return (${singleExprMatch[1]})`,
-      ) as (
+    if (isSingleExpression(str)) {
+      const fn = new Function("state", "$map", "item", "index", `return (${str.slice(2, -1)})`) as (
         state: Record<string, unknown>,
         $map: unknown,
         item: unknown,
@@ -2038,6 +2037,23 @@ function expandComponents(
       }
     }
 
+    /*
+     * A non-static instance discards its prerendered markup on upgrade and re-renders, so the
+     * props have to survive as data or the element comes back with its state defaults — correct
+     * content painting first and then being replaced by the wrong content. compiler.md §5.2 gives
+     * connectedCallback three prop sources and this is the first of them; the compiler read it but
+     * never wrote it, and lifting `props.*` into $props above removed the other channel too.
+     *
+     * JSON rather than re-emitted `props.*` attributes because those are strings by spec: a number
+     * or an array would arrive stringified, and a key that is not lowercase would be dropped by
+     * attribute-name folding.
+     */
+    if (!isStatic && node.$props && Object.keys(node.$props).length > 0) {
+      node.attributes = {
+        ...node.attributes,
+        "data-jx-props": JSON.stringify(node.$props),
+      };
+    }
     delete node.$props;
 
     if (isStatic) {

@@ -663,6 +663,23 @@ describe("applyStyle", () => {
     expect(style.textContent).toContain("@media --xl");
   });
 
+  /*
+   * `@(…)` carries its own parentheses, but a media TYPE is bare. Emitting `@media (print)` reads
+   * as a boolean media feature named `print`, which does not exist, so the rule never applied.
+   */
+  test("@(print) emits the bare media type", () => {
+    applyStyle(el, { "@(print)": { display: "none" } }, {});
+    const style = document.head.querySelector("style") as HTMLStyleElement;
+    expect(style.textContent).toContain("@media print");
+    expect(style.textContent).not.toContain("@media (print)");
+  });
+
+  test("@(feature: value) keeps its parentheses", () => {
+    applyStyle(el, { "@(min-width: 40rem)": { gap: "2rem" } }, {});
+    const style = document.head.querySelector("style") as HTMLStyleElement;
+    expect(style.textContent).toContain("@media (min-width: 40rem)");
+  });
+
   test("combined inline + nested + media", () => {
     applyStyle(
       el,
