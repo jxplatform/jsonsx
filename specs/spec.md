@@ -2,9 +2,9 @@
 
 ## Declarative Document Object Model — JSON Edition
 
-**Version:** 0.5.6-draft
+**Version:** 0.5.7-draft
 **Status:** Partial
-**Updated:** 2026-08-25
+**Updated:** 2026-08-26
 **License:** MIT
 
 ---
@@ -693,6 +693,30 @@ Non-standard attributes are set via the `attributes` object:
   }
 }
 ```
+
+**A boolean value is written the way the attribute is read.** HTML spells a boolean two
+incompatible ways, so an attribute whose value is `true` or `false` — declared directly, or resolved
+from a `${...}` template or `$ref` — is emitted according to the family its NAME puts it in:
+
+| Family                                                                                                     | `true`    | `false`          |
+| ---------------------------------------------------------------------------------------------------------- | --------- | ---------------- |
+| **Presence** — `open`, `disabled`, `checked`, `hidden`, `required`, and every other HTML boolean attribute | bare name | attribute absent |
+| **Enumerated** — every `aria-*`, plus `contenteditable`, `draggable`, `spellcheck`                         | `="true"` | `="false"`       |
+
+Neither form is a stylistic choice. A presence attribute counts _any_ value as true, so
+`<details open="false">` is an open `<details>`; an enumerated attribute reads an empty value as
+unset, so a bare `aria-hidden` is not hidden and an absent `contenteditable` means "inherit" rather
+than `false`. Writing either as the other inverts it in silence.
+
+A **string** is never reinterpreted in either family: `"aria-current": "false"` is emitted verbatim,
+because an enumerated attribute carries its value in its text.
+
+Every renderer applies this identically — the static compiler writing HTML source and the runtime
+writing live elements — so an element does not change meaning when a prerendered page hydrates.
+
+> **Status: Implemented.** `booleanAttrValue()` in `@jxsuite/runtime` is the single decision; the
+> compiler's `buildAttrs()` and the runtime's `applyAttributes()` both defer to it, and the runtime
+> removes the attribute rather than writing `"false"` when a binding flips.
 
 ### 8.4 Child Arrays
 
@@ -2490,6 +2514,7 @@ This rewrites the mutating handlers of Appendix A's idiom using `$expression`, l
 
 ## Changelog
 
+- **0.5.7-draft** (2026-08-26) — §8.3: a boolean attribute value is emitted by family — presence for HTML boolean attributes, the written word for aria-* and the enumerated three.
 - **0.5.6-draft** (2026-08-25) — Clarify that the parentheses in an @(condition) style key belong to the query, so a bare media type emits without them (§9).
 - **0.5.5-draft** (2026-08-24) — 13.2 states that the runtime takes a prop from an instance only where the instance genuinely carries one — an own property or an attribute — because a state key colliding with a reflected DOM property otherwise reports an empty string and beats the component's declared default.
 - **0.5.4-draft** (2026-08-18) — §21.5: Trusted Types enforcement is declined rather than deferred — the observation run answered its question and was removed with its header; no innerHTML write remains in code Jx ships.
@@ -2550,4 +2575,4 @@ This rewrites the mutating handlers of Appendix A's idiom using `$expression`, l
 
 ---
 
-_Jx Specification v0.5.6-draft — subject to revision_
+_Jx Specification v0.5.7-draft — subject to revision_
