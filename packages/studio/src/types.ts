@@ -33,6 +33,7 @@ import type {
   GitStatusResult,
   ImportProgressEvent,
   ImportSiteOptions,
+  ImportSiteSummary,
   OutdatedInfo,
   PackageInfo,
   PackageOpResult,
@@ -81,6 +82,7 @@ export type {
   GitStatusResult,
   ImportProgressEvent,
   ImportSiteOptions,
+  ImportSiteSummary,
   JsonValue,
   OutdatedInfo,
   PackageInfo,
@@ -434,7 +436,7 @@ export interface StudioPlatform {
     opts: ImportSiteOptions,
     onProgress: (evt: ImportProgressEvent) => void,
     signal?: AbortSignal,
-  ) => Promise<{ root: string; config: ProjectConfig }>;
+  ) => Promise<{ root: string; config: ProjectConfig; result?: ImportSiteSummary }>;
   /**
    * Open a native directory picker and return the chosen absolute path (null when cancelled). Backs
    * the New Project modal's **Browse…** button on `createDestination: "path"` platforms. Desktop

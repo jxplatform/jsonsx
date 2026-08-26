@@ -545,10 +545,44 @@ export interface ImportSiteOptions {
   maxPages: number;
   /** Refine component/prop names with the LLM (requires a key). */
   aiComponents: boolean;
+  /**
+   * Build the emitted project and screenshot-diff every page against the original.
+   *
+   * Off by default: it runs a full compile and a second browser pass, so it roughly doubles the
+   * run. What it buys is the one number the assistant can act on — a page at 61% fidelity is a
+   * question worth asking, and every other finding is a count of things that were skipped.
+   */
+  verify?: boolean;
+  /** Pixelmatch threshold 0..1 for `verify` (default 0.15). */
+  verifyThreshold?: number;
   /** OpenAI-compatible credentials, from the user's AI settings. */
   apiKey?: string;
   baseUrl?: string;
   model?: string;
+}
+
+/** Per-page fidelity from the `verify` pass. */
+export interface ImportVerifyPage {
+  route: string;
+  /** 0..1 — the share of pixels that matched the original. */
+  fidelity: number;
+}
+
+/**
+ * What the run produced, carried on the import stream's terminal `done` line.
+ *
+ * It exists because the pipeline computed all of this and the HTTP layer threw it away: the `done`
+ * line carried `{root, config}` and nothing else, so the caller could report that an import had
+ * happened and nothing whatever about what it found. Every field is optional — a backend that does
+ * not send one is not broken, and an older client ignores them.
+ */
+export interface ImportSiteSummary {
+  pages?: { route: string; title: string; nodeCount: number }[];
+  fileCount?: number;
+  /** Soft failures the pipeline recorded: assets that would not download, pages it skipped. */
+  warnings?: string[];
+  /** Present only when `verify` was requested and reference screenshots were captured. */
+  verify?: { averageFidelity: number; reportDir: string; pages?: ImportVerifyPage[] };
 }
 
 // ─── AI proxy ────────────────────────────────────────────────────────────────

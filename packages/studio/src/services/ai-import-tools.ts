@@ -39,6 +39,7 @@ import { currentToolCallId, turnSignal } from "./ai-turn-signal";
 
 import type { ToolRegistry } from "@jxsuite/ai/tools";
 import type { Tab } from "../tabs/tab";
+import type { ImportSiteSummary } from "../types";
 
 /** The same bounds `packages/server/src/import-api.ts` clamps to. */
 const MAX_DEPTH = 5;
@@ -46,6 +47,12 @@ const MAX_PAGES = 100;
 
 /** Log lines quoted back on a hard failure — enough to see WHICH phase died. */
 const FAILURE_TAIL = 5;
+
+/** Low-fidelity pages named in the summary. A list of twenty is a wall, not a finding. */
+const WEAKEST_PAGES = 3;
+
+/** Below this, a page is worth naming. Above it, "close enough" is the honest reading. */
+const WEAK_FIDELITY = 90;
 
 export interface ImportToolsCtx {
   /** The active tab, read AFTER adoption to re-anchor the agent loop's undo batch. */
@@ -88,10 +95,37 @@ export function resetImportGuard(): void {
  * confidently wrong number gets into a summary. It says what it knows and points at the tool that
  * knows the rest.
  */
-function describeRun(id: string, root: string): string {
+function describeRun(id: string, root: string, summary?: ImportSiteSummary): string {
   const record = importRun(id);
-  const warnings = record?.warnings ?? [];
+  const warnings = [...(record?.warnings ?? []), ...(summary?.warnings ?? [])];
   const lines = [`Imported ${record?.url ?? "the site"} into ${root} and opened it.`];
+
+  const pages = summary?.pages ?? [];
+  if (pages.length > 0) {
+    lines.push(
+      `${pages.length} page${pages.length === 1 ? "" : "s"}` +
+        `${summary?.fileCount ? `, ${summary.fileCount} files` : ""}: ` +
+        `${pages.map((p) => p.route).join(", ")}.`,
+    );
+  }
+
+  /* Per page, because the average cannot name one. "84% average" is a fact nobody can act on;
+     "the pricing page renders at 61%" is a decision — and it is the one finding here worth
+     interrupting a person for. */
+  if (summary?.verify) {
+    const weakest = (summary.verify.pages ?? [])
+      .filter((p) => p.fidelity < WEAK_FIDELITY)
+      .toSorted((a, b) => a.fidelity - b.fidelity)
+      .slice(0, WEAKEST_PAGES);
+    const detail =
+      weakest.length > 0
+        ? `; weakest: ${weakest.map((p) => `${p.route} at ${p.fidelity}%`).join(", ")}.`
+        : " on every page.";
+    lines.push(
+      `Fidelity against the original averaged ${summary.verify.averageFidelity}%${detail}`,
+    );
+  }
+
   if (warnings.length > 0) {
     lines.push(
       `${warnings.length} warning${warnings.length === 1 ? "" : "s"} during the run: ` +
@@ -101,7 +135,8 @@ function describeRun(id: string, root: string): string {
   lines.push(
     "The file and document tools are available now. Read the emitted pages, layouts and " +
       "components before proposing changes — then ask the user about anything the import had to " +
-      "guess at (pages it skipped, components it may have split wrongly, a layout it did not find).",
+      "guess at (pages it skipped, components it may have split wrongly, a layout it did not find, " +
+      "a page that did not render faithfully).",
   );
   return lines.join(" ");
 }
@@ -143,6 +178,13 @@ export function registerImportTools(
               "pipeline — no crawl, no shared-layout detection. Default 1.",
           },
           maxPages: { type: "number", description: "Most pages to capture (1–100). Default 20." },
+          verify: {
+            type: "boolean",
+            description:
+              "Build the imported project and screenshot-diff every page against the original, " +
+              "reporting a per-page fidelity score. Roughly doubles the run, and is the only " +
+              "finding that says how WELL the clone came out rather than what was skipped.",
+          },
           aiComponents: {
             type: "boolean",
             description:
@@ -153,12 +195,13 @@ export function registerImportTools(
         required: ["url"],
       },
       async execute(args) {
-        const { url, directory, depth, maxPages, aiComponents } = args as {
+        const { url, directory, depth, maxPages, aiComponents, verify } = args as {
           url?: unknown;
           directory?: unknown;
           depth?: unknown;
           maxPages?: unknown;
           aiComponents?: unknown;
+          verify?: unknown;
         };
 
         if (workspace.projectRoot) {
@@ -226,7 +269,7 @@ export function registerImportTools(
         const baseUrl = getBaseUrl();
         const model = brief?.model || preferredModel();
 
-        let result: { root: string };
+        let result: { root: string; result?: ImportSiteSummary };
         try {
           result = await platform.importSite(
             {
@@ -237,6 +280,11 @@ export function registerImportTools(
               maxPages: clamp(Number(maxPages ?? brief?.maxPages ?? 20) || 1, 1, MAX_PAGES),
               name: brief?.name || target.hostname.replace(/^www\./, ""),
               url: target.href,
+              ...(typeof verify === "boolean"
+                ? { verify }
+                : brief?.verify === undefined
+                  ? {}
+                  : { verify: brief.verify }),
               ...(apiKey ? { apiKey } : {}),
               ...(baseUrl ? { baseUrl } : {}),
               ...(model ? { model } : {}),
@@ -273,7 +321,10 @@ export function registerImportTools(
         });
         if (adopted) {
           onProjectAdopted?.(result.root);
-          return toolSuccess({ root: result.root }, describeRun(id, result.root));
+          return toolSuccess(
+            { root: result.root, ...(result.result ? { summary: result.result } : {}) },
+            describeRun(id, result.root, result.result),
+          );
         }
         return toolSuccess(
           { root: result.root },

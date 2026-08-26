@@ -11,7 +11,7 @@ import { clearPendingImportBrief, setPendingImportBrief } from "../src/services/
 import { importRun, resetImportRuns } from "../src/services/import-run";
 import { beginToolCall, beginTurnSignal, endTurnSignal } from "../src/services/ai-turn-signal";
 import { closeAllTabs, setWorkspaceProject } from "../src/workspace/workspace";
-import type { ImportProgressEvent, ImportSiteOptions } from "../src/types";
+import type { ImportProgressEvent, ImportSiteOptions, ImportSiteSummary } from "../src/types";
 import type { ImportBrief } from "../src/services/import-seed";
 
 const BRIEF: ImportBrief = {
@@ -23,13 +23,14 @@ const BRIEF: ImportBrief = {
   name: "Example",
   prompt: "Modernise the typography",
   url: "https://example.com/",
+  verify: false,
 };
 
 /** The captured call, so a test drives the stream by hand exactly as the import-tab tests do. */
 let captured: {
   opts: ImportSiteOptions;
   onProgress: (evt: ImportProgressEvent) => void;
-  resolve: (r: { root: string; config: object }) => void;
+  resolve: (r: { root: string; config: object; result?: ImportSiteSummary }) => void;
   reject: (e: Error) => void;
   signal?: AbortSignal | undefined;
 } | null = null;
@@ -198,6 +199,7 @@ describe("import_site — the run", () => {
       model: "o3-import",
       name: "Example",
       url: "https://example.com/",
+      verify: false,
     });
 
     captured!.onProgress({ current: 3, message: "Crawled 3 pages", phase: "crawl", total: 20 });
@@ -219,6 +221,79 @@ describe("import_site — the run", () => {
     expect(onProjectAdopted).toHaveBeenCalledWith("/home/dev/Sites/example");
     // The git init every create path owes (specs/desktop.md §4.5), which used to live in the modal.
     expect(state.calls.some(([name]) => name === "gitInit")).toBe(true);
+  });
+
+  test("the summary reports what the run found, naming the weakest pages", async () => {
+    /* Per page, because the average cannot name one: "84% average" is a fact nobody can act on,
+       and "the pricing page renders at 61%" is a decision. */
+    const { registry } = harness({ adoptProject: landing() });
+    const running = registry.execute("import_site", {
+      directory: "/home/dev/Sites/example",
+      url: "https://example.com",
+      verify: true,
+    });
+    expect(captured!.opts.verify).toBe(true);
+    captured!.resolve({
+      config: {},
+      result: {
+        fileCount: 14,
+        pages: [
+          { nodeCount: 120, route: "pages/index.json", title: "Home" },
+          { nodeCount: 80, route: "pages/pricing.json", title: "Pricing" },
+        ],
+        verify: {
+          averageFidelity: 84,
+          pages: [
+            { fidelity: 98, route: "pages/index.json" },
+            { fidelity: 74, route: "pages/about.json" },
+            { fidelity: 61, route: "pages/pricing.json" },
+          ],
+          reportDir: "/p/verify",
+        },
+        warnings: [],
+      },
+      root: "/home/dev/Sites/example",
+    });
+
+    const res = await running;
+    expect(res.summary).toContain("2 pages, 14 files");
+    expect(res.summary).toContain("averaged 84%");
+    // Weakest first, because that is the one worth interrupting a person for.
+    expect(res.summary).toContain("pages/pricing.json at 61%, pages/about.json at 74%");
+    // The page that rendered faithfully is not a finding.
+    expect(res.summary).not.toContain("pages/index.json at 98%");
+  });
+
+  test("a run where every page rendered faithfully says so rather than listing none", async () => {
+    const { registry } = harness({ adoptProject: landing() });
+    const running = registry.execute("import_site", {
+      directory: "/home/dev/Sites/example",
+      url: "https://example.com",
+      verify: true,
+    });
+    captured!.resolve({
+      config: {},
+      result: {
+        verify: {
+          averageFidelity: 99,
+          pages: [{ fidelity: 99, route: "pages/index.json" }],
+          reportDir: "/p/verify",
+        },
+      },
+      root: "/home/dev/Sites/example",
+    });
+
+    const res = await running;
+    expect(res.summary).toContain("on every page");
+  });
+
+  test("the brief's verify choice is used when the model does not state one", async () => {
+    setPendingImportBrief({ ...BRIEF, verify: true });
+    const { registry } = harness({ adoptProject: landing() });
+    const running = registry.execute("import_site", { url: "https://example.com" });
+    expect(captured!.opts.verify).toBe(true);
+    captured!.resolve({ config: {}, root: "/home/dev/Sites/example" });
+    await running;
   });
 
   test("the summary names the warnings and points at what to do next", async () => {

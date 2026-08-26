@@ -75,6 +75,15 @@ let _aiNaming = true;
 let _model = "";
 /** What the user wants done with the site once it is imported. Handed to the assistant. */
 let _prompt = "";
+/**
+ * Build the result and screenshot-diff it against the original.
+ *
+ * Off by default because it roughly doubles the run: a full compile plus a second browser pass.
+ * Worth offering because it produces the only finding that says how WELL the clone came out — every
+ * other one is a count of things that were skipped, and a page at 61% fidelity is a question the
+ * assistant can put to a person.
+ */
+let _verify = false;
 let _errorMsg = "";
 let _dirManual = false;
 
@@ -86,6 +95,7 @@ export function resetImportTab() {
   _aiNaming = true;
   _model = "";
   _prompt = "";
+  _verify = false;
   _errorMsg = "";
   _dirManual = false;
 }
@@ -177,6 +187,7 @@ export function importBriefFor(ctx: ImportTabCtx): ImportBrief | null {
     name: ctx.form.name.trim(),
     prompt: _prompt.trim(),
     url: parsed.href,
+    verify: _verify,
   };
 }
 
@@ -293,6 +304,14 @@ export function renderImportSource(ctx: ImportTabCtx): TemplateResult {
       }}
     >
       AI component naming
+    </sp-switch>
+    <sp-switch
+      ?checked=${_verify}
+      @change=${(e: Event) => {
+        _verify = (e.target as HTMLInputElement).checked;
+      }}
+    >
+      Check fidelity against the original (slower)
     </sp-switch>
     <label class="new-project-field">
       <span class="new-project-label">Model</span>

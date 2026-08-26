@@ -27,6 +27,8 @@ export interface ImportBrief {
   depth: number;
   maxPages: number;
   aiComponents: boolean;
+  /** Build and screenshot-diff the result. Off by default — it roughly doubles the run. */
+  verify: boolean;
   /** Empty means "whatever the assistant would use" (`preferredModel()`). */
   model: string;
   /** What the user wants done with the site once it is cloned. May be empty. */

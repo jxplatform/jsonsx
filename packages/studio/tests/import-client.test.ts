@@ -211,3 +211,66 @@ describe("streamImport", () => {
     expect((fetchMock.mock.calls[0]![1] as RequestInit).signal).toBe(controller.signal);
   });
 });
+
+describe("streamImport — the run summary", () => {
+  test("sends verify and its threshold only when they were asked for", async () => {
+    const fetchMock = stubFetch(async () =>
+      ndjsonResponse(['{"type":"done","root":"/p","config":{}}\n']),
+    );
+    await streamImport("/__studio/import-site", OPTS, () => {});
+    const plain = JSON.parse((fetchMock.mock.calls[0]![1] as RequestInit).body as string);
+    expect(plain).not.toHaveProperty("verify");
+    expect(plain).not.toHaveProperty("verifyThreshold");
+
+    await streamImport(
+      "/__studio/import-site",
+      { ...OPTS, verify: true, verifyThreshold: 0.2 },
+      () => {},
+    );
+    const asked = JSON.parse((fetchMock.mock.calls[1]![1] as RequestInit).body as string);
+    expect(asked).toMatchObject({ verify: true, verifyThreshold: 0.2 });
+  });
+
+  test("returns what the run found", async () => {
+    /* The pipeline computed all of this and the HTTP layer used to discard it: the caller learned
+       only that an import had happened, never what it found — so it could neither report it nor
+       ask about it. */
+    stubFetch(async () =>
+      ndjsonResponse([
+        `${JSON.stringify({
+          type: "done",
+          root: "/p",
+          config: { name: "Clone" },
+          result: {
+            pages: [{ route: "pages/index.json", title: "Home", nodeCount: 120 }],
+            fileCount: 14,
+            warnings: ["3 assets failed to download"],
+            verify: {
+              averageFidelity: 84,
+              reportDir: "/p/verify",
+              pages: [{ route: "pages/pricing.json", fidelity: 61 }],
+            },
+          },
+        })}\n`,
+      ]),
+    );
+
+    const out = await streamImport("/__studio/import-site", OPTS, () => {});
+    expect(out.root).toBe("/p");
+    expect(out.result).toMatchObject({
+      fileCount: 14,
+      warnings: ["3 assets failed to download"],
+    });
+    expect(out.result!.verify!.pages).toEqual([{ fidelity: 61, route: "pages/pricing.json" }]);
+  });
+
+  test("a done line with no result is a complete run, not a broken one", async () => {
+    // A backend that does not send one is not broken, and an older one never will.
+    stubFetch(async () =>
+      ndjsonResponse(['{"type":"done","root":"/p","config":{"name":"Clone"}}\n']),
+    );
+    const out = await streamImport("/__studio/import-site", OPTS, () => {});
+    expect(out.root).toBe("/p");
+    expect(out.result).toBeUndefined();
+  });
+});

@@ -18,6 +18,7 @@ const BRIEF: ImportBrief = {
   name: "Example",
   prompt: "Modernise the typography",
   url: "https://example.com/",
+  verify: false,
 };
 
 afterEach(() => {

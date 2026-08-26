@@ -863,6 +863,7 @@ describe("the New Project Import hand-off", () => {
     name: "Example",
     prompt: "Modernise the typography",
     url: "https://example.com/",
+    verify: false,
   };
 
   test("the turn reads as the user's own brief, with the parameters attached", () => {
