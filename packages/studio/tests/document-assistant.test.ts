@@ -357,6 +357,125 @@ describe("document-assistant — state-gated tools & bootstrap", () => {
     expect(capturedTools[1]).toContain("list_files");
     expect(capturedTools[1]).not.toContain("create_project");
   });
+
+  test("a new assistant restores the last-active session's messages on construction", async () => {
+    /* The panel constructs the assistant on load, so this is what makes a reload continue the
+       conversation rather than open an empty one. `openSession` shares the restore path, but only
+       this one runs it before the reader has done anything. */
+    nextRounds = [
+      [
+        { content: "Earlier reply", type: "delta" },
+        { stopReason: "stop", type: "done" },
+      ],
+    ];
+    const first = createDocumentAssistant();
+    await first.sendMessage("earlier question");
+    const id = first.activeSessionId();
+    expect(id).toBeTruthy();
+
+    // A fresh assistant over the same store — what a reload builds.
+    const revived = createDocumentAssistant();
+
+    expect(revived.activeSessionId()).toBe(id);
+    expect(revived.chatState.messages.map((m) => m.content)).toEqual([
+      "earlier question",
+      "Earlier reply",
+    ]);
+    // Every restored message carries an id, so the transcript can key its rows.
+    expect(revived.chatState.messages.every((m) => Boolean(m.id))).toBe(true);
+  });
+
+  test("import_site adopts the imported project and re-keys the pre-project session", async () => {
+    /* The import bootstraps a project exactly as `create_project` does, so the conversation that
+       asked for it has to follow it out of the unscoped store — otherwise the transcript of the
+       run is orphaned in `""` the moment the project it describes opens. */
+    /* A document stays OPEN, so the agent loop is holding an undo batch when adoption replaces
+       every tab in the workspace. That is what makes the tool's `getTab` seam load-bearing: the
+       batch has to be re-opened on whatever tab adoption left active, not on the disposed one. */
+    installMockPlatform({
+      importSite: (async () => ({
+        result: { pages: 2, warnings: [] },
+        root: "/abs/imported-site",
+      })) as never,
+    });
+    setProjectAdopter(async (root: string) => {
+      setWorkspaceProject(root, { name: "Imported" });
+    });
+    nextRounds = [
+      toolCallRound("i1", "import_site", {
+        directory: "/home/dev/Sites/imported-site",
+        url: "https://example.com",
+      }),
+      [
+        { content: "Import complete", type: "delta" },
+        { stopReason: "stop", type: "done" },
+      ],
+    ];
+
+    const a = createDocumentAssistant();
+    await a.sendMessage("clone example.com");
+
+    expect(workspace.projectRoot).toBe("/abs/imported-site");
+    // The live session left the unscoped store and is active under the imported root.
+    expect(listSessions("").some((s) => s.id === a.activeSessionId())).toBe(false);
+    const moved = listSessions("/abs/imported-site").find((s) => s.id === a.activeSessionId());
+    expect(moved?.title).toBe("clone example.com");
+    expect(getActiveSessionId("/abs/imported-site")).toBe(a.activeSessionId());
+  });
+
+  test("New Chat during a turn leaves the discarded conversation unpersisted", async () => {
+    /* `sendMessage` persists again in its `finally`, and New Chat clears the session id out from
+       under it. Writing there would resurrect the conversation the reader just discarded — under
+       whichever session id happened to be next. */
+    nextRounds = [
+      [
+        { content: "half a th", type: "delta" },
+        { stopReason: "stop", type: "done" },
+      ],
+    ];
+
+    const a = createDocumentAssistant();
+    // Clear the session id mid-flight, the way the New Chat button does.
+    const sending = a.sendMessage("start something");
+    a.newChat();
+    await sending;
+
+    expect(a.activeSessionId()).toBeNull();
+    expect(getActiveSessionId("")).toBeNull();
+    // Nothing was written back under a session the reader had already dismissed.
+    expect(listSessions("").every((s) => loadSession("", s.id)?.length !== 0)).toBe(true);
+    expect(a.chatState.messages).toHaveLength(0);
+  });
+  test("create_project re-anchors the agent's undo batch onto the adopted tab", async () => {
+    /* Adoption closes every tab and opens the new project's, so the batch `runAgentLoop` opened on
+       the PRE-adoption tab is holding a disposed one by the time the tool returns. Re-reading the
+       active tab afterwards is what keeps the rest of the turn's edits undoable — and it only runs
+       when a batch was actually open, which needs a document open when the turn started. */
+    setWorkspaceProject(null);
+    resetWorkspaceWithTab();
+    setProjectAdopter(async (root: string) => {
+      setWorkspaceProject(root, { name: "Fresh" });
+    });
+    nextRounds = [
+      toolCallRound("c1", "create_project", { location: "/home/dev/Sites", name: "Batched Site" }),
+      [
+        { content: "Project ready", type: "delta" },
+        { stopReason: "stop", type: "done" },
+      ],
+    ];
+
+    const a = createDocumentAssistant();
+    await a.sendMessage("bootstrap with a document open");
+
+    expect(workspace.projectRoot).toBeTruthy();
+    expect(a.chatState.status).toBe("idle");
+    // The turn reported the adoption rather than an error about a stale tab.
+    expect(
+      a.chatState.messages.some(
+        (m) => m.role === "assistant" && m.content.includes("Project ready"),
+      ),
+    ).toBe(true);
+  });
 });
 
 describe("document-assistant — cross-file wiring", () => {
