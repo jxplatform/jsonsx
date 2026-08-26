@@ -4,6 +4,7 @@ description: "Project Styles in Jx Studio: set the default look of every heading
 spec:
   - studio.md#7.4
 code:
+  - packages/studio/src/settings/settings-document.ts
   - packages/studio/src/panels/stylebook-panel.ts
   - packages/studio/src/panels/stylebook-layers-panel.ts
   - packages/studio/src/panels/stylebook-doc.ts
@@ -15,7 +16,7 @@ code:
 
 # Project Styles
 
-Project Styles catalogs your elements: every heading, paragraph, button, list, table, and form control, plus your components, rendered as specimen cards with their current default styles. Instead of styling one `h2` on one page, you style what _every_ `h2` looks like, in one place. Switch to it with **Project Styles** in the **Editor** control on the pane's context bar, which is where Studio lists it; files that don't support it don't offer it. See **[Modes and views](/docs/studio/interface/modes)**.
+Project Styles catalogs your elements: every heading, paragraph, button, list, table, and form control, plus your components, rendered as specimen cards with their current default styles. Instead of styling one `h2` on one page, you style what _every_ `h2` looks like, in one place. Open it with **Open Project Styles** — in the ⚙ **Settings** menu at the foot of the rail, and on :kbd[⌘K] — which works whether or not the project file is already open. Once it is, **Project Styles** also appears in the **Editor** control on the pane's context bar, beside the other editors that file supports; files that don't support it don't offer it. See **[Modes and views](/docs/studio/interface/modes)**.
 
 ![Jx Studio Project Styles showing element defaults across breakpoints](../../images/stylebook.png)
 

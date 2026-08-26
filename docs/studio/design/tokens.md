@@ -18,7 +18,7 @@ A design token is a named value: **Primary Blue** instead of `#3b82f6`, **Body S
 
 ## Define tokens
 
-1. Open **[Project settings](/docs/studio/projects/settings)** by pressing :kbd[⌘K] and running **Open Settings**, or pick it from the **⬢ menu** in the Command Bar.
+1. Open **[Project settings](/docs/studio/projects/settings)** from the ⚙ **Settings** menu at the foot of the rail, by pressing :kbd[⌘K] and running **Open Project Settings**, or from the **⬢ menu** in the Command Bar.
 2. Open the **CSS Variables** section.
 
 Tokens are grouped by what they name:

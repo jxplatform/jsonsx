@@ -77,6 +77,14 @@ export const PLACEMENTS = [
    */
   "blockbar/format",
   "outline/row",
+  /**
+   * The rail foot's ⚙ Settings menu — the settings FAMILY, and only it.
+   *
+   * A separate placement rather than a second use of `commandbar/overflow`, for the reason the
+   * status bar is three placements: the ⬢ menu is the chrome's residue for retired controls and
+   * this is a named family with its own trigger. Same admits, different surface, different budget.
+   */
+  "settings/menu",
   "palette",
   "never",
 ] as const;
@@ -119,6 +127,14 @@ export const PLACEMENT_MATRIX: Readonly<Record<Placement, PlacementRule>> = {
     note: "the bar's inline-format cluster — a range inside the selection is still the selection",
   },
   "outline/row": { admits: ["selection"], note: "row actions act on the row's node" },
+  "settings/menu": {
+    admits: ["application", "project"],
+    note:
+      "the rail foot's gear menu — the settings family. It is a MENU, not a pinned slot, so it " +
+      "may host two levels for the reason commandbar/overflow does: a menu prints each row's own " +
+      "name, chord and gate, and draws a divider where the level changes. The rail's PINNED " +
+      "groups stay single-level, in PANEL_PLACEMENT_MATRIX",
+  },
   palette: {
     admits: ["application", "project", "document", "selection"],
     note: "the level-agnostic surface; it groups rows by level",

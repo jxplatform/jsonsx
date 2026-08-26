@@ -28,7 +28,7 @@ The pill in the middle of the Command Bar reads `◈ project › document › se
 
 ## The Navigator
 
-The labelled rail on the far left, and the panel it opens beside it. The rail is in two groups. **Project**: **Files** (:kbd[⌘1]) and **Source Control** (:kbd[⌘3]). **Document**: **Outline** (:kbd[⌘4]), **Page** (:kbd[⌘5]), **Data** (:kbd[⌘6]) and **Packages** (:kbd[⌘7]). One panel shows at a time, under a header naming it and the level it works at, so you always know what you're looking at. Each panel is described in **[The workspace](/docs/studio/interface)**.
+The labelled rail on the far left, and the panel it opens beside it. The rail is in two groups. **Project**: **Files** (:kbd[⌘1]) and **Source Control** (:kbd[⌘3]). **Document**: **Outline** (:kbd[⌘4]), **Page** (:kbd[⌘5]), **Data** (:kbd[⌘6]) and **Packages** (:kbd[⌘7]). One panel shows at a time, under a header naming it and the level it works at, so you always know what you're looking at. At its foot, the ⚙ **Settings** button opens a menu holding **Preferences…** (the app), **Open Project Settings** and **Open Project Styles** (this project) — each with a submenu that jumps straight to a section. Each panel is described in **[The workspace](/docs/studio/interface)**.
 
 ## The panes and the canvas
 

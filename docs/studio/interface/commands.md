@@ -195,9 +195,10 @@ Everything Studio can do is a command, and every command is reachable by name: p
 | New Project…            | `project.new`           | —        | application | —                                           |
 | Open Data Grid          | `data.openGrid`         | —        | project     | a platform that serves the data routes      |
 | Open Library            | `library.open`          | `⌘⇧E`    | project     | an open project                             |
+| Open Project Settings   | `settings.open`         | `⌘⇧,`    | project     | an open project                             |
+| Open Project Styles     | `styles.open`           | —        | project     | an open project                             |
 | Open Project…           | `project.open`          | `⌘O`     | project     | —                                           |
 | Open Recent…            | `project.openRecent`    | —        | project     | —                                           |
-| Open Settings           | `settings.open`         | `⌘⇧,`    | project     | an open project                             |
 | Validate Redirects      | `redirects.validate`    | —        | project     | an open project                             |
 
 ## Source Control

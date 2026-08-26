@@ -21,11 +21,14 @@ import {
 import { describe, expect, test } from "bun:test";
 import { projectState } from "../src/store";
 
+import type { CommandContext } from "../src/commands/context";
 import type { MockPlatformState } from "./harness";
 import type { StudioPlatform } from "../src/types";
 
 const { renderGeneralSettings } = await import("../src/settings/general-settings");
-const { activeTab } = await import("../src/workspace/workspace");
+const { setActiveRegistry } = await import("../src/commands/active-registry");
+const { createCommandRegistry } = await import("../src/commands/registry");
+const { emptyContext } = await import("../src/commands/context");
 
 type AnyConfig = Record<string, any>;
 
@@ -349,11 +352,64 @@ describe("platform adapter", () => {
 // ─── Global styles shortcut ──────────────────────────────────────────────────
 
 describe("global styles shortcut", () => {
-  test("Edit Global Styles switches the SAME document to the Project Styles editor", () => {
+  /*
+   * The button RENDERS FROM `styles.open` and runs it. It used to write `session.ui.canvasMode`
+   * itself — a second implementation of a capability that also existed as no command at all, so
+   * the only way to reach Project Styles from a closed configuration tab was this button. §12.5.
+   */
+  function installStylesRegistry() {
+    const registry = createCommandRegistry({ getContext: () => emptyContext(), mac: true });
+    registry.register({
+      id: "styles.open",
+      title: "Open Project Styles",
+      category: "Project",
+      level: "project",
+      menus: ["settings/menu", "palette"],
+      requires: "an open project",
+      when: (ctx: CommandContext) => ctx.project.open,
+      run: () => {},
+    });
+    setActiveRegistry(registry);
+    return registry;
+  }
+
+  test("Edit Global Styles runs the command, rather than writing the mode itself", () => {
+    const registry = installStylesRegistry();
+    const ran: string[] = [];
+    registry.run = ((id: string) => {
+      ran.push(id);
+      return Promise.resolve();
+    }) as typeof registry.run;
     resetWorkspaceWithTab();
     const { container } = setup({});
     pointer(buttonByText(container, "Edit Global Styles"), "click");
-    // Nothing closes and nothing re-opens: project.json is already the document on screen.
-    expect(activeTab.value?.session.ui.canvasMode).toBe("stylebook");
+    expect(ran).toEqual(["styles.open"]);
+    setActiveRegistry(null);
+  });
+
+  test("its tooltip is the record's own title, so the two cannot drift", () => {
+    // The button's LABEL is in-context copy — "Edit Global Styles" is what this field is about —
+    // But what it invokes is named by the record, which is the half §12.3 governs.
+    installStylesRegistry();
+    const { container } = setup({});
+    expect(buttonByText(container, "Edit Global Styles").getAttribute("title")).toBe(
+      "Open Project Styles",
+    );
+    setActiveRegistry(null);
+  });
+
+  /*
+   * It does NOT render its enablement, and that is deliberate rather than an omission.
+   * `styles.open` is gated on an open project, and Overview is a section of that project's own
+   * configuration document — so the question cannot be false where this button lives. Asking anyway
+   * would be a focus read inside a pane-scoped render, which `check-pane-singletons.ts` rule 4
+   * forbids. What CAN be missing is the registry, and that is an existence check.
+   */
+  test("with no registry at all it renders disabled rather than throwing", () => {
+    setActiveRegistry(null);
+    const { container } = setup({});
+    const button = buttonByText(container, "Edit Global Styles");
+    expect(button.hasAttribute("disabled")).toBe(true);
+    expect(button.getAttribute("title")).toBe("");
   });
 });

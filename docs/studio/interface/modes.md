@@ -56,7 +56,7 @@ Project Styles is the catalog of your project's element defaults: every heading,
 
 ## Project Settings
 
-Your project's configuration, `project.json`, opens as a document too, and **Open Settings** shows it in its own editor: the sections down the left (Overview, Contexts, Site head, Definitions, Content types, Packages, Extensions, Deploy, Raw JSON), the section you picked filling the rest of the pane. Because it is a document, :kbd[⌘Z], the unsaved dot and :kbd[⌘S] mean here exactly what they mean in a page.
+Your project's configuration, `project.json`, opens as a document too, and **Open Project Settings** shows it in its own editor: the sections down the left (Overview, Contexts, Site head, Locales, CSS Variables, Data Shapes, Content types, Packages, Extensions, Deploy, Raw JSON, plus any an extension adds), the section you picked filling the rest of the pane. Because it is a document, :kbd[⌘Z], the unsaved dot and :kbd[⌘S] mean here exactly what they mean in a page.
 
 The pane's context bar steps aside for it. A settings form has no canvas view to choose, no rendering context to resolve against, and the place contexts are _defined_ is a section of the very document on screen. So the editor takes the whole pane instead of sitting under a row of controls with nothing to say. Full guide: **[Project settings](/docs/studio/projects/settings)**.
 
@@ -73,7 +73,7 @@ Every file opens in its natural editor and view, and the two controls offer only
 | Spreadsheets (`.csv`)              | **Grid**           | **Code**                     | —                       |
 | The project file (`project.json`)  | **Project Styles** | **Code**                     | —                       |
 
-Opening `project.json` from the Files tree lands on **Project Styles**; **Open Settings** puts that same document into its settings editor.
+Opening `project.json` from the Files tree lands on **Project Styles**; **Open Project Settings** puts that same document into its settings editor, and **Open Project Styles** puts it back. All three are in the ⚙ **Settings** menu at the foot of the rail.
 
 A file that belongs to a content collection also has an **Entry** editor. **Open Entry Form** is how you reach it, and it joins that file's **Editor** control from then on, so you can move between the form and the body without losing your place in either.
 

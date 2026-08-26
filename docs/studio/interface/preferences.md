@@ -4,16 +4,18 @@ description: "Application settings in Jx Studio: the theme, the AI provider, eve
 spec: studio.md#15
 code:
   - packages/studio/src/settings/preferences-dialog.ts
+  - packages/studio/src/settings/preferences-sections.ts
+  - packages/studio/src/panels/settings-menu.ts
   - packages/studio/src/settings/preferences-accounts.ts
   - packages/studio/src/settings/preferences-keymap.ts
 ---
 
 # Preferences
 
-Preferences holds the settings that belong to **Studio**, not to a project: how the editor looks, which AI provider it talks to, which accounts it has signed you into, and what every keyboard shortcut does. Open it with :kbd[Cmd+,] on macOS or :kbd[Ctrl+,] elsewhere, or find **Preferences…** in the command palette.
+Preferences holds the settings that belong to **Studio**, not to a project: how the editor looks, which AI provider it talks to, which accounts it has signed you into, and what every keyboard shortcut does. Open it with :kbd[Cmd+,] on macOS or :kbd[Ctrl+,] elsewhere, find **Preferences…** in the command palette, or pick it from the ⚙ **Settings** menu at the foot of the rail — whose submenu takes you straight to Appearance, Assistant, Accounts or Keyboard.
 
 :::doc-note
-**Preferences is not Project Settings.** Preferences is a dialog, it follows you between projects, and it works with no project open at all. Project Settings (contexts, definitions, packages, deploy) belongs to one project, and it is a **document**: the project's own `project.json`, open in a pane with undo and :kbd[Cmd+S] like any other file. See **[Project settings](/docs/studio/projects/settings)**.
+**Preferences is not Project Settings.** Preferences is a dialog, it follows you between projects, and it works with no project open at all. Project Settings (contexts, definitions, packages, deploy) belongs to one project, and it is a **document**: the project's own `project.json`, open in a pane with undo and :kbd[Cmd+S] like any other file. See **[Project settings](/docs/studio/projects/settings)**. They share the rail's ⚙ **Settings** menu, which is the one place both are named side by side — with a divider between what belongs to the app and what belongs to the project.
 :::
 
 Preferences opens over the workspace rather than replacing it, and :kbd[Escape] closes it. Nothing you do behind it is suspended.

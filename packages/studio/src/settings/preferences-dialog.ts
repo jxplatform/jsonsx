@@ -48,47 +48,24 @@ import type { ShortcutRow } from "../commands/reference";
 import type { RebindResult } from "./preferences-keymap";
 import type { AnyCommand, CommandRegistry } from "../commands/registry";
 
-/** One section of the sheet. The `id` is what `app.preferences { section }` accepts. */
-export interface PreferencesSection {
-  id: string;
-  title: string;
-  /** The one-line answer to "what is in here", shown under the heading. */
-  blurb: string;
-}
-
-/**
- * The sections, in sheet order.
- *
- * §9.3 lists six for the finished surface (Editor behaviour and Updates/About are the other two).
- * Four are built; a section is added here when it has something to configure, never before — an
- * empty pane is the "declared but unbuilt" state the rail already refuses to render.
+/*
+ * The sections moved to `./preferences-sections`, a leaf with no imports, so the rail's gear menu
+ * can enumerate `app.preferences`'s own `section` argument without pulling this module's graph
+ * (ai-models, github-auth, cf-settings, the settings kernel) into the rail. Re-exported here so
+ * every existing import site is unchanged.
  */
-export const PREFERENCES_SECTIONS: readonly PreferencesSection[] = [
-  { id: "appearance", title: "Appearance", blurb: "How the Studio chrome looks." },
-  {
-    id: "assistant",
-    title: "Assistant",
-    blurb: "The AI provider the assistant talks to. Stored on this machine.",
-  },
-  {
-    id: "accounts",
-    title: "Accounts",
-    blurb: "Every credential Studio holds, and how to make it forget one.",
-  },
-  {
-    id: "keyboard",
-    title: "Keyboard",
-    blurb: "Generated from the command registry — the app's own record of every chord.",
-  },
-];
+import {
+  DEFAULT_PREFERENCES_SECTION,
+  isPreferencesSection,
+  PREFERENCES_SECTIONS,
+} from "./preferences-sections";
 
-/** The section the sheet opens on when none is named. */
-export const DEFAULT_PREFERENCES_SECTION = PREFERENCES_SECTIONS[0]!.id;
-
-/** Whether a string names a section. */
-export function isPreferencesSection(id: unknown): boolean {
-  return PREFERENCES_SECTIONS.some((section) => section.id === id);
-}
+export {
+  DEFAULT_PREFERENCES_SECTION,
+  isPreferencesSection,
+  PREFERENCES_SECTIONS,
+} from "./preferences-sections";
+export type { PreferencesSection } from "./preferences-sections";
 
 // ─── Open state ───────────────────────────────────────────────────────────────
 
@@ -588,7 +565,7 @@ export function preferencesCommands(): AnyCommand[] {
       id: "app.preferences",
       level: "application",
       keybinding: "mod+,",
-      menus: ["commandbar/overflow", "palette"],
+      menus: ["commandbar/overflow", "settings/menu", "palette"],
       group: "7_settings",
       run: (_ctx, args) => {
         const section = (args as { section?: unknown } | undefined)?.section;

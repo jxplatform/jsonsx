@@ -68,7 +68,13 @@ Clicking the button of the panel that's already open collapses the Navigator; cl
 
 **Insert**, the palette of elements and components you can add to a page, is not on the rail, because you reach for it at the moment you're placing something, and it is not a view you sit in. Run **Show Insert** from the palette (:kbd[⌘K]) to open it in the Navigator.
 
-At the foot of the rail sit **About** (the app version, its release channel and the update status) and **Settings**, which opens this project's settings: breakpoints and color schemes, data shapes, content types, dependencies. See [Project settings](/docs/studio/projects/settings). The settings that belong to Studio itself are in **[Preferences](/docs/studio/interface/preferences)** (:kbd[⌘,]): the theme, the AI provider, your accounts, the keyboard sheet.
+At the foot of the rail is one button, **Settings**, and it opens a menu rather than a panel:
+
+- **Preferences…** (:kbd[⌘,]) — the settings that belong to Studio itself and follow you between projects: the theme, the AI provider, your accounts, the keyboard sheet. Its submenu jumps straight to one of those four. See **[Preferences](/docs/studio/interface/preferences)**.
+- **Open Project Settings** (:kbd[⌘⇧,]) — this project's configuration, from the site name through contexts, data shapes and packages to the deploy target. Its submenu lists every section, so you can land on the one you want instead of arriving at Overview and hunting. See **[Project settings](/docs/studio/projects/settings)**.
+- **Open Project Styles** — the design tokens and element defaults, over that same project file. See **[Project Styles](/docs/studio/design/stylebook)**.
+
+Clicking a heading opens that surface where you last left it; following its submenu opens it on the section you picked. A divider separates what belongs to the app from what belongs to the project. With no project open the two project entries are still listed, greyed, saying what they need — so the menu tells you what Studio can do before you have opened anything.
 
 ## Navigator dock
 

@@ -47,9 +47,18 @@ import type { ExtensionsInfo } from "../src/types";
 
 let host: HTMLElement;
 
-/** The one command this module registers. */
+/** One of this module's records, BY ID — never by index: a factory grows. */
+function commandById(id: string): AnyCommand {
+  const command = settingsCommands().find((candidate) => candidate.id === id);
+  if (!command) {
+    throw new Error(`settingsCommands() no longer holds "${id}"`);
+  }
+  return command;
+}
+
+/** The document-opening command. */
 function openCommand(): AnyCommand {
-  return settingsCommands()[0]!;
+  return commandById("settings.open");
 }
 
 /** Run `settings.open` and return the message it refused with. */
@@ -379,6 +388,33 @@ describe("the configuration tab", () => {
     expect(second.session.ui.canvasMode).toBe(SETTINGS_MODE);
   });
 
+  /*
+   * THE COLD-WORKSPACE CASE, and the reason `showSettingsDocument` writes the mode itself.
+   *
+   * `createTab` seeds `session.ui.canvasMode` from `resolvedModes.find(m => m !== "preview")`
+   * (`tabs/tab.ts`) — i.e. from `SETTINGS_TAB_MODES[0]`, which is `settings`. Parameterising only
+   * the already-open branch would therefore leave `styles.open` opening the settings FORM whenever
+   * the configuration tab happened to be closed, which is the ordinary case. Every assertion above
+   * drives the settings door and so cannot see it.
+   */
+  test("a mode opens a FRESH tab in that editor, not in the first declared one", () => {
+    expect(workspace.tabs.get("project.json")).toBeUndefined();
+    const tab = showSettingsDocument("stylebook")!;
+    expect(tab.session.ui.canvasMode).toBe("stylebook");
+    expect(tab.session.ui.preview).toBe(false);
+    // The capability list keeps its declared order regardless — the Editor control offers them in it.
+    expect(tab.capabilities.modes).toEqual([SETTINGS_MODE, "stylebook", "source"]);
+  });
+
+  test("a mode switches an already-open tab's editor and keeps its history", () => {
+    const first = showSettingsDocument()!;
+    first.doc.dirty = true;
+    const second = showSettingsDocument("stylebook")!;
+    expect(second.id).toBe(first.id);
+    expect(second.doc.dirty).toBe(true);
+    expect(second.session.ui.canvasMode).toBe("stylebook");
+  });
+
   test("an already-open project.json tab gains the settings editor without losing its modes", () => {
     const tab = showSettingsDocument()!;
     tab.capabilities.modes = ["stylebook", "source"];
@@ -456,7 +492,9 @@ describe("settings.open", () => {
     const command = openCommand();
     expect(command.id).toBe("settings.open");
     expect(command.level).toBe("project");
-    expect(command.menus).toEqual(["commandbar/overflow", "palette"]);
+    // It joined the rail foot's gear menu without leaving the ⬢ menu or the palette: a placement
+    // Chooses WHETHER a record renders somewhere, never what it is or where else it appears.
+    expect(command.menus).toEqual(["commandbar/overflow", "settings/menu", "palette"]);
     expect(Object.keys((command.args as { properties: object }).properties).toSorted()).toEqual([
       "entry",
       "section",
@@ -549,5 +587,52 @@ describe("the ends of the document", () => {
     await flush();
     expect(navLabels()).toEqual([]);
     expect(body().textContent).toContain("No settings sections");
+  });
+});
+
+// ─── The second door over the same document ──────────────────────────────────
+
+describe("styles.open", () => {
+  /** The Project Styles command. */
+  function stylesCommand(): AnyCommand {
+    return commandById("styles.open");
+  }
+
+  test("is a project-level record in the gear menu and the palette, and nowhere else", () => {
+    const command = stylesCommand();
+    expect(command.level).toBe("project");
+    expect(command.menus).toEqual(["settings/menu", "palette"]);
+    expect(command.group).toBe("7_settings_styles");
+    // No chord: ⌥⌘, and ⌃⌘, are free, so this is a choice — the gear and the palette are both
+    // Permanent doors and a third settings chord earns little. Rebinding is Preferences › Keyboard.
+    expect(command.keybinding).toBeUndefined();
+    // No arguments, so no submenu and nothing for the args-schema check to reject.
+    expect(command.args).toBeUndefined();
+  });
+
+  test("it is NAMED, never spelled from the wire value", () => {
+    // `stylebook` is shared with `dist/iframe-entry.js` and may never be renamed, so nothing a
+    // Reader sees may be derived from it — `style/project-styles.ts` states the rule.
+    const { title } = stylesCommand();
+    expect(title).toBe("Open Project Styles");
+    expect(title.toLowerCase()).not.toContain("stylebook");
+  });
+
+  test("two verbs over one document declare ONE availability rule", () => {
+    // §12.4: the family is defined by what `run` WRITES, and both write this tab's editor.
+    const styles = stylesCommand();
+    const open = openCommand();
+    expect(styles.requires).toBe(open.requires);
+    for (const project of [{ open: true }, { open: false }]) {
+      const ctx = { project } as unknown as CommandContext;
+      expect(styles.when?.(ctx)).toBe(open.when?.(ctx));
+    }
+  });
+
+  test("it opens the configuration document in the Project Styles editor", () => {
+    stylesCommand().run({} as CommandContext, undefined as never);
+    const tab = workspace.tabs.get("project.json");
+    expect(tab?.session.ui.canvasMode).toBe("stylebook");
+    expect(activeTab.value?.id).toBe("project.json");
   });
 });

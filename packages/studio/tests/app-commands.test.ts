@@ -95,8 +95,27 @@ describe("the set", () => {
       "selection",
       "settings",
       "style",
+      // `styles.open` — the Project Styles editor over `project.json`, a peer of `settings.open`
+      // And the second named door into one document. NOT a member of `style.*`, which are the
+      // Style inspector's SELECTION-level verbs over one element: the levels are the distinction,
+      // And the plural is how the ids carry it.
+      "styles",
       "view",
     ]);
+  });
+
+  /*
+   * The gear menu is a rendering of a placement, so what it holds is a fact about the RECORDS —
+   * and the synthetic registries in `tests/settings-menu.test.ts` cannot see the real ones.
+   */
+  test("the gear menu is the settings family, and only the settings family", () => {
+    const inMenu = COMMANDS.filter((c) => (c.menus ?? []).includes("settings/menu"))
+      .map((c) => c.id)
+      .toSorted();
+    expect(inMenu).toEqual(["app.preferences", "settings.open", "styles.open"]);
+    // The ⬢ menu is unchanged by this: `styles.open` never declared it.
+    const overflow = COMMANDS.filter((c) => (c.menus ?? []).includes("commandbar/overflow"));
+    expect(overflow.map((c) => c.id)).not.toContain("styles.open");
   });
 
   test("has no duplicate ids — a capability has exactly one definition site", () => {

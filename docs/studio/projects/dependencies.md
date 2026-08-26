@@ -19,7 +19,7 @@ Packages is where you decide which building blocks a document, or the whole site
 The panel follows whatever document is focused, and its header says so, reading **PACKAGES · document**:
 
 - **A page, layout, or component open** means you're managing that document's imports: which components it can place.
-- **`project.json` open** means you're managing the whole site: packages, site-wide component availability, and imported modules. Running **Open Settings** puts you here too, because [Project settings](/docs/studio/projects/settings) opens that same `project.json` document.
+- **`project.json` open** means you're managing the whole site: packages, site-wide component availability, and imported modules. Running **Open Project Settings** puts you here too, because [Project settings](/docs/studio/projects/settings) opens that same `project.json` document.
 
 ## Import your own components
 

@@ -12,9 +12,9 @@
 import { html, render as litRender, nothing } from "lit-html";
 import { live } from "lit-html/directives/live.js";
 import { errorMessage } from "@jxsuite/schema/parse";
-import { projectState, updateUi } from "../store";
+import { projectState } from "../store";
 import { updateSiteConfig } from "../site-context";
-import { tabOfContainer } from "../canvas/canvas-surface";
+import { activeRegistry } from "../commands/active-registry";
 import { getPlatform } from "../platform";
 
 import type { JxHeadEntry, ProjectConfig } from "@jxsuite/schema/types";
@@ -165,16 +165,27 @@ export function renderGeneralSettings(container: HTMLElement) {
   };
 
   /*
-   * Project Styles is the SAME document in a different editor, so this is a mode switch rather
-   * than a navigation. The predecessor closed the settings modal and opened `project.json` in a
-   * tab — the configuration IA jumping into the document IA, plan §9.3's own example of the split
-   * P6 removes. Nothing closes now, because nothing was covering anything.
+   * Project Styles is the SAME document in a different editor, and `styles.open` is the one place
+   * that says so. This used to write `session.ui.canvasMode` here directly — a second
+   * implementation of a capability, §12.5's defect in miniature: the button and the command could
+   * disagree about what "open Project Styles" means, and only one of them was reachable by name.
+   * The mode is still a fact about the TAB, and there is exactly one `project.json` tab, so
+   * `revealTab`'s `focusPane` puts the keyboard on whichever pane holds it.
+   *
+   * Rendered FROM the record, so the button is disabled with its `requires` sentence rather than
+   * absent when it cannot act (§12.3), and it cannot drift from the palette row or the gear menu.
    */
-  const onEditGlobalStyles = () => {
-    // THIS pane's tab. The Project Settings editor is stage content, so a settings document
-    // Open in the side pane used to send the PRIMARY into the Stylebook.
-    updateUi(tabOfContainer(container), "canvasMode", "stylebook");
-  };
+  const registry = activeRegistry();
+  const stylesCommand = registry?.get("styles.open");
+  /* The record's TITLE, and nothing else off the registry.
+     `disabledReason` would be the §12.3 shape for a control that can be inapplicable — but this one
+     cannot be. `styles.open` is gated on `ctx.project.open`, and Overview is a section of the
+     project's own configuration document, so by the time this renders the answer is always yes.
+     Asking anyway would also be a FOCUS read inside a function that was handed a container, which
+     is what `scripts/check-pane-singletons.ts` rule 4 forbids: a pane-scoped surface must not report
+     the focused pane's state. A project-level verb happens to read the same in every pane, but the
+     way to be right about that is not to ask. The one thing that can genuinely be missing is the
+     registry itself (bootstrap order, a test), and that is an existence check, not a state read. */
 
   const currentFavicon = config.favicon;
 
@@ -266,7 +277,14 @@ export function renderGeneralSettings(container: HTMLElement) {
           Design tokens and the default element styles that apply across every page. Opens Project
           Styles over this same document.
         </p>
-        <sp-action-button size="s" @click=${onEditGlobalStyles}>
+        <sp-action-button
+          size="s"
+          ?disabled=${!stylesCommand}
+          title=${stylesCommand?.title ?? ""}
+          @click=${() => {
+            void registry?.run("styles.open");
+          }}
+        >
           Edit Global Styles
         </sp-action-button>
       </div>
