@@ -661,9 +661,9 @@
       "width": 836
     },
     "docs/images/media-upload.png": {
-      "bytes": 238410,
-      "capturedAt": "2026-08-26T00:19:29Z",
-      "capturedBy": "screenshots@ci/32914361276",
+      "bytes": 238839,
+      "capturedAt": "2026-08-26T14:06:31Z",
+      "capturedBy": "screenshots@ci/32977855301",
       "definition": "ac0e427d3f9e29401cf944d5957009c5a615bf559b5de440f0a488e78f776b18",
       "height": 1638,
       "runtime": {
@@ -671,7 +671,7 @@
         "fontset": "fc:cac8f480b341",
         "os": "debian-12"
       },
-      "sha256": "e7627df8ba28a84287083647d0c61c339551424f9635f749e37d0316f1085f4f",
+      "sha256": "39212719d37337901814f8be6dd4cdea5652917d5c8ccc4fe3db054042387500",
       "shot": "media-upload",
       "width": 2688
     },
