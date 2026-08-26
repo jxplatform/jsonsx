@@ -1,6 +1,6 @@
 ---
 title: "A tour of Jx Studio"
-description: "A guided map of the Jx Studio window — the Command Bar, the Navigator, panes and the canvas, the jump bar, the Inspector and the Bottom dock."
+description: "A guided map of the Jx Studio window: the Command Bar, the Navigator, panes and the canvas, the jump bar, the Inspector and the Bottom dock."
 spec:
   - studio.md#3.1
 code:
@@ -14,13 +14,13 @@ code:
 
 # A tour of Jx Studio
 
-Everything in Jx Studio happens in one window. This page is your map: what each region is called, what it does, and where to read more. If you've used another visual builder the shape will feel familiar — a live canvas in the middle, docks on either side, a bar across the top — and the names below are the ones the app itself uses.
+Everything in Jx Studio happens in one window. This page is your map: what each region is called, what it does, and where to read more. If you've used another visual builder the shape will feel familiar: a live canvas in the middle, docks on either side, a bar across the top. The names below are the ones the app itself uses.
 
 ![The Jx Studio workspace with the canvas in the center, panels on both sides, and the Command Bar across the top](../images/hero.png)
 
 ## The Command Bar
 
-The top row. It holds the **⬢ menu** (opening and creating projects, Preferences, and everything else without a permanent button), the **layout tabs** — **Write · Design · Build · Ship** — the **Command Center pill**, the four buttons worth keeping in reach (**Save**, **Open in Browser**, **Undo**, **Redo**), and a toggle for each of the three docks. Read more in **[The workspace](/docs/studio/interface)**.
+The top row. It holds the **⬢ menu** (opening and creating projects, Preferences, and everything else without a permanent button), the **layout tabs** (**Write · Design · Build · Ship**), the **Command Center pill**, the four buttons worth keeping in reach (**Save**, **Open in Browser**, **Undo**, **Redo**), and a toggle for each of the three docks. Read more in **[The workspace](/docs/studio/interface)**.
 
 ## The Command Center
 
@@ -32,9 +32,9 @@ The labelled rail on the far left, and the panel it opens beside it. The rail is
 
 ## The panes and the canvas
 
-The center of the window holds one editor pane — or two side by side, when :kbd[⌘\] gives the open document a pane of its own, so you can keep a page on screen while you work on its source, its layout or the same page at another size. A pane renders your page or component live, exactly as it will look in production, and you select, edit and rearrange elements directly on it — see **[The canvas](/docs/studio/interface/canvas)**, **[Edit mode](/docs/studio/editing)** and **[Design mode](/docs/studio/design)**.
+The center of the window holds one editor pane, or two side by side when :kbd[⌘\] gives the open document a pane of its own, so you can keep a page on screen while you work on its source, its layout or the same page at another size. A pane renders your page or component live, exactly as it will look in production, and you select, edit and rearrange elements directly on it. See **[The canvas](/docs/studio/interface/canvas)**, **[Edit mode](/docs/studio/editing)** and **[Design mode](/docs/studio/design)**.
 
-Above the pane sits its strip of open documents, then the **[jump bar](/docs/studio/interface#the-jump-bar)** — `◈ project › file › element`, every segment a button, so you always know where you are and can step anywhere along the chain. Under those, a context bar states which **Editor** is open on the file, which **View** of the canvas — **Edit**, **Design** or **Preview** — and the **Context** it's being rendered in. Details in **[Documents and panes](/docs/studio/interface/tabs)** and **[Modes and views](/docs/studio/interface/modes)**.
+Above the pane sits its strip of open documents, then the **[jump bar](/docs/studio/interface#the-jump-bar)**, reading `◈ project › file › element` with every segment a button, so you always know where you are and can step anywhere along the chain. Under those, a context bar states which **Editor** is open on the file, which **View** of the canvas is showing (**Edit**, **Design** or **Preview**), and the **Context** it's being rendered in. Details in **[Documents and panes](/docs/studio/interface/tabs)** and **[Editors and views](/docs/studio/interface/modes)**.
 
 ## The Inspector
 
@@ -42,7 +42,7 @@ The dock on the right, in four tabs: **Content** (the selected element's setting
 
 ## The Bottom dock
 
-:kbd[⌘J] opens a dock under the panes with **Problems** — everything waiting to be fixed, each row carrying the file it happened in and the button that fixes it — and **Activity**, one entry per long operation with its steps, its log and a Cancel. A third tab, **Logic**, appears while you have a formula or a function open, so the page you're computing values for stays on screen beside the editor. The dock starts closed and only takes space from the canvas, never from the docks on either side.
+:kbd[⌘J] opens a dock under the panes with two tabs. **Problems** is everything waiting to be fixed, each row carrying the file it happened in and the button that fixes it. **Activity** is one entry per long operation, with its steps, its log and a Cancel. A third tab, **Logic**, appears while you have a formula or a function open, so the page you're computing values for stays on screen beside the editor. The dock starts closed and only takes space from the canvas, never from the docks on either side.
 
 ## The status bar
 
