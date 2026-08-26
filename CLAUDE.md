@@ -103,7 +103,7 @@ no tag, no GitHub release, no npm publish, green run.
 unresolvable. The bug is upstream and still present in release-please 17.11.1, so the defence is to
 keep the text out of the changelog. **Backticks do not help** — the escaping happens on raw text.
 
-- The rule and the full write-up live in `commitlint.config.js` (`changelog-safe-angle-brackets`).
+- The rule and the full write-up live in `commitlint.config.ts` (`changelog-safe-angle-brackets`).
 - `.husky/commit-msg` applies it as you commit; `checks` runs
   `bun scripts/check-changelog-safety.ts` over the pull request's commits, because a hook is
   skippable with `--no-verify` and that is how the subject landed.

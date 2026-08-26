@@ -3,12 +3,12 @@
  * REAL commits — the five in this repository's history that would each have deleted a package from
  * its own release, and the near-misses that must stay allowed.
  *
- * See `commitlint.config.js` for why an angle bracket in a commit subject has that effect.
+ * See `commitlint.config.ts` for why an angle bracket in a commit subject has that effect.
  */
 
 import { describe, expect, test } from "bun:test";
 
-import { findAngleTags, findChangelogUnsafeParts } from "../commitlint.config.js";
+import { findAngleTags, findChangelogUnsafeParts } from "../commitlint.config.ts";
 import { findUnsafeCommits, parseLog, report } from "./check-changelog-safety.ts";
 
 describe("findAngleTags", () => {

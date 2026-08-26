@@ -120,6 +120,6 @@ describe("report", () => {
     const text = report(await findGaps([target()], probes({})));
     expect(text).toContain("starters-v1.5.0");
     expect(text).toContain("but not for component");
-    expect(text).toContain("commitlint.config.js");
+    expect(text).toContain("commitlint.config.ts");
   });
 });

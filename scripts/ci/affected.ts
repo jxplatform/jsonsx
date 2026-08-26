@@ -153,7 +153,7 @@ const NO_TESTS = [
   ".gitignore",
   ".oxfmtrc.json",
   ".pre-commit-config.yaml",
-  "commitlint.config.js",
+  "commitlint.config.ts",
   "release-please-config.json",
   ".release-please-manifest.json",
 ];
