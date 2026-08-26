@@ -706,9 +706,9 @@
       "width": 3840
     },
     "docs/images/mode-manage.png": {
-      "bytes": 549286,
-      "capturedAt": "2026-08-26T13:17:34Z",
-      "capturedBy": "screenshots@ci/32973143760",
+      "bytes": 551901,
+      "capturedAt": "2026-08-26T14:40:00Z",
+      "capturedBy": "screenshots@ci/32981563619",
       "definition": "30af42c718ebeb7e90b6ba0ae1e36adf2265aabc3bd12e504887b02adf8313e4",
       "height": 2000,
       "runtime": {
@@ -716,7 +716,7 @@
         "fontset": "fc:cac8f480b341",
         "os": "debian-12"
       },
-      "sha256": "3d1a33b46bea46c1d58d56620bcbf4bc6429056501a88e4ca6b95924932ae9b2",
+      "sha256": "e5389f15031fdc30088a844d831884a67c459c393da98a9b3d91627754372d62",
       "shot": "mode-manage",
       "width": 3840
     },
