@@ -18,7 +18,12 @@
  * A `budget` is a per-file count that may only fall. It is DEBT, not configuration. The count is
  * checked in both directions: above its entry fails, and below its entry also fails, because a
  * number left high after a file was fixed is a number nobody will lower later. Each rewrite deletes
- * its files' entries, and when the map is empty the rule becomes a ban and the map goes away.
+ * its files' entries, and when the map empties the rule hardens into a ban.
+ *
+ * **That has now happened.** The em dash was carried as debt across 131 pages and reached zero, so
+ * it is a ban and `budgets` is empty. The machinery stays because the surfaces still outside this
+ * corpus, the marketing pages and the package READMEs, will need it; its tests run against a
+ * fixture rather than a real page, so a page reaching zero can no longer break them.
  *
  * **What is deliberately not here.** Sentence length, `rather than`, `X, not Y.`, bold labels on
  * list items, forced triples, and the animated-software verbs (`names`, `carries`, `holds`) are all

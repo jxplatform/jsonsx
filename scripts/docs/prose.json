@@ -3,10 +3,9 @@
   "rules": [
     {
       "id": "em-dash",
-      "tier": "budget",
+      "tier": "ban",
       "regex": "[\\u2014\\u2015]",
-      "hint": "Rewrite it away: move a list behind a colon, split the sentence, or use a comma or parentheses. See docs/extending/contributing/docs.md.",
-      "$note": "A bare em dash alone in a table cell is the value 'none' and is skipped in code, not here."
+      "hint": "Rewrite it away: move a list behind a colon, split the sentence, or use a comma or parentheses. See docs/extending/contributing/docs.md."
     },
     {
       "id": "en-dash",
@@ -55,263 +54,7 @@
       "hint": "A word AI writing reaches for far more often than people do. Say the plain thing."
     }
   ],
-  "budgets": {
-    "README.md": {
-      "em-dash": 14
-    },
-    "docs/extending.md": {
-      "em-dash": 4
-    },
-    "docs/extending/contributing/ai-evals.md": {
-      "em-dash": 18
-    },
-    "docs/extending/contributing/docs.md": {
-      "em-dash": 3
-    },
-    "docs/extending/contributing/monorepo.md": {
-      "em-dash": 23
-    },
-    "docs/extending/embedding.md": {
-      "em-dash": 17
-    },
-    "docs/extending/embedding/backend-protocol.md": {
-      "em-dash": 21
-    },
-    "docs/extending/embedding/dev-server.md": {
-      "em-dash": 23
-    },
-    "docs/extending/embedding/hosting.md": {
-      "em-dash": 14
-    },
-    "docs/extending/embedding/platform-adapter.md": {
-      "em-dash": 36
-    },
-    "docs/extending/extensions/anatomy.md": {
-      "em-dash": 17
-    },
-    "docs/extending/extensions/capabilities.md": {
-      "em-dash": 20
-    },
-    "docs/extending/extensions/classes.md": {
-      "em-dash": 16
-    },
-    "docs/extending/extensions/connectors.md": {
-      "em-dash": 20
-    },
-    "docs/extending/extensions/formats.md": {
-      "em-dash": 26
-    },
-    "docs/extending/extensions/project-sections.md": {
-      "em-dash": 22
-    },
-    "docs/extending/extensions/schema-composition.md": {
-      "em-dash": 25
-    },
-    "docs/extending/extensions/search.md": {
-      "em-dash": 11
-    },
-    "docs/extending/extensions/security.md": {
-      "em-dash": 14
-    },
-    "docs/extending/extensions/server.md": {
-      "em-dash": 17
-    },
-    "docs/extending/extensions/tutorial-guestbook.md": {
-      "em-dash": 14
-    },
-    "docs/extending/extensions/tutorial-toml-format.md": {
-      "em-dash": 17
-    },
-    "docs/framework/agents.md": {
-      "em-dash": 24
-    },
-    "docs/framework/agents/authoring-rules.md": {
-      "em-dash": 38
-    },
-    "docs/framework/agents/machine-readable.md": {
-      "em-dash": 18
-    },
-    "docs/framework/build.md": {
-      "em-dash": 38
-    },
-    "docs/framework/build/cli.md": {
-      "em-dash": 23
-    },
-    "docs/framework/build/dev-server.md": {
-      "em-dash": 16
-    },
-    "docs/framework/reference.md": {
-      "em-dash": 4
-    },
-    "docs/studio/ai.md": {
-      "em-dash": 26
-    },
-    "docs/studio/ai/chat.md": {
-      "em-dash": 25
-    },
-    "docs/studio/ai/document-assistant.md": {
-      "em-dash": 16
-    },
-    "docs/studio/data.md": {
-      "em-dash": 26
-    },
-    "docs/studio/data/auth-and-secrets.md": {
-      "em-dash": 57
-    },
-    "docs/studio/data/connections.md": {
-      "em-dash": 24
-    },
-    "docs/studio/data/grid.md": {
-      "em-dash": 22
-    },
-    "docs/studio/data/tables.md": {
-      "em-dash": 35
-    },
-    "docs/studio/design.md": {
-      "em-dash": 16
-    },
-    "docs/studio/design/breakpoints.md": {
-      "em-dash": 22
-    },
-    "docs/studio/design/components.md": {
-      "em-dash": 20
-    },
-    "docs/studio/design/elements.md": {
-      "em-dash": 10
-    },
-    "docs/studio/design/layers.md": {
-      "em-dash": 30
-    },
-    "docs/studio/design/properties.md": {
-      "em-dash": 31
-    },
-    "docs/studio/design/repeaters.md": {
-      "em-dash": 17
-    },
-    "docs/studio/design/states-and-selectors.md": {
-      "em-dash": 12
-    },
-    "docs/studio/design/style-inspector.md": {
-      "em-dash": 36
-    },
-    "docs/studio/design/stylebook.md": {
-      "em-dash": 20
-    },
-    "docs/studio/design/tokens.md": {
-      "em-dash": 17
-    },
-    "docs/studio/desktop.md": {
-      "em-dash": 19
-    },
-    "docs/studio/editing.md": {
-      "em-dash": 8
-    },
-    "docs/studio/editing/frontmatter.md": {
-      "em-dash": 31
-    },
-    "docs/studio/editing/grid.md": {
-      "em-dash": 42
-    },
-    "docs/studio/editing/slash-commands.md": {
-      "em-dash": 10
-    },
-    "docs/studio/editing/writing.md": {
-      "em-dash": 29
-    },
-    "docs/studio/interface.md": {
-      "em-dash": 56
-    },
-    "docs/studio/interface/canvas.md": {
-      "em-dash": 32
-    },
-    "docs/studio/interface/languages.md": {
-      "em-dash": 12
-    },
-    "docs/studio/interface/preferences.md": {
-      "em-dash": 21
-    },
-    "docs/studio/interface/problems-and-progress.md": {
-      "em-dash": 30
-    },
-    "docs/studio/interface/quick-access.md": {
-      "em-dash": 7
-    },
-    "docs/studio/interface/tabs.md": {
-      "em-dash": 38
-    },
-    "docs/studio/interface/welcome-screen.md": {
-      "em-dash": 7
-    },
-    "docs/studio/logic.md": {
-      "em-dash": 10
-    },
-    "docs/studio/logic/code.md": {
-      "em-dash": 20
-    },
-    "docs/studio/logic/data-sources.md": {
-      "em-dash": 45
-    },
-    "docs/studio/logic/data.md": {
-      "em-dash": 41
-    },
-    "docs/studio/logic/events.md": {
-      "em-dash": 34
-    },
-    "docs/studio/logic/formula-workspace.md": {
-      "em-dash": 13
-    },
-    "docs/studio/logic/formulas.md": {
-      "em-dash": 28
-    },
-    "docs/studio/logic/statements.md": {
-      "em-dash": 20
-    },
-    "docs/studio/projects.md": {
-      "em-dash": 14
-    },
-    "docs/studio/projects/browse.md": {
-      "em-dash": 30
-    },
-    "docs/studio/projects/content-types.md": {
-      "em-dash": 34
-    },
-    "docs/studio/projects/create.md": {
-      "em-dash": 28
-    },
-    "docs/studio/projects/dependencies.md": {
-      "em-dash": 15
-    },
-    "docs/studio/projects/media.md": {
-      "em-dash": 24
-    },
-    "docs/studio/projects/pages-layouts-components.md": {
-      "em-dash": 17
-    },
-    "docs/studio/projects/settings.md": {
-      "em-dash": 43
-    },
-    "docs/studio/publish.md": {
-      "em-dash": 25
-    },
-    "docs/studio/publish/cloudflare.md": {
-      "em-dash": 26
-    },
-    "docs/studio/publish/collaboration.md": {
-      "em-dash": 33
-    },
-    "docs/studio/publish/github.md": {
-      "em-dash": 18
-    },
-    "docs/studio/publish/other-hosts.md": {
-      "em-dash": 13
-    },
-    "docs/studio/publish/redirects.md": {
-      "em-dash": 18
-    },
-    "docs/studio/publish/source-control.md": {
-      "em-dash": 20
-    }
-  },
+  "budgets": {},
   "allow": [
     {
       "id": "en-dash",
@@ -355,6 +98,20 @@
       "file": "PROSE-REWRITE.md",
       "text": "there is not one hit for",
       "reason": "The audit naming the words the corpus does not contain. They are being counted, not used."
+    },
+    {
+      "id": "em-dash",
+      "file": "docs/studio/editing/frontmatter.md",
+      "text": "Nothing to flag",
+      "evidence": "packages/studio/src/panels/seo-modal.ts",
+      "reason": "Quoting the empty state Studio draws, verbatim, so a reader can match it against their screen."
+    },
+    {
+      "id": "em-dash",
+      "file": "docs/studio/projects/content-types.md",
+      "text": "this entry does not have one",
+      "evidence": "packages/studio/src/content/entry-editor.ts",
+      "reason": "Quoting the required-field error Studio writes, verbatim."
     }
   ]
 }

@@ -194,25 +194,25 @@ describe("allow entries", () => {
 });
 
 describe("budgets", () => {
+  // The budget tier has no live rule any more: the corpus reached zero and `em-dash` became a ban.
+  // The machinery stays tested against a fixture with a known count, so the next surface that needs
+  // To carry debt (the marketing pages, the package READMEs) inherits something that works.
+  const FIXTURE = "scripts/docs/_fixtures/budgeted.md";
   const rules: Rule[] = [{ hint: "h", id: "em-dash", regex: "—", tier: "budget" }];
   const cfg = (budgets: ProseConfig["budgets"]): ProseConfig => ({ allow: [], budgets, rules });
 
   test("a count above its budget fails", () => {
-    const { violations } = check(cfg({ "docs/studio/desktop.md": { "em-dash": 1 } }), [
-      "docs/studio/desktop.md",
-    ]);
+    const { violations } = check(cfg({ [FIXTURE]: { "em-dash": 1 } }), [FIXTURE]);
     expect(violations.join(" ")).toContain("exceeds its budget");
   });
 
   test("a count below its budget also fails, so the map only ratchets down", () => {
-    const { violations } = check(cfg({ "docs/studio/desktop.md": { "em-dash": 9999 } }), [
-      "docs/studio/desktop.md",
-    ]);
+    const { violations } = check(cfg({ [FIXTURE]: { "em-dash": 9999 } }), [FIXTURE]);
     expect(violations.join(" ")).toContain("is below its budget");
   });
 
   test("a file with no entry is held to zero, which is what new prose gets", () => {
-    const { violations } = check(cfg({}), ["docs/studio/desktop.md"]);
+    const { violations } = check(cfg({}), [FIXTURE]);
     expect(violations.join(" ")).toContain("with no budget entry");
   });
 
@@ -222,9 +222,7 @@ describe("budgets", () => {
   });
 
   test("a budget naming an unknown rule is stale", () => {
-    const { violations } = check(cfg({ "docs/studio/desktop.md": { nope: 1 } }), [
-      "docs/studio/desktop.md",
-    ]);
+    const { violations } = check(cfg({ [FIXTURE]: { nope: 1 } }), [FIXTURE]);
     expect(violations.join(" ")).toContain('unknown rule "nope"');
   });
 
@@ -271,9 +269,11 @@ describe("the committed tree", () => {
     }
   });
 
-  test("only em-dash is still budgeted; everything else has reached zero", () => {
-    const budgeted = new Set(Object.values(config.budgets).flatMap((b) => Object.keys(b)));
-    expect([...budgeted]).toEqual(["em-dash"]);
+  test("nothing is budgeted any more, and the em dash is a ban", () => {
+    // The terminal state the budget was built for: the map emptied, so the rule hardened.
+    expect(config.budgets).toEqual({});
+    expect(config.rules.find((r) => r.id === "em-dash")?.tier).toBe("ban");
+    expect(config.rules.every((r) => r.tier === "ban")).toBe(true);
   });
 });
 
