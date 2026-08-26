@@ -1,5 +1,5 @@
 {
-  "title": "Features — Jx Suite",
+  "title": "Features · Jx Suite",
   "$layout": "./layouts/base.json",
   "$head": [
     {
@@ -65,7 +65,7 @@
                 "margin": "0 auto",
                 "maxWidth": "640px"
               },
-              "textContent": "Jx Studio is how you build. Underneath it runs a file-based CMS, a reactive framework, a static generator, and an optional server tier for accounts and data — all plain files, zero lock-in."
+              "textContent": "Jx Studio is how you build. Underneath it runs a file-based CMS, a reactive framework, a static generator, and an optional server tier for accounts and data, all plain files, zero lock-in."
             }
           ]
         }
@@ -117,7 +117,7 @@
                     "lineHeight": "1.7",
                     "margin": "0 0 2rem"
                   },
-                  "textContent": "Jx Studio is a desktop visual IDE. Create a project, design on a canvas, edit content inline, wire up logic, and commit to git — everything saves to the same JSON and Markdown your compiler reads. No proprietary format. No export step."
+                  "textContent": "Jx Studio is a desktop visual IDE. Create a project, design on a canvas, edit content inline, wire up logic, and commit to git, and everything saves to the same JSON and Markdown your compiler reads. No proprietary format. No export step."
                 },
                 {
                   "tagName": "div",
@@ -142,7 +142,7 @@
                     {
                       "tagName": "check-item",
                       "attributes": {
-                        "props.text": "Inline content editing — click any text, type"
+                        "props.text": "Inline content editing: click any text, type"
                       }
                     },
                     {
@@ -165,7 +165,7 @@
               "tagName": "img",
               "attributes": {
                 "src": "/content/docs/images/mode-design.png",
-                "alt": "Jx Studio design mode — one component rendered across four responsive breakpoint canvases",
+                "alt": "Jx Studio design mode, with one component rendered across four responsive breakpoint canvases",
                 "width": "3840",
                 "height": "2000",
                 "loading": "lazy",
@@ -229,7 +229,7 @@
                     "lineHeight": "1.7",
                     "margin": "0 0 2rem"
                   },
-                  "textContent": "Your content lives as JSON documents and Markdown files in a git repository. No content database to manage, no admin panel to secure. Branch, review, merge — the same workflow you use for code."
+                  "textContent": "Your content lives as JSON documents and Markdown files in a git repository. No content database to manage, no admin panel to secure. Branch, review, merge: the same workflow you use for code."
                 },
                 {
                   "tagName": "div",
@@ -353,7 +353,7 @@
                     "lineHeight": "1.7",
                     "margin": "0 0 2rem"
                   },
-                  "textContent": "Declare state, bind it to the DOM with template strings, and let the compiler figure out the rest. Static by default — reactive islands hydrate only where you need interactivity."
+                  "textContent": "Declare state, bind it to the DOM with template strings, and let the compiler figure out the rest. Static by default, with reactive islands hydrating only where you need interactivity."
                 },
                 {
                   "tagName": "div",
@@ -378,7 +378,7 @@
                     {
                       "tagName": "check-item",
                       "attributes": {
-                        "props.text": "Template literal bindings — no JSX, no DSL"
+                        "props.text": "Template literal bindings: no JSX, no DSL"
                       }
                     },
                     {
@@ -571,7 +571,7 @@
                     "lineHeight": "1.7",
                     "margin": "0 0 2rem"
                   },
-                  "textContent": "Every page is prerendered at build time and served from a CDN — static pages are HTML and CSS with no JavaScript at all. Fast everywhere. Costs pennies. Online forever. Add accounts or a database, pick a server adapter, and the same command also writes a self-contained Hono worker for Cloudflare, Node, or Bun."
+                  "textContent": "Every page is prerendered at build time and served from a CDN, so static pages are HTML and CSS with no JavaScript at all. Fast everywhere. Costs pennies. Online forever. Add accounts or a database, pick a server adapter, and the same command also writes a self-contained Hono worker for Cloudflare, Node, or Bun."
                 },
                 {
                   "tagName": "div",
@@ -614,7 +614,7 @@
                     {
                       "tagName": "check-item",
                       "attributes": {
-                        "props.text": "No PHP, no containers — and no server unless you need one"
+                        "props.text": "No PHP, no containers, and no server unless you need one"
                       }
                     }
                   ]

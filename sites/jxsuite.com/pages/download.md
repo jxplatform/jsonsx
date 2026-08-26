@@ -1,5 +1,5 @@
 ---
-title: "Download Jx Studio — the visual IDE for the web."
+title: "Download Jx Studio, the visual IDE for the web."
 $head:
   - tagName: meta
     attributes:
@@ -62,7 +62,7 @@ Windows
 :::
 
 :::p{style.fontSize="0.875rem" style.color="var(--color-text-secondary)" style.margin="0" style.lineHeight="1.6"}
-Unsigned installer — Windows SmartScreen will warn on first run. Windows 10 or later, x64.
+Unsigned installer, so Windows SmartScreen warns on first run. Windows 10 or later, x64.
 :::
 
 ::cta-button{props.href="https://github.com/jxsuite/jx/releases/latest/download/JxStudio.msi" props.label="Download .msi" props.variant="primary" props.newTab="true"}
@@ -93,7 +93,7 @@ Looking for a specific version, checksums, or the full list of builds? See [all 
 :::
 
 :::div{style.maxWidth="var(--max-width)" style.margin="0.75rem auto 0" style.textAlign="center" style.fontSize="0.8125rem" style.color="var(--color-text-muted)"}
-On NixOS the same app is built from source — `nix run github:jxsuite/jx/release`. See [Install](/docs/start/install).
+On NixOS the same app is built from source with `nix run github:jxsuite/jx/release`. See [Install](/docs/start/install).
 :::
 ::::::
 
