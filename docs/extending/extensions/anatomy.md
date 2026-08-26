@@ -15,18 +15,18 @@ code:
 
 # Extension anatomy
 
-Jx documents are JSON, and everything beyond plain JSON — Markdown content, dynamic data tables, authentication, whatever you build next — enters the system through **extension packages**. The unit of admission is an npm package (or a local directory) shipping a `jx-extension.json` manifest; a project opts in with one line in `project.json`. The first-party extensions (`@jxsuite/parser`, `@jxsuite/connector`, `@jxsuite/auth`) use only these public hooks, so anything they do, your extension can do.
+Jx documents are JSON. Everything beyond plain JSON enters the system through **extension packages**: Markdown content, dynamic data tables, authentication, whatever you build next. The unit of admission is an npm package (or a local directory) shipping a `jx-extension.json` manifest; a project opts in with one line in `project.json`. The first-party extensions (`@jxsuite/parser`, `@jxsuite/connector`, `@jxsuite/auth`) use only these public hooks, so anything they do, your extension can do.
 
 An extension contributes up to four kinds of things, all declared in JSON before any code runs:
 
-- **Classes** — `.class.json` descriptors that become `$prototype`-visible names ([Custom classes](/docs/extending/extensions/classes)).
-- **Formats** — file-extension handling for parsing, saving, and content loading ([Custom formats](/docs/extending/extensions/formats)).
-- **Project sections** — top-level `project.json` keys with data loading and Studio settings UI ([Project sections and settings](/docs/extending/extensions/project-sections)).
-- **Schema fragments** — JSON Schema documents composed into the project's effective schema ([Schema composition](/docs/extending/extensions/schema-composition)).
+- **Classes**: `.class.json` descriptors that become `$prototype`-visible names ([Custom classes](/docs/extending/extensions/classes)).
+- **Formats**: file-extension handling for parsing, saving, and content loading ([Custom formats](/docs/extending/extensions/formats)).
+- **Project sections**: top-level `project.json` keys with data loading and Studio settings UI ([Project sections and settings](/docs/extending/extensions/project-sections)).
+- **Schema fragments**: JSON Schema documents composed into the project's effective schema ([Schema composition](/docs/extending/extensions/schema-composition)).
 
 ## Package layout
 
-The parser is the reference extension — its layout is the template:
+The parser is the reference extension, and its layout is the template:
 
 ```text
 extensions/
@@ -43,13 +43,13 @@ extensions/
   auth/                      # @jxsuite/auth — Better Auth sessions and permissions
 ```
 
-Three files matter to hosts: `package.json` names the manifest in its `"jx"` field, the manifest enumerates classes and schema fragments, and each `.class.json` descriptor declares what its class actually does. Implementation modules (`markdown.ts`) are imported only when a host invokes a declared capability — discovery is JSON all the way down.
+Three files matter to hosts: `package.json` names the manifest in its `"jx"` field, the manifest enumerates classes and schema fragments, and each `.class.json` descriptor declares what its class actually does. Implementation modules (`markdown.ts`) are imported only when a host invokes a declared capability. Discovery is JSON all the way down.
 
 Publish the manifest, descriptors, and fragments: they must appear in `package.json`'s `files` and `exports` so hosts can resolve `<package>/jx-extension.json` through the exports map.
 
 ## Dependency rules
 
-In the Jx monorepo, `packages/*` is **core** and `extensions/*` is **extensions** — and the arrow between them points one way:
+In the Jx monorepo, `packages/*` is **core** and `extensions/*` is **extensions**. The arrow between them points one way:
 
 - Extensions may depend on core packages and on each other. `@jxsuite/auth` depends on `@jxsuite/connector` for its database connection.
 - Core packages may **never** list an extension in `dependencies`, `peerDependencies`, or `optionalDependencies`, and may never import `@jxsuite/<extension>` from `src/`. `devDependencies` are permitted for test fixtures only. CI enforces this in `scripts/check-dep-rules.ts`.
@@ -72,14 +72,14 @@ A project enables extensions in `project.json`:
 }
 ```
 
-- Entries are bare package names or relative paths (for local, unpublished extensions). Package names resolve **project-first**: the project's own `node_modules`, then the host's. Projects own their extension dependencies — a scaffolded project lists `@jxsuite/parser` in its `package.json`.
+- Entries are bare package names or relative paths (for local, unpublished extensions). Package names resolve **project-first**: the project's own `node_modules`, then the host's. Projects own their extension dependencies, so a scaffolded project lists `@jxsuite/parser` in its `package.json`.
 - `imports` keeps its original, reduced job: mapping `$prototype` names to **project-local** class files. It does not register formats or extensions.
-- **Name visibility**: the manifest's class keys become `$prototype`-visible names. On a collision, a project-local `imports` entry wins over a manifest class; two extensions exporting the same class name is a registry error — rename via a local wrapper class to disambiguate.
+- **Name visibility**: the manifest's class keys become `$prototype`-visible names. On a collision, a project-local `imports` entry wins over a manifest class; two extensions exporting the same class name is a registry error. Rename via a local wrapper class to disambiguate.
 - **No implicit defaults.** A project with no `extensions` supports only `.json` documents and core state prototypes.
 
 ## Section keys
 
-Extensions contribute top-level `project.json` keys ("sections") — `content` (parser), `connections` and `data` (connector), `auth` (auth). By convention section keys are single words, and the key is used verbatim as:
+Extensions contribute top-level `project.json` keys ("sections"): `content` (parser), `connections` and `data` (connector), `auth` (auth). By convention section keys are single words, and the key is used verbatim as:
 
 - the property name in `project.json`,
 - the key under `_project` in resolved scope (`config._project.content`),
@@ -119,7 +119,7 @@ The manifest lives at the package root, referenced by `"jx": "./jx-extension.jso
 | `classes`     | `Record<string, string>` | `$prototype`-visible name → class descriptor path, relative to the manifest.                                   |
 | `schemas`     | `object`                 | Schema fragments this package contributes: `project` (project.json sections), `document` (document positions). |
 
-The manifest is pure data, validated by the generated `extension-manifest.schema.json` from `@jxsuite/schema`. It enumerates; it does not define behavior — behavior lives in the class descriptors it points to.
+The manifest is pure data, validated by the generated `extension-manifest.schema.json` from `@jxsuite/schema`. It enumerates; it does not define behavior. That lives in the class descriptors it points to.
 
 :::doc-note
 The registry implementing manifest discovery is `buildExtensionRegistry()` in `@jxsuite/schema/extension-registry`, with injected I/O so the identical logic serves node and browser hosts. It also enforces the conflict rules: duplicate class names, duplicate section keys, and overlapping server mounts all fail the registry build with a named error.
@@ -127,7 +127,7 @@ The registry implementing manifest discovery is `buildExtensionRegistry()` in `@
 
 ## Related
 
-- [Schema composition](/docs/extending/extensions/schema-composition) — what the `schemas` fragments contribute
-- [Custom classes](/docs/extending/extensions/classes) — the descriptors the `classes` map points to
-- [Tutorial: a TOML format extension](/docs/extending/extensions/tutorial-toml-format) — a complete third-party package, end to end
-- [First-party extensions](/docs/extending/extensions/first-party) — what parser, connector, and auth each provide
+- [Schema composition](/docs/extending/extensions/schema-composition): what the `schemas` fragments contribute
+- [Custom classes](/docs/extending/extensions/classes): the descriptors the `classes` map points to
+- [Tutorial: a TOML format extension](/docs/extending/extensions/tutorial-toml-format): a complete third-party package, end to end
+- [First-party extensions](/docs/extending/extensions/first-party): what parser, connector, and auth each provide

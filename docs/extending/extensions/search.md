@@ -16,7 +16,7 @@ code:
 
 # Search indexes
 
-`@jxsuite/search` is the reference implementation of the **`emit` capability** — the hook that lets a section-owner class write derived artifacts (here: a search index) into the build output. It is deliberately headless: the extension contributes the `search` project section, the build-time index, a `Search` state class, and a browser client, but no UI. Sites author their own search box against the client's contract.
+`@jxsuite/search` is the reference implementation of the **`emit` capability**, the hook that lets a section-owner class write derived artifacts (here: a search index) into the build output. It is deliberately headless: the extension contributes the `search` project section, the build-time index, a `Search` state class, and a browser client, but no UI. Sites author their own search box against the client's contract.
 
 If you want to _add search to a site_ rather than study the extension, start with the user-level [Site search](/docs/framework/site/search) page.
 
@@ -41,7 +41,7 @@ Two classes, one schema fragment:
 
 ## The `emit` capability
 
-`emit` runs at build time, after routes and components compile (extensions.md §8.4). The host passes the section value and a context carrying the **already-loaded** project sections — the emitter never re-reads source files:
+`emit` runs at build time, after routes and components compile (extensions.md §8.4). The host passes the section value and a context carrying the **already-loaded** project sections, so the emitter never re-reads source files:
 
 ```ts
 emit(sectionValue, { projectConfig, root, sections, routes })
@@ -50,8 +50,8 @@ emit(sectionValue, { projectConfig, root, sections, routes })
 
 `SearchIndex.emit` walks each configured collection in `sections.content` and produces two document granularities per entry:
 
-- a **page document** — title and description from frontmatter, full text extracted from the entry's rendered `$children`;
-- **section documents** (when `sections: true`) — one per heading up to `sectionDepth`, each with the heading text, the section's own text, and a URL ending in `#<heading-id>`. Heading ids are assigned by the parser and always match the rendered anchors ([parser.md §3.2](/docs/framework/site/content-collections)).
+- a **page document**: title and description from frontmatter, full text extracted from the entry's rendered `$children`;
+- **section documents** (when `sections: true`): one per heading up to `sectionDepth`, each with the heading text, the section's own text, and a URL ending in `#<heading-id>`. Heading ids are assigned by the parser and always match the rendered anchors ([parser.md §3.2](/docs/framework/site/content-collections)).
 
 The result is one JSON envelope at the configured `output` path:
 
@@ -73,7 +73,7 @@ The result is one JSON envelope at the configured `output` path:
 }
 ```
 
-The emitter returns data; **the host writes the files**, guards against path traversal, and skips the emitter entirely when the project declares no `search` section — the same gating as section loading and server mounts.
+The emitter returns data; **the host writes the files**, guards against path traversal, and skips the emitter entirely when the project declares no `search` section, the same gating as section loading and server mounts.
 
 ### Multilingual collections
 
@@ -81,11 +81,11 @@ A collection kept [one directory per locale](/docs/framework/site/i18n) indexes 
 
 | Field    | Is                                                                         |
 | -------- | -------------------------------------------------------------------------- |
-| `url`    | the entry's URL **in its own language** — `/fr-ca/blog/hello/`             |
+| `url`    | the entry's URL **in its own language** (`/fr-ca/blog/hello/`)             |
 | `id`     | `<collection>:<locale>:<entry-id>`, because translations share an entry id |
 | `locale` | the canonical tag                                                          |
 
-The client then searches **the page's language by default**, read from `<html lang>` — which the build wrote from the route's locale, so it is the same answer the index was built against:
+The client then searches **the page's language by default**, read from `<html lang>`, which the build wrote from the route's locale, so it is the same answer the index was built against:
 
 ```js
 query("bonjour"); // the page's language
@@ -93,7 +93,7 @@ query("bonjour", { locale: "fr-CA" }); // a named language
 query("bonjour", { locale: null }); // every language
 ```
 
-A document with no `locale` — an unlocalized collection — answers every search. It isn't in one language; it's outside the question.
+A document with no `locale` (an unlocalized collection) answers every search. It isn't in one language; it's outside the question.
 
 :::doc-note
 Without the scoping, a reader searching a French page gets the English copy of the page they're already on, ranked first, because it matched the same words.
@@ -123,11 +123,11 @@ In compiled sites `Search.lower()` replaces that def with a core `Function` comp
 
 The compiler's sidecar bundler resolves `npm:@jxsuite/search/client` from `node_modules`, bundles it (MiniSearch inlined) into `/assets/jxsuite-search-client.js`, and strips `$bundle` from the def. The deterministic URL comes from `sidecarAssetPath` in `@jxsuite/schema/asset-paths`, shared by extension and compiler so neither depends on the other.
 
-Inside compiled **components**, use the client's `$src` surface instead — components are not lowered; see [Site search](/docs/framework/site/search).
+Inside compiled **components**, use the client's `$src` surface instead, since components are not lowered; see [Site search](/docs/framework/site/search).
 
 ## Under node
 
-`Search.resolve()` degrades to `[]` with a warning outside the browser — search is a client interaction, and compiler-timing bakes or dev-server resolution should never fail a build over it.
+`Search.resolve()` degrades to `[]` with a warning outside the browser, because search is a client interaction, and compiler-timing bakes or dev-server resolution should never fail a build over it.
 
 :::doc-tip
 The `emit` contract generalizes beyond search: RSS/Atom feeds, export manifests, or any derived artifact a section owner can compute from loaded project data fits the same shape.

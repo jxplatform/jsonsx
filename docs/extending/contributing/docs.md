@@ -48,9 +48,9 @@ Your page is also published for machines. After `jx build`, the site build runs 
 
 The point of every rule below is that a reader should be able to hear a person behind the page. Read a paragraph aloud before you keep it. If you would not say it, rewrite it.
 
-**Dashes.** Do not use em dashes (—) or en dashes (–) in prose. They are the strongest single tell that a page was drafted by a model, and this corpus had one every forty-four words. An en dash between numbers or key names is a range (`0–100`, `` `h1`–`h6` ``) and is fine; a bare `—` in a table cell means "none" and is fine. Everywhere else, the dash is doing one of three jobs, and each has a better answer:
+**Dashes.** Do not use em dashes (`—`) or en dashes (–) in prose. They are the strongest single tell that a page was drafted by a model, and this corpus had one every forty-four words. An en dash between numbers or key names is a range (`0–100`, `` `h1`–`h6` ``) and is fine; a bare `—` in a table cell means "none" and is fine. Everywhere else, the dash is doing one of three jobs, and each has a better answer:
 
-- _An aside holding a list._ Put the list at the end behind a colon, or split the sentence. A comma cannot do this job, because the aside is already full of commas. "Every backend-touching operation in Studio — file I/O, project loading, git — goes through the adapter" becomes "Every backend-touching operation in Studio goes through the adapter: file I/O, project loading, git."
+- _An aside holding a list._ Put the list at the end behind a colon, or split the sentence. A comma cannot do this job, because the aside is already full of commas. `Every backend-touching operation in Studio — file I/O, project loading, git — goes through the adapter` becomes `Every backend-touching operation in Studio goes through the adapter: file I/O, project loading, git.`
 - _A clause tacked onto the end._ Promote it to its own sentence when it is a second fact, join it with "because" or "so" when it is a reason, and cut it when it only restates the sentence it is attached to. Vary between the three; six colons in a row is a new tic.
 - _A single appositive._ A comma, a colon, or parentheses.
 
@@ -59,6 +59,8 @@ The point of every rule below is that a reader should be able to hear a person b
 **Related-links tails.** A `## Related` or `## Next` item is `- [Link](slug): what it covers.` when the gloss is a bare noun phrase, or `- **[Link](slug)** verbs the rest of the sentence.` when it reads better as one. Either is within the dash rule; pick one and keep it consistent down the page.
 
 **Sentence length.** Aim under thirty words. A long sentence is fine when it is carrying a real chain of reasoning, and a short one is fine for emphasis, but a page where every sentence lands on the same medium-length beat reads like a machine. Vary it.
+
+**A quoted UI message is quoted verbatim**, dash and all. When a page shows what Studio says, the point is that a reader can match it against their screen, so the dash rule does not reach inside the quotation marks. Add an allow entry to `scripts/docs/prose.json` instead. Paraphrasing is fine where the message is templated and no fixed string exists.
 
 **Say it once.** Do not follow a heading with a sentence that only repeats it. A definition sentence is different and is required on a surface page, but it has to add the where and the what for: "Grid is for tabular data" earns its place; "Grid mode is a mode for grids" does not. No more than two sections in a row may open with the same frame.
 

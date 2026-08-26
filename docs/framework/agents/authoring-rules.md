@@ -12,7 +12,7 @@ code:
 
 # Authoring rules for agents
 
-An external coding agent — Claude Code, Cursor, a script against an API — needs no Jx-specific tooling to work on a project. It reads and writes files like any repository. What it does need is a briefing, because a model that has never seen Jx will reach for the conventions of frameworks it has seen: a CSS string where the format wants an object, an `attributes` bag where the property belongs on the element.
+An external coding agent (Claude Code, Cursor, a script against an API) needs no Jx-specific tooling to work on a project. It reads and writes files like any repository. What it does need is a briefing, because a model that has never seen Jx will reach for the conventions of frameworks it has seen: a CSS string where the format wants an object, an `attributes` bag where the property belongs on the element.
 
 Everything below is the briefing. Paste it into a system prompt, drop it in the agent's project instructions file, or point the agent at this page. The monorepo keeps a version of it as a `/jx` slash command at [`.claude/commands/jx.md`](https://github.com/jxsuite/jx/blob/main/.claude/commands/jx.md), which you can copy into your own project's `.claude/commands/`.
 
@@ -28,7 +28,7 @@ Both of these parse without complaint in any JSON tool, and both are **build err
 { "state": { "count": 0 }, "tagName": "div", "state": { "other": 1 } }
 ```
 
-A repeated key. `JSON.parse` keeps the last one and discards the first without a word — so the first `state` object is gone, and nothing downstream can tell it ever existed.
+A repeated key. `JSON.parse` keeps the last one and discards the first without a word, so the first `state` object is gone, and nothing downstream can tell it ever existed.
 
 ```json
 { "id": 9007199254740993 }
@@ -36,17 +36,17 @@ A repeated key. `JSON.parse` keeps the last one and discards the first without a
 
 An integer larger than a double can hold. It parses as `9007199254740992`, and the next save writes that wrong number back to your file.
 
-These are errors rather than warnings because a Jx document doesn't stay JSON. It round-trips through markdown frontmatter and through the collaborative editing layer, and each crossing rebuilds the object from the parsed value — so whatever was dropped at the boundary is dropped for good.
+These are errors rather than warnings because a Jx document doesn't stay JSON. It round-trips through markdown frontmatter and through the collaborative editing layer, and each crossing rebuilds the object from the parsed value. Whatever was dropped at the boundary is dropped for good.
 
 Fractions are never flagged. `0.1` isn't exactly representable in binary floating point either, so complaining about it would mean complaining about most real documents while telling you nothing about whether your value survived.
 
 ### Names are normalized, so an accent means one thing
 
-A state name is an identifier — declared as a key in `state`, referenced as `${state.été}` in a template and as `#/state/été` in a `$ref`. Typed on macOS an accented letter arrives decomposed (`e` plus a combining acute); typed on Windows, or pasted from most of the web, it arrives precomposed as a single character.
+A state name is an identifier: declared as a key in `state`, referenced as `${state.été}` in a template and as `#/state/été` in a `$ref`. Typed on macOS an accented letter arrives decomposed (`e` plus a combining acute); typed on Windows, or pasted from most of the web, it arrives precomposed as a single character.
 
-Those are two different property names. A document whose declaration and reference came from different machines used to build cleanly, emit a valid bundle, and render nothing at all — no error, and no way to see the difference in any editor.
+Those are two different property names. A document whose declaration and reference came from different machines used to build cleanly, emit a valid bundle, and render nothing at all: no error, and no way to see the difference in any editor.
 
-Every key and every string value is now put into Unicode Normalization Form C when the file is read, so both spellings become the same name. Values are normalized too: canonically equivalent text is the _same text_ by definition, so nothing about your content changes. NFC composes and never folds or strips — CJK, emoji, and scripts with no composed forms survive exactly as written.
+Every key and every string value is now put into Unicode Normalization Form C when the file is read, so both spellings become the same name. Values are normalized too: canonically equivalent text is the _same text_ by definition, so nothing about your content changes. NFC composes and never folds or strips, so CJK, emoji, and scripts with no composed forms survive exactly as written.
 
 ## The three schemas
 
@@ -58,7 +58,7 @@ Every Jx file validates against one of three JSON Schema 2020-12 documents, publ
 | `project.json`                        | `https://jxsuite.com/schema/project/v1` |
 | Class definitions (`*.class.json`)    | `https://jxsuite.com/schema/class/v1`   |
 
-Inside a project, prefer the generated local copies over the network: `jx schema` writes `project.schema.json` and `document.schema.json` into the project root, composed from the core schemas plus the fragments each enabled extension ships. Each is a self-contained single-resource schema — every `$ref` a root-relative JSON Pointer into the same file — so an editor resolves it offline with no `node_modules`, no network, and no configuration (see [Machine-readable docs](/docs/framework/agents/machine-readable) and [Schema composition](/docs/extending/extensions/schema-composition)). `project.json` binds itself with `"$schema": "./project.schema.json"`. Documents carry no `$schema` key in the shipped starters — `jx validate` checks them against `document.schema.json` either way — so add one only if you want editor autocomplete. It resolves relative to the file that carries it, so count the folder levels: `"../document.schema.json"` from `pages/index.json`, `"../../document.schema.json"` from `pages/blog/post.json`. A pointer with too few `../` names a file that does not exist, and validators report the unresolvable schema instead of checking the document at all.
+Inside a project, prefer the generated local copies over the network: `jx schema` writes `project.schema.json` and `document.schema.json` into the project root, composed from the core schemas plus the fragments each enabled extension ships. Each is a self-contained single-resource schema, with every `$ref` a root-relative JSON Pointer into the same file, so an editor resolves it offline with no `node_modules`, no network, and no configuration (see [Machine-readable docs](/docs/framework/agents/machine-readable) and [Schema composition](/docs/extending/extensions/schema-composition)). `project.json` binds itself with `"$schema": "./project.schema.json"`. Documents carry no `$schema` key in the shipped starters (`jx validate` checks them against `document.schema.json` either way), so add one only if you want editor autocomplete. It resolves relative to the file that carries it, so count the folder levels: `"../document.schema.json"` from `pages/index.json`, `"../../document.schema.json"` from `pages/blog/post.json`. A pointer with too few `../` names a file that does not exist, and validators report the unresolvable schema instead of checking the document at all.
 
 ## Project structure
 
@@ -91,9 +91,9 @@ A Jx document is a JSON object describing a reactive web component:
 
 Only `tagName` is required. A `tagName` containing a hyphen makes the document a custom element.
 
-### State — five shapes, detected by structure
+### State: five shapes, detected by structure
 
-**1. Naked value** — a scalar, array, or plain object with no reserved keys:
+**1. Naked value**: a scalar, array, or plain object with no reserved keys:
 
 ```json
 "count": 0,
@@ -101,20 +101,20 @@ Only `tagName` is required. A `tagName` containing a hyphen makes the document a
 "user": { "name": "", "email": "" }
 ```
 
-**2. Typed value** — has `default`, optionally `type`:
+**2. Typed value**: has `default`, optionally `type`:
 
 ```json
 "status": { "type": { "type": "string", "enum": ["idle", "loading"] }, "default": "idle" }
 ```
 
-**3. Computed** — a string containing `${}`:
+**3. Computed**: a string containing `${}`:
 
 ```json
 "fullName": "${state.firstName} ${state.lastName}",
 "itemCount": "${state.items.length} items"
 ```
 
-**4. Function** — `$prototype: "Function"`, with an inline `body` or an external `.js` sidecar:
+**4. Function**: `$prototype: "Function"`, with an inline `body` or an external `.js` sidecar:
 
 ```json
 "increment": { "$prototype": "Function", "body": "state.count++" },
@@ -122,7 +122,7 @@ Only `tagName` is required. A `tagName` containing a hyphen makes the document a
 "validate": { "$prototype": "Function", "$src": "./validators.js", "$export": "validateEmail" }
 ```
 
-**5. Data source** — `$prototype: <ClassName>`:
+**5. Data source**: `$prototype: <ClassName>`:
 
 ```json
 "userData": { "$prototype": "Request", "url": "/api/users", "method": "GET" },
@@ -147,7 +147,7 @@ Use `${}` templates for inline one-off bindings, `$ref` objects for named or reu
 
 ### Children
 
-Static — an array of element objects and text strings, mixed freely:
+Static children are an array of element objects and text strings, mixed freely:
 
 ```json
 "children": [
@@ -156,7 +156,7 @@ Static — an array of element objects and text strings, mixed freely:
 ]
 ```
 
-Dynamic list — `$prototype: "Array"`:
+A dynamic list uses `$prototype: "Array"`:
 
 ```json
 "children": {
@@ -206,7 +206,7 @@ See [Styling](/docs/framework/concepts/styling).
 
 ### Properties and attributes
 
-IDL properties — `href`, `src`, `textContent`, `className`, `hidden`, `disabled`, `value`, `checked` — go directly on the element object. Everything else (`aria-*`, `data-*`, `role`, `slot`) goes in `attributes`:
+IDL properties go directly on the element object: `href`, `src`, `textContent`, `className`, `hidden`, `disabled`, `value`, `checked`. Everything else (`aria-*`, `data-*`, `role`, `slot`) goes in `attributes`:
 
 ```json
 {
@@ -227,7 +227,7 @@ Reference a function from state:
 
 ### Components and props
 
-`$elements` is an **array** of `$ref` objects (paths relative to the current file) and bare npm specifiers for web-component libraries. The registered tag is the referenced document's own `tagName`. Instantiate it by tag and pass data with `$props` — a bare `{ "$ref": "./card.json" }` in `children` is not a component instance:
+`$elements` is an **array** of `$ref` objects (paths relative to the current file) and bare npm specifiers for web-component libraries. The registered tag is the referenced document's own `tagName`. Instantiate it by tag and pass data with `$props`. A bare `{ "$ref": "./card.json" }` in `children` is not a component instance:
 
 ```json
 {
@@ -262,9 +262,9 @@ Pages are documents with a few extra top-level fields:
 }
 ```
 
-- `$layout` — a path resolved from the **project root**, or `false` for no layout. Omit it to use `defaults.layout` from `project.json`.
-- `$head` — merges with the layout's and the project's entries; the page wins on conflicts.
-- `$paths` — the concrete routes a `[param]` page generates. One source shape, checked strictly by the generated document schema: `{ contentType, param, field }` (needs `@jxsuite/parser`), `{ values, param }`, `{ "$ref": "./data.json", param, field }`, or a bare array of parameter objects. A key that is not part of one of these is an error, not a silently empty build.
+- `$layout`: a path resolved from the **project root**, or `false` for no layout. Omit it to use `defaults.layout` from `project.json`.
+- `$head`: merges with the layout's and the project's entries; the page wins on conflicts.
+- `$paths`: the concrete routes a `[param]` page generates. One source shape, checked strictly by the generated document schema: `{ contentType, param, field }` (needs `@jxsuite/parser`), `{ values, param }`, `{ "$ref": "./data.json", param, field }`, or a bare array of parameter objects. A key that is not part of one of these is an error, not a silently empty build.
 - `tagName` is optional on a page that uses a layout.
 
 Dynamic route (`pages/blog/[slug].json`):
@@ -332,7 +332,7 @@ See [Layouts](/docs/framework/site/layouts).
 }
 ```
 
-`extensions` is the enablement list, and no Studio panel edits it: turning on the connector, auth, or search extension means adding its package name to this array by hand — a good job for the agent — then re-running `jx schema`. Studio picks up the change once it is on disk. See [project.json](/docs/framework/site/project-json) and [First-party extensions](/docs/extending/extensions/first-party).
+`extensions` is the enablement list, and no Studio panel edits it: turning on the connector, auth, or search extension means adding its package name to this array by hand (a good job for the agent), then re-running `jx schema`. Studio picks up the change once it is on disk. See [project.json](/docs/framework/site/project-json) and [First-party extensions](/docs/extending/extensions/first-party).
 
 ## `.class.json`
 
@@ -361,11 +361,11 @@ See [Custom classes](/docs/extending/extensions/classes).
 
 A brochure site is not the ceiling. Three additions turn a Jx project into an application, and an agent should know they exist:
 
-- **Server functions.** A state entry with `timing: "server"` names an async export via `$src` and `$export` — no `$prototype`. It compiles to `POST /_jx/server/<exportName>`, and the function receives `(args, env)` where `env` carries the platform's bindings. Secrets stay in that process. See [Timing](/docs/framework/concepts/timing).
+- **Server functions.** A state entry with `timing: "server"` names an async export via `$src` and `$export`, with no `$prototype`. It compiles to `POST /_jx/server/<exportName>`, and the function receives `(args, env)` where `env` carries the platform's bindings. Secrets stay in that process. See [Timing](/docs/framework/concepts/timing).
 - **Databases.** Add `@jxsuite/connector` to `extensions`, then declare `connections` (D1, Supabase, or SQLite) and `data` tables in `project.json`. `jx db push` applies the schema additively. Form actions and table queries read and write over `/_jx/data`. See [Databases](/docs/studio/data).
 - **Accounts.** Add `@jxsuite/auth` and an `auth` section for sign-in, sessions, roles, and per-table permissions. See [Auth and secrets](/docs/studio/data/auth-and-secrets).
 
-Two rules bind all three. **Secrets are never values in `project.json`** — the file records environment-variable _names_ only, and the values live in `.dev.vars` locally and in your host's environment when deployed. And any of this needs a server-capable `build.adapter` (`cloudflare-workers`, `cloudflare-pages`, `node`, or `bun`), which packages the server tier into a deployable worker; with connection-backed data tables it is not optional — the build **fails** on static. See [Build output and adapters](/docs/framework/site/deployment).
+Two rules bind all three. **Secrets are never values in `project.json`**: the file records environment-variable _names_ only, and the values live in `.dev.vars` locally and in your host's environment when deployed. And any of this needs a server-capable `build.adapter` (`cloudflare-workers`, `cloudflare-pages`, `node`, or `bun`), which packages the server tier into a deployable worker; with connection-backed data tables it is not optional, because the build **fails** on static. See [Build output and adapters](/docs/framework/site/deployment).
 
 ## Hard rules
 
@@ -374,11 +374,11 @@ Two rules bind all three. **Secrets are never values in `project.json`** — the
 3. IDL properties go on the element; everything else goes in `attributes`.
 4. Prefer CSS `clamp()` over media queries for simple responsive values.
 5. A component's `tagName` must contain a hyphen (Web Components requires it).
-6. `$defs` holds JSON Schema type definitions only — no functions, no defaults, no runtime artifacts.
-7. Template strings (`${}`) are pure expressions — no statements, no assignments.
+6. `$defs` holds JSON Schema type definitions only: no functions, no defaults, no runtime artifacts.
+7. Template strings (`${}`) are pure expressions, with no statements and no assignments.
 8. Function `body` strings are raw JavaScript where `state` is in scope; a sidecar export takes `state` as its first parameter.
 9. `$head` entries are `{ tagName, attributes }` objects, never HTML strings.
-10. Layouts inject content with `{ "tagName": "slot" }` — there is no `$slot` or `$content`.
+10. Layouts inject content with `{ "tagName": "slot" }`. There is no `$slot` or `$content`.
 11. All state entries are reactive by default; no `signal: true` flag exists.
 12. `timing` (`"compiler"`, `"server"`, `"client"`) decides where a data source resolves. `"client"` is the default.
 
@@ -399,11 +399,11 @@ pages/about.json:
   - /children/0: must NOT have additional properties
 ```
 
-Each line names the file, the JSON pointer, and the violation — enough to fix without guessing. Repeat until it prints `Project is valid`. The same command gates CI, so nothing is gained by skipping it. See [CLI commands](/docs/framework/build/cli).
+Each line names the file, the JSON pointer, and the violation, which is enough to fix without guessing. Repeat until it prints `Project is valid`. The same command gates CI, so nothing is gained by skipping it. See [CLI commands](/docs/framework/build/cli).
 
 ## Related
 
-- [Working with agents](/docs/framework/agents) — where this briefing fits in the wider workflow
-- [Machine-readable docs](/docs/framework/agents/machine-readable) — the schema and documentation URLs an agent can fetch
-- [Documents](/docs/framework/concepts/documents) — the long-form version of the document model
-- [Site architecture](/docs/framework/site) — the project layout these rules describe
+- [Working with agents](/docs/framework/agents): where this briefing fits in the wider workflow
+- [Machine-readable docs](/docs/framework/agents/machine-readable): the schema and documentation URLs an agent can fetch
+- [Documents](/docs/framework/concepts/documents): the long-form version of the document model
+- [Site architecture](/docs/framework/site): the project layout these rules describe

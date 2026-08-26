@@ -1,6 +1,6 @@
 ---
 title: "Quick Access"
-description: "Open any file in your project by name with the Quick Access palette — how to open it, what it searches, and its keyboard controls."
+description: "Open any file in your project by name with the Quick Access palette: how to open it, what it searches, and its keyboard controls."
 code:
   - packages/studio/src/panels/quick-search.ts
 ---
@@ -13,20 +13,20 @@ Quick Access is the fastest way to open a file: a search palette that drops over
 
 ## Open it
 
-Arrowing through the results announces the highlighted row, so the list is usable without looking at it — the input and the list beneath it are now connected in the way a screen reader expects, which they were not before.
+Arrowing through the results announces the highlighted row, so the list is usable without looking at it. The input and the list beneath it are now connected in the way a screen reader expects, which they were not before.
 
-- Press :kbd[⌘P] (macOS) or :kbd[Ctrl+P] (Windows/Linux) — it works from anywhere in Studio.
-- Or click any segment of the **Command Center** pill in the middle of the Command Bar — the segment you click scopes the search to that level.
+- Press :kbd[⌘P] (macOS) or :kbd[Ctrl+P] (Windows/Linux). It works from anywhere in Studio.
+- Or click any segment of the **Command Center** pill in the middle of the Command Bar; the segment you click scopes the search to that level.
 
 Press :kbd[Esc] or click outside the palette to dismiss it.
 
 ## What it finds
 
-With a project open, type any part of a filename and Quick Access searches the whole project's documents — pages, components, content, and data files alike. Each result shows the filename and the folder it lives in.
+With a project open, type any part of a filename and Quick Access searches the whole project's documents: pages, components, content, and data files alike. Each result shows the filename and the folder it lives in.
 
 Before you type anything, the palette lists your **recently opened** files, so reopening the file you just closed is :kbd[⌘P], :kbd[Enter].
 
-With no project open, the palette lists your recent projects instead — pick one to reopen it. It never mixes the two: with a project open you only ever see that project's files.
+With no project open, the palette lists your recent projects instead. Pick one to reopen it. It never mixes the two: with a project open you only ever see that project's files.
 
 ## Keyboard controls
 
@@ -34,7 +34,7 @@ With no project open, the palette lists your recent projects instead — pick on
 - :kbd[Enter] opens the highlighted result in a tab.
 - :kbd[Esc] closes the palette.
 
-The mouse works too — click any row to open it.
+The mouse works too: click any row to open it.
 
 ## Next
 

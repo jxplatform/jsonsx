@@ -1,6 +1,6 @@
 ---
 title: "The AI assistant"
-description: "The assistant's chat — open it, attach context, watch its edits land, manage chat history, and review or undo what it changed."
+description: "The assistant's chat: open it, attach context, watch its edits land, manage chat history, and review or undo what it changed."
 code:
   - packages/studio/src/panels/ai-chat/composer.ts
   - packages/studio/src/panels/ai-chat/chat-view.ts
@@ -10,30 +10,30 @@ code:
 
 # The AI assistant
 
-The assistant lives in the Inspector, as its fourth tab beside Content, Style and Logic. It survives tab switches — your draft message, scroll position, and conversation are all still there when you come back — and it works in every state of Studio, from the welcome screen to a page mid-edit. Because it shares the Inspector's width, showing it costs the canvas nothing.
+The assistant lives in the Inspector, as its fourth tab beside Content, Style and Logic. It survives tab switches (your draft message, scroll position, and conversation are all still there when you come back), and it works in every state of Studio, from the welcome screen to a page mid-edit. Because it shares the Inspector's width, showing it costs the canvas nothing.
 
 ![A conversation with the assistant: a user message with context chips, an assistant reply with a tool chip, and the composer below](../../images/ai-sidebar-chat.png)
 
 ## Open it
 
-Press :kbd[⌘⇧4] (macOS) / :kbd[Ctrl+Shift+4] (Windows/Linux), or click the **Assistant** tab at the top of the Inspector. :kbd[⌘⇧A] / :kbd[Ctrl+Shift+A] does the same and puts the cursor in the message box, ready to type — including on the welcome screen, before any project is open. Drag the Inspector's inner edge to resize it; the width and which tab you left selected are both remembered across sessions.
+Press :kbd[⌘⇧4] (macOS) / :kbd[Ctrl+Shift+4] (Windows/Linux), or click the **Assistant** tab at the top of the Inspector. :kbd[⌘⇧A] / :kbd[Ctrl+Shift+A] does the same and puts the cursor in the message box, ready to type. That works on the welcome screen too, before any project is open. Drag the Inspector's inner edge to resize it; the width and which tab you left selected are both remembered across sessions.
 
-If no AI provider is set up yet, the tab still opens on a chat, with one line under it — _No AI provider is connected yet_ — and an **Assistant: Settings…** button that opens the setup dialog. See **[Connect a provider](/docs/studio/ai#connect-a-provider)**.
+If no AI provider is set up yet, the tab still opens on a chat, with one line under it (_No AI provider is connected yet_) and an **Assistant: Settings…** button that opens the setup dialog. See **[Connect a provider](/docs/studio/ai#connect-a-provider)**.
 
 ## Send a message
 
-Type in the message box at the bottom and press :kbd[Enter] to send — :kbd[Shift+Enter] inserts a newline. The box grows as you type, and the send button enables once there's something to send.
+Type in the message box at the bottom and press :kbd[Enter] to send. :kbd[Shift+Enter] inserts a newline. The box grows as you type, and the send button enables once there's something to send.
 
 The row under the message box holds the composer's controls:
 
-- **Attach context** (paperclip) — pin the current page or the selected element to your message (below).
-- The **model picker** — switch models mid-conversation. The list comes from the provider you have configured, and only from that one: change the key or the endpoint and the picker re-asks rather than showing you the previous provider's catalogue.
-- **API key & endpoint** (gear) — reopen the **Assistant settings** dialog.
-- **Send** — becomes **Stop** while the assistant is replying; click it to halt the reply and any further actions.
+- **Attach context** (paperclip) pins the current page or the selected element to your message (below).
+- The **model picker** switches models mid-conversation. The list comes from the provider you have configured, and only from that one: change the key or the endpoint and the picker re-asks rather than showing you the previous provider's catalogue.
+- **API key & endpoint** (gear) reopens the **Assistant settings** dialog.
+- **Send** becomes **Stop** while the assistant is replying; click it to halt the reply and any further actions.
 
 ## How much the assistant is holding
 
-The chat header shows how much of the model's context the conversation is using — `18.4k` for about eighteen thousand tokens. It appears once there's something to count and stays quiet until it matters.
+The chat header shows how much of the model's context the conversation is using: `18.4k` for about eighteen thousand tokens. It appears once there's something to count and stays quiet until it matters.
 
 Past **half** the model's window it turns amber. That is the point at which the assistant starts dropping the oldest turns to make room, so a long conversation quietly forgets what you told it near the beginning. When you see amber and the assistant seems to have lost the thread, start a new chat: the reply that follows will have your whole message rather than the tail of it.
 
@@ -41,20 +41,20 @@ Past **half** the model's window it turns amber. That is the point at which the 
 
 The paperclip menu offers two attachments, each shown as a removable chip above the message box:
 
-- **Current page** — the file open in the active tab.
-- **Selected element** — the element currently selected on the canvas, identified by its tag and a snippet of its text.
+- **Current page**: the file open in the active tab.
+- **Selected element**: the element currently selected on the canvas, identified by its tag and a snippet of its text.
 
-With several elements selected, the chip carries the **primary** one — the last you added — so the attachment always names a single, unambiguous target. Attaching the selected element is the precise way to say "this one": "make _this_ heading smaller" works reliably when the heading rides along as a chip. One chip of each kind is kept, chips clear after sending, and sent messages display their chips so you can see later what a request pointed at.
+With several elements selected, the chip carries the **primary** one (the last you added), so the attachment always names a single, unambiguous target. Attaching the selected element is the precise way to say "this one": "make _this_ heading smaller" works reliably when the heading rides along as a chip. One chip of each kind is kept, chips clear after sending, and sent messages display their chips so you can see later what a request pointed at.
 
-Even without attachments the assistant already knows a lot: each message carries the open page's full contents and a summary of the project — its name, settings, component names, and file paths. Attachments are for pointing, not for granting access.
+Even without attachments the assistant already knows a lot: each message carries the open page's full contents and a summary of the project (its name, settings, component names, and file paths). Attachments are for pointing, not for granting access.
 
 ## Watch it work
 
-The assistant's reply streams in live. When it acts on your project, each action appears as a small labeled chip in the reply — one per edit or file operation — and each chip says what **became** of that action: a tick and the change it made, or a cross and the reason it was refused. A chip with neither is still in flight.
+The assistant's reply streams in live. When it acts on your project, each action appears as a small labeled chip in the reply (one per edit or file operation), and each chip says what **became** of that action: a tick and the change it made, or a cross and the reason it was refused. A chip with neither is still in flight.
 
-Under the chips, a reply that changed anything carries a one-line summary — "Changed 3 files", plus a count of any that were **written to disk, where undo cannot reach them**. Expand it for the list of paths. When every change in a reply went through the editor, the summary also offers **Restore to here**, which rolls that whole reply back in one step.
+Under the chips, a reply that changed anything carries a one-line summary: "Changed 3 files", plus a count of any that were **written to disk, where undo cannot reach them**. Expand it for the list of paths. When every change in a reply went through the editor, the summary also offers **Restore to here**, which rolls that whole reply back in one step.
 
-Document edits land on the canvas as they happen, so for canvas work you can literally watch the page change. If something goes wrong mid-request — a lost connection, a provider error — the chat shows the error with advice on how to recover, and a **Retry** button that sends your last message again.
+Document edits land on the canvas as they happen, so for canvas work you can literally watch the page change. If something goes wrong mid-request (a lost connection, a provider error), the chat shows the error with advice on how to recover, and a **Retry** button that sends your last message again.
 
 A long request that reaches the assistant's per-message limit on tool calls is not an error: it finishes with a note saying it ran out of rounds and listing what it did apply, and everything it changed stays changed. Send another message to continue.
 
@@ -62,9 +62,9 @@ A long request that reaches the assistant's per-message limit on tool calls is n
 
 What the assistant may change, and how you take it back, follows two rules:
 
-**Edits to a page open on the canvas** are applied to the open editor, not to disk. The page's tab is marked unsaved, exactly as if you had made the edits yourself — review them on the canvas, then save the tab to keep them or close without saving to discard. They also enter the page's normal undo history as **one undo step per request**: press :kbd[⌘Z] (macOS) or :kbd[Ctrl+Z] (Windows/Linux) once to roll back everything the assistant did to that page in its last reply. If one request edited several pages, each page carries its own single step.
+**Edits to a page open on the canvas** are applied to the open editor, not to disk. The page's tab is marked unsaved, exactly as if you had made the edits yourself. Review them on the canvas, then save the tab to keep them or close without saving to discard. They also enter the page's normal undo history as **one undo step per request**: press :kbd[⌘Z] (macOS) or :kbd[Ctrl+Z] (Windows/Linux) once to roll back everything the assistant did to that page in its last reply. If one request edited several pages, each page carries its own single step.
 
-**File-level changes** — new pages, new components, whole-file rewrites — are saved straight to disk and are **not undoable** from Studio's history. Two guards keep this safe: Jx documents are validated (and test-rendered) before writing, and the assistant refuses to overwrite a file you have open with unsaved changes. When it writes a file you _do_ have open (with no unsaved edits), the tab refreshes to show the new contents.
+**File-level changes** (new pages, new components, whole-file rewrites) are saved straight to disk and are **not undoable** from Studio's history. Two guards keep this safe: Jx documents are validated (and test-rendered) before writing, and the assistant refuses to overwrite a file you have open with unsaved changes. When it writes a file you _do_ have open (with no unsaved edits), the tab refreshes to show the new contents.
 
 :::doc-tip
 For disk-level changes, source control is the review tool: the **[Source Control](/docs/studio/publish/source-control)** panel shows every file the assistant touched as a pending change you can diff or discard before committing.
