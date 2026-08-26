@@ -94,12 +94,6 @@
       "reason": "The same table's warning row."
     },
     {
-      "id": "ai-vocab",
-      "file": "PROSE-REWRITE.md",
-      "text": "there is not one hit for",
-      "reason": "The audit naming the words the corpus does not contain. They are being counted, not used."
-    },
-    {
       "id": "em-dash",
       "file": "docs/studio/editing/frontmatter.md",
       "text": "Nothing to flag",
