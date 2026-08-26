@@ -72,14 +72,20 @@ function page(title: string, translationKey?: string): string {
   });
 }
 
-/** The switcher links a page rendered, as `hreflang → {url, dir, current}`. */
-function switcher(source: string): Record<string, { current: string; dir: string; url: string }> {
-  const out: Record<string, { current: string; dir: string; url: string }> = {};
+/**
+ * The switcher links a page rendered, as `hreflang → {url, dir, current}`.
+ *
+ * `current` is read by PRESENCE, not by text: `item.current` is a boolean, and the emitter spells a
+ * boolean as the attribute's presence — bare when true, absent when false (compiler spec §6). So
+ * the marker this asserts is `<a data-current>` against `<a>`, never `data-current="false"`.
+ */
+function switcher(source: string): Record<string, { current: boolean; dir: string; url: string }> {
+  const out: Record<string, { current: boolean; dir: string; url: string }> = {};
   for (const tag of source.match(/<a\b[^>]*>/g) ?? []) {
     const attr = (name: string) => new RegExp(`${name}="([^"]*)"`).exec(tag)?.[1] ?? "";
     if (attr("hreflang") !== "") {
       out[attr("hreflang")] = {
-        current: attr("data-current"),
+        current: /\bdata-current\b/.test(tag),
         dir: attr("dir"),
         url: attr("href"),
       };
@@ -163,15 +169,15 @@ describe("a language switcher", () => {
   it("renders one link per language the page exists in, itself included", () => {
     // No Arabic About exists, so the switcher must not offer one.
     expect(switcher(html("about"))).toEqual({
-      en: { current: "true", dir: "ltr", url: "/about" },
-      "fr-CA": { current: "false", dir: "ltr", url: "/fr-ca/a-propos" },
+      en: { current: true, dir: "ltr", url: "/about" },
+      "fr-CA": { current: false, dir: "ltr", url: "/fr-ca/a-propos" },
     });
   });
 
   it("marks the page the reader is on", () => {
     const links = switcher(html("fr-ca/a-propos"));
-    expect(links["fr-CA"]?.current).toBe("true");
-    expect(links.en?.current).toBe("false");
+    expect(links["fr-CA"]?.current).toBe(true);
+    expect(links.en?.current).toBe(false);
   });
 
   /*

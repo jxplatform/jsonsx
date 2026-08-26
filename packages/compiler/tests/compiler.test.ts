@@ -251,12 +251,26 @@ describe("compile — static nodes", () => {
     expect(html).toContain('data-n="42"');
   });
 
-  test("custom attributes block — boolean value", async () => {
+  /*
+   * A boolean is the attribute's PRESENCE, not its text (compiler spec §6). `data-flag="false"`
+   * would read as present to every HTML boolean attribute, so the emitter spells absence with
+   * `false` and presence with a bare name.
+   */
+  test("custom attributes block — boolean true emits the name bare", async () => {
     const { html } = await compile({
       attributes: { "data-flag": true },
       tagName: "div",
     });
-    expect(html).toContain('data-flag="true"');
+    expect(html).toContain("<div data-flag>");
+  });
+
+  test("custom attributes block — boolean false omits the attribute", async () => {
+    const { html } = await compile({
+      attributes: { "data-flag": false },
+      tagName: "div",
+    });
+    expect(html).toContain("<div></div>");
+    expect(html).not.toContain("data-flag");
   });
 
   test("textContent escaped", async () => {
