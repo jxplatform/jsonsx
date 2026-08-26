@@ -13,6 +13,7 @@
  */
 
 import { html } from "lit-html";
+import { live } from "lit/directives/live.js";
 import { getPlatform } from "../platform";
 import { preferredModel } from "../services/ai-models";
 import { createModelPicker } from "../ui/ai-model-picker";
@@ -268,7 +269,7 @@ export function renderImportSource(ctx: ImportTabCtx): TemplateResult {
       <span class="new-project-label">Site URL *</span>
       <sp-textfield
         placeholder="https://example.com"
-        .value=${_url}
+        .value=${live(_url)}
         @input=${onUrlInput(ctx)}
         style="width: 100%"
       ></sp-textfield>
@@ -279,7 +280,7 @@ export function renderImportSource(ctx: ImportTabCtx): TemplateResult {
         <sp-number-field
           min="0"
           max="2"
-          .value=${_depth}
+          .value=${live(_depth)}
           @change=${(e: Event) => {
             _depth = Math.trunc(Number((e.target as HTMLInputElement).value)) || 0;
           }}
@@ -290,7 +291,7 @@ export function renderImportSource(ctx: ImportTabCtx): TemplateResult {
         <sp-number-field
           min="1"
           max="100"
-          .value=${_maxPages}
+          .value=${live(_maxPages)}
           @change=${(e: Event) => {
             _maxPages = Math.trunc(Number((e.target as HTMLInputElement).value)) || 1;
           }}
@@ -298,7 +299,7 @@ export function renderImportSource(ctx: ImportTabCtx): TemplateResult {
       </label>
     </div>
     <sp-switch
-      ?checked=${_aiNaming}
+      .checked=${live(_aiNaming)}
       @change=${(e: Event) => {
         _aiNaming = (e.target as HTMLInputElement).checked;
       }}
@@ -306,7 +307,7 @@ export function renderImportSource(ctx: ImportTabCtx): TemplateResult {
       AI component naming
     </sp-switch>
     <sp-switch
-      ?checked=${_verify}
+      .checked=${live(_verify)}
       @change=${(e: Event) => {
         _verify = (e.target as HTMLInputElement).checked;
       }}
@@ -323,7 +324,7 @@ export function renderImportSource(ctx: ImportTabCtx): TemplateResult {
         multiline
         class="new-project-import-prompt"
         placeholder="Keep the layout but modernise the typography, and turn the news list into a content collection…"
-        .value=${_prompt}
+        .value=${live(_prompt)}
         @input=${(e: Event) => {
           _prompt = (e.target as HTMLInputElement).value;
         }}

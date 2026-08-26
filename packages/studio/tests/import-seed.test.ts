@@ -63,7 +63,7 @@ describe("import-seed — the hand-off slot", () => {
   test("does nothing with no assistant registered", async () => {
     /* A reduced host — a test fixture, an embedder without the assistant — would otherwise crash on
        a button the wizard should simply not have offered. */
-    await expect(runImportHandoff(BRIEF)).resolves.toBeUndefined();
+    expect(await runImportHandoff(BRIEF)).toBeUndefined();
   });
 
   test("delegates to the registered hand-off and awaits it", async () => {

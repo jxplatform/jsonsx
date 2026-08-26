@@ -795,7 +795,7 @@ describe("a turn suspended on a question", () => {
   });
 
   test("the composer becomes the answer field", async () => {
-    const settled = await raiseQuestion();
+    const { settled } = await raiseQuestion();
     expect(isAssistantWaiting()).toBe(true);
     expect(q("textarea")!.getAttribute("placeholder")).toContain("Answer the assistant");
     expect(q(".ai-ask-question")!.textContent!.trim()).toBe("Which pages matter?");
