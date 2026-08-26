@@ -1,5 +1,34 @@
 # Changelog
 
+## [3.0.0](https://github.com/jxsuite/jx/compare/server-v2.2.7...server-v3.0.0) (2026-08-26)
+
+
+### ⚠ BREAKING CHANGES
+
+* **server:** a project relying on root-relative static serving loses it. The root lane survives as a COMPATIBILITY lane and is scheduled for removal; until then a site URL answered from it prints a diagnostic naming the file and the fix — move it into `public/`.
+
+### Bug Fixes
+
+* **server:** public/ resolves before the project root, as a build does ([2c123c6](https://github.com/jxsuite/jx/commit/2c123c6f09793311d6b99af2e59913bccdbf0cee))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/collab bumped to 0.8.3
+    * @jxsuite/compiler bumped to 2.0.8
+    * @jxsuite/create bumped to 1.3.7
+    * @jxsuite/import bumped to 0.39.8
+    * @jxsuite/protocol bumped to 2.0.0
+    * @jxsuite/runtime bumped to 2.1.0
+    * @jxsuite/schema bumped to 1.9.0
+    * @jxsuite/starters bumped to 1.6.4
+  * devDependencies
+    * @jxsuite/auth bumped to 0.5.5
+    * @jxsuite/connector bumped to 0.5.5
+    * @jxsuite/parser bumped to 1.5.6
+
 ## [2.2.7](https://github.com/jxsuite/jx/compare/server-v2.2.6...server-v2.2.7) (2026-08-25)
 
 

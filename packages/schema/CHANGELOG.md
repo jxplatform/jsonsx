@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.9.0](https://github.com/jxsuite/jx/compare/schema-v1.8.1...schema-v1.9.0) (2026-08-26)
+
+
+### Features
+
+* **schema,runtime,studio:** the shared path math and a default-off canvas asset resolver ([5100bc7](https://github.com/jxsuite/jx/commit/5100bc7e23e428c87a6e721251ddc763786ac448))
+* **schema:** the pure math for project paths, site URLs, and the lanes between them ([d08dc18](https://github.com/jxsuite/jx/commit/d08dc18eea0e924392101af2d9b3c8b5c811de5f))
+
 ## [1.8.1](https://github.com/jxsuite/jx/compare/schema-v1.8.0...schema-v1.8.1) (2026-08-25)
 
 
