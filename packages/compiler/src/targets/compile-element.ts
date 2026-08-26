@@ -17,6 +17,7 @@ import {
   escapeHtml,
   isMutating,
   isSchemaOnly,
+  srcExportName,
   srcImportBinding,
   tagNameToClassName,
 } from "../shared.ts";
@@ -351,11 +352,36 @@ export function emitElementModule(
 
   // Collect $src imports from state entries before emitting other imports
   const srcImportMap = new Map<string, string[]>();
+  /** `$lazy` `$src` modules → the (export, local binding) pairs each one supplies. */
+  const lazySrcMap = new Map<string, { binding: string; exportName: string }[]>();
   const defs = doc.state ?? {};
+  const callableRefs = collectCallableRefs(doc);
   for (const [key, def] of Object.entries(defs)) {
     const d = def as JxMutableNode;
     if (d && typeof d === "object" && !Array.isArray(d) && d.$prototype === "Function" && d.$src) {
       const srcPath = d.$src;
+      if (d.$lazy === true) {
+        /*
+         * A computed reads its value synchronously, and a lazy binding can only ever hand back a
+         * promise. Silently producing `computed(() => Promise)` would render "[object Promise]" in
+         * whatever the template bound it to, so this is a build error rather than a surprise.
+         */
+        if (!callableRefs.has(key) && !LIFECYCLE_KEYS.has(key)) {
+          throw new Error(
+            `"${key}" declares "$lazy": true but is used as a computed value, not called. ` +
+              `A lazily loaded function resolves to a promise; a computed must resolve now. ` +
+              `Remove "$lazy", or call ${key}() from a handler instead of binding its value.`,
+          );
+        }
+        if (!lazySrcMap.has(srcPath)) {
+          lazySrcMap.set(srcPath, []);
+        }
+        (lazySrcMap.get(srcPath) as { binding: string; exportName: string }[]).push({
+          binding: key,
+          exportName: srcExportName(key, d),
+        });
+        continue;
+      }
       if (!srcImportMap.has(srcPath)) {
         srcImportMap.set(srcPath, []);
       }
@@ -380,6 +406,31 @@ export function emitElementModule(
   lines.push(
     `import { reactive, computed, effect, stop } from '@vue/reactivity';`,
     `import { render, html } from 'lit-html';`,
+  );
+
+  /*
+   * `$lazy` swaps the static import for a memoized dynamic one. A static import is a download, a
+   * parse and an evaluate on every page that renders the component, whether or not anybody calls
+   * the function: jxsuite.com's search client is 70 kB of MiniSearch fetched by every visitor, most
+   * of whom never open search. The local binding keeps its name so every call site is unchanged;
+   * what changes is that it now returns a promise.
+   */
+  let lazyIndex = 0;
+  for (const [srcPath, entries] of lazySrcMap) {
+    const importPath = rewriteSrc ? rewriteSrc(srcPath) : srcPath;
+    const mod = `_jxLazy${lazyIndex}`;
+    lazyIndex += 1;
+    lines.push(
+      `let ${mod};`,
+      `const ${mod}Load = () => (${mod} ??= import('${importPath}'));`,
+      ...entries.map(
+        ({ binding, exportName }) =>
+          `const ${binding} = (...args) => ${mod}Load().then((m) => m.${exportName}(...args));`,
+      ),
+    );
+  }
+
+  lines.push(
     "",
     `class ${className} extends HTMLElement {`,
     // One registry for every effect the element creates — render, dynamic host styles, Request
@@ -401,7 +452,6 @@ export function emitElementModule(
   const formulaEntries: [string, JxExpressionDef][] = [];
   /** `"${…}"` state entries — computed, exactly as the runtime treats them. */
   const templateEntries: [string, string][] = [];
-  const callableRefs = collectCallableRefs(doc);
   for (const [key, def] of Object.entries(defs)) {
     const d = def as JxMutableNode;
     if (isExpressionDef(d)) {

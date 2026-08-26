@@ -9,6 +9,13 @@ export const functionDefSchema = {
       description: "Named export in $src module. Defaults to the state key name.",
       type: "string",
     },
+    $lazy: {
+      description:
+        "Load $src on first call instead of importing it up front. The function then returns a " +
+        "promise, so it may only be called from a handler or lifecycle hook — never bound as a " +
+        "computed value. Use it for code most visitors never reach.",
+      type: "boolean",
+    },
     $prototype: { const: "Function", type: "string" },
     $src: {
       description: "External module specifier. Mutually exclusive with body.",

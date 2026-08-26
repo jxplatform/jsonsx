@@ -62,6 +62,7 @@ import {
   collectServerEntries,
   collectStyles,
   colorSchemePrePaintScript,
+  escapeStyleText,
   evaluateStaticTemplate,
   isComponentFullyStatic,
   isSingleExpression,
@@ -160,6 +161,13 @@ export async function buildSite(
   const pagesDir = resolve(projectRoot, "pages");
   const publicDir = resolve(projectRoot, "public");
   const trailingSlash = projectConfig.build.trailingSlash ?? "always";
+  /*
+   * Browser bundles are minified unless the project opts out. Off, the six scripts jxsuite.com
+   * loads weigh 155 kB of source a phone has to parse before it can paint; on, 65 kB. The opt-out
+   * exists for two real cases: reading a deployed stack trace, and diffing `dist/` across bundler
+   * backends, which agree on semantics but not on minified bytes.
+   */
+  const minify = projectConfig.build.minify !== false;
 
   // Client sidecar bundles: bundleable Function-def `$src` specifiers (and lowered-def `$bundle`
   // Hints) are rewritten to their /assets/ URL during compilation, registered here, and bundled
@@ -862,6 +870,8 @@ export async function buildSite(
     const runtime = await writeClientRuntime(
       { ...clientRuntime, assetPaths: [...runtimeAssetsUsed] },
       outDir,
+      undefined,
+      minify,
     );
     fileCount += runtime.written;
     for (const error of runtime.errors) {
@@ -889,7 +899,7 @@ export async function buildSite(
         mkdirSync(dirname(outfile), { recursive: true });
         await bundleEntry(
           { entryPath: bundle.entryPath, outfile },
-          { external: CLIENT_EXTERNALS, target: "browser" },
+          { external: CLIENT_EXTERNALS, minify, target: "browser" },
         );
         fileCount += 1;
         log(`  ${bundle.specifier} → ${assetPath}`);
@@ -914,7 +924,7 @@ export async function buildSite(
         await bundleSource(
           `${specifiers.map((sp) => `import ${JSON.stringify(sp)};`).join("\n")}\n`,
           { outfile, resolveDir: projectRoot },
-          { target: "browser" },
+          { minify, target: "browser" },
         );
         fileCount += 1;
         log(`  ${specifiers.length} element(s) → ${assetPath}`);
@@ -933,7 +943,7 @@ export async function buildSite(
    * discovered from their contents rather than declared anywhere (site-architecture.md §8.7).
    */
   if (runtimeAssetsUsed.size > 0) {
-    const subpaths = await writeRuntimeSubpaths(outDir);
+    const subpaths = await writeRuntimeSubpaths(outDir, undefined, minify);
     if (subpaths.written > 0) {
       log(`Bundling ${subpaths.written} runtime subpath module(s)...`);
     }
@@ -1095,12 +1105,36 @@ export async function buildSite(
     if (rules.length > 0) {
       log("Writing response headers...");
       fileCount += writeHeaders(outDir, rules);
-      const { adapter } = projectConfig.build;
+      const { adapter, deploy } = projectConfig.build;
       if (adapter === "node" || adapter === "bun") {
         console.warn(
           `The "${adapter}" adapter serves no static assets, so dist/_headers is documentation ` +
             `rather than configuration — apply these headers at the reverse proxy in front of it.`,
         );
+      } else if (adapter === undefined && deploy === undefined) {
+        /*
+         * `_headers` is a Cloudflare/Netlify convention, not a web standard, and the build has no
+         * way to know where a plain static `dist/` is going. Most static hosts — GitHub Pages among
+         * them — ignore the file entirely and serve their own `Cache-Control`, which is how a site
+         * ends up shipping a year-long `immutable` rule for its content-addressed images and
+         * getting ten minutes.
+         *
+         * A `public/CNAME` is GitHub Pages' custom-domain marker and nothing else's, so it is a
+         * specific enough signal to say so out loud rather than warn every static build.
+         */
+        if (existsSync(resolve(publicDir, "CNAME"))) {
+          console.warn(
+            "GitHub Pages ignores dist/_headers and serves its own Cache-Control: max-age=600, " +
+              "so the generated caching and security rules will not take effect. Deploy behind a " +
+              "host that reads _headers (Cloudflare Pages, Cloudflare Workers assets, Netlify) " +
+              "to apply them.",
+          );
+        } else {
+          log(
+            "  note: _headers is read by Cloudflare Pages, Cloudflare Workers assets and Netlify; " +
+              "other static hosts ignore it and serve their own Cache-Control.",
+          );
+        }
       }
     }
     fileCount += writeNoJekyll(outDir);
@@ -1393,7 +1427,7 @@ async function compilePage(
   if (slotCss.rules.length > 0) {
     result.html = result.html.replace(
       "</head>",
-      `<style>\n${slotCss.rules.join("\n")}\n</style>\n</head>`,
+      `<style>\n${escapeStyleText(slotCss.rules.join("\n"))}\n</style>\n</head>`,
     );
   }
 
@@ -2097,15 +2131,31 @@ function injectComponentScripts(
     return html;
   }
 
-  // Inject CSS links in <head> for ALL components that have CSS sidecars
-  const cssLinks = usedTags
-    .filter((tag: string) => cssMap.has(tag))
-    .map((tag: string) => `<link rel="stylesheet" href="/components/${tag}.css">`)
-    .join("\n  ");
-  let result = html;
-  if (cssLinks) {
-    result = result.replace("</head>", `  ${cssLinks}\n</head>`);
-  }
+  /*
+   * Component CSS is INLINED, not linked.
+   *
+   * A `<link rel="stylesheet">` per component tag is a render-blocking request per component: on
+   * jxsuite.com's home page, 11 of them totalling 22 kB — the whole of its critical request chain,
+   * for sheets averaging 2 kB each. The page already carries its project and page CSS inline
+   * (`buildStyleBlock`), so this is the same delivery, applied consistently.
+   *
+   * The trade is real and deliberate: these bytes now repeat on every page instead of caching
+   * across navigations. They are small, they gzip against the markup around them, and a round trip
+   * on a phone costs more than the bytes do. Components in shadow mode are untouched — their sheet
+   * is linked from inside the declarative shadow root and never enters `cssMap`.
+   *
+   * Emitted last in <head>, exactly where the links were, so the cascade is unchanged.
+   */
+  const componentCss = usedTags
+    .map((tag: string) => cssMap.get(tag))
+    .filter((css): css is string => css !== undefined && css !== "")
+    .join("\n");
+  const styleBlock =
+    componentCss === "" ? "" : `<style>\n${escapeStyleText(componentCss)}\n  </style>`;
+  const intoHead = (fragments: string[]) => {
+    const block = fragments.filter(Boolean).join("\n  ");
+    return block === "" ? html : html.replace("</head>", `  ${block}\n</head>`);
+  };
 
   // Only inject JS for components that have non-static instances. An island-rendered instance is
   // Never prerendered, so it needs its module even when the component itself is fully static —
@@ -2113,11 +2163,17 @@ function injectComponentScripts(
   // The static HTML: those instances are prerendered, but the ones the island creates are not.
   const jsTags = usedTags.filter((tag: string) => inIsland(tag) || !staticTags.has(tag));
   if (jsTags.length === 0) {
-    return result;
+    return intoHead([styleBlock]);
   }
 
   // Build import map (needed for @vue/reactivity and lit-html)
   const importMap = renderImportMap(runtimeImports);
+  /*
+   * The runtime modules THIS page needs. Kept separate from `runtimeAssetsUsed`, which accumulates
+   * across the whole build so step 6d knows what to bundle — preloading from that set would have
+   * every page hint at every other page's runtime.
+   */
+  const pageRuntimeAssets: string[] = [];
   for (const [specifier, url] of Object.entries(runtimeImports)) {
     /*
      * A prefix key's value is the DIRECTORY its subpaths are served from — `/assets/lit-html/` —
@@ -2128,7 +2184,21 @@ function injectComponentScripts(
       continue;
     }
     runtimeAssetsUsed.add(url);
+    pageRuntimeAssets.push(url);
   }
+
+  /*
+   * An import map declares where a bare specifier lives; it does not tell the browser to go get it.
+   * Without these hints `/assets/vue-reactivity.js` is discovered only after a component module has
+   * been fetched AND parsed — a three-deep request chain on the critical path, on a connection
+   * where each hop is a round trip. The component modules are hinted too so the whole set starts
+   * downloading while the HTML is still being parsed.
+   */
+  const preloads = [...pageRuntimeAssets, ...jsTags.map((tag: string) => `/components/${tag}.js`)]
+    .map((href) => `<link rel="modulepreload" href="${href}">`)
+    .join("\n  ");
+
+  const result = intoHead([preloads, styleBlock]);
 
   const moduleScripts = jsTags
     .map((tag: string) => `<script type="module" src="/components/${tag}.js"></script>`)

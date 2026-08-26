@@ -11,7 +11,7 @@
  */
 
 import { canonicalizeLocale, localeUrlPrefix, resolveI18n } from "@jxsuite/schema/locale";
-import { entryUrl, jxTreeToText, normalizeSearchConfig, splitSections } from "./shared.ts";
+import { entryUrl, jxTreeToText, normalizeSearchConfig, splitEntry } from "./shared.ts";
 import type { NormalizedSearchConfig } from "./shared.ts";
 import type { ContentLoaderEntry, JxElement, ProjectConfig } from "@jxsuite/schema/types";
 
@@ -123,6 +123,20 @@ export const SearchIndex = {
         const documentId =
           locale === undefined ? `${name}:${entry.id}` : `${name}:${locale}:${entry.id}`;
 
+        /*
+         * The preamble and the sections partition the entry, so the page document carries only the
+         * preamble when sections were produced — emitting the full text as well indexed the whole
+         * corpus twice, doubling both the bytes a visitor downloads and the tokenising their main
+         * thread does before search can answer.
+         *
+         * An entry that yielded no sections keeps its full text: it has no headings, or none with
+         * an id, and nothing else would index it.
+         */
+        const split = collection.sections
+          ? splitEntry(children, collection.sectionDepth)
+          : undefined;
+        const sections = split?.sections ?? [];
+
         documents.push({
           id: documentId,
           collection: name,
@@ -131,24 +145,22 @@ export const SearchIndex = {
           title,
           description,
           heading: "",
-          text: jxTreeToText(children),
+          text: sections.length > 0 && split ? split.preamble : jxTreeToText(children),
           ...(locale === undefined ? {} : { locale }),
         });
 
-        if (collection.sections) {
-          for (const section of splitSections(children, collection.sectionDepth)) {
-            documents.push({
-              id: `${documentId}#${section.anchor}`,
-              collection: name,
-              slug: entry.id,
-              url: `${url}#${section.anchor}`,
-              title,
-              description,
-              heading: section.heading,
-              text: section.text,
-              ...(locale === undefined ? {} : { locale }),
-            });
-          }
+        for (const section of sections) {
+          documents.push({
+            id: `${documentId}#${section.anchor}`,
+            collection: name,
+            slug: entry.id,
+            url: `${url}#${section.anchor}`,
+            title,
+            description,
+            heading: section.heading,
+            text: section.text,
+            ...(locale === undefined ? {} : { locale }),
+          });
         }
       }
     }

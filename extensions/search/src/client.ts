@@ -99,6 +99,14 @@ interface ClientState {
 
 const state: ClientState = { indexUrl: "/search-index.json", loading: null, mini: null };
 
+/**
+ * Documents indexed per chunk before yielding the main thread.
+ *
+ * Small enough that one chunk stays well inside a frame on a low-end phone, large enough that the
+ * per-chunk scheduling overhead stays noise against the tokenising itself.
+ */
+const INDEX_CHUNK_SIZE = 50;
+
 /** `text` is stored so flat results can carry a highlighted excerpt of the body. */
 const STORE_FIELDS = [
   "collection",
@@ -291,7 +299,14 @@ export function preload(indexUrl?: string): Promise<void> {
       },
       storeFields: STORE_FIELDS,
     });
-    mini.addAll(envelope.documents);
+    /*
+     * `addAll` is synchronous: it tokenises the entire corpus in one uninterruptible task, which on
+     * jxsuite.com's 1,342-document index measured 181 ms on a desktop and surfaced as a ~1.2 s
+     * "Unattributable" long task under Lighthouse's mobile CPU throttle — the single largest
+     * contributor to Total Blocking Time. `addAllAsync` does identical work and yields between
+     * chunks, so the same milliseconds no longer block paint or input.
+     */
+    await mini.addAllAsync(envelope.documents, { chunkSize: INDEX_CHUNK_SIZE });
     state.mini = mini;
   })().catch((error: unknown) => {
     state.loading = null;

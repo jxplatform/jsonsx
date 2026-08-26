@@ -2,7 +2,7 @@
 
 ## Declarative Document Object Model — JSON Edition
 
-**Version:** 0.5.7-draft
+**Version:** 0.5.8-draft
 **Status:** Partial
 **Updated:** 2026-08-26
 **License:** MIT
@@ -437,7 +437,9 @@ A body counts as returning a value only when something follows `return` on the s
 
 **Classifying an external Function.** Because `body` and `$src` are mutually exclusive, a `$src` entry has no body for the framework to inspect, so its role follows how the document uses it. An entry referenced as a **callable** — bound to an `on*` event, invoked by an `$expression` `call` node (§19.4c), called as `state.key(…)` from a template or another body, or named as a lifecycle hook (§16.4) — stays a function. Otherwise its return value is read reactively and the entry is a computed value, matching the inline-body rule in 4b. Reading a `$src` entry that resolves to a function (rather than its result) is therefore not a supported way to obtain the imported function itself.
 
-**Compiled-site delivery.** In compiled sites, bundleable `$src` specifiers — `npm:<pkg>[/subpath]` and project-relative `./…` files (TypeScript included) — are bundled per the entry's `timing`. Client-timing functions compile to self-contained ESM bundles under `/assets/` with deterministic, hash-free names (relative specifiers key on their project-relative path); emitted page and element modules import the bundle URL instead of the raw specifier, so external libraries work on purely static hosts with no `node_modules/` at runtime. `timing: "compiler"` functions are never bundled — they execute in the build host. Absolute URL specifiers (`/lib/x.js`, `https://…`) are emitted verbatim and served as-is. Server-timing functions are imported by the generated server output — the site worker when `build.adapter` is set, a per-page `_server.js` handler otherwise (compiler.md §6). The bundler backend is `Bun.build` under Bun and esbuild under Node (see compiler.md).
+**Compiled-site delivery.** In compiled sites, bundleable `$src` specifiers — `npm:<pkg>[/subpath]` and project-relative `./…` files (TypeScript included) — are bundled per the entry's `timing`. Client-timing functions compile to self-contained ESM bundles under `/assets/` with deterministic, hash-free names (relative specifiers key on their project-relative path); emitted page and element modules import the bundle URL instead of the raw specifier, so external libraries work on purely static hosts with no `node_modules/` at runtime. `timing: "compiler"` functions are never bundled — they execute in the build host. Absolute URL specifiers (`/lib/x.js`, `https://…`) are emitted verbatim and served as-is.
+
+**`$lazy`.** A Function def may set `"$lazy": true` alongside `$src`, which replaces the static import with a memoized dynamic `import()` taken on first call. A static import is a download, a parse and an evaluate on every page that renders the component, whether or not anything calls the function; `$lazy` moves all three to the moment somebody does. The local binding keeps its name, so call sites are unchanged — but the function now **returns a promise**, and so may only be called, never bound as a value. Declaring `$lazy` on an entry the document uses as a computed is a build error rather than a promise rendered into the DOM. Server-timing functions are imported by the generated server output — the site worker when `build.adapter` is set, a per-page `_server.js` handler otherwise (compiler.md §6). The bundler backend is `Bun.build` under Bun and esbuild under Node (see compiler.md).
 
 ##### 4e — Data Source (External Class)
 
@@ -2514,6 +2516,7 @@ This rewrites the mutating handlers of Appendix A's idiom using `$expression`, l
 
 ## Changelog
 
+- **0.5.8-draft** (2026-08-26) — §5.3: $lazy on a $src Function defers the module to first call.
 - **0.5.7-draft** (2026-08-26) — §8.3: a boolean attribute value is emitted by family — presence for HTML boolean attributes, the written word for aria-* and the enumerated three.
 - **0.5.6-draft** (2026-08-25) — Clarify that the parentheses in an @(condition) style key belong to the query, so a bare media type emits without them (§9).
 - **0.5.5-draft** (2026-08-24) — 13.2 states that the runtime takes a prop from an instance only where the instance genuinely carries one — an own property or an attribute — because a state key colliding with a reflected DOM property otherwise reports an empty string and beats the component's declared default.
@@ -2575,4 +2578,4 @@ This rewrites the mutating handlers of Appendix A's idiom using `$expression`, l
 
 ---
 
-_Jx Specification v0.5.7-draft — subject to revision_
+_Jx Specification v0.5.8-draft — subject to revision_

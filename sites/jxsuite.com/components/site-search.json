@@ -12,17 +12,19 @@
     "searchInit": {
       "$prototype": "Function",
       "$src": "npm:@jxsuite/search/client",
+      "$lazy": true,
       "parameters": ["state"]
     },
     "runSearch": {
       "$prototype": "Function",
       "$src": "npm:@jxsuite/search/client",
+      "$lazy": true,
       "parameters": ["state", "e"]
     },
     "onMount": {
       "$prototype": "Function",
       "arguments": ["state"],
-      "body": "const host = this; const boot = () => state.searchInit(state); if (window.requestIdleCallback) { requestIdleCallback(boot, { timeout: 3000 }); } else { setTimeout(boot, 1200); } const pop = host.querySelector('#site-search-modal'); if (pop) { pop.addEventListener('toggle', (ev) => { const inp = pop.querySelector('input'); if (ev.newState === 'open') { boot(); if (inp) { inp.focus(); inp.select(); } } else { if (inp) { inp.value = ''; } state.searchQuery = ''; state.searchResults = []; state.searchCount = 0; state.searchActive = 0; } }); } if (!document.__jxSearchHotkeys) { document.__jxSearchHotkeys = true; document.addEventListener('keydown', (ev) => { const t = ev.target; const tag = t && t.tagName; const typing = tag === 'INPUT' || tag === 'TEXTAREA' || (t && t.isContentEditable); if (((ev.metaKey || ev.ctrlKey) && ev.key === 'k') || (ev.key === '/' && !typing)) { const p = document.getElementById('site-search-modal'); if (p && !p.matches(':popover-open')) { ev.preventDefault(); p.showPopover(); } } }); }"
+      "body": "const host = this; const boot = () => state.searchInit(state); const pop = host.querySelector('#site-search-modal'); if (pop) { pop.addEventListener('toggle', (ev) => { const inp = pop.querySelector('input'); if (ev.newState === 'open') { boot(); if (inp) { inp.focus(); inp.select(); } } else { if (inp) { inp.value = ''; } state.searchQuery = ''; state.searchResults = []; state.searchCount = 0; state.searchActive = 0; } }); } if (!document.__jxSearchHotkeys) { document.__jxSearchHotkeys = true; document.addEventListener('keydown', (ev) => { const t = ev.target; const tag = t && t.tagName; const typing = tag === 'INPUT' || tag === 'TEXTAREA' || (t && t.isContentEditable); if (((ev.metaKey || ev.ctrlKey) && ev.key === 'k') || (ev.key === '/' && !typing)) { const p = document.getElementById('site-search-modal'); if (p && !p.matches(':popover-open')) { ev.preventDefault(); p.showPopover(); } } }); }"
     }
   },
 

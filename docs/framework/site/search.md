@@ -13,7 +13,7 @@ code:
 
 # Site search
 
-Jx sites get full-text search from the `@jxsuite/search` extension: the build emits a JSON index from your content collections, and a small headless client (MiniSearch under the hood, ~7 kB) answers queries entirely in the browser. No server and no third-party service: results work on any static host, and section matches deep-link straight to the heading (`/docs/framework/site/#assets`).
+Jx sites get full-text search from the `@jxsuite/search` extension: the build emits a JSON index from your content collections, and a small headless client (MiniSearch under the hood, ~21 kB minified) answers queries entirely in the browser. No server and no third-party service: results work on any static host, and section matches deep-link straight to the heading (`/docs/framework/site/#assets`).
 
 ## Enabling the section
 
@@ -43,6 +43,10 @@ Per collection:
 Top-level: `output` (default `/search-index.json`) sets where the index is written; `engine` is `minisearch` (the only engine today; the field exists so future engines slot in without reshaping the section).
 
 `bunx jx build` then emits the index into `dist/` alongside your pages. The index holds two kinds of documents per entry: the whole page, and one per heading section, so a query can land on "the _Assets_ section of _Site architecture_" rather than just the page.
+
+With `sections` on, the page document carries only the text **before** the first heading. The sections cover the rest, and storing both put the entire corpus in the index twice, doubling the download and the work the browser does to index it. Nothing becomes unsearchable: a body-text match now surfaces the section that contains it, deep-linked, instead of competing with it. An entry with no headings keeps its full text, because nothing else would index it.
+
+Set `sections: false` for a collection whose entries are short enough that a deep link adds nothing; the page documents then carry their full text again.
 
 ## Querying from page state
 
@@ -89,8 +93,8 @@ Interactive components aren't lowered, so inside a compiled component you use th
   "searchResults": [],
   "searchReady": false,
   "searchActive": 0,
-  "searchInit": { "$prototype": "Function", "$src": "npm:@jxsuite/search/client", "parameters": ["state"] },
-  "runSearch": { "$prototype": "Function", "$src": "npm:@jxsuite/search/client", "parameters": ["state", "e"] },
+  "searchInit": { "$prototype": "Function", "$src": "npm:@jxsuite/search/client", "$lazy": true, "parameters": ["state"] },
+  "runSearch": { "$prototype": "Function", "$src": "npm:@jxsuite/search/client", "$lazy": true, "parameters": ["state", "e"] },
   "onMount": { "$prototype": "Function", "arguments": ["state"], "body": "state.searchInit(state);" }
 }
 ```
@@ -99,6 +103,12 @@ Interactive components aren't lowered, so inside a compiled component you use th
 - `runSearch(state, e)` reads the input event, stores flat rows on `state.searchResults`, publishes the row count as `state.searchCount`, and resets `state.searchActive`. Wire it to your input's `oninput`.
 
 The build bundles `npm:@jxsuite/search/client` (MiniSearch included) into `/assets/` automatically. Declare the dependency in your project's `package.json` and import it like any module.
+
+:::doc-tip
+`"$lazy": true` is doing real work here. Without it the client is a static import, so every page that renders the component downloads, parses and evaluates MiniSearch whether or not anybody searches. With it, all three happen on the first call.
+
+Call `searchInit` when search is **opened**, not on mount. Warming the index ahead of time sounds free and is not: fetching and indexing a whole corpus is the single most expensive thing the page does, and doing it during load competes with the paint. The client handles being queried before it is ready (`query()` returns no rows and starts the load, and `searchInit` re-runs the pending query when it finishes), so booting on open costs the visitor nothing they notice.
+:::
 
 For full control, import the core API from the same module: `preload(indexUrl?)`, `isReady()`, and the synchronous `query(text, { limit, group, pageCap })`.
 

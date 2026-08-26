@@ -50,8 +50,14 @@ emit(sectionValue, { projectConfig, root, sections, routes })
 
 `SearchIndex.emit` walks each configured collection in `sections.content` and produces two document granularities per entry:
 
-- a **page document**: title and description from frontmatter, full text extracted from the entry's rendered `$children`;
+- a **page document**: title and description from frontmatter, plus the entry's text. All of it when `sections` is off, and only the **preamble** before the first heading when it is on;
 - **section documents** (when `sections: true`): one per heading up to `sectionDepth`, each with the heading text, the section's own text, and a URL ending in `#<heading-id>`. Heading ids are assigned by the parser and always match the rendered anchors ([parser.md §3.2](/docs/framework/site/content-collections)).
+
+Together the two **partition** the entry, which is the point. Emitting the full page text alongside the sections put the whole corpus in the index twice: on jxsuite.com that was 922,007 characters of page text against 899,502 of section text, of which only ~22,505 was preamble no section already covered. The index was 2.3 MB and took ~180 ms of uninterrupted main-thread work to build in the browser; the partitioned one is 1.4 MB and ~110 ms. No word left the index. An entry that yields no sections keeps its full text, because nothing else would index it.
+
+:::doc-tip
+This generalizes to any `emit` implementation: what an emitter writes is downloaded and parsed by a visitor, so emitting the same content twice costs them twice.
+:::
 
 The result is one JSON envelope at the configured `output` path:
 

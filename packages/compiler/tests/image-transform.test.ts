@@ -939,3 +939,135 @@ describe("image-transform", () => {
     });
   });
 });
+
+/*
+ * `sizes` is a promise about layout that the browser keeps absolutely: it picks a candidate from
+ * the string before layout exists and never revisits the choice. A single project-wide string
+ * therefore cannot be right for every image on a site, and the container width is layout the
+ * compiler already holds.
+ */
+describe("image-transform — sizes derived from the container", () => {
+  beforeEach(() => {
+    setup();
+  });
+  afterEach(() => {
+    teardown();
+  });
+
+  const cache = () => ({ entries: {}, version: 1 });
+  const imgIn = (style: Record<string, unknown>, imgAttrs: Record<string, unknown> = {}) => ({
+    children: [{ attributes: { src: "/images/hero.png", ...imgAttrs }, tagName: "img" }],
+    style,
+    tagName: "div",
+  });
+
+  test("an ancestor max-width becomes the sizes for the image inside it", async () => {
+    const doc: any = imgIn({ margin: "0 auto", maxWidth: "960px" });
+    await transformImageNodes(doc, defaultConfig, TMP, cache());
+    expect(sourcesOf(doc.children[0])[0].attributes.sizes).toBe("(max-width: 960px) 100vw, 960px");
+  });
+
+  test("rem lengths resolve against the 16px root", async () => {
+    const doc: any = imgIn({ maxWidth: "40rem" });
+    await transformImageNodes(doc, defaultConfig, TMP, cache());
+    expect(sourcesOf(doc.children[0])[0].attributes.sizes).toBe("(max-width: 640px) 100vw, 640px");
+  });
+
+  test("the narrowest literal max-width above the image wins", async () => {
+    const doc: any = {
+      children: [imgIn({ maxWidth: "480px" })],
+      style: { maxWidth: "1200px" },
+      tagName: "div",
+    };
+    await transformImageNodes(doc, defaultConfig, TMP, cache());
+    const [wrapper] = doc.children;
+    const [img] = wrapper.children;
+    const [avif] = sourcesOf(img);
+    expect(avif.attributes.sizes).toBe("(max-width: 480px) 100vw, 480px");
+  });
+
+  test("a width the build cannot resolve derives nothing — a wrong sizes is worse than none", async () => {
+    for (const maxWidth of ["clamp(20rem, 50vw, 60rem)", "100%", "var(--max-width)"]) {
+      const doc: any = imgIn({ maxWidth });
+      await transformImageNodes(doc, defaultConfig, TMP, cache());
+      expect(sourcesOf(doc.children[0])[0].attributes.sizes).toBe("(max-width: 768px) 100vw, 50vw");
+    }
+  });
+
+  test("with no resolvable container the project default still applies", async () => {
+    const doc: any = { attributes: { src: "/images/hero.png" }, tagName: "img" };
+    await transformImageNodes(doc, defaultConfig, TMP, cache());
+    expect(sourcesOf(doc)[0].attributes.sizes).toBe("(max-width: 768px) 100vw, 50vw");
+  });
+
+  test("an authored sizes outranks the container", async () => {
+    const doc: any = imgIn({ maxWidth: "960px" }, { sizes: "42px" });
+    await transformImageNodes(doc, defaultConfig, TMP, cache());
+    expect(sourcesOf(doc.children[0])[0].attributes.sizes).toBe("42px");
+  });
+
+  test("the image's own literal width constrains it too", async () => {
+    const doc: any = {
+      attributes: { src: "/images/hero.png" },
+      style: { width: "300px" },
+      tagName: "img",
+    };
+    await transformImageNodes(doc, defaultConfig, TMP, cache());
+    expect(sourcesOf(doc)[0].attributes.sizes).toBe("(max-width: 300px) 100vw, 300px");
+  });
+
+  test("no project default and no container leaves sizes off entirely", async () => {
+    const doc: any = { attributes: { src: "/images/hero.png" }, tagName: "img" };
+    const { sizes: _dropped, ...noSizes } = defaultConfig;
+    await transformImageNodes(doc, noSizes as never, TMP, cache());
+    expect(sourcesOf(doc)[0].attributes.sizes).toBeUndefined();
+  });
+});
+
+describe("image-transform — the <img> fallback src", () => {
+  beforeEach(() => {
+    setup();
+  });
+  afterEach(() => {
+    teardown();
+  });
+
+  test("keeps the original when no universally decodable format was emitted", async () => {
+    const doc: any = { attributes: { src: "/images/hero.png" }, tagName: "img" };
+    await transformImageNodes(doc, defaultConfig, TMP, { entries: {}, version: 1 });
+    // Avif + webp only: a smaller image nobody can decode is not an improvement.
+    expect(imgOf(doc).attributes.src).toBe("/images/hero.png");
+  });
+
+  test("points at the largest png/jpeg variant when one exists", async () => {
+    const withPng = {
+      ...mockManifest,
+      variants: [
+        ...mockManifest.variants,
+        {
+          absolutePath: "/tmp/fake-640.png",
+          format: "png",
+          outputPath: "/_optimized/hero-640-abc.png",
+          width: 640,
+        },
+        {
+          absolutePath: "/tmp/fake-1200.png",
+          format: "png",
+          outputPath: "/_optimized/hero-1200-abc.png",
+          width: 1200,
+        },
+      ],
+    };
+    processImage.mockImplementationOnce(async () => withPng);
+
+    const doc: any = { attributes: { src: "/images/hero.png" }, tagName: "img" };
+    await transformImageNodes(
+      doc,
+      { ...defaultConfig, formats: ["avif", "webp", "png"] } as never,
+      TMP,
+      { entries: {}, version: 1 },
+    );
+    // The unresized original is a correct fallback and a terrible one — largest, not original.
+    expect(imgOf(doc).attributes.src).toBe("/_optimized/hero-1200-abc.png");
+  });
+});

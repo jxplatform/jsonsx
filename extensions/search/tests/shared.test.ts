@@ -9,6 +9,7 @@ import {
   entryUrl,
   jxTreeToText,
   normalizeSearchConfig,
+  splitEntry,
   splitSections,
 } from "../src/shared";
 import type { JxElement } from "@jxsuite/schema/types";
@@ -126,5 +127,59 @@ describe("splitSections", () => {
 
   test("empty tree yields no sections", () => {
     expect(splitSections(undefined, 3)).toEqual([]);
+  });
+});
+
+describe("splitEntry", () => {
+  const tree: (JxElement | string)[] = [
+    { tagName: "p", textContent: "Preamble text." },
+    "loose preamble",
+    { id: "install", tagName: "h2", textContent: "Install" },
+    { tagName: "p", textContent: "Run bun install." },
+  ];
+
+  test("returns the text before the first section as the preamble", () => {
+    const { preamble, sections } = splitEntry(tree, 3);
+    expect(preamble).toBe("Preamble text. loose preamble");
+    expect(sections.map((section) => section.anchor)).toEqual(["install"]);
+  });
+
+  test("preamble and sections partition the entry — every part appears exactly once", () => {
+    const { preamble, sections } = splitEntry(tree, 3);
+    const joined = [preamble, ...sections.map((section) => section.text)].join(" ");
+    for (const part of ["Preamble text.", "loose preamble", "Run bun install."]) {
+      expect(joined.split(part)).toHaveLength(2);
+    }
+    // The heading text itself is carried by `heading`, not duplicated into any text field.
+    expect(joined).not.toContain("Install");
+  });
+
+  test("an entry that opens with a heading has an empty preamble", () => {
+    const { preamble, sections } = splitEntry(
+      [
+        { id: "top", tagName: "h2", textContent: "Top" },
+        { tagName: "p", textContent: "body" },
+      ],
+      3,
+    );
+    expect(preamble).toBe("");
+    expect(sections).toHaveLength(1);
+  });
+
+  test("with no section-starting heading the whole entry is preamble", () => {
+    const { preamble, sections } = splitEntry(
+      [
+        { tagName: "h2", textContent: "No anchor" },
+        { tagName: "p", textContent: "text" },
+      ],
+      3,
+    );
+    expect(sections).toEqual([]);
+    // The un-anchored heading text stays with the preamble rather than vanishing.
+    expect(preamble).toBe("No anchor text");
+  });
+
+  test("empty tree yields an empty preamble and no sections", () => {
+    expect(splitEntry(undefined, 3)).toEqual({ preamble: "", sections: [] });
   });
 });

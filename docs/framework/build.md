@@ -23,7 +23,7 @@ code:
 
 `jx build` turns a Jx project (JSON documents in `pages/`, `layouts/`, and `components/`) into a production site in `dist/`. The compiler erases the Jx abstractions at build time: no JSON documents, no interpreter, and no framework code ship to production. A page only gets JavaScript when the compiler can prove it needs some, and the proof runs in one direction: everything is static until something dynamic is found.
 
-The only client-side dependencies a page can end up with are `@vue/reactivity` (11.1 kB gzip) and `lit-html` (3.7 kB gzip), loaded through an import map, and only on pages that need them. Both are served from your own site, under `/assets/`.
+The only client-side dependencies a page can end up with are `@vue/reactivity` (7.8 kB gzip) and `lit-html` (3.3 kB gzip), loaded through an import map, and only on pages that need them. Both are served from your own site, under `/assets/`.
 
 ## What `jx build` does
 
@@ -109,6 +109,15 @@ Those two modules are bundled into your `dist/` at build time and the import map
 
 They come from `@jxsuite/compiler`'s own dependencies, not your project's, so you don't have to install anything. The runtime always matches the compiler that produced the page.
 
+The page also emits a `modulepreload` hint for each of them, and for each component module it loads:
+
+```html
+<link rel="modulepreload" href="/assets/vue-reactivity.js" />
+<link rel="modulepreload" href="/components/site-counter.js" />
+```
+
+An import map says where a bare specifier lives; it does not ask for it. Without the hints the browser only discovers `/assets/vue-reactivity.js` after fetching **and parsing** a component module: three round trips deep on a slow connection, one after another. The hints name only what the page actually loads.
+
 The trailing-slash entries cover package _subpaths_. A component or a `$src` sidecar rarely imports only `lit-html`. It imports `lit-html/directives/class-map.js` too, and an import map with only exact keys cannot resolve that. The build scans its own output for those imports, bundles each one it finds to `/assets/lit-html/…`, and repeats until nothing new turns up; which subpaths exist is a property of the third-party code your pages use, so the set is discovered rather than listed. Each one shares the single copy of the package core the exact key already points at, because two copies of lit on one page break in ways a size budget would not notice.
 
 :::doc-note
@@ -125,7 +134,15 @@ Across all three tiers the emitter indents nested children so the generated HTML
 
 ## CSS extraction
 
-Style never ships as JavaScript. During compilation, every static `style` definition (the project-level `style` from `project.json`, the layout's, the page's, and each node's) is extracted into a single `<style>` block in the page `<head>`, with `$media` breakpoint names expanded to real media queries. Components additionally emit a `dist/components/<tag>.css` sidecar, and styles found in component slot content are collected into the page's style block. See [Styling](/docs/framework/concepts/styling) for the authoring model.
+Style never ships as JavaScript. During compilation, every static `style` definition (the project-level `style` from `project.json`, the layout's, the page's, and each node's) is extracted into a single `<style>` block in the page `<head>`, with `$media` breakpoint names expanded to real media queries. Styles found in component slot content are collected into the same block. See [Styling](/docs/framework/concepts/styling) for the authoring model.
+
+**Component CSS is inlined into that block too**, after the page's own rules so the cascade is unchanged, and no `<link rel="stylesheet">` is emitted for it. A stylesheet link per component is a render-blocking request per component. jxsuite.com's home page had eleven of them, 22 kB in total, for sheets averaging 2 kB each: the whole of its critical request chain, spent on round trips rather than bytes.
+
+The sidecars are still written to `dist/components/<tag>.css` for anything that references them directly, and a component in [shadow mode](/docs/framework/concepts/elements) is unaffected: its sheet is linked from inside the declarative shadow root, where it belongs.
+
+:::doc-note
+The trade is deliberate. Inlined CSS repeats on every page instead of caching across navigations. It is small, it compresses against the markup around it, and on a phone a round trip costs more than the bytes do.
+:::
 
 ## What prerendering will and won't bake
 

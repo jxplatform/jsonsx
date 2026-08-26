@@ -1,0 +1,12 @@
+{
+  "$comment": "Gzip ceilings (bytes) for the BUILT site, checked by scripts/check-site-perf-budget.ts in deploy-site.yml after a real `jx build`. A page ceiling covers the HTML plus every same-origin asset that HTML eagerly references, derived from the built markup rather than listed here. Raise a ceiling deliberately, with justification, when a real feature grows it.",
+  "$baseline": "Measured on the build that minified browser bundles, inlined component CSS, emitted modulepreload hints, stopped emitting the search corpus twice, and made the search client a lazy import. Before that change the same home page cost 50,651 gz bytes across 18 requests and every visitor also downloaded search-index.json (409,178 gz) whether or not they searched — 491 KiB total, which is what prompted these budgets.",
+  "tolerance": 0.05,
+  "pages": {
+    "index.html": 27500,
+    "docs/start/install/index.html": 27600
+  },
+  "files": {
+    "search-index.json": 375000
+  }
+}

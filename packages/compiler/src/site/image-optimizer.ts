@@ -124,10 +124,24 @@ export function contentHash(srcPath: string) {
  * @param {ImageConfig} config
  * @returns {string}
  */
+/**
+ * Bumped whenever the pipeline decides variants differently for the same settings.
+ *
+ * The cache key is settings plus source bytes, which answers "would this produce the same output?"
+ * only while the code between them is fixed. It is not: capping variants at the largest configured
+ * width changed the answer for every image already cached, and without a version here those images
+ * keep their stale manifests — including the oversized variants the change exists to stop
+ * emitting.
+ *
+ * 1 → 2: variants stop at the largest configured width (compiler.md §7.2).
+ */
+const PIPELINE_VERSION = 2;
+
 export function configHash(config: ImageConfig) {
   const key = JSON.stringify({
     formats: config.formats,
     quality: config.quality,
+    v: PIPELINE_VERSION,
     widths: config.widths,
   });
   return createHash("md5").update(key).digest("hex").slice(0, 8);
@@ -166,8 +180,24 @@ export async function processImage(srcPath: string, cacheImgDir: string, config:
 
   const variants: ImageVariant[] = [];
 
+  /*
+   * The configured ladder, capped at the source's own width — upscaling only wastes bytes.
+   *
+   * A source SMALLER than every rung would otherwise produce no variants at all, and one that falls
+   * between rungs would never be offered at its native resolution, so both get their own width
+   * added. A source LARGER than the top rung does not: the largest configured width is the ceiling
+   * the project chose, and honouring it is the point of configuring it.
+   *
+   * This used to add the native width unconditionally, so a 3840 px screenshot shipped a 3840 px
+   * AVIF *and* WebP — encoded on every cold build, copied into dist, and offered as a `3840w`
+   * candidate that no `sizes` on any real viewport would pick.
+   */
+  const ceiling = config.widths.length > 0 ? Math.max(...config.widths) : meta.width;
   const widths = config.widths.filter((w) => w <= meta.width);
-  if (widths.length === 0 || !widths.includes(meta.width)) {
+  if (meta.width < ceiling && !widths.includes(meta.width)) {
+    widths.push(meta.width);
+  }
+  if (widths.length === 0) {
     widths.push(meta.width);
   }
   widths.sort((a, b) => a - b);

@@ -114,18 +114,30 @@ export interface ContentSection {
 
 const HEADING_TAG = /^h([1-6])$/;
 
+/** A content entry split into the text before its first section and the sections themselves. */
+export interface SplitEntry {
+  /** Text before the first section-starting heading. Empty when the entry opens with one. */
+  preamble: string;
+  sections: ContentSection[];
+}
+
 /**
- * Split a content entry's rendered tree into heading sections for section-level search documents. A
- * heading of depth ≤ `sectionDepth` (with an assigned `id` — see parser.md §3.2) starts a section;
- * its text runs until the next section-starting heading. Content before the first heading belongs
- * to no section (the page-level document already indexes the full text). Deeper headings' text
- * stays inside the enclosing section.
+ * Split a content entry's rendered tree into a preamble and heading sections. A heading of depth ≤
+ * `sectionDepth` (with an assigned `id` — see parser.md §3.2) starts a section; its text runs until
+ * the next section-starting heading. Deeper headings' text stays inside the enclosing section.
+ *
+ * The preamble is returned rather than discarded because together the two **partition** the entry:
+ * a page document that also carried the full text stored the whole corpus a second time. On
+ * jxsuite.com that was 922,007 characters of page text against 899,502 of section text, of which
+ * only ~22,505 (2.4%) was preamble no section already covered — an index twice the size it needed
+ * to be, and twice the parse and tokenise cost on every visitor's main thread.
  */
-export function splitSections(
+export function splitEntry(
   children: (JxElement | string)[] | undefined,
   sectionDepth: number,
-): ContentSection[] {
+): SplitEntry {
   const sections: ContentSection[] = [];
+  const preambleParts: string[] = [];
   let current: (ContentSection & { parts: string[] }) | null = null;
 
   for (const node of children ?? []) {
@@ -137,21 +149,35 @@ export function splitSections(
       current = { ...heading, parts: [], text: "" };
       continue;
     }
-    if (current && typeof node === "string") {
-      current.parts.push(node);
-    } else if (current && typeof node === "object" && node !== null) {
-      current.parts.push(jxTreeToText([node]));
+    const parts = current ? current.parts : preambleParts;
+    if (typeof node === "string") {
+      parts.push(node);
+    } else if (typeof node === "object" && node !== null) {
+      parts.push(jxTreeToText([node]));
     }
   }
   if (current) {
     sections.push(finishSection(current));
   }
-  return sections;
+  return { preamble: normalizeText(preambleParts), sections };
+}
+
+/** {@link splitEntry}, sections only. */
+export function splitSections(
+  children: (JxElement | string)[] | undefined,
+  sectionDepth: number,
+): ContentSection[] {
+  return splitEntry(children, sectionDepth).sections;
 }
 
 function finishSection(section: ContentSection & { parts: string[] }): ContentSection {
   const { heading, anchor, depth } = section;
-  return { anchor, depth, heading, text: section.parts.join(" ").replaceAll(/\s+/g, " ").trim() };
+  return { anchor, depth, heading, text: normalizeText(section.parts) };
+}
+
+/** Join collected text parts into one whitespace-normalized string. */
+function normalizeText(parts: readonly string[]): string {
+  return parts.join(" ").replaceAll(/\s+/g, " ").trim();
 }
 
 function headingOf(
