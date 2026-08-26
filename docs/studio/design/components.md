@@ -29,7 +29,7 @@ To open a component from an instance, right-click the instance and choose **Edit
 
 ## Props: the component's options
 
-Props are the knobs an instance can turn — the card's title, its image, whether it's featured. A component's props come from its state: every plain value you declare in the component's **State** panel becomes a prop, with that value as its default. See **[Script & logic](/docs/studio/logic)** for declaring state.
+Props are the knobs an instance can turn — the card's title, its image, whether it's featured. A component's props come from its state: every plain value you declare in the component's **State** panel becomes a prop, with that value as its default. See **[Logic](/docs/studio/logic)** for declaring state.
 
 On an instance, the [Content tab](/docs/studio/design/properties) shows a **Component Settings** section with a fitting control per prop — checkbox, number field, dropdown, media or color picker. Each prop can also be _bound_: click the **value source** chip beside its label and pick **From data…** for a signal, or **Mixed text** for a value that mixes text and data, so the instance follows live data instead of a fixed setting. It is the same three-rung choice, spelled the same way, that every other bindable row in Studio offers — see **[Formulas and expressions](/docs/studio/logic/formulas)**.
 

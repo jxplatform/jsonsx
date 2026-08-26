@@ -38,7 +38,7 @@ Above the pane sits its strip of open documents, then the **[jump bar](/docs/stu
 
 ## The Inspector
 
-The dock on the right, in four tabs: **Content** (the selected element's settings), **Style** (the visual inspector), **Logic** (what happens on click, input and so on), and **Assistant** (the AI chat). See **[Design mode](/docs/studio/design)** for Style and **[Script & logic](/docs/studio/logic)** for Logic.
+The dock on the right, in four tabs: **Content** (the selected element's settings), **Style** (the visual inspector), **Logic** (what happens on click, input and so on), and **Assistant** (the AI chat). **[Design mode](/docs/studio/design)** covers the Style tab, and **[Logic](/docs/studio/logic)** covers the Logic tab.
 
 ## The Bottom dock
 

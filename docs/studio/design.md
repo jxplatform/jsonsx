@@ -35,5 +35,5 @@ Design mode is the canvas plus a set of panels, each with its own page:
 ## Next
 
 - Learn the shared canvas interactions — selection, drag and drop, the context menu — in **[The canvas](/docs/studio/interface/canvas)**
-- Make it interactive in **[Script & logic](/docs/studio/logic)**
+- Make it interactive in **[Logic](/docs/studio/logic)**
 - The underlying style format is documented in **[Styling](/docs/framework/concepts/styling)**

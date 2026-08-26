@@ -97,5 +97,5 @@ Click any text to put the cursor there and start typing. Everything about writin
 ## Next
 
 - Style what you select in **[Design mode](/docs/studio/design)**
-- Wire up behavior in **[Script & logic](/docs/studio/logic)**
+- Wire up behavior in **[Logic](/docs/studio/logic)**
 - Keep your hands on the keys with the **[shortcut reference](/docs/studio/interface/shortcuts)**
