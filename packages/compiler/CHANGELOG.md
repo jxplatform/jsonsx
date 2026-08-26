@@ -1,5 +1,29 @@
 # Changelog
 
+## [2.0.8](https://github.com/jxsuite/jx/compare/compiler-v2.0.7...compiler-v2.0.8) (2026-08-26)
+
+
+### Bug Fixes
+
+* **compiler,runtime,studio:** a bare media type in an at-key emits without parentheses ([47c2e47](https://github.com/jxsuite/jx/commit/47c2e47c8d4f615c83e53b4f7aaf6dd2172824fa))
+* **compiler,runtime:** a component whose content is root textContent renders it ([03fc577](https://github.com/jxsuite/jx/commit/03fc577a18dc8f39d65665b131e1f67e27ebd628))
+* **compiler:** a non-static component instance keeps its props through hydration ([f89ce2d](https://github.com/jxsuite/jx/commit/f89ce2d3d8051cc880cdd9c47f408e65bf0e0c06))
+* **compiler:** a template with more than one interpolation resolves instead of emptying ([472cd4c](https://github.com/jxsuite/jx/commit/472cd4c025bf46d7c8d9fda62caf0ea3abe82038))
+* **compiler:** the client runtime resolves under Node, so builds stop reaching for a CDN ([aea1d64](https://github.com/jxsuite/jx/commit/aea1d643498e5f2d0c63aa5989ea150cb5c639c9))
+* six output-correctness defects, two of them live on jxsuite.com ([88d4479](https://github.com/jxsuite/jx/commit/88d447966dc002b454dc95fa52aa2634c029cb4c))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/create bumped to 1.3.7
+    * @jxsuite/runtime bumped to 2.1.0
+    * @jxsuite/schema bumped to 1.9.0
+  * devDependencies
+    * @jxsuite/connector bumped to 0.5.5
+    * @jxsuite/parser bumped to 1.5.6
+
 ## [2.0.7](https://github.com/jxsuite/jx/compare/compiler-v2.0.6...compiler-v2.0.7) (2026-08-25)
 
 

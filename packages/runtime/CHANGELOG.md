@@ -1,5 +1,32 @@
 # Changelog
 
+## [2.1.0](https://github.com/jxsuite/jx/compare/runtime-v2.0.5...runtime-v2.1.0) (2026-08-26)
+
+
+### Features
+
+* **runtime:** a canvas asset resolver, default-off ([43ffbd8](https://github.com/jxsuite/jx/commit/43ffbd812843598561ae68fce7c779251bba2762))
+* **schema,runtime,studio:** the shared path math and a default-off canvas asset resolver ([5100bc7](https://github.com/jxsuite/jx/commit/5100bc7e23e428c87a6e721251ddc763786ac448))
+* **studio:** declare assetSpace, and resolve media in the canvas realm ([196d259](https://github.com/jxsuite/jx/commit/196d2596b337e6298d2f0c15e984a5f29f7abe92))
+* **studio:** declare assetSpace, and resolve media in the canvas realm ([92b087f](https://github.com/jxsuite/jx/commit/92b087f2e504896f7f9800df18ff1310c40e8c4c))
+
+
+### Bug Fixes
+
+* **compiler,runtime,studio:** a bare media type in an at-key emits without parentheses ([47c2e47](https://github.com/jxsuite/jx/commit/47c2e47c8d4f615c83e53b4f7aaf6dd2172824fa))
+* **compiler,runtime:** a component whose content is root textContent renders it ([03fc577](https://github.com/jxsuite/jx/commit/03fc577a18dc8f39d65665b131e1f67e27ebd628))
+* **compiler:** a non-static component instance keeps its props through hydration ([f89ce2d](https://github.com/jxsuite/jx/commit/f89ce2d3d8051cc880cdd9c47f408e65bf0e0c06))
+* **runtime:** svg elements render, because nodes are created in the right namespace ([4b2ebb0](https://github.com/jxsuite/jx/commit/4b2ebb06f41391390ca1c8fb9f0e490b283c9baf))
+* six output-correctness defects, two of them live on jxsuite.com ([88d4479](https://github.com/jxsuite/jx/commit/88d447966dc002b454dc95fa52aa2634c029cb4c))
+* **studio:** a translated entry has a mount, and one predicate decides a media field ([eb55d84](https://github.com/jxsuite/jx/commit/eb55d84bb9ae8714144d35d4971a253ec3ff333c))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/schema bumped to 1.9.0
+
 ## [2.0.5](https://github.com/jxsuite/jx/compare/runtime-v2.0.4...runtime-v2.0.5) (2026-08-25)
 
 

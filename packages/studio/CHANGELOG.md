@@ -1,5 +1,44 @@
 # Changelog
 
+## [3.0.0](https://github.com/jxsuite/jx/compare/studio-v2.4.3...studio-v3.0.0) (2026-08-26)
+
+
+### ⚠ BREAKING CHANGES
+
+* **studio,desktop:** StudioPlatform's `saveSettings` is replaced by `patchSettings`, which takes a set/remove patch and answers with the resulting store. It stays optional, so an adapter that implements neither degrades to cache-only rather than throwing.
+
+### Features
+
+* **protocol:** type what an upload answers, and what a backend will accept ([8192345](https://github.com/jxsuite/jx/commit/819234555b3b37b5ce21d71005fc4f2cb05aae62))
+* **schema,runtime,studio:** the shared path math and a default-off canvas asset resolver ([5100bc7](https://github.com/jxsuite/jx/commit/5100bc7e23e428c87a6e721251ddc763786ac448))
+* **studio:** declare assetSpace, and resolve media in the canvas realm ([196d259](https://github.com/jxsuite/jx/commit/196d2596b337e6298d2f0c15e984a5f29f7abe92))
+* **studio:** declare assetSpace, and resolve media in the canvas realm ([92b087f](https://github.com/jxsuite/jx/commit/92b087f2e504896f7f9800df18ff1310c40e8c4c))
+
+
+### Bug Fixes
+
+* **compiler,runtime,studio:** a bare media type in an at-key emits without parentheses ([47c2e47](https://github.com/jxsuite/jx/commit/47c2e47c8d4f615c83e53b4f7aaf6dd2172824fa))
+* **screenshots:** re-capture only when the picture actually moved ([c414deb](https://github.com/jxsuite/jx/commit/c414deb7a8b58c9f01a77f62126a609935b65b28))
+* six output-correctness defects, two of them live on jxsuite.com ([88d4479](https://github.com/jxsuite/jx/commit/88d447966dc002b454dc95fa52aa2634c029cb4c))
+* **studio,desktop:** settings are patches, and a blank field never deletes ([76846af](https://github.com/jxsuite/jx/commit/76846afc28d81ff16e284fbe0b12d1f47cb604bc))
+* **studio:** a collection grid opens in the same order, and reports when it is drawn ([2838103](https://github.com/jxsuite/jx/commit/2838103096ca61ea8d787b1e3f59da817178ac0e))
+* **studio:** a translated entry has a mount, and one predicate decides a media field ([eb55d84](https://github.com/jxsuite/jx/commit/eb55d84bb9ae8714144d35d4971a253ec3ff333c))
+* **studio:** keep the canvas iframe out of the editor shell ([2a1818b](https://github.com/jxsuite/jx/commit/2a1818b2e4fa922555d2f236c867584d2adf8e24))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/ai bumped to 0.36.4
+    * @jxsuite/collab bumped to 0.8.3
+    * @jxsuite/create bumped to 1.3.7
+    * @jxsuite/formulas bumped to 0.0.14
+    * @jxsuite/markup bumped to 0.4.7
+    * @jxsuite/protocol bumped to 2.0.0
+    * @jxsuite/runtime bumped to 2.1.0
+    * @jxsuite/schema bumped to 1.9.0
+
 ## [2.4.3](https://github.com/jxsuite/jx/compare/studio-v2.4.2...studio-v2.4.3) (2026-08-25)
 
 

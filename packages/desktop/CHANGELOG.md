@@ -1,5 +1,41 @@
 # Changelog
 
+## [4.0.0](https://github.com/jxsuite/jx/compare/desktop-v3.0.1...desktop-v4.0.0) (2026-08-26)
+
+
+### ⚠ BREAKING CHANGES
+
+* **studio,desktop:** StudioPlatform's `saveSettings` is replaced by `patchSettings`, which takes a set/remove patch and answers with the resulting store. It stays optional, so an adapter that implements neither degrades to cache-only rather than throwing.
+
+### Features
+
+* **protocol:** type what an upload answers, and what a backend will accept ([8192345](https://github.com/jxsuite/jx/commit/819234555b3b37b5ce21d71005fc4f2cb05aae62))
+* **studio:** declare assetSpace, and resolve media in the canvas realm ([196d259](https://github.com/jxsuite/jx/commit/196d2596b337e6298d2f0c15e984a5f29f7abe92))
+* **studio:** declare assetSpace, and resolve media in the canvas realm ([92b087f](https://github.com/jxsuite/jx/commit/92b087f2e504896f7f9800df18ff1310c40e8c4c))
+
+
+### Bug Fixes
+
+* **desktop:** type the settings patch the window-manager test mocks ([f268344](https://github.com/jxsuite/jx/commit/f268344b15b0b57dd04b0115bd86b7a7f6abb50d))
+* **studio,desktop:** settings are patches, and a blank field never deletes ([76846af](https://github.com/jxsuite/jx/commit/76846afc28d81ff16e284fbe0b12d1f47cb604bc))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @jxsuite/compiler bumped to 2.0.8
+    * @jxsuite/create bumped to 1.3.7
+    * @jxsuite/parser bumped to 1.5.6
+    * @jxsuite/protocol bumped to 2.0.0
+    * @jxsuite/schema bumped to 1.9.0
+    * @jxsuite/server bumped to 3.0.0
+    * @jxsuite/starters bumped to 1.6.4
+    * @jxsuite/studio bumped to 3.0.0
+  * devDependencies
+    * @jxsuite/connector bumped to 0.5.5
+    * @jxsuite/server bumped to 3.0.0
+
 ## [3.0.1](https://github.com/jxsuite/jx/compare/desktop-v3.0.0...desktop-v3.0.1) (2026-08-25)
 
 
