@@ -359,6 +359,31 @@ describe("the submenu", () => {
     expect(subItems()).toHaveLength(0);
   });
 
+  test("re-entering the same parent leaves its submenu exactly as it was", () => {
+    /* An ordinary pointer path: crossing a row, leaving and coming back. Rebuilding the submenu
+       would reset the caret to row 0 and throw away the section subscription for no reason. */
+    installRegistry();
+    openSettingsMenu(anchor);
+    const parent = rowFor("settings.open");
+    parent.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
+    menuKey("ArrowDown");
+    menuKey("ArrowRight");
+    menuKey("End");
+    expect(focusedKey()?.sectionKey).toBe("cssVars");
+    parent.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
+    expect(subKeys()).toEqual(["overview", "contexts", "cssVars"]);
+    expect(focusedKey()?.sectionKey).toBe("cssVars");
+  });
+
+  test("entering a row that takes no section opens nothing", () => {
+    // `styles.open` has no `section` argument, so there is no submenu for it to own.
+    installRegistry();
+    openSettingsMenu(anchor);
+    rowFor("styles.open").dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
+    expect(subItems()).toHaveLength(0);
+    expect(rowFor("styles.open").hasAttribute("aria-expanded")).toBe(false);
+  });
+
   test("hovering a sibling closes the open submenu", () => {
     installRegistry();
     openSettingsMenu(anchor);
