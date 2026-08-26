@@ -10,6 +10,7 @@ import { html } from "lit-html";
 import { getPlatform } from "../platform";
 import { getBaseUrl, getOpenAiKey } from "../services/ai-settings";
 import { preferredModel } from "../services/ai-models";
+import { createModelPicker } from "../ui/ai-model-picker";
 import { IMPORT_WARNING_PHASE } from "../services/import-client";
 import { notify } from "../services/notify";
 import { errorMessage } from "@jxsuite/schema/parse";
@@ -57,6 +58,17 @@ let _url = "";
 let _depth = 1;
 let _maxPages = 20;
 let _aiNaming = true;
+/**
+ * The model this import will run its AI passes on. Empty means "whatever the assistant would use",
+ * which is what the tab did silently before there was a picker.
+ *
+ * A DRAFT, not the `jx.ai.model` preference: choosing a model for one import must not retarget the
+ * assistant for every later conversation. `startImport` falls back to {@link preferredModel} so an
+ * untouched picker behaves exactly as the tab did before.
+ */
+let _model = "";
+/** What the user wants done with the site once it is imported. Handed to the assistant. */
+let _prompt = "";
 let _status: "idle" | "running" | "error" = "idle";
 let _log: ImportProgressEvent[] = [];
 let _errorMsg = "";
@@ -69,11 +81,37 @@ export function resetImportTab() {
   _depth = 1;
   _maxPages = 20;
   _aiNaming = true;
+  _model = "";
+  _prompt = "";
   _status = "idle";
   _log = [];
   _errorMsg = "";
   _abort = null;
   _dirManual = false;
+}
+
+/**
+ * The tab's model picker, and the scheduler it repaints through.
+ *
+ * Created once and kept: `createModelPicker` holds the in-flight fetch and the failed-connection
+ * record, and a picker rebuilt per render would re-fetch the catalogue on every keystroke. The
+ * scheduler is a SLOT rather than a captured closure because `ImportTabCtx` is rebuilt per render
+ * (see `importCtxFor`), so the picker must reach whichever one is current.
+ */
+let _rerender: (() => void) | null = null;
+let _picker: ReturnType<typeof createModelPicker> | null = null;
+
+function modelPicker() {
+  _picker ??= createModelPicker({
+    className: "new-project-import-model",
+    getModel: () => _model || preferredModel(),
+    // A draft, deliberately not `setModel` — see `_model`.
+    onChange: (id) => {
+      _model = id;
+    },
+    requestRender: () => _rerender?.(),
+  });
+  return _picker;
 }
 
 function slugOf(name: string): string {
@@ -149,7 +187,7 @@ export async function startImport(ctx: ImportTabCtx) {
   try {
     const key = getOpenAiKey();
     const baseUrl = getBaseUrl();
-    const model = preferredModel();
+    const model = _model || preferredModel();
     const result = await platform.importSite(
       {
         url: parsed.href,
@@ -275,6 +313,8 @@ export function renderImportStatus(): TemplateResult {
 }
 
 export function renderImportSource(ctx: ImportTabCtx): TemplateResult {
+  // `ctx` is rebuilt per render, so the picker's scheduler has to be re-pointed at the current one.
+  _rerender = ctx.rerender;
   if (!ctx.aiGateOpen()) {
     return html`
       <div class="new-project-tab-intro">
@@ -334,6 +374,22 @@ export function renderImportSource(ctx: ImportTabCtx): TemplateResult {
     >
       AI component naming
     </sp-switch>
+    <label class="new-project-field">
+      <span class="new-project-label">Model</span>
+      ${modelPicker().render()}
+    </label>
+    <label class="new-project-field">
+      <span class="new-project-label">What should the assistant do with it?</span>
+      <sp-textfield
+        multiline
+        class="new-project-import-prompt"
+        placeholder="Keep the layout but modernise the typography, and turn the news list into a content collection…"
+        .value=${_prompt}
+        @input=${(e: Event) => {
+          _prompt = (e.target as HTMLInputElement).value;
+        }}
+      ></sp-textfield>
+    </label>
     ${_errorMsg ? html`<div class="new-project-error">${_errorMsg}</div>` : ""}
     ${
       _status === "error" && _log.length > 0

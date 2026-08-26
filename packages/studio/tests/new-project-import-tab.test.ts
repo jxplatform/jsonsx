@@ -183,13 +183,16 @@ describe("Import source step", () => {
     expect(footerButtons().map((b) => b.textContent?.trim())).toEqual(["Cancel", "Next"]);
   });
 
-  test("shows the URL + crawl options once a key is stored", () => {
+  test("shows the URL, crawl options, model and brief once a key is stored", () => {
     setKey();
     importPlatform();
     void openNewProjectModal();
     switchTab("import");
     expect(document.querySelector("#layer-modal .new-project-creds")).toBeNull();
-    expect(document.querySelectorAll("#layer-modal sp-textfield")).toHaveLength(1);
+    // Two textfields: the site URL, and the brief handed to the assistant afterwards.
+    expect(document.querySelectorAll("#layer-modal sp-textfield")).toHaveLength(2);
+    expect(document.querySelector("#layer-modal .new-project-import-prompt")).toBeTruthy();
+    expect(document.querySelector("#layer-modal .new-project-import-model")).toBeTruthy();
     expect(document.querySelectorAll("#layer-modal sp-number-field")).toHaveLength(2);
     expect(document.querySelector("#layer-modal sp-switch")).toBeTruthy();
     const labels = footerButtons().map((b) => b.textContent?.trim());
@@ -355,6 +358,46 @@ describe("Import — parameters validation", () => {
     expect(captured).toBeNull();
     expect(counter.rerenders).toBe(2);
     expect(resolved).toBe(0);
+  });
+});
+
+describe("Import — the model picker", () => {
+  test("a chosen model reaches importSite without retargeting the assistant", async () => {
+    /* The picker writes a DRAFT, not `jx.ai.model`: choosing a model for one import must not
+       silently change which model every later chat turn runs on. */
+    setKey();
+    importPlatform();
+    void reachParams();
+    npFillLocation();
+    npType(npName(), "Cloned Site");
+
+    // Step back to the source step, where the picker lives, and choose.
+    clickFooter("Back");
+    const picker = document.querySelector(
+      "#layer-modal .new-project-import-model",
+    ) as HTMLElement & { value?: string };
+    picker.value = "o3-import";
+    picker.dispatchEvent(new Event("change", { bubbles: true }));
+
+    clickFooter("Next");
+    clickFooter("Import Site");
+    await flush();
+
+    expect(captured!.opts.model).toBe("o3-import");
+    // The application preference is untouched.
+    expect(globalThis.localStorage.getItem("jx.ai.model")).toBe("test-model");
+  });
+
+  test("an untouched picker falls back to the assistant's own model", async () => {
+    setKey();
+    importPlatform();
+    void reachParams();
+    npFillLocation();
+    npType(npName(), "Cloned Site");
+    clickFooter("Import Site");
+    await flush();
+
+    expect(captured!.opts.model).toBe("test-model");
   });
 });
 
