@@ -3,6 +3,7 @@ title: "The workspace"
 description: "Every region of the Jx Studio window: the Command Bar, the Navigator, the pane grid, the jump bar, the Inspector, the Bottom dock, and the status bar."
 spec:
   - studio.md#3.1
+  - studio.md#9.1.4
   - studio.md#16
   - studio.md#18
 code:
@@ -10,6 +11,7 @@ code:
   - packages/studio/src/panels/activity-bar.ts
   - packages/studio/src/panels/left-panel.ts
   - packages/studio/src/files/files.ts
+  - packages/studio/src/files/gitignore.ts
   - packages/studio/src/panels/right-panel.ts
   - packages/studio/src/panels/jump-bar.ts
   - packages/studio/src/panels/bottom-dock.ts
@@ -52,7 +54,7 @@ The vertical strip on the far left. Every button carries a **text label under it
 
 **Project**
 
-- **Files** (:kbd[⌘1]) — the project file tree. Open, rename and organize the files in your project folder. **New File…** — from the panel's toolbar, or from a folder's right-click menu — opens the [creation dialog](#creating-a-file) with `untitled.json` pre-filled and only the name part selected, so typing replaces the name and keeps the extension. Studio picks the starting content from the extension you give it. Drag files in from your desktop and they upload into whichever folder you drop them on — see [Media](/docs/studio/projects/media). On a [multilingual project](/docs/studio/interface/languages), a file under a language's directory carries that language's name beside it — _français_, not _French_.
+- **Files** (:kbd[⌘1]) — the project file tree. Open, rename and organize the files in your project folder. **New File…** — from the panel's toolbar, or from a folder's right-click menu — opens the [creation dialog](#creating-a-file) with `untitled.json` pre-filled and only the name part selected, so typing replaces the name and keeps the extension. Studio picks the starting content from the extension you give it. The tree leaves out whatever your project ignores — see [Files the tree hides](#files-the-tree-hides). Drag files in from your desktop and they upload into whichever folder you drop them on — see [Media](/docs/studio/projects/media). On a [multilingual project](/docs/studio/interface/languages), a file under a language's directory carries that language's name beside it — _français_, not _French_.
 - **Source Control** (:kbd[⌘3]) — the built-in git client. A badge counts changed files. See [Git & publish](/docs/studio/publish).
 
 **Document**
@@ -86,6 +88,20 @@ The new file is written with the starting content its type calls for: a content 
 
 :::doc-note
 If the write itself fails, the reason arrives as a **Problem** in the [Bottom dock](#bottom-dock) carrying the path, rather than as a toast that scrolls away — the thing you have to do next is about that path.
+:::
+
+## Files the tree hides
+
+The Files tree draws the files you write, not the files your tools write for you. Anything your project's `.gitignore` covers — `node_modules`, `dist`, `build`, `coverage`, `.next` — is left out, so a project of forty documents opens as a list of forty rows rather than tens of thousands.
+
+Studio reads the same `.gitignore` files git reads, at every level of the project: the one in the project folder, and one in any folder below it. The rules mean what they mean in git — a later line beats an earlier one, a `.gitignore` further down the tree beats one above it, and a `!` line puts something back. Folders don't list dotfiles at all, so `.gitignore` itself isn't a row either.
+
+To see what's hidden, click **Show ignored files** in the Files toolbar, beside **New File** and **Refresh**. The tree redraws with everything in it and the button becomes **Hide ignored files**. Studio starts out hiding, and the choice is yours rather than the project's — it follows you into every project and every window.
+
+Change a `.gitignore` and the tree catches up as soon as the file is saved, whether the change came from Studio or from another editor. **Refresh** re-reads the rules as well.
+
+:::doc-note
+A project with no `.gitignore` is unaffected — nothing is hidden, and the toggle has nothing to change. Studio only reads `.gitignore` files that live inside the project folder; the ignore rules git keeps outside it (`.git/info/exclude`, and a global excludes file) are not consulted. So anything missing from the tree is always named by a `.gitignore` you can open.
 :::
 
 ## Panes and the canvas

@@ -47,7 +47,9 @@ void mock.module("@atlaskit/pragmatic-drag-and-drop/element/adapter", () => ({
   },
 }));
 
-const { registerFileTreeDnD, renderFilesTemplate } = await import("../src/files/files");
+const { loadDirectory, registerFileTreeDnD, renderFilesTemplate, setShowIgnoredFiles } =
+  await import("../src/files/files");
+const { resetIgnoreCache } = await import("../src/files/gitignore");
 const { createCommandRegistry } = await import("../src/commands/registry");
 const { emptyContext } = await import("../src/commands/context");
 const { setActiveRegistry } = await import("../src/commands/active-registry");
@@ -1506,5 +1508,181 @@ describe("file tree external file drops", () => {
 
     // One upload, into the row's directory — not a second one at the root.
     expect(uploadPaths(handle)).toEqual(["assets/hero.png"]);
+  });
+});
+
+// ─── .gitignore-aware rows ────────────────────────────────────────────────────
+
+/**
+ * The Files sidebar hides what `.gitignore` masks.
+ *
+ * These cases go through `loadDirectory` rather than `seedTreeState`, and that is the whole
+ * difference between them and every case above: seeding `projectState.dirs` by hand loads no ignore
+ * layers, so nothing is hidden and the older fixtures keep meaning what they always meant. A real
+ * listing fetches the rules alongside the entries, which is what makes a row disappear.
+ *
+ * The mock backend lists dotfiles that the dev server and the desktop session both drop, so the
+ * `.gitignore` itself draws a row here. Left as it is on purpose: a fixture that quietly filtered
+ * more than the code under test would make the row counts below unreadable.
+ */
+describe("the file tree and .gitignore", () => {
+  beforeEach(() => {
+    /* Both are module state that outlives a test: the compiled layers, and the roaming setting
+       behind the toolbar toggle. A tree that hides rows for a reason the case never stated is the
+       hardest kind of failure to read. */
+    resetIgnoreCache();
+    setShowIgnoredFiles(false);
+  });
+
+  /** Seed a backend, load the root (plus any directories to expand), and render the tree. */
+  async function renderIgnoreTree(
+    seed: Record<string, string>,
+    opts: { expand?: string[]; searchQuery?: string } = {},
+  ) {
+    const handle = installFsPlatform(seed);
+    siteState({ searchQuery: opts.searchQuery ?? "" });
+    await loadDirectory(".");
+    for (const dir of opts.expand ?? []) {
+      requireProjectState().expanded.add(dir);
+      await loadDirectory(dir);
+    }
+    const tree = makeTreeCtx();
+    const out = await renderInto(renderFilesTemplate(tree.ctx), host);
+    return { ...tree, handle, out };
+  }
+
+  /** The standard noisy project: a tool-written directory and a tool-written file. */
+  const NOISY_ROOT = {
+    ".gitignore": "node_modules/\n*.log\n",
+    "beta.md": "# b",
+    "build.log": "compiled at…",
+    "node_modules/left-pad/index.js": "module.exports = () => {};",
+    "pages/index.json": "{}",
+  };
+
+  test("an ignored directory and an ignored file draw no row; the rest still do", async () => {
+    const { out } = await renderIgnoreTree(NOISY_ROOT);
+
+    expect(rowFor(out, "node_modules", false)).toBeNull();
+    expect(rowFor(out, "build.log", false)).toBeNull();
+    expect(rowFor(out, "beta.md")).not.toBeNull();
+    expect(rowFor(out, "pages")).not.toBeNull();
+  });
+
+  test("the cache still mirrors the filesystem — hiding is a repaint, not a refetch", async () => {
+    await renderIgnoreTree(NOISY_ROOT);
+
+    /* Filtering happens where rows are BUILT, so everything else that reads `dirs` — the fs-event
+       reducer, the reference index, a later toggle — goes on seeing the real directory. Drop the
+       entries at the listing instead and showing them again costs a round trip. */
+    const paths = requireProjectState()
+      .dirs.get(".")!
+      .map((e) => e.path);
+    expect(paths).toContain("node_modules");
+    expect(paths).toContain("build.log");
+  });
+
+  test("the toolbar toggle draws the ignored rows, and takes them away again", async () => {
+    const { counters, ctx, handle, out } = await renderIgnoreTree(NOISY_ROOT);
+    expect(rowFor(out, "node_modules", false)).toBeNull();
+    handle.state.calls.length = 0;
+
+    pointer(out.querySelector('sp-action-button[label="Show ignored files"]')!, "click");
+    await flush();
+    /* The button asks the panel to repaint and nothing else — the entries were never dropped from
+       the cache, so nothing has to be fetched back. */
+    expect(counters.left).toBe(1);
+    expect(handle.state.calls.filter(([name]) => name === "listDirectory")).toHaveLength(0);
+
+    const shown = await renderInto(renderFilesTemplate(ctx), host);
+    expect(rowFor(shown, "node_modules")).not.toBeNull();
+    expect(rowFor(shown, "build.log")).not.toBeNull();
+    const hide = shown.querySelector('sp-action-button[label="Hide ignored files"]');
+    expect(hide).not.toBeNull();
+    expect(hide!.hasAttribute("selected")).toBe(true);
+
+    pointer(hide!, "click");
+    await flush();
+    const hidden = await renderInto(renderFilesTemplate(ctx), host);
+    expect(rowFor(hidden, "node_modules", false)).toBeNull();
+    expect(rowFor(hidden, "beta.md")).not.toBeNull();
+  });
+
+  test("the search filter runs on what is visible and cannot resurrect an ignored file", async () => {
+    // "catalog.md" and "build.log" both match the query; only one of them is the author's.
+    const seed = {
+      ".gitignore": "*.log\n",
+      "build.log": "compiled at…",
+      "catalog.md": "# c",
+      "other.md": "# o",
+    };
+    const { ctx, out } = await renderIgnoreTree(seed, { searchQuery: "log" });
+
+    expect(rowFor(out, "catalog.md")).not.toBeNull();
+    expect(rowFor(out, "build.log", false)).toBeNull();
+    expect(rowFor(out, "other.md", false)).toBeNull();
+
+    /* The ignore filter runs BEFORE the query, so the toggle is the only thing that brings the
+       masked match back — a search that reached past `.gitignore` would make the toggle a lie. */
+    setShowIgnoredFiles(true);
+    const shown = await renderInto(renderFilesTemplate(ctx), host);
+    expect(rowFor(shown, "build.log")).not.toBeNull();
+  });
+
+  test("a nested .gitignore hides only inside its own directory", async () => {
+    const { out } = await renderIgnoreTree(
+      {
+        "root.tmp": "kept",
+        "src/.gitignore": "*.tmp\n",
+        "src/main.ts": "export {};",
+        "src/scratch.tmp": "dropped",
+      },
+      { expand: ["src"] },
+    );
+
+    expect(rowFor(out, "src/scratch.tmp", false)).toBeNull();
+    expect(rowFor(out, "src/main.ts")).not.toBeNull();
+    /* The same name at the root is untouched: `src/.gitignore` is relative to `src/`, and a rule
+       the author wrote one level down must not reach back up. */
+    expect(rowFor(out, "root.tmp")).not.toBeNull();
+  });
+
+  test("aria-setsize / aria-posinset count the rows that are drawn", async () => {
+    const seed = {
+      ".gitignore": "node_modules/\ndist/\n",
+      "alpha.md": "# a",
+      "beta.md": "# b",
+      "dist/bundle.js": "x",
+      "node_modules/left-pad/index.js": "x",
+    };
+    const { ctx, out } = await renderIgnoreTree(seed);
+
+    /* Five entries in the directory, three rows on screen. A hidden row that still inflated the
+       set would have a screen reader announce "2 of 5" over a list of three — the count has to
+       describe what is drawn, not what was listed. */
+    expect(rowFor(out, "alpha.md").getAttribute("aria-posinset")).toBe("2");
+    expect(rowFor(out, "alpha.md").getAttribute("aria-setsize")).toBe("3");
+    expect(rowFor(out, "beta.md").getAttribute("aria-posinset")).toBe("3");
+    expect(rowFor(out, "beta.md").getAttribute("aria-setsize")).toBe("3");
+
+    setShowIgnoredFiles(true);
+    const shown = await renderInto(renderFilesTemplate(ctx), host);
+    expect(shown.querySelectorAll(".file-tree-item")).toHaveLength(5);
+    expect(rowFor(shown, "beta.md").getAttribute("aria-setsize")).toBe("5");
+  });
+
+  test("Refresh re-reads the .gitignore, not just the listing", async () => {
+    const { handle, out } = await renderIgnoreTree(NOISY_ROOT);
+    expect(handle.state.calls).toContainEqual(["readFile", ".gitignore"]);
+    handle.state.calls.length = 0;
+
+    pointer(out.querySelector('sp-action-button[label="Refresh"]')!, "click");
+    await flush();
+
+    /* Refresh is what an author reaches for after editing a `.gitignore` by hand. The rules are
+       cached per directory, so without the reset the second listing would be filtered by the first
+       run's rules and the button would look broken. */
+    expect(handle.state.calls).toContainEqual(["listDirectory", "."]);
+    expect(handle.state.calls).toContainEqual(["readFile", ".gitignore"]);
   });
 });

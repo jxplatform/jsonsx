@@ -18,6 +18,7 @@ describe("the key table", () => {
       "jx.ai.openaiKey": "",
       "jx.cf.accountId": "",
       "jx.cf.token": "",
+      "jx.files.showIgnored": "",
       "jx.keybindings": "",
     });
   });

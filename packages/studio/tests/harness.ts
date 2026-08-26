@@ -19,6 +19,7 @@ import { ALL_SETTINGS } from "../src/services/settings/definitions";
 import type { SettingDefinition } from "../src/services/settings/definitions";
 import { resetSettings, setSettings } from "../src/services/settings/kernel";
 import { setProjectState } from "../src/store";
+import { resetIgnoreCache } from "../src/files/gitignore";
 import { closeAllTabs, openTab } from "../src/workspace/workspace";
 import {
   STAGE_CLASS,
@@ -56,8 +57,15 @@ export async function flush(turns = 2): Promise<void> {
 
 // ─── State resets ─────────────────────────────────────────────────────────────
 
-/** Reset the global project state to a minimal valid shape, with overrides. */
+/**
+ * Reset the global project state to a minimal valid shape, with overrides.
+ *
+ * The `.gitignore` cache goes with it: it is module state keyed by directory, so a suite that
+ * seeded ignore rules for `.` would otherwise hand them to the next test in the file, and a tree
+ * that hides rows for a reason the test never stated is the hardest kind of failure to read.
+ */
 export function resetStudioState(overrides: Record<string, unknown> = {}): void {
+  resetIgnoreCache();
   setProjectState({
     expanded: new Set(),
     projectConfig: null,
