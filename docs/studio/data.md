@@ -18,7 +18,7 @@ You don't need to have run a database before. The default setup is a single file
 
 ## Where it lives
 
-Open **[Project settings](/docs/studio/projects/settings)** from the ⚙ **Settings** menu at the foot of the rail, by pressing :kbd[⌘K] and running **Open Project Settings**, or from the **⬢ menu** in the Command Bar. Projects with the connector extension enabled get two extra sections in the list:
+Open **[Project settings](/docs/studio/projects/settings)** from the **Settings** menu at the foot of the rail, by pressing :kbd[⌘K] and running **Open Project Settings**, or from the **⬢ menu** in the Command Bar. Projects with the connector extension enabled get two extra sections in the list:
 
 - **[Connections](/docs/studio/data/connections)**: which database (or databases) the project talks to.
 - **[Data Tables](/docs/studio/data/tables)**: the tables inside them, with their fields, ids, and access rules.

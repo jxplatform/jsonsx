@@ -24,7 +24,7 @@ code:
 
 Everything that applies to your whole site rather than one page (the name, the favicon, the fonts, the design tokens, the packages) lives in your project's configuration. In Studio that configuration is **a document**: it opens as a tab in the pane, with its sections listed down the left, and you edit, undo and save it exactly as you would a page.
 
-Open it from the ⚙ **Settings** menu at the foot of the rail — **Open Project Settings**, whose submenu lists every section so you can land on the one you want — or with :kbd[⌘⇧,], or by pressing :kbd[⌘K] and running **Open Project Settings**, or from the **⬢ menu** in the Command Bar. (:kbd[⌘,] is the other half of the pair: **Preferences**, which configures the app rather than this project.) Click a section on the left to move between them; the section you were last on is where you land next time.
+Open it from the **Settings** menu at the foot of the rail: **Open Project Settings**, whose submenu lists every section so you can land on the one you want. It is also on :kbd[⌘⇧,], on :kbd[⌘K] as **Open Project Settings**, and in the **⬢ menu** in the Command Bar. (:kbd[⌘,] is the other half of the pair: **Preferences**, which configures the app rather than this project.) Click a section on the left to move between them; the section you were last on is where you land next time.
 
 ![Project settings open on the Overview section, with the section list on the left](../../images/settings-document.png)
 
@@ -49,7 +49,7 @@ What the site _is_:
 - **Description**: one or two sentences about the site, used by search engines and link previews. Studio stores it as the site-wide `<meta name="description">` tag, so it also shows up in the **Site head** section; clearing it here removes the tag.
 - **Production URL**: where the published site lives, as a full address starting with `http://` or `https://`. Sitemap generation is switched on by having one, and absolute links are built from it. Clearing the field turns the sitemap back off.
 - **Favicon**: click **Upload Favicon** and pick an image; Studio copies it into your project and shows the current one beside the button.
-- **Global Styles**: **Edit Global Styles** switches this same document into **[Project Styles](/docs/studio/design/stylebook)**, where the design tokens and default element styles live with the canvas beside them. It runs **Open Project Styles**, which is also in the rail's ⚙ **Settings** menu and on :kbd[⌘K] — one capability, three doors. Run **Open Project Settings** again to come back.
+- **Global Styles**: **Edit Global Styles** switches this same document into **[Project Styles](/docs/studio/design/stylebook)**, where the design tokens and default element styles live with the canvas beside them. It runs **Open Project Styles**, which is also in the rail's **Settings** menu and on :kbd[⌘K]: one capability, three doors. Run **Open Project Settings** again to come back.
 
 A value the section refuses (a blank name, an address that isn't a full URL) is reported under the control that caused it, and the stored value stays as it was.
 

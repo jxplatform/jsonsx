@@ -41,7 +41,7 @@ Breakpoints layer in the same order a browser applies their media queries, so wh
 
 ## Define your breakpoints
 
-Breakpoints are defined in one place: **Settings › Contexts**. Pick **Open Project Settings › Contexts** from the ⚙ **Settings** menu at the foot of the rail — or press :kbd[⌘K] and run **Open Project Settings**, or use the **⬢ menu** in the Command Bar, then choose **Contexts** in the section list. From the canvas, the context bar's **Context** popover has a **Manage contexts…** button at the bottom that lands on the same section without losing your element selection.
+Breakpoints are defined in one place: **Settings › Contexts**. Pick **Open Project Settings › Contexts** from the **Settings** menu at the foot of the rail. You can also press :kbd[⌘K] and run **Open Project Settings**, or use the **⬢ menu** in the Command Bar, then choose **Contexts** in the section list. From the canvas, the context bar's **Context** popover has a **Manage contexts…** button at the bottom that lands on the same section without losing your element selection.
 
 The section holds three groups, because all three are the same thing on disk and only differ in what their condition asks about:
 

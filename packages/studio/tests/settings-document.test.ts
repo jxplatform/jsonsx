@@ -630,7 +630,7 @@ describe("styles.open", () => {
   });
 
   test("it opens the configuration document in the Project Styles editor", () => {
-    stylesCommand().run({} as CommandContext, undefined as never);
+    void stylesCommand().run({} as CommandContext, undefined as never);
     const tab = workspace.tabs.get("project.json");
     expect(tab?.session.ui.canvasMode).toBe("stylebook");
     expect(activeTab.value?.id).toBe("project.json");
