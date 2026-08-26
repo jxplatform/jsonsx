@@ -30,6 +30,7 @@ import {
   buildProjectExtensionRegistry,
 } from "@jxsuite/compiler/format-host";
 import { readBundledProjectSchemas } from "@jxsuite/compiler/schema-command";
+import { componentMetaFrom } from "@jxsuite/schema/component-meta";
 import type { ExtensionsPayloadEntry } from "@jxsuite/compiler/format-host";
 import type { ExtensionRegistry } from "@jxsuite/schema/extension-registry";
 import type {
@@ -40,13 +41,11 @@ import type {
 } from "@jxsuite/server/refactor";
 import { openExternal as handUrlToOs } from "./utils.ts";
 import type {
-  ComponentSlotMeta,
   DataPushRequest,
   DataRowDelete,
   DataRowInsert,
   DataRowsQuery,
   DataRowUpdate,
-  JsonValue,
   SecretsSetRequest,
 } from "@jxsuite/protocol";
 import type { FormatCapability, FormatRegistry } from "@jxsuite/schema/format-registry";
@@ -58,9 +57,6 @@ import type {
   OpenProjectResult,
   SiteConfig,
 } from "./rpc-schema";
-
-/** One entry of `ComponentMeta.props`, kept in step with the protocol rather than restated. */
-type ComponentProp = NonNullable<ComponentMeta["props"]>[number];
 
 // ─── Internal schema types for class.json parsing ─────────────────────────────
 
@@ -81,46 +77,6 @@ interface CtorParam {
   $ref?: string;
   identifier?: string;
   name?: string;
-}
-
-interface ComponentJsonDef {
-  tagName?: string;
-  $id?: string;
-  $elements?: unknown[];
-  state?: Record<string, unknown>;
-}
-
-/* The protocol's shape, not a restatement: a local copy typed `fallback?: unknown[]` drifted from
-   `(JxMutableNode | string)[]` and made every ComponentMeta unassignable — see rpc-schema.ts. */
-type SlotDef = ComponentSlotMeta;
-
-/**
- * Collect slot definitions (name + fallback children) from a parsed component tree. Whitespace-only
- * names count as unnamed (""). Only static children arrays are walked.
- */
-function collectSlotDefs(node: unknown, out: SlotDef[] = []): SlotDef[] {
-  if (!node || typeof node !== "object" || Array.isArray(node)) {
-    return out;
-  }
-  const el = node as Record<string, unknown>;
-  if (el.tagName === "slot") {
-    const attrs = el.attributes as Record<string, unknown> | undefined;
-    const rawName = attrs?.name;
-    const name = typeof rawName === "string" ? rawName.trim() : "";
-    const { children } = el;
-    out.push({
-      name,
-      ...(Array.isArray(children) && children.length > 0
-        ? { fallback: children as SlotDef["fallback"] }
-        : {}),
-    });
-  }
-  if (Array.isArray(el.children)) {
-    for (const c of el.children) {
-      collectSlotDefs(c, out);
-    }
-  }
-  return out;
 }
 
 interface ClassJsonDef {
@@ -903,44 +859,18 @@ export function createProjectSession(initialRoot: string | null) {
       }
       const fp = resolve(scanRoot, match);
       try {
-        const content = JSON.parse(await readFile(fp, "utf8")) as ComponentJsonDef;
-        if (content.tagName && content.tagName.includes("-")) {
-          const slotDefs = collectSlotDefs(content);
-          components.push({
-            $id: content.$id || null,
-            hasElements: Array.isArray(content.$elements) && content.$elements.length > 0,
-            path: match,
-            props: Object.entries(content.state || {})
-              .filter(([, d]) => {
-                if (d == null) {
-                  return false;
-                }
-                if (typeof d !== "object") {
-                  return true;
-                }
-                const entry = d as Record<string, unknown>;
-                return !entry.$prototype && !entry.$handler && !entry.$compute;
-              })
-              .map(([name, d]): ComponentProp => {
-                if (typeof d !== "object") {
-                  return { default: d as JsonValue, name, type: typeof d };
-                }
-                const entry = d as Record<string, unknown>;
-                const propResult: ComponentProp = {
-                  default: entry.default as JsonValue,
-                  name,
-                };
-                if (entry.type != null) {
-                  propResult.type = entry.type as string;
-                }
-                if (entry.format != null) {
-                  propResult.format = entry.format as string;
-                }
-                return propResult;
-              }),
-            ...(slotDefs.length > 0 ? { slots: slotDefs } : {}),
-            tagName: content.tagName,
-          });
+        /* The rules for "is this a component, and which of its `state` entries are props" live in
+           @jxsuite/schema/component-meta, shared with the dev server and the cloud adapter. This
+           session had its own copy and the two had already drifted — it set `type`/`format` only
+           when non-null, which JSON hides — so the answer is one function rather than three.
+
+           The cast is the same one the cloud adapter makes, for the same reason: @jxsuite/schema
+           sits UNDER @jxsuite/protocol in the dependency graph, so it reports a `state` entry's
+           `type` and `format` as it finds them (`unknown`) while the wire type narrows `type` to
+           `string`. Narrowing here would be the extractor lying about a document it just read. */
+        const meta = componentMetaFrom(JSON.parse(await readFile(fp, "utf8")), match);
+        if (meta) {
+          components.push(meta as ComponentMeta);
         }
       } catch {}
     }
