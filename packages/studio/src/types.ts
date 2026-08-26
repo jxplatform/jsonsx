@@ -34,9 +34,9 @@ import type {
   ImportProgressEvent,
   ImportSiteOptions,
   ImportSiteSummary,
-  OutdatedInfo,
   PackageInfo,
   PackageOpResult,
+  PackageVersionInfo,
   ProjectListEntry,
   ProjectSchemasResponse,
   RecentProjectEntry,
@@ -84,9 +84,9 @@ export type {
   ImportSiteOptions,
   ImportSiteSummary,
   JsonValue,
-  OutdatedInfo,
   PackageInfo,
   PackageOpResult,
+  PackageVersionInfo,
   ProjectListEntry,
   ProjectSchemasResponse,
   PullRequestInfo,
@@ -300,8 +300,12 @@ export interface StudioPlatform {
   installDependencies?: () => Promise<PackageOpResult>;
   /** Whether the project has uninstalled dependencies (node_modules missing). */
   dependenciesNeedInstall?: () => Promise<boolean>;
-  /** List dependencies that have a newer version available. */
-  outdatedPackages?: () => Promise<OutdatedInfo[]>;
+  /**
+   * The newest version published on the registry for each dependency, whether or not it is behind.
+   * Optional: a platform that cannot reach a registry omits it, and Studio shows no Latest column
+   * values rather than inventing them.
+   */
+  packageVersions?: () => Promise<PackageVersionInfo[]>;
   /**
    * Rewrite the version range of each named package (preserving its dependencies/devDependencies
    * placement) and run `bun install`. Used by the @jxsuite bump and per-dependency updates.

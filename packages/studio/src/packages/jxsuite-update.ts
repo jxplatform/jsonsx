@@ -16,7 +16,7 @@
  * build` and the project's types — not the running app. There is no reason for them to match
  * Studio, and pinning them to it was the residue of an assumption that is no longer true.
  *
- * The registry lookup is `platform.outdatedPackages()`, the same seam the dependencies editor uses.
+ * The registry lookup is `platform.packageVersions()`, the same seam the dependencies editor uses.
  * A host that does not offer it (the cloud session, which manages dependencies server-side) simply
  * gets no prompt: without the registry there is no honest target, and guessing is what this
  * replaced.
@@ -50,21 +50,22 @@ export interface JxsuiteUpdate {
  */
 export async function checkJxsuiteUpdate(): Promise<JxsuiteUpdate[]> {
   const platform = getPlatform();
-  if (!platform.outdatedPackages) {
+  if (!platform.packageVersions) {
     return [];
   }
   let reported;
   try {
-    reported = await platform.outdatedPackages();
+    reported = await platform.packageVersions();
   } catch {
     return [];
   }
   const outdated: JxsuiteUpdate[] = [];
   for (const p of reported) {
     /*
-     * `isUpgrade`, not merely "differs from latest". `outdatedPackages` reports any difference, and
-     * a project deliberately pinned AHEAD of the registry — a prerelease, or a range bumped before
-     * the publish landed — would otherwise be offered a downgrade described as an update.
+     * `isUpgrade`, not merely "differs from latest". `packageVersions` reports the registry's answer
+     * for every dependency, current ones included, and a project deliberately pinned AHEAD of the
+     * registry — a prerelease, or a range bumped before the publish landed — would otherwise be
+     * offered a downgrade described as an update.
      */
     if (p.name.startsWith(JXSUITE_PREFIX) && isUpgrade(p.current, p.latest)) {
       outdated.push({ current: p.current, dev: Boolean(p.dev), latest: p.latest, name: p.name });
@@ -146,11 +147,10 @@ export async function maybePromptJxsuiteUpdate(projectRoot: string): Promise<voi
   // That is not hypothetical: it put this dialog into the middle of 33 committed screenshots,
   // Including docs/images/hero.png, which is the jxsuite.com marketing hero.
   //
-  // Correct pins are NOT sufficient on their own. `outdatedPackages` compares the range's base
-  // Version against the registry's `latest` (packages/server/src/packages.ts: `latest ===
-  // StripRange(p.version)`), not whether the range resolves it — so a project pinned `^1.4.1` is
-  // "outdated" the moment 1.4.2 publishes, and every starter shot would be scrimmed again by the
-  // Next patch release of any @jxsuite package.
+  // Correct pins are NOT sufficient on their own. This compares the range's BASE version against
+  // The registry's `latest`, not whether the range resolves it — so a project pinned `^1.4.1` is
+  // Behind the moment 1.4.2 publishes, and every starter shot would be scrimmed again by the next
+  // Patch release of any @jxsuite package.
   if (shouldInstallAutomation(location.search)) {
     return;
   }

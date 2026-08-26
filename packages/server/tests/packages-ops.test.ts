@@ -10,7 +10,7 @@ import {
   installDependencies,
   isRegistryRange,
   listPackages,
-  outdatedPackages,
+  packageVersions,
   removePackage,
   setPackageVersions,
   stripRange,
@@ -90,7 +90,7 @@ describe("dependenciesNeedInstall", () => {
   });
 });
 
-// ─── fetchLatestVersion / outdatedPackages (fetch injected) ─────────────────────
+// ─── fetchLatestVersion / packageVersions (fetch injected) ─────────────────────
 
 describe("fetchLatestVersion", () => {
   test("returns version from an ok response", async () => {
@@ -128,32 +128,61 @@ describe("fetchLatestVersion", () => {
   });
 });
 
-describe("outdatedPackages", () => {
-  test("reports deps with a newer latest and skips non-registry specs", async () => {
-    writePkg({
-      dependencies: { hono: "^4.0.0", local: "file:../x", ws: "workspace:^" },
-      devDependencies: { "@jxsuite/compiler": "^0.19.0" },
-    });
-    const latestByName: Record<string, string> = {
-      "@jxsuite/compiler": "0.30.1",
-      hono: "4.0.0",
-    };
-    const f = async (input: string) => {
+describe("packageVersions", () => {
+  /** A registry that answers `latestByName`, or 0.0.0 for anything not listed. */
+  function registry(latestByName: Record<string, string>) {
+    return async (input: string) => {
       const name = decodeURIComponent(
         input.replace("https://registry.npmjs.org/", "").replace("/latest", ""),
       );
       return Response.json({ version: latestByName[name] ?? "0.0.0" }, { status: 200 });
     };
+  }
 
-    const out = await outdatedPackages(dir, f);
-    const names = out.map((o) => o.name);
-    expect(names).toContain("@jxsuite/compiler"); // 0.19.0 -> 0.30.1
-    expect(names).not.toContain("hono"); // Already at latest base
-    expect(names).not.toContain("local"); // Skipped (file: spec)
-    expect(names).not.toContain("ws"); // Skipped (workspace: spec)
-    const jx = out.find((o) => o.name === "@jxsuite/compiler");
-    expect(jx?.latest).toBe("0.30.1");
-    expect(jx?.dev).toBe(true);
+  test("reports every registry dependency and skips non-registry specs", async () => {
+    writePkg({
+      dependencies: { hono: "^4.0.0", local: "file:../x", ws: "workspace:^" },
+      devDependencies: { "@jxsuite/compiler": "^0.19.0" },
+    });
+
+    const out = await packageVersions(
+      dir,
+      registry({ "@jxsuite/compiler": "0.30.1", hono: "4.0.0" }),
+    );
+    const byName = new Map(out.map((o) => [o.name, o]));
+    expect([...byName.keys()].toSorted()).toEqual(["@jxsuite/compiler", "hono"]);
+    expect(byName.get("@jxsuite/compiler")?.latest).toBe("0.30.1");
+    expect(byName.get("@jxsuite/compiler")?.dev).toBe(true);
+    expect(byName.get("@jxsuite/compiler")?.current).toBe("^0.19.0");
+    expect(byName.get("hono")?.dev).toBeUndefined();
+  });
+
+  test("a package already AT its latest still gets a row", async () => {
+    /*
+     * The regression this replaced `outdatedPackages` for. That function dropped any package whose
+     * latest equalled its pinned base, so the Packages table could only describe an up-to-date
+     * dependency as a blank Latest cell — the registry's answer was known and thrown away.
+     */
+    writePkg({ dependencies: { hono: "^4.0.0" } });
+    const out = await packageVersions(dir, registry({ hono: "4.0.0" }));
+    expect(out).toEqual([{ current: "^4.0.0", latest: "4.0.0", name: "hono" }]);
+  });
+
+  test("a package pinned AHEAD of the registry still gets a row", async () => {
+    // Reported, not filtered: whether that is an upgrade or a deliberate pin is the caller's call.
+    writePkg({ dependencies: { hono: "^5.0.0-rc.1" } });
+    const out = await packageVersions(dir, registry({ hono: "4.6.0" }));
+    expect(out).toEqual([{ current: "^5.0.0-rc.1", latest: "4.6.0", name: "hono" }]);
+  });
+
+  test("a package the registry does not answer for is omitted", async () => {
+    writePkg({ dependencies: { hono: "^4.0.0", private: "^1.0.0" } });
+    const f = async (input: string) =>
+      input.includes("private")
+        ? new Response("not found", { status: 404 })
+        : Response.json({ version: "4.6.0" }, { status: 200 });
+    const out = await packageVersions(dir, f);
+    expect(out.map((o) => o.name)).toEqual(["hono"]);
   });
 });
 

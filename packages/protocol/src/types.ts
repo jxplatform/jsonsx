@@ -453,15 +453,20 @@ export interface PackageInfo {
   dev?: boolean;
 }
 
-/** A dependency with a newer version available, as reported by `bun outdated` / the npm registry. */
-export interface OutdatedInfo {
+/**
+ * A dependency's pinned range beside the newest version published for it on the npm registry.
+ *
+ * Reported for EVERY dependency whose spec is a registry range, whether or not it is behind — "is
+ * this outdated?" is a comparison the caller makes, not a filter the backend applies. That matters
+ * for the Packages table, which shows a Latest column for every row: a backend that only answered
+ * about outdated packages could describe the up-to-date ones only as a blank.
+ */
+export interface PackageVersionInfo {
   name: string;
   /** The version range pinned in package.json (e.g. "^0.19.0"). */
   current: string;
-  /** The newest published version. */
+  /** The newest version published for this package on the registry. */
   latest: string;
-  /** The newest version satisfying the current range, if known. */
-  wanted?: string;
   dev?: boolean;
 }
 
