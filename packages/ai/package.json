@@ -25,7 +25,7 @@
   "scripts": {
     "build": "bun build ./src/index.ts --outdir dist --target browser --sourcemap=linked",
     "test": "bun test",
-    "upgrade": "bunx npm-check-updates -u && bun install"
+    "upgrade": "bun update --latest && bun install"
   },
   "dependencies": {
     "@jxsuite/protocol": "workspace:^",
