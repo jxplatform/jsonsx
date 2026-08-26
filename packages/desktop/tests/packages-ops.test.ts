@@ -21,7 +21,7 @@ void mock.module("@jxsuite/server/packages", () => ({
   dependenciesNeedInstall: record("dependenciesNeedInstall", () => true),
   installDependencies: record("installDependencies", () => Promise.resolve(opResult)),
   listPackages: record("listPackages", () => Promise.resolve([{ name: "x", version: "^1" }])),
-  outdatedPackages: record("outdatedPackages", () =>
+  packageVersions: record("packageVersions", () =>
     Promise.resolve([{ current: "^1", latest: "2.0.0", name: "x" }]),
   ),
   removePackage: record("removePackage", () => Promise.resolve(opResult)),
@@ -82,11 +82,11 @@ describe("createPackageOps wrapper", () => {
     expect(await noRoot.dependenciesNeedInstall()).toBe(false);
   });
 
-  test("outdatedPackages delegates / [] without root", async () => {
-    expect(await withRoot.outdatedPackages()).toEqual([
+  test("packageVersions delegates / [] without root", async () => {
+    expect(await withRoot.packageVersions()).toEqual([
       { current: "^1", latest: "2.0.0", name: "x" },
     ]);
-    expect(await noRoot.outdatedPackages()).toEqual([]);
+    expect(await noRoot.packageVersions()).toEqual([]);
   });
 
   test("setPackageVersions delegates with root + updates / rejects without root", async () => {

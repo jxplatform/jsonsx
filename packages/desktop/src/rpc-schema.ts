@@ -103,12 +103,11 @@ export interface PackageInfo {
   dev?: boolean;
 }
 
-/** A dependency with a newer version available, as reported by `bun outdated` / the npm registry. */
-export interface OutdatedInfo {
+/** A dependency's pinned range beside its newest version on the registry, behind or not. */
+export interface PackageVersionInfo {
   name: string;
   current: string;
   latest: string;
-  wanted?: string;
   dev?: boolean;
 }
 
@@ -397,9 +396,9 @@ export interface StudioRPC {
         params: void;
         response: boolean;
       };
-      outdatedPackages: {
+      packageVersions: {
         params: void;
-        response: OutdatedInfo[];
+        response: PackageVersionInfo[];
       };
       setPackageVersions: {
         params: { updates: { name: string; version: string; dev?: boolean }[] };

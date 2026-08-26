@@ -3,12 +3,12 @@ import {
   dependenciesNeedInstall as needInstall,
   installDependencies as install,
   listPackages as list,
-  outdatedPackages as outdated,
+  packageVersions as versions,
   removePackage as removePkg,
   setPackageVersions as setVersions,
 } from "@jxsuite/server/packages";
 import { getProjectRoot } from "./handlers";
-import type { OutdatedInfo, PackageInfo, PackageOpResult } from "./rpc-schema";
+import type { PackageInfo, PackageOpResult, PackageVersionInfo } from "./rpc-schema";
 
 /** Build package operations bound to one project session (its projectRoot is the package cwd). */
 export function createPackageOps(session: { readonly projectRoot: string | null }) {
@@ -54,12 +54,12 @@ export function createPackageOps(session: { readonly projectRoot: string | null 
     return needInstall(root);
   }
 
-  async function outdatedPackages(): Promise<OutdatedInfo[]> {
+  async function packageVersions(): Promise<PackageVersionInfo[]> {
     const root = session.projectRoot;
     if (!root) {
       return [];
     }
-    return outdated(root);
+    return versions(root);
   }
 
   async function setPackageVersions(params: {
@@ -73,7 +73,7 @@ export function createPackageOps(session: { readonly projectRoot: string | null 
     dependenciesNeedInstall,
     installDependencies,
     listPackages,
-    outdatedPackages,
+    packageVersions,
     removePackage,
     setPackageVersions,
   };
@@ -92,5 +92,5 @@ export const { removePackage } = _legacy;
 export const { listPackages } = _legacy;
 export const { installDependencies } = _legacy;
 export const { dependenciesNeedInstall } = _legacy;
-export const { outdatedPackages } = _legacy;
+export const { packageVersions } = _legacy;
 export const { setPackageVersions } = _legacy;

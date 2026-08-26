@@ -1201,20 +1201,28 @@ describe("packages — install/needs/outdated/set-versions", () => {
     expect(typeof body.ok).toBe("boolean");
   });
 
-  test("outdated reports a newer version (registry mocked)", async () => {
-    mkdirSync(join(ROOT, "outdated-proj"), { recursive: true });
+  test("versions reports each dependency's latest, behind or not (registry mocked)", async () => {
+    mkdirSync(join(ROOT, "versions-proj"), { recursive: true });
     writeFileSync(
-      join(ROOT, "outdated-proj", "package.json"),
-      JSON.stringify({ dependencies: { "fake-pkg": "^1.0.0" }, name: "outdated-proj" }),
+      join(ROOT, "versions-proj", "package.json"),
+      JSON.stringify({
+        dependencies: { "current-pkg": "^3.0.0", "fake-pkg": "^1.0.0" },
+        name: "versions-proj",
+      }),
     );
     const origFetch = globalThis.fetch;
-    globalThis.fetch = (async () => Response.json({ version: "2.0.0" })) as unknown as typeof fetch;
+    globalThis.fetch = (async (input: string) =>
+      Response.json({
+        version: input.includes("current-pkg") ? "3.0.0" : "2.0.0",
+      })) as unknown as typeof fetch;
     try {
-      const { req, url } = getReq("/__studio/packages/outdated?dir=outdated-proj");
+      const { req, url } = getReq("/__studio/packages/versions?dir=versions-proj");
       const res = await callApi(req, url);
       expect(res.status).toBe(200);
       const list = await res.json();
       expect(list).toContainEqual({ current: "^1.0.0", latest: "2.0.0", name: "fake-pkg" });
+      // The up-to-date one is a row too — the Latest column has something to show for it.
+      expect(list).toContainEqual({ current: "^3.0.0", latest: "3.0.0", name: "current-pkg" });
     } finally {
       globalThis.fetch = origFetch;
     }

@@ -1,4 +1,10 @@
-/** Tests for src/settings/dependencies-editor.ts — the outdated-aware dependency table. */
+/**
+ * Tests for src/settings/dependencies-editor.ts — the dependency table.
+ *
+ * The Latest column is the registry's answer for EVERY row. The `../src/version` mock below is
+ * deliberately a version no package in these fixtures is at: it is what the `@jxsuite/*` rows used
+ * to be pinned to, so a row showing it again is the regression these tests exist to catch.
+ */
 import { flush, installMockPlatform, pointer } from "./harness";
 import { afterEach, beforeAll, describe, expect, mock, test } from "bun:test";
 import { initLayers } from "../src/ui/layers";
@@ -50,8 +56,21 @@ const TWO_DEPS = {
     { dev: true, name: "@jxsuite/compiler", version: "^0.19.0" },
     { name: "hono", version: "^4.0.0" },
   ],
-  outdatedPackages: async () => [{ current: "^4.0.0", latest: "4.6.0", name: "hono" }],
+  packageVersions: async () => [
+    { current: "^0.19.0", dev: true, latest: "0.22.0", name: "@jxsuite/compiler" },
+    { current: "^4.0.0", latest: "4.6.0", name: "hono" },
+  ],
 };
+
+/** The rendered table, keyed by package name → its cells. */
+function cellsByName(c: HTMLElement): Map<string | undefined, Element[]> {
+  return new Map(
+    [...c.querySelectorAll("sp-table-row")].map((r) => {
+      const cells = [...r.querySelectorAll("sp-table-cell")];
+      return [cells[0]?.textContent?.trim().split(/\s/)[0], cells];
+    }),
+  );
+}
 
 describe("renderDependenciesEditor", () => {
   test("shows a loading state then a table with current + latest", async () => {
@@ -61,17 +80,54 @@ describe("renderDependenciesEditor", () => {
     expect(c.querySelector(".about-muted")?.textContent).toContain("Loading");
 
     await flush();
-    const rows = [...c.querySelectorAll("sp-table-row")];
-    expect(rows).toHaveLength(2);
-    const cellsByName = new Map(
-      rows.map((r) => {
-        const cells = [...r.querySelectorAll("sp-table-cell")];
-        return [cells[0]?.textContent?.trim().split(/\s/)[0], cells];
-      }),
-    );
-    // @jxsuite row targets the embedded VERSION; hono targets the registry latest.
-    expect(cellsByName.get("@jxsuite/compiler")?.[2]?.textContent?.trim()).toBe("0.30.1");
-    expect(cellsByName.get("hono")?.[2]?.textContent?.trim()).toBe("4.6.0");
+    const cells = cellsByName(c);
+    expect(cells.size).toBe(2);
+    // Every row reads its OWN newest publish — including the @jxsuite one, which used to read the
+    // Version this Studio build embeds (mocked to 0.30.1 above) whatever npm actually had.
+    expect(cells.get("@jxsuite/compiler")?.[2]?.textContent?.trim()).toBe("0.22.0");
+    expect(cells.get("hono")?.[2]?.textContent?.trim()).toBe("4.6.0");
+  });
+
+  test("a package already AT its latest shows that version, with no update button", async () => {
+    /*
+     * The reported defect. The backend was asked for OUTDATED packages, so a current dependency
+     * arrived as an absence and the Latest column read `—` — the registry's answer was known and
+     * discarded. It is a version now, and only the update affordance is conditional.
+     */
+    installMockPlatform({
+      listPackages: async () => [{ name: "hono", version: "^4.6.0" }],
+      packageVersions: async () => [{ current: "^4.6.0", latest: "4.6.0", name: "hono" }],
+    });
+    const c = makeContainer();
+    renderDependenciesEditor(c);
+    await flush();
+    expect(cellsByName(c).get("hono")?.[2]?.textContent?.trim()).toBe("4.6.0");
+    expect(c.querySelector('sp-action-button[title^="Update to"]')).toBeNull();
+    expect(buttonByText(c, "Update all")).toBeUndefined();
+  });
+
+  test("a package pinned AHEAD of the registry shows latest but is not offered a downgrade", async () => {
+    installMockPlatform({
+      listPackages: async () => [{ name: "hono", version: "^5.0.0-rc.1" }],
+      packageVersions: async () => [{ current: "^5.0.0-rc.1", latest: "4.6.0", name: "hono" }],
+    });
+    const c = makeContainer();
+    renderDependenciesEditor(c);
+    await flush();
+    expect(cellsByName(c).get("hono")?.[2]?.textContent?.trim()).toBe("4.6.0");
+    expect(c.querySelector('sp-action-button[title^="Update to"]')).toBeNull();
+  });
+
+  test("a package the registry cannot answer for reads —", async () => {
+    // A workspace:/file:/git spec, or a name npm does not serve: no row comes back for it at all.
+    installMockPlatform({
+      listPackages: async () => [{ name: "local-thing", version: "workspace:^" }],
+      packageVersions: async () => [],
+    });
+    const c = makeContainer();
+    renderDependenciesEditor(c);
+    await flush();
+    expect(cellsByName(c).get("local-thing")?.[2]?.textContent?.trim()).toBe("—");
   });
 
   test("renders the empty state when there are no dependencies", async () => {
@@ -100,7 +156,7 @@ describe("renderDependenciesEditor", () => {
     expect(received).toEqual([{ dev: false, name: "hono", version: "^4.6.0" }]);
   });
 
-  test("update all bumps every outdated dependency", async () => {
+  test("update all bumps every dependency that is actually behind", async () => {
     let received: { name: string }[] = [];
     installMockPlatform({
       ...TWO_DEPS,

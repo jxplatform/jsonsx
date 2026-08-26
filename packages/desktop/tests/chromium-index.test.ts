@@ -156,7 +156,7 @@ const packageMocks = {
   dependenciesNeedInstall: mock(() => Promise.resolve(true)),
   installDependencies: mock(() => Promise.resolve({ ok: true })),
   listPackages: mock(() => Promise.resolve([{ name: "left-pad" }])),
-  outdatedPackages: mock(() => Promise.resolve([])),
+  packageVersions: mock(() => Promise.resolve([])),
   removePackage: mock(() => Promise.resolve({ removed: true })),
   setPackageVersions: mock(() => Promise.resolve({ ok: true })),
 };
@@ -686,7 +686,7 @@ describe("chromium launcher RPC dispatch", () => {
   test("dependency-management methods dispatch to the packages module", async () => {
     expect(await rpc("installDependencies")).toEqual({ ok: true });
     expect(await rpc("dependenciesNeedInstall")).toBe(true);
-    expect(await rpc("outdatedPackages")).toEqual([]);
+    expect(await rpc("packageVersions")).toEqual([]);
     const updates = [{ name: "@jxsuite/runtime", version: "^0.30.1" }];
     expect(await rpc("setPackageVersions", { updates })).toEqual({ ok: true });
     expect(packageMocks.setPackageVersions).toHaveBeenCalledWith({ updates });

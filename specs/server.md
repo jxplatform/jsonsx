@@ -2,7 +2,7 @@
 
 ## Development Server with Live Reload, Proxy Resolution, and Studio API
 
-**Version:** 0.2.13
+**Version:** 0.2.14
 **Status:** Implemented
 **Updated:** 2026-08-26
 **License:** MIT
@@ -148,7 +148,9 @@ The canonical endpoint list is the `STUDIO_ROUTES` table in `@jxsuite/protocol` 
 - **Filesystem** — directory listing and project-wide search on one route (`files?dir=` / `files?glob=`), file CRUD, upload, rename (with refactor report), locate
 - **Realtime co-editing** — `GET /__studio/collab`: a WebSocket upgrade speaking the `@jxsuite/collab` wire envelope (one socket per project, documents multiplexed by path); a plain GET answers the capability probe. Implemented in `src/collab.ts`: rooms seed from the file on disk, persistence is explicit (flush on save, plus graceful shutdown), and genuinely external file changes bump the doc epoch and reset subscribers.
 - **Documents / components / formats** — component discovery, CEM extraction, the project's format/extension registry, generated project schemas, format parse/serialize dispatch, plugin schemas, code services (§5)
-- **Packages** — dependency list/add/remove/install, staleness and outdated checks, bulk version updates
+- **Packages** — dependency list/add/remove/install, an install-staleness check, the newest published version of
+  every dependency (`packages/versions`, reported whether or not the pin is behind — comparing them is the
+  client's job), bulk version updates
 - **Git** — status, branches, log, stage/unstage, commit, push/pull/fetch, checkout, branch, diff/show, discard, init, remotes, clone, PR
 - **Data surface + secrets** — connector connections, connection test, additive schema push, row paging/CRUD, secret env-var names (never values)
 - **AI proxy** — SSE chat proxy and model catalogue
@@ -336,6 +338,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.2.14** (2026-08-26) — Packages family: `GET /__studio/packages/versions` reports every dependency's newest published version, behind or not, replacing the outdated-only check.
 - **0.2.13** (2026-08-26) — the import stream's done line carries the run summary, and accepts an opt-in verify pass (§4).
 - **0.2.12** (2026-08-25) — §3: the static-file order now matches a build — public/ precedes the project root, which survives as a compatibility lane that warns.
 - **0.2.11** (2026-08-22) — §3.1: watch-policy.ts — watchers watch only directories and regular files, and contain symlinks to the root, so a socket cannot throw and a link out cannot walk the filesystem.
@@ -363,4 +366,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/server` Specification v0.2.13_
+_`@jxsuite/server` Specification v0.2.14_

@@ -613,8 +613,8 @@ export function createDesktopPlatform() {
       return rpc.request.dependenciesNeedInstall();
     },
 
-    async outdatedPackages() {
-      return rpc.request.outdatedPackages();
+    async packageVersions() {
+      return rpc.request.packageVersions();
     },
 
     async setPackageVersions(updates: { name: string; version: string; dev?: boolean }[]) {

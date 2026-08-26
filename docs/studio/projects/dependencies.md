@@ -53,7 +53,7 @@ The site context also shows **Imported Modules** — modules that give the proje
 
 ## Stay up to date
 
-- The **Packages** section of [Project settings](/docs/studio/projects/settings) shows each package's current and latest version, with per-row update buttons and **Update all**.
+- The **Packages** section of [Project settings](/docs/studio/projects/settings) shows each package's current version beside its newest version on npm — every package, Jx's own included, each measured against its own latest — with per-row update buttons and **Update all**.
 - When you open a project whose Jx packages are behind, Studio offers to update them — accept, and it rewrites the versions and reinstalls for you. Each package goes to **its own** newest published version, checked against the registry: the Jx packages release on separate cadences, so there is no single number they all share. Decline, and it won't ask again until one of them publishes something newer.
 - If a project's packages have never been installed on this machine (say, you just cloned it), Studio installs them automatically before the editor loads.
 
