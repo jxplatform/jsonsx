@@ -9,6 +9,7 @@
  */
 
 import { getPlatform } from "../platform";
+import { reloadIgnoreCache, touchesGitignore } from "./gitignore";
 import { invalidateUsages } from "../services/references";
 import { projectState } from "../store";
 import type { DirEntry, FsEvent } from "../types";
@@ -174,6 +175,14 @@ export function startFsSync(ctx: FsSyncContext): () => void {
     // Gone.
     invalidateUsages();
     ctx.invalidateDerivedCaches?.();
+    /* A `.gitignore` governs the whole tree beneath it, so it is handled HERE rather than in the
+       batch below: the echo filter drops the events Studio caused, and an author who just edited
+       their own `.gitignore` in Studio is precisely the one waiting to see the tree change. It also
+       never reaches `applyFsEvents` — a dotfile is in no listing, so no directory reads as changed
+       and no repaint would follow. Hence the explicit one, once the rules are back. */
+    if (touchesGitignore(events.map((event) => event.path))) {
+      void reloadIgnoreCache().then(() => ctx.renderLeftPanel());
+    }
     pending.push(...events);
     if (timer) {
       clearTimeout(timer);

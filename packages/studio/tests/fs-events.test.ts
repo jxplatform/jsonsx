@@ -6,6 +6,7 @@ import {
   markLocalMutation,
   startFsSync,
 } from "../src/files/fs-events";
+import { ensureIgnoreLayers, isIgnoredEntry } from "../src/files/gitignore";
 import { invalidateUsages, loadUsages } from "../src/services/references";
 import type { DirEntry, FsEvent } from "../src/types";
 
@@ -200,6 +201,97 @@ describe("startFsSync", () => {
     handler([{ isDir: false, path: "sup/local.json", type: "add" }]);
     await sleep(70);
     expect(renders).toHaveLength(0);
+    stop();
+  });
+});
+
+// ─── A .gitignore is a tree-wide event ────────────────────────────────────────
+
+/**
+ * The watcher's `.gitignore` branch, which is the one event that changes every row at once.
+ *
+ * It sits ahead of the debounced batch in `startFsSync` for two reasons the cases below hold to:
+ * the file reaches `applyFsEvents` as a change to a dotfile nobody listed, so no directory reads as
+ * changed and no repaint would follow; and the echo filter would drop it exactly when the author
+ * who just edited their own `.gitignore` is waiting to see the tree respond.
+ */
+describe("startFsSync and .gitignore", () => {
+  /** Install a watcher-capable backend and hand back the handler it registered. */
+  function installWatchedPlatform(files: Record<string, string>) {
+    let handler: (events: FsEvent[]) => void = () => {};
+    const handle = installMockPlatform(
+      {
+        subscribeFileEvents: (h) => {
+          handler = h;
+          return () => {};
+        },
+      },
+      files,
+    );
+    return { fire: (events: FsEvent[]) => handler(events), state: handle.state };
+  }
+
+  test("a .gitignore event repaints, though no directory reads as changed", async () => {
+    const { fire, state } = installWatchedPlatform({ ".gitignore": "dist/\n" });
+    resetStudioState({
+      dirs: new Map([[".", [entry("dist", "directory"), entry("keep.md")]]]),
+      expanded: new Set(),
+    });
+    // The tree has listed the root, so its rules are cached — only probed directories are re-read.
+    await ensureIgnoreLayers(".");
+    state.calls.length = 0;
+
+    const renders: number[] = [];
+    const stop = startFsSync({ renderLeftPanel: () => renders.push(1) });
+    fire([{ isDir: false, path: ".gitignore", type: "change" }]);
+    await sleep(70);
+
+    /* `applyFsEvents` reports nothing for a `change`, so the debounced flush raises no repaint at
+       all: the one render here is the reload's, and without it the tree would keep drawing the old
+       rules until something unrelated happened to redraw it. */
+    expect(state.calls).toContainEqual(["readFile", ".gitignore"]);
+    expect(renders).toHaveLength(1);
+    stop();
+  });
+
+  test("an edited .gitignore changes what the tree hides", async () => {
+    const { fire, state } = installWatchedPlatform({ ".gitignore": "dist/\n" });
+    resetStudioState({ dirs: new Map([[".", [entry("dist", "directory")]]]), expanded: new Set() });
+    await ensureIgnoreLayers(".");
+    expect(isIgnoredEntry(".", "dist", true)).toBe(true);
+    expect(isIgnoredEntry(".", "coverage", true)).toBe(false);
+
+    const stop = startFsSync({ renderLeftPanel: () => {} });
+    /* What an author's own edit looks like from here: the bytes on disk moved, then the watcher
+       said so. */
+    state.files.set(".gitignore", "coverage/\n");
+    fire([{ isDir: false, path: ".gitignore", type: "change" }]);
+    await sleep(70);
+
+    expect(isIgnoredEntry(".", "dist", true)).toBe(false);
+    expect(isIgnoredEntry(".", "coverage", true)).toBe(true);
+    stop();
+  });
+
+  test("Studio's own edit is not treated as an echo", async () => {
+    const { fire, state } = installWatchedPlatform({ ".gitignore": "dist/\n" });
+    resetStudioState({ dirs: new Map([[".", [entry("dist", "directory")]]]), expanded: new Set() });
+    await ensureIgnoreLayers(".");
+    state.calls.length = 0;
+
+    const renders: number[] = [];
+    const stop = startFsSync({ renderLeftPanel: () => renders.push(1) });
+    /* `isRecentLocal` suppresses the events Studio caused, because the tree already repainted for
+       them. A `.gitignore` written in Studio is the exception: nothing repainted, and the author
+       editing it is precisely the one waiting for the rows to change. */
+    markLocalMutation(".gitignore");
+    state.files.set(".gitignore", "coverage/\n");
+    fire([{ isDir: false, path: ".gitignore", type: "change" }]);
+    await sleep(70);
+
+    expect(state.calls).toContainEqual(["readFile", ".gitignore"]);
+    expect(renders).toHaveLength(1);
+    expect(isIgnoredEntry(".", "coverage", true)).toBe(true);
     stop();
   });
 });

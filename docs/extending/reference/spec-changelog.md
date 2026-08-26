@@ -443,6 +443,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.9.47-draft** (2026-08-26) — 9.1.4 the Files tree hides what .gitignore masks — rules from every level, filtered where rows are built, a per-user toggle that defaults to hiding, and no .git/info/exclude or core.excludesFile.
 - **0.9.46-draft** (2026-08-26) — the Assistant tab draws a running import and the agent's questions (§6).
 - **0.9.45-draft** (2026-08-25) — Preferences §15: a blank field never deletes, a default is never a stored value, and every preference roams between windows.
 - **0.9.44-draft** (2026-08-25) — Declare assetSpace: the canvas origin serves either the site URL space or repo paths under documentBaseUrl (§3.4/§4.1/§11.2); media resolves at render rather than by a document walk (§4.1); typed UploadResult and declared asset capabilities (§9.3).
