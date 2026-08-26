@@ -391,9 +391,9 @@
       "width": 480
     },
     "docs/images/data-grid.png": {
-      "bytes": 774176,
-      "capturedAt": "2026-08-26T20:50:07Z",
-      "capturedBy": "screenshots@ci/33011987503",
+      "bytes": 773557,
+      "capturedAt": "2026-08-26T21:07:23Z",
+      "capturedBy": "screenshots@ci/33013492964",
       "definition": "7733baf1d19aff069527b88fefd317f30bb3a8b2ec780f65ed6f5dfbb25d08ea",
       "height": 2000,
       "runtime": {
@@ -401,7 +401,7 @@
         "fontset": "fc:cac8f480b341",
         "os": "debian-12"
       },
-      "sha256": "84f3dff0764f354b6f7d80e1a5588fa2da1f25a14f345ec0ae4dab7174103f40",
+      "sha256": "d0971370d68537691d0006a3b19e148414a3d1c9ba9a2fb7de7365b40274310f",
       "shot": "data-grid",
       "width": 3840
     },
