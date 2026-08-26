@@ -76,7 +76,7 @@ function page(title: string, translationKey?: string): string {
  * The switcher links a page rendered, as `hreflang → {url, dir, current}`.
  *
  * `current` is read by PRESENCE, not by text: `item.current` is a boolean, and the emitter spells a
- * boolean as the attribute's presence — bare when true, absent when false (compiler spec §6). So
+ * boolean as the attribute's presence — bare when true, absent when false (compiler spec §8). So
  * the marker this asserts is `<a data-current>` against `<a>`, never `data-current="false"`.
  */
 function switcher(source: string): Record<string, { current: boolean; dir: string; url: string }> {
