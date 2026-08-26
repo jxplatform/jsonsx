@@ -17,7 +17,7 @@ The documentation lives in `/docs` at the monorepo root, published through the j
 
 1. Create the Markdown file under the right section (`start/`, `studio/`, `framework/`, `extending/`).
 2. Add frontmatter: `title` (sentence case, no site suffix) and `description` (≤155 characters).
-3. Add one line to `docs/nav.json` — the sidebar is generated from it, and CI fails if a page is missing from nav (or nav points at a missing page).
+3. Add one line to `docs/nav.json` — to the section's own `pages` if the page sits directly under it, otherwise to the `pages` of the group it belongs to. The sidebar is generated from it, and CI fails if a page is missing from nav (or nav points at a missing page). A new group needs a `label` and at least one page; never leave a `pages` or `groups` array empty.
 4. Run `bun run docs:check` before pushing.
 
 Optional frontmatter associates a page with its sources, validated by CI:
