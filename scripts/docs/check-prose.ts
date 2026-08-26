@@ -231,7 +231,7 @@ export function corpusFiles(): string[] {
     (f) => !SITE_EXCLUDED.has(f),
   );
 
-  return [...new Set([...docs, ...readmes, ...site, "PROSE-REWRITE.md"])].toSorted();
+  return [...new Set([...docs, ...readmes, ...site])].toSorted();
 }
 
 export interface Report {
