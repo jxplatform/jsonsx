@@ -15,6 +15,17 @@ export type JxEventHandler = (scope: JxScope, event: Event) => unknown;
 
 export interface JxRenderOptions {
   _path?: JxPath;
+  /**
+   * Base URL the document's own references resolve against — `$ref`, `$elements`, `$head` and the
+   * asset paths beneath them.
+   *
+   * Only {@link Jx} reads it, and only when it was handed a document OBJECT rather than a URL. A URL
+   * carries its own base; an object does not, so the base defaulted to `location.href` — which is
+   * right for a page served at the project root and wrong everywhere else. A host that composes a
+   * document server-side and serves it at `/blog/hello/` needs to say that its references are still
+   * root-relative, or every one of them resolves a directory too deep.
+   */
+  base?: string;
   /** The namespace the parent element established — SVG and MathML descendants inherit it. */
   _ns?: string | null;
   /**

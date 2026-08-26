@@ -50,7 +50,7 @@ import type { AssetMount } from "@jxsuite/schema/asset-paths";
 import type { FormatEntry, FormatRegistry } from "@jxsuite/schema/format-registry";
 import type { ExtensionRegistry } from "@jxsuite/schema/extension-registry";
 import { resolveLayout } from "./layout-resolver.ts";
-import { mergeHead, renderHead } from "./head-merger.ts";
+import { mergeHead, renderHead } from "@jxsuite/schema/head-merger";
 import { unregisteredHeadRelations } from "./link-relations.ts";
 import { injectContext } from "./context-injection.ts";
 import { compile, compileServer, compileSiteServer } from "../compiler.ts";
@@ -1171,7 +1171,7 @@ async function compilePage(
   const pageDoc = await readPageDocument(route.sourcePath as string, formatRegistry);
 
   // Resolve layout (wraps page in layout with slot distribution)
-  const layoutDoc = resolveLayout(pageDoc, projectConfig, projectRoot);
+  const layoutDoc = await resolveLayout(pageDoc, projectConfig, projectRoot);
 
   // Extract head arrays before they get lost in the merge
   const pageHead = (pageDoc.$head ?? layoutDoc._pageHead ?? []) as JxHeadEntry[];

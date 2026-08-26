@@ -103,7 +103,11 @@ export async function Jx(
   target: HTMLElement = document.body,
   options?: JxRenderOptions,
 ) {
-  const base = typeof source === "string" ? new URL(source, location.href).href : location.href;
+  const base = options?.base
+    ? new URL(options.base, location.href).href
+    : typeof source === "string"
+      ? new URL(source, location.href).href
+      : location.href;
   const doc = await resolve(source);
   checkSchemaVersion(doc.$schema);
 

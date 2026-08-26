@@ -1,14 +1,8 @@
-export interface HeadMergeContext {
-  title?: string;
-  siteName?: string;
-  lang?: string;
-  charset?: string;
-  url?: string;
-  siteUrl?: string;
-  pageUrl?: string;
-  /** `rel="alternate"` links for this page's translations (site-architecture.md §13.5). */
-  alternates?: readonly { hreflang: string; href: string }[];
-}
+/**
+ * `HeadMergeContext` moved to `@jxsuite/schema/head-merger` with the merger itself — a browser
+ * bundle and a Worker both assemble the same `<head>`, and neither can import this package.
+ */
+export type { HeadMergeContext } from "@jxsuite/schema/head-merger";
 
 export interface SiteRoute {
   urlPattern: string;

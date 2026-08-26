@@ -427,3 +427,27 @@ export function primaryLanguage(tag: unknown): string | null {
   const canonical = canonicalizeLocale(tag);
   return canonical === null ? null : (canonical.split("-")[0] ?? null);
 }
+
+/**
+ * The locale a URL belongs to.
+ *
+ * Matching is on the **first path segment**, compared canonically, so `/fr-CA/about/` resolves for
+ * a project that declared `fr-ca`. A path under no declared locale is the default locale — under
+ * `prefix-except-default` that is the point, and under `prefix-always` it is a page the author put
+ * outside the locale tree, which is theirs to place.
+ *
+ * @param {string} urlPattern - Site-absolute route pattern, e.g. `/fr/about/`
+ * @param {ResolvedI18n | null} i18n
+ * @returns {string | null} A canonical tag, or null when the project has no i18n
+ */
+export function localeOfRoute(urlPattern: string, i18n: ResolvedI18n | null): string | null {
+  if (i18n === null) {
+    return null;
+  }
+  const first = urlPattern.split("/").find(Boolean);
+  if (first === undefined) {
+    return i18n.defaultLocale;
+  }
+  const canonical = canonicalizeLocale(first);
+  return canonical !== null && i18n.locales.includes(canonical) ? canonical : i18n.defaultLocale;
+}

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mergeHead, renderHead } from "../src/site/head-merger";
+import { mergeHead, renderHead } from "../src/head-merger.ts";
 import type { JxHeadEntry } from "@jxsuite/schema/types";
 
 // ─── mergeHead ──────────────────────────────────────────────────────────────
@@ -344,5 +344,72 @@ describe("structured data (§8.5)", () => {
   test("a string textContent is still emitted verbatim", () => {
     const html = renderHead([{ tagName: "script", textContent: '{"a":1}' }]);
     expect(html).toContain('<script>{"a":1}</script>');
+  });
+});
+
+// ─── Cases the compiler's own suite reached indirectly ───────────────────────
+
+describe("mergeHead singletons and alternates", () => {
+  test("a <title> is a singleton, and the resolved one is what survives", () => {
+    /* Three levels may each author a title; exactly one element comes out, and it carries the
+       title the build already resolved rather than whichever level happened to be merged last. */
+    const result = mergeHead(
+      [{ children: ["Site"], tagName: "title" }],
+      [{ children: ["Layout"], tagName: "title" }],
+      [{ children: ["Page"], tagName: "title" }],
+    ) as any[];
+    const titles = result.filter((entry) => entry.tagName === "title");
+    expect(titles).toHaveLength(1);
+    expect(titles[0].children).toEqual(["Jx Site"]);
+  });
+
+  test("the resolved page title outranks a <title> any level authored", () => {
+    /* `context.title` is the answer the build already worked out — the page's `title`, else the
+       layout's, else the site name — so it is applied last on purpose. */
+    const result = mergeHead([], [], [{ children: ["Page"], tagName: "title" }], {
+      title: "Resolved",
+    }) as any[];
+    const titles = result.filter((entry) => entry.tagName === "title");
+    expect(titles).toHaveLength(1);
+    expect(titles[0].children).toEqual(["Resolved"]);
+  });
+
+  test("an author charset replaces the auto-injected one rather than joining it", () => {
+    const result = mergeHead([{ attributes: { charset: "iso-8859-1" }, tagName: "meta" }]) as any[];
+    const charsets = result.filter((entry) => entry.attributes?.charset);
+    expect(charsets).toHaveLength(1);
+    expect(charsets[0].attributes.charset).toBe("iso-8859-1");
+  });
+
+  test("a malformed entry is keyed by its own value rather than crashing the merge", () => {
+    const result = mergeHead([null as any, "junk" as any, null as any]) as any[];
+    expect(result.filter((entry) => entry === null)).toHaveLength(1);
+  });
+
+  test("alternates become one link each, keyed by hreflang", () => {
+    const result = mergeHead([], [], [], {
+      alternates: [
+        { href: "https://example.com/", hreflang: "en" },
+        { href: "https://example.com/fr/", hreflang: "fr" },
+        { href: "https://example.com/", hreflang: "x-default" },
+      ],
+    }) as any[];
+    const alternates = result.filter((entry) => entry.attributes?.rel === "alternate");
+    expect(alternates.map((entry) => entry.attributes.hreflang)).toEqual(["en", "fr", "x-default"]);
+  });
+
+  test("an author-supplied alternate for the same link wins", () => {
+    /* Identity for a link is rel + href + the attribute that distinguishes two links sharing both,
+       so this is the same entry — and the generated one must not displace it. */
+    const authored = {
+      attributes: { href: "/fr/", hreflang: "fr", rel: "alternate", title: "Français" },
+      tagName: "link",
+    };
+    const result = mergeHead([], [], [authored], {
+      alternates: [{ href: "/fr/", hreflang: "fr" }],
+    }) as any[];
+    const alternates = result.filter((entry) => entry.attributes?.rel === "alternate");
+    expect(alternates).toHaveLength(1);
+    expect(alternates[0].attributes.title).toBe("Français");
   });
 });

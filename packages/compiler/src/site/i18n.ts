@@ -12,7 +12,11 @@
  * @docs framework/site/i18n
  */
 
-import { canonicalizeLocale, localeDirection } from "@jxsuite/schema/locale";
+import {
+  canonicalizeLocale,
+  localeDirection,
+  localeOfRoute as localeForRoute,
+} from "@jxsuite/schema/locale";
 import type { ResolvedI18n, TextDirection } from "@jxsuite/schema/locale";
 
 /*
@@ -26,30 +30,10 @@ import type { ResolvedI18n, TextDirection } from "@jxsuite/schema/locale";
  */
 export { resolveI18n } from "@jxsuite/schema/locale";
 export type { LocaleRouting, ResolvedI18n } from "@jxsuite/schema/locale";
-
-/**
- * The locale a URL belongs to.
- *
- * Matching is on the **first path segment**, compared canonically, so `/fr-CA/about/` resolves for
- * a project that declared `fr-ca`. A path under no declared locale is the default locale — under
- * `prefix-except-default` that is the point, and under `prefix-always` it is a page the author put
- * outside the locale tree, which is theirs to place.
- *
- * @param {string} urlPattern - Site-absolute route pattern, e.g. `/fr/about/`
- * @param {ResolvedI18n | null} i18n
- * @returns {string | null} A canonical tag, or null when the project has no i18n
- */
-export function localeOfRoute(urlPattern: string, i18n: ResolvedI18n | null): string | null {
-  if (i18n === null) {
-    return null;
-  }
-  const first = urlPattern.split("/").find(Boolean);
-  if (first === undefined) {
-    return i18n.defaultLocale;
-  }
-  const canonical = canonicalizeLocale(first);
-  return canonical !== null && i18n.locales.includes(canonical) ? canonical : i18n.defaultLocale;
-}
+/* `localeOfRoute` lives beside `resolveI18n` in `@jxsuite/schema/locale` for the reason that one
+   does: the studio and the cloud preview both have to answer "what language is this URL" and
+   neither can import this package. Re-exported so nothing in the build had to change its import. */
+export { localeOfRoute } from "@jxsuite/schema/locale";
 
 /**
  * Routes sitting outside the locale tree under `prefix-always`.
@@ -239,7 +223,7 @@ export function translationSets(
     if (route.translationKey !== undefined) {
       declared.add(route.urlPattern);
     }
-    const locale = localeOfRoute(route.urlPattern, i18n);
+    const locale = localeForRoute(route.urlPattern, i18n);
     if (locale === null) {
       continue;
     }
