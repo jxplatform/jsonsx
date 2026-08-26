@@ -333,3 +333,87 @@ describe("streaming", () => {
     expect(seenSignal).toBeInstanceOf(AbortSignal);
   });
 });
+
+describe("the verify pass and the run summary", () => {
+  test("verify is off unless asked for", async () => {
+    const { req, url } = makeRequest({ directory: "site", url: "https://x.example" });
+    await readLines((await handleImportApi(req, url, apiOptions))!);
+    expect(importCalls[0]!.options.verify).toBe(false);
+  });
+
+  test("verify is forwarded with a clamped threshold", async () => {
+    const { req, url } = makeRequest({
+      directory: "site",
+      url: "https://x.example",
+      verify: true,
+      verifyThreshold: 0.3,
+    });
+    await readLines((await handleImportApi(req, url, apiOptions))!);
+    expect(importCalls[0]!.options.verify).toEqual({ threshold: 0.3 });
+
+    for (const [sent, expected] of [
+      [5, 1],
+      [-2, 0.01],
+      ["nonsense", 0.15],
+      [undefined, 0.15],
+    ] as const) {
+      importCalls = [];
+      const next = makeRequest({
+        directory: "site",
+        url: "https://x.example",
+        verify: true,
+        ...(sent === undefined ? {} : { verifyThreshold: sent }),
+      });
+      await readLines((await handleImportApi(next.req, next.url, apiOptions))!);
+      expect(importCalls[0]!.options.verify).toEqual({ threshold: expected });
+    }
+  });
+
+  test("the done line carries what the run found", async () => {
+    /* The pipeline computed the page list, the file count, the warnings and the fidelity scores,
+       and this endpoint used to discard every one of them: the caller learned that an import had
+       happened and nothing about what it found. */
+    importBehavior = (call) => {
+      const outDir = call.options.outDir as string;
+      mkdirSync(outDir, { recursive: true });
+      writeFileSync(join(outDir, "project.json"), JSON.stringify({ name: "Imported Site" }));
+      return Promise.resolve({
+        fileCount: 14,
+        outDir,
+        pages: [{ nodeCount: 120, route: "pages/index.json", title: "Home" }],
+        verify: {
+          averageFidelity: 84,
+          pages: [{ fidelity: 61, route: "pages/pricing.json" }],
+          reportDir: `${outDir}/verify`,
+        },
+        warnings: ["3 assets failed to download"],
+      });
+    };
+
+    const { req, url } = makeRequest({
+      directory: "site",
+      url: "https://x.example",
+      verify: true,
+    });
+    const lines = await readLines((await handleImportApi(req, url, apiOptions))!);
+    const done = lines.at(-1)!;
+
+    expect(done.type).toBe("done");
+    expect(done.result).toMatchObject({
+      fileCount: 14,
+      pages: [{ nodeCount: 120, route: "pages/index.json", title: "Home" }],
+      warnings: ["3 assets failed to download"],
+    });
+    expect((done.result as { verify: { averageFidelity: number } }).verify.averageFidelity).toBe(
+      84,
+    );
+  });
+
+  test("a run with no verify pass omits the key rather than sending null", async () => {
+    const { req, url } = makeRequest({ directory: "site", url: "https://x.example" });
+    const lines = await readLines((await handleImportApi(req, url, apiOptions))!);
+    const result = lines.at(-1)!.result as Record<string, unknown>;
+    expect(result).toMatchObject({ fileCount: 3, pages: [], warnings: [] });
+    expect(result).not.toHaveProperty("verify");
+  });
+});

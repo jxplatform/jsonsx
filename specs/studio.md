@@ -2,9 +2,9 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.45-draft
+**Version:** 0.9.46-draft
 **Status:** Partial
-**Updated:** 2026-08-25
+**Updated:** 2026-08-26
 **License:** MIT
 
 ---
@@ -556,6 +556,14 @@ file. With no document open there is nowhere per-document to keep it, and the As
 exactly that state (the New Project hand-off sends a brief before any document exists), so the
 selection falls back to a single window-level value rather than being refused. An undeclared stored
 id coerces to Content.
+
+**The Assistant tab is where long agent work is watched, and where it stops to ask.** A site import
+runs for minutes and reports a line at a time; it renders under the tool call that started it, so the
+run and its chip are one thing and the account survives the run rather than dying with a dialog. A
+question the agent raises renders in the same transcript, as that call's own card, and the composer
+becomes its answer field — the next send answers the question instead of opening a new turn. Both
+contracts are `ai.md` §3.4–§3.5; what this section fixes is that they are drawn HERE, in a tab that
+is usable before any project exists.
 
 ### 6.1 Property Panel
 
@@ -2482,6 +2490,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.9.46-draft** (2026-08-26) — the Assistant tab draws a running import and the agent's questions (§6).
 - **0.9.45-draft** (2026-08-25) — Preferences §15: a blank field never deletes, a default is never a stored value, and every preference roams between windows.
 - **0.9.44-draft** (2026-08-25) — Declare assetSpace: the canvas origin serves either the site URL space or repo paths under documentBaseUrl (§3.4/§4.1/§11.2); media resolves at render rather than by a document walk (§4.1); typed UploadResult and declared asset capabilities (§9.3).
 - **0.9.43-draft** (2026-08-25) — §13.5 names all seven quiescence sources, and adds the grid: a table still building, or built but not yet showing its selection range, is not settled.
@@ -2582,4 +2591,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.45-draft_
+_`@jxsuite/studio` Specification v0.9.46-draft_

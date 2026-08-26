@@ -361,15 +361,21 @@ describe("collab, ai and capabilities", () => {
     });
   });
 
-  test("ai.streaming defaults to false when no probe is supplied", () => {
+  test("ai.streaming and ai.waiting default to false when no probe is supplied", () => {
     aiConfigured = true;
     const ctx = createLiveContext(sources())();
-    expect(ctx.ai).toEqual({ configured: true, streaming: false });
+    expect(ctx.ai).toEqual({ configured: true, streaming: false, waiting: false });
   });
 
   test("ai.streaming is read from the probe when there is one", () => {
     const ctx = createLiveContext(sources({ aiStreaming: () => true }))();
     expect(ctx.ai.streaming).toBe(true);
+  });
+
+  test("ai.waiting is its own probe — a suspended turn moves no tokens", () => {
+    const ctx = createLiveContext(sources({ aiWaiting: () => true }))();
+    expect(ctx.ai.waiting).toBe(true);
+    expect(ctx.ai.streaming).toBe(false);
   });
 
   test("with no platform every capability is off", () => {

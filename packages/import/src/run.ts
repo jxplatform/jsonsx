@@ -78,7 +78,18 @@ export interface ImportSiteResult {
   outDir: string;
   pages: { route: string; title: string; nodeCount: number }[];
   fileCount: number;
-  verify: { averageFidelity: number; reportDir: string } | null;
+  verify: {
+    averageFidelity: number;
+    reportDir: string;
+    /**
+     * Per page, because the average cannot name one.
+     *
+     * "Average fidelity 84%" is a fact nobody can act on; "the pricing page renders at 61%" is a
+     * decision — retry it, patch it by hand, or accept it. The verifier computed both and only the
+     * average was reported, so the actionable half was thrown away one level below the caller.
+     */
+    pages: { route: string; fidelity: number; error?: string }[];
+  } | null;
   warnings: string[];
 }
 
@@ -523,6 +534,16 @@ export async function importSite(
     return {
       averageFidelity: verifyResult.averageFidelity,
       reportDir: verifyResult.reportDir,
+      pages: verifyResult.pages.map((page) => {
+        const entry: { route: string; fidelity: number; error?: string } = {
+          route: page.route,
+          fidelity: page.fidelity,
+        };
+        if (page.error !== undefined) {
+          entry.error = page.error;
+        }
+        return entry;
+      }),
     };
   }
 }

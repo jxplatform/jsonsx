@@ -30,6 +30,7 @@ import { installUrlOf } from "../platform-errors";
 import { hasAiCredentials } from "../services/ai-models";
 import { setPendingAgentPrompt } from "../services/agent-seed";
 import { initProjectRepo } from "../files/files";
+import { runImportHandoff } from "../services/import-seed";
 import { createAiCredentialsForm } from "../ui/ai-credentials-form";
 import { createManagedConnect } from "../ui/ai-managed-connect";
 import {
@@ -39,14 +40,10 @@ import {
   resetLocationFields,
 } from "./location-fields";
 import {
-  cancelImport,
+  handoffImport,
   importButtonLabel,
-  isImportRunning,
-  renderImportProgress,
   renderImportSource,
-  renderImportStatus,
   resetImportTab,
-  startImport,
   validateImportSource,
 } from "./import-tab";
 import type { ProjectConfig } from "@jxsuite/schema/types";
@@ -211,9 +208,6 @@ export function closeNewProjectModal() {
   if (!_handle || _creating) {
     return;
   }
-  if (isImportRunning()) {
-    cancelImport(importCtxFor(renderModal));
-  }
   _handle.close();
   _handle = null;
   if (_resolve) {
@@ -223,7 +217,7 @@ export function closeNewProjectModal() {
 }
 
 /** Close the modal and resolve its promise with a created/imported project. */
-function finish(result: { root: string; config: ProjectConfig }) {
+function finish(result: { root: string; config: ProjectConfig } | null) {
   _creating = false;
   if (_handle) {
     _handle.close();
@@ -236,8 +230,12 @@ function finish(result: { root: string; config: ProjectConfig }) {
 }
 
 /**
- * Every path out of the wizard that produced a project: initialise version control for it, then
- * hand it to the caller. A scaffold is not a repository, and Delete and Rename are one click away.
+ * Every path out of the wizard that produced a project HERE: initialise version control for it,
+ * then hand it to the caller. A scaffold is not a repository, and Delete and Rename are one click
+ * away.
+ *
+ * The Import path does not come through here any more — `import_site` creates the project, so the
+ * obligation moved with it into `services/project-adoption.ts`, which both bootstrap tools share.
  */
 async function finishCreated(result: { root: string; config: ProjectConfig }) {
   await initProjectRepo(result.root);
@@ -275,9 +273,13 @@ function importCtxFor(rerender: () => void): ImportTabCtx {
     credsForm: credsForm(),
     form: _form,
     managedConnect: managedConnect(),
-    onDone: (result) => {
-      // See above: the discard is deliberate, and `void` as a statement is what says so.
-      void finishCreated(result);
+    /* The wizard creates nothing on this path. `import_site` is `no-project` tiered and does the
+       creating — including the git init every create path owes (`specs/desktop.md` §4.5), which
+       moved into `adoptCreatedProject` with it. The modal resolves `null`, the same as a dismissal,
+       because nothing was created HERE. */
+    onHandoff: (brief) => {
+      finish(null);
+      void runImportHandoff(brief);
     },
     rerender,
     resolveDestination: () => validateParams(),
@@ -338,7 +340,7 @@ function renderModal() {
   };
 
   const onTabChange = (e: Event) => {
-    if (_creating || isImportRunning()) {
+    if (_creating) {
       return;
     }
     _tab = (e.target as HTMLElement & { selected: string }).selected as NewProjectTab;
@@ -363,7 +365,7 @@ function renderModal() {
   };
 
   const goBack = () => {
-    if (_creating || isImportRunning()) {
+    if (_creating) {
       return;
     }
     _step = "source";
@@ -524,7 +526,12 @@ function renderModal() {
     })}
     ${
       _tab === "import"
-        ? renderImportStatus()
+        ? html`
+            <div class="new-project-tab-intro">
+              The assistant runs the import and reports as it goes — this dialog closes as soon as
+              it starts.
+            </div>
+          `
         : html`
             <div class="new-project-tab-intro">
               The site's address, deployment target and design tokens are project settings — set
@@ -542,15 +549,6 @@ function renderModal() {
         Cancel
       </sp-button>
     `;
-    if (isImportRunning()) {
-      // One cancel, not two: the run's own Cancel is the step's Cancel, and dismissing the modal
-      // (Escape, the underlay, the header ✕) aborts the run on the way out.
-      return html`
-        <sp-button variant="secondary" @click=${() => cancelImport(importCtx)}>
-          Cancel Import
-        </sp-button>
-      `;
-    }
     if (_step === "source") {
       const gated = (_tab === "import" || _tab === "agent") && !aiGateOpen();
       return html`
@@ -561,7 +559,7 @@ function renderModal() {
     const primary =
       _tab === "import"
         ? html`
-            <sp-button variant="accent" @click=${() => startImport(importCtx)}>
+            <sp-button variant="accent" @click=${() => handoffImport(importCtx)}>
               ${importButtonLabel()}
             </sp-button>
           `
@@ -583,12 +581,7 @@ function renderModal() {
     `;
   };
 
-  const bodyTpl = () => {
-    if (isImportRunning()) {
-      return renderImportProgress();
-    }
-    return _step === "source" ? sourceBodyTpl() : paramsBodyTpl();
-  };
+  const bodyTpl = () => (_step === "source" ? sourceBodyTpl() : paramsBodyTpl());
 
   const tpl = html`
     <sp-underlay open @close=${closeNewProjectModal}></sp-underlay>
@@ -602,7 +595,7 @@ function renderModal() {
         </sp-action-button>
       </div>
       ${
-        _step === "source" && !isImportRunning()
+        _step === "source"
           ? html`
               <div class="new-project-tabs">
                 <sp-tabs selected=${_tab} quiet @change=${onTabChange}>

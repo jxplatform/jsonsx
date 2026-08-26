@@ -261,7 +261,6 @@ export const SPECTRUM_DEBT: Record<string, number> = {
   "editor/convert-to-repeater.ts": 4,
   "files/files.ts": 1,
   "new-project/add-repo-modal.ts": 1,
-  "new-project/import-tab.ts": 4,
   "new-project/location-fields.ts": 5,
   "new-project/new-project-modal.ts": 2,
   "panels/block-action-bar.ts": 1,
@@ -318,7 +317,6 @@ export const SELF_QUERY_DEBT: Record<string, number> = {
      repaints a single Down keystroke walked ten rows". `@keydown` on the tree deleted the
      workaround, the deps entry that carried it, and the query, all at once. */
   "files/files.ts": 4,
-  "new-project/import-tab.ts": 1,
   "new-project/new-project-modal.ts": 1,
   "panels/block-action-bar.ts": 3,
   "panels/bottom-dock.ts": 1,

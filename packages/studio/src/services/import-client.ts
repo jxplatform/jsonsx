@@ -4,10 +4,12 @@
  * to their token-gated loopback servers — so the request/parse/settle logic lives here once.
  *
  * The endpoint emits one JSON object per line: `progress` lines (forwarded to onProgress),
- * `heartbeat` keep-alives (ignored), and a terminal `done` ({root, config}) or `error` line.
+ * `heartbeat` keep-alives (ignored), and a terminal `done` ({root, config, result}) or `error`
+ * line. `result` is optional — a backend that does not send one is not broken, and every caller
+ * treats its absence as "the run happened, and it did not say what it found".
  */
 
-import type { ImportProgressEvent, ImportSiteOptions } from "../types";
+import type { ImportProgressEvent, ImportSiteOptions, ImportSiteSummary } from "../types";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 
 /**
@@ -27,6 +29,7 @@ interface StreamLine {
   total?: number;
   root?: string;
   config?: ProjectConfig;
+  result?: ImportSiteSummary;
   error?: string;
 }
 
@@ -43,7 +46,7 @@ export async function streamImport(
   opts: ImportSiteOptions,
   onProgress: (evt: ImportProgressEvent) => void,
   signal?: AbortSignal,
-): Promise<{ root: string; config: ProjectConfig }> {
+): Promise<{ root: string; config: ProjectConfig; result?: ImportSiteSummary }> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (opts.apiKey) {
     headers["X-Api-Key"] = opts.apiKey;
@@ -60,6 +63,8 @@ export async function streamImport(
       maxPages: opts.maxPages,
       aiComponents: opts.aiComponents,
       ...(opts.model === undefined ? {} : { aiModel: opts.model }),
+      ...(opts.verify === undefined ? {} : { verify: opts.verify }),
+      ...(opts.verifyThreshold === undefined ? {} : { verifyThreshold: opts.verifyThreshold }),
     }),
     headers,
     method: "POST",
@@ -85,7 +90,7 @@ export async function streamImport(
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
-  let result: { root: string; config: ProjectConfig } | null = null;
+  let result: { root: string; config: ProjectConfig; result?: ImportSiteSummary } | null = null;
   /*
    * Lines the parser could not read. Tolerating one is right — an import that ran for two minutes
    * should not die on a garbled progress line — but doing it *silently* is not: the import then
@@ -114,7 +119,11 @@ export async function streamImport(
         ...(parsed.total === undefined ? {} : { total: parsed.total }),
       });
     } else if (parsed.type === "done" && parsed.root !== undefined && parsed.config) {
-      result = { root: parsed.root, config: parsed.config };
+      result = {
+        root: parsed.root,
+        config: parsed.config,
+        ...(parsed.result === undefined ? {} : { result: parsed.result }),
+      };
     } else if (parsed.type === "error") {
       throw new Error(parsed.error || "Import failed");
     }

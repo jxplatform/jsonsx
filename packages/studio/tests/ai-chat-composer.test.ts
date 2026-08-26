@@ -1,7 +1,7 @@
 /**
  * Tests for src/panels/ai-chat/composer.ts — the sticky chat input: Enter/Shift+Enter, empty-send +
  * streaming guards, auto-grow, clear-after-send, the Send↔Stop morph, context-attach chips
- * (page/selection), and the model picker states.
+ * (page/selection), and that it mounts a model picker.
  */
 import {
   clearSeededSettings,
@@ -10,7 +10,6 @@ import {
   key,
   pointer,
   resetWorkspaceWithTab,
-  seedSettings,
   setValue,
 } from "./harness";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
@@ -214,66 +213,14 @@ describe("context attach", () => {
 });
 
 describe("model picker", () => {
-  function pickerItems(c: ReturnType<typeof makeComposer>) {
-    return [...c.container.querySelectorAll(".ai-model-picker sp-menu-item")] as (HTMLElement & {
-      value?: string;
-    })[];
-  }
-
-  test("lists fetched models after the lazy load resolves", async () => {
+  /* One case, not five. The picker itself is `ui/ai-model-picker.ts` and is covered by
+     `ai-model-picker.test.ts`; what belongs HERE is that the composer mounts one and wires its own
+     render scheduler to it. */
+  test("mounts a picker wired to the composer's own scheduler", async () => {
     const c = makeComposer();
-    // First render kicks off the fetch; loading item present meanwhile.
-    expect(c.container.textContent).toContain("Loading models…");
+    expect(c.container.querySelector(".ai-model-picker")).not.toBeNull();
+    // The fetch settles through requestRender, so the list appears without an explicit rerender.
     await flush();
-    c.rerender();
-    const items = pickerItems(c);
-    expect(items.some((i) => i.getAttribute("value") === "o3")).toBe(true);
     expect(c.container.textContent).toContain("o3 mini");
-    expect(c.container.textContent).not.toContain("Loading models…");
-  });
-
-  test("prepends a stored custom model id missing from the list", async () => {
-    seedSettings({ "jx.ai.model": "my-custom-model" });
-    const c = makeComposer();
-    await flush();
-    c.rerender();
-    const first = pickerItems(c)[0]!;
-    expect(first.getAttribute("value")).toBe("my-custom-model");
-  });
-
-  test("change persists the model choice", async () => {
-    const c = makeComposer();
-    await flush();
-    c.rerender();
-    const picker = c.container.querySelector(".ai-model-picker") as HTMLElement & {
-      value?: string;
-    };
-    picker.value = "o3";
-    picker.dispatchEvent(new Event("change", { bubbles: true }));
-    expect(globalThis.localStorage.getItem("jx.ai.model")).toBe("o3");
-  });
-
-  test("fetch failure offers Retry, which refetches", async () => {
-    fetchImpl = async () => new Response("boom", { status: 500 });
-    const c = makeComposer();
-    await flush();
-    c.rerender();
-    const retry = pickerItems(c).find((i) => i.getAttribute("value") === "__retry_models__");
-    expect(retry).toBeDefined();
-    expect(c.container.querySelector(".ai-model-picker")!.getAttribute("title")).toContain(
-      "HTTP 500",
-    );
-
-    fetchImpl = async () => Response.json({ models: [{ id: "recovered" }] }, { status: 200 });
-    const picker = c.container.querySelector(".ai-model-picker") as HTMLElement & {
-      value?: string;
-    };
-    picker.value = "__retry_models__";
-    picker.dispatchEvent(new Event("change", { bubbles: true }));
-    await flush();
-    c.rerender();
-    expect(pickerItems(c).some((i) => i.getAttribute("value") === "recovered")).toBe(true);
-    // The retry sentinel never persists as the chosen model.
-    expect(globalThis.localStorage.getItem("jx.ai.model")).toBeNull();
   });
 });

@@ -1044,6 +1044,13 @@
 .new-project-agent-prompt {
   min-height: 120px;
 }
+.new-project-import-prompt {
+  width: 100%;
+  min-height: 90px;
+}
+.new-project-import-model {
+  width: 100%;
+}
 .new-project-step-context {
   font-size: var(--spectrum-font-size-75, 12px);
   color: var(--fg-dim);

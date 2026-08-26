@@ -2,9 +2,9 @@
 
 ## AI Assistant for Jx Studio
 
-**Version:** 0.1.8-draft
+**Version:** 0.1.9-draft
 **Status:** Partial
-**Updated:** 2026-08-23
+**Updated:** 2026-08-26
 **License:** MIT
 
 ---
@@ -132,6 +132,67 @@ A multi-tool turn may move between documents. The undo batch and the collaborati
 re-anchored to the document each tool actually wrote — anchoring once, to whichever tab happened to
 be active when the turn opened, silently files one document's edits under another's history.
 
+### 3.4 A turn may stop and ask
+
+An assistant that must guess, or apologise for not knowing, is worse than one that can ask. `ask_user`
+suspends the turn on the author and resumes with their reply. Five properties are normative.
+
+**The mechanism is the tool, not a new state.** The agent loop awaits each tool call, so a tool that
+returns a pending promise suspends the turn; nothing in the chat state or the streaming protocol
+changes. `finishStream` has already run by the time tools execute, so a suspended turn is idle by
+construction — "waiting" is the presence of an outstanding question, not a fourth status.
+
+**A skip is a success, and only a stopped turn is a failure.** "You decide" is a real answer to a
+fair question. Reporting it as an error would have the model apologise for asking, and would end the
+turn on the error path — which deletes the streaming message (§3.2).
+
+**The answer is a tool result, never a user message.** The wire format requires a `tool` reply to
+follow its `tool_calls` request; a user turn spliced between them is rejected. The reply is rendered
+into the question's own chip, so the exchange has one account in the transcript rather than two that
+can disagree.
+
+**An interactive round does not spend the tool-call budget.** The round cap bounds AUTONOMOUS work,
+and a round that ends by blocking on a person cannot advance without them — which is the property
+the cap was ever a proxy for. A separate hard ceiling keeps the loop terminating regardless.
+
+**A question does not survive a reload, and does not pretend to.** The promise is in memory and the
+transcript is not, so a restored question renders inert and says why. The same reload — and ordinary
+history truncation, and a turn stopped mid-tool — can separate a `tool_calls` request from its
+reply, so the send path repairs the pairing: a request with no reply is sealed with a synthesised
+failure, and a reply with no request is dropped.
+
+**What may be asked is bounded.** A question the model could have answered with another tool is
+waste, and a question about an option the answer cannot reach is worse than waste, because the reply
+cannot be honoured. Both are stated in the prompt as prohibitions.
+
+### 3.5 Bootstrapping by import
+
+`import_site` is `create_project`'s sibling: it clones a live site into a new project and adopts it
+into the window. Four properties are normative.
+
+**Availability is a tier AND a capability.** "No project is open" is exactly as true on a backend
+with no import pipeline as on one with it, so a tier alone cannot express this; the tool declares the
+PAL member it needs, and one predicate answers for both the prompt's tool list and the execution
+gate. A tool the model is told about and then refused is a surprise to it; one refused without being
+told is invisible.
+
+**The destination is the author's, not the model's.** When the run was started from the New Project
+wizard, the destination has already been chosen in front of the user, with a folder picker and a live
+preview. The tool takes it from there; a model-supplied path that disagrees is refused by name rather
+than silently preferred either way.
+
+**Every create path initialises a repository.** The obligation in `specs/desktop.md` §4.5 is the
+create path's, not the wizard's — it belongs with whatever creates the project, and both bootstrap
+tools go through the same adoption sequence: version control, then the open flow, then a check that
+the workspace really moved. The adopter reports its failures rather than raising them, so a resolved
+promise is not proof.
+
+**The pipeline reports; the agent asks.** The import stream is one-way, so nothing pauses mid-crawl.
+What the run found — pages skipped by robots or by the node cap, the layout it did not detect, the
+components it may have split wrongly, per-page render fidelity — travels on the terminal line and
+becomes the material for §3.4, against real numbers rather than a guess made before the browser
+launched.
+
 ## 4. Security & Trust
 
 The assistant executes only through the same file/RPC surfaces a human uses, behind the server's
@@ -151,6 +212,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.1.9-draft** (2026-08-26) — ask_user suspends a turn on the author (§3.4); import_site bootstraps a project from a live site (§3.5).
 - **0.1.8-draft** (2026-08-23) — 2.1 Managed providers: a platform may broker credentials, Studio offers that path before the key form, and the models endpoint is specified as a capability probe that must answer 200 for every credential state — with cf_not_connected, cf_reconnect_required and cf_upstream_error distinguished.
 - **0.1.7-draft** (2026-08-20) — The Anthropic client yields an error event with code NOT_IMPLEMENTED; it does not throw (§2).
 - **0.1.6-draft** (2026-08-16) — §2 failures are problem documents and the mid-stream frame carries one; gap:ai-problem-details closed.
@@ -163,4 +225,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx `@jxsuite/ai` Specification v0.1.8-draft — a stub, subject to expansion._
+_Jx `@jxsuite/ai` Specification v0.1.9-draft — a stub, subject to expansion._

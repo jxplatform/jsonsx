@@ -128,7 +128,13 @@ import { invalidateLibrary } from "./browse/library-pane";
 import { invalidateMediaCache } from "./ui/media-picker";
 import { setMediaChangedHandler } from "./files/media-upload";
 import { applyFileDrop } from "./editor/file-drop-action";
-import { assistantCommands, isAssistantStreaming, seedAssistantMessages } from "./panels/ai-panel";
+import {
+  assistantCommands,
+  isAssistantStreaming,
+  isAssistantWaiting,
+  revealImportHandoff,
+  seedAssistantMessages,
+} from "./panels/ai-panel";
 import { seedPublishConnected } from "./publish/publish-panel";
 
 import { getPlatform, hasPlatform, registerPlatform } from "./platform";
@@ -180,6 +186,7 @@ import * as frontmatterPanelMod from "./panels/frontmatter-panel";
 import * as rightPanelMod from "./panels/right-panel";
 import * as chatPanelMod from "./panels/chat-panel";
 import { setProjectAdopter } from "./services/project-adoption";
+import { setImportHandoff } from "./services/import-seed";
 import { tabBufferUnsaved } from "./services/monaco-buffer";
 import * as leftPanelMod from "./panels/left-panel";
 import * as tabStrip from "./panels/tab-strip";
@@ -799,6 +806,7 @@ frontmatterPanelMod.mount();
 // The assistant's create_project tool adopts freshly scaffolded projects through the same
 // Flow as the recent-projects list.
 setProjectAdopter(openRecentProject);
+setImportHandoff(revealImportHandoff);
 
 leftPanelMod.mount({
   cloneRepository: () => cloneRepository({ openRecentProject }),
@@ -1402,6 +1410,7 @@ const commandRegistry = createCommandRegistry({
     // The probe `live-context.ts` declared optional and nobody ever passed, so `ctx.ai.streaming`
     // Read false forever. `assistant.stop` is gated on it.
     aiStreaming: isAssistantStreaming,
+    aiWaiting: isAssistantWaiting,
     canvasMode: getCanvasMode,
     isCaretActive,
     isModalOpen,
