@@ -927,10 +927,31 @@ export function buildAttrs(def: JxElement | JxMutableNode, scope: Record<string,
   if (def.attributes) {
     for (const [k, v] of Object.entries(def.attributes)) {
       const value = resolveStaticValue(v, scope);
+      /*
+       * A boolean is the PRESENCE of a boolean attribute, never its text.
+       *
+       * @docs framework/concepts/elements
+       *
+       * Stringifying one emitted `open="false"`, and HTML reads a boolean attribute by presence
+       * Alone — so the author wrote "closed" and the page rendered open. Nor could the template
+       * Return nothing instead: `resolveDocTemplates` and `expandMapTemplate` both `?? v`, which
+       * Restores the raw `${…}` source on a null. Absence therefore has to be expressible HERE,
+       * And `false` is the only value that can mean it.
+       *
+       * A *string* "false" is untouched: an enumerated attribute like `aria-current` carries its
+       * Value in the text, and dropping it would be the same bug in the other direction.
+       */
+      if (value === false) {
+        continue;
+      }
+      if (value === true) {
+        out += ` ${k}`;
+        continue;
+      }
       if (
         value !== null &&
         value !== undefined &&
-        (typeof value === "string" || typeof value === "number" || typeof value === "boolean")
+        (typeof value === "string" || typeof value === "number")
       ) {
         out += ` ${k}="${escapeHtml(String(value))}"`;
       }

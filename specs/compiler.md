@@ -2,9 +2,9 @@
 
 ## Static HTML Compiler, Custom Element Emitter, and Island Detector
 
-**Version:** 0.3.1-draft
+**Version:** 0.3.2-draft
 **Status:** Partial
-**Updated:** 2026-08-18
+**Updated:** 2026-08-26
 **License:** MIT
 
 ---
@@ -613,6 +613,15 @@ In `site-build`, the pipeline integrates at step 6 (per-route compilation):
 
 When `isDynamic()` returns false for an entire document, the compiler emits plain HTML/CSS with zero JavaScript.
 
+**A boolean attribute is presence, not text.** An attribute whose value resolves to `false` is
+omitted from the emitted HTML; one that resolves to `true` is emitted bare — `open`, never
+`open="true"`. HTML reads a boolean attribute by presence alone, so stringifying the value inverted
+it, and `<details open="false">` was an OPEN `<details>`. Absence has to be expressible at the
+emitter because it cannot be expressed before it: a template that resolves to nothing falls back to
+its own source text, which is what keeps an unresolvable binding alive for the client. A _string_
+`"false"` is untouched — an enumerated attribute such as `aria-current` carries its value in the
+text, and dropping it would be the same defect facing the other way.
+
 **An empty expansion is not a collapse.** A repeater is expanded into static markup only when the
 expansion actually produces nodes. When `items` resolves to an empty array at build time there is
 nothing to prerender, so the repeater definition is kept for the client to bind — replacing it with
@@ -839,6 +848,7 @@ is doing the only size work in the pipeline.
 
 ## Changelog
 
+- **0.3.2-draft** (2026-08-26) — Static output omits a false boolean attribute and emits a true one bare.
 - **0.3.1-draft** (2026-08-18) — §4.3: separate the emitted-JavaScript accessor form from the pointer grammar it lowers.
 - **0.3.0-draft** (2026-08-17) — §4.3: ref lowering goes through the shared tokenizer — identifier segments dot, all others bracket, so every emitted ref parses.
 - **0.2.1-draft** (2026-08-15) — §3 Implemented — the tiers' inline blocks are hash-nameable and the site build emits the policy.
@@ -875,4 +885,4 @@ is doing the only size work in the pipeline.
 
 ---
 
-_`@jxsuite/compiler` Specification v0.3.1-draft_
+_`@jxsuite/compiler` Specification v0.3.2-draft_

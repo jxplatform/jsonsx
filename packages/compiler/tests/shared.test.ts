@@ -766,6 +766,33 @@ describe("buildAttrs", () => {
     );
     expect(result).toContain('data-color="blue"');
   });
+
+  test("omits an attribute whose value is boolean false", () => {
+    expect(buildAttrs({ attributes: { open: false } }, null)).toBe("");
+  });
+
+  test("emits a boolean-true attribute bare", () => {
+    expect(buildAttrs({ attributes: { open: true } }, null)).toBe(" open");
+  });
+
+  // The two directions of the same rule: presence carries a boolean attribute, text carries an
+  // Enumerated one. `aria-current="false"` is the docs sidebar's own not-the-current-page marker.
+  test('keeps a string "false" as a value', () => {
+    const result = buildAttrs({ attributes: { "aria-current": "false" } }, null);
+    expect(result).toBe(' aria-current="false"');
+  });
+
+  test("resolves a template to a boolean and omits it when false", () => {
+    const scope = buildInitialScope({ url: "/docs/studio/" });
+    const open = "${state.url.startsWith('/docs/framework/')}";
+    expect(buildAttrs({ attributes: { open } }, scope)).toBe("");
+  });
+
+  test("resolves a template to a boolean and emits it bare when true", () => {
+    const scope = buildInitialScope({ url: "/docs/studio/design/" });
+    const open = "${state.url.startsWith('/docs/studio/')}";
+    expect(buildAttrs({ attributes: { open } }, scope)).toBe(" open");
+  });
 });
 
 // ─── buildInner ────────────────────────────────────────────────────────────

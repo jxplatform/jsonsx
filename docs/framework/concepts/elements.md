@@ -3,6 +3,8 @@ title: "Elements"
 description: "How element objects map to the DOM: direct property names, the attributes object, children arrays, text nodes, and protected properties."
 spec:
   - spec.md#8
+code:
+  - packages/compiler/src/shared.ts
 ---
 
 # Elements
@@ -52,6 +54,20 @@ Anything that is not a standard DOM property — `data-*`, `aria-*`, `slot` — 
 ```
 
 Attribute values may also be reactive templates (`"aria-label": "${state.count} unread messages"`).
+
+A template that resolves to `true` or `false` writes a **boolean attribute** — present or absent,
+never the text `"true"`/`"false"`. That is how HTML reads `open`, `disabled`, `selected` and
+`checked`, so this is the way to author one conditionally:
+
+```json
+{
+  "tagName": "details",
+  "attributes": { "open": "${state.expanded}" }
+}
+```
+
+Write `"false"` in quotes when you mean the literal string — an enumerated attribute such as
+`aria-current` carries its value in its text, so `"aria-current": "false"` must still be emitted.
 
 ## Children
 
