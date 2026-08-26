@@ -21,9 +21,12 @@
  * its files' entries, and when the map empties the rule hardens into a ban.
  *
  * **That has now happened.** The em dash was carried as debt across 131 pages and reached zero, so
- * it is a ban and `budgets` is empty. The machinery stays because the surfaces still outside this
- * corpus, the marketing pages and the package READMEs, will need it; its tests run against a
- * fixture rather than a real page, so a page reaching zero can no longer break them.
+ * it is a ban and `budgets` is empty. The marketing pages and the package READMEs, the two surfaces
+ * that were going to need the budget tier next, went straight to zero and joined the corpus as
+ * bans. So nothing uses it today. It stays anyway, because the next rule with a rollout will want
+ * it and because deleting a ratchet is how the campaign after this one ends up with a number nobody
+ * lowers. Its tests run against a fixture instead of a real page, so a page reaching zero can no
+ * longer break them.
  *
  * **What is deliberately not here.** Sentence length, `rather than`, `X, not Y.`, bold labels on
  * list items, forced triples, and the animated-software verbs (`names`, `carries`, `holds`) are all
@@ -32,6 +35,12 @@
  * review time; and the bold-label rule in particular would fire on about a thousand bullets whose
  * label is a real button the style guide REQUIRES to be bold. They are style-guide rules for a
  * person to apply, and `--report` prints their counts without failing anything.
+ *
+ * `rather than` is the one to watch, and the reason it is not gated is also the reason it needs
+ * watching. Removing the em dashes pushed it from 212 to 240 and `X, not Y.` from 94 to 100,
+ * because a dash and a contrast are the same gesture and the obvious substitution keeps the
+ * gesture. No count is wrong; a page holding ten of them is. `--report` ranks by density so the
+ * concentrations are visible, and thinning them is a read, not a check.
  *
  * Rules judge segments from `lib/prose.ts`, never raw lines, so a bare em dash in a table cell
  * stays the data value it is and a `:::doc-note` marker is not mistaken for a sentence.
@@ -329,27 +338,59 @@ export function check(config: ProseConfig, files: string[], full = true): Report
   return { counts, violations };
 }
 
-/** Cadence measures the style guide asks a person to judge. Never a failure. */
-function cadence(files: string[]): void {
+/** One file's contrastive density, for the second half of `--report`. */
+export interface Density {
+  file: string;
+  hits: number;
+  words: number;
+  per1k: number;
+}
+
+/** What `--report` measured: corpus totals, plus per-file density for the two contrastive frames. */
+export interface Cadence {
+  measures: Record<string, number>;
+  density: Density[];
+}
+
+const RATHER_THAN = /\brather than\b/g;
+const NOT_ENDER = /,\s+not\s+[^.;:]{1,60}\./g;
+
+/**
+ * Cadence measures the style guide asks a person to judge. Never a failure.
+ *
+ * The totals are the boring half. A corpus this size can carry 240 of a phrase without anyone
+ * hearing it; one page carrying ten of them is what a reader notices. So `density` ranks the two
+ * contrastive frames per thousand words, and that is the list a consistency pass reads.
+ *
+ * Headings and table cells are skipped, because a heading is a label and a cell is usually one.
+ */
+export function cadenceOf(files: string[]): Cadence {
   const measures: Record<string, number> = {};
   const bump = (k: string, n = 1) => {
     measures[k] = (measures[k] ?? 0) + n;
   };
+  const density: Density[] = [];
   for (const file of files) {
     const source = readFileSync(join(ROOT, file), "utf8");
     const segments = file.endsWith(".json") ? segmentJson(source) : segment(source);
+    let hits = 0;
+    let words = 0;
     for (const seg of segments) {
       if (seg.ctx === "tableCell" || seg.ctx === "heading") {
         continue;
       }
-      bump("rather than", (seg.text.match(/\brather than\b/g) ?? []).length);
-      bump("X, not Y.", (seg.text.match(/,\s+not\s+[^.;:]{1,60}\./g) ?? []).length);
+      const rather = (seg.text.match(RATHER_THAN) ?? []).length;
+      const ender = (seg.text.match(NOT_ENDER) ?? []).length;
+      hits += rather + ender;
+      words += seg.text.split(/\s+/).filter(Boolean).length;
+      bump("rather than", rather);
+      bump("X, not Y.", ender);
       bump("quietly", (seg.text.match(/\bquietly\b/g) ?? []).length);
-      for (const s of seg.text.split(/(?<=[.!?])\s+/)) {
-        const words = s.split(/\s+/).filter(Boolean).length;
-        if (words > 40) {
+      for (const sentence of seg.text.split(/(?<=[.!?])\s+/)) {
+        const n = sentence.split(/\s+/).filter(Boolean).length;
+        if (n > 40) {
           bump("sentences over 40 words");
-        } else if (words > 30) {
+        } else if (n > 30) {
           bump("sentences over 30 words");
         }
       }
@@ -357,10 +398,29 @@ function cadence(files: string[]): void {
         bump("bullets opening with a bold label");
       }
     }
+    if (hits > 0 && words > 0) {
+      density.push({ file, hits, words, per1k: (hits / words) * 1000 });
+    }
   }
+  density.sort((a, b) => b.per1k - a.per1k);
+  return { measures, density };
+}
+
+function report(files: string[]): void {
+  const { measures, density } = cadenceOf(files);
   console.log(`prose report over ${files.length} file(s). None of these fails the build.\n`);
   for (const [k, v] of Object.entries(measures).toSorted((a, b) => b[1] - a[1])) {
     console.log(`  ${String(v).padStart(5)}  ${k}`);
+  }
+  const worst = density.slice(0, 10);
+  if (worst.length > 0) {
+    console.log("\n  `rather than` + `X, not Y.`, per thousand words. The read starts here:\n");
+    for (const d of worst) {
+      const rate = d.per1k.toFixed(1).padStart(5);
+      console.log(
+        `  ${rate}  ${String(d.hits).padStart(3)} in ${String(d.words).padStart(5)}w  ${d.file}`,
+      );
+    }
   }
   console.log(
     "\nThese are style-guide judgements, not gate rules. See docs/extending/contributing/docs.md.",
@@ -374,7 +434,7 @@ async function main(): Promise<void> {
   const config = JSON.parse(readFileSync(RULES_PATH, "utf8")) as ProseConfig;
 
   if (args.includes("--report")) {
-    cadence(files);
+    report(files);
     return;
   }
 

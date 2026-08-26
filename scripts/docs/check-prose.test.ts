@@ -13,7 +13,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { AllowEntry, ProseConfig, Rule } from "./check-prose.ts";
-import { check, corpusFiles, hitsOf, isAllowed } from "./check-prose.ts";
+import { cadenceOf, check, corpusFiles, hitsOf, isAllowed } from "./check-prose.ts";
 import { maskCodeSpans, maskLine, segment, segmentJson } from "./lib/prose.ts";
 
 const ROOT = resolve(import.meta.dir, "../..");
@@ -323,6 +323,38 @@ describe("the committed tree", () => {
     expect(config.budgets).toEqual({});
     expect(config.rules.find((r) => r.id === "em-dash")?.tier).toBe("ban");
     expect(config.rules.every((r) => r.tier === "ban")).toBe(true);
+  });
+});
+
+describe("CADENCE: the report a person reads", () => {
+  const fixture = "scripts/docs/_fixtures/cadenced.md";
+
+  test("counts both contrastive frames, and skips headings, cells and fences", () => {
+    const { measures } = cadenceOf([fixture]);
+    // Two `rather than` in the body paragraph. The heading, the table cell and the fence each
+    // Contain one and none of them is prose a reader hears as a cadence.
+    expect(measures["rather than"]).toBe(2);
+    expect(measures["X, not Y."]).toBe(1);
+  });
+
+  test("density is per thousand words, sorted worst first", () => {
+    const { density } = cadenceOf([fixture, "scripts/docs/_fixtures/budgeted.md"]);
+    // Budgeted.md has no contrastive frame at all, so it is absent rather than present at zero:
+    // A file with nothing to fix must never take a slot in a top-ten list.
+    expect(density.map((d) => d.file)).toEqual([fixture]);
+    const only = density[0]!;
+    expect(only.hits).toBe(3);
+    expect(only.per1k).toBeCloseTo((only.hits / only.words) * 1000, 6);
+  });
+
+  test("density ranks a short dense page above a long sparse one", () => {
+    // The whole reason the report grew this table: totals hide concentration, and concentration
+    // Is the thing a reader notices.
+    const { density } = cadenceOf(corpusFiles());
+    for (let i = 1; i < density.length; i++) {
+      expect(density[i - 1]!.per1k).toBeGreaterThanOrEqual(density[i]!.per1k);
+    }
+    expect(density.every((d) => d.hits > 0 && d.words > 0)).toBe(true);
   });
 });
 
