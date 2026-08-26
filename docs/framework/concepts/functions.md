@@ -13,11 +13,11 @@ code:
 
 # Functions and sidecars
 
-> **Studio writes this format for you.** The Monaco editor behind every function body ([Code editing](/docs/studio/logic/code)) reads and writes these entries — this page documents the JSON and the JavaScript contract around it.
+> **Studio writes this format for you.** The Monaco editor behind every function body ([Code editing](/docs/studio/logic/code)) reads and writes these entries, and this page documents the JSON and the JavaScript contract around it.
 
-A Function entry is a `state` entry with `$prototype: "Function"` — the top rung of the escalation ladder, where logic becomes real JavaScript. Its code lives either inline in a `body` or in an external `.js` **sidecar** file named by `$src`. Prefer [expressions](/docs/framework/concepts/expressions) and [statements](/docs/framework/concepts/statements) first; reach for a function when structure runs out.
+A Function entry is a `state` entry with `$prototype: "Function"`, the top rung of the escalation ladder, where logic becomes JavaScript. Its code lives either inline in a `body` or in an external `.js` **sidecar** file named by `$src`. Prefer [expressions](/docs/framework/concepts/expressions) and [statements](/docs/framework/concepts/statements) first; reach for a function when structure runs out.
 
-The smallest complete function — an inline handler:
+The smallest complete function is an inline handler:
 
 ```json
 {
@@ -32,7 +32,7 @@ Bind it to an event like any handler: `"onclick": { "$ref": "#/state/increment" 
 
 ## Inline handlers
 
-A `body` string is a raw function body. `state` is always in scope; `arguments` names any additional parameters — an event handler names `event`:
+A `body` string is a raw function body. `state` is always in scope; `arguments` names any additional parameters, so an event handler names `event`:
 
 ```json
 {
@@ -48,7 +48,7 @@ An event binding always calls the handler with the state and the event, and the 
 
 ## Inline computed values
 
-A function with only a `body` (no `arguments`) that returns a value acts as a computed — the framework wraps it in `computed()` when it detects the entry is referenced reactively:
+A function with only a `body` (no `arguments`) that returns a value acts as a computed, and the framework wraps it in `computed()` when it detects the entry is referenced reactively:
 
 ```json
 {
@@ -99,7 +99,7 @@ export function decrement(state) {
 
 When several entries share a `$src`, the module is imported once and its named exports extracted; module caching is automatic.
 
-A sidecar entry has no `body` to read, so its role follows how the document uses it. Bind it to an event, invoke it as `state.helper(state)`, or name it a lifecycle hook, and it stays a function. Read it anywhere else — a list's `items`, a `${}` interpolation, a property binding — and it becomes a computed value: what you get is the export's **return value**, recomputed when its inputs change, not the function itself.
+A sidecar entry has no `body` to read, so its role follows how the document uses it. Bind it to an event, invoke it as `state.helper(state)`, or name it a lifecycle hook, and it stays a function. Read it anywhere else, in a list's `items`, a `${}` interpolation or a property binding, and it becomes a computed value: what you get is the export's **return value**, recomputed when its inputs change, not the function itself.
 
 ```json
 {
@@ -125,11 +125,11 @@ export function openLeads(state) {
 
 ## Structured bodies
 
-A `body` may also be a JSON array of statements instead of a source string — multi-step logic that stays inspectable and visually editable. That form has its own page: [Statements](/docs/framework/concepts/statements).
+A `body` may also be a JSON array of statements instead of a source string, which is multi-step logic that stays inspectable and visually editable. That form has its own page: [Statements](/docs/framework/concepts/statements).
 
 ## State access from JavaScript
 
-Inside `body` strings and sidecar files, `state` is the component's reactive scope — a proxy over every declared state entry and function. Read and write it directly; there are no `.get()`/`.set()` calls:
+Inside `body` strings and sidecar files, `state` is the component's reactive scope, a proxy over every declared state entry and function. Read and write it directly; there are no `.get()`/`.set()` calls:
 
 ```js
 // Read
@@ -146,39 +146,39 @@ state.items.splice(0, 1);
 state.user.name = "Alice";
 ```
 
-Every write triggers the bindings that read that value — see [Reactivity](/docs/framework/concepts/reactivity). `this` is never used in Jx-managed code; all component access goes through `state`.
+Every write triggers the bindings that read that value. See [Reactivity](/docs/framework/concepts/reactivity). `this` is never used in Jx-managed code; all component access goes through `state`.
 
 ## Declaring the interface
 
 Optional metadata makes a function legible to tooling:
 
-| Property      | Description                                                          |
-| ------------- | -------------------------------------------------------------------- |
-| `arguments`   | Parameter names as plain strings, bound by name                      |
-| `parameters`  | CEM-compatible parameter objects — richer alternative to `arguments` |
-| `returns`     | JSON Schema describing the return value                              |
-| `emits`       | CEM `Event` objects this function dispatches                         |
-| `description` | Documentation string, surfaced in Studio's completions               |
+| Property      | Description                                                           |
+| ------------- | --------------------------------------------------------------------- |
+| `arguments`   | Parameter names as plain strings, bound by name                       |
+| `parameters`  | CEM-compatible parameter objects, a richer alternative to `arguments` |
+| `returns`     | JSON Schema describing the return value                               |
+| `emits`       | CEM `Event` objects this function dispatches                          |
+| `description` | Documentation string, surfaced in Studio's completions                |
 
 ## How it works
 
-At runtime, the scope builder recognizes the `$prototype: "Function"` shape and turns each entry into a callable on the reactive scope. Exports and bodies are invoked with `state` as their first argument; event bindings pass the DOM event second — `(state, event)`. A body-only function referenced from a reactive position is wrapped in `computed()` instead, so it re-evaluates when the state it reads changes.
+At runtime, the scope builder recognizes the `$prototype: "Function"` shape and turns each entry into a callable on the reactive scope. Exports and bodies are invoked with `state` as their first argument; event bindings pass the DOM event second, as `(state, event)`. A body-only function referenced from a reactive position is wrapped in `computed()` instead, so it re-evaluates when the state it reads changes.
 
-Functions marked `timing: "server"` are a separate mechanism — a plain `$src`/`$export` entry with no `$prototype`, executed across the RPC boundary. See [Timing](/docs/framework/concepts/timing).
+Functions marked `timing: "server"` are a separate mechanism: a plain `$src`/`$export` entry with no `$prototype`, executed across the RPC boundary. See [Timing](/docs/framework/concepts/timing).
 
 ## Rules
 
-- `body` and `$src` are mutually exclusive — declaring both is a compile-time error.
+- `body` and `$src` are mutually exclusive, and declaring both is a compile-time error.
 - `state` is always reachable from a body. `arguments`/`parameters` bind by name: a parameter named `state` gets the state, any other name gets the event.
 - `this` is never used. All component state goes through the `state` proxy.
 - `$export` defaults to the entry's key name; sidecar exports must be named exports.
 - Function entries use `camelCase` names, like all state entries.
-- Only `$prototype: "Function"` may point `$src` at a `.js` file — other prototypes require a `.class.json` (see [Data prototypes](/docs/framework/concepts/data-prototypes)).
+- Only `$prototype: "Function"` may point `$src` at a `.js` file. Other prototypes require a `.class.json` (see [Data prototypes](/docs/framework/concepts/data-prototypes)).
 
 ## Related
 
-- [Expressions](/docs/framework/concepts/expressions) — the declarative rung below functions
-- [Statements](/docs/framework/concepts/statements) — structured bodies without JavaScript
-- [Timing](/docs/framework/concepts/timing) — server functions and the RPC boundary
-- [Components](/docs/framework/concepts/components) — where state and functions are declared
-- [Code editing in Studio](/docs/studio/logic/code) — the editor for bodies and sidecars
+- [Expressions](/docs/framework/concepts/expressions): the declarative rung below functions
+- [Statements](/docs/framework/concepts/statements): structured bodies without JavaScript
+- [Timing](/docs/framework/concepts/timing): server functions and the RPC boundary
+- [Components](/docs/framework/concepts/components): where state and functions are declared
+- [Code editing in Studio](/docs/studio/logic/code): the editor for bodies and sidecars

@@ -36,7 +36,7 @@ Inside the `map` template, the `$map/` [reference scheme](/docs/framework/concep
 | `{ "$ref": "$map/item" }`  | The current array item               |
 | `{ "$ref": "$map/index" }` | The current zero-based integer index |
 
-Deeper paths reach into item fields — `"$map/item/title"` — and template strings inside the template can read the same context as `${$map.item.title}` or `${$map.index}`:
+Deeper paths reach into item fields, as in `"$map/item/title"`, and template strings inside the template can read the same context as `${$map.item.title}` or `${$map.index}`:
 
 ```json
 {
@@ -49,7 +49,7 @@ Deeper paths reach into item fields — `"$map/item/title"` — and template str
 }
 ```
 
-The `map` template is an ordinary element def, so `attributes`, `id`, `className`, `style`, and event handlers all work there and can read the iteration context — which is how a list row gets a per-item link or a selected state:
+The `map` template is an ordinary element def, so `attributes`, `id`, `className`, `style`, and event handlers all work there and can read the iteration context, which is how a list row gets a per-item link or a selected state:
 
 ```json
 {
@@ -69,7 +69,7 @@ The `map` template is an ordinary element def, so `attributes`, `id`, `className
 
 ## Mixing with sibling elements
 
-The Array object is a _member_ of `children`, so it can sit among ordinary siblings — a static header row followed by a dynamic list, for example. It renders **wrapper-less**: mapped items become direct children of the parent element, with no container in between.
+The Array object is a _member_ of `children`, so it can sit among ordinary siblings, such as a static header row followed by a dynamic list. It renders **wrapper-less**: mapped items become direct children of the parent element, with no container in between.
 
 ```json
 {
@@ -127,7 +127,7 @@ This works on the map body and on any descendant of it. A nested list shadows th
 
 ## Setting a property on each row
 
-Properties that live on the DOM element rather than in markup — `value`, `checked`, `selected`, `disabled` — go directly on the map body, the same as anywhere else. They may interpolate `$map`:
+Properties that live on the DOM element rather than in markup (`value`, `checked`, `selected`, `disabled`) go directly on the map body, the same as anywhere else. They may interpolate `$map`:
 
 ```json
 {
@@ -141,7 +141,7 @@ Properties that live on the DOM element rather than in markup — `value`, `chec
 }
 ```
 
-Each `<option>` gets its row's `id` as its value, so a `change` handler reads the key rather than the label shown on screen. Put it in `attributes` instead and you get an HTML attribute, which for `value` sets only the _default_ — the two diverge as soon as the user interacts.
+Each `<option>` gets its row's `id` as its value, so a `change` handler reads the key rather than the label shown on screen. Put it in `attributes` instead and you get an HTML attribute, which for `value` sets only the _default_, and the two diverge as soon as the user interacts.
 
 ## Filtering and sorting
 
@@ -157,16 +157,16 @@ Each `<option>` gets its row's `id` as its value, so a `change` handler reads th
 }
 ```
 
-Filtering and sorting never mutate the source array — they shape what renders.
+Filtering and sorting never mutate the source array; they shape what renders.
 
 ## How it works
 
-The runtime places an invisible anchor where the Array object sits, then renders the mapped items inline ahead of it. The whole render runs inside a reactive effect: when `items` (or a filter or sort dependency) changes, the previous generation of item nodes and their bindings is disposed and the list re-renders in place. Each item's template renders in a child scope carrying `$map` — the surrounding document's `state` remains fully visible inside the template.
+The runtime places an invisible anchor where the Array object sits, then renders the mapped items inline ahead of it. The whole render runs inside a reactive effect: when `items` (or a filter or sort dependency) changes, the previous generation of item nodes and their bindings is disposed and the list re-renders in place. Each item's template renders in a child scope carrying `$map`, and the surrounding document's `state` remains fully visible inside the template.
 
 ## Rules
 
 - The Array object must have `$prototype: "Array"`, an `items` source, and a `map` template.
-- `items` must resolve to an array — a state entry, a [data prototype](/docs/framework/concepts/data-prototypes) such as a content collection, or a literal array.
+- `items` must resolve to an array: a state entry, a [data prototype](/docs/framework/concepts/data-prototypes) such as a content collection, or a literal array.
 - The list renders wrapper-less; give structure a container by making the _parent_ the container element (`ul`, `tbody`, a grid `div`).
 - `$map/` references are valid only inside the `map` template.
 - `filter` and `sort` must be `$ref`s to functions in `state`.
@@ -174,8 +174,8 @@ The runtime places an invisible anchor where the Array object sits, then renders
 
 ## Related
 
-- [References](/docs/framework/concepts/references) — the `$map/` scheme and resolution order
-- [State](/docs/framework/concepts/state) — declaring the arrays lists iterate
-- [Data prototypes](/docs/framework/concepts/data-prototypes) — collections and requests as `items` sources
-- [Content collections](/docs/framework/site/content-collections) — site content as list data
-- [Repeaters](/docs/studio/design/repeaters) — the Studio surface that writes this format
+- [References](/docs/framework/concepts/references): the `$map/` scheme and resolution order
+- [State](/docs/framework/concepts/state): declaring the arrays lists iterate
+- [Data prototypes](/docs/framework/concepts/data-prototypes): collections and requests as `items` sources
+- [Content collections](/docs/framework/site/content-collections): site content as list data
+- [Repeaters](/docs/studio/design/repeaters): the Studio surface that writes this format

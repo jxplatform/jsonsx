@@ -12,11 +12,11 @@ code:
 
 # Color schemes
 
-A Jx design can ship light and dark variants of its tokens, follow the visitor's OS preference by default, and still let the visitor force either scheme with a switcher. The whole mechanism builds on [named media breakpoints](/docs/framework/concepts/styling#named-media-breakpoints) — no separate theme system.
+A Jx design can ship light and dark variants of its tokens, follow the visitor's OS preference by default, and still let the visitor force either scheme with a switcher. The whole mechanism builds on [named media breakpoints](/docs/framework/concepts/styling#named-media-breakpoints), with no separate theme system.
 
 ## Declaring scheme support
 
-Add a **scheme query** to `$media` in `project.json` — an entry whose value is exactly a `prefers-color-scheme` query:
+Add a **scheme query** to `$media` in `project.json`, an entry whose value is exactly a `prefers-color-scheme` query:
 
 ```json
 {
@@ -59,7 +59,7 @@ Then override any design token (or any style property) per scheme with an `@--da
 Declaring a scheme query opts the site into the forced-scheme contract:
 
 - Every `@--dark` block is emitted twice: once inside `@media (prefers-color-scheme: dark)` (applies in **auto** mode), and once under `:root[data-color-scheme="dark"]` (applies when the scheme is **forced**). Both copies are specificity-neutral, so your cascade is unchanged.
-- `color-scheme: light dark` is declared on `:root`, with forced-mode overrides — native form controls and scrollbars follow along.
+- `color-scheme: light dark` is declared on `:root`, with forced-mode overrides, so native form controls and scrollbars follow along.
 - A tiny inline script is injected at the top of `<head>` that restores the visitor's persisted choice before first paint, so a forced scheme never flashes.
 
 ## The visitor override contract

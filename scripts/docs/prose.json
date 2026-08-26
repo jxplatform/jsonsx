@@ -140,51 +140,6 @@
     "docs/framework/build/dev-server.md": {
       "em-dash": 16
     },
-    "docs/framework/concepts/color-schemes.md": {
-      "em-dash": 3
-    },
-    "docs/framework/concepts/components.md": {
-      "em-dash": 11
-    },
-    "docs/framework/concepts/data-prototypes.md": {
-      "em-dash": 32
-    },
-    "docs/framework/concepts/documents.md": {
-      "em-dash": 23
-    },
-    "docs/framework/concepts/elements.md": {
-      "em-dash": 14
-    },
-    "docs/framework/concepts/expressions.md": {
-      "em-dash": 36
-    },
-    "docs/framework/concepts/functions.md": {
-      "em-dash": 20
-    },
-    "docs/framework/concepts/lists.md": {
-      "em-dash": 15
-    },
-    "docs/framework/concepts/props-and-scope.md": {
-      "em-dash": 16
-    },
-    "docs/framework/concepts/references.md": {
-      "em-dash": 28
-    },
-    "docs/framework/concepts/security.md": {
-      "em-dash": 27
-    },
-    "docs/framework/concepts/state.md": {
-      "em-dash": 25
-    },
-    "docs/framework/concepts/statements.md": {
-      "em-dash": 22
-    },
-    "docs/framework/concepts/switching.md": {
-      "em-dash": 18
-    },
-    "docs/framework/concepts/timing.md": {
-      "em-dash": 17
-    },
     "docs/framework/reference.md": {
       "em-dash": 4
     },

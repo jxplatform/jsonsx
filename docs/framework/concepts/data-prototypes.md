@@ -8,11 +8,11 @@ spec:
 
 # Data prototypes
 
-> **Studio writes this format for you.** The source editors in the Data panel ([Data sources](/docs/studio/logic/data-sources)) generate these entries field by field — this page documents the underlying model.
+> **Studio writes this format for you.** The source editors in the Data panel ([Data sources](/docs/studio/logic/data-sources)) generate these entries field by field, and this page documents the underlying model.
 
-A `$prototype` entry declares where a state value comes from instead of what it is. The prototype names a class — a built-in Web-API wrapper, a content loader, or your own — and the entry's remaining keys are its configuration. The resolved value is reactive: when the source changes, everything bound to it updates.
+A `$prototype` entry declares where a state value comes from instead of what it is. The prototype names a class, whether a built-in Web-API wrapper, a content loader, or your own, and the entry's remaining keys are its configuration. The resolved value is reactive: when the source changes, everything bound to it updates.
 
-The smallest complete data prototype — an HTTP request whose URL tracks another state value:
+The smallest complete data prototype is an HTTP request whose URL tracks another state value:
 
 ```json
 {
@@ -31,16 +31,16 @@ The smallest complete data prototype — an HTTP request whose URL tracks anothe
 
 These resolve automatically, with no imports or `$src`, and each maps to a genuine Web API:
 
-- `Request` — HTTP fetch with reactive URL parameters, debouncing, and manual mode.
-- `LocalStorage` — a persistent key-value entry that survives closing the browser.
-- `SessionStorage` — the same, scoped to the visit.
-- `Cookie` — a cookie with `maxAge`, `path`, `domain`, `secure`, and `sameSite`. Name it with the `__Host-` prefix and the rest is filled in for you: `Secure`, `Path=/`, and no `Domain`, which is what the browser requires of that name and refuses the cookie without. `SameSite: "none"` likewise implies `Secure`. There is no `expires` — `maxAge` is the one that wins wherever both appear — and no `HttpOnly`, which a cookie written by the page could never read back.
-- `IndexedDB` — a browser database store with indexes and CRUD helpers.
-- `FormData` — form fields assembled for submission.
-- `URLSearchParams` — a computed query string.
-- `Set` / `Map` — reactive wrappers over the corresponding collections.
-- `Blob` — binary data from parts and a MIME type.
-- `Array` — a reactive array driving a [mapped list](/docs/framework/concepts/lists).
+- `Request`: HTTP fetch with reactive URL parameters, debouncing, and manual mode.
+- `LocalStorage`: a persistent key-value entry that survives closing the browser.
+- `SessionStorage`: the same, scoped to the visit.
+- `Cookie`: a cookie with `maxAge`, `path`, `domain`, `secure`, and `sameSite`. Name it with the `__Host-` prefix and the rest is filled in for you: `Secure`, `Path=/`, and no `Domain`, which is what the browser requires of that name and refuses the cookie without. `SameSite: "none"` likewise implies `Secure`. There is no `expires`, because `maxAge` wins wherever both appear, and no `HttpOnly`, which a cookie written by the page could never read back.
+- `IndexedDB`: a browser database store with indexes and CRUD helpers.
+- `FormData`: form fields assembled for submission.
+- `URLSearchParams`: a computed query string.
+- `Set` / `Map`: reactive wrappers over the corresponding collections.
+- `Blob`: binary data from parts and a MIME type.
+- `Array`: a reactive array driving a [mapped list](/docs/framework/concepts/lists).
 
 Field-level documentation for each source lives in [Data sources](/docs/studio/logic/data-sources). A storage entry is as small as:
 
@@ -52,12 +52,12 @@ Field-level documentation for each source lives in [Data sources](/docs/studio/l
 
 ## Content prototypes
 
-Content loaders are built in too, and resolve at build time (`timing: "compiler"` — see [Timing](/docs/framework/concepts/timing)):
+Content loaders are built in too, and resolve at build time (`timing: "compiler"`; see [Timing](/docs/framework/concepts/timing)):
 
-- `MarkdownFile` — parses one `.md` file into frontmatter and a content tree.
-- `MarkdownCollection` — globs and parses many `.md` files.
-- `ContentCollection` — a schema-validated, multi-format content source.
-- `ContentEntry` — a single entry within a collection.
+- `MarkdownFile`: parses one `.md` file into frontmatter and a content tree.
+- `MarkdownCollection`: globs and parses many `.md` files.
+- `ContentCollection`: a schema-validated, multi-format content source.
+- `ContentEntry`: a single entry within a collection.
 
 ```json
 {
@@ -69,11 +69,11 @@ Content loaders are built in too, and resolve at build time (`timing: "compiler"
 }
 ```
 
-These names map internally to `.class.json` implementations shipped with Jx — no configuration needed.
+These names map internally to `.class.json` implementations shipped with Jx, with no configuration needed.
 
 ## External classes
 
-Any other prototype name is an **external class**. Its `$src` must point to a `.class.json` file — a JSON Schema document describing the class's parameters, fields, and methods, optionally delegating to a JS module via `$implementation`:
+Any other prototype name is an **external class**. Its `$src` must point to a `.class.json` file: a JSON Schema document describing the class's parameters, fields, and methods, optionally delegating to a JS module via `$implementation`:
 
 ```json
 {
@@ -109,11 +109,11 @@ To avoid repeating `$src` on every entry, declare a top-level `imports` map from
 
 ## How it works
 
-The scope builder injects any import-mapped `$src`, constructs the class with the entry's configuration, and wraps the resolved value in a reactive reference automatically. Resolution order for `$src` is: explicit `$src` → page `imports` → site `imports` → built-in mappings → unknown-prototype warning. Configuration values that are `$ref`s are reactive — a `Request` whose `urlParams` reference state re-fetches when that state changes. The `timing` field decides where resolution happens: in the browser, on the server, or at build time — see [Timing](/docs/framework/concepts/timing).
+The scope builder injects any import-mapped `$src`, constructs the class with the entry's configuration, and wraps the resolved value in a reactive reference automatically. Resolution order for `$src` is: explicit `$src` → page `imports` → site `imports` → built-in mappings → unknown-prototype warning. Configuration values that are `$ref`s are reactive, so a `Request` whose `urlParams` reference state re-fetches when that state changes. The `timing` field decides where resolution happens: in the browser, on the server, or at build time. See [Timing](/docs/framework/concepts/timing).
 
 ## Rules
 
-- A non-Function `$src` **must** point to a `.class.json` file — direct `.js` sources are for `$prototype: "Function"` only (see [Functions and sidecars](/docs/framework/concepts/functions)).
+- A non-Function `$src` **must** point to a `.class.json` file. Direct `.js` sources are for `$prototype: "Function"` only (see [Functions and sidecars](/docs/framework/concepts/functions)).
 - Reserved keys (`$prototype`, `$src`, `$export`, `timing`, `default`, `description`) are never passed to the constructor.
 - Import-map values must end in `.class.json`; anything else is warned about and skipped.
 - An entry's own `$src` always beats the import map.
@@ -121,9 +121,9 @@ The scope builder injects any import-mapped `$src`, constructs the class with th
 
 ## Related
 
-- [Timing](/docs/framework/concepts/timing) — client, server, and compiler resolution
-- [State](/docs/framework/concepts/state) — the grammar prototypes live inside
-- [Lists](/docs/framework/concepts/lists) — iterating over a source's resolved array
-- [Reactivity](/docs/framework/concepts/reactivity) — how resolved values propagate
-- [Data sources in Studio](/docs/studio/logic/data-sources) — every field, source by source
-- [The Data panel in Studio](/docs/studio/logic/data) — inspecting resolved values live
+- [Timing](/docs/framework/concepts/timing): client, server, and compiler resolution
+- [State](/docs/framework/concepts/state): the grammar prototypes live inside
+- [Lists](/docs/framework/concepts/lists): iterating over a source's resolved array
+- [Reactivity](/docs/framework/concepts/reactivity): how resolved values propagate
+- [Data sources in Studio](/docs/studio/logic/data-sources): every field, source by source
+- [The Data panel in Studio](/docs/studio/logic/data): inspecting resolved values live

@@ -56,6 +56,8 @@ The point of every rule below is that a reader should be able to hear a person b
 
 **Bold labels in lists.** Bold a list item's opening words when they are a label the reader will see on screen or type into a file: a button, a panel, a field, a JSON key, a package name. Do not bold a category you invented to introduce a sentence. The test is whether the reader could search the app or the file for that exact string. A list of four packages compared across the same five fields is a table in list form and should stay one; four sentences wearing headings should be a paragraph.
 
+**Related-links tails.** A `## Related` or `## Next` item is `- [Link](slug): what it covers.` when the gloss is a bare noun phrase, or `- **[Link](slug)** verbs the rest of the sentence.` when it reads better as one. Either is within the dash rule; pick one and keep it consistent down the page.
+
 **Sentence length.** Aim under thirty words. A long sentence is fine when it is carrying a real chain of reasoning, and a short one is fine for emphasis, but a page where every sentence lands on the same medium-length beat reads like a machine. Vary it.
 
 **Say it once.** Do not follow a heading with a sentence that only repeats it. A definition sentence is different and is required on a surface page, but it has to add the where and the what for: "Grid is for tabular data" earns its place; "Grid mode is a mode for grids" does not. No more than two sections in a row may open with the same frame.
