@@ -26,6 +26,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import { extname, join, relative, resolve } from "node:path";
 import { headingsOf } from "./lib/headings.ts";
+import type { Nav } from "./nav.ts";
+import { navPaths } from "./nav.ts";
 
 const ROOT = resolve(import.meta.dir, "../..");
 const DOCS_DIR = join(ROOT, "docs");
@@ -75,28 +77,20 @@ export function linksOf(source: string, file: string): LinkRef[] {
   return found;
 }
 
-interface NavNode {
-  path: string;
-  children?: NavNode[];
-}
-
 /**
  * The slugs the site publishes, in nav order.
+ *
+ * The walk comes from `nav.ts`, which the sidebar and `check-doc-refs.ts` also read, for the same
+ * reason this file imports `slugifyHeading` instead of restating it: one definition of what a page
+ * is. A private copy of the walk had a `children` array, and the accordion sidebar replaced that
+ * shape with `pages` + `groups`. The copy then reported every page in the corpus as unknown while
+ * `docs:check` stayed green, which is the failure a second implementation always eventually has.
  *
  * @param {string} navJson
  * @returns {string[]}
  */
 export function navSlugs(navJson: string): string[] {
-  const nav = JSON.parse(navJson) as { sections: NavNode[] };
-  const out: string[] = [];
-  const walk = (nodes: NavNode[]) => {
-    for (const n of nodes) {
-      out.push(n.path);
-      walk(n.children ?? []);
-    }
-  };
-  walk(nav.sections);
-  return out;
+  return navPaths(JSON.parse(navJson) as Nav);
 }
 
 /** `docs/studio/interface/tabs.md` -> `studio/interface/tabs`; `x/index.md` -> `x`. */

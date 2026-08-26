@@ -10,6 +10,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { readNav, sectionPaths } from "./nav";
 
 const ROOT = resolve(import.meta.dir, "../..");
 const DOCS_DIR = join(ROOT, "docs");
@@ -19,12 +20,6 @@ const DIST = resolve(process.argv[2] ?? join(ROOT, "sites/jxsuite.com/dist"));
 if (!existsSync(DIST)) {
   console.error(`No build output at ${DIST} — run the site build first.`);
   process.exit(2);
-}
-
-interface NavNode {
-  path: string;
-  label: string;
-  children?: NavNode[];
 }
 
 interface DocEntry {
@@ -54,15 +49,13 @@ function readPage(slug: string): { title: string; description: string; body: str
   };
 }
 
-const nav = JSON.parse(readFileSync(join(DOCS_DIR, "nav.json"), "utf8")) as {
-  sections: NavNode[];
-};
+const nav = readNav(join(DOCS_DIR, "nav.json"));
 
-// Nav-ordered corpus: each section landing first, then its children.
+// Nav-ordered corpus — the same order the sidebar draws, from the same walk it is checked with.
 const entries: DocEntry[] = [];
 for (const section of nav.sections) {
-  for (const node of [section, ...(section.children ?? [])]) {
-    const page = readPage(node.path);
+  for (const slug of sectionPaths(section)) {
+    const page = readPage(slug);
     if (!page) {
       continue;
     }
@@ -70,9 +63,9 @@ for (const section of nav.sections) {
       description: page.description,
       markdown: page.body,
       section: section.label,
-      slug: node.path,
+      slug,
       title: page.title,
-      url: `${SITE_URL}/docs/${node.path}/`,
+      url: `${SITE_URL}/docs/${slug}/`,
     });
   }
 }
@@ -86,8 +79,8 @@ const llms: string[] = [
 ];
 for (const section of nav.sections) {
   llms.push(`## ${section.label}`, "");
-  for (const node of [section, ...(section.children ?? [])]) {
-    const entry = entries.find((e) => e.slug === node.path);
+  for (const slug of sectionPaths(section)) {
+    const entry = entries.find((e) => e.slug === slug);
     if (entry) {
       llms.push(`- [${entry.title}](${entry.url}): ${entry.description}`);
     }

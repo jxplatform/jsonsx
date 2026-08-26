@@ -147,9 +147,28 @@ describe("the committed tree", () => {
     }
   });
 
-  test("navSlugs walks children, not just top-level sections", () => {
+  test("navSlugs reads a section own rows and its groups, in sidebar order", () => {
+    /* The walk is `nav.ts`'s, not a copy, and this asserts the delegation still holds. A private
+       copy understood a `children` array; the accordion sidebar replaced that with `pages` plus
+       `groups`, and the copy then called every page in the corpus unknown while `docs:check`
+       stayed green. */
     expect(
-      navSlugs(JSON.stringify({ sections: [{ children: [{ path: "a/b" }], path: "a" }] })),
-    ).toEqual(["a", "a/b"]);
+      navSlugs(
+        JSON.stringify({
+          id: "docs",
+          sections: [
+            {
+              path: "a",
+              label: "A",
+              pages: [
+                { path: "a", label: "Overview" },
+                { path: "a/b", label: "B" },
+              ],
+              groups: [{ label: "G", pages: [{ path: "a/g/c", label: "C" }] }],
+            },
+          ],
+        }),
+      ),
+    ).toEqual(["a", "a/b", "a/g/c"]);
   });
 });

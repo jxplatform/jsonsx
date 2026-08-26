@@ -10,7 +10,7 @@ The style guide for writing a page — voice, page shapes, callouts, the canonic
 | [`studio/`](./studio) + `studio.md`          | The visual editor, surface by surface (`ai/ data/ design/ editing/ interface/ logic/ projects/ publish/`) |
 | [`framework/`](./framework) + `framework.md` | The JSON document format Studio writes, how a site compiles, and the generated catalogs                   |
 | [`extending/`](./extending) + `extending.md` | Extension authoring, embedding Studio, the backend protocol, generated reference tables                   |
-| [`nav.json`](./nav.json)                     | The sidebar manifest — `{ id, sections[{ path, label, children[] }] }`                                    |
+| [`nav.json`](./nav.json)                     | The sidebar manifest — `{ id, sections[{ path, label, pages[], groups[{ label, pages[] }] }] }`           |
 | [`images/`](./images)                        | Screenshots, every one produced by `bun run screenshots`                                                  |
 
 ## Anatomy of a page
@@ -40,6 +40,8 @@ code:
 The reverse association is a `@docs <slug>` tag in a source comment, scanned across `packages/*/src/**/*.ts` and `extensions/*/src/**/*.ts`. A tag pointing at a page that does not exist fails CI; a missing tag fails nothing, it just drops that file out of future sync reports.
 
 **Every page appears exactly once in `nav.json`, and every nav path has a page.** The bijection is enforced in both directions, and a duplicate nav path is a third failure mode — so a new page and its one nav line land in the same change.
+
+A section holds its own rows in `pages`, leading with `Overview`, which is the section's own index page, and its disclosures in `groups`. The sidebar draws each as a `<details>` and ships every page already expanded to its own location. A group has no path and opens when the current page is one of its `pages`, so it needs no shared path segment, which is how "Start here" is grouped at all. **Neither array may be empty**: a repeater over an empty array survives the build and makes its node dynamic, so one empty `groups` would ship JavaScript to every page in that section. `scripts/docs/nav.ts` owns the walk and asserts all of this.
 
 Markup beyond CommonMark: `:::doc-note`, `:::doc-tip` and `:::doc-warning` container directives (real components registered as the collection's `$elements`), and `:kbd[Ctrl+K]` for keys. Bold for clickable UI labels; backticks only for literal code, filenames, and JSON keys.
 
