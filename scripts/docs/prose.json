@@ -49,7 +49,7 @@
     {
       "id": "ai-vocab",
       "tier": "ban",
-      "regex": "\\b(delve|delves|delving|seamless|seamlessly|comprehensive|holistic|intricate|intricacies|cutting-edge|groundbreaking|transformative|tapestry|testament|pivotal|crucial|vital|realm|landscape|underscore|underscores|underscoring|showcase|showcases|showcasing)\\b|(?<![-\\w])robust\\b|\\bshed light\\b|\\bpave the way\\b|\\bat its core\\b|\\bworth noting\\b|\\bin order to\\b|\\bdue to the fact\\b|\\bhas the ability to\\b|\\bwhen it comes to\\b|\\blet's (dive|explore|break)\\b|\\bleverag(e|es|ing|ed)\\s|\\bfoster(s|ing|ed)?\\s+(a|an|the)\\b",
+      "regex": "\\b(delve|delves|delving|seamless|seamlessly|comprehensive|holistic|intricate|intricacies|cutting-edge|groundbreaking|transformative|tapestry|testament|pivotal|crucial|vital|realm|landscape|underscore|underscores|underscoring|showcases|showcasing)\\b|(?<![-\\w])robust\\b|\\bshed light\\b|\\bpave the way\\b|\\bat its core\\b|\\bworth noting\\b|\\bin order to\\b|\\bdue to the fact\\b|\\bhas the ability to\\b|\\bwhen it comes to\\b|\\blet's (dive|explore|break)\\b|\\bleverag(e|es|ing|ed)\\s|\\bfoster(s|ing|ed)?\\s+(a|an|the)\\b",
       "flags": "i",
       "hint": "A word AI writing reaches for far more often than people do. Say the plain thing."
     }
@@ -112,6 +112,37 @@
       "text": "this entry does not have one",
       "evidence": "packages/studio/src/content/entry-editor.ts",
       "reason": "Quoting the required-field error Studio writes, verbatim."
+    },
+    {
+      "id": "em-dash",
+      "file": "sites/README.md",
+      "text": "stale allow entry",
+      "evidence": "scripts/docs/check-site-claims.ts",
+      "reason": "Quoting the failure message check-site-claims.ts prints, verbatim."
+    },
+    {
+      "id": "emoji",
+      "file": "sites/jxsuite.com/pages/download.md",
+      "text": "🍎",
+      "reason": "The platform icon on the macOS download card. Site design, not prose decoration; removing it changes the page."
+    },
+    {
+      "id": "emoji",
+      "file": "sites/jxsuite.com/pages/download.md",
+      "text": "🪟",
+      "reason": "The platform icon on the Windows download card."
+    },
+    {
+      "id": "emoji",
+      "file": "sites/jxsuite.com/pages/download.md",
+      "text": "🐧",
+      "reason": "The platform icon on the Linux download card."
+    },
+    {
+      "id": "emoji",
+      "file": "sites/jxsuite.com/pages/features.json",
+      "text": "like-button",
+      "reason": "A heart in a code sample of a like-button component, which is the sample's content."
     }
   ]
 }

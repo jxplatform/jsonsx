@@ -14,7 +14,7 @@ import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { AllowEntry, ProseConfig, Rule } from "./check-prose.ts";
 import { check, corpusFiles, hitsOf, isAllowed } from "./check-prose.ts";
-import { maskCodeSpans, maskLine, segment } from "./lib/prose.ts";
+import { maskCodeSpans, maskLine, segment, segmentJson } from "./lib/prose.ts";
 
 const ROOT = resolve(import.meta.dir, "../..");
 const config = JSON.parse(
@@ -97,6 +97,55 @@ describe("the segmenter", () => {
 
   test("the list marker is dropped, so a bullet is not read as a dash", () => {
     expect(segment("- an item").every((s) => !s.text.startsWith("-"))).toBe(true);
+  });
+});
+
+describe("the JSON extractor", () => {
+  // The marketing pages are Jx documents. Their copy is in `textContent` and `props.*`, sitting
+  // Beside style values and `$ref` bindings that a prose rule must never see.
+  const page = JSON.stringify({
+    title: "Features",
+    $head: [{ tagName: "meta", attributes: { content: "A page description." } }],
+    children: [
+      {
+        tagName: "p",
+        className: "lead-in",
+        style: { fontSize: "clamp(1rem, 2vw, 1.5rem)" },
+        textContent: "Real copy a reader sees.",
+      },
+      {
+        tagName: "check-item",
+        attributes: { "props.text": "A checked claim.", "props.href": "/docs/start" },
+      },
+      { tagName: "span", textContent: { $ref: "#/state/count" } },
+    ],
+  });
+
+  test("reads textContent and the prose props", () => {
+    expect(segmentJson(page).map((s) => s.raw)).toEqual([
+      "Features",
+      "Real copy a reader sees.",
+      "A checked claim.",
+    ]);
+  });
+
+  test("never reads a class, a style value, a href, or a $ref binding", () => {
+    const raws = segmentJson(page)
+      .map((s) => s.raw)
+      .join(" ");
+    for (const machinery of ["lead-in", "clamp", "/docs/start", "$ref", "#/state/count"]) {
+      expect(raws).not.toContain(machinery);
+    }
+  });
+
+  test("a span reports a line a person can find", () => {
+    const hit = segmentJson(page).find((s) => s.raw === "A checked claim.");
+    expect(hit?.line).toBeGreaterThan(0);
+  });
+
+  test("it would have caught the dashes the marketing pages used to carry", () => {
+    const before = JSON.stringify({ children: [{ textContent: "Works offline — no cloud." }] });
+    expect(segmentJson(before).filter((s) => s.text.includes("—"))).toHaveLength(1);
   });
 });
 

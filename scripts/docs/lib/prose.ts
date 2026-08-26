@@ -205,3 +205,68 @@ export function segment(source: string): Segment[] {
 
   return segments;
 }
+
+/** Keys whose string value is copy a reader sees on a rendered Jx page. */
+const JSON_PROSE_KEYS = new Set([
+  "props.description",
+  "props.imageAlt",
+  "props.label",
+  "props.name",
+  "props.tagline",
+  "props.text",
+  "textContent",
+  "title",
+]);
+
+/**
+ * The prose spans of a Jx document, which is how the marketing pages are written.
+ *
+ * A marketing page is JSON, not Markdown: its copy sits in `textContent` and in `props` attributes,
+ * beside style values and `$ref` bindings that are machinery. Only the keys above are read, so a
+ * class name or a colour never reaches a prose rule. Line numbers are recovered by finding the
+ * value in the raw source, because JSON.parse discards them.
+ *
+ * @param {string} source
+ * @returns {Segment[]}
+ */
+export function segmentJson(source: string): Segment[] {
+  const segments: Segment[] = [];
+  const lines = source.split("\n");
+
+  const locate = (value: string): { line: number; col: number } => {
+    const needle =
+      JSON.stringify(value)
+        .slice(1, -1)
+        .split(String.raw`\n`)[0] ?? value;
+    for (const [i, line] of lines.entries()) {
+      const at = line.indexOf(needle.slice(0, 60));
+      if (at !== -1) {
+        return { col: at + 1, line: i + 1 };
+      }
+    }
+    return { col: 1, line: 1 };
+  };
+
+  const walk = (node: unknown, key: string) => {
+    if (Array.isArray(node)) {
+      for (const item of node) {
+        walk(item, key);
+      }
+      return;
+    }
+    if (node !== null && typeof node === "object") {
+      for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
+        walk(v, k);
+      }
+      return;
+    }
+    if (typeof node !== "string" || !JSON_PROSE_KEYS.has(key) || node.trim() === "") {
+      return;
+    }
+    const { col, line } = locate(node);
+    segments.push({ col, ctx: "paragraph", line, raw: node, text: maskLine(node) });
+  };
+
+  walk(JSON.parse(source), "");
+  return segments;
+}

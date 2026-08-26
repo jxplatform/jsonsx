@@ -42,7 +42,7 @@
 import { readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import type { Ctx, Segment } from "./lib/prose.ts";
-import { segment } from "./lib/prose.ts";
+import { segment, segmentJson } from "./lib/prose.ts";
 
 const ROOT = resolve(import.meta.dir, "../..");
 const RULES_PATH = join(ROOT, "scripts/docs/prose.json");
@@ -165,13 +165,64 @@ export function isAllowed(hit: Hit, allow: AllowEntry[], used: Set<AllowEntry>):
   return false;
 }
 
-/** Files the gate reads: every published docs page that a generator does not own. */
+/**
+ * Every published page under the marketing site that carries copy. `privacy.md` is legal text and
+ * is deliberately not in the corpus: rewording a privacy policy for cadence is a legal change.
+ */
+const SITE_EXCLUDED = new Set(["sites/jxsuite.com/pages/privacy.md"]);
+
+/**
+ * Tracked files under one directory. `git ls-files`, not a glob, so node_modules can never enter.
+ *
+ * The pathspec is a DIRECTORY and the extension filter is applied in code, because a git pathspec
+ * does not glob the way a shell does. The first version of this passed `docs` slash star-star slash
+ * star dot md and silently missed `docs/start.md`, leaving the corpus short by exactly the section
+ * landing pages nobody would notice were absent.
+ */
+function tracked(dir: string, ...extensions: string[]): string[] {
+  const proc = Bun.spawnSync(["git", "ls-files", "-z", "--", dir], { cwd: ROOT, stdout: "pipe" });
+  return proc.stdout
+    .toString()
+    .split("\0")
+    .filter(Boolean)
+    .filter((f) => extensions.some((e) => f.endsWith(e)))
+    .filter((f) => !f.includes("/fixtures/") && !f.includes("/_fixtures/"));
+}
+
+/**
+ * Files the gate reads.
+ *
+ * Three surfaces, not one. The docs are the bulk of it; the READMEs ship to npm and are the first
+ * prose most people meet; the marketing pages are Jx documents whose copy lives in `textContent`
+ * rather than in Markdown, which is why {@link segmentJson} exists.
+ *
+ * The set comes from `git ls-files` rather than a glob, which is the rule scripts/README.md gives
+ * for any derived file set. A glob over `packages/` walks into `node_modules` and swept in
+ * thirty-odd vendored READMEs the first time this was written; a pathspec cannot.
+ *
+ * Generated docs pages are excluded by their own frontmatter flag, because a generator would
+ * overwrite any edit made to one.
+ *
+ * @returns {string[]}
+ */
 export function corpusFiles(): string[] {
-  const docs = [...new Bun.Glob("**/*.md").scanSync({ cwd: join(ROOT, "docs") })]
-    .map((f) => `docs/${f}`)
-    .filter((f) => f !== "docs/README.md")
-    .filter((f) => !/^generated: true$/m.test(readFileSync(join(ROOT, f), "utf8")));
-  return [...docs, "README.md", "PROSE-REWRITE.md"].toSorted();
+  const docs = tracked("docs", ".md").filter(
+    (f) =>
+      f !== "docs/README.md" && !/^generated: true$/m.test(readFileSync(join(ROOT, f), "utf8")),
+  );
+  const readmes = [
+    ...tracked("packages", "README.md"),
+    ...tracked("extensions", "README.md"),
+    ...tracked("examples", "README.md"),
+    ...tracked("scripts", "README.md"),
+    ...tracked("sites", "README.md"),
+    "README.md",
+  ];
+  const site = tracked("sites/jxsuite.com/pages", ".md", ".json").filter(
+    (f) => !SITE_EXCLUDED.has(f),
+  );
+
+  return [...new Set([...docs, ...readmes, ...site, "PROSE-REWRITE.md"])].toSorted();
 }
 
 export interface Report {
@@ -199,7 +250,8 @@ export function check(config: ProseConfig, files: string[], full = true): Report
   const byId = new Map(config.rules.map((r) => [r.id, r]));
 
   for (const file of files) {
-    const segments = segment(readFileSync(join(ROOT, file), "utf8"));
+    const source = readFileSync(join(ROOT, file), "utf8");
+    const segments = file.endsWith(".json") ? segmentJson(source) : segment(source);
     for (const rule of config.rules) {
       const hits = hitsOf(rule, segments, file).filter((h) => !isAllowed(h, config.allow, used));
       if (hits.length === 0) {
@@ -284,7 +336,8 @@ function cadence(files: string[]): void {
     measures[k] = (measures[k] ?? 0) + n;
   };
   for (const file of files) {
-    const segments = segment(readFileSync(join(ROOT, file), "utf8"));
+    const source = readFileSync(join(ROOT, file), "utf8");
+    const segments = file.endsWith(".json") ? segmentJson(source) : segment(source);
     for (const seg of segments) {
       if (seg.ctx === "tableCell" || seg.ctx === "heading") {
         continue;
