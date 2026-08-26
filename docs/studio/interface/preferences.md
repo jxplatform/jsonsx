@@ -18,7 +18,7 @@ Preferences holds the settings that belong to **Studio**, not to a project: how 
 
 Preferences opens over the workspace rather than replacing it, and :kbd[Escape] closes it. Nothing you do behind it is suspended.
 
-Every change here is saved as you make it — there is no Apply — and saved for the whole app rather than for this window, so a second window sees it. If a setting cannot be written (a full disk, a configuration folder that is not writable), Studio says so in **Problems** rather than letting it look like it took.
+Every change here is saved as you make it, with no Apply, and saved for the whole app rather than for this window, so a second window sees it. If a setting cannot be written (a full disk, a configuration folder that is not writable), Studio says so in **Problems** rather than letting it look like it took.
 
 ## Appearance
 

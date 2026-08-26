@@ -54,7 +54,7 @@ If Cloudflare itself is briefly unreachable, Studio does **not** ask you to reco
 Below the Cloudflare option (or on its own, everywhere else) is the **AI provider key** form:
 
 1. Paste an API key. Any OpenAI-compatible key works — OpenAI itself, a compatible hosted provider, or a local model server.
-2. Optionally set an **Endpoint** — leave it empty for OpenAI, or point it at a compatible server such as a local LLM (for example `http://localhost:11434/v1`).
+2. Optionally set an **Endpoint**. Leave it empty for OpenAI, or point it at a compatible server such as a local LLM (for example `http://localhost:11434/v1`).
 3. Pick a **Model**. Click **Fetch models** to list what your key can use, or type a model ID directly. Leave it empty to use your provider's own default.
 4. Click **Save**. The form keeps showing what it saved, so you can see the endpoint it kept and the model it recorded.
 

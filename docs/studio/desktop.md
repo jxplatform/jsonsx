@@ -52,7 +52,7 @@ Each window holds one project, and the window's title tells you which. When you 
 
 Opening a project that's already open never duplicates it: whichever you chose, the window that has it comes to the front instead.
 
-What belongs to **you** rather than to a project is shared by every window: your recent projects, and everything in **[Preferences](/docs/studio/interface/preferences)** — the theme, your AI provider, the accounts you are signed in to. Each window writes only the settings it actually changed, so two windows open at once cannot overwrite each other's.
+What belongs to **you** rather than to a project is shared by every window: your recent projects, and everything in **[Preferences](/docs/studio/interface/preferences)**: the theme, your AI provider, the accounts you are signed in to. Each window writes only the settings it actually changed, so two windows open at once cannot overwrite each other's.
 
 _File > Open Project…_ from the app menu always opens into a window of its own, and **New Window** (:kbd[⇧⌘N] / :kbd[Ctrl+Shift+N]) opens a fresh welcome window when you want to start something else — from the _File_ menu, or by name from the **[command list](/docs/studio/interface/commands)**.
 
