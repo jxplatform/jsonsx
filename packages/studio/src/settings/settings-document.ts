@@ -52,6 +52,8 @@ import { renderGeneralSettings } from "./general-settings";
 import { renderHeadEditor } from "./head-editor";
 import { renderLocalesSection } from "./locales-section";
 import { selectContributedEntry } from "./contributed-section";
+// The NAME and the wire value, kept apart by that module on purpose — see its docstring.
+import { PROJECT_STYLES_TITLE, PROJECT_STYLES_VIEW } from "../style/project-styles";
 import type { Tab } from "../tabs/tab";
 import type { AnyCommand, CommandRegistry } from "../commands/registry";
 
@@ -192,28 +194,37 @@ export function settingsDocumentOpen(): boolean {
  *
  * @returns {Tab | null} The tab, or null when no project is open
  */
-export function showSettingsDocument(): Tab | null {
+export function showSettingsDocument(mode: string = SETTINGS_MODE): Tab | null {
   const state = requireProjectState();
   if (!state) {
     return null;
   }
   const existing = workspace.tabs.get(PROJECT_CONFIG_PATH);
   if (existing) {
-    for (const mode of SETTINGS_TAB_MODES) {
-      if (!existing.capabilities.modes.includes(mode)) {
-        existing.capabilities.modes.unshift(mode);
+    for (const candidate of SETTINGS_TAB_MODES) {
+      if (!existing.capabilities.modes.includes(candidate)) {
+        existing.capabilities.modes.unshift(candidate);
       }
     }
-    existing.session.ui.canvasMode = SETTINGS_MODE;
+    existing.session.ui.canvasMode = mode;
     existing.session.ui.preview = false;
     return revealTab(existing as unknown as Tab);
   }
-  return openTab({
+  const tab = openTab({
     capabilities: { modes: [...SETTINGS_TAB_MODES] },
     document: (state.projectConfig ?? {}) as unknown as Record<string, unknown>,
     documentPath: PROJECT_CONFIG_PATH,
     id: PROJECT_CONFIG_PATH,
   });
+  /* The mode is written here rather than left to the capability list, because `createTab` seeds
+     `session.ui.canvasMode` from `resolvedModes.find(m => m !== "preview")` (`tabs/tab.ts`) — i.e.
+     from `SETTINGS_TAB_MODES[0]`, which is `settings`. A second door over the same document has to
+     SAY which editor it is, or `styles.open` from a cold workspace opens the settings form. The
+     capability list stays in its declared order for the same reason it always had one: the tab's
+     Editor control offers the modes in that order. */
+  tab.session.ui.canvasMode = mode;
+  tab.session.ui.preview = false;
+  return tab;
 }
 
 /**
@@ -328,10 +339,17 @@ export function settingsCommands(): AnyCommand[] {
       // ⌘⇧, — the other half of §5.3's `⌘, / ⌘⇧,` pair. `app.preferences` shipped with its chord
       // And this one did not, so the two halves of "settings" were a keystroke and a palette search.
       keybinding: "mod+shift+,",
-      menus: ["commandbar/overflow", "palette"],
+      menus: ["commandbar/overflow", "settings/menu", "palette"],
       group: "7_settings",
       requires: "an open project",
-      when: (ctx) => ctx.project.open,
+      /* `enablement`, not `when`: with no project open this row is DRAWN, greyed, carrying the
+         sentence above — §12.3's rule that a control which cannot act explains itself rather than
+         vanishing, and the reason the palette greys unavailable commands instead of hiding them.
+         It used to be `when`, so the rail's Settings menu held one row on the welcome screen and
+         said nothing about the other two; "why can't I" had no answer anywhere. The gate itself is
+         unchanged — `enabledWith` still refuses, so `registry.run` and the assistant's tool still
+         throw `CommandUnavailableError` exactly as before. */
+      enablement: (ctx) => ctx.project.open,
       aiTool: {
         description:
           "Open the project's Settings, optionally on a named section (overview, contexts, head, " +
@@ -370,7 +388,45 @@ export function settingsCommands(): AnyCommand[] {
         }
         notifySettingsDocument();
       },
-      title: "Open Settings",
+      title: "Open Project Settings",
+    },
+    /*
+     * The SECOND door over the same document. `project.json` has three editors — the settings form,
+     * Project Styles and the raw source — and until now only one of them had a name: Project Styles
+     * was reached by the pane's Editor control (which can only re-mode a tab that is ALREADY open)
+     * and by a hand-written `canvasMode` assignment inside Overview. `canvas.setMode` cannot stand
+     * in for this: it is level `document` and requires an open one, so from a cold workspace there
+     * is nothing to re-mode.
+     *
+     * It is a peer of `settings.open` and declares the same gate, byte for byte (§12.4: two verbs
+     * over one document declare ONE availability rule). `styles.*` is the project-level plural of
+     * the selection-level `style.*` verbs in `panels/style-panel.ts`; the ids are one letter apart
+     * and the levels are the reason.
+     */
+    {
+      category: "Project",
+      id: "styles.open",
+      level: "project",
+      menus: ["settings/menu", "palette"],
+      /* A distinct ordinal inside the settings family, so the gear reads Settings → Styles.
+         §12.3's lever is `group`, never a per-menu sort; `styles.open` is not in the ⬢ menu, so
+         nothing else sees this string. */
+      group: "7_settings_styles",
+      requires: "an open project",
+      // §12.4: two verbs over ONE document declare ONE availability rule, byte-identical.
+      enablement: (ctx) => ctx.project.open,
+      aiTool: {
+        description:
+          "Open the project's configuration document in its Project Styles editor — the design " +
+          "tokens and the default element styles that apply across every page.",
+        name: "open_project_styles",
+      },
+      run: () => {
+        showSettingsDocument(PROJECT_STYLES_VIEW);
+      },
+      // Named, never spelled from the wire value: `stylebook` is shared with `dist/iframe-entry.js`
+      // And may never be renamed, so nothing a reader sees is derived from it (`style/project-styles`).
+      title: `Open ${PROJECT_STYLES_TITLE}`,
     },
   ];
 }

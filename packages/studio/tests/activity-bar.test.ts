@@ -1,4 +1,4 @@
-import { flush, renderInto, resetWorkspaceWithTab } from "./harness";
+import { flush, mountOverlayLayers, renderInto, resetWorkspaceWithTab } from "./harness";
 import { nothing } from "lit-html";
 import { afterEach, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
 import type { TemplateResult } from "lit-html";
@@ -56,13 +56,16 @@ const footerButton = (label: string) =>
 const { mountShell, resetProjectShell, shell, unmountShell } = await import("../src/shell");
 const { closeAllTabs } = await import("../src/workspace/workspace");
 const { activeRegistry, setActiveRegistry } = await import("../src/commands/active-registry");
+const { initLayers } = await import("../src/ui/layers");
+const { dismissSettingsMenu, isSettingsMenuOpen } = await import("../src/panels/settings-menu");
 const { createCommandRegistry } = await import("../src/commands/registry");
 const { emptyContext } = await import("../src/commands/context");
 
 /**
- * The rail foot renders FROM the `app.preferences` record, so a rail with no registry has no foot.
+ * The rail foot renders FROM the `settings/menu` PLACEMENT, so a rail whose registry declares
+ * nothing for it has no foot — which is what the last case in `renderActivityBar` pins.
  *
- * Only that one record: this file is about the rail, and pulling in the whole app command set would
+ * Only these records: this file is about the rail, and pulling in the whole app command set would
  * make every rail assertion depend on every other module's registration.
  */
 function installPreferencesRegistry() {
@@ -73,7 +76,7 @@ function installPreferencesRegistry() {
     category: "View",
     level: "application",
     keybinding: "mod+,",
-    menus: ["commandbar/overflow", "palette"],
+    menus: ["commandbar/overflow", "settings/menu", "palette"],
     group: "7_settings",
     run: () => {},
   });
@@ -90,6 +93,13 @@ beforeAll(() => {
   barEl.id = "activity-bar";
   app.append(barEl);
   document.body.append(app);
+  /* A SIBLING host, never `document.body`: `mountOverlayLayers` clears the host it is handed, and
+     handing it the body would take `#app` — and the rail — with it. The gear's menu renders into
+     `#layer-popover`, so the layers have to exist before any case clicks it. */
+  const overlays = document.createElement("div");
+  document.body.append(overlays);
+  mountOverlayLayers(overlays);
+  initLayers();
   initShellRefs();
   // The rail draws whatever the registry holds, so the records have to be contributed first.
   // `mount()` does this in the app; the direct-render tests below do it here.
@@ -97,6 +107,9 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
+  // The foot depends on a registry now, so one leaking forward from a previous case is a button
+  // Appearing where that case never asked for it. Four cases below install their own.
+  setActiveRegistry(null);
   closeAllTabs();
   shell.leftTab = "layers";
   shell.docks.left.collapsed = false;
@@ -113,6 +126,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  // Belt and braces — `unmount()` dismisses too, but a case that never mounted still may have
+  // Opened the menu, and a stranded document-level keydown listener would answer the next case.
+  dismissSettingsMenu();
   unmount();
 });
 
@@ -225,7 +241,7 @@ describe("renderActivityBar", () => {
       "Page",
       "Data",
       "Packages",
-      "Preferences",
+      "Settings",
     ]);
   });
 
@@ -348,17 +364,23 @@ describe("renderActivityBar", () => {
     resetNotifications();
   });
 
-  test("the foot carries Preferences, rendered from its own record", () => {
-    // The rail is application- and project-scoped chrome, so the slot pinned to its foot is the
-    // APPLICATION's settings. Project configuration is `settings.open` — the ⬢ menu and the
-    // Palette — and About is `help.about`, because a thing opened once in an app's lifetime does
-    // Not earn a permanent slot. Both were hand-authored buttons calling a module function here.
+  /*
+   * THE FOOT IS A MENU TRIGGER, and this is the case that used to say the opposite.
+   *
+   * It asserted that clicking the gear ran `app.preferences` directly, which was the right shape
+   * for a pinned SLOT. A slot holds one thing; a menu holds a family and prints each row's own
+   * name, chord and gate, which is what lets the rail's foot offer the project's configuration
+   * without an application-level control lying about what it opens.
+   */
+  test("the foot is a menu trigger, not a command button", () => {
     installPreferencesRegistry();
     renderActivityBar();
-    const preferences = footerButton("Preferences")!;
-    expect(preferences.dataset.command).toBe("app.preferences");
-    // Title and chord come from the record, so the tooltip cannot drift from the keymap.
-    expect(preferences.getAttribute("title")).toContain("Preferences…");
+    const gear = footerButton("Settings")!;
+    expect(gear).toBeDefined();
+    expect(gear.getAttribute("aria-haspopup")).toBe("menu");
+    expect(gear.getAttribute("aria-expanded")).toBe("false");
+    // It runs no single command any more, so it claims none.
+    expect(gear.dataset.command).toBeUndefined();
 
     const ran: string[] = [];
     const registry = activeRegistry()!;
@@ -367,16 +389,88 @@ describe("renderActivityBar", () => {
       ran.push(id);
       return Promise.resolve();
     }) as typeof registry.run;
-    preferences.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    gear.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     registry.run = original;
-    expect(ran).toEqual(["app.preferences"]);
+
+    // Clicking the gear opens the menu and runs nothing.
+    expect(ran).toEqual([]);
+    expect(footerButton("Settings")?.getAttribute("aria-expanded")).toBe("true");
+    expect(
+      document.querySelector('#layer-popover sp-menu-item[data-command-id="app.preferences"]'),
+    ).not.toBeNull();
   });
 
-  test("neither Settings nor About holds a rail slot any more", () => {
+  test("the gear's first row is Preferences, and it runs the record", () => {
     installPreferencesRegistry();
     renderActivityBar();
-    expect(footerButton("Settings")).toBeUndefined();
+    footerButton("Settings")!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    const ran: string[] = [];
+    const registry = activeRegistry()!;
+    const original = registry.run.bind(registry);
+    registry.run = ((id: string) => {
+      ran.push(id);
+      return Promise.resolve();
+    }) as typeof registry.run;
+    const row = document.querySelector<HTMLElement>(
+      '#layer-popover sp-menu-item[data-command-id="app.preferences"]',
+    )!;
+    // Title and chord come from the record, so neither can drift from the keymap.
+    expect(row.textContent).toContain("Preferences…");
+    expect(row.querySelector("kbd")?.textContent).toBe("⌘,");
+    row.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    registry.run = original;
+
+    expect(ran).toEqual(["app.preferences"]);
+    expect(document.querySelector("#layer-popover sp-menu-item")).toBeNull();
+  });
+
+  /*
+   * The successor to "neither Settings nor About holds a rail slot any more". Settings is a slot
+   * again — as a MENU — and the half that still holds is the half about About: a thing opened once
+   * in an app's lifetime does not earn permanent chrome. `Preferences` is no longer a slot of its
+   * own either; it is the menu's first row.
+   */
+  test("About still holds no rail slot, and Preferences is no longer one", () => {
+    installPreferencesRegistry();
+    renderActivityBar();
     expect(footerButton("About")).toBeUndefined();
+    expect(footerButton("Preferences")).toBeUndefined();
+  });
+
+  test("either arrow opens the menu from the gear, and other keys fall through", () => {
+    // The menu-button convention: an arrow opens and the menu takes the keyboard from there.
+    // Enter and Space are the button's own activation and already reach `@click`, so they are not
+    // Handled twice — and nothing else is swallowed from the rail.
+    installPreferencesRegistry();
+    renderActivityBar();
+    const press = (key: string) => {
+      const event = new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key });
+      footerButton("Settings")!.dispatchEvent(event);
+      return event;
+    };
+    expect(press("a").defaultPrevented).toBe(false);
+    expect(isSettingsMenuOpen()).toBe(false);
+    expect(press("ArrowDown").defaultPrevented).toBe(true);
+    expect(isSettingsMenuOpen()).toBe(true);
+    dismissSettingsMenu();
+    expect(press("ArrowUp").defaultPrevented).toBe(true);
+    expect(isSettingsMenuOpen()).toBe(true);
+  });
+
+  test("a registry that declares nothing for the gear renders no foot", () => {
+    const registry = createCommandRegistry({ getContext: () => emptyContext(), mac: true });
+    registry.register({
+      id: "app.preferences",
+      title: "Preferences…",
+      category: "View",
+      level: "application",
+      menus: ["palette"],
+      run: () => {},
+    });
+    setActiveRegistry(registry);
+    renderActivityBar();
+    expect(bar().querySelector(".rail-footer .rail-item")).toBeNull();
   });
 });
 

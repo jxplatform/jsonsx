@@ -79,7 +79,7 @@ Every row is also a command: press :kbd[⌘K] and type the name to run it withou
 | `⌘O`    | `Ctrl+O`         | Open Project…          | `project.open`               |
 | `⌘P`    | `Ctrl+P`         | Go to File…            | `palette.openFiles`          |
 | `⌘S`    | `Ctrl+S`         | Save                   | `file.save`                  |
-| `⌘⇧,`   | `Ctrl+Shift+,`   | Open Settings          | `settings.open`              |
+| `⌘⇧,`   | `Ctrl+Shift+,`   | Open Project Settings  | `settings.open`              |
 | `⌘⇧1`   | `Ctrl+Shift+1`   | Show Content           | `inspector.focus.properties` |
 | `⌘⇧2`   | `Ctrl+Shift+2`   | Show Style             | `inspector.focus.style`      |
 | `⌘⇧3`   | `Ctrl+Shift+3`   | Show Logic             | `inspector.focus.events`     |

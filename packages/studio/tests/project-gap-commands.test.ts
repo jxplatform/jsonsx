@@ -120,6 +120,8 @@ describe("the records themselves", () => {
       "collection.editInGrid",
       "data.openGrid",
       "settings.open",
+      // The second door over the same `project.json` tab, registered by the same factory.
+      "styles.open",
       "library.open",
       "library.setCategory",
       "library.setLayout",
@@ -246,9 +248,16 @@ describe("settings.open", () => {
     expect(await refusal("settings.open", { section: 3 })).toContain("expected a non-empty string");
   });
 
-  test("is hidden with no project open", () => {
+  test("with no project open it is DISABLED with its reason, not hidden", () => {
+    /* §12.3: a control that cannot act explains itself rather than vanishing, and the palette greys
+       unavailable commands for the same reason — "why can't I" is the question it is uniquely good
+       at answering. It was `when` (invisible), which left the rail's Settings menu holding one row
+       on the welcome screen with nothing to say about the other two. The GATE is unchanged. */
     ctx = makeContext();
-    expect(registry.isVisible("settings.open")).toBe(false);
+    expect(registry.isVisible("settings.open")).toBe(true);
+    expect(registry.isEnabled("settings.open")).toBe(false);
+    expect(registry.disabledReason("settings.open")).toBe("an open project");
+    expect(() => registry.run("settings.open")).toThrow(/an open project/);
   });
 });
 

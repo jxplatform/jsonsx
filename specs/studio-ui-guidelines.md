@@ -1,8 +1,8 @@
 # Jx Studio UI/UX Interface Guidelines
 
-**Version:** 0.3.14
+**Version:** 0.3.15
 **Status:** Implemented
-**Updated:** 2026-08-22
+**Updated:** 2026-08-26
 **Applies to:** `packages/studio/`
 
 ---
@@ -492,9 +492,43 @@ out of it. A caret inside a block IS the edit — there is no session to enter, 
   survive that
 - Escape dismisses the caret; text is committed, not discarded
 
-### 8.4 Context Menus
+### 8.4 Menus
 
-Rendered with `sp-menu` inside `sp-overlay` / `sp-popover`. Triggered on right-click in the canvas.
+Rendered with `sp-menu` inside `sp-overlay` / `sp-popover`, mounted through `renderPopover` (§8.7).
+There are two triggers, and they are different contracts:
+
+- **Right-click**, in the canvas or on a row. The menu appears at the pointer and is clamped into
+  the viewport.
+- **A menu button** — a control that opens a menu instead of running a command. It carries
+  `aria-haspopup="menu"` and a live `aria-expanded`, and it prints no chord of its own, because the
+  chords belong to the rows. The rail foot's ⚙ **Settings** is the worked example.
+
+**A menu's rows come from a placement** (§12.1), never from an array beside the trigger (§12.5).
+Dividers fall where the record's `group` changes — or, where a placement admits two levels, where
+the **level** changes, which is the same boundary the Navigator rail draws between its own groups.
+
+#### Submenus
+
+A row may own a submenu. It is a second popover, and the levels form a stack:
+
+- One submenu open at a time. Opening another, or entering a sibling row, closes the first.
+- `ArrowRight` opens and moves in; `ArrowLeft` closes and returns focus to the parent row.
+- `Escape` closes **one level** — the submenu if one is open, the whole menu otherwise. `Tab`
+  dismisses everything.
+- **Outside-click dismissal is one handler for the whole stack.** Per-popover dismissal treats a
+  click in the submenu as outside the root, and removing the root's node means the submenu row's
+  own `click` never arrives — so following a section silently does nothing.
+- A submenu row is named by the **argument value** it passes, not by a reworded command title. That
+  is state, so it does not violate §12.3.
+
+> **A parent row that owns a submenu still runs its own command.** This is a deliberate deviation
+> from the WAI-ARIA APG menu pattern, which gives such a row no action of its own, and it is why
+> these menus are hand-rolled: Spectrum's stock `slot="submenu"` enforces the APG reading outright —
+> `Menu.handlePointerBasedSelection` bails on `hasSubmenu` so the parent emits no `change`, and
+> `MenuItem.handleSubmenuChange` reports the **parent's** value to the outer menu, which would break
+> the deep link as well. Nothing is unreachable: Enter runs the row, ArrowRight reaches every child,
+> `aria-haspopup` announces the popup, and every child has a second door of its own. Recorded again
+> in §14.
 
 ### 8.5 Slash Menu
 
@@ -753,6 +787,8 @@ When building new UI in Studio, verify:
 - [ ] A control that invokes an action renders it from its command record (§12): the record's title
       as the accessible name, its chord formatted by the one formatter, its `requires` as the
       disabled tooltip — never a hand-maintained `{ label, action }` list
+- [ ] A control that opens a MENU carries `aria-haspopup="menu"` and a live `aria-expanded`, prints
+      no chord of its own, and draws its rows from a placement (§8.4, §12.1, §12.5)
 
 ---
 
@@ -823,29 +859,40 @@ every appearance must print.
 `packages/studio/src/commands/levels.ts` (`PLACEMENT_MATRIX`) mirrors it, and
 `scripts/check-command-levels.ts` validates every registered command's `menus` against it in CI.
 
-| Placement             | Admits levels                             | Why                                                                             |
-| --------------------- | ----------------------------------------- | ------------------------------------------------------------------------------- |
-| `commandbar/primary`  | application, document                     | document only for Save / Undo / Redo / Open in Browser, by frequency; ≤5 total  |
-| `commandbar/overflow` | application, project, document            | never selection — the Command Bar is not a selection surface                    |
-| `statusbar/project`   | project                                   | the status bar's left field                                                     |
-| `statusbar/document`  | document                                  | the status bar's centre field                                                   |
-| `statusbar/selection` | selection                                 | the status bar's right field                                                    |
-| `context/element`     | selection                                 | the canvas element menu acts on a selection                                     |
-| `context/file`        | project                                   | a file row addresses the project's file set                                     |
-| `context/layer`       | selection                                 | an outline row IS a selection                                                   |
-| `context/tab`         | document                                  | a tab addresses one document                                                    |
-| `context/pane`        | document                                  | a pane hosts one document                                                       |
-| `blockbar`            | selection                                 | the floating bar owns selection-scoped verbs                                    |
-| `blockbar/format`     | selection                                 | the bar's inline-format cluster — a range inside the selection is the selection |
-| `outline/row`         | selection                                 | row actions act on the row's node                                               |
-| `palette`             | application, project, document, selection | the level-agnostic surface; it groups its rows by level                         |
-| `never`               | application, project, document, selection | keyboard- and API-only; there is no rendered surface to be misplaced in         |
+| Placement             | Admits levels                             | Why                                                                                                                                                         |
+| --------------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `commandbar/primary`  | application, document                     | document only for Save / Undo / Redo / Open in Browser, by frequency; ≤5 total                                                                              |
+| `commandbar/overflow` | application, project, document            | never selection — the Command Bar is not a selection surface                                                                                                |
+| `statusbar/project`   | project                                   | the status bar's left field                                                                                                                                 |
+| `statusbar/document`  | document                                  | the status bar's centre field                                                                                                                               |
+| `statusbar/selection` | selection                                 | the status bar's right field                                                                                                                                |
+| `context/element`     | selection                                 | the canvas element menu acts on a selection                                                                                                                 |
+| `context/file`        | project                                   | a file row addresses the project's file set                                                                                                                 |
+| `context/layer`       | selection                                 | an outline row IS a selection                                                                                                                               |
+| `context/tab`         | document                                  | a tab addresses one document                                                                                                                                |
+| `context/pane`        | document                                  | a pane hosts one document                                                                                                                                   |
+| `blockbar`            | selection                                 | the floating bar owns selection-scoped verbs                                                                                                                |
+| `blockbar/format`     | selection                                 | the bar's inline-format cluster — a range inside the selection is the selection                                                                             |
+| `outline/row`         | selection                                 | row actions act on the row's node                                                                                                                           |
+| `settings/menu`       | application, project                      | the rail foot's gear menu — the settings family; a menu prints each row's own name, chord and gate, so it may host two levels as `commandbar/overflow` does |
+| `palette`             | application, project, document, selection | the level-agnostic surface; it groups its rows by level                                                                                                     |
+| `never`               | application, project, document, selection | keyboard- and API-only; there is no rendered surface to be misplaced in                                                                                     |
 
 `blockbar/format` is one surface with two budgets, and that is why it is a row rather than a note.
 The bar's verb cluster is capped at five (`CHROME_BUDGET.commandbarPrimary`'s sibling), and the
 inline-format vocabulary is eight — Bold, Italic, Underline, Strikethrough, Superscript, Subscript,
 Code, Link — so sharing one cap would have pushed Bold behind a `⋮`. Same level, same region,
 separate budget: the status bar's three single-level placements are the precedent.
+
+`settings/menu` is the second row admitting more than one level, and the reason is the same one
+`commandbar/overflow` has: a **menu** prints each row's own name, chord and gate beside it, so
+nothing about a row's level has to be inferred from where the control sits. A **pinned slot** cannot
+do that — it has room for one thing and must lie about the rest by omission, which is why the rail's
+foot held only application-level Preferences for a release while project configuration lived
+elsewhere. The levels are still separated, in two places: the row admits exactly application and
+project, and the menu draws a divider where the level changes. The rail's **pinned** groups stay
+single-level, in `PANEL_PLACEMENT_MATRIX` — a panel is filed by what it writes, and there is no menu
+to say so for it.
 
 Panel placements — the two Navigator rail groups (project above, document below), the Navigator dock
 body, the Bottom dock (project and document, with the panel header stating which) and the Inspector
@@ -908,6 +955,11 @@ Consequences:
   them, because "why can't I" is the question a palette is uniquely good at answering.
 - **`destructive: true` derives the danger styling**, and `group` derives menu ordering
   (`"1_clipboard"`, `"3_structure"`, `"9_danger"`); neither is re-decided per menu.
+- **A row that owns a submenu still runs its own command.** The submenu is opened by hover,
+  ArrowRight or the chevron — never by activating the row, which would leave the parent's own verb
+  with no surface at all (§8.4).
+- **A submenu row prints no chord.** The chord belongs to the command, and the parent already
+  prints it; repeating it on every child would teach that each child has one of its own.
 
 ### 12.4 One surface, one availability rule
 
@@ -1068,16 +1120,17 @@ variable rather than a revert.
 
 External standards this specification binds itself to. Vocabulary and cell grammar: [`standards.md`](./standards.md). Spectrum Web Components is a component library rather than a standard; §6 records which of its components are in use.
 
-| Standard                                                                          | Class       | Binds            | Evidence                                                                                                                                                                                                 | Note                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| --------------------------------------------------------------------------------- | ----------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [WAI-ARIA](https://www.w3.org/TR/wai-aria-1.2/)                                   | **Subset**  | §6, §8, §12      | packages/studio/src/files/files.ts, packages/studio/src/panels/layers-panel.ts, packages/studio/src/editor/context-menu.ts, packages/studio/src/panels/quick-search.ts, packages/studio/src/ui/layers.ts | `gap:apg-coverage` The tree, menu, toolbar and radiogroup patterns are implemented with their full state and keyboard contracts, and two more now are: the **combobox** (Quick Access carries `aria-controls`, `aria-activedescendant` and an `aria-expanded` that is false when nothing matched — it was the literal string `true`) and the **dialog** (`role`, `aria-modal` and a name off the wrapper's headline). The tab strips still carry no tab semantics, and the Tabulator data grid is virtualized — hand-authoring `role="grid"` over rows that do not exist in the DOM would make it worse, not better.                                            |
-| [Accessible Name and Description Computation](https://www.w3.org/TR/accname-1.2/) | **Adopted** | §10              | packages/studio/src/panels/problems-panel.ts                                                                                                                                                             | §10's rule that a control carries exactly one accessible name — `title` and `aria-label` with the same string announce it twice — is this algorithm's precedence order restated.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| [WCAG 2.2](https://www.w3.org/TR/WCAG22/)                                         | **Subset**  | §1.1, §8.2, §8.7 | packages/studio/src/services/announce.ts, packages/studio/styles/forced-colors.css, packages/studio/scripts/check-styles.ts, packages/studio/tests/announce.test.ts                                      | `gap:wcag-conformance` No level is claimed, and conformance is not tested end to end — that needs a browser. Four criteria are met deliberately and checked: **SC 4.1.3** (Status Messages) — one live region, called from `notify()` itself, so a failure that lands in the Problems panel is still announced; **SC 2.5.7** (Dragging Movements) — cut/paste is the stated alternative to every drag; **SC 1.4.3/1.4.11** (Contrast) — a required-pairs table gated in `check-styles.ts`, with one entry on the debt list; **SC 1.4.1** — a `forced-colors` block redraws the selection and focus affordances Windows High Contrast deletes with `box-shadow`. |
-| [ATAG 2.0](https://www.w3.org/TR/ATAG20/)                                         | **Subset**  | §8, §13.1a       | packages/studio/src/services/announce.ts, packages/studio/src/services/a11y-report.ts                                                                                                                    | Part A — the tool's own accessibility — is answered by §13.1a's live region and §8.2's keyboard alternative to every drag. Part B is `studio.md` §16.6: a check over the author's document, filing a Problem per finding with its WCAG criterion. Neither part claims a conformance level, which needs a browser.                                                                                                                                                                                                                                                                                                                                               |
-| [WebDriver BiDi](https://www.w3.org/TR/webdriver-bidi/)                           | **Adopted** | §15              | scripts/screenshots/lib/browser.ts, scripts/screenshots/lib/browser.test.ts, scripts/screenshots/lib/shot.ts                                                                                             | The documentation screenshot pipeline drives Chromium over the W3C protocol rather than CDP. Verified by capturing the same shot over each with everything else held equal and hashing the results: byte-identical. The one behavioural difference — BiDi refuses a pointer move outside the viewport, where CDP allowed `(-1, -1)` — is fixed in the pipeline rather than worked around, and §15 records it.                                                                                                                                                                                                                                                   |
+| Standard                                                                          | Class       | Binds            | Evidence                                                                                                                                                                                                                                              | Note                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| --------------------------------------------------------------------------------- | ----------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [WAI-ARIA](https://www.w3.org/TR/wai-aria-1.2/)                                   | **Subset**  | §6, §8, §12      | packages/studio/src/files/files.ts, packages/studio/src/panels/layers-panel.ts, packages/studio/src/editor/context-menu.ts, packages/studio/src/panels/settings-menu.ts, packages/studio/src/panels/quick-search.ts, packages/studio/src/ui/layers.ts | `gap:apg-coverage` The tree, menu, toolbar and radiogroup patterns are implemented with their full state and keyboard contracts, and two more now are: the **combobox** (Quick Access carries `aria-controls`, `aria-activedescendant` and an `aria-expanded` that is false when nothing matched — it was the literal string `true`) and the **dialog** (`role`, `aria-modal` and a name off the wrapper's headline). The tab strips still carry no tab semantics, and the Tabulator data grid is virtualized — hand-authoring `role="grid"` over rows that do not exist in the DOM would make it worse, not better. One deviation from the menu pattern is deliberate and is recorded in §8.4: the rail foot's Settings menu gives a row that owns a submenu **an action of its own**, which the APG does not describe. It is the requirement rather than an oversight — the heading opens the surface and the submenu deep-links a section — and Spectrum's stock `slot="submenu"` forbids it outright, which is why that menu is hand-rolled. Nothing is unreachable: Enter runs the row, ArrowRight reaches every child, `aria-haspopup` announces the popup, and every child has a second door. |
+| [Accessible Name and Description Computation](https://www.w3.org/TR/accname-1.2/) | **Adopted** | §10              | packages/studio/src/panels/problems-panel.ts                                                                                                                                                                                                          | §10's rule that a control carries exactly one accessible name — `title` and `aria-label` with the same string announce it twice — is this algorithm's precedence order restated.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| [WCAG 2.2](https://www.w3.org/TR/WCAG22/)                                         | **Subset**  | §1.1, §8.2, §8.7 | packages/studio/src/services/announce.ts, packages/studio/styles/forced-colors.css, packages/studio/scripts/check-styles.ts, packages/studio/tests/announce.test.ts                                                                                   | `gap:wcag-conformance` No level is claimed, and conformance is not tested end to end — that needs a browser. Four criteria are met deliberately and checked: **SC 4.1.3** (Status Messages) — one live region, called from `notify()` itself, so a failure that lands in the Problems panel is still announced; **SC 2.5.7** (Dragging Movements) — cut/paste is the stated alternative to every drag; **SC 1.4.3/1.4.11** (Contrast) — a required-pairs table gated in `check-styles.ts`, with one entry on the debt list; **SC 1.4.1** — a `forced-colors` block redraws the selection and focus affordances Windows High Contrast deletes with `box-shadow`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| [ATAG 2.0](https://www.w3.org/TR/ATAG20/)                                         | **Subset**  | §8, §13.1a       | packages/studio/src/services/announce.ts, packages/studio/src/services/a11y-report.ts                                                                                                                                                                 | Part A — the tool's own accessibility — is answered by §13.1a's live region and §8.2's keyboard alternative to every drag. Part B is `studio.md` §16.6: a check over the author's document, filing a Problem per finding with its WCAG criterion. Neither part claims a conformance level, which needs a browser.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| [WebDriver BiDi](https://www.w3.org/TR/webdriver-bidi/)                           | **Adopted** | §15              | scripts/screenshots/lib/browser.ts, scripts/screenshots/lib/browser.test.ts, scripts/screenshots/lib/shot.ts                                                                                                                                          | The documentation screenshot pipeline drives Chromium over the W3C protocol rather than CDP. Verified by capturing the same shot over each with everything else held equal and hashing the results: byte-identical. The one behavioural difference — BiDi refuses a pointer move outside the viewport, where CDP allowed `(-1, -1)` — is fixed in the pipeline rather than worked around, and §15 records it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 
 ## Changelog
 
+- **0.3.15** (2026-08-26) — §8.4 becomes Menus: menu-button triggers, submenus and the APG deviation; §12.1 gains the settings/menu placement.
 - **0.3.14** (2026-08-22) — Template conventions (9.4) and the gate behind them; render orchestration described as it is; custom components corrected to the two that exist.
 - **0.3.13** (2026-08-21) — Chrome ships two themes; a theme in CHROME_THEMES must have its Spectrum colour fragment registered, and the semantic token table documents the dark fallbacks with the light ramp resolved from the brand fragment.
 - **0.3.12** (2026-08-16) — §15 the documentation screenshot pipeline drives Chromium over WebDriver BiDi rather than CDP — byte-identical captures, and the one behavioural difference (a pointer move outside the viewport) fixed rather than worked around.

@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.48-draft
+**Version:** 0.9.50-draft
 **Status:** Partial
 **Updated:** 2026-08-26
 **License:** MIT
@@ -380,6 +380,35 @@ Three more panels are registered `rail: false` — **Search** (`search`, project
 **Languages** (`i18n`, project level, §20.4). They have
 records, regions and `panel.focus.<id>` commands like any other panel; what they give up is a rail
 button, because the group is a glance and a glance does not scale.
+
+**The rail's foot holds one control: ⚙ Settings**, and it opens a **menu** rather than running a
+command. Its rows are `forPlacement("settings/menu")` — today `app.preferences` (⌘,),
+`settings.open` (⌘⇧,) and `styles.open` — ordered by level with a divider at the boundary, and each
+row with a `section` argument offers that argument's values as a submenu, so a section of
+Preferences or of Project Settings is one click deep.
+
+It is a menu because the two settings families sit at two levels. A **pinned slot** has room for one
+thing and must lie about the rest by omission: for a release the foot ran `app.preferences` alone,
+and project configuration was reachable only from the ⬢ menu and the palette, so the control most
+people press when looking for settings could not offer the project's. A menu prints each row's own
+name, chord and gate, so it can hold both and say which is which — the same reason
+`commandbar/overflow` admits three levels (`studio-ui-guidelines.md` §12.1). The rail's **panel**
+groups above it stay single-level, because a panel has no row to explain itself with.
+
+With no project open the two project rows render **disabled, carrying their `requires` sentence** —
+§12.3's rule, and the same thing the palette does. They gate on `enablement` rather than `when` for
+exactly this reason: hiding them left the gear holding one row on the welcome screen and saying
+nothing about the two surfaces most people open it looking for, so "why can't I" had no answer
+anywhere. The gate itself is unchanged; `registry.run` and the assistant's tool still refuse.
+
+⌘, is unchanged and still opens Preferences from anywhere; the menu's first row prints that chord.
+
+**The menu is anchored by its BOTTOM**, flush with the bottom of the region its trigger sits in —
+the rail, whose foot is the status bar's top — and grows upward. A control at the foot of a
+full-height rail has nothing below it, so "drop the menu under the button" is not available; and the
+region rather than the button is what makes it flush, because the rail's foot carries padding the
+status bar does not. Both levels of the stack share that floor, so a long submenu scrolls inside
+itself instead of running down over the status bar.
 
 **A rail-less panel is a panel you have to already know about.** That is an acceptable price for a
 surface with another door — Insert is reachable from the canvas and the palette — and not an
@@ -943,6 +972,14 @@ styles, so tuning a token shows the page changing rather than describing it.
 bundle and `dist/iframe-entry.js` rebuilt in lockstep. The id and the name are different things, and
 the code says which is which. Tokens are pickable as chips from any Style field, and a colour scheme
 is declared as a row in Contexts (§16) rather than by a control that exists only here.
+
+**`styles.open` is how it is reached by name** (project level, `requires: "an open project"`). Until
+it existed, Project Styles had no command at all: the pane's Editor control can only re-mode a tab
+that is already open, and the only other door was a button inside Project Settings › Overview that
+wrote `session.ui.canvasMode` itself. So from a closed configuration tab there was no way to ask for
+it — `canvas.setMode` is document level and requires an open document. It is a peer of
+`settings.open` over the same `project.json` tab and declares the same availability rule (§17.1),
+and it renders in the rail foot's Settings menu and the palette.
 
 ### 7.2 Canvas
 
@@ -2036,6 +2073,11 @@ It does not suspend the app, and it is reachable with **no project open** — a 
 exactly there. Re-opening it while it is up selects the named section rather than stacking a second
 sheet.
 
+Three doors reach it: ⌘,, the palette, and the first row of the rail foot's **Settings** menu (§5.1),
+whose submenu is the four sections below. That submenu is a deep link rather than a second surface
+precisely because of the re-opening rule above — picking **Accounts** from the gear and picking it
+from the sheet's own nav are the same operation, `app.preferences { section }`.
+
 | Section    | Contents                                                                                                                                                                                       |
 | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Appearance | The chrome theme — Dark or Light (`shell.theme`, also settable by `view.setTheme`); it repaints the chrome, the overlays and any open code view, and the canvas stays a light document in both |
@@ -2252,8 +2294,16 @@ highest-consequence silent-failure path, and it wrote the file that defines the 
 `project.json` is a **Tab**, which is what makes the rest true rather than aspirational: it gets
 undo, the dirty flag, ⌘S and the history delegate from the same machinery every document uses. Two
 surfaces render it — **Project Settings** (sections as inner nav: Overview, Contexts, Site head,
-Locales, Definitions, Content types, Packages, Extensions, Deploy, Raw JSON) and **Project Styles**
-(§7) — and both edit one object.
+Locales, CSS Variables, Data Shapes, Content types, Data tables, Connections, Packages, Extensions,
+Deploy, Raw JSON, plus whatever else an extension contributes) and **Project Styles** (§7) — and
+both edit one object.
+
+**Each surface is reached by one command**, `settings.open { section, entry }` and `styles.open`,
+and the two declare the **same availability rule** because they write the same state (§13,
+`studio-ui-guidelines.md` §12.4). Both open the tab if it is closed and switch its editor if it is
+not, so neither ever discards the document's history. Project Settings' sections are one click deep
+from the rail foot's Settings menu (§5.1), and that submenu is the same projection the inner nav
+draws — a contributed section appears in both or in neither.
 
 Three rules follow, and they are the section's whole content:
 
@@ -2557,6 +2607,8 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.9.50-draft** (2026-08-26) — the gear's project rows disable rather than hide, and the menu is bottom-anchored to its trigger's region.
+- **0.9.49-draft** (2026-08-26) — the rail foot is a Settings menu over both settings families; styles.open names the Project Styles editor.
 - **0.9.48-draft** (2026-08-26) — buildSite may serve a live rendering of the working tree rather than build output; SiteBuildResult.mode says which.
 - **0.9.47-draft** (2026-08-26) — 9.1.4 the Files tree hides what .gitignore masks — rules from every level, filtered where rows are built, a per-user toggle that defaults to hiding, and no .git/info/exclude or core.excludesFile.
 - **0.9.46-draft** (2026-08-26) — the Assistant tab draws a running import and the agent's questions (§6).
@@ -2660,4 +2712,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.48-draft_
+_`@jxsuite/studio` Specification v0.9.50-draft_

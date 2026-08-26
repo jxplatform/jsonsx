@@ -2744,3 +2744,36 @@
 .jx-layer--toast {
   z-index: 4000;
 }
+
+/* The gear menu's section submenu.
+
+   Project Settings has ~16 sections once the extensions have contributed theirs, which is taller
+   than a short window. The menu's own placement floors `top` at 4px so the first rows can never be
+   pushed off the top edge; this is the other half — the list scrolls inside itself rather than
+   demanding a viewport it cannot have. */
+/* The gear menu's rows.
+
+   A min-width so the widest title and its chord are not crushed into each other: the rows are
+   `Preferences… ⌘,` and `Open Project Settings ⌘⇧,`, and Spectrum sizes a menu to its content. */
+.settings-menu {
+  min-width: 260px;
+}
+
+/* One flex cell for the trailing chord and chevron.
+
+   They must be a SINGLE slotted node. Spectrum's menu-item grid gives `[slot=value]` one cell with
+   `justify-self: end`, applied per assigned node — so a chord and a chevron slotted separately are
+   both pinned to the same right edge, on top of each other. */
+.settings-menu-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 24px;
+  color: var(--fg-dim);
+}
+
+.settings-submenu {
+  max-height: min(60vh, 480px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}

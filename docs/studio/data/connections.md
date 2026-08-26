@@ -13,7 +13,7 @@ code:
 
 A connection names a database your project talks to. Most sites need exactly one; you can add more if, say, orders and analytics live in different places.
 
-Connections are a section of your project's configuration document. Press :kbd[⌘K] and run **Open Settings** (or pick it from the **⬢ menu** in the Command Bar), then choose **Connections** from the section list: your connections are listed on the left, and selecting one opens its form on the right. Like every other section of that document, a change here is a step you can take back with :kbd[⌘Z]; see **[Project settings](/docs/studio/projects/settings)**.
+Connections are a section of your project's configuration document. Pick **Open Project Settings › Connections** from the **Settings** menu at the foot of the rail. You can also press :kbd[⌘K] and run **Open Project Settings** (or use the **⬢ menu** in the Command Bar) and choose **Connections** from the section list: your connections are listed on the left, and selecting one opens its form on the right. Like every other section of that document, a change here is a step you can take back with :kbd[⌘Z]; see **[Project settings](/docs/studio/projects/settings)**.
 
 ![The Connections section with a connection selected and its provider form open](../../images/connections-section.png)
 

@@ -30,6 +30,12 @@ import type { PanelRecord } from "./panel-registry";
 import type { CommandContext } from "../commands/context";
 import type { EffectScope } from "@vue/reactivity";
 import { activeRegistry } from "../commands/active-registry";
+import {
+  dismissSettingsMenu,
+  isSettingsMenuOpen,
+  openSettingsMenu,
+  SETTINGS_MENU_PLACEMENT,
+} from "./settings-menu";
 import type { TemplateResult } from "lit-html";
 
 let _scope: EffectScope | null = null;
@@ -55,6 +61,9 @@ export function mount() {
 }
 
 export function unmount() {
+  // Before the scope stops: an unmounted rail must not leave the menu's document-level capture
+  // Keydown listener behind, answering for a gear that is no longer on screen.
+  dismissSettingsMenu();
   _scope?.stop();
   _scope = null;
 }
@@ -168,36 +177,56 @@ function railButton(panel: PanelRecord, ctx: CommandContext): TemplateResult {
 }
 
 /**
- * The rail foot: **Preferences**, and only Preferences (plan §3.2 ②).
+ * The rail foot: the ⚙ **Settings** menu.
  *
  * It was two hand-authored buttons calling two module functions directly — the exact shape §2
- * principle 1 bans, and the reason the gear opened PROJECT configuration from an application-level
- * slot. Preferences is the application's own settings and follows the author between projects, so
- * it is the one that earns the pinned position; project configuration is `settings.open`, which
- * lives in the ⬢ menu and the palette because it is scoped to a project; and About is `help.about`,
- * reachable by name.
+ * principle 1 bans — and then, for a release, one button that ran `app.preferences` and nothing
+ * else. That was the right shape for a pinned SLOT: a slot holds one thing, so it held the
+ * application's settings, and project configuration went to the ⬢ menu and the palette because a
+ * slot at application level could not honestly offer it.
  *
- * Rendered FROM the record, so the label and the chord in its tooltip cannot drift from ⌘,.
+ * **This reverses that, and the reason it is not a regression is that the gear is no longer a
+ * slot.** A menu may host two levels — `commandbar/overflow` has admitted application, project and
+ * document since the matrix was written — because a menu prints each row's own name, chord and gate
+ * beside it, so nothing about a row's level has to be inferred from where the control sits. The
+ * levels are still separated: `settings/menu` is a matrix row admitting exactly application and
+ * project, and the menu draws a divider where the level changes. Its one-click meaning is gone
+ * deliberately: ⌘, still opens Preferences from anywhere, and the menu's first row prints that
+ * chord.
+ *
+ * Rendered FROM the placement, so a record joins the gear by declaring `settings/menu` and there is
+ * nothing here to update in step. With no project open the two project rows hide themselves and the
+ * menu is Preferences alone — which is the correct answer on the welcome screen, and the reason the
+ * button's own visibility asks the placement rather than one id.
  */
 function railFooterTpl(): TemplateResult {
   const registry = activeRegistry();
-  const command = registry?.get("app.preferences");
-  if (!registry || !command || !registry.isVisible("app.preferences")) {
+  if (!registry || registry.forPlacement(SETTINGS_MENU_PLACEMENT).length === 0) {
     return html`${nothing}`;
   }
-  const chord = registry.keymap.formatBinding("app.preferences");
+  const open = isSettingsMenuOpen();
   return html`
     <button
       type="button"
-      class="rail-item"
-      data-command="app.preferences"
-      title=${chord ? `${command.title} (${chord})` : command.title}
-      @click=${() => {
-        void registry.run("app.preferences");
+      class="rail-item${open ? " rail-item--menu-open" : ""}"
+      data-rail-menu="settings"
+      aria-haspopup="menu"
+      aria-expanded=${open ? "true" : "false"}
+      title="Settings"
+      @click=${(event: MouseEvent) => {
+        openSettingsMenu(event.currentTarget as HTMLElement, { rerender: renderActivityBar });
+      }}
+      @keydown=${(event: KeyboardEvent) => {
+        // The menu-button convention: either arrow opens, and the menu takes the keyboard from
+        // There. Enter and Space are the button's own activation and already reach `@click`.
+        if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+          event.preventDefault();
+          openSettingsMenu(event.currentTarget as HTMLElement, { rerender: renderActivityBar });
+        }
       }}
     >
       <span class="rail-icon"><sp-icon-settings size="m"></sp-icon-settings></span>
-      <span class="rail-label">Preferences</span>
+      <span class="rail-label">Settings</span>
     </button>
   `;
 }

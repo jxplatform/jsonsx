@@ -14,7 +14,7 @@ code:
 
 # Data tables
 
-A data table is like a content type for live data: a name, a set of fields, and the connection its rows are stored in. You define tables here; **Push Schema** then creates them in the actual database. Open **[Project settings](/docs/studio/projects/settings)** (press :kbd[⌘K] and run **Open Settings**, or pick it from the **⬢ menu** in the Command Bar), then choose _Data Tables_: tables on the left, the selected table's editor on the right.
+A data table is like a content type for live data: a name, a set of fields, and the connection its rows are stored in. You define tables here; **Push Schema** then creates them in the actual database. Pick **Open Project Settings › Data Tables** from the **Settings** menu at the foot of the rail. You can also open **[Project settings](/docs/studio/projects/settings)** any other way (:kbd[⌘K] then **Open Project Settings**, or the **⬢ menu**) and choose _Data Tables_: tables on the left, the selected table's editor on the right.
 
 ![The Data Tables editor pane showing the connection picker and field schema builder](../../images/data-table-editor.png)
 

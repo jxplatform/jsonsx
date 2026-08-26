@@ -18,7 +18,7 @@ In this tutorial you give your site a blog the structured way: a `posts` content
 
 A content type is your CMS schema: where a collection's entries live, and what fields each one carries.
 
-1. Press :kbd[⌘K], run **Open Settings**, and pick the **Content Types** section.
+1. Open the **Settings** menu at the foot of the rail and pick **Open Project Settings › Content Types**. (:kbd[⌘K] and **Open Project Settings** gets you to the same place.)
 2. Click **New Entry** at the bottom of the type list.
 3. Type `Posts` and click **Create**.
 

@@ -17,7 +17,7 @@ code:
 
 Content types are your site's CMS schema. Each one describes a collection (blog posts, team members, projects) by naming the folder its entries live in, the file format they use, and the fields every entry carries. Once a type exists, Studio can create entries against it and draw their fields as a form.
 
-The builder is a section of your project's configuration document. Press :kbd[⌘K] and run **Open Settings**, or pick it from the **⬢ menu** in the Command Bar, then choose **Content Types** from the section list: your types are listed on the left, and selecting one opens its editor on the right. Like every other section of that document, what you do here is recorded as a step you can take back with :kbd[⌘Z]; see **[Project settings](/docs/studio/projects/settings)**.
+The builder is a section of your project's configuration document. Pick **Open Project Settings › Content Types** from the **Settings** menu at the foot of the rail. You can also press :kbd[⌘K] and run **Open Project Settings**, or use the **⬢ menu** in the Command Bar, then choose **Content Types** from the section list: your types are listed on the left, and selecting one opens its editor on the right. Like every other section of that document, what you do here is recorded as a step you can take back with :kbd[⌘Z]; see **[Project settings](/docs/studio/projects/settings)**.
 
 ![The Content Types section with a type selected and its field schema open in the builder](../../images/content-type-builder.png)
 

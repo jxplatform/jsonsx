@@ -48,6 +48,13 @@
     outline-offset: -2px;
   }
 
+  /* The rail's gear while its menu is open. That state is drawn with a `background`, which this
+     mode re-forces to the system canvas — so it says nothing. An outline says it instead. */
+  .rail-item--menu-open {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+
   /* The drop target. A 3px translucent ring is invisible here twice over — shadow and alpha. */
   .drop-target,
   .is-drop-target {
