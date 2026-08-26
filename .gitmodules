@@ -1,0 +1,24 @@
+# The Electrobun SDK's TypeScript sources, pinned to the release `packages/desktop` depends on.
+#
+# Electrobun 2 publishes no SDK to npm: `node_modules/electrobun` is a CLI bootstrap whose every
+# export — types included — resolves to a module that throws. The real sources reach a project only
+# when Hutch downloads that release's core archive and copies them into a gitignored
+# `.hutch/devkit`, which is a network step no clone, linter or CI job can perform for itself.
+#
+# So this submodule is the TYPECHECK sysroot: `packages/desktop/tsconfig.json` `paths` point into
+# `package/src`, and Hutch's `.hutch/devkit` remains the BUILD sysroot. The projected devkit is a
+# verbatim copy of these same directories (196 of 197 files byte-identical at 2.0.1), so the two
+# describe one release; `bun run electrobun:verify` proves they still name the same version.
+#
+# `bun run electrobun:sync` owns this checkout — it pins the tag named by the `electrobun`
+# devDependency, applies the sparse patterns below, and writes the one generated file the SDK
+# imports. Do not move the gitlink by hand.
+#
+# The sparse-checkout is not decoration. A full checkout is 26 MB, 17 MB of it committed macOS
+# dylibs, and it carries ~40 `*.test.ts` files plus a `.md` — which `bun test` discovery, oxfmt's
+# markdown normalizer and `check-coverage-manifest.ts` would all pick up. Narrowed to the five
+# directories the SDK's entry points actually reach, it is 1 MB and invisible to all three.
+[submodule "vendor/electrobun"]
+	path = vendor/electrobun
+	url = https://github.com/blackboardsh/electrobun.git
+	shallow = true

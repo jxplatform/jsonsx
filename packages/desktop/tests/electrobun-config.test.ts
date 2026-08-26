@@ -48,48 +48,43 @@ describe("electrobun config", () => {
 
 /*
  * The root tsconfig excludes `packages/desktop`, and that carve-out is owned by this dependency:
- * the Electrobun SDK is raw TypeScript rather than declarations — Hutch projects `.ts` sources into
- * `.hutch/devkit/api` and this package's `paths` point straight at them — so importing it pulls its
- * SOURCE into whichever program imports it. `exclude` cannot stop that (it only filters
- * which files become program roots, never what an import reaches) and `skipLibCheck` cannot either
- * (it covers `.d.ts` only) — so the root's `exactOptionalPropertyTypes` lands on a dependency's
- * code and this package needs a looser config.
+ * the Electrobun SDK is raw TypeScript rather than declarations, so importing it pulls its SOURCE
+ * into whichever program imports it. `exclude` cannot stop that (it only filters which files become
+ * program roots, never what an import reaches) and `skipLibCheck` cannot either (it covers `.d.ts`
+ * only) — so the root's `exactOptionalPropertyTypes` lands on a dependency's code and this package
+ * needs a looser config.
  *
  * Asserted rather than written down, because the day it stops being true is the day the split can
  * go, and nothing else would ever tell us. When this fails: try deleting `packages/desktop` from
  * the root `exclude` and this package's tsconfig with it.
  */
 describe("the electrobun SDK's shipped types", () => {
-  /* The committed half, which always runs: these paths ARE the import, so a `.d.ts` target here
-     would be the end of the carve-out even if the devkit still shipped sources. */
+  /* Read as text, not JSON.parse: this tsconfig carries comments. Each paths entry is one line of
+     the form `"electrobun/main": ["../../vendor/electrobun/…"],`. */
+  const targets = readFileSync(resolve(desktopDir, "tsconfig.json"), "utf8")
+    .split(/\r?\n/)
+    .filter((line) => line.trimStart().startsWith('"electrobun'))
+    .flatMap((line) => [...line.matchAll(/"((?:\.\.?\/)[^"]+)"/g)].map((m) => m[1]!));
+
+  /* These paths ARE the import, so a `.d.ts` target here would be the end of the carve-out even if
+     the SDK still shipped sources everywhere else. */
   test("this package's own paths point at raw .ts", () => {
-    const tsconfig = readFileSync(resolve(desktopDir, "tsconfig.json"), "utf8");
-    /* Read as text, not JSON.parse: this tsconfig carries comments. Each paths entry is one
-       line of the form `"electrobun/main": ["./.hutch/devkit/..."],`. */
-    const targets = tsconfig
-      .split(/\r?\n/)
-      .filter((line) => line.trimStart().startsWith('"electrobun'))
-      .map((line) => line.slice(line.indexOf("./"), line.lastIndexOf('"')));
     expect(targets.length).toBeGreaterThan(0);
     for (const target of targets) {
       expect({ source: target.endsWith(".ts"), target }).toEqual({ source: true, target });
     }
   });
 
-  /* The upstream half. Skipped without a devkit — `bun test` never resolves `electrobun/*` (every
-     suite mocks it by specifier), so CI's desktop test job deliberately does not run
-     `electrobun prepare`. It runs wherever the SDK has actually been projected. */
-  const devkit = resolve(desktopDir, ".hutch/devkit/package.json");
-  test.skipIf(!existsSync(devkit))("the projected SDK is still raw .ts, not declarations", () => {
-    const pkg = JSON.parse(readFileSync(devkit, "utf8")) as { exports: Record<string, string> };
-    const entries = Object.values(pkg.exports);
-    expect(entries.length).toBeGreaterThan(0);
-    for (const target of entries) {
-      expect({
-        declaration: target.endsWith(".d.ts"),
-        source: target.endsWith(".ts"),
+  /* Electrobun 2 publishes no SDK on npm, so `electrobun/*` has to resolve out of SOMETHING that a
+     clone supplies. That is the pinned vendor/electrobun submodule — not `.hutch/devkit`, which is
+     a network download Hutch performs and which no fresh checkout, linter or CI job has. A path
+     that drifts back into `.hutch` would typecheck on the author's machine and nowhere else. */
+  test("they resolve out of the vendored submodule, not a Hutch projection", () => {
+    for (const target of targets) {
+      expect({ target, vendored: target.startsWith("../../vendor/electrobun/") }).toEqual({
         target,
-      }).toEqual({ declaration: false, source: true, target });
+        vendored: true,
+      });
     }
   });
 });

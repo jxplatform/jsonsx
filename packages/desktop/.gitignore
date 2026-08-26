@@ -7,7 +7,9 @@ artifacts/
 
 # Hutch's generated SDK sysroot — copied out of the pinned Electrobun core archive by
 # `electrobun prepare`, replaced whenever the selected release or target changes, and never edited or
-# committed. tsconfig.json `paths` point into it; `electrobun/*` imports resolve through it.
+# committed. A BUILD resolves `electrobun/*` through it. TYPECHECKING does not: tsconfig.json
+# `paths` point at the vendor/electrobun submodule instead, because this directory is a network
+# download no clone, editor or CI job can produce for itself.
 .hutch/
 
 # Scratch Hutch writes while running the build hooks and the config loader under Cottontail. Left

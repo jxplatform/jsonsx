@@ -2,7 +2,7 @@
 
 ## Platform Abstraction, Project Loading, and Component Scoping
 
-**Version:** 0.4.1-draft
+**Version:** 0.4.2-draft
 **Status:** Pending
 **Updated:** 2026-08-26
 **License:** MIT
@@ -597,7 +597,11 @@ When the user navigates into a sub-component (via `pushDocument()` in the state 
 
 The Bun process owns all filesystem and OS operations. The webview contains Studio's UI. Communication happens via ElectroBun's RPC bridge.
 
-**Toolchain boundary (ElectroBun 2).** Build orchestration belongs to **Hutch**, ElectroBun's build CLI, but nothing installs it by hand: the `electrobun` devDependency is a dependency-free bootstrap whose version selects the whole toolchain — it downloads the paired Hutch, verifies it against the release's published digest, and caches it. Hutch, Cottontail and ElectroBun therefore all ride the workspace lockfile, and a machine-wide Hutch is only a fallback. `electrobun.config.ts` describes the application and the build Hutch produces; `hutch.config.ts` only names tasks. ElectroBun 2 publishes no SDK to npm — `electrobun prepare` copies the release's SDK out of its platform core archive into a generated, gitignored `.hutch/devkit` sysroot, which is where every `electrobun/*` import resolves from. `electrobun/main` is the runtime-neutral main-process namespace (`electrobun/bun` remains a deprecated alias); `electrobun/view` is unchanged.
+**Toolchain boundary (ElectroBun 2).** Build orchestration belongs to **Hutch**, ElectroBun's build CLI, but nothing installs it by hand: the `electrobun` devDependency is a dependency-free bootstrap whose version selects the whole toolchain — it downloads the paired Hutch, verifies it against the release's published digest, and caches it. Hutch, Cottontail and ElectroBun therefore all ride the workspace lockfile, and a machine-wide Hutch is only a fallback. `electrobun.config.ts` describes the application and the build Hutch produces; `hutch.config.ts` only names tasks. ElectroBun 2 publishes no SDK to npm — `electrobun prepare` copies the release's SDK out of its platform core archive into a generated, gitignored `.hutch/devkit` sysroot, and that is what a BUILD resolves `electrobun/*` from. `electrobun/main` is the runtime-neutral main-process namespace (`electrobun/bun` remains a deprecated alias); `electrobun/view` is unchanged.
+
+**Typechecking resolves elsewhere, and must.** A projection is a network download, so nothing a clone, an editor or a CI job can do on its own produces one — and the npm package resolves every specifier, types included, to a module that throws. Typechecking therefore reads the SDK's TypeScript sources out of `vendor/electrobun`, a git submodule pinned to the exact release the `electrobun` devDependency names, which `packages/desktop/tsconfig.json` maps `electrobun/*` into directly.
+
+The two sysroots are one release, not two sources of truth: the projected devkit is a verbatim copy of the same directories the submodule carries. `bun run electrobun:verify` asserts that the submodule and the version pin agree and fails when they do not, which is the check that keeps a dependency bump from moving one without the other. It compares versions rather than bytes deliberately — an upstream release artifact and its git tag may differ in ways that carry no type surface, and policing that is not this repository's job.
 
 ElectroBun 2 defaults its main process to Cottontail. Jx Studio selects `build.mainProcess: "bun"` explicitly, because the main-process module graph is Bun-native throughout — `Bun.serve`, `Bun.$`, `Bun.spawn`, `Bun.Glob`. Hutch itself runs project TypeScript with Cottontail regardless, so the `preBuild` and `postBuild` hook scripts stay on portable APIs rather than Bun's shell.
 
@@ -705,13 +709,20 @@ jx-studio-app/
 │           ├── index.html        # Studio HTML shell
 │           └── init.js           # registerPlatform(createDesktopPlatform())
 ├── package.json
-├── .hutch/devkit/               # Generated: the pinned release's SDK, where electrobun/* resolves
+├── .hutch/devkit/               # Generated: the pinned release's SDK, where a BUILD resolves electrobun/*
 └── node_modules/
     ├── @jxsuite/studio/           # UI package (the studio itself)
     └── @jxsuite/runtime/          # Canvas rendering
 ```
 
 `.hutch/devkit` is written by Hutch and gitignored — never edited or committed. The `electrobun` package under `node_modules` carries neither runtime nor SDK: it is the bootstrap that resolves and invokes the paired Hutch, which is why it belongs in `devDependencies` rather than `dependencies`.
+
+Typechecking resolves from the repository root instead, out of a sibling of this package:
+
+```
+vendor/electrobun/            # Submodule, pinned to the release the electrobun pin names
+└── package/src/              # The SDK's TypeScript sources, where TYPECHECKING resolves electrobun/*
+```
 
 **Distribution names.** A stable build's INSTALLER carries no channel prefix (`macos-arm64-JxStudio.dmg`), while its updater metadata and update archive keep one (`stable-macos-arm64-update.json`) — the same feed name ElectroBun 1.x used, so an installed 1.x app still finds its updates. ElectroBun 2 publishes no macOS x64 core archive, so that target is not built.
 
@@ -1236,6 +1247,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.4.2-draft** (2026-08-26) — Typechecking resolves the ElectroBun SDK from the pinned vendor/electrobun submodule; .hutch/devkit stays the build sysroot.
 - **0.4.1-draft** (2026-08-26) — the Import source hands its brief to the assistant, which runs the import; the git-init obligation moves to whatever creates the project (§4.5).
 - **0.4.0-draft** (2026-08-25) — StudioPlatform writes user settings as patches (set/remove) rather than replacing the whole map, so one window cannot clear another's; and §3.6 states which store a credential belongs in.
 - **0.3.24-draft** (2026-08-25) — §3.1: a platform declares assetSpace beside documentBaseUrl; §10.2 (Pending → Partial): what a storage backend must declare, including that stored bytes come back losslessly.
@@ -1281,4 +1293,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx Studio Desktop Architecture Specification v0.4.1-draft_
+_Jx Studio Desktop Architecture Specification v0.4.2-draft_

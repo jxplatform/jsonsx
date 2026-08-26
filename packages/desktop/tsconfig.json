@@ -3,15 +3,14 @@
      nothing here was typechecked at all until an unbound identifier shipped through `bun run
      typecheck` unnoticed. CI runs this config as a second step for that reason.
 
-     The cause is that electrobun's SDK is raw TypeScript, not declarations: Electrobun 2 projects
-     `.ts` sources under `.hutch/devkit/api` and the `paths` below point straight at them, so
-     importing the SDK pulls its sources into the program as first-class files. Neither `exclude`
-     nor `skipLibCheck` keeps them out — see the root config for why — and under the root's
+     The cause is that electrobun's SDK is raw TypeScript, not declarations, so importing it pulls a
+     dependency's SOURCES into the program as first-class files. Neither `exclude` nor
+     `skipLibCheck` keeps them out — see the root config for why — and under the root's
      `exactOptionalPropertyTypes` they emit errors we cannot fix in a dependency.
 
-     ONE of the root's flags is genuinely blocked. Measured on the electrobun 2.0.1 devkit:
+     ONE of the root's flags is genuinely blocked. Measured on electrobun 2.0.1:
 
-       exactOptionalPropertyTypes  → 15 errors across 7 devkit files (BrowserView 7, BrowserWindow 2,
+       exactOptionalPropertyTypes  → 15 errors across 7 SDK files (BrowserView 7, BrowserWindow 2,
                                      Updater 2, Utils, Tray, ContextMenu, ApplicationMenu). Ours: 7.
        noUncheckedIndexedAccess    → 0 errors in electrobun. Ours: 129, ~90% of them array indexing
                                      in tests (88 in window-manager.test.ts alone).
@@ -28,18 +27,26 @@
     "noFallthroughCasesInSwitch": true,
     "noImplicitOverride": true,
 
-    /* Where `electrobun/*` resolves from. Electrobun 2 ships no SDK on npm — `electrobun
-       prepare` copies the release's SDK trees into a generated `.hutch/devkit` sysroot (run
-       `bun run --cwd packages/desktop sync`, or any build, which syncs implicitly). Hutch also
-       writes `.hutch/devkit/tsconfig.json` with the full 46-entry path map, and the intended
-       wiring is to `extends` it — but that file sets `baseUrl`, which TypeScript 7 removed, so
-       extending it fails the whole project with TS5102. These three entries are the entire
-       `electrobun` surface this package imports; add one here if a fourth is ever needed, and
-       revisit the `extends` when Hutch stops emitting `baseUrl`. */
+    /* Where `electrobun/*` resolves from: the `vendor/electrobun` submodule, pinned to the exact
+       release the `electrobun` devDependency names. Electrobun 2 ships no SDK on npm — every
+       specifier in `node_modules/electrobun` resolves to a module that throws — and the SDK reaches
+       a project only when Hutch downloads that release's core archive into `.hutch/devkit`. Pointing
+       here instead means a plain `git clone` typechecks: no network, no Hutch, no `electrobun
+       prepare` step in front of `tsc`.
+
+       Hutch's `.hutch/devkit` is still the BUILD sysroot, and the two are the same release rather
+       than two sources of truth — the devkit is a verbatim copy of these same directories, and
+       `bun run electrobun:verify` fails when the submodule and the pin disagree. `.gitmodules`
+       carries the full rationale.
+
+       These three entries are the entire `electrobun` surface this package imports; add one here and
+       to `SDK_ENTRY_POINTS` in `scripts/check-electrobun-vendor.ts` if a fourth is ever needed.
+       Extending the devkit's own generated tsconfig is not an option even when one exists: it sets
+       `baseUrl`, which TypeScript 7 removed, so the whole project fails with TS5102. */
     "paths": {
-      "electrobun": ["./.hutch/devkit/api/sdks/main/index.ts"],
-      "electrobun/main": ["./.hutch/devkit/api/sdks/main/index.ts"],
-      "electrobun/view": ["./.hutch/devkit/api/browser/index.ts"]
+      "electrobun": ["../../vendor/electrobun/package/src/sdks/main/index.ts"],
+      "electrobun/main": ["../../vendor/electrobun/package/src/sdks/main/index.ts"],
+      "electrobun/view": ["../../vendor/electrobun/package/src/browser/index.ts"]
     },
 
     "resolveJsonModule": true,

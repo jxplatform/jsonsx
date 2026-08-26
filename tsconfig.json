@@ -26,14 +26,15 @@
   /* `packages/desktop` is checked by its OWN config (`packages/desktop/tsconfig.json`), which CI runs
      as a second step. It is excluded here for a reason that is easy to misdiagnose, so:
 
-     `electrobun`'s package.json `exports` maps every entry point at raw TypeScript
-     (`./dist/api/bun/index.ts`), and it ships 48 `.ts` against 2 `.d.ts`. Importing it therefore
-     pulls a dependency's SOURCE into whichever program imports it, and neither obvious defence
-     applies:
+     The electrobun SDK is raw TypeScript, not declarations — 195 `.ts` against 2 `.d.ts`, both of
+     those ambient globals rather than API types. `packages/desktop/tsconfig.json` therefore maps
+     `electrobun/*` straight at `.ts` files in the pinned `vendor/electrobun` submodule, and
+     importing it pulls a dependency's SOURCE into whichever program imports it. Neither obvious
+     defence applies:
 
-       - `"node_modules"` below does NOT stop it. `exclude` only filters which files `include`
-         promotes to program ROOTS; anything reached by an import from a root joins the program
-         regardless. The two node_modules entries here have never protected anything.
+       - `exclude` below does NOT stop it. It only filters which files `include` promotes to program
+         ROOTS; anything reached by an import from a root joins the program regardless. Adding
+         `vendor` there would protect nothing, exactly as the two node_modules entries never have.
        - `skipLibCheck` does NOT stop it. That suppresses errors in `.d.ts` only, and these are
          ordinary `.ts`, so every flag above applies to them.
 

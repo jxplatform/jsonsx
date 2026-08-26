@@ -23,8 +23,48 @@ Conventions:
 - **Ratchet**: when a PR meaningfully raises a workspace's worst-file coverage, raise that workspace's `coverageThreshold` to just below the new minimum. Lowering a threshold requires explicit justification in the PR description.
 - Run tests only via `bun test --isolate` (plain `bun test` has known order-dependent failures and is unsupported).
 - Studio tests: use the shared harness `packages/studio/tests/harness.ts` (lit rendering, state/tab resets, in-memory `StudioPlatform` mock, event helpers, happy-dom rect stubs). The first import of a DOM test file must be `./harness` or `./with-dom.js` — lit-html captures `document` at import time.
-- `mock.module()` before importing the module under test; `await import()` afterwards for modules with import-time side effects. sharp and `electrobun/bun` must always be mocked (sharp is unloadable on NixOS).
+- `mock.module()` before importing the module under test; `await import()` afterwards for modules with import-time side effects. sharp and `electrobun/main` must always be mocked (sharp is unloadable on NixOS; `electrobun/bun` is a deprecated alias no source here imports).
 - Check per-file coverage with `bun test --isolate --coverage` from the workspace directory (`packages/<pkg>` or `extensions/<ext>`); the table prints to stderr.
+
+## The Electrobun SDK is vendored, and typechecking depends on it
+
+Electrobun 2 publishes **no SDK to npm**: `node_modules/electrobun` is a command bootstrap whose
+`exports` map sends every specifier — `electrobun`, `electrobun/main`, `electrobun/view`, types
+included — to `lib/moved.cjs`, a module whose entire body is `throw new Error(...)`. The real SDK
+reaches a project only when Hutch downloads that release's core archive and copies it into a
+gitignored `.hutch/devkit`. That is a network step, so a clone could not typecheck
+`packages/desktop` at all and CI had to run `bunx electrobun prepare` before it could reach `tsc`.
+
+So the SDK's TypeScript sources are vendored: **`vendor/electrobun`, a git submodule pinned to the
+exact release the `electrobun` devDependency names.** `packages/desktop/tsconfig.json` maps
+`electrobun/*` straight into `vendor/electrobun/package/src`.
+
+- **`bun run electrobun:verify` is the gate; `bun run electrobun:sync` is the fixer**
+  (`scripts/check-electrobun-vendor.ts`). The root `postinstall` runs the fixer softly, so an
+  ordinary `bun install` leaves a working tree that typechecks. CI runs `--init`, which materialises
+  and narrows the submodule but deliberately **does not move the gitlink** — moving it is exactly
+  how a Dependabot bump would stop looking like a mismatch.
+- **The version has two writers**, the pin and the gitlink, and the gate is what keeps them
+  together. A Dependabot `electrobun` bump goes red here; `bun run electrobun:sync` then committing
+  the moved gitlink is the whole follow-up.
+- **Hutch still owns builds.** `.hutch/devkit` is the build sysroot, the submodule is the typecheck
+  sysroot, and they are one release rather than two sources of truth — the projection is a verbatim
+  copy of the same directories (196 of 197 files byte-identical at 2.0.1). The gate compares
+  VERSIONS, not bytes, on purpose: upstream's release artifact and its git tag legitimately differ,
+  and `--init` reports those byte differences without failing on them.
+- **The checkout is sparse**, and that is load-bearing rather than thrift. Upstream interleaves ~40
+  `*.test.ts` with its sources and ships a `.md` among them; at a tracked path those would be
+  collected by a root-level `bun test`, rewritten by `bun run format:md`, and globbed by
+  `check-coverage-manifest.ts`. Narrowed to the five directories the entry points reach, it is 1 MB
+  instead of 26 MB and none of that happens.
+- **A tracked path is not ignored by anything implicitly.** oxlint walks the tree honouring
+  `.gitignore` — which is what actually excludes `node_modules`, `dist` and the old `.hutch/devkit`,
+  and why `.oxlintignore` is inert (oxlint's ignore file is `.eslintignore`, via `--ignore-path`,
+  and the lint script passes neither). `vendor` therefore needs an explicit entry in **both**
+  `.oxlintrc.json` and `.oxlintrc.typecheck.json`, plus `.oxfmtrc.json` and root `bunfig.toml`.
+- **`.d.ts` remains impossible.** `TS4094` in the SDK's own `index.ts` blocks declaration emit, so
+  `skipLibCheck` cannot help and `packages/desktop` keeps its own tsconfig. That carve-out is
+  asserted, not just written down, in `packages/desktop/tests/electrobun-config.test.ts`.
 
 ## Dependency Autopilot
 
