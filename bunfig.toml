@@ -13,4 +13,10 @@ linker = "hoisted"
 pathIgnorePatterns = ["**/result/**"]
 coverageReporter = ["text"]
 coverageSkipTestFiles = true
-coveragePathIgnorePatterns = ["./result/**", "**/dist/**", "**/tests/**", "**/tmp/**"]
+coveragePathIgnorePatterns = [
+	"./commitlint.config.js",
+	"./result/**",
+	"**/dist/**",
+	"**/tests/**",
+	"**/tmp/**",
+]
