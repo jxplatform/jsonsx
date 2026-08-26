@@ -11,15 +11,15 @@ If Cwicly's shutdown is what brought you here: welcome — losing a good tool mi
 
 ## The concept map
 
-| WordPress                         | Jx                           | Where to look                                        |
-| --------------------------------- | ---------------------------- | ---------------------------------------------------- |
-| Theme                             | Starter + Stylebook + tokens | [Starter templates](/docs/studio/projects/starters)  |
-| Blocks                            | Elements and components      | [Elements](/docs/studio/design/elements)             |
-| The block editor                  | Edit mode                    | [Edit mode](/docs/studio/editing)                    |
-| Custom post types + custom fields | Content types                | [Content types](/docs/studio/projects/content-types) |
-| Media library                     | Media                        | [Media](/docs/studio/projects/media)                 |
-| Plugins                           | Extensions and npm packages  | [Extending](/docs/extending)                         |
-| Publish button                    | Commit and sync              | [Publish](/docs/studio/publish)                      |
+| WordPress                         | Jx                                | Where to look                                        |
+| --------------------------------- | --------------------------------- | ---------------------------------------------------- |
+| Theme                             | Starter + Project Styles + tokens | [Starter templates](/docs/studio/projects/starters)  |
+| Blocks                            | Elements and components           | [Elements](/docs/studio/design/elements)             |
+| The block editor                  | Edit mode                         | [Edit mode](/docs/studio/editing)                    |
+| Custom post types + custom fields | Content types                     | [Content types](/docs/studio/projects/content-types) |
+| Media library                     | Media                             | [Media](/docs/studio/projects/media)                 |
+| Plugins                           | Extensions and npm packages       | [Extending](/docs/extending)                         |
+| Publish button                    | Commit and sync                   | [Publish](/docs/studio/publish)                      |
 
 The rest of this page walks through each row, then gets honest about what's different.
 
@@ -28,7 +28,7 @@ The rest of this page walks through each row, then gets honest about what's diff
 A WordPress theme bundles templates, default styles, and options into something you install — and switching themes means starting over. In Jx the same jobs are separate, ordinary parts of your project:
 
 - A **[starter template](/docs/studio/projects/starters)** gives you complete pages, components, and content to reshape. Nothing about a starter is special afterward — it's plain files you own, with no parent theme to update or fight.
-- The **[Stylebook](/docs/studio/design/stylebook)** sets the default look of every heading, button, link, and form control in one catalog.
+- The **[Project Styles](/docs/studio/design/stylebook)** sets the default look of every heading, button, link, and form control in one catalog.
 - **[Design tokens](/docs/studio/design/tokens)** name your colors, fonts, and sizes once, so the whole site draws from one palette.
 
 ## Blocks and the editor
@@ -78,7 +78,7 @@ There's no Publish button mutating a live server. When you're happy, open **Sour
 - **Fast by default.** Prebuilt pages from a CDN and automatically optimized images, with no caching plugins to tune.
 - **Version control of everything.** Design, settings, and content all live in git — every change is a reviewable commit you can roll back.
 - **Portability.** Your content is Markdown any tool can open; moving hosts is a settings change, not a database migration.
-- **A real design system.** Tokens and the Stylebook instead of overriding theme CSS from a child theme.
+- **A real design system.** Tokens and Project Styles instead of overriding theme CSS from a child theme.
 
 ## Start here
 

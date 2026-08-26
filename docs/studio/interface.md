@@ -53,13 +53,13 @@ The vertical strip on the far left. Every button carries a **text label under it
 **Project**
 
 - **Files** (:kbd[⌘1]) — the project file tree. Open, rename and organize the files in your project folder. **New File…** — from the panel's toolbar, or from a folder's right-click menu — opens the [creation dialog](#creating-a-file) with `untitled.json` pre-filled and only the name part selected, so typing replaces the name and keeps the extension. Studio picks the starting content from the extension you give it. Drag files in from your desktop and they upload into whichever folder you drop them on — see [Media](/docs/studio/projects/media). On a [multilingual project](/docs/studio/interface/languages), a file under a language's directory carries that language's name beside it — _français_, not _French_.
-- **Source Control** (:kbd[⌘3]) — the built-in git client. A badge counts changed files. See [Git & publish](/docs/studio/publish).
+- **Source Control** (:kbd[⌘3]) — the built-in git client. A badge counts changed files. See [Publish](/docs/studio/publish).
 
 **Document**
 
 - **Outline** (:kbd[⌘4]) — the element structure of the open page or component, as a tree you can select and reorder. In **Project Styles** it lists the style targets instead.
 - **Page** (:kbd[⌘5]) — the page's title, description and social preview.
-- **Data** (:kbd[⌘6]) — the values, data sources and functions the document knows about, with what each one currently resolves to. See [Script & logic](/docs/studio/logic).
+- **Data** (:kbd[⌘6]) — the values, data sources and functions the document knows about, with what each one currently resolves to. See [Logic](/docs/studio/logic).
 - **Packages** (:kbd[⌘7]) — the components and packages the open document pulls in.
 
 Clicking the button of the panel that's already open collapses the Navigator; clicking any button brings it back. A document-level panel with no document open says what it needs rather than showing an empty box.
@@ -115,7 +115,7 @@ The dock on the right inspects whatever is selected, in four tabs:
 
 - **Content** (:kbd[⌘⇧1]) — the selected element's settings: its text, links, images and component options.
 - **Style** (:kbd[⌘⇧2]) — the visual inspector: spacing, typography, color, layout and more. See [Design mode](/docs/studio/design).
-- **Logic** (:kbd[⌘⇧3]) — what the element does on click, input, submit and other interactions. See [Script & logic](/docs/studio/logic).
+- **Logic** (:kbd[⌘⇧3]) — what the element does on click, input, submit and other interactions. See [Logic](/docs/studio/logic).
 - **Assistant** (:kbd[⌘⇧4]) — the [AI assistant](/docs/studio/ai), as a tab in this dock rather than a column of its own, so showing it never narrows the canvas.
 
 Every tab renders under a header naming the tab and what it is pointed at — the selected element, or the open document when nothing is selected. Resize the dock by dragging its inner edge, or collapse it with :kbd[⌘⌥B].

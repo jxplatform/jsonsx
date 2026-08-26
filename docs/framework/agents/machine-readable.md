@@ -20,7 +20,7 @@ Everything on this site has a machine-readable counterpart at a stable URL. An a
 
 A plain-text index in the [llms.txt convention](https://llmstxt.org): a one-paragraph summary of the project, then one `##` heading per documentation section, then one line per page in sidebar order:
 
-```
+```markdown
 # Jx Suite
 
 > Jx Suite is a visual site builder (Jx Studio), a JSON-native component format, and a compiler that prerenders every page — working on plain files you own and publish with git. …

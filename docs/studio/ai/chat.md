@@ -115,4 +115,4 @@ Two of them state when they cannot act instead of going quiet: **Retry** needs a
 
 - How the assistant edits the open page: **[Document assistant](/docs/studio/ai/document-assistant)**
 - What each message shares with your provider: **[AI assistant](/docs/studio/ai#what-leaves-your-machine)**
-- Where saved and unsaved files live: **[Tabs and files](/docs/studio/interface/tabs)**
+- Where saved and unsaved files live: **[Documents and panes](/docs/studio/interface/tabs)**

@@ -3,7 +3,7 @@ title: "Install Jx Studio"
 description: "Download the Jx Studio desktop app for macOS, Windows, or Linux — the only way to run the visual editor."
 ---
 
-# Get Studio
+# Install Jx Studio
 
 Jx Studio is a desktop application. There is no hosted, sign-in version — you run it on your own machine, against your own files.
 
@@ -28,7 +28,7 @@ Jx Studio is Apple Silicon only. Intel Macs can still run the last release built
 
 On NixOS the same desktop app is packaged as a Nix derivation rather than an installer, because its bundler cannot run in a Nix sandbox. It runs Studio in a Chromium app window and presents the identical editor.
 
-```
+```bash
 nix run github:jxsuite/jx/release
 ```
 
@@ -36,7 +36,7 @@ Pin the `release` branch, not `main`: `release` holds only released code, and it
 
 To install it rather than run it once:
 
-```
+```bash
 nix profile install github:jxsuite/jx/release
 ```
 
@@ -48,7 +48,7 @@ Released builds are published to a public [Cachix](https://cachix.org) cache, so
 
 The flake names the cache itself, so Nix offers to use it the first time you run one of the commands above. Answer `y`, or pass `--accept-flake-config` to skip the prompt:
 
-```
+```bash
 nix run github:jxsuite/jx/release --accept-flake-config
 ```
 

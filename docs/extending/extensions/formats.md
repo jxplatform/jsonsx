@@ -43,7 +43,7 @@ Two classes may claim the same extension **only with disjoint capabilities** —
 
 Your `mediaType` reaches an HTTP header, a file-picker filter and a Studio label, so it's parsed rather than passed through. Get the grammar wrong and the build tells you:
 
-```
+```text
 Format "Toml" declares an invalid mediaType: "applicationtoml" has no "/" — a media type is type/subtype (RFC 6838 §4.2)
 ```
 

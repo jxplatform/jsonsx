@@ -7,13 +7,13 @@ spec:
 
 # Site architecture
 
-> **Studio manages this structure for you** — [Browse your project](/docs/studio/projects/browse) maps to `pages/`, `components/`, and `content/`; the [content-type builder](/docs/studio/projects/content-types) writes the `content` section; [Project settings](/docs/studio/projects/settings) edits `project.json`. This section documents the on-disk layout for reference.
+> **Studio manages this structure for you** — [The Library](/docs/studio/projects/browse) maps to `pages/`, `components/`, and `content/`; the [content-type builder](/docs/studio/projects/content-types) writes the `content` section; [Project settings](/docs/studio/projects/settings) edits `project.json`. This section documents the on-disk layout for reference.
 
 A Jx site is a folder of plain JSON and Markdown files with a conventional layout. Only `project.json` and `pages/` are required — everything else is optional and additive.
 
 ## Project anatomy
 
-```
+```text
 my-site/
 ├── project.json           # Site configuration (required)
 ├── pages/                 # File-based routing (required)

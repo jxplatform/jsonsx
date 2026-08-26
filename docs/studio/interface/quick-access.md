@@ -38,5 +38,5 @@ The mouse works too — click any row to open it.
 
 ## Next
 
-- See how opened files behave in **[Tabs and files](/docs/studio/interface/tabs)**
+- See how opened files behave in **[Documents and panes](/docs/studio/interface/tabs)**
 - The rest of the keyboard lives in the **[shortcut reference](/docs/studio/interface/shortcuts)**

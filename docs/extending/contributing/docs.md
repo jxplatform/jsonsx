@@ -70,9 +70,13 @@ The point of every rule below is that a reader should be able to hear a person b
 
 ## Canonical UI names
 
-Never invent synonyms for Studio surfaces. The shell regions are the **Command Bar**, the **Navigator rail** and its **Navigator** dock, the **pane** (with its **context bar**), the **Inspector**, the **Bottom dock** and the **status bar**.
+Never invent synonyms for Studio surfaces. The shell regions are the **Command Bar** and the **Command Center** pill in the middle of it, the **Navigator rail** and its **Navigator** dock, the **pane** (with its **context bar** and, above that, its **jump bar**), the **Inspector**, the **Bottom dock** and the **status bar**.
 
-The Navigator panels are **Files, Source Control, Problems** (the rail's Project group), **Outline, Page, Data, Packages** (its Document group), plus **Insert** and **State**, which have no rail button and are opened by name from the palette. The Inspector tabs are **Content, Style, Logic, Assistant**; the Bottom dock's are **Problems, Logic, Activity**. Diff is not one of them: it is an **Editor** kind, and Source Control opens a changed file as a Diff editor in the side pane. A pane's **View** control offers **Edit, Design, Preview**, and its **Editor** control names the editor kind: **Canvas, Grid, Code, Diff, Library, Project Styles**.
+The Navigator panels are **Files, Source Control** and **Problems** (the rail's Project group) and **Outline, Page, Data** and **Packages** (its Document group). **Insert** has no rail button and is opened by name from the palette. **Languages** belongs to the Project group but stays off the rail, and appears only in a project with more than one locale. A **Search** panel is declared and not yet built, so it never shows. The Inspector tabs are **Content, Style, Logic, Assistant**; the Bottom dock's are **Problems, Logic, Activity**. Diff is not one of them: it is an **Editor** kind, and Source Control opens a changed file as a Diff editor in the side pane. A pane's **View** control offers **Edit, Design, Preview**, and its **Editor** control names the editor kind: **Canvas, Grid, Code, Diff, Library, Project Styles**.
+
+A **View** is a view and an **Editor** is an editor: write "the Code editor", never "Code mode", because _mode_ belongs to the View control and mixing the two axes is what the modes page spends its opening paragraph separating.
+
+**The palette** is an acceptable collective for the **Command Center** (:kbd[⌘K]) and **Quick Access** (:kbd[⌘P]) where the difference does not matter. Name one of them where it does.
 
 **Settings** is the project's (contexts, content types, connections, packages); **Preferences** is the application's (appearance, assistant, accounts, keyboard). Never use one word for the other.
 

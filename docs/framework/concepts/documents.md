@@ -9,7 +9,7 @@ spec:
 
 # Documents
 
-> **Studio writes this format for you.** Every page and component you build in Studio is saved as one of these files — open [Code mode](/docs/studio/logic/code) to see the raw source of whatever document you have open.
+> **Studio writes this format for you.** Every page and component you build in Studio is saved as one of these files — open the [Code editor](/docs/studio/logic/code) to see the raw source of whatever document you have open.
 
 A Jx document is a single `.json` file that describes one piece of user interface: its structure, its styling, the state it holds, and the behavior attached to it. The tree of JSON objects mirrors the DOM — the browser's own object model — so property names like `tagName` and `textContent` mean exactly what they mean to a browser. Simple documents are fully self-describing: no template language, no companion script file.
 

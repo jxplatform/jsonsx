@@ -23,7 +23,7 @@ Everything else about the site lives in [project settings](/docs/studio/projects
 
 Already have a Jx project? Use **Open Project** to point Studio at a folder on disk, or **Clone** to pull one from git. (Developers who'd rather scaffold from a terminal can use `bun create @jxsuite` instead, described in [CLI commands](/docs/framework/build/cli), then open the result in Studio.)
 
-## 3. Manage, edit, design
+## 3. Browse, edit, design
 
 Studio gives you a surface for each part of the job. Start in **[The Library](/docs/studio/projects/browse)** to see your project: pages, components, content, and media, each with a live preview.
 

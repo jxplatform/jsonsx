@@ -1,5 +1,5 @@
 ---
-title: "Modes and views"
+title: "Editors and views"
 description: "The Editor and View controls in Jx Studio: what each editor and each view of the canvas is for, and which files offer which."
 spec:
   - studio.md#4.2
@@ -12,7 +12,7 @@ code:
   - packages/studio/src/settings/settings-document.ts
 ---
 
-# Modes and views
+# Editors and views
 
 Two controls on the [context bar](/docs/studio/interface/tabs) decide how the open file is presented, and they answer different questions. **Editor** is _which editor_: **Canvas**, **Grid**, **Code**, **Diff**, **Entry**, **Library** or **Project Styles**. It lists only the editors this file supports, so there is nothing in it to be disabled. **View** is _which view of the canvas_: **Edit** or **Design**, with **Preview** as a toggle beside them. It appears only while the Canvas editor is open. A view is a lens rather than a different app, showing the same file underneath in the way that suits the job. Every open file remembers both as you switch between tabs.
 
@@ -40,17 +40,17 @@ A file that belongs to a content collection can open as a form built from that c
 
 ## Library
 
-Library is the project's browser: every page, layout, component, content entry and media file, filtered by category and searchable, in whichever layout suits what you are looking at (**Table**, **Cards**, **Media**, **Calendar** or **Board**). **Open Library**, from the **⬢ menu** or the palette, opens it as a document in a pane. It sits in the strip alongside your files rather than over the top of them, and you can keep it beside a page in a [split](/docs/studio/interface/tabs#two-panes). Full guide: **[Browse your project](/docs/studio/projects/browse)**.
+Library is the project's browser: every page, layout, component, content entry and media file, filtered by category and searchable, in whichever layout suits what you are looking at (**Table**, **Cards**, **Media**, **Calendar** or **Board**). **Open Library**, from the **⬢ menu** or the palette, opens it as a document in a pane. It sits in the strip alongside your files rather than over the top of them, and you can keep it beside a page in a [split](/docs/studio/interface/tabs#two-panes). Full guide: **[The Library](/docs/studio/projects/browse)**.
 
 ## Code
 
 Code shows the file as raw source in a full code editor with syntax highlighting, the same editor VS Code uses. It is the escape hatch when you want to see exactly what Studio wrote, and the **Export** button at the right of the context bar saves a copy of the file elsewhere. Everything you can do here you can also do visually; see **[Logic](/docs/studio/logic)** for where code fits in Studio.
 
-Switching away from Code, to another editor or another view or another document, carries your last keystrokes with you rather than leaving them behind in a buffer you can no longer see. See **[Code editing](/docs/studio/logic/code#code-mode-the-whole-file-as-source)**.
+Switching away from Code, to another editor or another view or another document, carries your last keystrokes with you rather than leaving them behind in a buffer you can no longer see. See **[Code editing](/docs/studio/logic/code#the-code-editor-the-whole-file-as-source)**.
 
 ## Project Styles
 
-Project Styles is the catalog of your project's element defaults: every heading, button, and link rendered with its base style, so you set the look of each element type once for the whole site. Selecting it switches the right panel to the **Style** tab automatically. See **[Design mode](/docs/studio/design)** for how it fits into styling.
+Project Styles is the catalog of your project's element defaults: every heading, button, and link rendered with its base style, so you set the look of each element type once for the whole site. Selecting it switches the Inspector to the **Style** tab automatically. See **[Design mode](/docs/studio/design)** for how it fits into styling.
 
 ![Jx Studio Project Styles showing element defaults across breakpoints](../../images/stylebook.png)
 

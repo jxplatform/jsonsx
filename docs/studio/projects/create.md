@@ -96,5 +96,5 @@ A garbled line in the import's stream doesn't stop the run; the pages already cr
 ## Next
 
 - **[Projects](/docs/studio/projects)** — the other ways to get a project: open a folder or clone a repository
-- **[Browse your project](/docs/studio/projects/browse)** — find your way around what was just created
+- **[The Library](/docs/studio/projects/browse)** — find your way around what was just created
 - **[Starter templates](/docs/studio/projects/starters)** — the full starter gallery

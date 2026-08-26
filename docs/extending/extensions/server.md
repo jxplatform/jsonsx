@@ -93,7 +93,7 @@ The first-party extensions demonstrate the choreography: the auth mount (order 1
 
 The connector's data mount is the canonical consumer, serving the wire contract every table rides on:
 
-```
+```text
 GET    /_jx/data/:table        ?filter=<json>&sort=<json>&limit=&offset=&include=
 GET    /_jx/data/:table/:id
 POST   /_jx/data/:table
@@ -109,7 +109,7 @@ The dev server constructs mounts the same way the generated worker does, so `jx 
 
 Connector classes declare a `deploySchema` capability to sync tables ([Connectors](/docs/extending/extensions/connectors)). A **non-connector** [project-section class](/docs/extending/extensions/project-sections) may declare one too, letting its section contribute steps to the schema push (`jx db push`, the Studio push button). The signature differs — there is no single connection definition to hand over:
 
-```
+```text
 deploySchema(sectionValue, projectConfig, { env, dryRun?, connection?, connectors? })
   → { steps, applied, warnings, connection }
 ```
