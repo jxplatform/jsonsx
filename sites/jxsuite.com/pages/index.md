@@ -1,16 +1,16 @@
 ---
-title: Jx Studio — the visual IDE for the web. Free & open source.
+title: "Jx Studio: the visual IDE for the web. Free & open source."
 $head:
   - tagName: meta
     attributes:
       name: description
       content: Jx Studio is a free, open-source visual IDE for building real websites
-        and web apps — design on a canvas, edit content, wire up logic, and commit
+        and web apps. Design on a canvas, edit content, wire up logic, and commit
         to git. Every change saves as plain files you own forever.
   - tagName: meta
     attributes:
       property: og:title
-      content: Jx Studio — the visual IDE for the web.
+      content: "Jx Studio: the visual IDE for the web."
   - tagName: meta
     attributes:
       property: og:description
@@ -45,7 +45,7 @@ Build websites visually.\
 :::
 
 :::p{style.fontSize="clamp(1.0625rem, 2vw, 1.3125rem)" style.color="var(--color-text-secondary)" style.lineHeight="1.7" style.margin="0 auto 1rem" style.maxWidth="680px"}
-Jx Studio is a desktop visual IDE for building real websites and web apps. Design on a canvas, edit content inline, wire up interactivity, and commit to git — without leaving the app. Every change saves as plain JSON and Markdown you keep forever.
+Jx Studio is a desktop visual IDE for building real websites and web apps. Design on a canvas, edit content inline, wire up interactivity, and commit to git, without leaving the app. Every change saves as plain JSON and Markdown you keep forever.
 :::
 
 :::p{style.fontSize="1rem" style.color="var(--color-text-muted)" style.margin="0 auto 2.5rem" style.maxWidth="600px" style.fontFamily="var(--font-mono)" style.letterSpacing="0.02em"}
@@ -63,7 +63,7 @@ Free forever · macOS, Windows & Linux · or `bun create @jxsuite my-site`
 :::
 
 :::div{style.maxWidth="960px" style.margin="0 auto"}
-::img{style.display="block" style.width="100%" style.height="auto" style.borderRadius="var(--radius-lg)" style.border="1px solid var(--color-border)" style.boxShadow="0 24px 64px rgba(0, 0, 0, 0.45)" src="/content/docs/images/hero.png" width="3840" height="2400" alt="Jx Studio editing a website — layers panel, live canvas, and element inspector" loading="eager" decoding="async"}
+::img{style.display="block" style.width="100%" style.height="auto" style.borderRadius="var(--radius-lg)" style.border="1px solid var(--color-border)" style.boxShadow="0 24px 64px rgba(0, 0, 0, 0.45)" src="/content/docs/images/hero.png" width="3840" height="2400" alt="Jx Studio editing a website: layers panel, live canvas, and element inspector" loading="eager" decoding="async"}
 :::
 ::::
 :::::
@@ -78,7 +78,7 @@ One window. The whole website.
 :::
 
 :::p{style.color="var(--color-text-secondary)" style.maxWidth="600px" style.margin="0 auto" style.fontSize="1.0625rem" style.lineHeight="1.7"}
-From the first file to the final commit — organize, write, design, and wire up interactivity, all on one canvas.
+From the first file to the final commit: organize, write, design, and wire up interactivity, all on one canvas.
 :::
 ::::
 
@@ -100,17 +100,17 @@ The visual builder that doesn't own your files.
 :::
 
 :::p{style.color="var(--color-text-secondary)" style.fontSize="1.0625rem" style.lineHeight="1.7" style.margin="0 0 2rem"}
-Most visual builders trap your work in a proprietary format you can't read, can't version, and can't leave. Jx Studio reads and writes the same JSON and Markdown files you'd write by hand. Close the app — your site is still there, still readable, still yours.
+Most visual builders trap your work in a proprietary format you can't read, can't version, and can't leave. Jx Studio reads and writes the same JSON and Markdown files you'd write by hand. Close the app and your site is still there, still readable, still yours.
 :::
 
 :::div{style.display="flex" style.flexDirection="column" style.gap="0.75rem"}
-::check-item{props.text="Opens any Jx project from disk — no import step"}
+::check-item{props.text="Opens any Jx project from disk, with no import step"}
 
-::check-item{props.text="Saves standard JSON and Markdown — readable by any tool"}
+::check-item{props.text="Saves standard JSON and Markdown, readable by any tool"}
 
-::check-item{props.text="Works offline — no cloud service, no Jx account"}
+::check-item{props.text="Works offline: no cloud service, no Jx account"}
 
-::check-item{props.text="Git-friendly output — clean diffs, no binary blobs"}
+::check-item{props.text="Git-friendly output: clean diffs, no binary blobs"}
 :::
 ::::
 
@@ -125,7 +125,7 @@ Most visual builders trap your work in a proprietary format you can't read, can'
 
 :::div{style.padding="1.5rem" style.borderRadius="var(--radius)" style.border="1px solid var(--color-border)" style.backgroundColor="var(--color-bg-surface)"}
 :span[Servers optional]{style.display="block" style.fontFamily="var(--font-mono)" style.fontSize="0.6875rem" style.letterSpacing="0.1em" style.textTransform="uppercase" style.color="var(--color-accent)" style.marginBottom="0.75rem"}
-:span[Static HTML on a global CDN by default — fast everywhere, costs pennies, online forever. Need accounts or a database? Add the auth and connector extensions and pick a server adapter; the build emits one small worker beside the pages. The pages stay prerendered, so the logged-in view renders in the browser.]{style.fontSize="0.9375rem" style.lineHeight="1.6" style.color="var(--color-text-secondary)"}
+:span[Static HTML on a global CDN by default: fast everywhere, costs pennies, online forever. Need accounts or a database? Add the auth and connector extensions and pick a server adapter; the build emits one small worker beside the pages. The pages stay prerendered, so the logged-in view renders in the browser.]{style.fontSize="0.9375rem" style.lineHeight="1.6" style.color="var(--color-text-secondary)"}
 :::
 ::::
 :::::
@@ -152,7 +152,7 @@ Webflow and Wix give you a canvas but keep your work. Astro and Hugo give you th
 :::div{style.display="grid" style.gridTemplateColumns="repeat(auto-fit, minmax(200px, 1fr))" style.gap="1rem"}
 ::stat-card{props.value="0kb" props.label="JavaScript on static pages by default"}
 
-::stat-card{props.value="$0" props.label="License cost — MIT, no subscription"}
+::stat-card{props.value="$0" props.label="License cost: MIT, no subscription"}
 
 ::stat-card{props.value="MIT" props.label="Yours to fork, self-host, and keep"}
 
@@ -171,18 +171,18 @@ Studio is a window onto one idea: your site is JSON.
 :::
 
 :::p{style.color="var(--color-text-secondary)" style.maxWidth="620px" style.margin="0 auto" style.fontSize="1.0625rem" style.lineHeight="1.7"}
-Everything you design compiles from — and saves back to — plain JSON-DOM. Read it, hand-edit it, diff it, or generate it with an LLM. Studio and the compiler are two views of the same files.
+Everything you design compiles from plain JSON-DOM, and saves back to it. Read it, hand-edit it, diff it, or generate it with an LLM. Studio and the compiler are two views of the same files.
 :::
 ::::
 
 ::interactive-demo
 
 :::div{style.marginTop="3rem" style.display="grid" style.gridTemplateColumns="repeat(auto-fit, minmax(260px, 1fr))" style.gap="1rem"}
-::pillar-card{props.icon="📄" props.title="File-Based CMS" props.description="JSON documents and Markdown content. No content database, no admin panel. Git is your CMS — branch, merge, review, deploy." props.features="Content collections · Markdown + directives · Frontmatter schemas · Dynamic routes"}
+::pillar-card{props.icon="📄" props.title="File-Based CMS" props.description="JSON documents and Markdown content. No content database, no admin panel. Git is your CMS: branch, merge, review, deploy." props.features="Content collections · Markdown + directives · Frontmatter schemas · Dynamic routes"}
 
 ::pillar-card{props.icon="⚡" props.title="Reactive Framework" props.description="Fine-grained reactivity, web components, and template bindings. Interactive islands hydrate only where needed." props.features="Vue-powered reactivity · Web Components · Template literals · Zero JS by default"}
 
-::pillar-card{props.icon="🚀" props.title="Static Generator" props.description="Compiles to pure HTML, CSS, and minimal JS. Deploy to any static host — Cloudflare Pages, GitHub Pages, Vercel, or a $5 VPS." props.features="No JS on static pages · Image optimization · Cloudflare, Node & Bun adapters"}
+::pillar-card{props.icon="🚀" props.title="Static Generator" props.description="Compiles to pure HTML, CSS, and minimal JS. Deploy to any static host: Cloudflare Pages, GitHub Pages, Vercel, or a $5 VPS." props.features="No JS on static pages · Image optimization · Cloudflare, Node & Bun adapters"}
 
 ::pillar-card{props.icon="🔐" props.title="Accounts & Data" props.description="Sessions, sign-in, and per-table permissions from the auth extension. Database connections and CRUD tables from the connector extension. Secrets stay on the server." props.features="Better Auth sessions · D1, Supabase, SQLite · Server functions"}
 :::
@@ -210,9 +210,9 @@ Three steps to production.
 :::div{style.display="grid" style.gridTemplateColumns="repeat(3, 1fr)" style.gap="2rem" style.--md.gridTemplateColumns="1fr"}
 ::step-card{props.number="1" props.title="Author" props.description="Design visually in Studio, or hand-write JSON and Markdown. Every format is a plain file in git."}
 
-::step-card{props.number="2" props.title="Commit & push" props.description="Commit and sync straight from Studio's git panel — or the CLI. No deploy scripts to write."}
+::step-card{props.number="2" props.title="Commit & push" props.description="Commit and sync straight from Studio's git panel, or the CLI. No deploy scripts to write."}
 
-::step-card{props.number="3" props.title="Go live" props.description="Your host builds on push — Cloudflare, GitHub Pages, a Node or Bun adapter, or any static server. Live on a CDN in seconds."}
+::step-card{props.number="3" props.title="Go live" props.description="Your host builds on push: Cloudflare, GitHub Pages, a Node or Bun adapter, or any static server. Live on a CDN in seconds."}
 :::
 :::::
 ::::::

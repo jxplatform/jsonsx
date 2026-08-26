@@ -766,6 +766,69 @@ describe("buildAttrs", () => {
     );
     expect(result).toContain('data-color="blue"');
   });
+
+  test("omits an attribute whose value is boolean false", () => {
+    expect(buildAttrs({ attributes: { open: false } }, null)).toBe("");
+  });
+
+  test("emits a boolean-true attribute bare", () => {
+    expect(buildAttrs({ attributes: { open: true } }, null)).toBe(" open");
+  });
+
+  // The two directions of the same rule: presence carries a boolean attribute, text carries an
+  // Enumerated one. `aria-current="false"` is the docs sidebar's own not-the-current-page marker.
+  test('keeps a string "false" as a value', () => {
+    const result = buildAttrs({ attributes: { "aria-current": "false" } }, null);
+    expect(result).toBe(' aria-current="false"');
+  });
+
+  test("resolves a template to a boolean and omits it when false", () => {
+    const scope = buildInitialScope({ url: "/docs/studio/" });
+    const open = "${state.url.startsWith('/docs/framework/')}";
+    expect(buildAttrs({ attributes: { open } }, scope)).toBe("");
+  });
+
+  test("resolves a template to a boolean and emits it bare when true", () => {
+    const scope = buildInitialScope({ url: "/docs/studio/design/" });
+    const open = "${state.url.startsWith('/docs/studio/')}";
+    expect(buildAttrs({ attributes: { open } }, scope)).toBe(" open");
+  });
+
+  /*
+   * The other family. ARIA has no presence attributes at all — every `aria-*` is enumerated and
+   * reads an empty value as unset, so a bare `aria-hidden` is NOT hidden and writing one that way
+   * is the `open="false"` defect pointed the other direction.
+   */
+  test("an aria-* boolean is written as text, both ways", () => {
+    expect(buildAttrs({ attributes: { "aria-hidden": true } }, null)).toBe(' aria-hidden="true"');
+    expect(buildAttrs({ attributes: { "aria-expanded": false } }, null)).toBe(
+      ' aria-expanded="false"',
+    );
+  });
+
+  test("the enumerated HTML three are text, so false stays explicit", () => {
+    // `contenteditable` absent means "inherit"; only the written word means false.
+    expect(buildAttrs({ attributes: { contenteditable: false } }, null)).toBe(
+      ' contenteditable="false"',
+    );
+    expect(buildAttrs({ attributes: { draggable: false } }, null)).toBe(' draggable="false"');
+    expect(buildAttrs({ attributes: { spellcheck: true } }, null)).toBe(' spellcheck="true"');
+  });
+
+  test("an aria-* template resolving to a boolean keeps the word", () => {
+    const scope = buildInitialScope({ url: "/docs/studio/" });
+    const expanded = "${state.url.startsWith('/docs/studio/')}";
+    expect(buildAttrs({ attributes: { "aria-expanded": expanded } }, scope)).toBe(
+      ' aria-expanded="true"',
+    );
+  });
+
+  test("attribute names are matched case-insensitively", () => {
+    expect(buildAttrs({ attributes: { "ARIA-HIDDEN": true } }, null)).toBe(' ARIA-HIDDEN="true"');
+    expect(buildAttrs({ attributes: { contentEditable: false } }, null)).toBe(
+      ' contentEditable="false"',
+    );
+  });
 });
 
 // ─── buildInner ────────────────────────────────────────────────────────────

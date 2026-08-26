@@ -22,10 +22,10 @@ A project's effective schema is a plain JSON Schema 2020-12 document composed fr
 
 Two kinds of fragment feed the composition:
 
-- **Core** ships `@jxsuite/schema/schemas/project.core.schema.json`: the core project properties (`name`, `url`, `build`, `imports`, `extensions`, …) plus two published `$defs` — `JxFieldSchema` (the JSON-Schema-subset field shape used by content and table schemas) and `RelationshipRef` (see [Relationships](/docs/framework/site/relationships)). The core fragment is **open** — closure happens in the generated entry document.
+- **Core** ships `@jxsuite/schema/schemas/project.core.schema.json`: the core project properties (`name`, `url`, `build`, `imports`, `extensions`, …) plus two published `$defs`, `JxFieldSchema` (the JSON-Schema-subset field shape used by content and table schemas) and `RelationshipRef` (see [Relationships](/docs/framework/site/relationships)). The core fragment is **open**. Closure happens in the generated entry document.
 - **Each extension** ships the fragments named in its [manifest](/docs/extending/extensions/anatomy)'s `schemas` map. A project fragment contributes plain `properties` for its section keys. Fragments must be standalone-valid 2020-12 documents with their own `$id`.
 
-The parser's project fragment, abbreviated — it contributes the `content` section:
+The parser's project fragment contributes the `content` section, abbreviated here:
 
 ```json
 {
@@ -55,11 +55,11 @@ The parser's project fragment, abbreviated — it contributes the `content` sect
 }
 ```
 
-Note the one non-local reference: field-schema positions point at the canonical URI `https://jxsuite.com/schema/project/fields/v2` rather than a local shape. That is the open recursion point described below.
+Note the one non-local reference: field-schema positions point at the canonical URI `https://jxsuite.com/schema/project/fields/v2`. That is the open recursion point described below.
 
 ## Generated entry documents
 
-`jx schema` writes two committed files into the project root, composing core with every fragment listed by the project's `extensions`. Both files are **self-contained single-resource schemas**: every referenced resource is embedded under `$defs`, and every `$ref` is a root-relative JSON Pointer into the same file — no relative `./node_modules/…` paths and no canonical URIs, so every editor and validator resolves them offline and identically. The generated `project.schema.json` of a project using only the parser (embedded resource bodies elided):
+`jx schema` writes two committed files into the project root, composing core with every fragment listed by the project's `extensions`. Both files are **self-contained single-resource schemas**: every referenced resource is embedded under `$defs`, and every `$ref` is a root-relative JSON Pointer into the same file, with no relative `./node_modules/…` paths and no canonical URIs, so every editor and validator resolves them offline and identically. The generated `project.schema.json` of a project using only the parser (embedded resource bodies elided):
 
 ```json
 {
@@ -81,9 +81,9 @@ Note the one non-local reference: field-schema positions point at the canonical 
 }
 ```
 
-Top-level section keys combine via `allOf` + `unevaluatedProperties: false` — 2020-12 `unevaluatedProperties` sees annotations from adjacent `allOf` branches, so the entry document closes the object without any fragment needing to know its siblings. A misspelled or un-contributed top-level key fails validation.
+Top-level section keys combine via `allOf` + `unevaluatedProperties: false`. In 2020-12, `unevaluatedProperties` sees annotations from adjacent `allOf` branches, so the entry document closes the object without any fragment needing to know its siblings. A misspelled or un-contributed top-level key fails validation.
 
-Each `$defs` key is a slug of the embedded resource's `$id` — `https://jxsuite.com/schema/project/core/v2` becomes `project-core-v2`.
+Each `$defs` key is a slug of the embedded resource's `$id`: `https://jxsuite.com/schema/project/core/v2` becomes `project-core-v2`.
 
 `document.schema.json` is the same move for documents: the core document schema embedded as `#/$defs/v1` and referenced through `"allOf": [{ "$ref": "#/$defs/v1" }]`, with the paths union resource re-embedded as the union of extension-contributed `$paths` shapes (the parser contributes `ContentPathsSource` from its document fragment).
 
@@ -98,38 +98,38 @@ Two positions are **open recursion points** where a fragment must reference the 
 | `https://jxsuite.com/schema/project/fields/v2` | Field-schema values inside section entry schemas (content frontmatter fields, table columns). | Core `JxFieldSchema` + `RelationshipRef`; the entry adds extension field extras.                                       |
 | `https://jxsuite.com/schema/document/paths/v2` | The `$paths` value of a document.                                                             | Core source shapes plus an unknown-source branch; the entry drops that branch and unions each extension's paths shape. |
 
-The mechanism is **`$id` shadowing**: core ships a default resource under each well-known `$id`, and the generated entry document re-embeds the same `$id` with the effective union — outermost wins, with plain `$ref`s and no jx-specific runtime. Fragments just write `{ "$ref": "https://jxsuite.com/schema/project/fields/v2" }` at field positions; no local fallbacks needed.
+The mechanism is **`$id` shadowing**: core ships a default resource under each well-known `$id`, and the generated entry document re-embeds the same `$id` with the effective union. Outermost wins, with plain `$ref`s and no jx-specific runtime. Fragments just write `{ "$ref": "https://jxsuite.com/schema/project/fields/v2" }` at field positions; no local fallbacks needed.
 
-An entry embed **shadows** the shipped default rather than extending it, so it restates the core members — otherwise they would stop validating the moment an extension contributed one. The paths union is the one place the two differ: the shipped default also accepts "a source shape from an extension I cannot see", because a default has no way to know which extensions a project enables and would otherwise report `{ "contentType": "blog" }` as an error. Your generated `document.schema.json` knows, so it drops that branch and checks `$paths` exactly — a misspelled `contentType`, or a source belonging to an extension you have not enabled, is an error instead of a route that silently builds zero pages. The override is settled while the entry document is generated, not while it is validated: each canonical-`$id` reference is rewritten to the root pointer of the entry's own embed, so the committed file states the winner outright.
+An entry embed **shadows** the shipped default rather than extending it, so it restates the core members; otherwise they would stop validating the moment an extension contributed one. The paths union is the one place the two differ: the shipped default also accepts "a source shape from an extension I cannot see", because a default has no way to know which extensions a project enables and would otherwise report `{ "contentType": "blog" }` as an error. Your generated `document.schema.json` knows, so it drops that branch and checks `$paths` exactly. A misspelled `contentType`, or a source belonging to an extension you have not enabled, is an error instead of a route that silently builds zero pages. The override is settled while the entry document is generated, not while it is validated: each canonical-`$id` reference is rewritten to the root pointer of the entry's own embed, so the committed file states the winner outright.
 
 :::doc-note
-`$dynamicRef` looks like the textbook fit, but ajv 8.x supports `$dynamicAnchor` only at schema-resource roots — and the recursion unit here (a field schema) is not the document root. `$id` shadowing achieves the identical outermost-wins override; the behavior is verified against ajv in `packages/schema/tests/project-schemas.test.ts`.
+`$dynamicRef` looks like the textbook fit, but ajv 8.x supports `$dynamicAnchor` only at schema-resource roots, and the recursion unit here (a field schema) is not the document root. `$id` shadowing achieves the identical outermost-wins override; the behavior is verified against ajv in `packages/schema/tests/project-schemas.test.ts`.
 :::
 
 ## Validation
 
 - Every consumer resolves the committed entry documents offline **with no file access at all**: each `$ref` is a root-relative JSON Pointer into the same document. No `node_modules`, no network, no editor configuration.
-- `jx validate` **reads**; `jx schema` writes. If a committed entry document is out of date, validation composes a fresh one in memory and reports against that, leaving the file on disk exactly as it is — a checker that edits what it is checking cannot tell you your repository is wrong.
+- `jx validate` **reads**; `jx schema` writes. If a committed entry document is out of date, validation composes a fresh one in memory and reports against that, leaving the file on disk exactly as it is, because a checker that edits what it is checking cannot tell you your repository is wrong.
 - `jx validate` validates the whole project tree: both committed entry documents for self-containment (any `$ref` that is a relative path, a URI, or a pointer to nothing fails), `project.json` against `./project.schema.json`, every component/page/layout against the bundled document schema, every project-local `*.class.json` against the class schema, and each fragment standalone. CI runs this over every project root in the repo.
-- Where a client fetches the canonical URLs instead (they are served from jxsuite.com), it gets the shipped defaults — the degradation is _under-suggestion_ of extension field extras, never false errors.
+- Where a client fetches the canonical URLs instead (they are served from jxsuite.com), it gets the shipped defaults. The degradation is _under-suggestion_ of extension field extras, never false errors.
 
 :::doc-note
-Root pointers rather than a `$id`-keyed compound document, because VS Code's JSON language service — which Monaco embeds, so this covers Studio too — implements neither half of compound-document resolution. It resolves `#/…` against the document root instead of the enclosing `$id`, and it fetches anything with a URI before the `#` over the network rather than matching the resource embedded in the same file. Root pointers sidestep both and cost nothing under ajv.
+Root pointers, in place of a `$id`-keyed compound document, because VS Code's JSON language service (which Monaco embeds, so this covers Studio too) implements neither half of compound-document resolution. It resolves `#/…` against the document root instead of the enclosing `$id`. It fetches anything with a URI before the `#` over the network, leaving the resource embedded in the same file unmatched. Root pointers sidestep both and cost nothing under ajv.
 :::
 
 ## Where core comes from
 
-A `@jxsuite/*` schema ref is always read from the **host** — the workspace running the generator — before any file sitting at the same path inside your project. Your own extension fragments keep resolving from the project, which is what the loader is for; what a project may not do is answer for the Jx core itself. If the host has no such package, composition stops and names the ref, rather than falling back.
+A `@jxsuite/*` schema ref is always read from the **host** (the workspace running the generator) before any file sitting at the same path inside your project. Your own extension fragments keep resolving from the project, which is what the loader is for; what a project may not do is answer for the Jx core itself. If the host has no such package, composition stops and names the ref, rather than falling back.
 
-**This covers extensions too, not only core.** `@jxsuite/parser`, `@jxsuite/auth`, `@jxsuite/connector` and `@jxsuite/search` are first-party by the same rule, so their fragments are read from the host as well. The practical consequence: **the host must ship every extension your project enables.** Installing one into the project does not help — the loader will not read it from there.
+**This covers extensions too, not only core.** `@jxsuite/parser`, `@jxsuite/auth`, `@jxsuite/connector` and `@jxsuite/search` are first-party by the same rule, so their fragments are read from the host as well. The practical consequence: **the host must ship every extension your project enables.** Installing one into the project does not help, because the loader will not read it from there.
 
-That refusal is deliberate. A starter pins published `@jxsuite/*` versions, so opening one in Studio installs a real `@jxsuite/schema` right beside a much newer workspace. When the project-local copy was allowed to win, one starter's committed `document.schema.json` was composed from a core nine minor versions behind — not just stale but **narrower than the starter's own content**, dropping the computed-children branch so that the starter's own pages failed to validate against its own schema. It went unnoticed for six weeks, because the file was only ever regenerated on the one machine with the stray install.
+That refusal is deliberate. A starter pins published `@jxsuite/*` versions, so opening one in Studio installs a real `@jxsuite/schema` right beside a much newer workspace. When the project-local copy was allowed to win, one starter's committed `document.schema.json` was composed from a core nine minor versions behind: not just stale but **narrower than the starter's own content**, dropping the computed-children branch so that the starter's own pages failed to validate against its own schema. It went unnoticed for six weeks, because the file was only ever regenerated on the one machine with the stray install.
 
 :::doc-tip
 If composition fails with _"must resolve from the host workspace and does not"_, read which package the message names.
 
-- **`@jxsuite/schema` or another core package** — you are running the generator somewhere that has no core on its resolution path. Install it in the workspace you are running from, rather than in the project being generated.
-- **An extension** (`@jxsuite/parser` and friends) — the host does not ship that extension. Installing it into the project will not fix it, because the loader refuses to read a first-party schema from there. Either use a host build that includes the extension, or drop it from the project's `extensions` list.
+- **`@jxsuite/schema` or another core package**: you are running the generator somewhere that has no core on its resolution path. Install it in the workspace you are running from, and not in the project being generated.
+- **An extension** (`@jxsuite/parser` and friends): the host does not ship that extension. Installing it into the project will not fix it, because the loader refuses to read a first-party schema from there. Either use a host build that includes the extension, or drop it from the project's `extensions` list.
 
 In Studio the failure is not fatal: it falls back to the bundled core schemas and says so in the log. `project.json` and your documents still validate against core; what you lose is the fields each enabled extension contributes.
 :::
@@ -141,11 +141,11 @@ Run [`jx schema`](/docs/framework/build/cli) whenever the `extensions` list chan
 - Studio regenerates the entry documents when settings are saved.
 - The dev server's Studio API regenerates them on demand when they are missing or older than `project.json`, serving the same self-contained single-resource form to the browser (Monaco registers them as inline objects and never resolves a ref itself).
 
-The outputs are committed artifacts — check `project.schema.json` and `document.schema.json` into the repo so editors and CI validate without a build step.
+The outputs are committed artifacts. Check `project.schema.json` and `document.schema.json` into the repo so editors and CI validate without a build step.
 
 ## Related
 
-- [CLI commands](/docs/framework/build/cli) — `jx schema` and `jx validate`
-- [Extension anatomy](/docs/extending/extensions/anatomy) — where fragments are declared
-- [project.json](/docs/framework/site/project-json) — the document being validated
-- [Project sections and settings](/docs/extending/extensions/project-sections) — the behavior side of a contributed section
+- [CLI commands](/docs/framework/build/cli): `jx schema` and `jx validate`
+- [Extension anatomy](/docs/extending/extensions/anatomy): where fragments are declared
+- [project.json](/docs/framework/site/project-json): the document being validated
+- [Project sections and settings](/docs/extending/extensions/project-sections): the behavior side of a contributed section

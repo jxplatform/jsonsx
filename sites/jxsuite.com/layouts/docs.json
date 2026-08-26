@@ -118,22 +118,28 @@
               "children": [
                 {
                   "$prototype": "Array",
-                  "items": { "$ref": "#/state/nav/data/sections" },
+                  "items": {
+                    "$ref": "#/state/nav/data/sections"
+                  },
                   "map": {
-                    "tagName": "div",
-                    "attributes": { "class": "nav-section" },
+                    "tagName": "details",
+                    "attributes": {
+                      "class": "nav-section",
+                      "open": "${(state.$page.url.endsWith('/') ? state.$page.url : state.$page.url + '/').startsWith('/docs/' + item.path + '/')}"
+                    },
                     "children": [
                       {
-                        "tagName": "a",
+                        "tagName": "summary",
                         "attributes": {
-                          "class": "nav-section-label",
-                          "href": "/docs/${item.path}/"
+                          "class": "nav-section-label"
                         },
                         "textContent": "${item.label}"
                       },
                       {
                         "$prototype": "Array",
-                        "items": { "$ref": "$map/item/children" },
+                        "items": {
+                          "$ref": "$map/item/pages"
+                        },
                         "map": {
                           "tagName": "a",
                           "attributes": {
@@ -142,6 +148,43 @@
                             "aria-current": "${(state.$page.url.endsWith('/') ? state.$page.url.slice(0, -1) : state.$page.url) === '/docs/' + item.path ? 'page' : 'false'}"
                           },
                           "textContent": "${item.label}"
+                        }
+                      },
+                      {
+                        "$prototype": "Array",
+                        "items": {
+                          "$ref": "$map/item/groups"
+                        },
+                        "map": {
+                          "tagName": "details",
+                          "attributes": {
+                            "class": "nav-group",
+                            "open": "${item.pages.some((page) => '/docs/' + page.path + '/' === (state.$page.url.endsWith('/') ? state.$page.url : state.$page.url + '/'))}"
+                          },
+                          "children": [
+                            {
+                              "tagName": "summary",
+                              "attributes": {
+                                "class": "nav-group-label"
+                              },
+                              "textContent": "${item.label}"
+                            },
+                            {
+                              "$prototype": "Array",
+                              "items": {
+                                "$ref": "$map/item/pages"
+                              },
+                              "map": {
+                                "tagName": "a",
+                                "attributes": {
+                                  "class": "nav-link",
+                                  "href": "/docs/${item.path}/",
+                                  "aria-current": "${(state.$page.url.endsWith('/') ? state.$page.url.slice(0, -1) : state.$page.url) === '/docs/' + item.path ? 'page' : 'false'}"
+                                },
+                                "textContent": "${item.label}"
+                              }
+                            }
+                          ]
                         }
                       }
                     ]
@@ -233,24 +276,28 @@
           "children": [
             {
               "$prototype": "Array",
-              "items": { "$ref": "#/state/nav/data/sections" },
+              "items": {
+                "$ref": "#/state/nav/data/sections"
+              },
               "map": {
-                "tagName": "div",
-                "attributes": { "class": "nav-section" },
+                "tagName": "details",
+                "attributes": {
+                  "class": "nav-section",
+                  "open": "${(state.$page.url.endsWith('/') ? state.$page.url : state.$page.url + '/').startsWith('/docs/' + item.path + '/')}"
+                },
                 "children": [
                   {
-                    "tagName": "a",
+                    "tagName": "summary",
                     "attributes": {
-                      "class": "nav-section-label",
-                      "href": "/docs/${item.path}/",
-                      "popovertarget": "docs-mobile-nav",
-                      "popovertargetaction": "hide"
+                      "class": "nav-section-label"
                     },
                     "textContent": "${item.label}"
                   },
                   {
                     "$prototype": "Array",
-                    "items": { "$ref": "$map/item/children" },
+                    "items": {
+                      "$ref": "$map/item/pages"
+                    },
                     "map": {
                       "tagName": "a",
                       "attributes": {
@@ -261,6 +308,45 @@
                         "popovertargetaction": "hide"
                       },
                       "textContent": "${item.label}"
+                    }
+                  },
+                  {
+                    "$prototype": "Array",
+                    "items": {
+                      "$ref": "$map/item/groups"
+                    },
+                    "map": {
+                      "tagName": "details",
+                      "attributes": {
+                        "class": "nav-group",
+                        "open": "${item.pages.some((page) => '/docs/' + page.path + '/' === (state.$page.url.endsWith('/') ? state.$page.url : state.$page.url + '/'))}"
+                      },
+                      "children": [
+                        {
+                          "tagName": "summary",
+                          "attributes": {
+                            "class": "nav-group-label"
+                          },
+                          "textContent": "${item.label}"
+                        },
+                        {
+                          "$prototype": "Array",
+                          "items": {
+                            "$ref": "$map/item/pages"
+                          },
+                          "map": {
+                            "tagName": "a",
+                            "attributes": {
+                              "class": "nav-link",
+                              "href": "/docs/${item.path}/",
+                              "aria-current": "${(state.$page.url.endsWith('/') ? state.$page.url.slice(0, -1) : state.$page.url) === '/docs/' + item.path ? 'page' : 'false'}",
+                              "popovertarget": "docs-mobile-nav",
+                              "popovertargetaction": "hide"
+                            },
+                            "textContent": "${item.label}"
+                          }
+                        }
+                      ]
                     }
                   }
                 ]

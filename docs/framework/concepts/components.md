@@ -10,13 +10,13 @@ code:
 
 # Components
 
-> **Studio writes this format for you.** This page documents the underlying JSON — useful when you want to hand-edit a file, review a diff, or understand what the visual tools produce.
+> **Studio writes this format for you.** This page documents the underlying JSON, which is useful when you want to hand-edit a file, review a diff, or understand what the visual tools produce.
 
 A Jx component is a single `.json` file. All state, computed values, and functions are declared in `state`. Simple components need no sidecar file.
 
-## Self-Describing Components
+## A component is one file
 
-```
+```json
 {
   "$id": "Counter",
   "state": {
@@ -34,23 +34,23 @@ A Jx component is a single `.json` file. All state, computed values, and functio
 }
 ```
 
-## State Shapes
+## The four shapes of a state entry
 
-Every entry in `state` falls into one of four shapes, determinable by inspection:
+Every entry in `state` is one of four shapes, and you can tell which by looking at it. Nothing declares the shape; the entry's own structure decides.
 
-### Shape 1 — Naked Value
+### Shape 1: a naked value
 
 A JSON scalar, array, or plain object with no reserved keys:
 
-```
+```json
 { "state": { "count": 0, "name": "World", "tags": [] } }
 ```
 
-### Shape 2 — Typed Value
+### Shape 2: a typed value
 
 An object with a `default` property and optional `type`:
 
-```
+```json
 {
   "state": {
     "count": {
@@ -62,11 +62,11 @@ An object with a `default` property and optional `type`:
 }
 ```
 
-### Shape 3 — Computed (Template String)
+### Shape 3: a computed template string
 
 A string containing `${}` syntax:
 
-```
+```json
 {
   "state": {
     "fullName": "${state.firstName} ${state.lastName}",
@@ -75,11 +75,11 @@ A string containing `${}` syntax:
 }
 ```
 
-### Shape 4 — Prototype (`$prototype`)
+### Shape 4: a prototype (`$prototype`)
 
 An object with `$prototype` for functions and data sources:
 
-```
+```json
 {
   "state": {
     "increment": {
@@ -95,11 +95,11 @@ An object with `$prototype` for functions and data sources:
 }
 ```
 
-## External Sidecars
+## External sidecars
 
 When functions grow complex, extract them to a `.js` file:
 
-```
+```json
 {
   "state": {
     "increment": { "$prototype": "Function", "$src": "./counter.js" },
@@ -108,7 +108,7 @@ When functions grow complex, extract them to a `.js` file:
 }
 ```
 
-```
+```js
 export function increment(state) {
   state.count++;
 }
@@ -117,13 +117,13 @@ export function decrement(state) {
 }
 ```
 
-The first parameter is always `state` — the component's reactive scope. `this` is never used.
+The first parameter is always `state`, the component's reactive scope. `this` is never used.
 
-## Custom Elements
+## Custom elements
 
 A component whose `tagName` contains a hyphen is a custom element:
 
-```
+```json
 {
   "tagName": "user-card",
   "state": {
@@ -146,7 +146,7 @@ sty-card .inner {
 ```
 
 :::doc-note
-This cuts both ways, and it's worth knowing which. Your page CSS **can** reach into a component and restyle it — handy when you want it, and the reason a stray global rule can change a component you didn't touch. There's no encapsulation boundary to stop either one.
+This cuts both ways. Your page CSS **can** reach into a component and restyle it, which is handy when you want it and the reason a stray global rule can change a component you didn't touch. There is no encapsulation boundary to stop either one.
 :::
 
 ## Opting into a shadow root
@@ -165,7 +165,7 @@ If you want that boundary, ask for it per component:
 }
 ```
 
-Or for the whole project, with `"defaults": { "shadow": "open" }` in `project.json`. A component's own `$shadow` always wins — including `"$shadow": false`, which is how you keep one component in the light DOM when everything else moved.
+Or for the whole project, with `"defaults": { "shadow": "open" }` in `project.json`. A component's own `$shadow` always wins, including `"$shadow": false`, which is how you keep one component in the light DOM when everything else moved.
 
 The build emits a **declarative shadow root**, so the component paints correctly before any JavaScript runs:
 
@@ -182,14 +182,14 @@ The build emits a **declarative shadow root**, so the component paints correctly
 
 ### What changes
 
-|                           | Light DOM (default)                      | `$shadow`              |
-| ------------------------- | ---------------------------------------- | ---------------------- |
-| Page CSS reaches in       | yes                                      | no                     |
-| `<slot>`                  | emulated — children are moved into place | real slot distribution |
-| Your styles are scoped by | the tag name                             | `:host`                |
-| Stylesheet lives in       | the page `<head>`                        | the shadow root        |
+|                           | Light DOM (default)                     | `$shadow`              |
+| ------------------------- | --------------------------------------- | ---------------------- |
+| Page CSS reaches in       | yes                                     | no                     |
+| `<slot>`                  | emulated: children are moved into place | real slot distribution |
+| Your styles are scoped by | the tag name                            | `:host`                |
+| Stylesheet lives in       | the page `<head>`                       | the shadow root        |
 
-**Slots are the difference that matters.** The light-DOM emulation _moves_ your children into the component's rendered tree. A real slot leaves them where they are and projects them — so they stay your page's children, your page's CSS still styles them, and the component reaches them with `::slotted()`.
+**Slots are the difference that matters.** The light-DOM emulation _moves_ your children into the component's rendered tree. A real slot leaves them where they are and projects them, so they stay your page's children, your page's CSS still styles them, and the component reaches them with `::slotted()`.
 
 :::doc-tip
 Write `:host` in your styles either way. In a shadow component it stays `:host`; in a light one the build turns it into the tag name, and `:host(.wide)` into `sd-card.wide`. That means the same style object works in both modes, so flipping `$shadow` doesn't silently break your CSS.
@@ -197,11 +197,11 @@ Write `:host` in your styles either way. In a shadow component it stays `:host`;
 
 `closed` works too, and means what the standard says: nothing outside can reach the root, not even your own scripts via `element.shadowRoot`. Use it when you mean it.
 
-## Props and Encapsulation
+## Props and encapsulation
 
-Props are passed via `$props` on an instance node — the only mechanism for crossing component boundaries. Register the component in `$elements` and instantiate it by its custom-element tag:
+Props are passed via `$props` on an instance node, which is the only mechanism for crossing component boundaries. Register the component in `$elements` and instantiate it by its custom-element tag:
 
-```
+```json
 {
   "$elements": { "my-card": { "$ref": "./card.json" } },
   "children": [

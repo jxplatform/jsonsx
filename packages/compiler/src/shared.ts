@@ -10,7 +10,9 @@ import {
   COLOR_SCHEME_ATTR,
   COLOR_SCHEME_STORAGE_KEY,
   RESERVED_KEYS,
+  booleanAttrValue,
   camelToKebab,
+  isSingleExpression,
   pureSchemeOf,
   resolveAtQuery,
   schemeSelectors,
@@ -55,7 +57,9 @@ export {
   COLOR_SCHEME_ATTR,
   COLOR_SCHEME_STORAGE_KEY,
   RESERVED_KEYS,
+  booleanAttrValue,
   camelToKebab,
+  isSingleExpression,
   pureSchemeOf,
   schemeSelectors,
   toCSSText,
@@ -781,37 +785,6 @@ function readsRuntimeOnlyState(str: string, scope: Record<string, unknown>) {
 }
 
 /**
- * Whether the whole string is exactly ONE `${…}` — the interpolation that opens at index 0 also
- * closes at the final character.
- *
- * A greedy `/^\$\{(.+)\}$/` also matched `"${a} / ${b}"`, spliced the interior into `return (a} /
- * ${b)`, and the SyntaxError became a silent null: the node rendered empty, and a `$head` entry
- * shipped its own template text. A brace-depth scan is exact where a tightened regex is not —
- * `"${`${a}-x`}"` is still one expression, and must keep returning a raw value.
- *
- * @param {string} str
- * @returns {boolean}
- */
-export function isSingleExpression(str: string): boolean {
-  if (!str.startsWith("${") || !str.endsWith("}")) {
-    return false;
-  }
-  let depth = 0;
-  for (let i = 1; i < str.length; i += 1) {
-    const c = str[i];
-    if (c === "{") {
-      depth += 1;
-    } else if (c === "}") {
-      depth -= 1;
-      if (depth === 0) {
-        return i === str.length - 1;
-      }
-    }
-  }
-  return false;
-}
-
-/**
  * @param {string} str
  * @param {Record<string, unknown>} scope
  * @returns {unknown}
@@ -927,10 +900,34 @@ export function buildAttrs(def: JxElement | JxMutableNode, scope: Record<string,
   if (def.attributes) {
     for (const [k, v] of Object.entries(def.attributes)) {
       const value = resolveStaticValue(v, scope);
+      /*
+       * A boolean is the attribute's PRESENCE or its text, depending on which family HTML puts the
+       * attribute in — `booleanAttrValue` owns that judgement, and the runtime asks it the same
+       * question so a prerendered page cannot change meaning as it hydrates.
+       *
+       * @docs framework/concepts/elements
+       *
+       * Stringifying a boolean emitted `open="false"`, and HTML reads a boolean attribute by
+       * Presence alone — so the author wrote "closed" and the page rendered open. Nor could the
+       * Template return nothing instead: `resolveDocTemplates` and `expandMapTemplate` both `?? v`,
+       * Which restores the raw `${…}` source on a null. Absence therefore has to be expressible
+       * HERE, and `false` is the only value that can mean it.
+       *
+       * A *string* is never reinterpreted, in either family. `"aria-current": "false"` is the docs
+       * Sidebar's own not-the-current-page marker, and second-guessing it would be this same defect
+       * Pointed the other way.
+       */
+      if (typeof value === "boolean") {
+        const text = booleanAttrValue(k, value);
+        if (text !== null) {
+          out += text === "" ? ` ${k}` : ` ${k}="${escapeHtml(text)}"`;
+        }
+        continue;
+      }
       if (
         value !== null &&
         value !== undefined &&
-        (typeof value === "string" || typeof value === "number" || typeof value === "boolean")
+        (typeof value === "string" || typeof value === "number")
       ) {
         out += ` ${k}="${escapeHtml(String(value))}"`;
       }

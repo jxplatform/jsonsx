@@ -19,7 +19,7 @@ void mock.module("../src/packages.ts", () => ({
   bunExecutable: () => "bun",
   dependenciesNeedInstall: () => false,
   installDependencies: () => Promise.reject(new Error("install exploded")),
-  outdatedPackages: () => Promise.reject(new Error("outdated exploded")),
+  packageVersions: () => Promise.reject(new Error("versions exploded")),
   setPackageVersions: () => Promise.reject(new Error("set-versions exploded")),
 }));
 
@@ -79,12 +79,12 @@ describe("package operations — helper failures", () => {
     expect(payload.error).toContain("install exploded");
   });
 
-  test("outdated returns 500 when outdatedPackages rejects", async () => {
-    const { req, url } = getReq("/__studio/packages/outdated");
+  test("versions returns 500 when packageVersions rejects", async () => {
+    const { req, url } = getReq("/__studio/packages/versions");
     const res = await callApi(req, url);
     expect(res.status).toBe(500);
     const payload = (await res.json()) as { error: string };
-    expect(payload.error).toContain("outdated exploded");
+    expect(payload.error).toContain("versions exploded");
   });
 
   test("set-versions returns 500 when setPackageVersions rejects", async () => {

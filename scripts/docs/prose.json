@@ -1,0 +1,148 @@
+{
+  "$comment": "Rules for scripts/docs/check-prose.ts. A `ban` is wrong every time it appears and an exception needs an allow entry stating the fact that makes it one. A `budget` is per-file DEBT that may only fall: above the entry fails, below it also fails, and `--ratchet` prints the corrected map. Each rewrite deletes its files' entries; when the map empties, the rule becomes a ban and the map goes away. Cadence measures the style guide leaves to a person (sentence length, `rather than`, bold labels, forced triples) are deliberately absent and printed by --report instead.",
+  "rules": [
+    {
+      "id": "em-dash",
+      "tier": "ban",
+      "regex": "[\\u2014\\u2015]",
+      "hint": "Rewrite it away: move a list behind a colon, split the sentence, or use a comma or parentheses. See docs/extending/contributing/docs.md."
+    },
+    {
+      "id": "en-dash",
+      "tier": "ban",
+      "regex": "\\u2013",
+      "hint": "An en dash between numbers or key names is a range and is allowed. Anywhere else, rewrite it."
+    },
+    {
+      "id": "curly-quote",
+      "tier": "ban",
+      "regex": "[\\u2018\\u2019\\u201C\\u201D]",
+      "hint": "Use straight quotes. Curly ones arrive from a word processor, not from this repo."
+    },
+    {
+      "id": "emoji",
+      "tier": "ban",
+      "regex": "\\p{Extended_Pictographic}\\uFE0F?",
+      "flags": "u",
+      "hint": "No decorative emoji. A glyph the app itself draws is a UI label and needs an allow entry saying so."
+    },
+    {
+      "id": "chatbot-residue",
+      "tier": "ban",
+      "regex": "I hope this helps|Let me know if|Would you like me to|Certainly!|Great question|You're absolutely right|without further ado|Here's what you need to know",
+      "flags": "i",
+      "hint": "Chatbot framing left in the page. Delete it."
+    },
+    {
+      "id": "neg-parallel",
+      "tier": "ban",
+      "regex": "[Ii]t's not (just|only|merely)|\\b(does|do|did|is|are|was|were)n't (just|only|merely)\\b[^.]{0,70}\\bbut\\b|[Nn]ot only\\b[^.]{0,60},\\s*but\\b|isn't (just )?about[^.]{0,40}\\.\\s*It's about|^No \\w+\\.\\s*No \\w+\\.",
+      "hint": "Negative parallelism (\"it's not just X, it's Y\") is the most-cited AI structure there is. State the claim directly."
+    },
+    {
+      "id": "stock-heading",
+      "tier": "ban",
+      "regex": "^(Conclusion|Summary|In summary|Key takeaways|Takeaways|Challenges|Future outlook|Final thoughts|TL;DR)\\b",
+      "contexts": ["heading"],
+      "hint": "An essay-shaped section heading. Say what the section is about instead."
+    },
+    {
+      "id": "ai-vocab",
+      "tier": "ban",
+      "regex": "\\b(delve|delves|delving|seamless|seamlessly|comprehensive|holistic|intricate|intricacies|cutting-edge|groundbreaking|transformative|tapestry|testament|pivotal|crucial|vital|realm|landscape|underscore|underscores|underscoring|showcases|showcasing)\\b|(?<![-\\w])robust\\b|\\bshed light\\b|\\bpave the way\\b|\\bat its core\\b|\\bworth noting\\b|\\bin order to\\b|\\bdue to the fact\\b|\\bhas the ability to\\b|\\bwhen it comes to\\b|\\blet's (dive|explore|break)\\b|\\bleverag(e|es|ing|ed)\\s|\\bfoster(s|ing|ed)?\\s+(a|an|the)\\b",
+      "flags": "i",
+      "hint": "A word AI writing reaches for far more often than people do. Say the plain thing."
+    }
+  ],
+  "budgets": {},
+  "allow": [
+    {
+      "id": "en-dash",
+      "file": "docs/extending/contributing/docs.md",
+      "text": "Do not use em dashes",
+      "reason": "The rule showing the character it bans. The mark is being named here, not used."
+    },
+    {
+      "id": "ai-vocab",
+      "file": "docs/extending/contributing/docs.md",
+      "text": "Do not tell the reader what to think",
+      "reason": "The rule quoting the phrases it bans, so the guide can name them."
+    },
+    {
+      "id": "ai-vocab",
+      "file": "docs/extending/embedding/platform-adapter.md",
+      "text": "not reachable from that realm",
+      "evidence": "specs/studio.md",
+      "reason": "A JavaScript realm, the HTML spec's term for the iframe's global scope, not the filler noun."
+    },
+    {
+      "id": "emoji",
+      "file": "docs/studio/interface/problems-and-progress.md",
+      "text": "count in the status bar",
+      "reason": "The glyph Studio draws in the status bar. The page is naming a control, not decorating a heading."
+    },
+    {
+      "id": "emoji",
+      "file": "docs/framework/site/i18n.md",
+      "text": "lang=\"fr-CA\"",
+      "reason": "The result column of the locale-matching table, using the app's own status glyphs."
+    },
+    {
+      "id": "emoji",
+      "file": "docs/framework/site/i18n.md",
+      "text": "default locale, with a warning",
+      "reason": "The same table's warning row."
+    },
+    {
+      "id": "ai-vocab",
+      "file": "PROSE-REWRITE.md",
+      "text": "there is not one hit for",
+      "reason": "The audit naming the words the corpus does not contain. They are being counted, not used."
+    },
+    {
+      "id": "em-dash",
+      "file": "docs/studio/editing/frontmatter.md",
+      "text": "Nothing to flag",
+      "evidence": "packages/studio/src/panels/seo-modal.ts",
+      "reason": "Quoting the empty state Studio draws, verbatim, so a reader can match it against their screen."
+    },
+    {
+      "id": "em-dash",
+      "file": "docs/studio/projects/content-types.md",
+      "text": "this entry does not have one",
+      "evidence": "packages/studio/src/content/entry-editor.ts",
+      "reason": "Quoting the required-field error Studio writes, verbatim."
+    },
+    {
+      "id": "em-dash",
+      "file": "sites/README.md",
+      "text": "stale allow entry",
+      "evidence": "scripts/docs/check-site-claims.ts",
+      "reason": "Quoting the failure message check-site-claims.ts prints, verbatim."
+    },
+    {
+      "id": "emoji",
+      "file": "sites/jxsuite.com/pages/download.md",
+      "text": "🍎",
+      "reason": "The platform icon on the macOS download card. Site design, not prose decoration; removing it changes the page."
+    },
+    {
+      "id": "emoji",
+      "file": "sites/jxsuite.com/pages/download.md",
+      "text": "🪟",
+      "reason": "The platform icon on the Windows download card."
+    },
+    {
+      "id": "emoji",
+      "file": "sites/jxsuite.com/pages/download.md",
+      "text": "🐧",
+      "reason": "The platform icon on the Linux download card."
+    },
+    {
+      "id": "emoji",
+      "file": "sites/jxsuite.com/pages/features.json",
+      "text": "like-button",
+      "reason": "A heart in a code sample of a like-button component, which is the sample's content."
+    }
+  ]
+}

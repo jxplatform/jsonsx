@@ -279,7 +279,7 @@ function buildWindowRpc(entry: WindowEntry, getWin: () => BrowserWindow) {
         dependenciesNeedInstall: () => pkg.dependenciesNeedInstall(),
         installDependencies: () => pkg.installDependencies(),
         listPackages: () => pkg.listPackages(),
-        outdatedPackages: () => pkg.outdatedPackages(),
+        packageVersions: () => pkg.packageVersions(),
         removePackage: (params) => pkg.removePackage(params),
         setPackageVersions: (params) => pkg.setPackageVersions(params),
 

@@ -7,11 +7,11 @@ spec:
 
 # Expressions
 
-> **Studio writes this format for you.** The **fx** mode on value fields and the formula editor ([Formulas and expressions](/docs/studio/logic/formulas)) generate everything below — this page documents the JSON if you want to hand-edit a file, review a diff, or understand what the chips represent.
+> **Studio writes this format for you.** The **fx** mode on value fields and the formula editor ([Formulas and expressions](/docs/studio/logic/formulas)) generate everything below, and this page documents the JSON if you want to hand-edit a file, review a diff, or understand what the chips represent.
 
-An `$expression` is a computation or state change written as JSON structure instead of JavaScript source. One operator is applied to a `target`, optionally with a `value` — and because the whole thing is data, schema tooling can validate it, Studio can render it as editable chips, and the compiler can analyze it without parsing code.
+An `$expression` is a computation or state change written as JSON structure instead of JavaScript source. One operator is applied to a `target`, optionally with a `value`. Because the whole thing is data, schema tooling can validate it, Studio can render it as editable chips, and the compiler can analyze it without parsing code.
 
-The smallest complete expression — a dark-mode toggle handler:
+The smallest complete expression is a dark-mode toggle handler:
 
 ```json
 {
@@ -36,13 +36,13 @@ Expressions sit on the middle rung of the escalation ladder. Prefer the least po
 
 Every node has the same three fields:
 
-| Field      | Required          | Description                                                              |
-| ---------- | ----------------- | ------------------------------------------------------------------------ |
-| `operator` | Yes               | A token from the blessed set (see below)                                 |
-| `target`   | Yes               | The operand the operator acts on — a `$ref`, a literal, or a nested node |
-| `value`    | By operator arity | The right-hand operand — a `$ref`, a literal, an array, or a nested node |
+| Field      | Required          | Description                                                             |
+| ---------- | ----------------- | ----------------------------------------------------------------------- |
+| `operator` | Yes               | A token from the blessed set (see below)                                |
+| `target`   | Yes               | The operand the operator acts on: a `$ref`, a literal, or a nested node |
+| `value`    | By operator arity | The right-hand operand: a `$ref`, a literal, an array, or a nested node |
 
-Nodes nest: a `target` or `value` may itself be a node, with no inner `$expression` wrapper — the wrapper appears only at the state entry or handler boundary. `counter = counter + 1` becomes:
+Nodes nest: a `target` or `value` may itself be a node, with no inner `$expression` wrapper, which appears only at the state entry or handler boundary. `counter = counter + 1` becomes:
 
 ```json
 {
@@ -54,11 +54,11 @@ Nodes nest: a `target` or `value` may itself be a node, with no inner `$expressi
 }
 ```
 
-Operands resolve exactly like any [`$ref`](/docs/framework/concepts/references) — state paths are always explicit JSON Pointers (`#/state/counter`), never raw `state.counter` strings, and `$map/` paths resolve through iteration context as elsewhere.
+Operands resolve exactly like any [`$ref`](/docs/framework/concepts/references). State paths are always explicit JSON Pointers (`#/state/counter`), never raw `state.counter` strings, and `$map/` paths resolve through iteration context as elsewhere.
 
 ## Pure and mutating operators
 
-Every operator is one of two modes, and the mode is never declared — it follows from the operator:
+Every operator is one of two modes, and the mode is never declared; it follows from the operator:
 
 - **Pure** operators compute and return a value, mutating nothing: unary (`!`, `-`), arithmetic, comparison, logical, conditionals, aggregates, and the method operators below. A pure expression used as a state entry is a computed value, read via `$ref` or `${}` like any other.
 - **Mutating** operators write to their `target` and return nothing: assignment (`=`, `+=`, `-=`, `*=`, `/=`) and the array-mutation methods (`push`, `pop`, `shift`, `unshift`, `splice`). A mutating expression is a handler, bound to events.
@@ -75,7 +75,7 @@ Every operator is one of two modes, and the mode is never declared — it follow
 }
 ```
 
-`push`/`unshift` take a single `value`; `splice` takes an argument array (`[start, deleteCount, ...items]`); `pop`/`shift` take none. The full operator set is closed and enumerated in the [operator reference](/docs/framework/reference/operators) — anything outside it is a compile-time error, and logic that needs more escalates to a [function body](/docs/framework/concepts/functions).
+`push`/`unshift` take a single `value`; `splice` takes an argument array (`[start, deleteCount, ...items]`); `pop`/`shift` take none. The full operator set is closed and enumerated in the [operator reference](/docs/framework/reference/operators). Anything outside it is a compile-time error, and logic that needs more escalates to a [function body](/docs/framework/concepts/functions).
 
 ## Aggregates
 
@@ -87,7 +87,7 @@ Every operator is one of two modes, and the mode is never declared — it follow
 | `{ "$ref": "$map/index" }`  | The current zero-based index    |
 | `{ "$ref": "$reduce/acc" }` | The accumulator (`reduce` only) |
 
-A cart total — `acc + item.price * item.qty`, seeded by `initial`:
+A cart total, `acc + item.price * item.qty`, seeded by `initial`:
 
 ```json
 {
@@ -106,11 +106,11 @@ A cart total — `acc + item.price * item.qty`, seeded by `initial`:
 }
 ```
 
-`reduce` requires `initial`; `map` and `filter` must not declare it. Aggregates compose by nesting — a `filter` node can be the `target` of a `reduce`.
+`reduce` requires `initial`; `map` and `filter` must not declare it. Aggregates compose by nesting, so a `filter` node can be the `target` of a `reduce`.
 
 ## Conditionals
 
-`?:` selects between two results. Its fields follow the ECMAScript conditional: `target` is the test, `value` the result when true, `initial` the result when false — all three required. Else-if chains nest another `?:` in `initial`.
+`?:` selects between two results. Its fields follow the ECMAScript conditional: `target` is the test, `value` the result when true, `initial` the result when false. All three are required. Else-if chains nest another `?:` in `initial`.
 
 ```json
 {
@@ -132,11 +132,11 @@ A cart total — `acc + item.price * item.qty`, seeded by `initial`:
 }
 ```
 
-For fallbacks, prefer `??` (nullish coalescing) over `||` when `0`, `""`, or `false` are legitimate values — it substitutes only for `null` and `undefined`.
+For fallbacks, prefer `??` (nullish coalescing) over `||` when `0`, `""`, or `false` are legitimate values, because it substitutes only for `null` and `undefined`.
 
 ## Pure method operators
 
-Genuine `String.prototype`, `Array.prototype`, and `Number.prototype` methods are operators too — the receiver in `target`, arguments in `value` (a bare scalar, or an array for multiple). Only **pure** methods qualify; where the original mutates, the ES2023 change-by-copy name stands in (`toSorted`, not `sort`).
+Genuine `String.prototype`, `Array.prototype`, and `Number.prototype` methods are operators too, with the receiver in `target` and arguments in `value` (a bare scalar, or an array for multiple). Only **pure** methods qualify; where the original mutates, the ES2023 change-by-copy name stands in (`toSorted`, not `sort`).
 
 ```json
 { "operator": "toUpperCase", "target": { "$ref": "#/state/name" } }
@@ -150,7 +150,7 @@ Evaluation is null-safe: a missing receiver yields `undefined` rather than throw
 
 ## Named formulas and `call`
 
-A pure expression entry with `parameters` is a **named formula** — a reusable computation instead of a computed value. Inside its body, parameters resolve through the `$args/` scheme:
+A pure expression entry with `parameters` is a **named formula**: a reusable computation instead of a computed value. Inside its body, parameters resolve through the `$args/` scheme:
 
 ```json
 {
@@ -178,7 +178,7 @@ The `call` operator invokes it: `target` is the callee pointer, `value` the posi
 }
 ```
 
-A callee may also be a pure standard-library global through `window#/`, gated by a closed allowlist (`Math.*`, `JSON.*`, `Object.keys`/`values`/`entries`/`fromEntries`, `Number.*`, `Array.from`/`isArray`/`of`, `parseFloat`, `structuredClone`, …). Impure platform functions — `fetch`, `alert`, `Math.random`, `Date.now` — are deliberately absent; side effects belong to [Function entries](/docs/framework/concepts/functions).
+A callee may also be a pure standard-library global through `window#/`, gated by a closed allowlist (`Math.*`, `JSON.*`, `Object.keys`/`values`/`entries`/`fromEntries`, `Number.*`, `Array.from`/`isArray`/`of`, `parseFloat`, `structuredClone`, …). Impure platform functions (`fetch`, `alert`, `Math.random`, `Date.now`) are deliberately absent; side effects belong to [Function entries](/docs/framework/concepts/functions).
 
 ```json
 {
@@ -188,11 +188,11 @@ A callee may also be a pure standard-library global through `window#/`, gated by
 }
 ```
 
-Formulas declared in `project.json` `state` are available on every page. A catalog of ready-made composite formulas ships with Studio's palette — see the [formula catalog](/docs/framework/reference/formulas).
+Formulas declared in `project.json` `state` are available on every page. A catalog of ready-made composite formulas ships with Studio's palette. See the [formula catalog](/docs/framework/reference/formulas).
 
 ## Reading the event
 
-Handlers receive the DOM event, and the `event#/` reference scheme reads it without escalating to code — resolvable only inside an expression used as an event handler:
+Handlers receive the DOM event, and the `event#/` reference scheme reads it without escalating to code. It resolves only inside an expression used as an event handler:
 
 ```json
 {
@@ -211,15 +211,15 @@ Handlers receive the DOM event, and the `event#/` reference scheme reads it with
 
 An `$expression` is valid in three positions:
 
-1. **As a `state` entry** — a named, reusable operation. A pure entry is a computed value; a mutating entry is a handler you bind with `"onclick": { "$ref": "#/state/toggleTheme" }`, exactly like a Function entry.
+1. **As a `state` entry**, a named, reusable operation. A pure entry is a computed value; a mutating entry is a handler you bind with `"onclick": { "$ref": "#/state/toggleTheme" }`, exactly like a Function entry.
 2. **Inline as an event handler value** on any element, in place of a `$ref` to a function.
-3. **As an element's `tagName`** — see [Choosing an element's tag](#choosing-an-elements-tag) below.
+3. **As an element's `tagName`**, described in [Choosing an element's tag](#choosing-an-elements-tag) below.
 
 Prefer the named form when reused; the inline form for single-use handlers.
 
 ## Choosing an element's tag
 
-Sometimes one element should be a link when it has somewhere to go and a plain box when it doesn't — wrapping the same content either way. Write the choice in `tagName`:
+Sometimes one element should be a link when it has somewhere to go and a plain box when it doesn't, wrapping the same content either way. Write the choice in `tagName`:
 
 ```json
 {
@@ -236,7 +236,7 @@ Sometimes one element should be a link when it has somewhere to go and a plain b
 }
 ```
 
-Use `switch` when there are more than two, and give it a `default` — an element with no tag can't exist:
+Use `switch` when there are more than two, and give it a `default`, because an element with no tag can't exist:
 
 ```json
 {
@@ -254,19 +254,19 @@ Use `switch` when there are more than two, and give it a `default` — an elemen
 Two rules make this different from every other formula:
 
 - **Every branch is a tag name, not a formula.** You choose _between_ tags; you don't compute one. That's what lets Studio tell you at authoring time that `"A LINK"` isn't a tag, instead of the page breaking in a browser.
-- **The tag is decided once, when the element is created**, and isn't re-read afterwards. Changing it later would mean throwing the element away and building a new one, taking your content's focus, typed-in values and scroll position with it. If a tag needs to change in response to something, that's a `$switch` — which swaps content, not the element itself.
+- **The tag is decided once, when the element is created**, and isn't re-read afterwards. Changing it later would mean throwing the element away and building a new one, taking your content's focus, typed-in values and scroll position with it. If a tag needs to change in response to something, that's a `$switch`, which swaps content rather than the element itself.
 
 :::doc-note
-A component's own `tagName` — the name at the top of the file — is always a plain name, as is a `$head` entry's. Those become a custom element's registered name and a tag in the page head, which can't vary per instance.
+A component's own `tagName`, the name at the top of the file, is always a plain name, as is a `$head` entry's. Those become a custom element's registered name and a tag in the page head, which can't vary per instance.
 :::
 
 ## How it works
 
-An expression lowers to the same target a `body` string would — but the function is constructed from the node tree, never parsed from a string, so no `eval` or `new Function` is involved. A mutating expression becomes a handler over the reactive `state` proxy (`(state, event) => { state.darkMode = !state.darkMode; }`); a pure expression becomes a `computed()`, recomputing whenever the state it reads changes — see [Reactivity](/docs/framework/concepts/reactivity).
+An expression lowers to the same target a `body` string would, but the function is constructed from the node tree and never parsed from a string, so no `eval` or `new Function` is involved. A mutating expression becomes a handler over the reactive `state` proxy (`(state, event) => { state.darkMode = !state.darkMode; }`); a pure expression becomes a `computed()`, recomputing whenever the state it reads changes. See [Reactivity](/docs/framework/concepts/reactivity).
 
 References inside a node resolve in a fixed order:
 
-```
+```text
 1. $map/       — iteration context
 2. $reduce/acc — fold accumulator (reduce only)
 3. $args/      — named-formula parameters
@@ -282,19 +282,19 @@ In production, `?:` and `switch` evaluate only the taken branch. In Studio's edi
 ## Rules
 
 - The operator set is **closed**. An unknown operator is a compile-time error; escalate to a Function `body` instead.
-- A mutating node may only appear at the handler boundary — never nested as an operand.
+- A mutating node may only appear at the handler boundary, never nested as an operand.
 - Nested nodes take no `$expression` wrapper; it appears only at the entry or handler boundary.
 - State operands are explicit `$ref` pointers, never raw `state.x` strings.
 - `reduce` requires `initial`; `map` and `filter` must not declare it. `?:` requires `target`, `value`, and `initial`.
 - `switch` matches on the discriminant's string form, because JSON keys are strings.
-- `event#/` resolves only in handler position — referencing it from a non-handler entry is a compile-time error.
+- `event#/` resolves only in handler position; referencing it from a non-handler entry is a compile-time error.
 - `call` targets a named formula or a blessed global; call depth is capped at 64, and statically detectable call cycles are rejected.
 
 ## Related
 
-- [Operator reference](/docs/framework/reference/operators) — every blessed token
-- [Formula catalog](/docs/framework/reference/formulas) — composite formulas in Studio's palette
-- [Statements](/docs/framework/concepts/statements) — multi-step bodies built from expression nodes
-- [Functions and sidecars](/docs/framework/concepts/functions) — the escape hatch to real JavaScript
-- [Reactivity](/docs/framework/concepts/reactivity) — how computed values track their inputs
-- [Formulas and expressions in Studio](/docs/studio/logic/formulas) — the visual editor for all of this
+- [Operator reference](/docs/framework/reference/operators): every blessed token
+- [Formula catalog](/docs/framework/reference/formulas): composite formulas in Studio's palette
+- [Statements](/docs/framework/concepts/statements): multi-step bodies built from expression nodes
+- [Functions and sidecars](/docs/framework/concepts/functions): the escape hatch to real JavaScript
+- [Reactivity](/docs/framework/concepts/reactivity): how computed values track their inputs
+- [Formulas and expressions in Studio](/docs/studio/logic/formulas): the visual editor for all of this

@@ -2,16 +2,16 @@
  * Src/packages/jxsuite-update.ts — the on-open @jxsuite update prompt.
  *
  * The behaviour under test CHANGED: the target is each package's own newest published version, read
- * from the registry through `platform.outdatedPackages()`, not the version this Studio build
- * embeds. So the cases that matter are the ones a suite-wide target got wrong — packages on
- * different versions, a package with no newer publish, and a project pinned ahead of the registry.
+ * from the registry through `platform.packageVersions()`, not the version this Studio build embeds.
+ * So the cases that matter are the ones a suite-wide target got wrong — packages on different
+ * versions, a package with no newer publish, and a project pinned ahead of the registry.
  */
 import { flush, installMockPlatform } from "./harness";
 import { afterEach, beforeAll, describe, expect, test } from "bun:test";
 import { initLayers } from "../src/ui/layers";
 import { problems, resetNotifications } from "../src/services/notify";
 import { resetActivities } from "../src/panels/activity-panel";
-import type { OutdatedInfo } from "@jxsuite/protocol";
+import type { PackageVersionInfo } from "@jxsuite/protocol";
 import type { StudioPlatform } from "../src/types";
 
 const { applyJxsuiteUpdate, checkJxsuiteUpdate, maybePromptJxsuiteUpdate } =
@@ -33,8 +33,8 @@ function dialog(): HTMLElement | null {
 }
 
 /** A host whose registry lookup answers with `reported`. */
-function withRegistry(reported: OutdatedInfo[], extra: Partial<StudioPlatform> = {}) {
-  installMockPlatform({ outdatedPackages: async () => reported, ...extra });
+function withRegistry(reported: PackageVersionInfo[], extra: Partial<StudioPlatform> = {}) {
+  installMockPlatform({ packageVersions: async () => reported, ...extra });
 }
 
 afterEach(() => {
@@ -66,7 +66,7 @@ describe("checkJxsuiteUpdate", () => {
   });
 
   test("a project pinned AHEAD of the registry is not offered a downgrade", async () => {
-    // `outdatedPackages` reports any DIFFERENCE from latest. A prerelease, or a range bumped before
+    // `packageVersions` reports any DIFFERENCE from latest. A prerelease, or a range bumped before
     // The publish landed, is not something to "update".
     withRegistry([{ current: "^2.0.0", latest: "1.9.0", name: "@jxsuite/runtime" }]);
     expect(await checkJxsuiteUpdate()).toEqual([]);
@@ -81,7 +81,7 @@ describe("checkJxsuiteUpdate", () => {
     // This runs on project open. Being offline is not something to interrupt the author about.
     withRegistry([]);
     installMockPlatform({
-      outdatedPackages: async () => {
+      packageVersions: async () => {
         throw new Error("getaddrinfo ENOTFOUND registry.npmjs.org");
       },
     });
@@ -89,7 +89,7 @@ describe("checkJxsuiteUpdate", () => {
   });
 
   test("a host with no registry lookup at all gets no prompt", async () => {
-    // The cloud session manages dependencies server-side and offers no `outdatedPackages`. Without
+    // The cloud session manages dependencies server-side and offers no `packageVersions`. Without
     // The registry there is no honest target, and guessing one is what this module stopped doing.
     installMockPlatform({});
     expect(await checkJxsuiteUpdate()).toEqual([]);
@@ -104,7 +104,7 @@ describe("maybePromptJxsuiteUpdate", () => {
     // Screenshot shot dispatched into a scrim — which is how this dialog ended up in the middle of
     // 33 committed images, `docs/images/hero.png` (the jxsuite.com marketing hero) among them.
     //
-    // Correct dependency pins do not make this unnecessary: `outdatedPackages` compares the range's
+    // Correct dependency pins do not make this unnecessary: `packageVersions` compares the range's
     // BASE version against the registry's `latest`, so a project pinned `^1.4.1` is "outdated" the
     // Moment 1.4.2 publishes, and every starter shot would be scrimmed again by the next patch
     // Release of any @jxsuite package.
@@ -113,7 +113,7 @@ describe("maybePromptJxsuiteUpdate", () => {
     let asked = 0;
     let wrote = 0;
     installMockPlatform({
-      outdatedPackages: async () => {
+      packageVersions: async () => {
         asked += 1;
         return [{ current: "^1.2.0", latest: "1.4.0", name: "@jxsuite/parser" }];
       },

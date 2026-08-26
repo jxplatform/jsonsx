@@ -5,7 +5,7 @@
     "param": "slug",
     "field": "id"
   },
-  "title": "${state.page.data.title} — Jx Suite",
+  "title": "${state.page.data.title} · Jx Suite",
   "$head": [
     {
       "tagName": "meta",

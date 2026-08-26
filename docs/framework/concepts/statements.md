@@ -7,11 +7,11 @@ spec:
 
 # Statements
 
-> **Studio writes this format for you.** The statement editor ([Statements](/docs/studio/logic/statements)) builds these bodies as visual step cards — this page documents the JSON those cards write to disk.
+> **Studio writes this format for you.** The statement editor ([Statements](/docs/studio/logic/statements)) builds these bodies as visual step cards, and this page documents the JSON those cards write to disk.
 
-A [Function entry](/docs/framework/concepts/functions)'s `body` may be a **JSON array of statements** instead of a JavaScript source string. Each statement is one step; steps run top to bottom, exactly like the statement list inside a JavaScript function — but as structure, so tooling can validate, inspect, and edit every step.
+A [Function entry](/docs/framework/concepts/functions)'s `body` may be a **JSON array of statements** instead of a JavaScript source string. Each statement is one step; steps run top to bottom, exactly like the statement list inside a JavaScript function, but as structure, so tooling can validate, inspect, and edit every step.
 
-The smallest complete structured body — mutate, then notify:
+The smallest complete structured body mutates, then notifies:
 
 ```json
 {
@@ -36,13 +36,13 @@ There are four statement kinds, each reusing a web-platform name:
 
 ## Expression statements
 
-Any mutating [expression node](/docs/framework/concepts/expressions) — or a `call` — stands alone as a step. No wrapper key; the node appears bare in the array:
+Any mutating [expression node](/docs/framework/concepts/expressions), or a `call`, stands alone as a step. No wrapper key; the node appears bare in the array:
 
 ```json
 { "operator": "+=", "target": { "$ref": "#/state/count" }, "value": 1 }
 ```
 
-To capture a result, make the step an assignment whose `value` is a `call` node — there is no dedicated capture field:
+To capture a result, make the step an assignment whose `value` is a `call` node. There is no dedicated capture field:
 
 ```json
 {
@@ -81,7 +81,7 @@ To capture a result, make the step an assignment whose `value` is a `call` node 
 
 ## Dispatching events
 
-`dispatchEvent` fires a DOM `CustomEvent` — the statement's other keys mirror `CustomEventInit`. `detail` may be a literal, a `$ref`, or an expression node:
+`dispatchEvent` fires a DOM `CustomEvent`, and the statement's other keys mirror `CustomEventInit`. `detail` may be a literal, a `$ref`, or an expression node:
 
 ```json
 {
@@ -96,7 +96,7 @@ The event dispatches from the handler's `event.currentTarget` (or the component 
 
 ## Parameters
 
-A structured body follows the named-formula pattern. Without `parameters`, the entry is an event handler — statements see `state` and the `event#/` scheme. With `parameters`, it is a callable invoked positionally, its arguments bound to `$args/` names:
+A structured body follows the named-formula pattern. Without `parameters`, the entry is an event handler, and statements see `state` and the `event#/` scheme. With `parameters`, it is a callable invoked positionally, its arguments bound to `$args/` names:
 
 ```json
 {
@@ -116,36 +116,36 @@ A structured body follows the named-formula pattern. Without `parameters`, the e
 
 ## Statements, expressions, or a body string?
 
-The escalation ladder continues inside Shape 4 — prefer the least powerful form:
+The escalation ladder continues inside Shape 4. Prefer the least powerful form:
 
-| Form                          | Use when                                                                                      |
-| ----------------------------- | --------------------------------------------------------------------------------------------- |
-| A single `$expression`        | One operation — toggle, increment, push, a computed value                                     |
-| `body` as a statement array   | Multiple steps, branching, or dispatching events — still no code                              |
-| `body` as a JavaScript string | Loops, `await` chains, try/catch, browser APIs — anything structural statements can't express |
+| Form                          | Use when                                                                          |
+| ----------------------------- | --------------------------------------------------------------------------------- |
+| A single `$expression`        | One operation: toggle, increment, push, a computed value                          |
+| `body` as a statement array   | Multiple steps, branching, or dispatching events, still with no code              |
+| `body` as a JavaScript string | Loops, `await` chains, try/catch, browser APIs: anything statements can't express |
 
 A statement body stays fully analyzable and visually editable; a source string is opaque to tooling. Reach for the string only when structure genuinely runs out.
 
 ## How it works
 
-One engine serves both halves: an interpreter (`runStatements`) executes statement arrays directly against the reactive `state` proxy, and a compiler (`compileStatements`) emits the genuine ECMAScript forms — `if`/`else` statements, a `switch` over the discriminant's string form, and `dispatchEvent(new CustomEvent(type, init))`. The emitted function is identical in shape to a hand-written handler, so [reactivity](/docs/framework/concepts/reactivity) tracking works unchanged.
+One engine serves both halves: an interpreter (`runStatements`) executes statement arrays directly against the reactive `state` proxy, and a compiler (`compileStatements`) emits the genuine ECMAScript forms: `if`/`else` statements, a `switch` over the discriminant's string form, and `dispatchEvent(new CustomEvent(type, init))`. The emitted function is identical in shape to a hand-written handler, so [reactivity](/docs/framework/concepts/reactivity) tracking works unchanged.
 
-Statements execute sequentially. A step whose value is a promise is awaited before the next step runs — async/await semantics without writing `await`.
+Statements execute sequentially. A step whose value is a promise is awaited before the next step runs, giving async/await semantics without writing `await`.
 
 ## Rules
 
-- A `body` is either a statement array or a source string — one representation per entry.
+- A `body` is either a statement array or a source string, one representation per entry.
 - Branch tests (`if`) and `$switch` discriminants are **pure** operands: no mutations, no `call` to a mutating entry.
 - `$switch` matches `String(discriminant)` against `cases` keys, because JSON keys are strings.
 - Statements run in order; thenable results are awaited before the next step.
-- There is no capture field — assign a `call`'s result with an `=` statement.
+- There is no capture field; assign a `call`'s result with an `=` statement.
 - `dispatchEvent` needs a dispatch target; outside a handler (no `event`), a compiled custom element dispatches from the component instance.
-- Declare dispatched events in `emits` — it is the declaration tooling reads.
+- Declare dispatched events in `emits`, which is the declaration tooling reads.
 
 ## Related
 
-- [Expressions](/docs/framework/concepts/expressions) — the nodes statements are built from
-- [Functions and sidecars](/docs/framework/concepts/functions) — the entries that own a `body`
-- [Switching](/docs/framework/concepts/switching) — `$switch` at the element level
-- [Statements in Studio](/docs/studio/logic/statements) — the visual step editor
-- [Code editing in Studio](/docs/studio/logic/code) — the JavaScript escape hatch
+- [Expressions](/docs/framework/concepts/expressions): the nodes statements are built from
+- [Functions and sidecars](/docs/framework/concepts/functions): the entries that own a `body`
+- [Switching](/docs/framework/concepts/switching): `$switch` at the element level
+- [Statements in Studio](/docs/studio/logic/statements): the visual step editor
+- [Code editing in Studio](/docs/studio/logic/code): the JavaScript escape hatch

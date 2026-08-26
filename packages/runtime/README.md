@@ -4,7 +4,7 @@
 
 ## Overview
 
-The runtime mounts Jx documents into the browser DOM. It walks the JSON tree, constructs DOM nodes, and wires reactive effects using [`@vue/reactivity`](https://github.com/vuejs/core/tree/main/packages/reactivity). State is tracked automatically — no virtual DOM, no diffing.
+The runtime mounts Jx documents into the browser DOM. It walks the JSON tree, constructs DOM nodes, and wires reactive effects using [`@vue/reactivity`](https://github.com/vuejs/core/tree/main/packages/reactivity). State is tracked automatically: no virtual DOM, no diffing.
 
 ## Installation
 
@@ -55,7 +55,7 @@ Each document goes through four steps:
 | Map item | `{ "$ref": "$map/item" }`      | Current item in `Array` iteration                           |
 | Parent   | `{ "$ref": "parent#/color" }`  | Prop passed via `$props`                                    |
 | Window   | `{ "$ref": "window#/config" }` | Window global                                               |
-| External | `{ "$ref": "./card.json" }`    | Component doc — via `$switch`/`$elements`, not a bare child |
+| External | `{ "$ref": "./card.json" }`    | Component doc (via `$switch`/`$elements`, not a bare child) |
 
 ## Custom element support
 

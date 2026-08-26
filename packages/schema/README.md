@@ -44,12 +44,12 @@ const valid = await validateDocument(doc); // validate a Jx document
 
 ## Component schema coverage
 
-- **`tagName`** — all standard HTML element names from `@webref/elements`
-- **Element properties** — all DOM IDL properties from `@webref/idl`
-- **`style`** — all CSSOM camelCase properties from `@webref/css`
-- **Event handlers** — all `EventHandler` names (`onclick`, `oninput`, …)
-- **`state` shapes** — naked value, typed value, computed, function, external class
-- **Built-in `$prototype` values** — `Request`, `LocalStorage`, `SessionStorage`, `Cookie`, `IndexedDB`, `Array`, `Set`, `Map`, `Blob`, `ReadableStream`, `URLSearchParams`, `FormData`
+- **`tagName`**: all standard HTML element names from `@webref/elements`
+- **Element properties**: all DOM IDL properties from `@webref/idl`
+- **`style`**: all CSSOM camelCase properties from `@webref/css`
+- **Event handlers**: all `EventHandler` names (`onclick`, `oninput`, …)
+- **`state` shapes**: naked value, typed value, computed, function, external class
+- **Built-in `$prototype` values**: `Request`, `LocalStorage`, `SessionStorage`, `Cookie`, `IndexedDB`, `Array`, `Set`, `Map`, `Blob`, `ReadableStream`, `URLSearchParams`, `FormData`
 
 ## VSCode / editor integration
 

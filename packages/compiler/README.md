@@ -4,7 +4,7 @@
 
 ## Overview
 
-The compiler transforms Jx `.json` documents into optimized production artifacts. It erases all Jx abstractions at build time — the output is plain HTML/CSS/JS with no JSON and no Jx-specific code shipped to browsers.
+The compiler transforms Jx `.json` documents into optimized production artifacts. It erases all Jx abstractions at build time. The output is plain HTML/CSS/JS with no JSON and no Jx-specific code shipped to browsers.
 
 ## Installation
 
@@ -34,13 +34,13 @@ const { html, files } = await compile("./counter.json", {
 
 The compiler auto-detects the appropriate output target:
 
-| Route              | Condition                        | Output                            |
-| ------------------ | -------------------------------- | --------------------------------- |
-| 0 — Class          | Input is `.class.json`           | ES class module                   |
-| 1 — Static         | No dynamic bindings              | Plain HTML/CSS, zero JS           |
-| 2 — Custom element | Root `tagName` contains a hyphen | `HTMLElement` subclass + lit-html |
-| 3 — Dynamic page   | Dynamic, standard `tagName`      | Pre-rendered HTML + reactive JS   |
-| 4 — Server         | Has `timing: "server"` entries   | Hono server handler               |
+| Route             | Condition                        | Output                            |
+| ----------------- | -------------------------------- | --------------------------------- |
+| 0: Class          | Input is `.class.json`           | ES class module                   |
+| 1: Static         | No dynamic bindings              | Plain HTML/CSS, zero JS           |
+| 2: Custom element | Root `tagName` contains a hyphen | `HTMLElement` subclass + lit-html |
+| 3: Dynamic page   | Dynamic, standard `tagName`      | Pre-rendered HTML + reactive JS   |
+| 4: Server         | Has `timing: "server"` entries   | Hono server handler               |
 
 ## Site builder
 

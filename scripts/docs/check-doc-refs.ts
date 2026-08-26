@@ -33,6 +33,7 @@ import {
   readLock,
   readShots,
 } from "../check-image-lock";
+import { navPaths, navProblems, readNav } from "./nav";
 
 const ROOT = resolve(import.meta.dir, "../..");
 const DOCS_DIR = join(ROOT, "docs");
@@ -249,23 +250,16 @@ for (const file of docFiles) {
 
 // ─── Nav bijection ───────────────────────────────────────────────────────────
 
-interface NavNode {
-  path: string;
-  label: string;
-  children?: NavNode[];
-}
+const nav = readNav(NAV_PATH);
 
-const nav = JSON.parse(readFileSync(NAV_PATH, "utf8")) as { sections: NavNode[] };
-const navPaths: string[] = [];
-for (const section of nav.sections) {
-  navPaths.push(section.path);
-  for (const child of section.children ?? []) {
-    navPaths.push(child.path);
-  }
+// Shape first: a malformed manifest makes the bijection below meaningless rather than wrong, since
+// A page the walk cannot reach is a page neither direction ever looks at.
+for (const problem of navProblems(nav)) {
+  fail(NAV_PATH, problem);
 }
 
 const navPathSet = new Set<string>();
-for (const path of navPaths) {
+for (const path of navPaths(nav)) {
   if (navPathSet.has(path)) {
     fail(NAV_PATH, `nav path appears more than once: ${path}`);
   }

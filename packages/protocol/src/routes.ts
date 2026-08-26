@@ -259,11 +259,11 @@ export const STUDIO_ROUTES = {
     "Whether node_modules is stale",
     "The install-on-open prompt never shows.",
   ),
-  packagesOutdated: route(
+  packagesVersions: route(
     "GET",
-    "/__studio/packages/outdated",
-    "Dependencies with newer versions (OutdatedInfo[])",
-    "The update affordances are hidden.",
+    "/__studio/packages/versions",
+    "Newest published version of each dependency (PackageVersionInfo[])",
+    "The Latest column stays empty and the update affordances are hidden.",
   ),
   packagesSetVersions: route(
     "POST",
