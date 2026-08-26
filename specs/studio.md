@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.47-draft
+**Version:** 0.9.48-draft
 **Status:** Partial
 **Updated:** 2026-08-26
 **License:** MIT
@@ -1406,9 +1406,9 @@ listener anywhere below it never fires.
 ### 10.1 Open in Browser
 
 Studio closes the loop from "I changed something" to "I looked at the real page": **Open in Browser**
-(toolbar, beside Save; `Cmd+Shift+O`) hands the active page's BUILT output to the user's own browser
-through the same seam Preview link clicks use (`canvas/preview-navigate.ts`, §4.2), so on desktop it
-reaches the real browser rather than a webview.
+(toolbar, beside Save; `Cmd+Shift+O`) hands the active page's route to the user's own browser through
+the same seam Preview link clicks use (`canvas/preview-navigate.ts`, §4.2), so on desktop it reaches
+the real browser rather than a webview.
 
 **The URL is the page's ROUTE, not its output file's path**, and the difference is the whole
 feature. A built page is written for its published origin: it links to `/blog/hello/` and pulls
@@ -1443,6 +1443,28 @@ is optional on the PAL — but a backend that does not declare it, or that repor
 preview: the action says so rather than sending the reader to an origin where half the site is the
 wrong file.
 
+**A backend may satisfy `buildSite` by BUILDING or by RENDERING, and it says which.** The contract
+is "produce something browsable at real routes on an origin of your own, and name it" — not "run the
+compiler", which not every backend can. A hosted backend executes no project JS and has no bundler,
+no image pipeline and no filesystem, so `jx build` is not available to it at any price; what it can
+do is serve the working tree as a site and let `@jxsuite/runtime` assemble each page in the reader's
+browser, exactly as the canvas does. `SiteBuildResult.mode` reports which happened — `built` (the
+default, and what an absent field means, so a backend predating this keeps its meaning) or `live` —
+and the report the author reads says so, because the two differ in ways they can see:
+
+|                    | `built`                                     | `live`                                   |
+| ------------------ | ------------------------------------------- | ---------------------------------------- |
+| HTML               | prerendered, islands split out              | assembled client-side from the document  |
+| Images             | optimized, responsive variants              | the originals, as authored               |
+| `timing: "server"` | resolved at build time                      | not run, as in edit mode (§4.2)          |
+| Emitted files      | sitemap, headers, redirects, service worker | none                                     |
+| Freshness          | the last build                              | the working tree, unsaved edits included |
+
+That last row is the reason a live preview is not merely a degraded build: it is the only one of the
+two that can show an author what they are looking at right now, including a collaborator's edits
+mid-keystroke. "Does my site build?" remains a question for a real build; "what does this page look
+like at its real URL?" is what the action is for, and both answer it.
+
 The action is never hidden: when a page cannot be resolved it renders **disabled with the reason in
 its tooltip**, one of —
 
@@ -1453,7 +1475,7 @@ its tooltip**, one of —
 | Document is not under `pages/`  | Only pages have a route — `<path>` is not under pages/.           |
 | Catch-all route (`[...rest]`)   | Catch-all routes match many pages — open a generated one instead. |
 | Dynamic route with unset params | Pick a value for `:<param>` to open one of this route's pages.    |
-| Backend cannot build            | This backend cannot build a preview of the site.                  |
+| Backend cannot preview          | This backend cannot build a preview of the site.                  |
 | Backend serves no preview       | The site was built, but this backend serves no preview of it.     |
 
 Invoked by chord while blocked, the reason goes to the status bar instead of opening nothing.
@@ -2535,6 +2557,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.9.48-draft** (2026-08-26) — buildSite may serve a live rendering of the working tree rather than build output; SiteBuildResult.mode says which.
 - **0.9.47-draft** (2026-08-26) — 9.1.4 the Files tree hides what .gitignore masks — rules from every level, filtered where rows are built, a per-user toggle that defaults to hiding, and no .git/info/exclude or core.excludesFile.
 - **0.9.46-draft** (2026-08-26) — the Assistant tab draws a running import and the agent's questions (§6).
 - **0.9.45-draft** (2026-08-25) — Preferences §15: a blank field never deletes, a default is never a stored value, and every preference roams between windows.
@@ -2637,4 +2660,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.47-draft_
+_`@jxsuite/studio` Specification v0.9.48-draft_

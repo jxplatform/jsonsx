@@ -258,6 +258,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `site-architecture.md`
 
+- **0.5.18-draft** (2026-08-26) — Standards evidence follows head-merger to @jxsuite/schema.
 - **0.5.17-draft** (2026-08-25) — §9.3: an editor whose host does not serve the site URL space MUST resolve references to the project files they name; §9.4: a parent-realm preview resolves in the same space, and an authored reference is not a file path.
 - **0.5.16-draft** (2026-08-19) — §13.5: a translation key may name its route's parameters, so a collection's URLs can be localized; §13.3: a ContentEntry lookup is scoped to the route's language and a locale directory is matched case-insensitively; §6.7: a localized collection publishes one feed per language.
 - **0.5.15-draft** (2026-08-18) — §13.5: a document declares its identity across languages with $translationKey, so a localized slug is a translation; two routes claiming one language are reported, as an error when declared.
@@ -444,6 +445,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.9.48-draft** (2026-08-26) — buildSite may serve a live rendering of the working tree rather than build output; SiteBuildResult.mode says which.
 - **0.9.47-draft** (2026-08-26) — 9.1.4 the Files tree hides what .gitignore masks — rules from every level, filtered where rows are built, a per-user toggle that defaults to hiding, and no .git/info/exclude or core.excludesFile.
 - **0.9.46-draft** (2026-08-26) — the Assistant tab draws a running import and the agent's questions (§6).
 - **0.9.45-draft** (2026-08-25) — Preferences §15: a blank field never deletes, a default is never a stored value, and every preference roams between windows.

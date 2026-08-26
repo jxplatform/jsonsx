@@ -739,6 +739,52 @@ describe("runOpenInBrowser", () => {
     expect(notified.mock.calls.at(-1)![0]).toContain("serves no preview");
     setPreviewNavigateHandler(null);
   });
+
+  /* A hosted backend cannot run a build at all — no project JS, no bundler, no sharp, no disk — so
+     it renders the working tree as a site instead. That is a different thing from build output in
+     ways the reader can see, and the report has to say which one they are looking at. */
+  test("a LIVE preview is reported as one rather than as a build", async () => {
+    openSiteProject();
+    pageTab("pages/index.md");
+    installBuildingPlatform({ mode: "live" });
+    const opened: string[] = [];
+    setPreviewNavigateHandler((url) => opened.push(url));
+    await toolbar.runOpenInBrowser();
+    expect(opened).toEqual([`${SITE_ORIGIN}/`]);
+    const message = notified.mock.calls.at(-1)![0] as string;
+    expect(message).toContain("live preview");
+    expect(message).toContain("working tree");
+    expect(message).not.toContain("Built");
+    setPreviewNavigateHandler(null);
+  });
+
+  test("a live preview's errors are 'previewed with', not 'built with'", async () => {
+    openSiteProject();
+    pageTab("pages/index.md");
+    installBuildingPlatform({
+      errors: ["$paths for pages/[slug].json needs a module"],
+      mode: "live",
+    });
+    const opened: string[] = [];
+    setPreviewNavigateHandler((url) => opened.push(url));
+    await toolbar.runOpenInBrowser();
+    // The page still opens: what did resolve is worth looking at beside what did not.
+    expect(opened).toEqual([`${SITE_ORIGIN}/`]);
+    const message = notified.mock.calls.at(-1)![0] as string;
+    expect(message).toContain("previewed with 1 error");
+    expect(message).toContain("needs a module");
+    setPreviewNavigateHandler(null);
+  });
+
+  test("an absent mode still reads as a build, so an older backend keeps its meaning", async () => {
+    openSiteProject();
+    pageTab("pages/index.md");
+    installBuildingPlatform();
+    setPreviewNavigateHandler(() => {});
+    await toolbar.runOpenInBrowser();
+    expect(notified.mock.calls.at(-1)![0]).toContain("Built 2 page(s).");
+    setPreviewNavigateHandler(null);
+  });
 });
 
 // ─── Lifecycle ────────────────────────────────────────────────────────────────

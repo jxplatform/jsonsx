@@ -56,9 +56,9 @@ The canonical Studio Backend Protocol route table (protocol version 1), from `@j
 
 ## Site build
 
-| Route       | Method | Path              | Summary                                                               | Optional | Degradation                                                      |
-| ----------- | ------ | ----------------- | --------------------------------------------------------------------- | -------- | ---------------------------------------------------------------- |
-| `buildSite` | POST   | `/__studio/build` | Build the site to its output directory → {routes, files, errors, url} | yes      | Open in Browser reports that this target cannot build a preview. |
+| Route       | Method | Path              | Summary                                                        | Optional | Degradation                                                      |
+| ----------- | ------ | ----------------- | -------------------------------------------------------------- | -------- | ---------------------------------------------------------------- |
+| `buildSite` | POST   | `/__studio/build` | Build or render the site → {routes, files, errors, mode?, url} | yes      | Open in Browser reports that this target cannot build a preview. |
 
 ## Packages
 
