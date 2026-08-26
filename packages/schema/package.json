@@ -52,7 +52,7 @@
     "schema": "bun run src/schema.ts",
     "test": "bun test --isolate",
     "test:coverage": "bun test --isolate --coverage",
-    "upgrade": "bunx npm-check-updates -u && bun install"
+    "upgrade": "bun update --latest && bun install"
   },
   "type": "module",
   "version": "1.9.0",

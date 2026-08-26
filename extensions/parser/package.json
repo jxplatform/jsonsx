@@ -45,7 +45,7 @@
     "build:metafile": "bun build src/content.ts src/content-loader.ts src/markdown.ts src/csv.ts src/serialize.ts --outdir=dist --format=esm --target=node --metafile=metafile.json",
     "test": "bun test --isolate",
     "test:coverage": "bun test --isolate --coverage",
-    "upgrade": "bunx npm-check-updates -u && bun install"
+    "upgrade": "bun update --latest && bun install"
   },
   "dependencies": {
     "@jxsuite/markup": "workspace:^",

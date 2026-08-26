@@ -42,7 +42,7 @@
     "build:site": "bun src/cli.ts build",
     "test": "bun test --isolate",
     "test:coverage": "bun test --isolate --coverage",
-    "upgrade": "bunx npm-check-updates -u && bun install"
+    "upgrade": "bun update --latest && bun install"
   },
   "dependencies": {
     "@apidevtools/json-schema-ref-parser": "^16.0.0",
