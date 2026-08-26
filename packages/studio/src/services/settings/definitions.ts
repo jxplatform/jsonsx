@@ -127,6 +127,23 @@ export const SETTINGS = {
     normalize: trimmed,
     scope: "user",
   },
+  /**
+   * Whether the Files tree draws what `.gitignore` masks.
+   *
+   * Unset — the default — HIDES them, which is the whole point: a project root holds the author's
+   * forty documents and a tool's forty thousand, and the author already said which is which. The
+   * setting exists so that answer is not a trap. `.env`, a built `dist/` an author wants to read, a
+   * generated file being debugged: each is a legitimate reason to look at an ignored file, and a
+   * sidebar that cannot show one sends the author to a different program.
+   *
+   * Roams, because "show me everything" is a way of working rather than a property of a window.
+   */
+  showIgnoredFiles: {
+    default: "",
+    key: "jx.files.showIgnored",
+    normalize: trimmed,
+    scope: "user",
+  },
   cfAccountId: {
     default: "",
     key: "jx.cf.accountId",

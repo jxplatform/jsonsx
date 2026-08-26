@@ -35,6 +35,9 @@ import { ensureDependenciesInstalled } from "../packages/ensure-deps";
 import { maybePromptJxsuiteUpdate } from "../packages/jxsuite-update";
 import { autoSyncProjectOnOpen } from "../packages/pull-package-sync";
 import { markLocalMutation } from "./fs-events";
+import { ensureIgnoreLayers, isIgnoredEntry, resetIgnoreCache } from "./gitignore";
+import { SETTINGS } from "../services/settings/definitions";
+import { readStoredSetting, setSetting } from "../services/settings/kernel";
 import { registerPanel } from "../panels/panel-registry";
 import { isImage, uploadAccept, uploadAssets } from "./media-upload";
 import { isCollabPath } from "../collab/collab-state";
@@ -106,11 +109,32 @@ export async function loadDirectory(dirPath: string) {
   }
   try {
     const platform = getPlatform();
-    const entries = await platform.listDirectory(dirPath);
+    /* The `.gitignore` chain is fetched WITH the listing, not after it: `collectFileRows` reads the
+       ignore rules synchronously while it builds rows, and a repaint that beat the rules would draw
+       a `node_modules` and then take it away again. Concurrent, because neither needs the other. */
+    const [entries] = await Promise.all([
+      platform.listDirectory(dirPath),
+      ensureIgnoreLayers(dirPath),
+    ]);
     projectState.dirs.set(dirPath, entries);
   } catch {
     projectState.dirs.set(dirPath, []);
   }
+}
+
+/**
+ * Whether the tree currently draws the files `.gitignore` masks.
+ *
+ * Read through the kernel on every render rather than cached in a module variable: the setting
+ * roams, so another window can change it, and this one repaints on `onSettingsChanged`.
+ */
+export function showIgnoredFiles(): boolean {
+  return readStoredSetting(SETTINGS.showIgnoredFiles) === "true";
+}
+
+/** Set whether the tree draws the files `.gitignore` masks. */
+export function setShowIgnoredFiles(show: boolean): void {
+  setSetting(SETTINGS.showIgnoredFiles, show ? "true" : "");
 }
 
 /** Probe the dev server for a root project and populate projectState. */
@@ -126,6 +150,7 @@ export async function loadProject() {
     refreshFormats();
     void loadFormats();
     refreshExtensionUi(platform);
+    resetIgnoreCache();
 
     setProjectState({
       dirs: new Map(),
@@ -194,6 +219,7 @@ export async function openProject({
     refreshFormats();
     void loadFormats();
     refreshExtensionUi(platform);
+    resetIgnoreCache();
 
     setProjectState({
       .../** @type {ProjectState} */ projectState,
@@ -436,6 +462,8 @@ export function renderFilesTemplate({
     </div>`;
   }
 
+  const showingIgnored = showIgnoredFiles();
+
   return html`
     ${
       projectState.isSiteProject
@@ -462,6 +490,10 @@ export function renderFilesTemplate({
           label="Refresh"
           @click=${async () => {
             requireProjectState().dirs.clear();
+            /* The rules go with the listings. Refresh is what an author reaches for after editing a
+               `.gitignore` by hand, and a tree that came back still hiding by the old rules would
+               read as the button not having worked. */
+            resetIgnoreCache();
             await loadDirectory(".");
             for (const dir of requireProjectState().expanded) {
               await loadDirectory(dir);
@@ -470,6 +502,23 @@ export function renderFilesTemplate({
           }}
         >
           <sp-icon-refresh slot="icon"></sp-icon-refresh>
+        </sp-action-button>
+        <sp-action-button
+          size="xs"
+          label=${showingIgnored ? "Hide ignored files" : "Show ignored files"}
+          ?selected=${showingIgnored}
+          @click=${() => {
+            /* A repaint and nothing else: the ignored entries were never dropped from
+               `projectState.dirs`, only from the rows built out of it. */
+            setShowIgnoredFiles(!showingIgnored);
+            renderLeftPanel();
+          }}
+        >
+          ${
+            showingIgnored
+              ? html`<sp-icon-visibility slot="icon"></sp-icon-visibility>`
+              : html`<sp-icon-visibility-off slot="icon"></sp-icon-visibility-off>`
+          }
         </sp-action-button>
       </sp-action-group>
       <sp-search
@@ -606,10 +655,18 @@ function collectFileRows(
     return a.name.localeCompare(b.name);
   });
 
+  /* Ignored entries are dropped HERE and not at the listing, so `projectState.dirs` goes on
+     mirroring the filesystem for everything else that reads it and the toggle is a repaint. An
+     ignored directory contributes no row, so nothing ever recurses into one — which is also git's
+     rule that a parent's exclusion cannot be undone from inside it. */
+  const visible = showIgnoredFiles()
+    ? sorted
+    : sorted.filter((e) => !isIgnoredEntry(dirPath, e.path, e.type === "directory"));
+
   const query = requireProjectState().searchQuery.toLowerCase();
   const filtered = query
-    ? sorted.filter((e) => e.type === "directory" || e.name.toLowerCase().includes(query))
-    : sorted;
+    ? visible.filter((e) => e.type === "directory" || e.name.toLowerCase().includes(query))
+    : visible;
 
   for (const [index, entry] of filtered.entries()) {
     const isDir = entry.type === "directory";

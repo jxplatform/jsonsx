@@ -1,7 +1,7 @@
 # @jxsuite/starters
 
 The catalogue of ready-made **starter sites** a user can clone when creating a
-new Jx project — from Studio's New Project picker or
+new Jx project, either from Studio's New Project picker or with
 `bun create @jxsuite <directory> --template <id>`. The package is two things:
 `registry.json`, the picker metadata, and `sites/`, one complete buildable Jx
 project tree per starter.
@@ -25,12 +25,12 @@ from the monorepo and from the copy staged inside the packaged desktop app.
 `getStarterDir` throws `Unknown starter: "<id>"` rather than handing back a path
 that does not exist. The registry is also exported raw as
 `@jxsuite/starters/registry.json`, for consumers that want the array without the
-module. The package publishes raw TypeScript — `exports["."]` is `./index.ts`,
+module. The package publishes raw TypeScript: `exports["."]` is `./index.ts`,
 there is no build step, and the module imports only `node:fs` and `node:path`.
 
 ## The registry contract
 
-`registry.json` is a flat JSON array. Every entry carries all eight fields —
+`registry.json` is a flat JSON array. Every entry carries all eight fields;
 there are no optional keys and no defaults (`index.ts`, `StarterMeta`):
 
 | Field         | Contract                                                     |
@@ -42,7 +42,7 @@ there are no optional keys and no defaults (`index.ts`, `StarterMeta`):
 | `description` | Longer copy for the showcase                                 |
 | `features`    | Non-empty `string[]` of Jx features the starter demonstrates |
 | `accent`      | Hex colour, `/^#[0-9a-fA-F]{3,8}$/`                          |
-| `thumbnail`   | `data:image/…` URI — **generated**, see below                |
+| `thumbnail`   | `data:image/…` URI (**generated**, see below)                |
 
 `tests/registry.test.ts` asserts each of those, that ids are unique, and that
 every id maps to a `sites/<id>/project.json`. Never restate the number of
@@ -59,9 +59,9 @@ verifier, and the screenshot lane's shot selector.
 
 ## Layout of `sites/`
 
-Each `sites/<id>/` is a complete, buildable Jx project — `components/`,
-`layouts/`, `pages/`, `content/`, `public/`, `project.json`, a `package.json`,
-and two **committed generated** entry schemas:
+Each `sites/<id>/` is a complete, buildable Jx project. It contains
+`components/`, `layouts/`, `pages/`, `content/`, `public/`, `project.json`, a
+`package.json`, and two **committed generated** entry schemas:
 
 ```
 sites/restaurant/
@@ -82,7 +82,7 @@ must satisfy both `parseProjectConfig` and its own `project.schema.json`, every
 `content/**/*.md` must start with frontmatter. `tests/validate-projects.test.ts`
 runs each starter through `@jxsuite/schema`'s `validateProjectFile` as well.
 
-Starters are not uniform by design — the museum starter is the multilingual one
+Starters are not uniform by design: the museum starter is the multilingual one
 (`i18n.locales: ["en", "fr-CA", "ar"]` with `routing: "prefix-except-default"`),
 and real-estate's `listings` collection uses `format: "Csv"` where the others
 use Markdown.
@@ -90,8 +90,8 @@ use Markdown.
 ## Consumption: cloned, never depended on
 
 Nothing a user ships depends on this package. `@jxsuite/create` imports
-`getStarterDir` lazily — so blank projects never load the large starters
-package — copies the tree, and then re-stamps identity:
+`getStarterDir` lazily (so blank projects never load the large starters
+package), copies the tree, and then re-stamps identity:
 
 ```sh
 bun create @jxsuite my-site --template restaurant
@@ -115,16 +115,16 @@ both its Electrobun and Chromium window layers.
 ## Authoring or modifying a starter
 
 1. Add the `sites/<id>/` tree and a `registry.json` entry with all eight fields.
-2. `bun run schema:generate-all` — regenerates every `project.schema.json` and
+2. `bun run schema:generate-all` regenerates every `project.schema.json` and
    `document.schema.json`. **Always via this script**, never by hand: it runs
    `schema:clean-roots` first (see below). `bun run schema:verify` proves the
-   result in CI, so a stale entry schema is a red build — and
-   `.github/workflows/schemas.yml` regenerates it and pushes the fix to your
-   branch, with a comment naming the JSON Pointers that moved.
-3. `bun run docs:generate` — `docs/studio/projects/starters.md` is rendered from
-   `registry.json` by `scripts/docs/generators/starters.ts`. Hand-editing it is
-   a bug; CI diffs the page.
-4. `bun run screenshots:thumbnails` — the `thumbnail` data URI is not
+   result in CI, so a stale entry schema is a red build.
+   `.github/workflows/schemas.yml` also regenerates it and pushes the fix to
+   your branch, with a comment naming the JSON Pointers that moved.
+3. `bun run docs:generate`, because `docs/studio/projects/starters.md` is
+   rendered from `registry.json` by `scripts/docs/generators/starters.ts`.
+   Hand-editing it is a bug; CI diffs the page.
+4. `bun run screenshots:thumbnails`. The `thumbnail` data URI is not
    hand-authored. The script builds the starter with image optimization off,
    serves `dist/`, screenshots the hero viewport in headless Chromium, and
    writes the small JPEG into `registry.json` plus a full-res JPEG into
@@ -141,8 +141,8 @@ both its Electrobun and Chromium window layers.
    fetch the _same_ images; `--force` re-picks even pinned ones. The script
    upserts a per-site block in `CREDITS.md` between `<!-- site:<id>:start -->`
    and `<!-- site:<id>:end -->`.
-   Committed output is plain image files — scaffolded projects have no Pexels or
-   network dependency.
+   Committed output is plain image files, so scaffolded projects have no Pexels
+   or network dependency.
 
 6. `bun test --isolate` from `packages/starters`. Per-file coverage is gated at
    99% lines / 99% functions (`bunfig.toml`); `sites/`, `scripts/` and `tests/`
@@ -155,7 +155,7 @@ staged registry, so every new id is covered automatically.
 ## Hazards
 
 **The shadowed core.** A starter's `package.json` pins _published_ `@jxsuite/*`
-ranges — it must, because it is a template a user scaffolds from, and starters
+ranges. It must, because it is a template a user scaffolds from, and starters
 are not bun workspace members, so `workspace:^` is unavailable. Iterating a
 starter in Studio runs `bun install` in that root, which materialises a real
 `@jxsuite/schema` beside a workspace far ahead of it. That has already produced
@@ -163,7 +163,7 @@ a starter document schema narrower than the starter's own content, unnoticed for
 six weeks (`scripts/check-shadowed-core.ts` carries the full post-mortem).
 `bun run schema:generate-all` therefore runs `schema:clean-roots`
 (`bun scripts/check-shadowed-core.ts --fix`) first, removing only
-`node_modules/@jxsuite/*` and a stray lockfile — third-party dependencies stay,
+`node_modules/@jxsuite/*` and a stray lockfile. Third-party dependencies stay,
 because the install is what makes the starter preview, and a workspace
 _symlink_ is never removed.
 
@@ -178,9 +178,9 @@ release-please rewrites them inside its release commit via `extra-files`; the
 gate is `bun run templates:check` (`templates:sync` to repair).
 
 **Packaged-desktop path contract.** ElectroBun inlines the bun-side JS graph, so
-`import.meta.dirname` resolves to `app/bun/` at runtime — `registry.json` and
-`sites/` must be staged to `bun/registry.json` and `bun/sites` by `build.copy`
-in `packages/desktop/electrobun.config.ts` (specs/desktop.md §7.4).
+`import.meta.dirname` resolves to `app/bun/` at runtime. `registry.json` and
+`sites/` must therefore be staged to `bun/registry.json` and `bun/sites` by
+`build.copy` in `packages/desktop/electrobun.config.ts` (specs/desktop.md §7.4).
 
 **The screenshot lane ignores this package's source.** It watches only
 `registry.json` and the six starter roots a shot actually opens
@@ -189,8 +189,8 @@ in `packages/desktop/electrobun.config.ts` (specs/desktop.md §7.4).
 
 ## Versioning
 
-Published to npm as `@jxsuite/starters` — TypeScript source, like every
-`@jxsuite` package, following the monorepo's release train (the `starters`
+Published to npm as `@jxsuite/starters`. Like every `@jxsuite` package, it ships
+TypeScript source and follows the monorepo's release train (the `starters`
 release-please component). Within the monorepo, `@jxsuite/create` depends on it
 via `workspace:^`. Because consumption is a one-time clone, publishing a new
 version never changes an existing project.

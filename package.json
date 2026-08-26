@@ -31,6 +31,8 @@
     "desktop:stable": "bun run --cwd packages/desktop build:stable",
     "dev": "bun run server.js",
     "docs:check": "bun scripts/docs/check-doc-refs.ts",
+    "docs:links": "bun scripts/docs/check-doc-links.ts",
+    "docs:prose": "bun scripts/docs/check-prose.ts",
     "docs:images:check": "bun scripts/check-image-lock.ts",
     "docs:claims": "bun scripts/docs/check-site-claims.ts",
     "docs:status": "bun scripts/docs/check-spec-status.ts",

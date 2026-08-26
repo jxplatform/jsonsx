@@ -9,9 +9,9 @@ code:
 
 # Layouts
 
-> **Studio writes this format for you** — layouts appear alongside pages and components in [Browse your project](/docs/studio/projects/pages-layouts-components), and you edit them on the same canvas.
+> **Studio writes this format for you.** Layouts appear alongside pages and components in [Pages, layouts, components](/docs/studio/projects/pages-layouts-components), and you edit them on the same canvas.
 
-A layout is an ordinary Jx document that provides the shell shared across pages — navigation, footer, wrappers — with HTML `<slot>` elements marking where page content is injected. It is the same slot mechanism [components](/docs/framework/concepts/components) use, run at compile time instead of DOM time.
+A layout is an ordinary Jx document that provides the shell shared across pages, such as navigation, a footer and wrappers, with HTML `<slot>` elements marking where page content is injected. It is the same slot mechanism [components](/docs/framework/concepts/components) use, run at compile time instead of DOM time.
 
 ## Layout documents
 
@@ -33,7 +33,7 @@ A minimal layout registers its chrome components via `$elements` (paths relative
 }
 ```
 
-A layout doesn't have to own `<html>` — jxsuite.com's docs layout is a flex `<div>` with a sidebar; the compiler still wraps the result in a full HTML document with the merged `<head>`.
+A layout doesn't have to own `<html>`. jxsuite.com's docs layout is a flex `<div>` with a sidebar; the compiler still wraps the result in a full HTML document with the merged `<head>`.
 
 ## Declaring a layout
 
@@ -47,7 +47,7 @@ Pages opt in with a top-level `$layout`, resolved from the **project root** (not
 ```
 
 - If a page omits `$layout`, the site default from `project.json` `defaults.layout` applies.
-- `"$layout": false` renders the page with no layout at all — useful for standalone landing pages and embeds.
+- `"$layout": false` renders the page with no layout at all, which suits standalone landing pages and embeds.
 
 The page's `children` are distributed into the layout's `<slot>` positions when the page compiles.
 
@@ -84,7 +84,7 @@ Pages target a named slot with the standard `slot` attribute; children without o
 }
 ```
 
-Per the HTML spec, a `<slot>`'s own children are fallback content — they render only when the page supplies nothing for that slot.
+Per the HTML spec, a `<slot>`'s own children are fallback content, and they render only when the page supplies nothing for that slot.
 
 ## Nesting
 
@@ -109,15 +109,15 @@ Saved as `layouts/blog-post.json`, this wraps blog pages in blog chrome while in
 
 Compiling a page against its layout produces one document:
 
-- **Children** — page children are distributed into the layout's slots.
-- **State** — the layout's `state` is kept and the page's is merged over it; **the page wins** on any shared key. Layouts can carry real state of their own — jxsuite.com's docs layout loads the sidebar nav with a `ContentEntry`.
-- **`$media`, `style`, `attributes`** — merged the same way, page over layout.
-- **`$head`** — merged site → layout → page, later entries winning for singletons like `<title>`; see [SEO and metadata](/docs/framework/site/seo).
+- **Children**: page children are distributed into the layout's slots.
+- **State**: the layout's `state` is kept and the page's is merged over it; **the page wins** on any shared key. Layouts can carry state of their own; jxsuite.com's docs layout loads the sidebar nav with a `ContentEntry`.
+- **`$media`, `style`, `attributes`**: merged the same way, page over layout.
+- **`$head`**: merged site → layout → page, later entries winning for singletons like `<title>`; see [SEO and metadata](/docs/framework/site/seo).
 
-Layouts also receive the compiler-injected contexts: `$page` (`title`, `url`, `params`) and `$site` (`name`, `url`, plus site state) — see [project.json](/docs/framework/site/project-json).
+Layouts also receive the compiler-injected contexts: `$page` (`title`, `url`, `params`) and `$site` (`name`, `url`, plus site state). See [project.json](/docs/framework/site/project-json).
 
 ## Related
 
-- [Routing](/docs/framework/site/routing) — which pages exist and how they resolve
-- [Components](/docs/framework/concepts/components) — the runtime slot mechanism layouts reuse
-- [SEO and metadata](/docs/framework/site/seo) — the `$head` merge in detail
+- [Routing](/docs/framework/site/routing): which pages exist and how they resolve
+- [Components](/docs/framework/concepts/components): the runtime slot mechanism layouts reuse
+- [SEO and metadata](/docs/framework/site/seo): the `$head` merge in detail

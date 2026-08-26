@@ -12,7 +12,7 @@ code:
 
 # Tutorial: a TOML format extension
 
-By the end of this tutorial you have `@acme/jx-toml`, a standalone npm package that teaches every Jx host — build, dev server, Studio, runtime — to treat `.toml` files as content, with **no changes to any core package**. It is the worked example from the extensions spec, built step by step. Plan on about half an hour.
+By the end of this tutorial you have `@acme/jx-toml`, a standalone npm package that teaches every Jx host (build, dev server, Studio, runtime) to treat `.toml` files as content, with **no changes to any core package**. It is the worked example from the extensions spec, built step by step. Plan on about half an hour.
 
 **Prerequisites**: you have read [The anatomy of an extension](/docs/extending/extensions/anatomy) and [Formats](/docs/extending/extensions/formats), and you have a Jx site project to test against ([Your first project](/docs/start/first-project)).
 
@@ -38,7 +38,7 @@ The `"jx"` field is how hosts find the manifest; the `exports` entries make the 
 
 ## 2. Write the manifest
 
-`jx-extension.json` at the package root enumerates what the package provides — here, a single class:
+`jx-extension.json` at the package root enumerates what the package provides (here, a single class):
 
 ```json
 {
@@ -69,15 +69,15 @@ The manifest is pure data: it names things, and behavior lives in the class desc
 }
 ```
 
-`documentKinds: ["content"]` admits `.toml` as a content-collection source only — it does not enter pages/components discovery the way the parser's Markdown format does.
+`documentKinds: ["content"]` admits `.toml` as a content-collection source only. It does not enter pages/components discovery the way the parser's Markdown format does.
 
 :::doc-note
-`$implementation` says `./toml.js` while the source file is `toml.ts` — the TypeScript convention of importing by emitted name. The first-party classes do the same (`Markdown.class.json` points at `./markdown.js`); Bun resolves it to the `.ts` source.
+`$implementation` says `./toml.js` while the source file is `toml.ts`, the TypeScript convention of importing by emitted name. The first-party classes do the same (`Markdown.class.json` points at `./markdown.js`); Bun resolves it to the `.ts` source.
 :::
 
 ## 4. Declare the constructor and runtime access
 
-Next, the class's `$defs` describe its instance surface — the standard external-class contract of a `config`-taking constructor plus an instance `resolve()`:
+Next, the class's `$defs` describe its instance surface, the standard external-class contract of a `config`-taking constructor plus an instance `resolve()`:
 
 ```json
 "$defs": {
@@ -117,7 +117,7 @@ This is what makes `{ "$prototype": "Toml", "src": "./x.toml" }` work as a state
 }
 ```
 
-`timing` includes `"client"` because TOML parsing needs no filesystem — declaring it lets Studio parse in-process instead of round-tripping through the dev server.
+`timing` includes `"client"` because TOML parsing needs no filesystem. Declaring it lets Studio parse in-process instead of round-tripping through the dev server.
 
 ## 6. Declare the content capabilities
 
@@ -150,9 +150,9 @@ This is what makes `{ "$prototype": "Toml", "src": "./x.toml" }` work as a state
 
 ## 7. Implement the statics
 
-The spec leaves `src/toml.ts` to you, and so does this tutorial — the contract is the interesting part. Per the [host introspection contract](/docs/extending/extensions/anatomy), hosts import `$implementation` and take the export named by the class `title`: so `toml.ts` must export a `Toml` object (or class) whose static methods carry the declared identifiers — `parse` turning TOML source into an object with any TOML library, `discover` globbing `.toml` files under the source directory, `load` reading one file into content entries, and instance `resolve()` for runtime state access.
+The spec leaves `src/toml.ts` to you, and so does this tutorial, because the contract is the interesting part. Per the [host introspection contract](/docs/extending/extensions/anatomy), hosts import `$implementation` and take the export named by the class `title`. So `toml.ts` must export a `Toml` object (or class) whose static methods carry the declared identifiers: `parse` turning TOML source into an object with any TOML library, `discover` globbing `.toml` files under the source directory, `load` reading one file into content entries, and instance `resolve()` for runtime state access.
 
-If you later want Studio saves or export sidecars for your format, add a `serialize` capability the same way — the parser's `Markdown.class.json` declares one; this example, like the spec's, elides it.
+If you later want Studio saves or export sidecars for your format, add a `serialize` capability the same way. The parser's `Markdown.class.json` declares one; this example, like the spec's, elides it.
 
 ## 8. Use it in a project
 
@@ -167,18 +167,18 @@ A project enables the extension with one line, then names the format on a conten
 }
 ```
 
-(`@jxsuite/parser` stays in the list because the `content` section itself belongs to it — your package contributes only the format.)
+(`@jxsuite/parser` stays in the list because the `content` section itself belongs to it; your package contributes only the format.)
 
-Run `jx schema` to regenerate the project's entry schema documents. This extension ships no [schema fragment](/docs/extending/extensions/schema-composition) — it contributes no `project.json` section — but the generator still picks up the class, so `"format": "Toml"` validates in the regenerated format-name enum.
+Run `jx schema` to regenerate the project's entry schema documents. This extension ships no [schema fragment](/docs/extending/extensions/schema-composition) (it contributes no `project.json` section), but the generator still picks up the class, so `"format": "Toml"` validates in the regenerated format-name enum.
 
 You should now see the whole surface light up: the content loader discovers and loads `.toml` entries through your class, `ContentCollection`/`ContentEntry` queries work unchanged, pages can declare `{ "$prototype": "Toml", "src": "./x.toml" }` state for runtime access, and Studio lists `.toml` files (add a `$studio` block to the descriptor to refine its icon and editing modes).
 
 ## What you built
 
-One package, three JSON files, and one implementation module: a manifest naming a class, a descriptor whose `format` block and capability roles tell every host what the class can do, and statics the hosts invoke — with no host knowing anything TOML-specific.
+One package, three JSON files, and one implementation module: a manifest naming a class, a descriptor whose `format` block and capability roles tell every host what the class can do, and statics the hosts invoke, with no host knowing anything TOML-specific.
 
 ## Next steps
 
-- [Tutorial: a guestbook extension](/docs/extending/extensions/tutorial-guestbook) — the same pattern extended to project sections, tables, and a server mount.
-- [Formats](/docs/extending/extensions/formats) — everything the `format` block can declare, including `exportTarget` and `remote`.
-- [Content collections](/docs/framework/site/content-collections) — the user-facing model your format now feeds.
+- [Tutorial: a guestbook extension](/docs/extending/extensions/tutorial-guestbook): the same pattern extended to project sections, tables, and a server mount.
+- [Formats](/docs/extending/extensions/formats): everything the `format` block can declare, including `exportTarget` and `remote`.
+- [Content collections](/docs/framework/site/content-collections): the user-facing model your format now feeds.

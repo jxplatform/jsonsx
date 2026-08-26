@@ -1,5 +1,5 @@
 {
-  "title": "Compare — Jx Suite vs. WordPress, Webflow, and the rest.",
+  "title": "Compare Jx Suite with WordPress, Webflow, and the rest.",
   "$layout": "./layouts/base.json",
   "$head": [
     {
@@ -68,7 +68,7 @@
                 "margin": "0 auto",
                 "maxWidth": "640px"
               },
-              "textContent": "WordPress, Webflow, and Wix each solved one thing and traded away another — your files, your speed, or your budget. Jx Studio is an open-source visual builder that hands you the files. Here's how it compares."
+              "textContent": "WordPress, Webflow, and Wix each solved one thing and traded away another: your files, your speed, or your budget. Jx Studio is an open-source visual builder that hands you the files. Here's how it compares."
             }
           ]
         }
@@ -683,7 +683,7 @@
                     "margin": "0 auto",
                     "fontSize": "1.0625rem"
                   },
-                  "textContent": "A typical 40-page brochure site for a small business. Illustrative estimates — your costs will vary. Projects that add accounts or a database ship a worker alongside the same static output — on Cloudflare Pages it goes out inside the same deploy, so there is no second service to provision; other hosts price it their own way."
+                  "textContent": "A typical 40-page brochure site for a small business. Illustrative estimates, so your costs will vary. Projects that add accounts or a database ship a worker alongside the same static output. On Cloudflare Pages it goes out inside the same deploy, so there is no second service to provision; other hosts price it their own way."
                 }
               ]
             },
@@ -991,7 +991,7 @@
                                 "fontFamily": "var(--font-mono)",
                                 "color": "var(--color-accent)"
                               },
-                              "textContent": "N/A — static pages"
+                              "textContent": "N/A, static pages"
                             }
                           ]
                         },
@@ -1079,7 +1079,7 @@
                     "fontSize": "1.0625rem",
                     "lineHeight": "1.7"
                   },
-                  "textContent": "Your content is Markdown. Your components are JSON. Your output is prerendered HTML — plus a self-contained JavaScript worker when you build for a server-capable target like Cloudflare, Node, or Bun. Every layer is a standard format that other tools can read. There is no proprietary intermediate representation."
+                  "textContent": "Your content is Markdown. Your components are JSON. Your output is prerendered HTML, plus a self-contained JavaScript worker when you build for a server-capable target like Cloudflare, Node, or Bun. Every layer is a standard format that other tools can read. There is no proprietary intermediate representation."
                 }
               ]
             },
@@ -1151,7 +1151,7 @@
                         "color": "var(--color-text-secondary)",
                         "lineHeight": "1.6"
                       },
-                      "textContent": "Plain HTML, CSS, and JavaScript — deployable on any web server in the world. Use the server tier and you also get one standard JS worker, which runs on Cloudflare, Node, or Bun."
+                      "textContent": "Plain HTML, CSS, and JavaScript, deployable on any web server in the world. Use the server tier and you also get one standard JS worker, which runs on Cloudflare, Node, or Bun."
                     }
                   ]
                 },

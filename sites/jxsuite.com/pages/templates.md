@@ -1,10 +1,10 @@
 ---
-title: "Starter templates — Jx Studio"
+title: "Starter templates for Jx Studio"
 $head:
   - tagName: meta
     attributes:
       name: description
-      content: "Start a new Jx project from a production-ready starter site — restaurants, shops, portfolios, SaaS landings, and more. Pick one in Studio's New Project dialog or clone it from the CLI."
+      content: "Start a new Jx project from a production-ready starter site: restaurants, shops, portfolios, SaaS landings, and more. Pick one in Studio's New Project dialog or clone it from the CLI."
   - tagName: meta
     attributes:
       property: "og:title"
@@ -12,7 +12,7 @@ $head:
   - tagName: meta
     attributes:
       property: "og:description"
-      content: "Thirteen production-ready starter sites — plain JSON and Markdown you own forever."
+      content: "Thirteen production-ready starter sites, in plain JSON and Markdown you own forever."
 $elements:
   - "$ref": "../components/section-label.json"
   - "$ref": "../components/cta-button.json"
@@ -29,7 +29,7 @@ Start from a template,\
 :::
 
 :::p{style.fontSize="clamp(1.0625rem, 2vw, 1.25rem)" style.color="var(--color-text-secondary)" style.lineHeight="1.7" style.margin="0 auto" style.maxWidth="620px"}
-Thirteen production-ready sites across the industries people actually build for. Pick one in Studio's **New Project** dialog, or clone it from the CLI. Every template is plain JSON and Markdown — yours to keep and change forever.
+Thirteen production-ready sites across the industries people actually build for. Pick one in Studio's **New Project** dialog, or clone it from the CLI. Every template is plain JSON and Markdown, yours to keep and change forever.
 :::
 :::::
 ::::::
@@ -71,7 +71,7 @@ Open one in Studio and make it yours.
 :::
 
 :::p{style.color="var(--color-text-secondary)" style.margin="0 0 2rem" style.fontSize="1.0625rem" style.lineHeight="1.7"}
-Choose a template in the New Project dialog, then design on the canvas, edit content, and commit to git — without leaving the app.
+Choose a template in the New Project dialog, then design on the canvas, edit content, and commit to git, without leaving the app.
 :::
 
 :::div{style.display="flex" style.gap="0.75rem" style.justifyContent="center" style.flexWrap="wrap"}

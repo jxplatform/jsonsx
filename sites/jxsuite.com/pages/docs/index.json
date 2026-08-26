@@ -1,12 +1,12 @@
 {
   "$layout": "./layouts/docs.json",
-  "title": "Documentation — Jx Suite",
+  "title": "Documentation · Jx Suite",
   "$head": [
     {
       "tagName": "meta",
       "attributes": {
         "name": "description",
-        "content": "Jx Suite documentation — build visually with Jx Studio, learn the Jx framework, and extend it with your own packages."
+        "content": "Jx Suite documentation: build visually with Jx Studio, learn the Jx framework, and extend it with your own packages."
       }
     }
   ],
@@ -18,7 +18,7 @@
         { "tagName": "h1", "textContent": "Documentation" },
         {
           "tagName": "p",
-          "textContent": "Jx Suite is a visual site builder, a JSON-native component format, and a static-site compiler — working on plain files you own. Pick a section to get going."
+          "textContent": "Jx Suite is a visual site builder, a JSON-native component format, and a static-site compiler, working on plain files you own. Pick a section to get going."
         },
         {
           "tagName": "div",
@@ -72,7 +72,7 @@
                 {
                   "tagName": "p",
                   "style": { "color": "var(--color-text-secondary)", "margin": "0.375rem 0 0" },
-                  "textContent": "The visual builder — editing, design, logic, and publishing."
+                  "textContent": "The visual builder: editing, design, logic, and publishing."
                 }
               ]
             },
@@ -96,7 +96,7 @@
                 {
                   "tagName": "p",
                   "style": { "color": "var(--color-text-secondary)", "margin": "0.375rem 0 0" },
-                  "textContent": "The JSON document format Studio writes — components, state, styling, and the site build."
+                  "textContent": "The JSON document format Studio writes: components, state, styling, and the site build."
                 }
               ]
             },

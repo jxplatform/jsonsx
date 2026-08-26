@@ -8,9 +8,9 @@ spec:
 
 # Props and scope
 
-> **Studio writes this format for you.** Editing an instance's props in the Properties panel — see [Working with components](/docs/studio/design/components) — writes the `$props` objects on this page.
+> **Studio writes this format for you.** Editing an instance's props in the Inspector's **Content** tab (see [Working with components](/docs/studio/design/components)) writes the `$props` objects on this page.
 
-Scope is where a name can be seen. Within one document, every `state` entry is visible to every descendant element — no passing required. Across a component boundary, nothing is visible unless it is passed explicitly through `$props`. That single rule makes data flow statically knowable: you can read a file and see exactly what it depends on.
+Scope is where a name can be seen. Within one document, every `state` entry is visible to every descendant element, with no passing required. Across a component boundary, nothing is visible unless it is passed explicitly through `$props`. That single rule makes data flow statically knowable: you can read a file and see exactly what it depends on.
 
 ```json
 {
@@ -24,7 +24,7 @@ Scope is where a name can be seen. Within one document, every `state` entry is v
 
 ## Component instances
 
-A component instance is created in two steps: **register** the component document under a custom-element tag in the top-level `$elements` map, then place an element node with that tag. `$props` is optional — an instance without it renders the component with its own defaults:
+A component instance is created in two steps: **register** the component document under a custom-element tag in the top-level `$elements` map, then place an element node with that tag. `$props` is optional, and an instance without it renders the component with its own defaults:
 
 ```json
 {
@@ -46,7 +46,7 @@ A component instance is created in two steps: **register** the component documen
 ```
 
 :::doc-note
-A bare `{ "$ref": "./card.json" }` placed directly in `children` is **not** a component instance — it renders an empty `<div>`. Register the document in `$elements` and instantiate it by its tag, as above. See spec §13.
+A bare `{ "$ref": "./card.json" }` placed directly in `children` is **not** a component instance; it renders an empty `<div>`. Register the document in `$elements` and instantiate it by its tag, as above. See spec §13.
 :::
 
 ## Static and bound props
@@ -64,11 +64,11 @@ A prop value is either a plain JSON value (fixed for this instance) or a `$ref` 
 }
 ```
 
-Inside `card.json`, `title` and `count` behave like the component's own state entries — typically declared there with defaults, overridden per instance.
+Inside `card.json`, `title` and `count` behave like the component's own state entries, typically declared there with defaults and overridden per instance.
 
 ## Signal forwarding
 
-When a `$props` value is a `$ref` to a reactive state entry, the child receives the **same reactive reference**, not a copy. A write in either scope triggers updates in both — parent and child stay in sync through one shared signal. A plain value, by contrast, is just an initial setting for that instance.
+When a `$props` value is a `$ref` to a reactive state entry, the child receives the **same reactive reference**, not a copy. A write in either scope triggers updates in both, so parent and child stay in sync through one shared signal. A plain value, by contrast, is just an initial setting for that instance.
 
 ## Scope levels
 
@@ -84,7 +84,7 @@ Globals are reachable from any component via the `window#/` and `document#/` [re
 
 When a name is looked up, scopes are consulted in order:
 
-1. `$map/` context — the enclosing [repeater](/docs/framework/concepts/lists) iteration
+1. `$map/` context, the enclosing [repeater](/docs/framework/concepts/lists) iteration
 2. Local component `state`
 3. Explicitly passed `$props`
 4. `window` globals
@@ -92,21 +92,21 @@ When a name is looked up, scopes are consulted in order:
 
 ## How it works
 
-Each component builds its own reactive scope from its own `state`. When the runtime renders an instance, it resolves each `$props` entry against the **parent's** scope, then layers the results onto the child's scope — plain values as initial settings, `$ref` values as live references into the parent's reactive state. Nothing else crosses over: a template string or `$ref` inside the child can only see the child's scope plus what was passed.
+Each component builds its own reactive scope from its own `state`. When the runtime renders an instance, it resolves each `$props` entry against the **parent's** scope, then layers the results onto the child's scope: plain values as initial settings, `$ref` values as live references into the parent's reactive state. Nothing else crosses over: a template string or `$ref` inside the child can only see the child's scope plus what was passed.
 
 ## Rules
 
-- `$props` is the only mechanism for passing state across a component boundary — scope never leaks implicitly.
+- `$props` is the only mechanism for passing state across a component boundary. Scope never leaks implicitly.
 - Within a single component, all `state` entries are available to all descendant elements without passing.
 - Signal scope is bounded at the component (custom element) level, like a CSS custom property.
 - Private `#`-prefixed state entries can never be set via `$props`.
 - A `$ref` prop is live in both directions; a plain value is per-instance and static.
-- Every external dependency must appear in `$props` — that is what makes documents statically analyzable.
+- Every external dependency must appear in `$props`, which is what makes documents statically analyzable.
 
 ## Related
 
-- [Components](/docs/framework/concepts/components) — the component model and custom elements
-- [State](/docs/framework/concepts/state) — declaring the entries props override
-- [References](/docs/framework/concepts/references) — `parent#/`, `window#/`, `document#/` schemes
-- [Dynamic switching](/docs/framework/concepts/switching) — swapping whole components on state
-- [Working with components](/docs/studio/design/components) — the Studio props workflow
+- [Components](/docs/framework/concepts/components): the component model and custom elements
+- [State](/docs/framework/concepts/state): declaring the entries props override
+- [References](/docs/framework/concepts/references): `parent#/`, `window#/`, `document#/` schemes
+- [Dynamic switching](/docs/framework/concepts/switching): swapping whole components on state
+- [Working with components](/docs/studio/design/components): the Studio props workflow

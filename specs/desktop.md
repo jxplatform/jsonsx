@@ -1294,4 +1294,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx Studio Desktop Architecture Specification v0.4.2-draft_
+_Jx Studio Desktop Architecture Specification v0.4.3-draft_

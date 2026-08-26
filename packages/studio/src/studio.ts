@@ -113,6 +113,7 @@ import {
   registerFileTreeDnD,
   reloadCleanTab,
 } from "./files/files";
+import { resetIgnoreCache } from "./files/gitignore";
 import { startFsSync } from "./files/fs-events";
 import { invalidateParamValues } from "./page-params";
 import {
@@ -979,6 +980,7 @@ if (_projectParam) {
             }
           }
 
+          resetIgnoreCache();
           setProjectState({
             dirs: new Map(),
             expanded: new Set(),
@@ -1008,15 +1010,18 @@ if (_projectParam) {
             "public",
             "styles",
           ]);
-          const dirEntries = await platform.listDirectory(".");
-          requireProjectState().dirs.set(".", dirEntries);
+          /* Through `loadDirectory`, not `platform.listDirectory`: this is the second copy of the
+             conventional-dir walk (the first is `openProject` in files/files.ts), and the loader is
+             what reads the `.gitignore` chain governing each directory. Listing around it left the
+             `?project=` boot as the one door into a project whose tree knew no ignore rules. */
+          await loadDirectory(".");
+          const dirEntries = requireProjectState().dirs.get(".") ?? [];
           const foundDirs = [];
           for (const e of dirEntries) {
             if (e.type === "directory" && conventionalDirs.has(e.name)) {
               foundDirs.push(e.name);
               requireProjectState().expanded.add(e.path || e.name);
-              const sub = await platform.listDirectory(e.path || e.name);
-              requireProjectState().dirs.set(e.path || e.name, sub);
+              await loadDirectory(e.path || e.name);
             }
           }
           requireProjectState().projectDirs = foundDirs;
@@ -1305,6 +1310,7 @@ async function openRecentProject(root: string) {
     const config = JSON.parse(content) as ProjectConfig;
 
     closeAllTabs();
+    resetIgnoreCache();
 
     setProjectState({
       ...projectState,

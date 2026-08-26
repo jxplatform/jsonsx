@@ -1,12 +1,12 @@
 {
-  "title": "Jx Studio — A visual IDE for the web.",
+  "title": "Jx Studio: a visual IDE for the web.",
   "$layout": "./layouts/base.json",
   "$head": [
     {
       "tagName": "meta",
       "attributes": {
         "name": "description",
-        "content": "Jx Studio is a visual IDE for designing, editing, and shipping websites. Create a project, design on a canvas, wire up logic, and commit to git — all in one app. Saves as plain files. No lock-in."
+        "content": "Jx Studio is a visual IDE for designing, editing, and shipping websites. Create a project, design on a canvas, wire up logic, and commit to git, all in one app. Saves as plain files. No lock-in."
       }
     }
   ],
@@ -55,7 +55,7 @@
                 "margin": "0 auto 2.5rem",
                 "maxWidth": "640px"
               },
-              "textContent": "Create a project, design on a canvas, edit content inline, and wire up interactivity — then commit to git without leaving the app. Everything saves to plain JSON and Markdown: the same files your compiler reads, your git tracks, and your team reviews."
+              "textContent": "Create a project, design on a canvas, edit content inline, and wire up interactivity, then commit to git without leaving the app. Everything saves to plain JSON and Markdown: the same files your compiler reads, your git tracks, and your team reviews."
             },
             {
               "tagName": "div",
@@ -89,7 +89,7 @@
               "tagName": "img",
               "attributes": {
                 "src": "/content/docs/images/hero.png",
-                "alt": "Jx Studio editing a website — layers panel, live canvas, and element inspector",
+                "alt": "Jx Studio editing a website: layers panel, live canvas, and element inspector",
                 "width": "3840",
                 "height": "2400",
                 "loading": "eager",
@@ -147,7 +147,7 @@
                     "margin": "0 auto",
                     "fontSize": "1.0625rem"
                   },
-                  "textContent": "Move between surfaces as the work changes — from file management to content authoring to visual design to scripting."
+                  "textContent": "Move between surfaces as the work changes, from file management to content authoring to visual design to scripting."
                 }
               ]
             },
@@ -165,7 +165,7 @@
                     "props.name": "Manage",
                     "props.image": "/content/docs/images/mode-manage.png",
                     "props.imageAlt": "Jx Studio Manage Files modal with live previews of every project file",
-                    "props.description": "Project explorer, content collections, and file operations with live previews. Create pages, upload media, and build content models — the CMS layer, without the CMS."
+                    "props.description": "Project explorer, content collections, and file operations with live previews. Create pages, upload media, and build content models: the CMS layer, without the CMS."
                   }
                 },
                 {
@@ -174,7 +174,7 @@
                     "props.name": "Edit",
                     "props.image": "/content/docs/images/mode-edit.png",
                     "props.imageAlt": "Jx Studio editing markdown content inline with a WYSIWYG editor",
-                    "props.description": "Click any text and type. Slash commands for blocks, frontmatter forms on the side. WYSIWYG content authoring that feels like Notion — saves as clean Markdown."
+                    "props.description": "Click any text and type. Slash commands for blocks, frontmatter forms on the side. WYSIWYG content authoring that feels like Notion, saved as clean Markdown."
                   }
                 },
                 {
@@ -183,7 +183,7 @@
                     "props.name": "Design",
                     "props.image": "/content/docs/images/mode-design.png",
                     "props.imageAlt": "Jx Studio design canvas showing one component across four responsive breakpoints with a style inspector",
-                    "props.description": "A live canvas for every breakpoint and a full CSS inspector — spacing, type, color, layout, hover states, and design tokens. Everything you'd do in DevTools, but persistent."
+                    "props.description": "A live canvas for every breakpoint and a full CSS inspector for spacing, type, color, layout, hover states, and design tokens. Everything you'd do in DevTools, but persistent."
                   }
                 },
                 {
@@ -192,7 +192,7 @@
                     "props.name": "Script",
                     "props.image": "/content/docs/images/mode-script.png",
                     "props.imageAlt": "Jx Studio editing a component state function in the Monaco code editor",
-                    "props.description": "State, data, and events in structured panels, plus a Monaco editor for functions and integrations. Switch a fetch from the browser to the server with one picker, and — once the connector and auth extensions are added — bind a list to a database table or wire up a sign-in form. Hover effects and logged-in apps, same panels."
+                    "props.description": "State, data, and events in structured panels, plus a Monaco editor for functions and integrations. Switch a fetch from the browser to the server with one picker, and, once the connector and auth extensions are added, bind a list to a database table or wire up a sign-in form. Hover effects and logged-in apps, same panels."
                   }
                 }
               ]
@@ -255,7 +255,7 @@
                     {
                       "tagName": "check-item",
                       "attributes": {
-                        "props.text": "Guided setup — name, directory, and production URL"
+                        "props.text": "Guided setup: name, directory, and production URL"
                       }
                     },
                     {
@@ -282,7 +282,7 @@
               "tagName": "img",
               "attributes": {
                 "src": "/content/docs/images/new-project.png",
-                "alt": "Jx Studio New Project dialog — name, directory, production URL, and deployment adapter picker",
+                "alt": "Jx Studio New Project dialog: name, directory, production URL, and deployment adapter picker",
                 "width": "3840",
                 "height": "2000",
                 "loading": "lazy",
@@ -323,7 +323,7 @@
               "tagName": "img",
               "attributes": {
                 "src": "/content/docs/images/git-panel.png",
-                "alt": "Jx Studio Source Control panel — branch, commit-and-sync, and a tree of changed files",
+                "alt": "Jx Studio Source Control panel: branch, commit-and-sync, and a tree of changed files",
                 "width": "480",
                 "height": "1880",
                 "loading": "lazy",
@@ -366,7 +366,7 @@
                     "lineHeight": "1.7",
                     "margin": "0 0 2rem"
                   },
-                  "textContent": "Review changes, write a message, and commit-and-sync — right from Studio. Starting fresh? Create the GitHub repository in a click, from inside Studio. From there, your host builds and publishes the site on every push — pages, assets, and the server tier if your project has one."
+                  "textContent": "Review changes, write a message, and commit-and-sync, right from Studio. Starting fresh? Create the GitHub repository in a click, from inside Studio. From there, your host builds and publishes the site on every push: pages, assets, and the server tier if your project has one."
                 },
                 {
                   "tagName": "div",
@@ -375,7 +375,7 @@
                     {
                       "tagName": "check-item",
                       "attributes": {
-                        "props.text": "Stage, diff, commit, branch, and push — all in-app"
+                        "props.text": "Stage, diff, commit, branch, and push, all in-app"
                       }
                     },
                     {
@@ -387,7 +387,7 @@
                     {
                       "tagName": "check-item",
                       "attributes": {
-                        "props.text": "Your host builds on push — no deploy scripts to babysit"
+                        "props.text": "Your host builds on push, with no deploy scripts to babysit"
                       }
                     },
                     {
@@ -437,7 +437,7 @@
                 "margin": "0 auto 2rem",
                 "maxWidth": "560px"
               },
-              "textContent": "Most visual builders trap your work in a proprietary format you can't read, can't version, and can't leave. Jx Studio reads and writes the same JSON and Markdown you'd write by hand. Close the app — your site is still there, still readable, still yours."
+              "textContent": "Most visual builders trap your work in a proprietary format you can't read, can't version, and can't leave. Jx Studio reads and writes the same JSON and Markdown you'd write by hand. Close the app and your site is still there, still readable, still yours."
             },
             {
               "tagName": "div",
@@ -453,7 +453,9 @@
               "children": [
                 {
                   "tagName": "check-item",
-                  "attributes": { "props.text": "Opens any Jx project from disk — no import step" }
+                  "attributes": {
+                    "props.text": "Opens any Jx project from disk, with no import step"
+                  }
                 },
                 {
                   "tagName": "check-item",
@@ -461,11 +463,11 @@
                 },
                 {
                   "tagName": "check-item",
-                  "attributes": { "props.text": "Works offline — no cloud, no account" }
+                  "attributes": { "props.text": "Works offline: no cloud, no account" }
                 },
                 {
                   "tagName": "check-item",
-                  "attributes": { "props.text": "Git-friendly output — clean diffs, no blobs" }
+                  "attributes": { "props.text": "Git-friendly output: clean diffs, no blobs" }
                 }
               ]
             }

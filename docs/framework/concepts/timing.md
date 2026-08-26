@@ -9,17 +9,17 @@ spec:
 
 # Timing: client, server, compiler
 
-> **Studio writes this format for you.** The **Timing** field on a data source's editor ([Data sources](/docs/studio/logic/data-sources)) sets the values below — this page documents what each one means.
+> **Studio writes this format for you.** The **Timing** field on a data source's editor ([Data sources](/docs/studio/logic/data-sources)) sets the values below, and this page documents what each one means.
 
 The `timing` key on a state entry declares **where** its value is resolved. There are three values, and each moves the work to a different machine:
 
-| Value        | When it resolves                                          |
-| ------------ | --------------------------------------------------------- |
-| `"client"`   | At runtime, in the visitor's browser (the default)        |
-| `"server"`   | At runtime, on the server, called over an RPC boundary    |
-| `"compiler"` | At build time — the result is baked into the emitted HTML |
+| Value        | When it resolves                                         |
+| ------------ | -------------------------------------------------------- |
+| `"client"`   | At runtime, in the visitor's browser (the default)       |
+| `"server"`   | At runtime, on the server, called over an RPC boundary   |
+| `"compiler"` | At build time; the result is baked into the emitted HTML |
 
-The smallest complete server-timed entry — a function that runs on the server, whose return value lands in state:
+The smallest complete server-timed entry is a function that runs on the server, whose return value lands in state:
 
 ```json
 {
@@ -35,11 +35,11 @@ The smallest complete server-timed entry — a function that runs on the server,
 
 ## Client
 
-`"client"` is the default — omit `timing` and the entry resolves in the browser. All the Web-API [data prototypes](/docs/framework/concepts/data-prototypes) (`Request`, `LocalStorage`, `IndexedDB`, …) are client-timed unless told otherwise.
+`"client"` is the default: omit `timing` and the entry resolves in the browser. All the Web-API [data prototypes](/docs/framework/concepts/data-prototypes) (`Request`, `LocalStorage`, `IndexedDB`, …) are client-timed unless told otherwise.
 
 ## Server: the RPC function boundary
 
-`timing: "server"` designates a cross-process function call. The entry names an async export in a server-side module via `$src` and `$export` — no `$prototype` is used. The function receives `(args, env)`: the caller's arguments object, and the platform's environment bindings (Cloudflare Workers `env`, a Node `process.env` wrapper, …):
+`timing: "server"` designates a cross-process function call. The entry names an async export in a server-side module via `$src` and `$export`, and no `$prototype` is used. The function receives `(args, env)`: the caller's arguments object, and the platform's environment bindings (Cloudflare Workers `env`, a Node `process.env` wrapper, …):
 
 ```js
 export async function fetchMetrics(args, env) {
@@ -53,7 +53,7 @@ A function that needs no bindings simply ignores the second parameter.
 
 ### Arguments
 
-An optional `arguments` field passes named parameters — a single object, not a positional list. Values may be static or reactive `$ref`s; any reactive value makes the call re-run when it changes:
+An optional `arguments` field passes named parameters as a single object rather than a positional list. Values may be static or reactive `$ref`s; any reactive value makes the call re-run when it changes:
 
 ```json
 {
@@ -71,15 +71,15 @@ An optional `arguments` field passes named parameters — a single object, not a
 
 ### The security boundary
 
-Server credentials stay in the server process. The `env` parameter gives the function its platform bindings — databases, KV namespaces, secrets, email workers — and none of it crosses to the client: the browser receives only the function's serialized return value.
+Server credentials stay in the server process. The `env` parameter gives the function its platform bindings (databases, KV namespaces, secrets, email workers), and none of it crosses to the client: the browser receives only the function's serialized return value.
 
 :::doc-warning
-The boundary is enforced by the **compiled** output. During development, the runtime may execute a server entry client-side (falling back to the dev server's proxy when the module can't load in a browser), so don't treat dev behavior as proof that a secret is hidden — build and deploy to exercise the real boundary.
+The boundary is enforced by the **compiled** output. During development, the runtime may execute a server entry client-side (falling back to the dev server's proxy when the module can't load in a browser), so don't treat dev behavior as proof that a secret is hidden. Build and deploy to exercise the boundary.
 :::
 
 ## Compiler
 
-`timing: "compiler"` resolves the entry during the build. The result is baked into the emitted HTML and the entry is stripped from the shipped state — visitors download the finished value, not the machinery that produced it. This is the natural timing for content that changes only when you rebuild, and the content prototypes (`MarkdownFile`, `MarkdownCollection`, `ContentCollection`) use it by design:
+`timing: "compiler"` resolves the entry during the build. The result is baked into the emitted HTML and the entry is stripped from the shipped state, so visitors download the finished value rather than the machinery that produced it. This is the natural timing for content that changes only when you rebuild, and the content prototypes (`MarkdownFile`, `MarkdownCollection`, `ContentCollection`) use it by design:
 
 ```json
 {
@@ -97,7 +97,7 @@ For each `timing: "server"` entry, the [compiler](/docs/framework/build) emits t
 
 When `build.adapter` is set in `project.json`, every server entry across the whole site is collected, deduplicated by export name, and bundled into a single worker (`dist/_worker.js` plus a `_routes.json` limiting invocation to `/_jx/*` on Cloudflare Pages). Without an adapter, a standalone per-document handler is generated instead. During development the [dev server](/docs/framework/build/dev-server) stands in for both.
 
-Compiler-timed entries never produce runtime artifacts at all — the site build resolves them, bakes the values into the static HTML, and strips the entries from the document.
+Compiler-timed entries never produce runtime artifacts at all. The site build resolves them, bakes the values into the static HTML, and strips the entries from the document.
 
 ## Rules
 
@@ -106,12 +106,12 @@ Compiler-timed entries never produce runtime artifacts at all — the site build
 - The server function's signature is `(args, env)`; `arguments` is one named-values object.
 - A reactive `$ref` in `arguments` makes the RPC call reactive.
 - `env` and everything reachable through it stay server-side; only the return value is serialized to the browser.
-- `timing: "compiler"` values are fixed at build time — rebuild the site to refresh them.
+- `timing: "compiler"` values are fixed at build time, so rebuild the site to refresh them.
 
 ## Related
 
-- [Data prototypes](/docs/framework/concepts/data-prototypes) — the entries `timing` applies to
-- [Functions and sidecars](/docs/framework/concepts/functions) — client-side functions by contrast
-- [The build](/docs/framework/build) — where server bundling and baking happen
-- [Dev server](/docs/framework/build/dev-server) — server timing during development
-- [Data sources in Studio](/docs/studio/logic/data-sources) — the Timing field in the editor
+- [Data prototypes](/docs/framework/concepts/data-prototypes): the entries `timing` applies to
+- [Functions and sidecars](/docs/framework/concepts/functions): client-side functions by contrast
+- [The build](/docs/framework/build): where server bundling and baking happen
+- [Dev server](/docs/framework/build/dev-server): server timing during development
+- [Data sources in Studio](/docs/studio/logic/data-sources): the Timing field in the editor

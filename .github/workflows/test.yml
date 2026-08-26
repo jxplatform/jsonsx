@@ -336,6 +336,15 @@ jobs:
       # footer versions match, and each spec's changelog agrees with its header.
       # See scripts/docs/check-spec-status.ts.
       - run: bun run docs:status
+      # Links: every internal link resolves, and every `#anchor` names a heading the target page
+      # really publishes. Nothing checked these until six pages were found shipping relative
+      # `./i18n.md` links, which render in a Markdown preview and 404 once published.
+      # See scripts/docs/check-doc-links.ts.
+      - run: bun run docs:links
+      # Prose: no em dash, curly quote, decorative emoji or stock AI vocabulary, and the per-file
+      # em-dash debt may only fall. Cadence rules the style guide leaves to a person are NOT gated;
+      # `--report` prints them. See scripts/docs/check-prose.ts and scripts/docs/prose.json.
+      - run: bun run docs:prose
       # Markdown: no visual-editor escapes (`## 18\.`, `RESERVED\_KEYS`). One of these once made
       # spec.md's whole Standards Alignment section unfindable, so twelve rows silently stopped
       # being validated. See scripts/normalize-markdown.ts; `bun run format:md` fixes it.

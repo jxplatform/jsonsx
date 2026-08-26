@@ -32,7 +32,7 @@ export function generateFormulas(): string {
     "",
     "# Formula catalog",
     "",
-    "These composite formulas ship with Jx and appear in Studio's formula palette. Inserting one copies its pure `$expression` body into your document — there is no runtime dependency on this catalog. The blessed operator set the bodies draw from is in the [operator reference](/docs/framework/reference/operators/).",
+    "These composite formulas ship with Jx and appear in Studio's formula palette. Inserting one copies its pure `$expression` body into your document — there is no runtime dependency on this catalog. The blessed operator set the bodies draw from is in the [operator reference](/docs/framework/reference/operators).",
     "",
   ];
 
