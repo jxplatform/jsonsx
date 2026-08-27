@@ -13,6 +13,8 @@
  * `@jxsuite/schema/asset-paths`, the same lane math the canvas, the dev server and the build all
  * use. Resolving a rooted ref against the project root alone was how a rename of any file under
  * `public/` rewrote nothing while promising otherwise (issue 239).
+ *
+ * @docs studio/projects/pages-layouts-components
  */
 
 import { BUILD_LANES, projectPathsForSiteUrl, siteUrlForPath } from "@jxsuite/schema/asset-paths";

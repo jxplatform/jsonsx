@@ -303,6 +303,15 @@ export interface StudioPlatform {
    */
   uploadFile: (path: string, data: string | File | Blob | ArrayBuffer) => Promise<UploadResult>;
   deleteFile: (path: string) => Promise<void>;
+  /**
+   * Move a file and rewrite the project's references to it.
+   *
+   * `from` and `to` are project-relative, and so is every path in the report — including
+   * `references.files[].path` and the `errors[].path` naming a document the refactor could not
+   * write. An adapter over a backend with a different path space translates the REQUEST or the
+   * REPLY, never both: which one needs translating is a property of that backend's route, and doing
+   * both silently assumes it echoes its own input space (specs/desktop.md §3.1).
+   */
   renameFile: (from: string, to: string) => Promise<RenameResult>;
   /**
    * Where a file or a component tag is used across the project — the read side of the same walker
@@ -316,6 +325,9 @@ export interface StudioPlatform {
    *
    * At least one of `path` / `tagName` must be given. A `path` naming a component document
    * contributes its own root tag, so one call answers "as a file AND as an element" together.
+   *
+   * `path` is project-relative going in, and every path coming back is too. A backend that cannot
+   * place the target inside the active project MUST fail rather than answer zero.
    */
   findReferences?: (target: { path?: string; tagName?: string }) => Promise<ReferencesResult>;
   createDirectory: (path: string) => Promise<void>;

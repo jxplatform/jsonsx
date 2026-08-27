@@ -16,6 +16,8 @@
  *
  * The visitor seam is what stops the read side from being a second, drifting copy of the key list.
  * A new reference-bearing key added below is a key the usage count sees on the same commit.
+ *
+ * @docs studio/projects/pages-layouts-components
  */
 
 import { classifyRef, looksLikeFileRef, rewriteRef } from "./paths.ts";

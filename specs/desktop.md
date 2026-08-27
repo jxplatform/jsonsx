@@ -2,7 +2,7 @@
 
 ## Platform Abstraction, Project Loading, and Component Scoping
 
-**Version:** 0.4.5-draft
+**Version:** 0.4.6-draft
 **Status:** Pending
 **Updated:** 2026-08-27
 **License:** MIT
@@ -92,6 +92,14 @@ The canonical `StudioPlatform` interface is `packages/studio/src/types.ts` — r
 | **Code services / AI**   | `codeService` (§5.3), `resolveClass?`, `aiChatUrl`                                                                                                                                                                             |
 | **Multi-window / shell** | `openProjectInNewWindow?`, `pickProject?`, `newWindow?`, `setWindowProject?`, `getProjectRoot?`, `getAppInfo?`, `getSettings?`, `patchSettings?`                                                                               |
 | **Canvas**               | `canvasUrl?`, `canvasUrlDeferred?`, `documentBaseUrl?`, `assetSpace?`, `assetCapabilities?`                                                                                                                                    |
+
+**Every path across the PAL is project-relative, in both directions.** A caller passes
+`components/card.json`, and a member that reports paths reports them in that same space — including
+the refactor members, whose reports name files the sweep found. Where a backend speaks a different
+space, the adapter translates, and it translates in ONE direction only: an adapter that both
+prefixes a request and strips a prefix off the reply is asserting that the backend echoes its own
+input space, which is a property of a particular route rather than of the protocol. The dev server's
+own convention is stated in `server.md` §4.1.
 
 **User settings are written as PATCHES, never as the whole map.** `patchSettings({ set, remove })`
 must leave a key named by neither exactly as it found it, and answers with the store as it then
@@ -1263,6 +1271,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.4.6-draft** (2026-08-27) — The PAL is project-relative in both directions; an adapter translates a request space or a reply space, never both.
 - **0.4.5-draft** (2026-08-27) — Both launchers preview the working tree live at real routes; Build Site keeps the compiler, and leaving the webview is stated to be one-way.
 - **0.4.4-draft** (2026-08-26) — the Import tab chooses how many breakpoints the project keeps, and what an import emits is normative (§4.5).
 - **0.4.3-draft** (2026-08-26) — Typechecking resolves the ElectroBun SDK from the pinned vendor/electrobun submodule; .hutch/devkit stays the build sysroot.
@@ -1312,4 +1321,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx Studio Desktop Architecture Specification v0.4.5-draft_
+_Jx Studio Desktop Architecture Specification v0.4.6-draft_
