@@ -1,4 +1,4 @@
-import { flush, installMockPlatform, resetStudioState } from "./harness";
+import { flush, installMockPlatform, resetStudioState, stubRect } from "./harness";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { notifyModule } from "./notify-mock";
 import { fakeCell, fakeRange, fakeRow, FakeTabulator, tabulatorMockModule } from "./tabulator-mock";
@@ -132,9 +132,21 @@ describe("gridIdleBlockers", () => {
    */
   const mine = (id: string) => gridIdleBlockers().filter((line) => line.includes(id));
 
+  /** The `.tabulator-range` div the SelectRange module paints, with a box happy-dom cannot compute. */
+  function paintOutline(host: HTMLElement): HTMLElement {
+    const overlay = document.createElement("div");
+    overlay.className = "tabulator-range-overlay";
+    const outline = document.createElement("div");
+    outline.className = "tabulator-range";
+    overlay.append(outline);
+    host.append(overlay);
+    stubRect(outline, { height: 28, left: 376, top: 180, width: 142 });
+    return outline;
+  }
+
   test("a grid is in-flight until it is built AND its range is laid out", async () => {
     const id = "grid://idle/built";
-    const { table, view } = await setupView(stubSource({ id }));
+    const { host, table, view } = await setupView(stubSource({ id }));
 
     // `data.openGrid` has already resolved by here and `editor.kind` already reads "grid", which
     // Is precisely why the screenshot runner used to photograph the table mid-build.
@@ -146,10 +158,31 @@ describe("gridIdleBlockers", () => {
     const row = fakeRow({ [ROW_KEY_FIELD]: "a" });
     const cell = fakeCell(row, "title", table);
     table.ranges.push(fakeRange([[cell]]));
+    // The MODEL now has a range and the OUTLINE is still unpainted. This is the window the probe
+    // Used to call settled, and `data-grid.png` alternated across it 16 times in ten days.
+    expect(mine(id)).toEqual([`grid[${id}]: selection range outline not painted`]);
+
+    paintOutline(host);
     expect(mine(id)).toEqual([]);
 
     view.destroy();
     expect(mine(id)).toEqual([]);
+  });
+
+  test("a range whose outline has no box yet is still in-flight", async () => {
+    const id = "grid://idle/zero-box";
+    const { host, table, view } = await setupView(stubSource({ id }));
+    table.emit("tableBuilt");
+    const row = fakeRow({ [ROW_KEY_FIELD]: "a" });
+    table.ranges.push(fakeRange([[fakeCell(row, "title", table)]]));
+
+    // Tabulator appends the overlay before it positions it. An element with a zero-width box is a
+    // Range that has not been laid out, so presence alone would reopen the window this closes.
+    const outline = paintOutline(host);
+    stubRect(outline, { height: 0, left: 0, top: 0, width: 0 });
+    expect(mine(id)).toEqual([`grid[${id}]: selection range outline not painted`]);
+
+    view.destroy();
   });
 
   test("an empty grid never waits for the range it will never be given", async () => {
