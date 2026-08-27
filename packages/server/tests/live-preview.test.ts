@@ -385,6 +385,22 @@ describe("the overlay", () => {
       clearLivePreviewOverlay(resolve(TMP, "..", "never-published"));
     }).not.toThrow();
   });
+
+  /*
+   * Studio retracts per document, and it retracts documents it never published — a tab closed
+   * without an edit runs the same path as one closed with unsaved bytes. Naming a document the
+   * overlay does not hold must therefore leave the ones it DOES hold exactly where they were.
+   */
+  test("retracting a document that was never published leaves the others standing", async () => {
+    const { origin } = await startLivePreview(TMP);
+    setLivePreviewOverlay(
+      TMP,
+      "pages/index.json",
+      JSON.stringify({ children: ["Unsaved"], tagName: "main" }),
+    );
+    clearLivePreviewOverlay(TMP, "pages/never-published.json");
+    expect(await bodyOf(origin, "/")).toContain("Unsaved");
+  });
 });
 
 describe("reading the tree", () => {

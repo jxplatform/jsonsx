@@ -158,6 +158,7 @@ describe("serveSite", () => {
     const context = { config: {} as never, routes: [] as never };
     const seeded = await siteContext(tree({ "pages/index.json": PAGE }).io);
     const withRoutes = { ...context, routes: seeded.routes };
+    // oxlint-disable-next-line typescript/await-thenable -- bun test .rejects is typed `void` but returns a real Promise; the await is required.
     await expect(serveSite("/", io, assets, withRoutes, SHELL)).rejects.toThrow("disk on fire");
   });
 });

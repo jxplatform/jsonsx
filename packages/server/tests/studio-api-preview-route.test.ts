@@ -1,11 +1,13 @@
 /**
- * POST /__studio/preview — the route behind `View: Open in Browser`, live edition.
+ * The two routes behind `View: Open in Browser`, live edition: POST /__studio/preview, which opens
+ * the origin, and /__studio/preview/overlay, which carries the unsaved bytes to it.
  *
  * `live-preview.test.ts` drives the origin itself against a real tree. This mocks it away, which is
- * what makes the judgements the ROUTE makes observable: which directory it previews, that it
- * refuses a directory that is not a site project, that it forwards the requested route to the
- * retarget, and — the one a caller acts on — that `reused` comes back untouched, because a caller
- * that ignores it gives the author two tabs on one project.
+ * what makes the judgements the ROUTES make observable: which directory is previewed, that a
+ * directory which is not a site project is refused, that the requested route reaches the retarget,
+ * that `reused` comes back untouched — because a caller that ignores it gives the author two tabs
+ * on one project — and, for the overlay, that a browser request becomes exactly the publish or the
+ * retraction Studio asked for, against the same directory the preview itself runs from.
  */
 
 import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
@@ -29,9 +31,13 @@ let startResult: Preview = {
 };
 let startFailure: string | null = null;
 let navigateResult = false;
+const overlaySets: { contents: string; path: string; root: string }[] = [];
+const overlayClears: { path: string | undefined; root: string }[] = [];
 
 void mock.module("../src/live-preview.ts", () => ({
-  clearLivePreviewOverlay: () => {},
+  clearLivePreviewOverlay: (projectRoot: string, path?: string) => {
+    overlayClears.push({ path, root: projectRoot });
+  },
   livePreviewClients: () => 0,
   livePreviewOrigin: () => startResult.origin,
   navigateLivePreview: (projectRoot: string, route: string) => {
@@ -39,7 +45,9 @@ void mock.module("../src/live-preview.ts", () => ({
     return Promise.resolve(navigateResult);
   },
   notifyLivePreviewChange: () => {},
-  setLivePreviewOverlay: () => {},
+  setLivePreviewOverlay: (projectRoot: string, path: string, contents: string) => {
+    overlaySets.push({ contents, path, root: projectRoot });
+  },
   startLivePreview: (projectRoot: string) => {
     startCalls.push(projectRoot);
     return startFailure === null
@@ -70,6 +78,24 @@ async function callApi(body: unknown, root: string, activeProjectRoot: string | 
   return res;
 }
 
+async function callOverlay(
+  method: "POST" | "DELETE",
+  body: unknown,
+  root: string,
+  activeProjectRoot: string | null,
+) {
+  const url = new URL("http://localhost/__studio/preview/overlay");
+  const req = new Request(url, {
+    body: typeof body === "string" ? body : JSON.stringify(body),
+    method,
+  });
+  const res = await handleStudioApi(req, url, root, activeProjectRoot);
+  if (!res) {
+    throw new Error("handleStudioApi returned null");
+  }
+  return res;
+}
+
 beforeAll(() => {
   rmSync(FIXTURES, { force: true, recursive: true });
   mkdirSync(SITE, { recursive: true });
@@ -88,6 +114,8 @@ beforeEach(() => {
   startResult = { errors: [], origin: "http://127.0.0.1:41234", port: 41_234, routes: 3 };
   startFailure = null;
   navigateResult = false;
+  overlaySets.length = 0;
+  overlayClears.length = 0;
 });
 
 describe("which directory is previewed", () => {
@@ -176,5 +204,86 @@ describe("failure", () => {
     const res = await callApi({ route: "/" }, SITE, null);
     expect(res.status).toBe(500);
     expect(JSON.stringify(await res.json())).toContain("port exhausted");
+  });
+});
+
+describe("the unsaved bytes", () => {
+  test("a POST publishes one document, and answers with no content", async () => {
+    const res = await callOverlay(
+      "POST",
+      { contents: '{"tagName":"main"}', path: "pages/index.json" },
+      SITE,
+      null,
+    );
+    expect(res.status).toBe(204);
+    expect(overlaySets).toEqual([
+      { contents: '{"tagName":"main"}', path: "pages/index.json", root: SITE },
+    ]);
+  });
+
+  /*
+   * The same directory the preview itself runs from. An overlay published against the server root
+   * while the origin serves the active project would be bytes nothing ever reads.
+   */
+  test("publishes against the ACTIVE project, not the server root", async () => {
+    await callOverlay("POST", { contents: "{}", path: "pages/index.json" }, PLAIN, SITE);
+    expect(overlaySets.map((o) => o.root)).toEqual([SITE]);
+  });
+
+  test("with nothing activated, the server root is the project", async () => {
+    await callOverlay("POST", { contents: "{}", path: "pages/index.json" }, SITE, null);
+    expect(overlaySets.map((o) => o.root)).toEqual([SITE]);
+  });
+
+  test("a DELETE naming a document retracts exactly that one", async () => {
+    const res = await callOverlay("DELETE", { path: "pages/index.json" }, SITE, null);
+    expect(res.status).toBe(204);
+    expect(overlayClears).toEqual([{ path: "pages/index.json", root: SITE }]);
+  });
+
+  // Naming none means every one of this project's — how Studio lets go of a project it is leaving.
+  test("a DELETE naming no document retracts the whole project's", async () => {
+    const res = await callOverlay("DELETE", {}, SITE, null);
+    expect(res.status).toBe(204);
+    expect(overlayClears).toEqual([{ path: undefined, root: SITE }]);
+  });
+});
+
+describe("the unsaved bytes, refused", () => {
+  /*
+   * Half a publish is worse than none: a path with no contents would retract nothing and publish
+   * nothing, leaving the reader on stale bytes with no error anywhere.
+   */
+  test("a POST missing either half is refused, and nothing is published", async () => {
+    const noContents = await callOverlay("POST", { path: "pages/index.json" }, SITE, null);
+    const noPath = await callOverlay("POST", { contents: "{}" }, SITE, null);
+
+    expect(noContents.status).toBe(400);
+    expect(noPath.status).toBe(400);
+    expect(overlaySets).toEqual([]);
+  });
+
+  test("a body that is not JSON is refused, for either method", async () => {
+    const posted = await callOverlay("POST", "{oops", SITE, null);
+    const deleted = await callOverlay("DELETE", "{oops", SITE, null);
+
+    expect(posted.status).toBe(400);
+    expect(deleted.status).toBe(400);
+    expect(overlaySets).toEqual([]);
+    expect(overlayClears).toEqual([]);
+  });
+
+  /*
+   * Publishing and retracting are the whole vocabulary. Any other method falls through to the rest
+   * of the API rather than being answered here, which is what keeps this route from claiming a path
+   * it has no meaning for.
+   */
+  test("a method that is neither is not this route's to answer", async () => {
+    const url = new URL("http://localhost/__studio/preview/overlay");
+    const req = new Request(url, { body: JSON.stringify({}), method: "PUT" });
+
+    expect(await handleStudioApi(req, url, SITE, null)).toBeNull();
+    expect(overlaySets).toEqual([]);
+    expect(overlayClears).toEqual([]);
   });
 });

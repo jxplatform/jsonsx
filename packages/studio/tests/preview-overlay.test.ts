@@ -307,6 +307,7 @@ describe("no platform at all", () => {
     const saved = holder.__jxPlatform;
     delete holder.__jxPlatform;
     try {
+      // oxlint-disable-next-line typescript/await-thenable -- bun test .resolves is typed `void` but returns a real Promise; the await is required.
       await expect(flushPreviewOverlay()).resolves.toBeUndefined();
       expect(published).toEqual([]);
     } finally {
@@ -321,6 +322,7 @@ describe("a backend that cannot hold an overlay", () => {
     armPreviewOverlay();
     const tab = tabAt("pages/index.json");
     edit(tab, "Edited");
+    // oxlint-disable-next-line typescript/await-thenable -- bun test .resolves is typed `void` but returns a real Promise; the await is required.
     await expect(flushPreviewOverlay()).resolves.toBeUndefined();
   });
 });

@@ -47,7 +47,10 @@ void mock.module("../src/grid/grid-open", () => ({
 }));
 
 /** Tabs this file has declared to be grid tabs, keyed by the raw tab `openTab` handed back. */
-const gridTabs = new Map<object, { save: () => Promise<void>; serializeForSource: () => null }>();
+const gridTabs = new Map<
+  object,
+  { save: () => Promise<void>; serializeForSource: () => string | null }
+>();
 void mock.module("../src/grid/grid-controller", () => ({
   ROW_KEY_FIELD: "__key",
   getGridController: (tab: object | null) => (tab === null ? null : (gridTabs.get(tab) ?? null)),
@@ -56,6 +59,7 @@ void mock.module("../src/grid/grid-controller", () => ({
 const { openFileInTab, openLastSessionOrHome, renderFilesTemplate } =
   await import("../src/files/files");
 const { saveFile } = await import("../src/files/file-ops");
+const { serializeDocument } = await import("../src/files/serialize-document");
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
 
@@ -324,6 +328,43 @@ describe("saving a grid tab", () => {
     expect(await saveFile(tab)).toBe(false);
     expect(tab.doc.dirty).toBe(true);
     expect(state.calls.filter(([name]) => name === "writeFile")).toHaveLength(0);
+  });
+});
+
+// ─── serializeDocument · a grid tab serializes through its source ─────────────
+
+describe("serializing a grid tab", () => {
+  /*
+   * The SOURCE, not the document. A grid tab's document is the grid's own shape, so serializing it
+   * would show the Monaco source View something no save would ever write — and the pending edits,
+   * which live in the buffer rather than the document, would be missing from it.
+   */
+  test("the source's pending text is what serializes, document untouched", async () => {
+    installMockPlatform({ formatAction: mockFormatAction });
+    const tab = openTab({
+      document: { children: [], tagName: "div" },
+      documentPath: "data/live.csv",
+      id: "data/live.csv",
+    });
+    gridTabs.set(tab, {
+      save: async () => {},
+      serializeForSource: () => "name,role\nAda,author\n",
+    });
+
+    expect(await serializeDocument(tab)).toBe("name,role\nAda,author\n");
+  });
+
+  // A source with nothing to say is not an answer — the document is still the fallback.
+  test("a source that answers with nothing falls through to the document", async () => {
+    installMockPlatform({ formatAction: mockFormatAction });
+    const tab = openTab({
+      document: { children: [], tagName: "div" },
+      documentPath: "data/empty.csv",
+      id: "data/empty.csv",
+    });
+    gridTabs.set(tab, { save: async () => {}, serializeForSource: () => null });
+
+    expect(JSON.parse(await serializeDocument(tab))).toEqual({ children: [], tagName: "div" });
   });
 });
 

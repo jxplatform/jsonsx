@@ -243,8 +243,12 @@ export const handlers: Record<string, (params: unknown) => Promise<unknown>> = {
   // `View: Open in Browser` builds before it opens, so the reader sees what the author sees.
   buildSite: () => buildSite(),
   previewSite: (params) => previewSite(params as { route: string }),
-  setPreviewOverlay: (params) => setPreviewOverlay(params as { contents: string; path: string }),
-  clearPreviewOverlay: (params) => clearPreviewOverlay(params as { path?: string }),
+  /* Both publish synchronously into an in-memory overlay — `rpc-schema` declares `response: void`
+     and `createProjectSession` throws where it is called, which `preview-site.test.ts` pins. The
+     map's contract is a promise, so the adaptation is here rather than in the session. */
+  setPreviewOverlay: async (params) =>
+    setPreviewOverlay(params as { contents: string; path: string }),
+  clearPreviewOverlay: async (params) => clearPreviewOverlay(params as { path?: string }),
   gitCheckout: (params) => gitCheckout(params as { branch: string }),
   gitCommit: (params) => gitCommit(params as { message: string }),
   gitCreateBranch: (params) => gitCreateBranch(params as { name: string }),

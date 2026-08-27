@@ -134,6 +134,7 @@ describe("previewSite", () => {
 
   test("with no project open it refuses rather than previewing nothing", async () => {
     const session = createProjectSession(null);
+    // oxlint-disable-next-line typescript/await-thenable -- .rejects is typed void, awaited at runtime
     await expect(session.previewSite({ route: "/" })).rejects.toThrow("No project open");
   });
 });
