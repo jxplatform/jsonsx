@@ -7,7 +7,7 @@
  */
 import { describe, expect, test } from "bun:test";
 import { resolveLayout } from "../src/layout.ts";
-import type { JxDocument } from "../types.ts";
+import type { JxDocument } from "@jxsuite/schema/types";
 
 /** A loader over a plain map, recording the refs it was asked for. */
 function loaderFor(layouts: Record<string, unknown>) {

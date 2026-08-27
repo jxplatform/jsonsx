@@ -50,7 +50,7 @@ import type { AssetMount } from "@jxsuite/schema/asset-paths";
 import type { FormatEntry, FormatRegistry } from "@jxsuite/schema/format-registry";
 import type { ExtensionRegistry } from "@jxsuite/schema/extension-registry";
 import { resolveLayout } from "./layout-resolver.ts";
-import { mergeHead, renderHead } from "@jxsuite/schema/head-merger";
+import { mergeHead, renderHead } from "@jxsuite/site/head-merger";
 import { unregisteredHeadRelations } from "./link-relations.ts";
 import { injectContext } from "./context-injection.ts";
 import { compile, compileServer, compileSiteServer } from "../compiler.ts";

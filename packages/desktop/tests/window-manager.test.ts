@@ -119,6 +119,16 @@ function makeSession(initialRoot: string | null) {
       routes: 1,
       url: "http://127.0.0.1:4321",
     })),
+    previewSite: mock(async () => ({
+      errors: [],
+      files: 0,
+      mode: "live" as const,
+      reused: true,
+      routes: 3,
+      url: "http://127.0.0.1:51000",
+    })),
+    setPreviewOverlay: mock(() => {}),
+    clearPreviewOverlay: mock(() => {}),
     formatAction: mock(async () => ({})),
     // Data surface + secrets (desktop twins of /__studio/data/* + /__studio/secrets)
     dataConnections: mock(async () => ({ connections: [] })),
@@ -411,13 +421,31 @@ describe("per-window RPC", () => {
     await reqs.jxResolve({ body: "{}" });
     await reqs.jxServerFunction({ body: "{}" });
     await reqs.listFormats();
-    // `View: Open in Browser` builds through this window and opens the origin the reply names.
+    // `Build Site` compiles through this window and opens the origin the reply names.
     expect(await reqs.buildSite()).toEqual({
       errors: [],
       files: 2,
       routes: 1,
       url: "http://127.0.0.1:4321",
     });
+    /* `View: Open in Browser` reaches previewSite instead, and the route rides along so the
+       backend can point an already-open tab at it rather than only naming an origin. */
+    expect(await reqs.previewSite({ route: "/blog/hello/" })).toEqual({
+      errors: [],
+      files: 0,
+      mode: "live",
+      reused: true,
+      routes: 3,
+      url: "http://127.0.0.1:51000",
+    });
+    expect(session.previewSite).toHaveBeenCalledWith({ route: "/blog/hello/" });
+    await reqs.setPreviewOverlay({ contents: "{}", path: "pages/index.json" });
+    expect(session.setPreviewOverlay).toHaveBeenCalledWith({
+      contents: "{}",
+      path: "pages/index.json",
+    });
+    await reqs.clearPreviewOverlay({ path: "pages/index.json" });
+    expect(session.clearPreviewOverlay).toHaveBeenCalledWith({ path: "pages/index.json" });
     expect(session.handleDeleteFile).toHaveBeenCalledWith({ path: "a.json" });
     expect(session.findReferences).toHaveBeenCalledWith({ path: "components/card.json" });
     expect(session.listDirectory).toHaveBeenCalledWith({ dir: "src" });

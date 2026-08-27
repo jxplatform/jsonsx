@@ -36,6 +36,7 @@ import type {
   SecretsSetRequest,
   SecretsSetResponse,
   SiteBuildResult,
+  SitePreviewResult,
   StarterInfo,
 } from "../types";
 import { problemDetail, problemMessage } from "@jxsuite/protocol";
@@ -1149,6 +1150,41 @@ export function createDevServerPlatform() {
         throw new Error(problemDetail(body) ?? "The site could not be built.");
       }
       return (await res.json()) as SiteBuildResult;
+    },
+
+    /**
+     * Preview the working tree live, and point this project's open tab at a route.
+     *
+     * The dev server holds the same live origin the desktop launchers do, so the browser Studio
+     * gets the same preview: composed on demand, unsaved edits included.
+     */
+    async previewSite(opts: { route: string }) {
+      const res = await fetch("/__studio/preview", {
+        body: JSON.stringify(opts),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+      if (!res.ok) {
+        const body = await readJson<ErrorBody>(res);
+        throw new Error(problemDetail(body) ?? "The site could not be previewed.");
+      }
+      return (await res.json()) as SitePreviewResult;
+    },
+
+    async setPreviewOverlay(path: string, contents: string) {
+      await fetch("/__studio/preview/overlay", {
+        body: JSON.stringify({ contents, path }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+    },
+
+    async clearPreviewOverlay(path?: string) {
+      await fetch("/__studio/preview/overlay", {
+        body: JSON.stringify(path === undefined ? {} : { path }),
+        headers: { "Content-Type": "application/json" },
+        method: "DELETE",
+      });
     },
 
     /**

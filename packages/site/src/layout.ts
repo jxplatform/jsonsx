@@ -18,7 +18,7 @@
  * only thing this module asks for is a {@link LayoutLoader}, and everything else is pure.
  */
 
-import type { JxDocument, JxElement } from "../types.ts";
+import type { JxDocument, JxElement } from "@jxsuite/schema/types";
 
 /**
  * Read one layout document by the `$layout` reference that named it.

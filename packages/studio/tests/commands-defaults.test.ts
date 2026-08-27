@@ -40,6 +40,9 @@ const RAIL_PANELS: readonly RailPanel[] = [
 function recordingDeps() {
   const calls: string[] = [];
   const deps: CommandDeps = {
+    buildSite: () => {
+      calls.push("buildSite");
+    },
     saveDocument: () => {
       calls.push("saveDocument");
     },
@@ -304,7 +307,9 @@ describe("gating", () => {
     registry.registerAll(defaultCommandSet());
     expect(registry.isVisible("view.openInBrowser")).toBe(true);
     expect(registry.isEnabled("view.openInBrowser")).toBe(false);
-    expect(registry.disabledReason("view.openInBrowser")).toBe("a built page to open");
+    /* Nothing is built on the way here any more, so what it waits for is a document with a
+       route rather than an output file. */
+    expect(registry.disabledReason("view.openInBrowser")).toBe("a page to preview");
   });
 
   test("Undo is visible but disabled on an open document with no history", () => {
@@ -335,6 +340,7 @@ describe("the implementations", () => {
       "saveDocument",
       "closeDocument",
       "openInBrowser",
+      "buildSite",
       "undo",
       "redo",
       "duplicateSelection",

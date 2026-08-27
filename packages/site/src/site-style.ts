@@ -1,12 +1,16 @@
 /// <reference lib="dom" />
 /**
- * Site-style stylesheet builder — pure functions extracted for testability.
+ * Site-style stylesheet builder — `project.json`'s `style` as a real stylesheet.
  *
- * The canvas iframe injects the project's `style` as a real stylesheet instead of inline properties
- * on the root element: inline custom properties would defeat the forced-scheme override selectors
+ * A host emits the project's `style` as a stylesheet rather than as inline properties on the root
+ * element: inline custom properties would defeat the forced-scheme override selectors
  * (`:root[data-color-scheme]`, spec §9.5), and object-valued `@--name` blocks used to be dropped
- * entirely. Scheme-query blocks dual-emit through the runtime's schemeSelectors so the canvas
- * honors both the OS preference and the preview toggle.
+ * entirely. Scheme-query blocks dual-emit through the runtime's schemeSelectors so a host honors
+ * both the OS preference and its own forced-scheme toggle.
+ *
+ * Two hosts share it, which is why it is here rather than in either of them: the studio canvas,
+ * which passes a transposer rewriting viewport units to container units, and the live preview
+ * origin, which passes identity because a browser tab IS the viewport.
  */
 
 import { pureSchemeOf, resolveAtQuery, schemeSelectors, camelToKebab } from "@jxsuite/runtime";

@@ -562,8 +562,11 @@ describe("platform methods", () => {
       { pk: "r1", table: "posts" },
     ],
     ["setSecrets", [{ set: { MAIN_URL: "v" } }], "setSecrets", { set: { MAIN_URL: "v" } }],
-    // `View: Open in Browser` builds through this and opens the origin the reply names.
+    // `Build Site` compiles through this and opens the origin the reply names.
     ["buildSite", [], "buildSite", undefined],
+    /* `View: Open in Browser` reaches this one, and the route travels WITH the call: the backend
+       needs it to point an already-open tab somewhere, not just to name an origin. */
+    ["previewSite", [{ route: "/blog/hello/" }], "previewSite", { route: "/blog/hello/" }],
   ];
 
   for (const [method, args, rpcMethod, expectedPayload] of delegations) {
@@ -631,6 +634,22 @@ describe("platform methods", () => {
       "saveRecentProjects",
       { projects: [{ name: "x", root: "/x", timestamp: 1 }] },
     ],
+    /* The bytes a save WOULD write, so the preview shows the canvas rather than the disk. Two
+       positional arguments on the PAL, one object on the wire. */
+    [
+      "setPreviewOverlay",
+      ["pages/index.json", '{"tagName":"main"}'],
+      "setPreviewOverlay",
+      { contents: '{"tagName":"main"}', path: "pages/index.json" },
+    ],
+    [
+      "clearPreviewOverlay",
+      ["pages/index.json"],
+      "clearPreviewOverlay",
+      {
+        path: "pages/index.json",
+      },
+    ],
   ];
 
   for (const [method, args, rpcMethod, expectedPayload] of voidDelegations) {
@@ -649,6 +668,15 @@ describe("platform methods", () => {
       expect(result).toBeUndefined();
     });
   }
+
+  /* `clearPreviewOverlay()` with no path means EVERY document, and the wire has to say that as an
+     empty object rather than `{ path: undefined }` — which a JSON round trip would turn into the
+     same thing but which the backend reads as a positional argument either way. The distinction is
+     what separates "drop this document" from "drop all of them". */
+  test("clearPreviewOverlay with no path asks for the whole project", async () => {
+    await platform.clearPreviewOverlay!();
+    expect(lastCall("clearPreviewOverlay")!.args[0]).toEqual({});
+  });
 
   test("discoverComponents includes dir only when provided", async () => {
     await platform.discoverComponents("components");

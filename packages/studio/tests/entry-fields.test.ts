@@ -13,7 +13,7 @@ import { flush, installMockPlatform, resetStudioState } from "./harness";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { MARKDOWN_FORMAT, mockFormatAction, seedMarkdownFormat } from "./format-fixture";
 import { closeAllTabs, openTab } from "../src/workspace/workspace";
-import { serializeDocument } from "../src/files/file-ops";
+import { serializeDocument } from "../src/files/serialize-document";
 import { transactDoc, undo } from "../src/tabs/transact";
 import { commitEntryFields, entryFields, mutateEntryField } from "../src/content/entry-fields";
 import type { StudioPlatform } from "../src/types";

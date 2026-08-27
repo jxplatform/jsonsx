@@ -59,8 +59,22 @@ writeFileSync(
 let projectRootValue = FIXTURES;
 
 const handlerMocks = {
-  // `View: Open in Browser` builds first, so the reader sees what the author does.
+  // `Build Site` compiles; `View: Open in Browser` reaches previewSite instead.
   buildSite: mock(() => Promise.resolve({ errors: [], files: 0, routes: 0 })),
+  clearPreviewOverlay: mock(() => {}),
+  /* The live preview: no build, and `reused` says whether the project's open tab took the route
+     rather than a new one being opened for it. */
+  previewSite: mock(() =>
+    Promise.resolve({
+      errors: [],
+      files: 0,
+      mode: "live",
+      reused: false,
+      routes: 2,
+      url: "http://127.0.0.1:41234",
+    }),
+  ),
+  setPreviewOverlay: mock(() => {}),
   codeService: mock((params: unknown) => Promise.resolve({ echoed: params })),
   // Data surface + secrets (desktop twins of /__studio/data/* + /__studio/secrets)
   dataConnections: mock(() => Promise.resolve({ connections: [] })),
@@ -506,6 +520,27 @@ describe("chromium launcher RPC dispatch", () => {
     expect(await rpc("uploadFile", { data: "aGk=", path: "u.bin" })).toBeNull();
     expect(handlerMocks.handleWriteFile).toHaveBeenCalledWith({ content: "x", path: "a.txt" });
     expect(handlerMocks.handleRenameFile).toHaveBeenCalledWith({ from: "a", to: "b" });
+  });
+
+  /*
+   * The two synchronous entries in a map typed to promises, so the map is where they are adapted.
+   * Dispatching them through the socket is what proves the adaptation answers at all — declaring
+   * the entry is not calling it, and nothing else here ever did.
+   */
+  test("the preview overlay methods publish and retract through the socket", async () => {
+    const published = await rpc("setPreviewOverlay", {
+      contents: '{"tagName":"main"}',
+      path: "pages/index.json",
+    });
+    const retracted = await rpc("clearPreviewOverlay", { path: "pages/index.json" });
+
+    expect(published).toBeNull();
+    expect(retracted).toBeNull();
+    expect(handlerMocks.setPreviewOverlay).toHaveBeenCalledWith({
+      contents: '{"tagName":"main"}',
+      path: "pages/index.json",
+    });
+    expect(handlerMocks.clearPreviewOverlay).toHaveBeenCalledWith({ path: "pages/index.json" });
   });
 
   test("file and project queries return handler results", async () => {

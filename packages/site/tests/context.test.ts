@@ -5,7 +5,7 @@
  * in the compiler's workspace would not notice a host that lost a field.
  */
 import { describe, expect, test } from "bun:test";
-import { localeLabel } from "../src/locale.ts";
+import { localeLabel } from "@jxsuite/schema/locale";
 import { injectContext } from "../src/context.ts";
 import type { SiteRoute } from "../src/context.ts";
 

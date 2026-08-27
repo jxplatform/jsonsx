@@ -10,7 +10,7 @@
  * pages/docs/[...path].json → /docs/* (catch-all) pages/_component.json → NOT routed (underscore
  * prefix)
  *
- * The conventions themselves live in `@jxsuite/schema/routes`, not here. The studio and the cloud
+ * The conventions themselves live in `@jxsuite/site/routes`, not here. The studio and the cloud
  * preview both have to answer "what URL is this file" and neither can import this package — its
  * dependency graph carries `sharp` and `esbuild` — so what remains in this file is the part that
  * genuinely needs a filesystem: the walk, the `$layout` peek, and `$paths` expansion.
@@ -18,7 +18,7 @@
 
 import { readFileSync, readdirSync } from "node:fs";
 import { parseJxDocument } from "@jxsuite/schema/parse";
-import { compareRoutes, fileToRoute as routeShape } from "@jxsuite/schema/routes";
+import { compareRoutes, fileToRoute as routeShape } from "@jxsuite/site/routes";
 import { extname, join, relative, resolve } from "node:path";
 import type { ExtensionRegistry } from "@jxsuite/schema/extension-registry";
 import type { FormatRegistry } from "@jxsuite/schema/format-registry";

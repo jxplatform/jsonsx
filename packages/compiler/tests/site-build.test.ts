@@ -15,7 +15,7 @@ import { join, resolve } from "node:path";
 import { loadProjectConfig } from "../src/site/site-loader";
 import { discoverPages } from "../src/site/pages-discovery";
 import { resolveLayout } from "../src/site/layout-resolver";
-import { mergeHead, renderHead } from "@jxsuite/schema/head-merger";
+import { mergeHead, renderHead } from "@jxsuite/site/head-merger";
 import { injectContext } from "../src/site/context-injection";
 import { buildSite } from "../src/site/site-build";
 import { hashOf } from "../src/site/csp.ts";

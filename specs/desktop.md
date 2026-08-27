@@ -2,9 +2,9 @@
 
 ## Platform Abstraction, Project Loading, and Component Scoping
 
-**Version:** 0.4.4-draft
+**Version:** 0.4.5-draft
 **Status:** Pending
-**Updated:** 2026-08-26
+**Updated:** 2026-08-27
 **License:** MIT
 
 ---
@@ -88,6 +88,7 @@ The canonical `StudioPlatform` interface is `packages/studio/src/types.ts` — r
 | **Collab**               | `collab?` (realtime co-editing handle per document)                                                                                                                                                                            |
 | **Data / secrets**       | `dataConnections?`, `dataRows?`, row CRUD, `dataPush?`, `listSecrets?`, `setSecrets?`                                                                                                                                          |
 | **Publish / identity**   | `getUser?`, `getAccountStatus?`, `listRepos?`, `importProject?`, `cfConnection?`, `cfConnect?`, `cfApi?`                                                                                                                       |
+| **Site preview / build** | `previewSite?`, `setPreviewOverlay?`, `clearPreviewOverlay?`, `buildSite?` (specs/studio.md §10.1, §10.2)                                                                                                                      |
 | **Code services / AI**   | `codeService` (§5.3), `resolveClass?`, `aiChatUrl`                                                                                                                                                                             |
 | **Multi-window / shell** | `openProjectInNewWindow?`, `pickProject?`, `newWindow?`, `setWindowProject?`, `getProjectRoot?`, `getAppInfo?`, `getSettings?`, `patchSettings?`                                                                               |
 | **Canvas**               | `canvasUrl?`, `canvasUrlDeferred?`, `documentBaseUrl?`, `assetSpace?`, `assetCapabilities?`                                                                                                                                    |
@@ -194,6 +195,12 @@ browser** via an `openExternal` RPC, not to the editor's own window. Following a
 exists to see the page behave like the deployed thing — routing, history, devtools — and neither a
 webview nor a frameless Chromium `--app` window is that; navigating either would also replace the
 editor. `View: Open in Browser` (§9.5) and the sign-in redirect (§3.6) use the same seam.
+
+**Leaving the webview is one-way.** Nothing on this side can bring a browser tab back: no page can
+raise a background tab, and handing the OS opener a URL it already has open opens a DUPLICATE rather
+than switching to the existing one. That is why a live preview retargets its own tab over its reload
+channel (specs/studio.md §10.1) instead of asking the opener a second time, and why doing so reports
+where to look rather than pretending to raise anything.
 
 The Bun side hands the URL over in two steps, and the second is not redundancy. ElectroBun's
 `Utils.openExternal` comes from `electrobun/bun` — the module the chromium launcher is defined by
@@ -1073,8 +1080,9 @@ Two PAL families are absent on purpose, and their absence is a claim recorded in
   Chromium `--app` window is decorated by the desktop environment, and a second set of buttons
   inside the page would minimize and close nothing.
 
-Everything else the ElectroBun launcher implements, this one implements: `buildSite` behind
-`View: Open in Browser`, `subscribeFileEvents` behind the live sidebar, `findReferences`,
+Everything else the ElectroBun launcher implements, this one implements: `previewSite` and the
+overlay pair behind `View: Open in Browser`, `buildSite` behind `Build Site`,
+`subscribeFileEvents` behind the live sidebar, `findReferences`,
 `importSite`, the data and secrets surfaces, the native folder and project pickers (via the XDG
 desktop portal, §8.2.1), and sign-in (§3.6).
 
@@ -1225,10 +1233,10 @@ Package Studio as a NixOS-native app using Chromium `--app` mode:
 
 Ensure desktop app matches dev-mode capabilities:
 
-- [ ] Live preview in canvas with hot reload on file change
+- [x] Live preview at real routes with hot reload, on an origin per project (specs/server.md §3.4)
 - [ ] `$prototype`/`$src` resolution via Bun process imports
 - [ ] `timing: "server"` function execution
-- [ ] Build / SSG pipeline accessible from Studio toolbar
+- [x] Build / SSG pipeline accessible from Studio, as its own `Build Site` command (specs/studio.md §10.2)
 - [ ] Drag-and-drop component insertion from sidebar
 
 ### Phase 4: Cloud Adapter ✅
@@ -1255,6 +1263,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.4.5-draft** (2026-08-27) — Both launchers preview the working tree live at real routes; Build Site keeps the compiler, and leaving the webview is stated to be one-way.
 - **0.4.4-draft** (2026-08-26) — the Import tab chooses how many breakpoints the project keeps, and what an import emits is normative (§4.5).
 - **0.4.3-draft** (2026-08-26) — Typechecking resolves the ElectroBun SDK from the pinned vendor/electrobun submodule; .hutch/devkit stays the build sysroot.
 - **0.4.2-draft** (2026-08-26) — Packages capability row: the registry seam is `packageVersions?` (each dependency's own latest), not `outdatedPackages?`.
@@ -1303,4 +1312,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx Studio Desktop Architecture Specification v0.4.4-draft_
+_Jx Studio Desktop Architecture Specification v0.4.5-draft_

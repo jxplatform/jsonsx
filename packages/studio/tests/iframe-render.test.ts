@@ -21,7 +21,7 @@ import {
   syncStylebookCss,
 } from "../src/canvas/iframe-render";
 import { BUILD_LANES } from "@jxsuite/schema/asset-paths";
-import { SITE_STYLE_ID } from "../src/canvas/site-style-css";
+import { SITE_STYLE_ID } from "@jxsuite/site/site-style";
 import type { AssetContext } from "../src/canvas/asset-refs";
 import type { PathMapCtx } from "../src/canvas/path-mapping";
 import { serializeJxPath } from "../src/canvas/path-mapping";

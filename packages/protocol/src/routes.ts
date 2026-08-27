@@ -245,7 +245,39 @@ export const STUDIO_ROUTES = {
     "POST",
     "/__studio/build",
     "Build or render the site → {routes, files, errors, mode?, url}",
-    "Open in Browser reports that this target cannot build a preview.",
+    "Build Site reports that this target cannot build.",
+  ),
+
+  /**
+   * Preview the site LIVE at a route, with no build on the path.
+   *
+   * The sibling of `buildSite` and what `Open in Browser` reaches first. Nothing is compiled: the
+   * working tree is composed on demand and the runtime assembles each page in the reader's browser,
+   * so what opens carries edits nobody has saved (see `previewOverlay`).
+   *
+   * `reused` is the answer a caller must honour: `true` means a client already holding this
+   * project's preview took the route, and opening a tab anyway would leave the author with two on
+   * one project.
+   */
+  previewSite: route(
+    "POST",
+    "/__studio/preview",
+    "Preview the working tree at a route → {routes, files, errors, mode, url, reused}",
+    "Open in Browser falls back to buildSite.",
+  ),
+
+  /**
+   * The unsaved bytes a live preview reads before the disk.
+   *
+   * POST publishes one document's bytes, DELETE retracts one (or all, with no path). The editor
+   * owns the lifecycle — it knows which documents are dirty and when a save, a close or a discard
+   * ends that — so a backend stores what it is told and decides nothing.
+   */
+  previewOverlay: route(
+    "POST",
+    "/__studio/preview/overlay",
+    "Publish (POST) or retract (DELETE) a document's unsaved bytes → 204",
+    "A live preview shows the last saved state instead of the editor's.",
   ),
 
   // ─── Packages ─────────────────────────────────────────────────────────────

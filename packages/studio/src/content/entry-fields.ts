@@ -29,6 +29,7 @@
  */
 
 import { cloneValue } from "@jxsuite/collab/ops";
+import { notePreviewOverlayEdit } from "../preview/preview-overlay";
 import { recordDocOp } from "../tabs/patch-ops";
 import { mutateUpdateFrontmatter, transactDoc } from "../tabs/transact";
 import type { Tab } from "../tabs/tab";
@@ -85,6 +86,11 @@ function mutateDocumentField(tab: Tab, field: string, value?: JsonValue): void {
     inverse: { key: field, op: "set-key", path: [], value: before },
   });
   tab.doc.dirty = true;
+  /* The document's ROOT REFERENCE is untouched here — the key is written in place — so the preview
+     overlay's effect, which reads that reference, sees nothing. `transactDoc` and the Monaco source
+     commit both assign a fresh one and need no such call; this path is the exception, and without
+     the note an entry field edited twice would stop reaching a live preview after the first. */
+  notePreviewOverlayEdit();
 }
 
 /**

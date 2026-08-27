@@ -4,7 +4,7 @@ description: "Shared page shells in Jx sites: $layout, slot injection, named slo
 spec:
   - site-architecture.md#5
 code:
-  - packages/schema/src/layout.ts
+  - packages/site/src/layout.ts
   - packages/compiler/src/site/layout-resolver.ts
 ---
 

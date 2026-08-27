@@ -6,7 +6,7 @@
 import { describe, expect, test } from "bun:test";
 import { injectContext, nodeImportRebaser } from "../src/site/context-injection";
 import { resolvePrototypes } from "../src/site/prototype-resolver";
-import type { SiteRoute } from "@jxsuite/schema/context";
+import type { SiteRoute } from "@jxsuite/site/context";
 
 describe("nodeImportRebaser", () => {
   const route: SiteRoute = { sourcePath: "/site/pages/blog/hello.json", urlPattern: "/blog/hello" };

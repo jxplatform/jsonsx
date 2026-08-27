@@ -69,6 +69,9 @@ const mockBuildPayload = mock((_registry: unknown) => fakeExtensionsPayload);
 void mock.module("@jxsuite/compiler/format-host", () => ({
   buildExtensionsPayload: mockBuildPayload,
   buildProjectExtensionRegistry: mockBuildRegistry,
+  /* The live preview parses non-JSON pages through this, and a module mock replaces the WHOLE
+     module — so omitting it makes every import of `@jxsuite/server/live-preview` fail to link. */
+  buildProjectFormatRegistry: mock(() => Promise.resolve({ byExtension: () => null })),
 }));
 
 const fakeBundles = {

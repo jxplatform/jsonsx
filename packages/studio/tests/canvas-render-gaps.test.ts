@@ -192,9 +192,12 @@ void mock.module("../src/panels/stylebook-panel.js", () => ({
   renderStylebookMode: () => {},
 }));
 
+void mock.module("../src/files/serialize-document.js", () => ({
+  serializeDocument: async () => "{}",
+}));
+
 void mock.module("../src/files/file-ops.js", () => ({
   parseSourceForPath: async () => ({ document: { tagName: "div" }, frontmatter: {} }),
-  serializeDocument: async () => "{}",
   /* Two more the Library's context menu reads. canvas-render draws the Library now, so this
      partial mock has to cover what that path imports — see the iframe-host note above. */
   confirmFileDelete: () => Promise.resolve(false),

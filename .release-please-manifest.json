@@ -1,6 +1,7 @@
 {
   "packages/ai": "0.36.4",
   "packages/schema": "1.9.0",
+  "packages/site": "0.1.0",
   "packages/runtime": "2.1.0",
   "packages/markup": "0.4.7",
   "extensions/parser": "1.5.6",

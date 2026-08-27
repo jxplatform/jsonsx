@@ -7,9 +7,12 @@ spec:
   - server.md#3.1 # live reload
   - server.md#3.2 # $prototype/$src proxy
   - server.md#3.3 # server function proxy
+  - server.md#3.4 # live site preview
 code:
   - packages/server/src/server.ts
   - packages/server/src/watch.ts
+  - packages/server/src/sse.ts
+  - packages/server/src/live-preview.ts
   - packages/server/src/watch-policy.ts
   - packages/server/src/resolve.ts
 ---
@@ -111,6 +114,38 @@ Extensions that declare server mounts (for example the data API) are served unde
 Anything the other routes don't claim is served from disk: files under `root` at their natural URLs, then files under the active Studio project, then the project's `public/` directory mapped to the site root, mirroring where assets live in production. Bare npm specifiers in URLs (such as `@jxsuite/parser/…`) are resolved through `node_modules`, bundled on demand with `Bun.build`, and cached for the life of the server. All responses are sent with `Cache-Control: no-cache` so a plain reload never serves a stale bundle.
 
 Content types come from Bun's own inference, with two corrections: a `.md` file is sent as `text/markdown; variant=GFM` (bare `text/markdown` doesn't say which markdown), and a `.yaml` file as `application/yaml` rather than the deprecated `text/yaml`. Every other extension keeps the inferred type.
+
+## The live site preview
+
+Studio's **Open in Browser** doesn't compile anything. It asks this server to stand up a second
+loopback address, one per project, that serves your working tree as a site: each page is composed as
+it's asked for, at the route it will really have, and assembled in the reader's browser by
+`@jxsuite/runtime`. That's why it opens at once and why it can show you the document you're editing
+rather than the last one you saved, which is the whole point of it. Studio sends the unsaved bytes
+over and this server prefers them over the file at every read.
+
+The address is separate from this one on purpose, and not because the paths would clash. A browser
+tab belongs to a _project_, and this server belongs to a _window_: a tab pointed here would die with
+the window that opened it. The other reason is that a previewed page runs your project's own
+JavaScript, and giving it an origin of its own keeps it away from anything the editor keeps in the
+browser. What it will serve is an allowlist that defaults closed, so `project.json`, a lockfile and
+every dotfile are unreachable from a page.
+
+Your own components render without being listed anywhere. The preview walks the page it composed,
+finds the tags your `components/` directory defines, and registers those, following each component
+into the components it uses in turn. You only need `$elements` for what your project does not
+define, such as a component from an npm package.
+
+Markdown pages preview too, and so does anything else one of your extensions can parse. The preview
+reads the `extensions` list in your `project.json` and builds the same format registry a build does,
+so `pages/index.md` renders here the way it will in production. It reads that file the same way it
+reads the rest of your tree, unsaved bytes first, so adding an extension in Studio takes effect on
+the next reload rather than after a save. A page whose format nothing installed can parse says so by
+name instead of rendering blank.
+
+It reloads the same way this server does, over the same stream, and one save is one reload however
+many things it changed. Press **Open in Browser** again and you get the same tab, moved to whatever
+page you're on now.
 
 ## Related
 

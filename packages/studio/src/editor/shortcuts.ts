@@ -123,6 +123,7 @@ export interface StudioCommandHooks {
    */
   openProject: (target: ProjectOpenTarget) => Promise<ProjectOpenOutcome>;
   openInBrowser: () => void | Promise<void>;
+  buildSite: () => void | Promise<void>;
 }
 
 // ─── Shared predicates ────────────────────────────────────────────────────────
@@ -832,6 +833,7 @@ export function registerStudioCommands(
       duplicateSelection,
       focusInspectorTab: (tabId) => focusInspectorTab(registry, tabId),
       focusPanel,
+      buildSite: () => hooks.buildSite(),
       openInBrowser: () => hooks.openInBrowser(),
       openPalette: (mode) => {
         openQuickSearch(mode);

@@ -22,6 +22,12 @@ import { readBundledProjectSchemas } from "@jxsuite/compiler/schema-command";
 import { handleDataApi } from "./data-api.ts";
 import { containedPath } from "./net-guard.ts";
 import { startSitePreview } from "./site-preview.ts";
+import {
+  clearLivePreviewOverlay,
+  navigateLivePreview,
+  setLivePreviewOverlay,
+  startLivePreview,
+} from "./live-preview.ts";
 import { applyRename } from "./refactor/apply.ts";
 import { findReferences } from "./refactor/find-refs.ts";
 import {
@@ -886,6 +892,76 @@ export async function handleStudioApi(
       });
     } catch (error) {
       return problem("internalError", errorMessage(error));
+    }
+  }
+
+  /**
+   * Preview the site LIVE — the working tree browsable at real routes, with no build on the path.
+   *
+   * The sibling of `/__studio/build` and the one Open in Browser reaches first. What it answers
+   * with is not compiler output: `@jxsuite/site` composes each page on demand and
+   * `@jxsuite/runtime` assembles it in the reader's browser, so what opens is the tree as it stands
+   * — the author's unsaved edits included, because Studio publishes those as an overlay this origin
+   * reads first.
+   *
+   * `reused` is the second answer and the caller must honour it. A tab already holding this
+   * project's reload stream is retargeted in place, and opening another would give the author two
+   * tabs on one project — which is the thing the retarget exists to prevent.
+   */
+  if (path === "/__studio/preview" && req.method === "POST") {
+    const dir = activeProjectRoot ?? root;
+    if (!existsSync(resolve(dir, "project.json"))) {
+      return problem("invalidRequest", "Not a site project");
+    }
+    let body: { route?: string };
+    try {
+      body = (await req.json()) as { route?: string };
+    } catch {
+      return problem("invalidRequest", "Invalid JSON body");
+    }
+    try {
+      const preview = await startLivePreview(dir);
+      const reused = body.route ? await navigateLivePreview(dir, body.route) : false;
+      return Response.json({
+        errors: preview.errors,
+        /* A live preview writes nothing, so there are no files to count. The field is part of the
+           shared shape and saying zero is the honest answer rather than an omission. */
+        files: 0,
+        mode: "live",
+        reused,
+        routes: preview.routes,
+        url: preview.origin,
+      });
+    } catch (error) {
+      return problem("internalError", errorMessage(error));
+    }
+  }
+
+  /**
+   * The unsaved bytes a live preview reads before the disk.
+   *
+   * POST publishes one document, DELETE retracts one or all of them. Studio owns the lifecycle — it
+   * knows which documents are dirty and when a save, a close or a discard ends that — so this route
+   * stores what it is told and decides nothing.
+   */
+  if (path === "/__studio/preview/overlay") {
+    const dir = activeProjectRoot ?? root;
+    let body: { path?: string; contents?: string };
+    try {
+      body = (await req.json()) as { path?: string; contents?: string };
+    } catch {
+      return problem("invalidRequest", "Invalid JSON body");
+    }
+    if (req.method === "POST") {
+      if (typeof body.path !== "string" || typeof body.contents !== "string") {
+        return problem("invalidRequest", "Missing path or contents");
+      }
+      setLivePreviewOverlay(dir, body.path, body.contents);
+      return new Response(null, { status: 204 });
+    }
+    if (req.method === "DELETE") {
+      clearLivePreviewOverlay(dir, typeof body.path === "string" ? body.path : undefined);
+      return new Response(null, { status: 204 });
     }
   }
 

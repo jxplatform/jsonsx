@@ -18,7 +18,7 @@
  * Cloudflare Worker serving a live preview — assemble the same `<head>` the build does.
  */
 
-import type { JxHeadEntry } from "../types.ts";
+import type { JxHeadEntry } from "@jxsuite/schema/types";
 
 /** What a page knows about itself while its `<head>` is being merged. */
 export interface HeadMergeContext {

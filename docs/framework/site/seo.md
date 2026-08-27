@@ -4,7 +4,7 @@ description: "Declare page metadata with $head, template it from state, and let 
 spec:
   - site-architecture.md#8
 code:
-  - packages/schema/src/head-merger.ts
+  - packages/site/src/head-merger.ts
   - packages/compiler/src/site/link-relations.ts
   - packages/compiler/src/site/site-build.ts
   - packages/schema/src/asset-paths.ts

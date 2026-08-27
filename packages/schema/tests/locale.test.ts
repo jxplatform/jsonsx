@@ -6,6 +6,7 @@ import {
   localeDirection,
   localeLabel,
   localeOfPath,
+  localeOfRoute,
   localeUrlPrefix,
   servedLocaleOfPath,
   primaryLanguage,
@@ -206,6 +207,44 @@ describe("the path-shaped locale primitives", () => {
     expect(translationPathFor("pages/about.json", "de", i18n)).toBeNull();
     expect(translationPathFor("pages/about.json", "not_a_tag", i18n)).toBeNull();
     expect(translationPathFor("pages/about.json", "ar", null)).toBeNull();
+  });
+});
+
+/*
+ * The route sibling of `localeOfPath`, and it answers differently on purpose. A path outside the
+ * locale tree is `null` because whether it IS the default locale's copy depends on `routing`; a
+ * ROUTE is already served, so the question is settled and the default locale is the answer.
+ */
+describe("localeOfRoute", () => {
+  const { i18n } = resolveI18n(project({ defaultLocale: "en", locales: ["en", "fr-CA", "ar"] }));
+
+  // Matching is on the first segment, compared canonically, so `/fr-CA/` resolves for `fr-ca`.
+  test("the first segment names the locale, whatever its spelling", () => {
+    expect(localeOfRoute("/fr-ca/about/", i18n)).toBe("fr-CA");
+    expect(localeOfRoute("/FR-CA/about/", i18n)).toBe("fr-CA");
+    expect(localeOfRoute("/ar/", i18n)).toBe("ar");
+  });
+
+  /*
+   * Under `prefix-except-default` an unprefixed route is the point; under `prefix-always` it is a
+   * page the author put outside the locale tree, which is theirs to place. Both are the default.
+   */
+  test("a segment that names no declared locale is the default locale", () => {
+    expect(localeOfRoute("/about/", i18n)).toBe("en");
+    expect(localeOfRoute("/de/about/", i18n)).toBe("en");
+    expect(localeOfRoute("/not_a_tag/about/", i18n)).toBe("en");
+  });
+
+  // The root has no first segment at all, which is the default locale's home page.
+  test("a route with no segment is the default locale", () => {
+    expect(localeOfRoute("/", i18n)).toBe("en");
+    expect(localeOfRoute("", i18n)).toBe("en");
+  });
+
+  // A project with no i18n has no locales to belong to, so there is nothing to name.
+  test("a project without i18n has no locale, not the default one", () => {
+    expect(localeOfRoute("/fr/about/", null)).toBeNull();
+    expect(localeOfRoute("/", null)).toBeNull();
   });
 });
 

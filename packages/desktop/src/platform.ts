@@ -510,6 +510,18 @@ export function createDesktopPlatform() {
       return rpc.request.buildSite();
     },
 
+    async previewSite(opts: { route: string }) {
+      return rpc.request.previewSite(opts);
+    },
+
+    async setPreviewOverlay(path: string, contents: string) {
+      await rpc.request.setPreviewOverlay({ contents, path });
+    },
+
+    async clearPreviewOverlay(path?: string) {
+      await rpc.request.clearPreviewOverlay(path === undefined ? {} : { path });
+    },
+
     async gitAddRemote(name: string, url: string) {
       await rpc.request.gitAddRemote({ name, url });
     },

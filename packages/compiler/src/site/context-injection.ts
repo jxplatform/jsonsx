@@ -1,7 +1,7 @@
 /**
  * The build's filesystem half of context injection.
  *
- * `injectContext` itself is `@jxsuite/schema/context` — a live renderer binds `${$site.name}` and
+ * `injectContext` itself is `@jxsuite/site/context` — a live renderer binds `${$site.name}` and
  * `${$page.url}` exactly as a built page does, so the two must not be separate implementations.
  * What is left here is the one thing that needs real directories: rebasing a project-level relative
  * `imports` entry onto the page's own directory.
@@ -10,8 +10,8 @@
  */
 
 import { dirname, relative, resolve } from "node:path";
-import { injectContext as injectContextWith } from "@jxsuite/schema/context";
-import type { ImportRebaser, SiteRoute, TranslationMember } from "@jxsuite/schema/context";
+import { injectContext as injectContextWith } from "@jxsuite/site/context";
+import type { ImportRebaser, SiteRoute, TranslationMember } from "@jxsuite/site/context";
 import type { ResolvedI18n } from "@jxsuite/schema/locale";
 import type { JxDocument, ProjectConfig } from "@jxsuite/schema/types";
 

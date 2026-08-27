@@ -1,0 +1,37 @@
+{
+  "name": "@jxsuite/site",
+  "version": "0.1.0",
+  "description": "What a Jx project's page at a route consists of — routing, layout, context, head and the document that boots it",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jxsuite/jx.git",
+    "directory": "packages/site"
+  },
+  "files": [
+    "src/"
+  ],
+  "type": "module",
+  "exports": {
+    "./compose": "./src/compose.ts",
+    "./context": "./src/context.ts",
+    "./head-merger": "./src/head-merger.ts",
+    "./layout": "./src/layout.ts",
+    "./paths": "./src/paths.ts",
+    "./routes": "./src/routes.ts",
+    "./serve": "./src/serve.ts",
+    "./shell": "./src/shell.ts",
+    "./site-style": "./src/site-style.ts"
+  },
+  "publishConfig": {
+    "provenance": true
+  },
+  "scripts": {
+    "test": "bun test --isolate",
+    "test:coverage": "bun test --isolate --coverage"
+  },
+  "dependencies": {
+    "@jxsuite/runtime": "workspace:^",
+    "@jxsuite/schema": "workspace:^"
+  }
+}

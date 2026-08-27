@@ -313,13 +313,18 @@ void mock.module("../src/panels/stylebook-panel.js", () => ({
 
 void mock.module("../src/files/file-ops.js", () => ({
   parseSourceForPath: parseSourceForPathMock,
-  serializeDocument: serializeDocumentMock,
   /* Two more the Library's context menu reads. canvas-render draws the Library now, so this
      partial mock has to cover what that path imports — see the iframe-host note above. */
   confirmFileDelete: () => Promise.resolve(false),
   renamePromptMessage: () => Promise.resolve(""),
   /* And one the TAB STRIP reads: its close offers to save first (§8.7's three-way dialog). */
   saveFile: () => Promise.resolve(true),
+}));
+
+/* Its own module, because four callers need it and one of them is `file-ops` itself — mocking it
+   on `file-ops` stubs a re-export nobody imports any more. */
+void mock.module("../src/files/serialize-document.js", () => ({
+  serializeDocument: serializeDocumentMock,
 }));
 
 const { initCanvasRender, renderCanvas, renderOverlays, scheduleCanvasRender } =

@@ -149,6 +149,7 @@ beforeAll(() => {
   registerStudioCommands(
     registry,
     {
+      buildSite: () => {},
       openInBrowser: () => {},
       openProject: async () => "opened" as const,
       saveDocument: () => {},

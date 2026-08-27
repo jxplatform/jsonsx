@@ -2,7 +2,7 @@
 
 ## Visual Builder for Jx Documents
 
-**Version:** 0.9.51-draft
+**Version:** 0.9.52-draft
 **Status:** Partial
 **Updated:** 2026-08-27
 **License:** MIT
@@ -115,6 +115,10 @@ Studio uses a platform abstraction (`src/platform.ts`) to decouple UI from backe
 | `canvasUrlDeferred?`     | This platform resolves `canvasUrl` asynchronously; the host waits rather than mounting the default (§11.2) |
 | `assetSpace?`            | What the canvas ORIGIN answers for a site URL: `"site"` (the default when absent) or `"repo"` (below)      |
 | `assetCapabilities?`     | What this backend accepts as an upload — `maxUploadBytes`, `accept`. Absent means no declared limit (§9.3) |
+| `previewSite?(opts)`     | Serve the working tree as a site at `opts.route` → `SitePreviewResult` (§10.1)                             |
+| `setPreviewOverlay?`     | Publish the bytes a save would write for one document, so a preview shows the canvas (§10.1)               |
+| `clearPreviewOverlay?`   | Retract one document's unsaved bytes, or every one of this project's (§10.1)                               |
+| `buildSite?()`           | Compile the site and name where the output is browsable → `SiteBuildResult` (§10.2)                        |
 
 **`assetSpace` is about the ORIGIN, not the backend.** A document references media by site URL
 (`/hero.jpg`) or relative to itself (`./images/hero.png`), and neither is a URL the canvas can use
@@ -1468,60 +1472,104 @@ Studio closes the loop from "I changed something" to "I looked at the real page"
 the same seam Preview link clicks use (`canvas/preview-navigate.ts`, §4.2), so on desktop it reaches
 the real browser rather than a webview.
 
-**The URL is the page's ROUTE, not its output file's path**, and the difference is the whole
-feature. A built page is written for its published origin: it links to `/blog/hello/` and pulls
-`/components/demo.css`, both root-absolute. Handed `…/dist/blog/hello/index.html` — the compiler's
-output path, which is what this said and what shipped — a browser resolves those two against the
-server ROOT, so the HTML arrives, every stylesheet and script 404s, and the first link the reader
-clicks leaves the site. The page loads and nothing else works. So the address is `<route>`, with the
-trailing slash `build.trailingSlash` decides — the URL the page will have when it is published,
-which is also the one its own links already point at.
+**What opens is the working tree, not a build.** The action calls `platform.previewSite({ route })`,
+and a backend answers by serving the project's own files as a site: it composes each page from the
+tree on demand — route, layout, `$elements`, `$site`/`$page`, `<head>` — and hands the document to
+`@jxsuite/runtime`, which assembles the DOM in the reader's browser exactly as the canvas does. No
+compiler runs. That is what makes the page appear at once, carry edits nobody has saved, and reload
+as the author keeps typing.
 
-**The built site is served on its own origin**, and the ORIGIN comes back from the build rather than
-being assumed to be the editor's. An editing server's paths mean the project's SOURCES — that is
-what the canvas reads through them — while a built page addresses its own OUTPUT by the very same
-paths: `/components/demo.js` is the module of formulas the compiler reads in one space and the
-custom-element definition the page needs in the other. Serving the output as a fallback on the
-editor's origin therefore looks like it works and is not: measured in a browser, the page rendered,
-`customElements.get(…)` was null, and nothing on it did anything. So `@jxsuite/server` starts a
-loopback server rooted AT the output directory (`site-preview.ts`, one per project, reused), where
-every path has exactly the meaning the published site gives it, nothing is injected, and a miss is
-the site's own `404.html` at 404. Neither editing server serves the built output at any position in
-its chain. `jx dev`'s `createDistMiddleware` is separate and unchanged — a site project's own dev
-server is showing the built site rather than visiting it, so there it runs FIRST and injects live
-reload.
+It used to build first, and the build was the problem rather than the price. A full compile runs the
+bundler, the image pipeline and every emitter before anything opens; what then opened was the last
+SAVE rather than the canvas; and it was inert once open, so a second look meant pressing the button
+again and getting a second tab. Only the first of those is about speed. "Does my site build?" is a
+real question and it keeps a command — **Build Site** (§10.2) — but it is not the question this
+action asks.
 
-**The site is built first.** The action runs `platform.buildSite()` before it opens anything, so the
-reader sees what the author is looking at rather than whatever the last build left on disk — which,
-since nothing in Studio had ever written that output, was usually nothing at all. The same call
-returns `url`, the origin to open the route at. Build errors are NAMED and the page still opens: a
-partial build produced pages, and the author is better served by the one they asked for with the
-failures beside it. A build that throws opens nothing, because the page would be a lie. `buildSite`
-is optional on the PAL — but a backend that does not declare it, or that reports no `url`, cannot
-preview: the action says so rather than sending the reader to an origin where half the site is the
-wrong file.
+**The URL is the page's ROUTE, not a file's path**, and the difference is the whole feature. A page
+is written for its published origin: it links to `/blog/hello/` and pulls `/components/demo.css`,
+both root-absolute. Handed `…/dist/blog/hello/index.html` — an output path, which is what this said
+and what shipped — a browser resolves those two against the server ROOT, so the HTML arrives, every
+stylesheet and script 404s, and the first link the reader clicks leaves the site. The page loads and
+nothing else works. So the address is `<route>`, with the trailing slash `build.trailingSlash`
+decides — the URL the page will have when it is published, which is also the one its own links
+already point at.
 
-**A backend may satisfy `buildSite` by BUILDING or by RENDERING, and it says which.** The contract
-is "produce something browsable at real routes on an origin of your own, and name it" — not "run the
-compiler", which not every backend can. A hosted backend executes no project JS and has no bundler,
-no image pipeline and no filesystem, so `jx build` is not available to it at any price; what it can
-do is serve the working tree as a site and let `@jxsuite/runtime` assemble each page in the reader's
-browser, exactly as the canvas does. `SiteBuildResult.mode` reports which happened — `built` (the
-default, and what an absent field means, so a backend predating this keeps its meaning) or `live` —
-and the report the author reads says so, because the two differ in ways they can see:
+**The preview is served on an origin of its own**, and the origin comes back from the backend rather
+than being assumed to be the editor's. Not because the paths would collide — a live preview's paths
+mean the project's SOURCES, which is exactly what an editing server serves — but for two reasons the
+editing server cannot satisfy:
 
-|                    | `built`                                     | `live`                                   |
-| ------------------ | ------------------------------------------- | ---------------------------------------- |
-| HTML               | prerendered, islands split out              | assembled client-side from the document  |
-| Images             | optimized, responsive variants              | the originals, as authored               |
-| `timing: "server"` | resolved at build time                      | not run, as in edit mode (§4.2)          |
-| Emitted files      | sitemap, headers, redirects, service worker | none                                     |
-| Freshness          | the last build                              | the working tree, unsaved edits included |
+- **Lifetime.** One tab per project needs one origin per project, and an editing server is per
+  WINDOW: a tab pointed at it dies when that window closes, and two windows on one project would
+  produce two tabs. `@jxsuite/server`'s origin is keyed by project root and lives for the process
+  (`live-preview.ts`, specs/server.md §3.4), so no single window's teardown may close it.
+- **Isolation.** A previewed page runs the project's own JavaScript, third-party script included. On
+  the chromium build the Studio shell is served BY the editing server, so a preview mounted there
+  would share `localStorage`, IndexedDB and service-worker scope with the editor.
+
+The rules differ too, and that is the third reason. An editing server serves the whole project root,
+which is Studio addressing files it already holds paths for; on an origin running project script the
+same latitude is a way to read `.dev.vars`. A preview origin serves an allowlist that defaults
+closed.
+
+**Unsaved documents travel as an overlay.** A live preview composes from the tree, and the tree is
+what has been SAVED — so without this, the one thing a live preview is for would be the one thing it
+could not show. Studio publishes `platform.setPreviewOverlay(path, contents)` for each document that
+is dirty and has a path, and a backend prefers those bytes over the file at every read.
+
+Three properties of that are contractual:
+
+- **The bytes are exactly what a save would write.** Studio serializes through the same function
+  `writeFile` receives, so "what the reader sees" and "what saving would produce" are one answer
+  rather than two that drift. A document object would bypass the format layer, and a `.md` page's
+  bytes are not `JSON.stringify(doc)`.
+- **Every dirty document publishes, not only the previewed one.** The layout a page wraps in and the
+  component it uses live in other tabs, and an unsaved edit to either changes the page.
+- **A backend holds them in memory and writes them nowhere.** There is no file to go stale, so a
+  crash leaves a preview showing the saved state, which is right. `clearPreviewOverlay(path?)`
+  retracts one or all of them; Studio owns that lifecycle, because it is what knows when a save, a
+  close or a discard ends it.
+
+**One tab per project, and it is retargeted rather than reopened.** A second `Open in Browser` —
+from any page of the project — points the tab that is already showing it at the new route.
+`SitePreviewResult.reused` reports that this happened, and a caller MUST honour it: opening a tab
+anyway leaves the author with two on one project, which is what retargeting exists to prevent.
+
+The retarget is ACKNOWLEDGED, not assumed. A closed tab's channel drops promptly, but a frozen or
+back/forward-cached one looks connected and will not act, so a backend answers `reused: true` only
+once a client says it took the route. When that loses the race the reader gets a second tab, which
+is the visible failure and the deliberate choice over the invisible one.
+
+**What this costs, stated rather than filed as a bug: the browser does not come forward.** No page
+can raise a background tab — Chrome does not honour `focus()` across tabs, and under Wayland the
+compositor arbitrates — and handing the URL to the OS again opens a DUPLICATE rather than switching
+to the existing one. So a reused preview reports where to look instead of opening anything. A reader
+who closed their tab is not stuck: the channel closes with it, `reused` comes back false, and a
+fresh tab opens.
+
+**A backend that cannot preview may still build, and says which it did.** `previewSite` is optional;
+without it the action falls back to `buildSite`, whose `SiteBuildResult.mode` reports `built` (the
+default, and what an absent field means) or `live`. A hosted backend executes no project JS and has
+no bundler, image pipeline or filesystem, so it answers `buildSite` by rendering rather than
+compiling. The report the author reads says which, because the two differ in ways they can see:
+
+|               | `built`                                     | live                                     |
+| ------------- | ------------------------------------------- | ---------------------------------------- |
+| HTML          | prerendered, islands split out              | assembled client-side from the document  |
+| Images        | optimized, responsive variants              | the originals, as authored               |
+| Emitted files | sitemap, headers, redirects, service worker | none                                     |
+| Freshness     | the last build                              | the working tree, unsaved edits included |
 
 That last row is the reason a live preview is not merely a degraded build: it is the only one of the
 two that can show an author what they are looking at right now, including a collaborator's edits
-mid-keystroke. "Does my site build?" remains a question for a real build; "what does this page look
-like at its real URL?" is what the action is for, and both answer it.
+mid-keystroke.
+
+**Content, `$src` classes and `timing: "server"` resolve when the backend can reach a resolver, and
+this is a property of the BACKEND rather than of the mode.** A hosted one cannot run project code at
+any price, so a content collection renders as an empty list there. A desktop or dev-server backend
+can, and mounts the resolver on the preview origin behind a credential of its own (specs/server.md
+§3.4) — without which a preview of a blog is a preview of its chrome.
 
 The action is never hidden: when a page cannot be resolved it renders **disabled with the reason in
 its tooltip**, one of —
@@ -1533,10 +1581,34 @@ its tooltip**, one of —
 | Document is not under `pages/`  | Only pages have a route — `<path>` is not under pages/.           |
 | Catch-all route (`[...rest]`)   | Catch-all routes match many pages — open a generated one instead. |
 | Dynamic route with unset params | Pick a value for `:<param>` to open one of this route's pages.    |
-| Backend cannot preview          | This backend cannot build a preview of the site.                  |
-| Backend serves no preview       | The site was built, but this backend serves no preview of it.     |
+| Backend cannot preview or build | This backend cannot preview the site.                             |
+| Backend serves no origin        | This backend serves no preview of the site.                       |
 
 Invoked by chord while blocked, the reason goes to the status bar instead of opening nothing.
+
+### 10.2 Build Site
+
+The compiler, kept reachable under its own verb. **Build Site** (`project.buildSite`, the rail foot's
+menu and the palette, no default chord) runs `platform.buildSite()` and reports what it produced:
+routes, files, and any errors by name.
+
+It is a separate command rather than a mode of §10.1 because the two questions are separate. A build
+answers "does my site build?" — it runs the bundler, resolves `timing: "server"` at build time,
+optimizes images into responsive variants, and emits the sitemap, headers, redirects and service
+worker. A live preview runs none of those and does not pretend to. Coupling them meant every look at
+a page paid for a full compile, and the compile's own answer arrived as a side effect of asking
+something else.
+
+It is project-level and sits in the overflow menu rather than the Command Bar's primary row, which is
+budgeted at five and is document-level by frequency (studio-ui-guidelines §12). A build is neither
+frequent nor about the document in front of you.
+
+Where the built site is browsable is unchanged: a loopback origin rooted AT the output directory
+(`site-preview.ts`, one per project, reused), where every path has exactly the meaning the published
+site gives it, nothing is injected, and a miss is the site's own `404.html` at 404. Neither editing
+server serves the built output at any position in its chain. `jx dev`'s `createDistMiddleware` is
+separate and unchanged — a site project's own dev server is showing the built site rather than
+visiting it, so there it runs FIRST and injects live reload.
 
 ---
 
@@ -2628,6 +2700,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.9.52-draft** (2026-08-27) — Open in Browser previews the working tree through the runtime; Build Site keeps the compiler under its own verb.
 - **0.9.51-draft** (2026-08-27) — a media file opens in a Media mode that shows it and says what uses it (§4.2, §9.3, §13.4); a long run's log is a feed that outlives the run (§6).
 - **0.9.50-draft** (2026-08-26) — the gear's project rows disable rather than hide, and the menu is bottom-anchored to its trigger's region.
 - **0.9.49-draft** (2026-08-26) — the rail foot is a Settings menu over both settings families; styles.open names the Project Styles editor.
@@ -2734,4 +2807,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/studio` Specification v0.9.51-draft_
+_`@jxsuite/studio` Specification v0.9.52-draft_

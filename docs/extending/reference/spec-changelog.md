@@ -79,6 +79,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `desktop.md`
 
+- **0.4.5-draft** (2026-08-27) — Both launchers preview the working tree live at real routes; Build Site keeps the compiler, and leaving the webview is stated to be one-way.
 - **0.4.4-draft** (2026-08-26) — the Import tab chooses how many breakpoints the project keeps, and what an import emits is normative (§4.5).
 - **0.4.3-draft** (2026-08-26) — Typechecking resolves the ElectroBun SDK from the pinned vendor/electrobun submodule; .hutch/devkit stays the build sysroot.
 - **0.4.2-draft** (2026-08-26) — Packages capability row: the registry seam is `packageVersions?` (each dependency's own latest), not `outdatedPackages?`.
@@ -154,6 +155,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `imports.md`
 
+- **0.1.10-draft** (2026-08-27) — Components a project defines are discovered from the tree rather than only declared.
 - **0.1.9-draft** (2026-08-15) — Name where the emitted import map now points (§1).
 - **0.1.8-draft** (2026-08-15) — Number the sections so they are addressable, and add §7 Standards Alignment.
 - **0.1.7-draft** (2026-08-02) — Imports panel section renamed to Imported Modules in the UI.
@@ -235,6 +237,9 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `server.md`
 
+- **0.2.18** (2026-08-27) — The preview origin registers the project's own components without a declaration.
+- **0.2.17** (2026-08-27) — The preview origin composes non-JSON pages through the project's extension registry, built from its config.
+- **0.2.16** (2026-08-27) — The live site preview origin: an origin per project serving the working tree, with the overlay, the shared reload stream and its own resolver credential.
 - **0.2.15** (2026-08-26) — the import stream names its destination on a ready line, before the crawl finishes (§4.2).
 - **0.2.14** (2026-08-26) — Packages family: `GET /__studio/packages/versions` reports every dependency's newest published version, behind or not, replacing the outdated-only check.
 - **0.2.13** (2026-08-26) — the import stream's done line carries the run summary, and accepts an opt-in verify pass (§4).
@@ -264,6 +269,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `site-architecture.md`
 
+- **0.6.2-draft** (2026-08-27) — Routing, layout, context and head-merge move to @jxsuite/site; standards evidence follows.
 - **0.6.1-draft** (2026-08-27) — media files open in a viewer, which is the reader the usage query was missing (§9.4).
 - **0.6.0-draft** (2026-08-26) — §12.4: component CSS inlined and modulepreload hints emitted; §14.3: name the hosts that read _headers, and warn when one will not.
 - **0.5.18-draft** (2026-08-26) — Standards evidence follows head-merger to @jxsuite/schema.
@@ -455,6 +461,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.9.52-draft** (2026-08-27) — Open in Browser previews the working tree through the runtime; Build Site keeps the compiler under its own verb.
 - **0.9.51-draft** (2026-08-27) — a media file opens in a Media mode that shows it and says what uses it (§4.2, §9.3, §13.4); a long run's log is a feed that outlives the run (§6).
 - **0.9.50-draft** (2026-08-26) — the gear's project rows disable rather than hide, and the menu is bottom-anchored to its trigger's region.
 - **0.9.49-draft** (2026-08-26) — the rail foot is a Settings menu over both settings families; styles.open names the Project Styles editor.

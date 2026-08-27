@@ -102,6 +102,7 @@ export interface CommandDeps {
   undo: () => void;
   redo: () => void;
   openInBrowser: () => void | Promise<void>;
+  buildSite: () => void | Promise<void>;
   closeDocument: () => void;
   duplicateSelection: () => void;
   deleteSelection: () => void;
@@ -147,6 +148,7 @@ export function noopCommandDeps(): CommandDeps {
     undo: () => {},
     redo: () => {},
     openInBrowser: () => {},
+    buildSite: () => {},
     closeDocument: () => {},
     duplicateSelection: () => {},
     deleteSelection: () => {},
@@ -243,8 +245,34 @@ export function defaultCommands(deps: CommandDeps): AnyCommand[] {
       group: "2_output",
       when: (ctx) => ctx.project.isSite,
       enablement: documentOpen,
-      requires: "a built page to open",
+      /* "A page to preview", not "a built page to open". Nothing is built on the way here any
+         more: the working tree is rendered at its real route, so what this waits for is a document
+         with a route rather than an output file. */
+      requires: "a page to preview",
       run: () => deps.openInBrowser(),
+    },
+    {
+      /*
+       * The compiler, kept reachable under its own verb.
+       *
+       * `View: Open in Browser` used to run a full build, which answered "does my site build?" as a
+       * side effect of asking "what does this page look like?". Those are different questions and
+       * only one of them is worth waiting for a bundler, an image pipeline and every emitter. So
+       * the build keeps a command of its own rather than disappearing with the coupling.
+       *
+       * `commandbar/overflow` rather than `commandbar/primary`: the primary row is budgeted at five
+       * and is document-level by frequency (studio-ui-guidelines §12), and a build is neither
+       * frequent nor about the document in front of you. No default chord for the same reason.
+       */
+      id: "project.buildSite",
+      title: "Build Site",
+      category: "Project",
+      level: "project",
+      menus: ["commandbar/overflow", "palette"],
+      group: "2_output",
+      when: (ctx) => ctx.project.isSite,
+      requires: "a site project",
+      run: () => deps.buildSite(),
     },
 
     // ── Edit ──

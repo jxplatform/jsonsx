@@ -34,7 +34,7 @@ export const { openExternal } = _default;
 /* Registering a sink is what starts the filesystem watcher; the launcher points it at its push
    channel so the studio sidebar sees a file appear the moment it lands. */
 export const { setFileEventSink } = _default;
-export const { buildSite } = _default;
+export const { buildSite, previewSite, setPreviewOverlay, clearPreviewOverlay } = _default;
 export const { createProject } = _default;
 export const { listDirectory } = _default;
 export const { handleReadFile } = _default;

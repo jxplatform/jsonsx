@@ -104,7 +104,7 @@ Everything Studio can do is a command, and every command is reachable by name: p
 | Keep This Document             | `pane.pin`                   | —                     | document    | a derived pane showing a document of its own — Code, Diff and breakpoint views project the document already open beside them |
 | New Window                     | `view.newWindow`             | `⌘⇧N`                 | application | a host that can hold more than one window                                                                                    |
 | Open Command Center            | `palette.open`               | `⌘K`                  | application | —                                                                                                                            |
-| Open in Browser                | `view.openInBrowser`         | `⌘⇧O`                 | document    | a built page to open                                                                                                         |
+| Open in Browser                | `view.openInBrowser`         | `⌘⇧O`                 | document    | a page to preview                                                                                                            |
 | Open Selector Menu             | `style.openSelectorMenu`     | —                     | selection   | the Style tab showing a selected element                                                                                     |
 | Preferences…                   | `app.preferences`            | `⌘,`                  | application | —                                                                                                                            |
 | Rename Layout                  | `view.renameLayout`          | —                     | application | an open project                                                                                                              |
@@ -183,6 +183,7 @@ Everything Studio can do is a command, and every command is reachable by name: p
 | Command                 | Id                      | Shortcut | Level       | Requires                                    |
 | ----------------------- | ----------------------- | -------- | ----------- | ------------------------------------------- |
 | Add Language            | `i18n.addLocale`        | —        | project     | an open project                             |
+| Build Site              | `project.buildSite`     | —        | project     | a site project                              |
 | Edit Collection in Grid | `collection.editInGrid` | —        | project     | a project that declares content collections |
 | Edit Redirects          | `redirects.open`        | —        | project     | an open project                             |
 | Import Redirects…       | `redirects.import`      | —        | project     | an open project                             |

@@ -19,7 +19,8 @@ void mock.module("../src/canvas/iframe-host", () => ({
   },
 }));
 
-const { exportFile, openFile, saveFile, serializeDocument } = await import("../src/files/file-ops");
+const { exportFile, openFile, saveFile } = await import("../src/files/file-ops");
+const { serializeDocument } = await import("../src/files/serialize-document");
 
 beforeEach(() => {
   flushCalls = 0;
