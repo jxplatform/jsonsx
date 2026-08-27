@@ -59,8 +59,22 @@ writeFileSync(
 let projectRootValue = FIXTURES;
 
 const handlerMocks = {
-  // `View: Open in Browser` builds first, so the reader sees what the author does.
+  // `Build Site` compiles; `View: Open in Browser` reaches previewSite instead.
   buildSite: mock(() => Promise.resolve({ errors: [], files: 0, routes: 0 })),
+  clearPreviewOverlay: mock(() => {}),
+  /* The live preview: no build, and `reused` says whether the project's open tab took the route
+     rather than a new one being opened for it. */
+  previewSite: mock(() =>
+    Promise.resolve({
+      errors: [],
+      files: 0,
+      mode: "live",
+      reused: false,
+      routes: 2,
+      url: "http://127.0.0.1:41234",
+    }),
+  ),
+  setPreviewOverlay: mock(() => {}),
   codeService: mock((params: unknown) => Promise.resolve({ echoed: params })),
   // Data surface + secrets (desktop twins of /__studio/data/* + /__studio/secrets)
   dataConnections: mock(() => Promise.resolve({ connections: [] })),

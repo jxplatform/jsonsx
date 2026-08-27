@@ -14,6 +14,7 @@ import type {
   ReferencesResult,
   RenameResult,
   SiteBuildResult,
+  SitePreviewResult,
   StarterInfo,
   StudioPlatform,
 } from "@jxsuite/studio/types";
@@ -417,6 +418,23 @@ export function createDesktopPlatform() {
      */
     async buildSite() {
       return request("buildSite") as Promise<SiteBuildResult>;
+    },
+
+    /**
+     * The live preview, and the origin is the backend's to name for the same reason the built
+     * site's is: it is served on a port of its own, per project rather than per window, so a tab
+     * outlives the window that opened it.
+     */
+    async previewSite(opts: { route: string }) {
+      return request("previewSite", opts) as Promise<SitePreviewResult>;
+    },
+
+    async setPreviewOverlay(path: string, contents: string) {
+      await request("setPreviewOverlay", { contents, path });
+    },
+
+    async clearPreviewOverlay(path?: string) {
+      await request("clearPreviewOverlay", path === undefined ? {} : { path });
     },
 
     async gitAddRemote(name: string, url: string) {

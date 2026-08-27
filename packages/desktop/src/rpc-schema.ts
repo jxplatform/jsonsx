@@ -288,8 +288,54 @@ export interface StudioRPC {
         params: void;
         /* `url` is the origin the result is browsable at — its own port, because this window's
            project server answers for the project's SOURCES and a built page addresses its OUTPUT
-           by the same paths. */
-        response: { routes: number; files: number; errors: string[]; url?: string };
+           by the same paths.
+
+           `mode` says how the result was produced. It is absent here and means `built`, which is
+           what this call always is; it exists on the shape so a reply cannot be read as compiler
+           output when it is not — see `previewSite`, which always says `live`. Its absence from
+           this schema is why a desktop live answer could not round-trip at all before. */
+        response: {
+          routes: number;
+          files: number;
+          errors: string[];
+          mode?: "built" | "live";
+          url?: string;
+        };
+      };
+      /**
+       * Preview the site LIVE, and point the project's open tab at a route.
+       *
+       * The sibling of `buildSite` and the one `View: Open in Browser` reaches first. Nothing is
+       * compiled: the working tree is composed on demand and assembled by the runtime in the
+       * reader's browser, so what opens carries the author's unsaved edits.
+       *
+       * `reused` is the answer the caller must honour. `true` means a tab already holding this
+       * project's reload stream took the route, and opening another would give the author two tabs
+       * on one project.
+       */
+      previewSite: {
+        params: { route: string };
+        response: {
+          routes: number;
+          files: number;
+          errors: string[];
+          mode: "live";
+          url: string;
+          reused: boolean;
+        };
+      };
+      /**
+       * Publish the bytes a save WOULD write for one document, so the live preview shows the canvas
+       * rather than the disk. Held in memory and written nowhere.
+       */
+      setPreviewOverlay: {
+        params: { path: string; contents: string };
+        response: void;
+      };
+      /** Drop one document's unsaved bytes, or every one of this project's. */
+      clearPreviewOverlay: {
+        params: { path?: string };
+        response: void;
       };
       // Files
       /* `extensions` mirrors the PAL's second argument (the format registry's document extensions);

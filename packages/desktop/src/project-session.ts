@@ -26,6 +26,14 @@ import {
 import { applyRename, createFsWatcher, findReferences } from "@jxsuite/server/refactor";
 import { startSitePreview } from "@jxsuite/server/site-preview";
 import {
+  clearLivePreviewOverlay,
+  livePreviewOrigin,
+  navigateLivePreview,
+  notifyLivePreviewChange,
+  setLivePreviewOverlay,
+  startLivePreview,
+} from "@jxsuite/server/live-preview";
+import {
   buildExtensionsPayload,
   buildProjectExtensionRegistry,
 } from "@jxsuite/compiler/format-host";
@@ -393,6 +401,80 @@ export function createProjectSession(initialRoot: string | null) {
     };
   }
 
+  /**
+   * Preview the site LIVE, and point the project's open tab at a route.
+   *
+   * The sibling of {@link buildSite} and the one `View: Open in Browser` reaches first. Nothing is
+   * compiled: `@jxsuite/site` composes each page from the working tree on demand and
+   * `@jxsuite/runtime` assembles it in the reader's browser, so what opens is the tree as it
+   * stands, unsaved edits included, because {@link setPreviewOverlay} has already published them.
+   *
+   * `reused` is the answer the caller must honour. A tab already holding this project's reload
+   * stream is retargeted in place; opening another would give the author two tabs on one project,
+   * which is the thing the retarget exists to prevent.
+   */
+  async function previewSite(params: { route: string }): Promise<{
+    routes: number;
+    files: number;
+    errors: string[];
+    mode: "live";
+    url: string;
+    reused: boolean;
+  }> {
+    const root = requireRoot();
+    const preview = await startLivePreview(root);
+    /* An origin now exists, and it wants filesystem events whether or not a shell subscribed for
+       the sidebar. Re-arming is idempotent — `startWatching` stops the old watcher first. */
+    startWatching();
+    const reused = params.route ? await navigateLivePreview(root, params.route) : false;
+    return {
+      errors: preview.errors,
+      /* A live preview writes nothing, so there are no files to count. Zero is the honest answer
+         for a field the shared shape requires rather than an omission. */
+      files: 0,
+      mode: "live",
+      reused,
+      routes: preview.routes,
+      url: preview.origin,
+    };
+  }
+
+  /**
+   * Publish the bytes a save WOULD write for one document.
+   *
+   * Byte-identical to a save by construction: Studio serializes through the same function
+   * `writeFile` uses, so what a reader sees and what saving would produce cannot drift. Held in
+   * memory and written nowhere, so a crash leaves the preview showing the saved state.
+   */
+  function setPreviewOverlay(params: { path: string; contents: string }): void {
+    setLivePreviewOverlay(requireRoot(), params.path, params.contents);
+  }
+
+  /** Drop one document's unsaved bytes, or every one of this project's. */
+  function clearPreviewOverlay(params: { path?: string }): void {
+    clearLivePreviewOverlay(requireRoot(), params.path);
+  }
+
+  /**
+   * Point this session at a project, and let go of the last one's unsaved state.
+   *
+   * The overlay is keyed by project root and lives for the process, so a session that re-roots
+   * without clearing would leave one project's unsaved bytes for a later preview of it to read as
+   * current. Clearing here is a net under Studio's own lifecycle rather than a replacement for it.
+   *
+   * Two windows on one project share the overlay, so a re-root by one drops the other's unsaved
+   * bytes until its next keystroke republishes them. That is self-healing and bounded, which is why
+   * it is preferred to leaving every root a session ever held populated forever.
+   */
+  function reroot(next: string | null): void {
+    if (projectRoot && projectRoot !== next) {
+      clearLivePreviewOverlay(projectRoot);
+    }
+    projectRoot = next;
+    extensionRegistry = null;
+    startWatching();
+  }
+
   async function getExtensionRegistry(): Promise<ExtensionRegistry> {
     const root = requireRoot();
     if (extensionRegistry?.root === root) {
@@ -455,7 +537,10 @@ export function createProjectSession(initialRoot: string | null) {
    */
   function startWatching(): void {
     void stopWatching();
-    if (!projectRoot || !fileEventSink) {
+    /* Two consumers now, and either is reason enough. The sidebar's sink was the original one; a
+       live preview origin is the second, and it wants to know about a git checkout or an external
+       editor whether or not a shell happens to be subscribed. */
+    if (!projectRoot || (!fileEventSink && !livePreviewOrigin(projectRoot))) {
       return;
     }
     if (!existsSync(resolve(projectRoot, "project.json"))) {
@@ -468,7 +553,14 @@ export function createProjectSession(initialRoot: string | null) {
     }
     unwatchableRoot = null;
     const sink = fileEventSink;
-    watcherHandle = createFsWatcher(projectRoot, (events) => sink(events));
+    const root = projectRoot;
+    watcherHandle = createFsWatcher(root, (events) => {
+      /* The preview first, so a reload is scheduled from the same event the sidebar redraws on.
+         One watcher, two consumers: a second chokidar on the same tree would double the inotify
+         watch count and could disagree with this one about what `watch-policy.ts` ignores. */
+      notifyLivePreviewChange(root);
+      sink?.(events);
+    });
   }
 
   /** Register (or clear) the sink that receives batched filesystem events for the active project. */
@@ -588,9 +680,7 @@ export function createProjectSession(initialRoot: string | null) {
     }
 
     // Binding is the part `pickProjectFile` deliberately leaves out — see its docstring.
-    projectRoot = picked.root;
-    extensionRegistry = null;
-    startWatching();
+    reroot(picked.root);
 
     return {
       config: picked.config,
@@ -685,9 +775,7 @@ export function createProjectSession(initialRoot: string | null) {
     const config = JSON.parse(
       await readFile(resolve(destPath, "project.json"), "utf8"),
     ) as SiteConfig;
-    projectRoot = destPath;
-    extensionRegistry = null;
-    startWatching();
+    reroot(destPath);
 
     return { config, root: destPath };
   }
@@ -1086,11 +1174,7 @@ export function createProjectSession(initialRoot: string | null) {
     get projectRoot(): string | null {
       return projectRoot;
     },
-    setProjectRoot(root: string | null) {
-      projectRoot = root;
-      extensionRegistry = null;
-      startWatching();
-    },
+    setProjectRoot: reroot,
     setFileEventSink,
     dispose: stopWatching,
     listFormats,
@@ -1100,6 +1184,9 @@ export function createProjectSession(initialRoot: string | null) {
     openProject,
     openExternal,
     buildSite,
+    previewSite,
+    setPreviewOverlay,
+    clearPreviewOverlay,
     createProject,
     pickDirectory,
     listDirectory,

@@ -71,8 +71,19 @@ const responses: Record<string, unknown> = {
   dataDeleteRow: { ok: true },
   listSecrets: { names: ["MAIN_URL"] },
   setSecrets: { names: ["MAIN_URL"], ok: true },
-  // View: Open in Browser — build, then open the OUTPUT on the origin the backend names.
+  // Build Site — compile, then open the OUTPUT on the origin the backend names.
   buildSite: { errors: [], files: 12, routes: 4, url: "http://127.0.0.1:45678" },
+  // View: Open in Browser — no build, and the reply says whether a tab already took the route.
+  previewSite: {
+    errors: [],
+    files: 0,
+    mode: "live",
+    reused: true,
+    routes: 4,
+    url: "http://127.0.0.1:51000",
+  },
+  setPreviewOverlay: null,
+  clearPreviewOverlay: null,
   // About screen. A system-packaged build has no update feed, so it reports no status.
   appInfo: { channel: "system", hash: "unknown", version: "1.4.1" },
   // Multi-window
@@ -701,6 +712,39 @@ describe("chromium desktop platform", () => {
       routes: 4,
       url: "http://127.0.0.1:45678",
     });
+  });
+
+  test("previewSite carries the route, and reports that a tab already took it", async () => {
+    /* `reused` is the answer the caller acts on: a second tab on one project is exactly what
+       retargeting the first exists to prevent, so it has to survive the wire intact. */
+    const result = await platform.previewSite!({ route: "/blog/hello/" });
+    expect(result).toEqual({
+      errors: [],
+      files: 0,
+      mode: "live",
+      reused: true,
+      routes: 4,
+      url: "http://127.0.0.1:51000",
+    });
+    expect(methodLog.at(-1)).toEqual({
+      method: "previewSite",
+      params: { route: "/blog/hello/" },
+    });
+  });
+
+  test("setPreviewOverlay sends the path and the bytes a save would write", async () => {
+    await platform.setPreviewOverlay!("pages/index.json", '{"tagName":"main"}');
+    expect(methodLog.at(-1)).toEqual({
+      method: "setPreviewOverlay",
+      params: { contents: '{"tagName":"main"}', path: "pages/index.json" },
+    });
+  });
+
+  test("clearPreviewOverlay names one document, or the whole project when it names none", async () => {
+    await platform.clearPreviewOverlay!("pages/index.json");
+    expect(methodLog.at(-1)!.params).toEqual({ path: "pages/index.json" });
+    await platform.clearPreviewOverlay!();
+    expect(methodLog.at(-1)!.params).toEqual({});
   });
 
   // ─── About screen ──────────────────────────────────────────────────────

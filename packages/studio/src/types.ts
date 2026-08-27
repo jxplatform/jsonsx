@@ -176,6 +176,24 @@ export interface SiteBuildResult {
   url?: string;
 }
 
+/**
+ * What a live site preview reports back.
+ *
+ * Everything {@link SiteBuildResult} carries, plus the one answer only a live preview can give:
+ * whether the reader already had a tab on this project.
+ */
+export interface SitePreviewResult extends SiteBuildResult {
+  /**
+   * A tab already holding this project's preview took the route, so open nothing.
+   *
+   * The caller MUST honour it. One tab per project is the contract, and a caller that opens a
+   * second one anyway gives the author two tabs on the same project — which is precisely what
+   * retargeting the first one exists to prevent. `false` means the backend has no live client, or
+   * had one that did not answer, and the caller should open a tab itself.
+   */
+  reused?: boolean;
+}
+
 export interface StudioPlatform {
   id: string;
   projectRoot: string;
@@ -409,6 +427,31 @@ export interface StudioPlatform {
    * build happened to leave — which for most projects is nothing at all.
    */
   buildSite?: () => Promise<SiteBuildResult>;
+  /**
+   * Preview the site LIVE at `route`, with no build on the path.
+   *
+   * The sibling of {@link buildSite} and what `View: Open in Browser` reaches first. Nothing is
+   * compiled: the backend composes the working tree on demand and the runtime assembles each page
+   * in the reader's browser, so what opens carries edits nobody has saved. `buildSite` keeps its
+   * own meaning and its own command, because "what does this page look like at its real URL?" and
+   * "does my site build?" are different questions and only one of them wants to wait.
+   *
+   * Optional, and the fallback is `buildSite`: a backend that predates this keeps working, and a
+   * backend that can do neither says so rather than opening an origin where half the site is the
+   * wrong file.
+   */
+  previewSite?: (opts: { route: string }) => Promise<SitePreviewResult>;
+  /**
+   * Publish the bytes a save WOULD write for one document, so a live preview shows the canvas
+   * rather than the disk.
+   *
+   * Bytes rather than a document, and the same bytes `writeFile` would receive: that is what makes
+   * "what the reader sees" and "what saving would produce" one answer instead of two that drift. A
+   * backend holds them in memory and writes them nowhere.
+   */
+  setPreviewOverlay?: (path: string, contents: string) => Promise<void>;
+  /** Drop one document's unsaved bytes, or every one of this project's when no path is given. */
+  clearPreviewOverlay?: (path?: string) => Promise<void>;
   gitAddRemote: (name: string, url: string) => Promise<void>;
   /**
    * How the New Project modal collects a destination, and which `CreateProjectDestination` variant
