@@ -17,6 +17,7 @@ coveragePathIgnorePatterns = [
   "../protocol/**",
   "../runtime/**",
   "../schema/**",
+  "../site/**",
   "../starters/**",
   "../studio/**",
 ]

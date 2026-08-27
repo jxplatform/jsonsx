@@ -2,17 +2,17 @@
  * The build's filesystem half of layout resolution.
  *
  * The rule — which layout a page uses, how its children land in the layout's slots, which
- * properties the page extends onto it — is `@jxsuite/schema/layout`, because the studio's canvas
- * and the cloud's live preview have to reach the same answer and neither can import this package.
- * What is left here is the part that genuinely needs a disk: turning `./layouts/base.json` into
- * bytes, and saying which file was wrong when it is.
+ * properties the page extends onto it — is `@jxsuite/site/layout`, because the studio's canvas and
+ * the cloud's live preview have to reach the same answer and neither can import this package. What
+ * is left here is the part that genuinely needs a disk: turning `./layouts/base.json` into bytes,
+ * and saying which file was wrong when it is.
  */
 
 import { existsSync, readFileSync } from "node:fs";
 import { parseJxDocument } from "@jxsuite/schema/parse";
 import { resolve } from "node:path";
-import { resolveLayout as resolveLayoutWith } from "@jxsuite/schema/layout";
-import type { LayoutLoader } from "@jxsuite/schema/layout";
+import { resolveLayout as resolveLayoutWith } from "@jxsuite/site/layout";
+import type { LayoutLoader } from "@jxsuite/site/layout";
 import type { JxDocument } from "@jxsuite/schema/types";
 
 /** A {@link LayoutLoader} over the project's own directory. */

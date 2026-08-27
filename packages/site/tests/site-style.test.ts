@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { SITE_STYLE_ID, buildSiteStyleCSS } from "../src/canvas/site-style-css";
+import { SITE_STYLE_ID, buildSiteStyleCSS } from "../src/site-style.ts";
 
 const id = (v: string) => v;
 

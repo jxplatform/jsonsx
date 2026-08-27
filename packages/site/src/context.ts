@@ -21,9 +21,14 @@
  * @docs framework/site/i18n
  */
 
-import type { JxDocument, JxElement, JxStateDefinition, ProjectConfig } from "../types.ts";
-import { localeDirection, localeLabel, localeOfRoute } from "./locale.ts";
-import type { ResolvedI18n } from "./locale.ts";
+import type {
+  JxDocument,
+  JxElement,
+  JxStateDefinition,
+  ProjectConfig,
+} from "@jxsuite/schema/types";
+import { localeDirection, localeLabel, localeOfRoute } from "@jxsuite/schema/locale";
+import type { ResolvedI18n } from "@jxsuite/schema/locale";
 
 /** One member of a route's translation set — the shape `<head>` and `$page.alternates` share. */
 export interface TranslationMember {

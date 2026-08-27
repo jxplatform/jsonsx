@@ -911,6 +911,7 @@
   "@jxsuite/schema" = copyPathToStore ./packages/schema;
   "@jxsuite/search" = copyPathToStore ./extensions/search;
   "@jxsuite/server" = copyPathToStore ./packages/server;
+  "@jxsuite/site" = copyPathToStore ./packages/site;
   "@jxsuite/site-jxsuite.com" = copyPathToStore ./sites/jxsuite.com;
   "@jxsuite/starters" = copyPathToStore ./packages/starters;
   "@jxsuite/studio" = copyPathToStore ./packages/studio;

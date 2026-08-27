@@ -153,6 +153,7 @@
         "@jxsuite/create": "workspace:^",
         "@jxsuite/runtime": "workspace:^",
         "@jxsuite/schema": "workspace:^",
+        "@jxsuite/site": "workspace:^",
         "@vue/reactivity": "3.5.41",
         "esbuild": "^0.28.2",
         "lit-html": "^3.3.3",
@@ -304,6 +305,14 @@
         "@jxsuite/parser": "workspace:^",
       },
     },
+    "packages/site": {
+      "name": "@jxsuite/site",
+      "version": "0.1.0",
+      "dependencies": {
+        "@jxsuite/runtime": "workspace:^",
+        "@jxsuite/schema": "workspace:^",
+      },
+    },
     "packages/starters": {
       "name": "@jxsuite/starters",
       "version": "1.6.4",
@@ -329,6 +338,7 @@
         "@jxsuite/protocol": "workspace:^",
         "@jxsuite/runtime": "workspace:^",
         "@jxsuite/schema": "workspace:^",
+        "@jxsuite/site": "workspace:^",
         "@spectrum-web-components/accordion": "^1.12.2",
         "@spectrum-web-components/action-bar": "1.12.2",
         "@spectrum-web-components/action-button": "^1.12.2",
@@ -859,6 +869,8 @@
     "@jxsuite/search": ["@jxsuite/search@workspace:extensions/search"],
 
     "@jxsuite/server": ["@jxsuite/server@workspace:packages/server"],
+
+    "@jxsuite/site": ["@jxsuite/site@workspace:packages/site"],
 
     "@jxsuite/site-jxsuite.com": ["@jxsuite/site-jxsuite.com@workspace:sites/jxsuite.com"],
 

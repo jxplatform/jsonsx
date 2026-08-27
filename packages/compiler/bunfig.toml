@@ -22,6 +22,7 @@ coveragePathIgnorePatterns = [
   "../runtime/**",
   "../schema/**",
   "../server/**",
+  "../site/**",
   "../studio/**",
 ]
 coverageThreshold = { lines = 0.96, functions = 0.98 }

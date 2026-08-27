@@ -10,7 +10,7 @@
  * matching built page.
  */
 
-import { documentUrlPattern as routePattern } from "@jxsuite/schema/routes";
+import { documentUrlPattern as routePattern } from "@jxsuite/site/routes";
 import { getPlatform } from "./platform";
 import { loadExtensions } from "./format/format-host";
 import type { JxMutableNode, JxPathsDef } from "@jxsuite/schema/types";
@@ -19,7 +19,7 @@ import type { JxMutableNode, JxPathsDef } from "@jxsuite/schema/types";
 export type ParamValues = Record<string, string[]>;
 
 /**
- * Route derivation is `@jxsuite/schema/routes`, re-exported so this module stays the studio's one
+ * Route derivation is `@jxsuite/site/routes`, re-exported so this module stays the studio's one
  * import for everything `$params`.
  *
  * These two used to be written out here, under a docblock admitting they mirrored the compiler's
@@ -28,7 +28,7 @@ export type ParamValues = Record<string, string[]>;
  * import `@jxsuite/compiler` (its graph carries `sharp` and `esbuild`, and this bundles for a
  * browser), so the rules moved down to the package both CAN import.
  */
-export { documentUrlPattern, dynamicRouteParams } from "@jxsuite/schema/routes";
+export { documentUrlPattern, dynamicRouteParams } from "@jxsuite/site/routes";
 
 /**
  * The `$paths` declaration of an open document. JSON pages carry it on the document root;

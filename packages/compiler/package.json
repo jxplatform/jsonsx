@@ -49,6 +49,7 @@
     "@jxsuite/create": "workspace:^",
     "@jxsuite/runtime": "workspace:^",
     "@jxsuite/schema": "workspace:^",
+    "@jxsuite/site": "workspace:^",
     "@vue/reactivity": "3.5.41",
     "esbuild": "^0.28.2",
     "lit-html": "^3.3.3",

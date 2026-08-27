@@ -28,7 +28,7 @@ import {
 import { resolveAssetRef } from "./asset-resolve";
 import { classifyRenderNode, serializeJxPath } from "./path-mapping";
 import type { AssetContext } from "./asset-resolve";
-import { SITE_STYLE_ID, buildSiteStyleCSS } from "./site-style-css";
+import { SITE_STYLE_ID, buildSiteStyleCSS } from "@jxsuite/site/site-style";
 import type { CanvasMode } from "./iframe-protocol";
 import type { JxDocument } from "@jxsuite/schema/types";
 import type { PathMapCtx } from "./path-mapping";
