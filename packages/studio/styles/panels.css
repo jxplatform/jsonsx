@@ -479,7 +479,9 @@
   font-size: 0;
   overflow: hidden;
 }
-.empty-text-placeholder:not([contenteditable])::after {
+.empty-text-placeholder:is(:empty, :has(> br:only-child)):not([data-jx-active-block]):not(
+    [contenteditable]
+  )::after {
   content: "Click here to add text...";
   color: color-mix(in srgb, var(--fg-dim, #808080) 40%, transparent);
   font-style: italic;

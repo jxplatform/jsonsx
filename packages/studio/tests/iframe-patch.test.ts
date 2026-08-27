@@ -571,6 +571,68 @@ describe("applyIframePatch — echoed ops", () => {
     }
   });
 
+  test("reconciles the placeholder class of the block being typed in, without touching its text", () => {
+    // The screenshot bug: the class is stamped from the DOCUMENT, and typing into an empty block
+    // Reaches the DOM natively — so the block the author is writing in kept `empty-text-placeholder`
+    // For the whole session (its own commit comes back as an echo, which is never re-rendered), and
+    // "Click here to add text..." sat beside the text they had just typed. The class is model-derived
+    // State, so an echo still gets to correct it; only the CONTENT is the author's to own.
+    const { container, shadow } = mount(BASE);
+    const el = elAt(container, ["children", 1]);
+    el.classList.add("empty-text-placeholder"); // Stamped when the span rendered empty.
+    el.textContent = "asdfasdf"; // What the user typed, already in the DOM.
+
+    applyIframePatch(
+      shadow,
+      [{ key: "textContent", op: "set-key", path: ["children", 1], value: "asdfasdf" }],
+      container,
+      CTX,
+      [["children", 1]],
+    );
+
+    expect(el.classList.contains("empty-text-placeholder")).toBe(false);
+    expect(el.textContent).toBe("asdfasdf"); // Not rewritten — the caret lives in this text node.
+    expect(elAt(container, ["children", 1])).toBe(el); // Nor re-rendered.
+  });
+
+  test("an echo that empties the block puts the placeholder class back", () => {
+    const { container, shadow } = mount(BASE);
+    const el = elAt(container, ["children", 1]);
+    el.textContent = ""; // The user deleted it.
+
+    applyIframePatch(
+      shadow,
+      [{ key: "textContent", op: "set-key", path: ["children", 1], value: "" }],
+      container,
+      CTX,
+      [["children", 1]],
+    );
+
+    expect(el.classList.contains("empty-text-placeholder")).toBe(true);
+  });
+
+  test("an echoed op for a path this render never drew is a no-op, not an escalation", () => {
+    // Reconciling a class is best-effort: throwing here would be reported as a `patchError`, and
+    // The parent's full render would take the caret with it.
+    // `mount` mirrors only the top-level children, so this nested node exists in the doc with no
+    // Element of its own — the shape a patch for an unrendered subtree arrives in.
+    const { container, shadow } = mount({
+      children: [{ children: [{ tagName: "em", textContent: "deep" }], tagName: "p" }],
+      tagName: "div",
+    } as unknown as JxMutableNode);
+    expect(() =>
+      applyIframePatch(
+        shadow,
+        [{ key: "textContent", op: "set-key", path: ["children", 0, "children", 0], value: "x" }],
+        container,
+        CTX,
+        [["children", 0, "children", 0]],
+      ),
+    ).not.toThrow();
+    // The shadow doc still took it — an echo is folded whether or not this render drew it.
+    expect(getNodeAtPath(shadow, ["children", 0, "children", 0])?.textContent).toBe("x");
+  });
+
   test("only set-key ops are suppressed — a structural op at an echoed path still applies", () => {
     // Echo suppression exists for the commit shape (set-key on textContent/children). A structural
     // Op arriving for the same path is something else entirely and must not be silently dropped.
