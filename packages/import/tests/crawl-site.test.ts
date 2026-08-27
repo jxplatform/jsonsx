@@ -68,8 +68,8 @@ void mock.module("../src/asset-collect.ts", () => ({ collectAssets }));
 const downloadAssets = mock(() =>
   Promise.resolve({
     rewriteMap: new Map([
-      ["https://crawl.example/logo.png", "public/assets/images/logo.png"],
-      ["https://crawl.example/font.woff2", "public/assets/fonts/font.woff2"],
+      ["https://crawl.example/logo.png", "/assets/images/logo.png"],
+      ["https://crawl.example/font.woff2", "/assets/fonts/font.woff2"],
     ]),
     failed: [],
     skipped: [],
@@ -187,7 +187,7 @@ describe("crawlSite", () => {
     // Assets: font-face rules deduped across pages, font rewrites collected.
     expect(result.fontFaceRules).toEqual(["@font-face { font-family: X }"]);
     expect(result.fontRewriteMap.get("https://crawl.example/font.woff2")).toBe(
-      "public/assets/fonts/font.woff2",
+      "/assets/fonts/font.woff2",
     );
     expect(messages.some((m) => m.includes("robots.txt"))).toBe(true);
   });

@@ -57,8 +57,8 @@ void mock.module("../src/asset-collect.ts", () => ({ collectAssets }));
 const downloadAssets = mock(() =>
   Promise.resolve({
     rewriteMap: new Map([
-      ["https://site.example/hero.jpg", "public/assets/images/hero.jpg"],
-      ["https://site.example/font.woff2", "public/assets/fonts/font.woff2"],
+      ["https://site.example/hero.jpg", "/assets/images/hero.jpg"],
+      ["https://site.example/font.woff2", "/assets/fonts/font.woff2"],
     ]),
     failed: ["https://site.example/broken.png"],
     skipped: [] as string[],
@@ -285,7 +285,7 @@ describe("importSite — single-page mode", () => {
 
   test("reports sub-kilobyte download sizes and skipped tracking URLs", async () => {
     downloadAssets.mockResolvedValueOnce({
-      rewriteMap: new Map([["https://site.example/hero.jpg", "public/assets/images/hero.jpg"]]),
+      rewriteMap: new Map([["https://site.example/hero.jpg", "/assets/images/hero.jpg"]]),
       failed: [],
       skipped: ["https://site.example/analytics.js"],
       totalBytes: 512,
@@ -301,7 +301,7 @@ describe("importSite — single-page mode", () => {
 
   test("reports megabyte-range download sizes", async () => {
     downloadAssets.mockResolvedValueOnce({
-      rewriteMap: new Map([["https://site.example/hero.jpg", "public/assets/images/hero.jpg"]]),
+      rewriteMap: new Map([["https://site.example/hero.jpg", "/assets/images/hero.jpg"]]),
       failed: [],
       skipped: [],
       totalBytes: 3 * 1024 * 1024,

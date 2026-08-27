@@ -97,7 +97,7 @@ describe("downloadAssets", () => {
       const url = "https://example.com/images/pic.jpg";
       const result = await downloadAssets([{ url, source: "img-src" }], tmpDir);
 
-      expect(result.rewriteMap.get(url)).toBe("public/assets/images/pic.jpg");
+      expect(result.rewriteMap.get(url)).toBe("/assets/images/pic.jpg");
       expect(result.totalBytes).toBe(5);
       expect(result.failed.length).toBe(0);
       expect(existsSync(join(tmpDir, "public", "assets", "images", "pic.jpg"))).toBe(true);
@@ -122,16 +122,16 @@ describe("downloadAssets", () => {
       const result = await downloadAssets(assets, tmpDir);
 
       expect(result.rewriteMap.get("https://fonts.example.com/custom.ttf")).toBe(
-        "public/assets/fonts/custom.ttf",
+        "/assets/fonts/custom.ttf",
       );
       expect(result.rewriteMap.get("https://example.com/favicon.ico")).toBe(
-        "public/assets/icons/favicon.ico",
+        "/assets/icons/favicon.ico",
       );
       expect(result.rewriteMap.get("https://cdn.example.com/inter.woff2")).toBe(
-        "public/assets/fonts/inter.woff2",
+        "/assets/fonts/inter.woff2",
       );
       expect(result.rewriteMap.get("https://example.com/whitepaper.pdf")).toBe(
-        "public/assets/other/whitepaper.pdf",
+        "/assets/other/whitepaper.pdf",
       );
     } finally {
       globalThis.fetch = originalFetch;
@@ -154,11 +154,11 @@ describe("downloadAssets", () => {
 
       // No extension → ".bin" appended (and classified as "other")
       expect(result.rewriteMap.get("https://example.com/assets/logo")).toBe(
-        "public/assets/other/logo.bin",
+        "/assets/other/logo.bin",
       );
       // 120-char filename → capped to 96 chars + extension
       expect(result.rewriteMap.get(`https://example.com/${longName}.png`)).toBe(
-        `public/assets/images/${"a".repeat(96)}.png`,
+        `/assets/images/${"a".repeat(96)}.png`,
       );
     } finally {
       globalThis.fetch = originalFetch;
@@ -179,10 +179,10 @@ describe("downloadAssets", () => {
       const result = await downloadAssets(assets, tmpDir);
 
       expect(result.rewriteMap.get("https://a.example.com/logo.png")).toBe(
-        "public/assets/images/logo.png",
+        "/assets/images/logo.png",
       );
       expect(result.rewriteMap.get("https://b.example.com/logo.png")).toBe(
-        "public/assets/images/logo-1.png",
+        "/assets/images/logo-1.png",
       );
       expect(existsSync(join(tmpDir, "public", "assets", "images", "logo-1.png"))).toBe(true);
     } finally {

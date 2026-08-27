@@ -8,7 +8,10 @@ import { describe, test, expect } from "bun:test";
 import { join } from "node:path";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { existsSync } from "node:fs";
 import { emitMultiPageProject } from "../src/emit.ts";
+import { downloadAssets } from "../src/asset-download.ts";
+import type { DiscoveredAsset } from "../src/asset-collect.ts";
 
 /** The keys `project.schema.json` accepts at the top level of a project document. */
 const PROJECT_KEYS = new Set([
@@ -74,6 +77,32 @@ describe("an emitted project is one the compiler accepts", () => {
       expect(project.style).toEqual({ "--brand": "#3b82f6" });
       expect(project.$style).toBeUndefined();
     } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+describe("an asset reference names the path the built site serves", () => {
+  test("a downloaded asset is mapped site-absolute, with no `public/` segment", async () => {
+    // `public/` is the compiler's static ROOT: its contents land at dist/<path>. A reference that
+    // Keeps the segment names a file that does not exist, and one without a leading slash resolves
+    // Against the current route — so the same document 404s differently on every page.
+    const dir = await mkdtemp(join(tmpdir(), "jx-import-assetpath-"));
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () => new Response("data")) as unknown as typeof fetch;
+    try {
+      const assets: DiscoveredAsset[] = [
+        { url: "https://example.com/logo.png", source: "img-src" },
+      ];
+
+      const { rewriteMap } = await downloadAssets(assets, dir);
+      const mapped = rewriteMap.get("https://example.com/logo.png");
+
+      expect(mapped).toBe("/assets/images/logo.png");
+      expect(mapped).not.toContain("public/");
+      // The file itself still lands under public/, which is what the compiler copies from.
+      expect(existsSync(join(dir, "public", "assets", "images", "logo.png"))).toBe(true);
+    } finally {
+      globalThis.fetch = originalFetch;
       await rm(dir, { recursive: true, force: true });
     }
   });
