@@ -74,11 +74,11 @@ Breakpoints are stored as a `$media` map in `project.json`. A single document ma
 
 ## Breakpoints in an imported site
 
-When you [import an existing site](/docs/studio/projects/create), its breakpoints come from whatever CSS it happens to ship — which on a site that has been through two or three frameworks means a lot of them. Nine is ordinary: `520`, `600`, `767`, `781`, `782`, `960`, `1024`, `1025`, `1390` came out of one real import. Kept literally, that's nine canvases in Design mode and nine columns in every style editor.
+When you [import an existing site](/docs/studio/projects/create), its breakpoints come from whatever CSS it happens to ship, which on a site that has been through two or three frameworks means a lot of them. Nine is ordinary: `520`, `600`, `767`, `781`, `782`, `960`, `1024`, `1025`, `1390` came out of one real import. Kept literally, that's nine canvases in Design mode and nine columns in every style editor.
 
-So the Import tab asks how many you want before it starts. By default it keeps **three**, spaced evenly across the widths the site declares — the narrowest, the widest, and the one in the middle. You can raise or lower that number, name the widths yourself (`640, 1024, 1440`), or keep every one.
+So the Import tab asks how many you want before it starts. By default it keeps **three**, spaced evenly across the widths the site declares: the narrowest, the widest, and the one in the middle. You can raise or lower that number, name the widths yourself (`640, 1024, 1440`), or keep every one.
 
-Whichever you choose, a width that isn't kept is **folded** into the kept one nearest it, so nothing the site expressed disappears — the styles it carried arrive at the breakpoint your project actually has. A rounding rule (nearest, round down, round up) decides which declared width backs a kept one, because the site's rules flip where its CSS says they do. The import's log names the result:
+Whichever you choose, a width that isn't kept is **folded** into the kept one nearest it, so nothing the site expressed disappears: the styles it carried arrive at the breakpoint your project actually has. A rounding rule (nearest, round down, round up) decides which declared width backs a kept one, because the site's rules flip where its CSS says they do. The import's log names the result:
 
 ```
 9 breakpoints declared, keeping 3: --520 (+600), --767 (+781, 782, 960, 1024, 1025), --1390

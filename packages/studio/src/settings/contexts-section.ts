@@ -30,7 +30,7 @@
  * alone), parks any rejection under the control that caused it, and re-renders. §7.1's third tier:
  * a bad value belongs at its control, not in a toast that expires.
  *
- * @docs studio/projects/pages-layouts-components
+ * @docs studio/projects/settings
  */
 
 import { html, render as litRender, nothing } from "lit-html";

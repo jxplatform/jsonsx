@@ -44,7 +44,7 @@ Library is the project's browser: every page, layout, component, content entry a
 
 ## Media
 
-An image, video, audio file, font or PDF opens in a viewer rather than an editor. It shows the file itself — the picture at full size, media with playback controls, a font set as a specimen — plus what Studio knows about it, the URL a document references it by, and which documents use it. Clicking a file in the Files panel or a tile in the Library is all it takes. Full guide: **[Media](/docs/studio/projects/media#open-a-media-file)**.
+An image, video, audio file, font or PDF opens in a viewer rather than an editor. It shows the file itself (the picture at full size, media with playback controls, a font set as a specimen) plus what Studio knows about it, the URL a document references it by, and which documents use it. Clicking a file in the Files panel or a tile in the Library is all it takes. Full guide: **[Media](/docs/studio/projects/media#open-a-media-file)**.
 
 ## Code
 

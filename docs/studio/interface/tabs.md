@@ -26,7 +26,7 @@ Every document you open in Jx Studio belongs to a **pane**. A pane is one editor
 
 Open documents from the **Files** panel, the **[Library](/docs/studio/projects/browse)**, or the Command Center (:kbd[⌘K], or :kbd[⌘P] straight into file search). Click a document in the strip to switch to it; the Files tree follows along, so the strip and the tree never disagree about where you are.
 
-Media files open too. An image, a video, a font or a PDF gets a document of its own — same strip, same label rules, same :kbd[⌘W] — showing the file in the [Media viewer](/docs/studio/projects/media#open-a-media-file) rather than an editor.
+Media files open too. An image, a video, a font or a PDF gets a document of its own, with the same strip, the same label rules and the same :kbd[⌘W], showing the file in the [Media viewer](/docs/studio/projects/media#open-a-media-file) rather than an editor.
 
 - Switch back and forth with :kbd[⌃Tab] / :kbd[⌃⇧Tab], which walk your documents in most-recently-used order.
 - Close one with its **×**, by middle-clicking it, or with :kbd[⌘W].
