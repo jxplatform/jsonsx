@@ -58,7 +58,6 @@ export async function emitProject({
 export async function emitMultiPageProject({
   outDir,
   title,
-  sourceUrl,
   pages,
   layout,
   breakpoints,
@@ -75,8 +74,6 @@ export async function emitMultiPageProject({
 
   const projectJson: Record<string, unknown> = {
     name: title || "Imported Site",
-    title: title || "Imported Site",
-    description: `Imported from ${sourceUrl}`,
     imports: {},
     images: { optimize: false },
   };
@@ -86,7 +83,7 @@ export async function emitMultiPageProject({
   }
 
   if (styleTokens && Object.keys(styleTokens).length > 0) {
-    projectJson.$style = styleTokens;
+    projectJson.style = styleTokens;
   }
 
   const files: string[] = [];

@@ -79,7 +79,7 @@ describe("emitMultiPageProject", () => {
       expect(files.length).toBe(5);
 
       const project = await Bun.file(join(dir, "project.json")).json();
-      expect(project.title).toBe("Multi Page Test");
+      expect(project.name).toBe("Multi Page Test");
 
       const index = await Bun.file(join(dir, "pages", "index.json")).json();
       expect(index.textContent).toBe("Home");
@@ -164,7 +164,7 @@ describe("emitMultiPageProject", () => {
     }
   });
 
-  test("writes style tokens into project.json.$style", async () => {
+  test("writes style tokens into project.json.style", async () => {
     const dir = await mkdtemp(join(tmpdir(), "jx-import-tokens-"));
 
     try {
@@ -177,7 +177,7 @@ describe("emitMultiPageProject", () => {
       });
 
       const project = await Bun.file(join(dir, "project.json")).json();
-      expect(project.$style).toEqual({ "--brand": "#3b82f6", "--space-4": "16px" });
+      expect(project.style).toEqual({ "--brand": "#3b82f6", "--space-4": "16px" });
     } finally {
       await rm(dir, { recursive: true });
     }
