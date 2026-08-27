@@ -41,12 +41,13 @@ import { openQuickSearch } from "./quick-search";
 import { showPromptDialog } from "../ui/layers";
 import { getPlatform, hasPlatform } from "../platform";
 import { getPreviewNavigateHandler } from "../canvas/preview-navigate";
+import { armPreviewOverlay, flushPreviewOverlay } from "../preview/preview-overlay";
 import { documentUrlPattern, dynamicRouteParams } from "../page-params";
 import { getNodeAtPath, nodeLabel, projectState } from "../store";
 import { activeRegistry } from "../commands/active-registry";
 import { notify } from "../services/notify";
 import type { Tab } from "../tabs/tab";
-import type { SiteBuildResult } from "../types";
+import type { SiteBuildResult, SitePreviewResult, StudioPlatform } from "../types";
 import type { CommandRegistry } from "../commands/registry";
 import type { EffectScope } from "@vue/reactivity";
 import type { TemplateResult } from "lit-html";
@@ -253,27 +254,96 @@ export async function runOpenInBrowser() {
     notify.warn(target.reason, { key: OPEN_IN_BROWSER, source: "Preview" });
     return;
   }
-  /* Build first, because the reader is about to see the OUTPUT and the author is looking at the
-     DOCUMENT. Without this they differ by however long it has been since anyone ran a build —
-     which for most projects is "always", since nothing in Studio had ever written the output at
-     all. A preview that quietly shows last week's page is worse than one that says it cannot open.
-
-     The build is also what NAMES the origin. The built site is served on a port of its own, because
-     the editor's own paths mean the project's sources while a built page means its output by the
-     same paths — so a backend that cannot build cannot preview either, and says so instead of
-     sending the reader to an address where half the site is the wrong file. */
   const platform = hasPlatform() ? getPlatform() : null;
-  if (!platform?.buildSite) {
-    notify.warn("This backend cannot build a preview of the site.", {
+  if (!platform?.previewSite && !platform?.buildSite) {
+    notify.warn("This backend cannot preview the site.", {
       key: OPEN_IN_BROWSER,
       source: "Preview",
     });
     return;
   }
+
+  /* A LIVE preview is what this action is for, and a build is the fallback for a backend that
+     cannot do one. The two answer different questions: "what does this page look like at its real
+     URL?" wants the tree as it stands, and "does my site build?" is `Build Site`. */
+  if (platform.previewSite) {
+    await runLivePreview(platform.previewSite, target.path);
+    return;
+  }
+  await runBuiltPreview(platform.buildSite!, target.path);
+}
+
+/**
+ * Preview the working tree, and open a tab only if one is not already showing this project.
+ *
+ * The overlay is flushed FIRST, and that ordering is the whole point: the page the author is about
+ * to look at should carry the keystroke they just typed, not the one before the debounce.
+ */
+async function runLivePreview(
+  previewSite: NonNullable<StudioPlatform["previewSite"]>,
+  path: string,
+) {
+  armPreviewOverlay();
+  await flushPreviewOverlay();
+  notify.info("Opening a live preview…", { key: OPEN_IN_BROWSER, source: "Preview" });
+  let result: SitePreviewResult;
+  try {
+    result = await previewSite({ route: path });
+  } catch (error) {
+    notify.error(`The site could not be previewed: ${errorText(error)}`, {
+      key: OPEN_IN_BROWSER,
+      source: "Preview",
+    });
+    return;
+  }
+  if (!result.url) {
+    notify.warn("This backend serves no preview of the site.", {
+      key: OPEN_IN_BROWSER,
+      source: "Preview",
+    });
+    return;
+  }
+
+  /* `reused` is honoured, and honouring it is the feature. A tab already holding this project's
+     preview has been pointed at the route; opening another would leave the author with two tabs on
+     one project, which is exactly what retargeting the first one exists to prevent. What it costs
+     is that the browser does not come forward — no page can raise a background tab, and handing the
+     URL to the OS again would open a duplicate rather than switch to it — so the notification says
+     where to look. A reader who CLOSED their tab is not stuck here: the stream closes with it, so
+     `reused` comes back false and a fresh tab opens without anyone having to ask. */
+  if (result.reused) {
+    notify.info(`Updated your preview tab — switch to your browser to see ${path}`, {
+      key: OPEN_IN_BROWSER,
+      source: "Preview",
+    });
+    return;
+  }
+
+  if (result.errors.length > 0) {
+    notify.warn(`Previewed with ${result.errors.length} problem(s): ${result.errors[0]}`, {
+      key: OPEN_IN_BROWSER,
+      source: "Preview",
+    });
+  } else {
+    notify.success(
+      `Opened a live preview of ${result.routes} page(s) — rendered from your working tree, not a build.`,
+      { key: OPEN_IN_BROWSER, source: "Preview" },
+    );
+  }
+  openUrlExternally(`${result.url}${path}`);
+}
+
+/**
+ * The compiler-backed path, for a backend that declares no live preview.
+ *
+ * Kept so nothing regresses on a backend that predates `previewSite`: the cloud adapter answers
+ * `buildSite` with `mode: "live"` of its own, and `jx dev` answers it with a real build.
+ */
+async function runBuiltPreview(buildSite: NonNullable<StudioPlatform["buildSite"]>, path: string) {
   notify.info("Building the site…", { key: OPEN_IN_BROWSER, source: "Preview" });
   let result: SiteBuildResult;
   try {
-    result = await platform.buildSite();
+    result = await buildSite();
   } catch (error) {
     notify.error(`The site could not be built: ${errorText(error)}`, {
       key: OPEN_IN_BROWSER,
@@ -301,9 +371,6 @@ export async function runOpenInBrowser() {
       source: "Preview",
     });
   } else if (live) {
-    /* Named, because the two are not the same thing and the difference is visible. A live preview
-       renders in the reader's browser from the working tree — so it carries edits nobody has saved
-       yet, and carries no prerendered HTML, optimized images or server-timing results. */
     notify.success(
       `Opened a live preview of ${result.routes} page(s) — rendered from your working tree, not a build.`,
       { key: OPEN_IN_BROWSER, source: "Preview" },
@@ -311,8 +378,49 @@ export async function runOpenInBrowser() {
   } else {
     notify.success(`Built ${result.routes} page(s).`, { key: OPEN_IN_BROWSER, source: "Preview" });
   }
-  openUrlExternally(`${result.url}${target.path}`);
+  openUrlExternally(`${result.url}${path}`);
 }
+
+/**
+ * Run `Build Site`, the compiler-backed answer to "does my site build?".
+ *
+ * `View: Open in Browser` stopped meaning this when it started previewing the working tree, and the
+ * question did not stop being worth asking: a build runs the bundler, the image pipeline and every
+ * emitter, and a live preview runs none of them. So it keeps its own verb, its own report, and the
+ * output origin it always opened.
+ */
+export async function runBuildSite() {
+  const platform = hasPlatform() ? getPlatform() : null;
+  if (!platform?.buildSite) {
+    notify.warn("This backend cannot build the site.", { key: BUILD_SITE, source: "Build" });
+    return;
+  }
+  notify.info("Building the site…", { key: BUILD_SITE, source: "Build" });
+  let result: SiteBuildResult;
+  try {
+    result = await platform.buildSite();
+  } catch (error) {
+    notify.error(`The site could not be built: ${errorText(error)}`, {
+      key: BUILD_SITE,
+      source: "Build",
+    });
+    return;
+  }
+  if (result.errors.length > 0) {
+    notify.warn(`Built with ${result.errors.length} error(s): ${result.errors[0]}`, {
+      key: BUILD_SITE,
+      source: "Build",
+    });
+    return;
+  }
+  notify.success(`Built ${result.routes} page(s), ${result.files} file(s).`, {
+    key: BUILD_SITE,
+    source: "Build",
+  });
+}
+
+/** One notification key for the build, kept apart so a build report never replaces a preview's. */
+const BUILD_SITE = "project.buildSite";
 
 /** One notification key for the whole flow, so building → built → failed replaces rather than piles. */
 const OPEN_IN_BROWSER = "view.openInBrowser";

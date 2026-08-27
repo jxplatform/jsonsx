@@ -14,7 +14,7 @@ import { flush, installMockPlatform } from "./harness";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { notifyModule } from "./notify-mock";
 import type { Tab } from "../src/tabs/tab";
-import type { SiteBuildResult } from "../src/types";
+import type { SiteBuildResult, SitePreviewResult } from "../src/types";
 import type { PaletteMode } from "../src/commands/defaults";
 
 // ─── Module mocks (must precede the toolbar import) ───────────────────────────
@@ -610,6 +610,180 @@ describe("openInBrowserTarget", () => {
   });
 });
 
+describe("runOpenInBrowser — the live path", () => {
+  /** A backend that previews the working tree, which is what the action reaches first. */
+  function installPreviewingPlatform(result: Partial<SitePreviewResult> = {}) {
+    const routes: string[] = [];
+    installMockPlatform({
+      canvasUrl: `${SITE_ORIGIN}/__studio__/canvas.html`,
+      clearPreviewOverlay: () => Promise.resolve(),
+      previewSite: async (opts: { route: string }) => {
+        routes.push(opts.route);
+        return {
+          errors: [],
+          files: 0,
+          mode: "live" as const,
+          reused: false,
+          routes: 4,
+          url: SITE_ORIGIN,
+          ...result,
+        };
+      },
+      setPreviewOverlay: () => Promise.resolve(),
+    });
+    return routes;
+  }
+
+  test("previews rather than builds, and opens the route it asked for", async () => {
+    openSiteProject();
+    pageTab("pages/blog/hello.md");
+    const routes = installPreviewingPlatform();
+    const opened: string[] = [];
+    setPreviewNavigateHandler((url) => opened.push(url));
+    try {
+      await toolbar.runOpenInBrowser();
+      expect(routes).toEqual(["/blog/hello/"]);
+      expect(opened).toEqual([`${SITE_ORIGIN}/blog/hello/`]);
+      expect(notified.mock.calls.at(-1)![0]).toContain("not a build");
+    } finally {
+      setPreviewNavigateHandler(null);
+    }
+  });
+
+  test("`reused` opens NOTHING — that is what stops a second tab on one project", async () => {
+    /* No page can raise a background tab and handing the URL to the OS again would duplicate it,
+       so the notification says where to look instead of opening anything. */
+    openSiteProject();
+    pageTab("pages/index.md");
+    installPreviewingPlatform({ reused: true });
+    const opened: string[] = [];
+    setPreviewNavigateHandler((url) => opened.push(url));
+    try {
+      await toolbar.runOpenInBrowser();
+      expect(opened).toEqual([]);
+      expect(notified.mock.calls.at(-1)![0]).toContain("switch to your browser");
+      expect(notified.mock.calls.at(-1)![0]).toContain("/");
+    } finally {
+      setPreviewNavigateHandler(null);
+    }
+  });
+
+  test("problems the preview reports are named, and the page still opens", async () => {
+    openSiteProject();
+    pageTab("pages/index.md");
+    installPreviewingPlatform({ errors: ["pages/huge.json is too large to preview unsaved."] });
+    const opened: string[] = [];
+    setPreviewNavigateHandler((url) => opened.push(url));
+    try {
+      await toolbar.runOpenInBrowser();
+      expect(notified.mock.calls.at(-1)![0]).toContain("too large");
+      expect(opened).toEqual([`${SITE_ORIGIN}/`]);
+    } finally {
+      setPreviewNavigateHandler(null);
+    }
+  });
+
+  test("a backend that serves no origin says so rather than guessing one", async () => {
+    openSiteProject();
+    pageTab("pages/index.md");
+    installMockPlatform({
+      canvasUrl: `${SITE_ORIGIN}/__studio__/canvas.html`,
+      previewSite: async () => ({
+        errors: [],
+        files: 0,
+        mode: "live" as const,
+        reused: false,
+        routes: 0,
+      }),
+    });
+    const opened: string[] = [];
+    setPreviewNavigateHandler((url) => opened.push(url));
+    try {
+      await toolbar.runOpenInBrowser();
+      expect(opened).toEqual([]);
+      expect(notified.mock.calls.at(-1)![0]).toContain("serves no preview");
+    } finally {
+      setPreviewNavigateHandler(null);
+    }
+  });
+
+  test("a preview that throws is reported, and nothing opens", async () => {
+    openSiteProject();
+    pageTab("pages/index.md");
+    installMockPlatform({
+      canvasUrl: `${SITE_ORIGIN}/__studio__/canvas.html`,
+      previewSite: () => Promise.reject(new Error("port exhausted")),
+    });
+    const opened: string[] = [];
+    setPreviewNavigateHandler((url) => opened.push(url));
+    try {
+      await toolbar.runOpenInBrowser();
+      expect(opened).toEqual([]);
+      expect(notified.mock.calls.at(-1)![0]).toContain("port exhausted");
+    } finally {
+      setPreviewNavigateHandler(null);
+    }
+  });
+
+  test("a backend with only buildSite still works — nothing regresses on day one", async () => {
+    /* The cloud adapter answers `buildSite` with `mode: "live"` of its own, and `jx dev` answers
+       it with a real build. Neither declares `previewSite`, and both must keep working. */
+    openSiteProject();
+    pageTab("pages/index.md");
+    installMockPlatform({
+      buildSite: async () => ({
+        errors: [],
+        files: 3,
+        mode: "live" as const,
+        routes: 2,
+        url: SITE_ORIGIN,
+      }),
+      canvasUrl: `${SITE_ORIGIN}/__studio__/canvas.html`,
+    });
+    const opened: string[] = [];
+    setPreviewNavigateHandler((url) => opened.push(url));
+    try {
+      await toolbar.runOpenInBrowser();
+      expect(opened).toEqual([`${SITE_ORIGIN}/`]);
+      expect(notified.mock.calls.at(-1)![0]).toContain("not a build");
+    } finally {
+      setPreviewNavigateHandler(null);
+    }
+  });
+});
+
+describe("runBuildSite", () => {
+  test("reports what the compiler produced", async () => {
+    openSiteProject();
+    installMockPlatform({ buildSite: async () => ({ errors: [], files: 12, routes: 4 }) });
+    await toolbar.runBuildSite();
+    expect(notified.mock.calls.at(-1)![0]).toContain("Built 4 page(s), 12 file(s).");
+  });
+
+  test("a build with errors is named, and does not read as a success", async () => {
+    openSiteProject();
+    installMockPlatform({
+      buildSite: async () => ({ errors: ["pages/x.json: bad ref"], files: 0, routes: 0 }),
+    });
+    await toolbar.runBuildSite();
+    expect(notified.mock.calls.at(-1)![0]).toContain("bad ref");
+  });
+
+  test("a build that throws is reported", async () => {
+    openSiteProject();
+    installMockPlatform({ buildSite: () => Promise.reject(new Error("sharp missing")) });
+    await toolbar.runBuildSite();
+    expect(notified.mock.calls.at(-1)![0]).toContain("sharp missing");
+  });
+
+  test("a backend that cannot build says so", async () => {
+    openSiteProject();
+    installMockPlatform({});
+    await toolbar.runBuildSite();
+    expect(notified.mock.calls.at(-1)![0]).toContain("cannot build the site");
+  });
+});
+
 describe("runOpenInBrowser", () => {
   /** A backend that builds and reports where the result is browsable. */
   function installBuildingPlatform(result: Partial<SiteBuildResult> = {}) {
@@ -708,7 +882,7 @@ describe("runOpenInBrowser", () => {
     setPreviewNavigateHandler(null);
   });
 
-  test("a backend that cannot build says so rather than opening the editor's origin", async () => {
+  test("a backend that can neither preview nor build says so rather than opening the editor's origin", async () => {
     /* It used to open the canvas origin and call that graceful. It is not: that origin serves the
        project's SOURCES, so the reader would get a page whose scripts and styles are whichever
        source file shares the URL. A sentence beats a site that looks published and is not. */
@@ -719,7 +893,7 @@ describe("runOpenInBrowser", () => {
     setPreviewNavigateHandler((url) => opened.push(url));
     await toolbar.runOpenInBrowser();
     expect(opened).toEqual([]);
-    expect(notified.mock.calls.at(-1)![0]).toContain("cannot build a preview");
+    expect(notified.mock.calls.at(-1)![0]).toContain("cannot preview the site");
     setPreviewNavigateHandler(null);
   });
 

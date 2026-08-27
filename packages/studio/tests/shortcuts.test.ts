@@ -218,7 +218,7 @@ beforeAll(() => {
   });
   registerStudioCommands(
     registry,
-    { openInBrowser, openProject, saveDocument: saveFile },
+    { buildSite: mock(() => {}), openInBrowser, openProject, saveDocument: saveFile },
     stageContext,
   );
   // ⌘J and ⌘⇧4 both address the Assistant, which is an Inspector TAB and therefore
@@ -1285,7 +1285,7 @@ describe("openProjectFlow", () => {
 
   test("with one window there is no choice to make, and none is offered", async () => {
     installMockPlatform();
-    const hooks = { openInBrowser, openProject, saveDocument: saveFile };
+    const hooks = { buildSite: mock(() => {}), openInBrowser, openProject, saveDocument: saveFile };
     await openProjectFlow(hooks);
     expect(openProject).toHaveBeenCalledWith("thisWindow");
     expect(dialogWrapper()).toBeNull();
@@ -1294,7 +1294,7 @@ describe("openProjectFlow", () => {
   test("with a project open on a multi-window platform it asks, and reports the outcome", async () => {
     multiWindowPlatform();
     openProjectOutcome = "newWindow";
-    const hooks = { openInBrowser, openProject, saveDocument: saveFile };
+    const hooks = { buildSite: mock(() => {}), openInBrowser, openProject, saveDocument: saveFile };
     const pending = openProjectFlow(hooks);
     await flush();
     const wrapper = dialogWrapper()!;
@@ -1309,7 +1309,7 @@ describe("openProjectFlow", () => {
 
   test("This Window is a real answer, not a dismissal", async () => {
     multiWindowPlatform();
-    const hooks = { openInBrowser, openProject, saveDocument: saveFile };
+    const hooks = { buildSite: mock(() => {}), openInBrowser, openProject, saveDocument: saveFile };
     const pending = openProjectFlow(hooks);
     await flush();
     dialogWrapper()!.dispatchEvent(new Event("secondary", { bubbles: true }));
@@ -1319,7 +1319,7 @@ describe("openProjectFlow", () => {
 
   test("cancelling opens nothing and says nothing", async () => {
     multiWindowPlatform();
-    const hooks = { openInBrowser, openProject, saveDocument: saveFile };
+    const hooks = { buildSite: mock(() => {}), openInBrowser, openProject, saveDocument: saveFile };
     const pending = openProjectFlow(hooks);
     await flush();
     dialogWrapper()!.dispatchEvent(new Event("cancel", { bubbles: true }));
@@ -1334,7 +1334,7 @@ describe("openProjectFlow", () => {
   test("a cancelled picker is reported as nothing, because nothing happened", async () => {
     multiWindowPlatform();
     openProjectOutcome = "cancelled";
-    const hooks = { openInBrowser, openProject, saveDocument: saveFile };
+    const hooks = { buildSite: mock(() => {}), openInBrowser, openProject, saveDocument: saveFile };
     const pending = openProjectFlow(hooks);
     await flush();
     dialogWrapper()!.dispatchEvent(new Event("confirm", { bubbles: true }));
@@ -1346,7 +1346,7 @@ describe("openProjectFlow", () => {
   test("a project already open elsewhere is reported as a focus, not as a new window", async () => {
     multiWindowPlatform();
     openProjectOutcome = "focused";
-    const hooks = { openInBrowser, openProject, saveDocument: saveFile };
+    const hooks = { buildSite: mock(() => {}), openInBrowser, openProject, saveDocument: saveFile };
     const pending = openProjectFlow(hooks);
     await flush();
     dialogWrapper()!.dispatchEvent(new Event("confirm", { bubbles: true }));
@@ -1361,7 +1361,7 @@ describe("openProjectFlow", () => {
      path that replaces the asking window's project. Nothing to honour it with, nothing asked. */
   test("no picker that leaves this window alone means no choice is offered", async () => {
     installMockPlatform({ openProjectInNewWindow: (async () => ({ focused: false })) as never });
-    const hooks = { openInBrowser, openProject, saveDocument: saveFile };
+    const hooks = { buildSite: mock(() => {}), openInBrowser, openProject, saveDocument: saveFile };
     await openProjectFlow(hooks);
     expect(dialogWrapper()).toBeNull();
     expect(openProject).toHaveBeenCalledWith("thisWindow");

@@ -29,6 +29,7 @@ import { ref } from "lit-html/directives/ref.js";
 import { renderPopover, showPromptDialog } from "../ui/layers";
 import { projectState, requireProjectState, setProjectState } from "../store";
 import { getPlatform } from "../platform";
+import { disarmPreviewOverlay } from "../preview/preview-overlay";
 import { notify } from "../services/notify";
 import { loadComponentRegistry } from "./components";
 import { ensureDependenciesInstalled } from "../packages/ensure-deps";
@@ -216,6 +217,10 @@ export async function openProject({
       id: "initial",
     });
 
+    /* A different project means a different preview origin, and the published map is keyed by
+       project-relative path — so carrying it across would let one project's `pages/index.json`
+       stand in as the answer for another's. */
+    disarmPreviewOverlay();
     refreshFormats();
     void loadFormats();
     refreshExtensionUi(platform);

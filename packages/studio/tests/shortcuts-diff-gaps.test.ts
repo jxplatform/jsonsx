@@ -172,7 +172,7 @@ beforeAll(() => {
   registry = createCommandRegistry({ getContext: () => ctx, mac: false });
   registerStudioCommands(
     registry,
-    { openInBrowser, openProject, saveDocument },
+    { buildSite: mock(() => {}), openInBrowser, openProject, saveDocument },
     () => pointerContext,
   );
   // ⌘J's legacy branch runs `view.setAssistant`, which is `shell.ts`'s record — the app's bootstrap

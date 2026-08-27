@@ -56,9 +56,11 @@ The canonical Studio Backend Protocol route table (protocol version 1), from `@j
 
 ## Site build
 
-| Route       | Method | Path              | Summary                                                        | Optional | Degradation                                                      |
-| ----------- | ------ | ----------------- | -------------------------------------------------------------- | -------- | ---------------------------------------------------------------- |
-| `buildSite` | POST   | `/__studio/build` | Build or render the site → {routes, files, errors, mode?, url} | yes      | Open in Browser reports that this target cannot build a preview. |
+| Route            | Method | Path                        | Summary                                                                          | Optional | Degradation                                                        |
+| ---------------- | ------ | --------------------------- | -------------------------------------------------------------------------------- | -------- | ------------------------------------------------------------------ |
+| `buildSite`      | POST   | `/__studio/build`           | Build or render the site → {routes, files, errors, mode?, url}                   | yes      | Build Site reports that this target cannot build.                  |
+| `previewSite`    | POST   | `/__studio/preview`         | Preview the working tree at a route → {routes, files, errors, mode, url, reused} | yes      | Open in Browser falls back to buildSite.                           |
+| `previewOverlay` | POST   | `/__studio/preview/overlay` | Publish (POST) or retract (DELETE) a document's unsaved bytes → 204              | yes      | A live preview shows the last saved state instead of the editor's. |
 
 ## Packages
 

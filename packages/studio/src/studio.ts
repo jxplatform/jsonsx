@@ -94,7 +94,8 @@ import { mountJumpBar } from "./panels/jump-bar";
 import { cellForPane } from "./panels/pane-grid";
 import { notify } from "./services/notify";
 import { beginActivity } from "./panels/activity-panel";
-import { exportFile, parseSourceForPath, saveFile, serializeDocument } from "./files/file-ops";
+import { exportFile, parseSourceForPath, saveFile } from "./files/file-ops";
+import { serializeDocument } from "./files/serialize-document";
 import {
   formatForPath,
   loadFormats,
@@ -1431,6 +1432,10 @@ registerStudioCommands(
     // Hands the URL to the launcher's preview-navigate handler — the OS browser — where a bare
     // `window.open` would open a webview with no address bar. The browser build falls back to a
     // New tab either way.
+    // `View: Open in Browser` renders the working tree; `Build Site` runs the compiler. Two
+    // Verbs, because "what does this page look like?" and "does my site build?" are two questions
+    // And only one of them is worth waiting for a bundler and an image pipeline.
+    buildSite: () => toolbarPanel.runBuildSite(),
     openInBrowser: () => toolbarPanel.runOpenInBrowser(),
     openProject,
     // Wrapped rather than passed by reference: `saveFile` takes an optional tab and reports

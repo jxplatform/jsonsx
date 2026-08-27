@@ -1219,6 +1219,71 @@ describe("git write operations", () => {
   });
 });
 
+// ─── Live site preview ───────────────────────────────────────────────────────
+
+describe("live site preview", () => {
+  test("previewSite posts the route and returns the report untouched", async () => {
+    /* `reused` is the answer the caller acts on — it is what stops a second tab on one project —
+       so it has to survive the adapter rather than being normalised away. */
+    route("/__studio/preview", (c) => {
+      expect(c.body).toEqual({ route: "/blog/hello/" });
+      return json({
+        errors: [],
+        files: 0,
+        mode: "live",
+        reused: true,
+        routes: 4,
+        url: "http://127.0.0.1:51000",
+      });
+    });
+    const p = createDevServerPlatform();
+    expect(await p.previewSite!({ route: "/blog/hello/" })).toEqual({
+      errors: [],
+      files: 0,
+      mode: "live",
+      reused: true,
+      routes: 4,
+      url: "http://127.0.0.1:51000",
+    });
+  });
+
+  test("a preview that fails surfaces the reason", async () => {
+    route("/__studio/preview", () => json({ error: "Not a site project" }, 400));
+    const p = createDevServerPlatform();
+    expect(p.previewSite!({ route: "/" })).rejects.toThrow("Not a site project");
+  });
+
+  test("setPreviewOverlay posts the path and the bytes a save would write", async () => {
+    const seen: unknown[] = [];
+    route("/__studio/preview/overlay", (c) => {
+      seen.push([c.method, c.body]);
+      return new Response(null, { status: 204 });
+    });
+    const p = createDevServerPlatform();
+    await p.setPreviewOverlay!("pages/index.json", '{"tagName":"main"}');
+    expect(seen).toEqual([["POST", { contents: '{"tagName":"main"}', path: "pages/index.json" }]]);
+  });
+
+  test("clearPreviewOverlay names one document, or the whole project when it names none", async () => {
+    const seen: unknown[] = [];
+    route(
+      "/__studio/preview/overlay",
+      (c) => {
+        seen.push([c.method, c.body]);
+        return new Response(null, { status: 204 });
+      },
+      "DELETE",
+    );
+    const p = createDevServerPlatform();
+    await p.clearPreviewOverlay!("pages/index.json");
+    await p.clearPreviewOverlay!();
+    expect(seen).toEqual([
+      ["DELETE", { path: "pages/index.json" }],
+      ["DELETE", {}],
+    ]);
+  });
+});
+
 // ─── AI assistant ────────────────────────────────────────────────────────────
 
 describe("AI assistant", () => {

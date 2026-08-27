@@ -22,7 +22,12 @@ import { readBundledProjectSchemas } from "@jxsuite/compiler/schema-command";
 import { handleDataApi } from "./data-api.ts";
 import { containedPath } from "./net-guard.ts";
 import { startSitePreview } from "./site-preview.ts";
-import { navigateLivePreview, startLivePreview } from "./live-preview.ts";
+import {
+  clearLivePreviewOverlay,
+  navigateLivePreview,
+  setLivePreviewOverlay,
+  startLivePreview,
+} from "./live-preview.ts";
 import { applyRename } from "./refactor/apply.ts";
 import { findReferences } from "./refactor/find-refs.ts";
 import {
@@ -929,6 +934,34 @@ export async function handleStudioApi(
       });
     } catch (error) {
       return problem("internalError", errorMessage(error));
+    }
+  }
+
+  /**
+   * The unsaved bytes a live preview reads before the disk.
+   *
+   * POST publishes one document, DELETE retracts one or all of them. Studio owns the lifecycle — it
+   * knows which documents are dirty and when a save, a close or a discard ends that — so this route
+   * stores what it is told and decides nothing.
+   */
+  if (path === "/__studio/preview/overlay") {
+    const dir = activeProjectRoot ?? root;
+    let body: { path?: string; contents?: string };
+    try {
+      body = (await req.json()) as { path?: string; contents?: string };
+    } catch {
+      return problem("invalidRequest", "Invalid JSON body");
+    }
+    if (req.method === "POST") {
+      if (typeof body.path !== "string" || typeof body.contents !== "string") {
+        return problem("invalidRequest", "Missing path or contents");
+      }
+      setLivePreviewOverlay(dir, body.path, body.contents);
+      return new Response(null, { status: 204 });
+    }
+    if (req.method === "DELETE") {
+      clearLivePreviewOverlay(dir, typeof body.path === "string" ? body.path : undefined);
+      return new Response(null, { status: 204 });
     }
   }
 

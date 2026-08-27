@@ -15,7 +15,7 @@ import { render } from "lit-html";
 import { MARKDOWN_FORMAT, mockFormatAction, seedMarkdownFormat } from "./format-fixture";
 import { activeTab, closeAllTabs, workspace } from "../src/workspace/workspace";
 import { openFileInTab } from "../src/files/files";
-import { serializeDocument } from "../src/files/file-ops";
+import { serializeDocument } from "../src/files/serialize-document";
 import { editorKindForMode } from "../src/commands/context";
 import {
   ENTRY_MODE,
