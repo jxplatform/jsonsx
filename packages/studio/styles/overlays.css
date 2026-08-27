@@ -2820,6 +2820,8 @@
   max-height: min(60vh, 480px);
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
 /* ─── Media viewer ────────────────────────────────────────────────────────────
    A pane that SHOWS a file rather than editing one (`media/media-pane.ts`). The stage takes the
    room and the details column stays a fixed width, so the asset is the thing you are looking at
