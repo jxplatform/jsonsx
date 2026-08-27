@@ -29,6 +29,13 @@ export interface ImportBrief {
   aiComponents: boolean;
   /** Build and screenshot-diff the result. Off by default — it roughly doubles the run. */
   verify: boolean;
+  /**
+   * The average fidelity, 0..100, the clone has to reach for `verify` to report success.
+   *
+   * Only meaningful when `verify` is on. A finding rather than a failure here: the project is
+   * written and opened either way, and the assistant says the bar was missed.
+   */
+  minFidelity: number;
   /** Empty means "whatever the assistant would use" (`preferredModel()`). */
   model: string;
   /** What the user wants done with the site once it is cloned. May be empty. */

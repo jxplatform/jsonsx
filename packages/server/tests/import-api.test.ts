@@ -349,7 +349,7 @@ describe("the verify pass and the run summary", () => {
       verifyThreshold: 0.3,
     });
     await readLines((await handleImportApi(req, url, apiOptions))!);
-    expect(importCalls[0]!.options.verify).toEqual({ threshold: 0.3 });
+    expect(importCalls[0]!.options.verify).toEqual({ minFidelity: 0, threshold: 0.3 });
 
     for (const [sent, expected] of [
       [5, 1],
@@ -365,8 +365,44 @@ describe("the verify pass and the run summary", () => {
         ...(sent === undefined ? {} : { verifyThreshold: sent }),
       });
       await readLines((await handleImportApi(next.req, next.url, apiOptions))!);
-      expect(importCalls[0]!.options.verify).toEqual({ threshold: expected });
+      expect(importCalls[0]!.options.verify).toEqual({ minFidelity: 0, threshold: expected });
     }
+  });
+
+  /*
+   * The bar, which is a different number from the colour tolerance beside it (jxsuite/jx issue
+   * 232). It defaults to 0 here rather than to the CLI's 25: over this transport a missed bar is a
+   * finding the assistant reports, and a caller that never asked for one gets the score reported
+   * exactly as it always was.
+   */
+  test("the fidelity minimum is forwarded, clamped, and defaults to report-only", async () => {
+    for (const [sent, expected] of [
+      [60, 60],
+      [400, 100],
+      [-5, 0],
+      ["nonsense", 0],
+      [undefined, 0],
+    ] as const) {
+      importCalls = [];
+      const next = makeRequest({
+        directory: "site",
+        url: "https://x.example",
+        verify: true,
+        ...(sent === undefined ? {} : { verifyMinFidelity: sent }),
+      });
+      await readLines((await handleImportApi(next.req, next.url, apiOptions))!);
+      expect(importCalls[0]!.options.verify).toMatchObject({ minFidelity: expected });
+    }
+  });
+
+  test("a fidelity minimum without verify asks for no verification at all", async () => {
+    const { req, url } = makeRequest({
+      directory: "site",
+      url: "https://x.example",
+      verifyMinFidelity: 90,
+    });
+    await readLines((await handleImportApi(req, url, apiOptions))!);
+    expect(importCalls[0]!.options.verify).toBe(false);
   });
 
   test("the done line carries what the run found", async () => {

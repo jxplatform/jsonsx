@@ -85,6 +85,20 @@ let _prompt = "";
  * assistant can put to a person.
  */
 let _verify = false;
+/**
+ * The average fidelity the clone has to reach before the run counts as having matched the original.
+ *
+ * A floor, not a quality target: a faithful import of a complicated site lands well under 100 for
+ * reasons no importer can fix (a rotating hero, a font rendering a hair differently). What it
+ * catches is the other case — the clone that came out at 8% and reported success anyway. Same
+ * default as `jx-import --min-fidelity`, so the two surfaces answer the same question the same
+ * way.
+ *
+ * Failing it is a FINDING here rather than a failure: the project is written and opened either way,
+ * and the assistant reports that the bar was missed. The CLI turns the same number into an exit
+ * code because a script in a pipeline has nobody to tell.
+ */
+let _minFidelity = 25;
 let _errorMsg = "";
 let _dirManual = false;
 
@@ -97,6 +111,7 @@ export function resetImportTab() {
   _model = "";
   _prompt = "";
   _verify = false;
+  _minFidelity = 25;
   _errorMsg = "";
   _dirManual = false;
 }
@@ -187,6 +202,7 @@ export function importBriefFor(ctx: ImportTabCtx): ImportBrief | null {
     model: _model,
     name: ctx.form.name.trim(),
     prompt: _prompt.trim(),
+    minFidelity: _minFidelity,
     url: parsed.href,
     verify: _verify,
   };
@@ -310,10 +326,35 @@ export function renderImportSource(ctx: ImportTabCtx): TemplateResult {
       .checked=${live(_verify)}
       @change=${(e: Event) => {
         _verify = (e.target as HTMLInputElement).checked;
+        // The bar below it only means anything while the check runs, so it appears with it.
+        ctx.rerender();
       }}
     >
       Check fidelity against the original (slower)
     </sp-switch>
+    ${
+      _verify
+        ? html`
+            <label class="new-project-field">
+              <span class="new-project-label">Minimum fidelity</span>
+              <sp-number-field
+                min="0"
+                max="100"
+                .value=${live(_minFidelity)}
+                @change=${(e: Event) => {
+                  const raw = Math.trunc(Number((e.target as HTMLInputElement).value));
+                  _minFidelity = Number.isNaN(raw) ? 0 : Math.min(100, Math.max(0, raw));
+                }}
+              ></sp-number-field>
+              <span class="new-project-hint">
+                Below this average, the assistant reports that the clone did not match the original.
+                A floor rather than a target: a faithful import of a complicated site still lands
+                well under 100. Set 0 to report the score without judging it.
+              </span>
+            </label>
+          `
+        : ""
+    }
     <label class="new-project-field">
       <span class="new-project-label">Model</span>
       ${modelPicker().render()}

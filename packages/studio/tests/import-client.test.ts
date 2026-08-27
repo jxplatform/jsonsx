@@ -221,14 +221,31 @@ describe("streamImport — the run summary", () => {
     const plain = JSON.parse((fetchMock.mock.calls[0]![1] as RequestInit).body as string);
     expect(plain).not.toHaveProperty("verify");
     expect(plain).not.toHaveProperty("verifyThreshold");
+    expect(plain).not.toHaveProperty("verifyMinFidelity");
 
     await streamImport(
       "/__studio/import-site",
-      { ...OPTS, verify: true, verifyThreshold: 0.2 },
+      { ...OPTS, verify: true, verifyMinFidelity: 60, verifyThreshold: 0.2 },
       () => {},
     );
     const asked = JSON.parse((fetchMock.mock.calls[1]![1] as RequestInit).body as string);
-    expect(asked).toMatchObject({ verify: true, verifyThreshold: 0.2 });
+    /* Two numbers, not one: `verifyThreshold` is pixelmatch's per-pixel colour tolerance and only
+       moves the score, `verifyMinFidelity` is the bar the run is judged against. */
+    expect(asked).toMatchObject({ verify: true, verifyMinFidelity: 60, verifyThreshold: 0.2 });
+  });
+
+  // 0 is a real answer — "report the score, judge nothing" — so it must survive the wire.
+  test("sends a zero fidelity minimum rather than dropping it", async () => {
+    const fetchMock = stubFetch(async () =>
+      ndjsonResponse(['{"type":"done","root":"/p","config":{}}\n']),
+    );
+    await streamImport(
+      "/__studio/import-site",
+      { ...OPTS, verify: true, verifyMinFidelity: 0 },
+      () => {},
+    );
+    const body = JSON.parse((fetchMock.mock.calls[0]![1] as RequestInit).body as string);
+    expect(body.verifyMinFidelity).toBe(0);
   });
 
   test("returns what the run found", async () => {

@@ -65,6 +65,9 @@ export async function streamImport(
       ...(opts.model === undefined ? {} : { aiModel: opts.model }),
       ...(opts.verify === undefined ? {} : { verify: opts.verify }),
       ...(opts.verifyThreshold === undefined ? {} : { verifyThreshold: opts.verifyThreshold }),
+      ...(opts.verifyMinFidelity === undefined
+        ? {}
+        : { verifyMinFidelity: opts.verifyMinFidelity }),
     }),
     headers,
     method: "POST",
