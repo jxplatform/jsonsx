@@ -320,3 +320,132 @@ describe("composePage", () => {
     expect(JSON.stringify(state)).toContain("Acme");
   });
 });
+
+/*
+ * Discovery, which is what makes a component render at all. `$elements` is a declaration and almost
+ * nothing declares one: the shipped starters put the chrome on the layout and nothing on any page,
+ * because a build does not need it — the compiler scans rendered HTML for the tags it compiled. A
+ * composer that took the declaration literally rendered every undeclared component as an inert
+ * unknown tag, silently, while the studio canvas beside it rendered the same page correctly.
+ */
+describe("component auto-discovery", () => {
+  const CARD = JSON.stringify({ children: ["A card"], tagName: "site-card" });
+
+  async function compose(files: Record<string, string>, config = {} as ProjectConfig) {
+    const io = treeIO(files);
+    return composePage(io, routeTable(io.paths())[0]!, config, {});
+  }
+
+  const refsOf = (page: { doc: JxDocument }) =>
+    ((page.doc.$elements ?? []) as { $ref?: string }[]).map((entry) => entry.$ref);
+
+  test("a component the page uses but declares nowhere is registered anyway", async () => {
+    const page = await compose({
+      "components/site-card.json": CARD,
+      "pages/index.json": JSON.stringify({
+        children: [{ tagName: "site-card" }],
+        tagName: "main",
+      }),
+    });
+
+    expect(refsOf(page)).toEqual(["./components/site-card.json"]);
+  });
+
+  /*
+   * The build gets this free by scanning HTML it has already rendered, and the canvas does not do it
+   * at all. Here the definition has to be opened, so a component bringing a component is the case
+   * that decides whether opening it was worth doing.
+   */
+  test("the walk is transitive: a component's own components are found by reading it", async () => {
+    const page = await compose({
+      "components/site-check.json": JSON.stringify({ tagName: "site-check" }),
+      "components/site-pricing.json": JSON.stringify({
+        children: [{ tagName: "site-check" }],
+        tagName: "site-pricing",
+      }),
+      "pages/index.json": JSON.stringify({
+        children: [{ tagName: "site-pricing" }],
+        tagName: "main",
+      }),
+    });
+
+    expect(refsOf(page)).toEqual([
+      "./components/site-pricing.json",
+      "./components/site-check.json",
+    ]);
+  });
+
+  /*
+   * A layout writes `../components/nav.json` and discovery would write `./components/nav.json` for
+   * the same file. Comparing the strings registers it twice; comparing what they RESOLVE to is what
+   * makes them one entry — and the declared one is still walked, so what it brings is still found.
+   */
+  test("a component already declared is walked, not declared a second time", async () => {
+    const page = await compose({
+      "components/site-check.json": JSON.stringify({ tagName: "site-check" }),
+      "components/site-nav.json": JSON.stringify({
+        children: [{ tagName: "site-check" }],
+        tagName: "site-nav",
+      }),
+      "layouts/base.json": JSON.stringify({
+        $elements: [{ $ref: "../components/site-nav.json" }],
+        children: [{ tagName: "site-nav" }, { tagName: "slot" }],
+        tagName: "body",
+      }),
+      "pages/index.json": JSON.stringify({ $layout: "./layouts/base.json", tagName: "main" }),
+    });
+
+    expect(refsOf(page)).toEqual(["../components/site-nav.json", "./components/site-check.json"]);
+  });
+
+  // The project's own, merged by `injectContext` before discovery runs for exactly this reason.
+  test("a component the PROJECT declares is not re-declared per page", async () => {
+    const page = await compose(
+      {
+        "components/site-card.json": CARD,
+        "pages/index.json": JSON.stringify({
+          children: [{ tagName: "site-card" }],
+          tagName: "main",
+        }),
+      },
+      { $elements: [{ $ref: "./components/site-card.json" }] } as ProjectConfig,
+    );
+
+    expect(refsOf(page)).toEqual(["./components/site-card.json"]);
+  });
+
+  /*
+   * A hyphenated tag is not necessarily this project's: it may come from an npm package the author
+   * declared, or be a typo. Either way the tree has no file to point at, so inventing a `$ref` would
+   * turn a silent unknown element into a failed fetch.
+   */
+  test("a hyphenated tag the project has no component for is left alone", async () => {
+    const page = await compose({
+      "pages/index.json": JSON.stringify({
+        children: [{ tagName: "sl-button" }],
+        tagName: "main",
+      }),
+    });
+
+    expect(page.doc.$elements).toBeUndefined();
+  });
+
+  test("a project with no component library adds nothing at all", async () => {
+    const page = await compose({ "pages/index.json": PAGE });
+
+    expect(page.doc.$elements).toBeUndefined();
+  });
+
+  // Only `.json`: a `$ref` is fetched and parsed by the BROWSER, which has no extension parser.
+  test("a component in a format the browser cannot parse is not pointed at", async () => {
+    const page = await compose({
+      "components/site-card.md": "# card",
+      "pages/index.json": JSON.stringify({
+        children: [{ tagName: "site-card" }],
+        tagName: "main",
+      }),
+    });
+
+    expect(page.doc.$elements).toBeUndefined();
+  });
+});

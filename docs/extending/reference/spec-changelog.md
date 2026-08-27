@@ -152,6 +152,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `imports.md`
 
+- **0.1.10-draft** (2026-08-27) — Components a project defines are discovered from the tree rather than only declared.
 - **0.1.9-draft** (2026-08-15) — Name where the emitted import map now points (§1).
 - **0.1.8-draft** (2026-08-15) — Number the sections so they are addressable, and add §7 Standards Alignment.
 - **0.1.7-draft** (2026-08-02) — Imports panel section renamed to Imported Modules in the UI.
@@ -233,6 +234,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `server.md`
 
+- **0.2.17** (2026-08-27) — The preview origin registers the project's own components without a declaration.
 - **0.2.16** (2026-08-27) — The preview origin composes non-JSON pages through the project's extension registry, built from its config.
 - **0.2.15** (2026-08-27) — The live site preview origin: an origin per project serving the working tree, with the overlay, the shared reload stream and its own resolver credential.
 - **0.2.14** (2026-08-26) — Packages family: `GET /__studio/packages/versions` reports every dependency's newest published version, behind or not, replacing the outdated-only check.

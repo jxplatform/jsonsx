@@ -131,6 +131,11 @@ JavaScript, and giving it an origin of its own keeps it away from anything the e
 browser. What it will serve is an allowlist that defaults closed, so `project.json`, a lockfile and
 every dotfile are unreachable from a page.
 
+Your own components render without being listed anywhere. The preview walks the page it composed,
+finds the tags your `components/` directory defines, and registers those, following each component
+into the components it uses in turn. You only need `$elements` for what your project does not
+define, such as a component from an npm package.
+
 Markdown pages preview too, and so does anything else one of your extensions can parse. The preview
 reads the `extensions` list in your `project.json` and builds the same format registry a build does,
 so `pages/index.md` renders here the way it will in production. It reads that file the same way it

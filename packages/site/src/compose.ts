@@ -128,6 +128,110 @@ export function unionElements(
   return merged.length > 0 ? merged : undefined;
 }
 
+/** A component file in the project's own library, keyed by the tag it defines. */
+const COMPONENT_FILE = /^components\/([^/]+-[^/]*)\.json$/;
+
+/**
+ * A `$ref`'s project path, so the same file written from two places is one key.
+ *
+ * A layout says `../components/nav.json` and a page says `./components/nav.json` for one file. Both
+ * resolve against the shell's base rather than against the document that wrote them, so both name
+ * `/components/nav.json` — and comparing the raw strings would register it twice.
+ */
+function refPath(ref: string): string {
+  return new URL(ref, "file:///").pathname;
+}
+
+/** Every custom-element tag a document tree names, root included. */
+function collectTagNames(node: unknown, into: Set<string>): void {
+  if (!node || typeof node !== "object") {
+    return;
+  }
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      collectTagNames(child, into);
+    }
+    return;
+  }
+  const { children, tagName } = node as { children?: unknown; tagName?: unknown };
+  if (typeof tagName === "string" && tagName.includes("-")) {
+    into.add(tagName);
+  }
+  collectTagNames(children, into);
+}
+
+/**
+ * The project components a document USES, as `$elements` entries it never declared.
+ *
+ * `$elements` is a declaration, and almost nothing declares one: across the shipped starters a
+ * layout names the chrome it uses and no page names anything, because in a BUILD it does not have
+ * to — the compiler scans the rendered HTML for tags it compiled and emits a module script per tag
+ * (`site-build.ts`, `injectComponentScripts`). The studio canvas reaches the same answer a third
+ * way, walking the document against its component registry. Only this composer took `$elements`
+ * literally, so a page rendered its own components as inert unknown tags while the canvas beside it
+ * rendered them correctly — and, as everywhere else in this area, with nothing reported anywhere.
+ *
+ * The walk is transitive, which the other two auto-discoveries are not: a component's own tags are
+ * found by reading it, so `sa-pricing` bringing `sa-check-item` registers both. The build gets that
+ * for free by scanning HTML it has already rendered; here the definition has to be opened. It is
+ * bounded by the components a page actually reaches, and each is opened once.
+ *
+ * Only `.json` components are discoverable, because a `$ref` is resolved by the browser: the
+ * runtime fetches the file and parses it as a document, so a component in a format needing an
+ * extension's parser cannot be registered this way whoever discovers it.
+ */
+async function discoverElements(io: SiteIO, doc: JxDocument): Promise<{ $ref: string }[]> {
+  const available = new Map<string, string>();
+  for (const path of io.paths()) {
+    const tag = COMPONENT_FILE.exec(path)?.[1];
+    if (tag !== undefined) {
+      available.set(tag, path);
+    }
+  }
+  if (available.size === 0) {
+    return [];
+  }
+
+  /* What the document already declares, at any level: the union above has run, so this is the
+     page's, the layout's and the project's together. A declared entry is still WALKED — it may
+     bring components of its own — it is just not declared a second time. */
+  const declared = new Set<string>();
+  for (const entry of doc.$elements ?? []) {
+    const ref = (entry as { $ref?: unknown } | null)?.$ref;
+    if (typeof ref === "string") {
+      declared.add(refPath(ref));
+    }
+  }
+
+  const discovered: { $ref: string }[] = [];
+  const opened = new Set<string>();
+  let frontier: unknown[] = [doc];
+  while (frontier.length > 0) {
+    const tags = new Set<string>();
+    for (const node of frontier) {
+      collectTagNames(node, tags);
+    }
+    const next: unknown[] = [];
+    for (const tag of tags) {
+      const path = available.get(tag);
+      if (path === undefined || opened.has(tag)) {
+        continue;
+      }
+      opened.add(tag);
+      const ref = `./${path}`;
+      if (!declared.has(refPath(ref))) {
+        discovered.push({ $ref: ref });
+      }
+      const definition = await readDocument(io, path);
+      if (definition) {
+        next.push(definition);
+      }
+    }
+    frontier = next;
+  }
+  return discovered;
+}
+
 /**
  * Why a route could not be composed — a sentence for the reader, not a stack trace.
  *
@@ -210,6 +314,14 @@ export async function composePage(
     urlPattern: route.urlPattern,
   };
   injectContext(merged, config, siteRoute, null, i18n);
+
+  /* After `injectContext`, because that is what merges the PROJECT's `$elements` in — discovering
+     before it would re-declare every component the project already names for every page. */
+  const discovered = await discoverElements(io, merged);
+  const withDiscovered = unionElements(merged.$elements, discovered);
+  if (withDiscovered) {
+    merged.$elements = withDiscovered;
+  }
 
   const pageHead = (pageDoc.$head ?? merged._pageHead ?? []) as JxHeadEntry[];
   const layoutHead = (merged.$head ?? []) as JxHeadEntry[];

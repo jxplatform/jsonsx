@@ -19,12 +19,12 @@ This page is generated from the `> **Status: …**` markers in the specification
 | `compiler.md`             | 0.4.0-draft  | Partial     | 2026-08-26 |
 | `desktop.md`              | 0.4.4-draft  | Pending     | 2026-08-27 |
 | `extensions.md`           | 0.4.0-draft  | Partial     | 2026-08-26 |
-| `imports.md`              | 0.1.9-draft  | Partial     | 2026-08-15 |
+| `imports.md`              | 0.1.10-draft | Partial     | 2026-08-27 |
 | `jx-markdown.md`          | 0.1.8-draft  | Partial     | 2026-08-15 |
 | `parser.md`               | 0.2.9-draft  | Partial     | 2026-08-16 |
 | `relationships.md`        | 0.1.4-draft  | Partial     | 2026-08-15 |
 | `schema.md`               | 0.4.8-draft  | Partial     | 2026-08-16 |
-| `server.md`               | 0.2.16       | Implemented | 2026-08-27 |
+| `server.md`               | 0.2.17       | Implemented | 2026-08-27 |
 | `site-architecture.md`    | 0.6.1-draft  | Partial     | 2026-08-27 |
 | `spec.md`                 | 0.5.8-draft  | Partial     | 2026-08-26 |
 | `standards.md`            | 0.1.15-draft | Partial     | 2026-08-17 |

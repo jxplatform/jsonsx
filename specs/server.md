@@ -2,7 +2,7 @@
 
 ## Development Server with Live Reload, Proxy Resolution, and Studio API
 
-**Version:** 0.2.16
+**Version:** 0.2.17
 **Status:** Implemented
 **Updated:** 2026-08-27
 **License:** MIT
@@ -191,6 +191,13 @@ while the host is in fact running one. `project.json` is read through the overla
 read, so adding an extension in Studio takes effect on the next reload rather than on the next save.
 A host without a registry — a Worker, where a format's parser is not reachable — still routes the
 page and reports it by name, which is the failure the seam exists to make legible.
+
+**The project's own components register without being declared**, by the rule `imports.md` §1.4
+states: the composer walks the composed document against the tree and points `$elements` at every
+`components/<tag>.json` it names, transitively. Nothing else here would — a build discovers those
+tags by scanning HTML it has already rendered and there is no build on this path, so taking
+`$elements` literally left a page's own components as inert unknown tags while the canvas beside it
+rendered them.
 
 **Reload is the §3.1 stream, shared.** The same reading of the EventSource contract — `retry:`, the
 `id:` that arms `Last-Event-ID`, one reload on resume and none on a first connection — is defined
@@ -433,6 +440,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.2.17** (2026-08-27) — The preview origin registers the project's own components without a declaration.
 - **0.2.16** (2026-08-27) — The preview origin composes non-JSON pages through the project's extension registry, built from its config.
 - **0.2.15** (2026-08-27) — The live site preview origin: an origin per project serving the working tree, with the overlay, the shared reload stream and its own resolver credential.
 - **0.2.14** (2026-08-26) — Packages family: `GET /__studio/packages/versions` reports every dependency's newest published version, behind or not, replacing the outdated-only check.
@@ -463,4 +471,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/server` Specification v0.2.16_
+_`@jxsuite/server` Specification v0.2.17_
