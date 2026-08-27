@@ -64,9 +64,9 @@
     "postgres": "^3.4.9"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20260823.1",
+    "@cloudflare/workers-types": "^5.20260826.1",
     "ajv": "^8.20.0",
-    "hono": "^4.13.4"
+    "hono": "^4.13.5"
   },
   "jx": "./jx-extension.json"
 }
