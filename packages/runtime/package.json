@@ -18,7 +18,8 @@
     "./expression": "./src/expression.ts",
     "./pointer": "./src/pointer.ts",
     "./statements": "./src/statements.ts",
-    "./types": "./src/types.ts"
+    "./types": "./src/types.ts",
+    "./dist/runtime.js": "./dist/runtime.js"
   },
   "publishConfig": {
     "provenance": true

@@ -294,6 +294,7 @@
         "@jxsuite/protocol": "workspace:^",
         "@jxsuite/runtime": "workspace:^",
         "@jxsuite/schema": "workspace:^",
+        "@jxsuite/site": "workspace:^",
         "@jxsuite/starters": "workspace:^",
         "chokidar": "^5.0.0",
         "kysely": "^0.29.5",
