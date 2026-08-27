@@ -1396,7 +1396,18 @@ Three states, three different sentences, and they are never collapsed:
 
 The same query backs the inspector's **Used on N pages** line for a selected component instance and
 the `selection.findUsages` command; all three read one cache, invalidated by the filesystem rather
-than by a timer, so they cannot disagree.
+than by a timer, so they cannot disagree. A local rename, delete or **drag-move** drops that cache
+itself: those writes suppress the watcher echo that would otherwise announce them, so a gesture that
+did not invalidate would leave every count in the session answering about a path that no longer
+exists.
+
+**A promise made must be a promise reported on.** The rename sentence commits the refactor pass to
+rewriting the references it counted, and the pass can fail to keep that for a nameable reason — a
+content source with a parser and deliberately no serializer, a document that does not parse. The
+engine names those files rather than dropping them (`site-architecture.md` §9.3), and Studio MUST
+surface the naming: a move whose report carries them reports a **warning** identifying them, not the
+plain success. This binds the drag-move most of all, since it shows no dialog and therefore makes
+its promise only in retrospect.
 
 ### 9.1.2 The Library
 
@@ -2827,6 +2838,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 ## Changelog
 
 - **0.10.0-draft** (2026-08-27) — New File chooses a format rather than an extension (Other... preserves arbitrary names); a document converts between formats in place; creating in a collection source routes to New Entry.
+- **0.9.53-draft** (2026-08-27) — A rename or drag-move whose refactor report names references it could not rewrite reports a warning, not a plain success; a drag-move invalidates the usage cache like its siblings.
 - **0.9.52-draft** (2026-08-27) — Open in Browser previews the working tree through the runtime; Build Site keeps the compiler under its own verb.
 - **0.9.51-draft** (2026-08-27) — a media file opens in a Media mode that shows it and says what uses it (§4.2, §9.3, §13.4); a long run's log is a feed that outlives the run (§6).
 - **0.9.50-draft** (2026-08-26) — the gear's project rows disable rather than hide, and the menu is bottom-anchored to its trigger's region.

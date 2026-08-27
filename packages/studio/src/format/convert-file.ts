@@ -209,19 +209,13 @@ export async function buildPlan(
     lines.push("This file will not read back identically after conversion.");
   }
 
+  /* The count only. Which referrers the engine could not rewrite is reported AFTER the move, per
+     file, by the same `notifyMoveOutcome` a rename and a drag-move use — a fact beats the guess
+     this used to make from the referrer's extension, which could be wrong in both directions. */
   const { loadUsages, usageWarning } = await import("../services/references");
-  const { unrewritableReferrers } = await import("../files/file-ops");
-  const usage = await loadUsages({ path });
-  const sentence = usageWarning(usage, "convert");
+  const sentence = usageWarning(await loadUsages({ path }), "convert");
   if (sentence !== null) {
     lines.push(sentence);
-  }
-  const stale = unrewritableReferrers(usage);
-  if (stale.files > 0) {
-    lines.push(
-      `${stale.files} of them ${stale.files === 1 ? "is" : "are"} in a format Studio cannot write ` +
-        `back (${stale.extensions.join(", ")}); those references will be left pointing at the old name.`,
-    );
   }
 
   lines.push(`${path} becomes ${targetPath}. The original file is not kept.`);
@@ -316,7 +310,7 @@ export async function convertFile(path: string, targetExt?: string): Promise<str
   }
 
   const { markLocalMutation } = await import("../files/fs-events");
-  const { settleRename } = await import("../files/files");
+  const { notifyMoveOutcome, settleRename } = await import("../files/files");
   markLocalMutation(path, plan.targetPath);
   try {
     await platform.writeFile(path, plan.text);
@@ -344,14 +338,7 @@ export async function convertFile(path: string, targetExt?: string): Promise<str
   }
   await settleRename(path, plan.targetPath, report);
 
-  for (const entry of report.errors ?? []) {
-    notify.warn(`References in ${entry.path} were not updated.`, {
-      detail: entry.error,
-      path: entry.path,
-      source: "Convert",
-    });
-  }
-  notify.success(convertStatus(plan.targetPath, report));
+  notifyMoveOutcome(convertStatus(plan.targetPath, report), report, plan.targetPath);
   return plan.targetPath;
 }
 
@@ -414,7 +401,14 @@ const DIRTY_TAB =
 
 const EXISTS = "Rename or delete the existing file first; converting would replace it.";
 
-/** The success line, in the same family as a rename's — the new name, and what moved with it. */
+/**
+ * The outcome line, in the same family as a rename's — the new name, and what moved with it.
+ *
+ * Handed to `notifyMoveOutcome`, which turns it into a success or, when the refactor could not
+ * rewrite every referrer, into a warning naming them. A conversion makes the strongest promise of
+ * the three moves — its dialog states both the reference count and what the file is becoming — so
+ * it is the one that can least afford to report a plain success over a partial repair.
+ */
 function convertStatus(
   targetPath: string,
   report: { references?: { refsUpdated: number; filesChanged: number } },

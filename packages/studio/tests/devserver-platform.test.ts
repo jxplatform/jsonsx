@@ -609,21 +609,27 @@ describe("file operations", () => {
     expect(p.renameFile("a.json", "b.json")).rejects.toThrow("Failed to rename: a.json → b.json");
   });
 
-  test("renameFile maps the refactor report back to project-relative paths", async () => {
+  test("renameFile prefixes the query and passes the project-relative report through", async () => {
+    /* The refactor routes answer in the ACTIVE PROJECT's space, because that is the space their
+       sweep runs in — `applyRename({root: scanRoot})`. This stub replies in the shape the real
+       engine emits (`find-refs.ts` reports `relative(opts.root, fp)`); it used to reply in server
+       space, a shape no server has ever sent, and the adapter's strip was written to match it. */
     route("/__studio/activate", () => json({ ok: true }));
-    route("/__studio/file/rename", () =>
-      json({
-        errors: [{ error: "x", path: "site/bad.json" }],
-        from: "site/a.json",
+    route("/__studio/file/rename", (c) => {
+      // The request space does NOT move: from/to are server-root-relative, like every sibling.
+      expect(c.body).toMatchObject({ from: "site/a.json", to: "site/b.json" });
+      return json({
+        errors: [{ error: "x", path: "bad.json" }],
+        from: "a.json",
         ok: true,
         references: {
-          files: [{ count: 2, path: "site/pages/index.json" }],
+          files: [{ count: 2, path: "pages/index.json" }],
           filesChanged: 1,
           refsUpdated: 2,
         },
-        to: "site/b.json",
-      }),
-    );
+        to: "b.json",
+      });
+    });
     const p = createDevServerPlatform();
     p.projectRoot = "site";
     const report = await p.renameFile("a.json", "b.json");
@@ -635,16 +641,17 @@ describe("file operations", () => {
     });
   });
 
-  test("findReferences prefixes the query and strips the root off every path it returns", async () => {
+  test("findReferences prefixes the query and passes the project-relative answer through", async () => {
     route("/__studio/activate", () => json({ ok: true }));
     route("/__studio/references", (c) => {
+      // The request space does NOT move: `?path=` is server-root-relative, like every sibling.
       expect(c.search.get("path")).toBe("site/components/card.json");
       expect(c.search.get("tag")).toBe("my-card");
       return json({
-        errors: [{ error: "x", path: "site/bad.json" }],
-        files: [{ count: 2, path: "site/pages/index.json", refs: [] }],
+        errors: [{ error: "x", path: "bad.json" }],
+        files: [{ count: 2, path: "pages/index.json", refs: [] }],
         filesReferencing: 1,
-        path: "site/components/card.json",
+        path: "components/card.json",
         refsTotal: 2,
         tagName: "my-card",
       });
@@ -660,6 +667,28 @@ describe("file operations", () => {
       files: [{ count: 2, path: "pages/index.json" }],
       path: "components/card.json",
     });
+  });
+
+  test("a project-relative reply whose first segment is the project's own name survives", async () => {
+    /* Why the strip had to go rather than stay as a no-op. With `_projectRoot = "components"` — a
+       shape `/__studio/create-project` really returns — `stripRoot("components/card.json")` ate the
+       first segment and reported a file that does not exist. */
+    route("/__studio/activate", () => json({ ok: true }));
+    route("/__studio/references", () =>
+      json({
+        errors: [],
+        files: [{ count: 1, path: "components/card.json", refs: [] }],
+        filesReferencing: 1,
+        path: "components/nav.json",
+        refsTotal: 1,
+        tagName: null,
+      }),
+    );
+    const p = createDevServerPlatform();
+    p.projectRoot = "components";
+    const result = await p.findReferences!({ path: "components/nav.json" });
+    expect(result.files[0]!.path).toBe("components/card.json");
+    expect(result.path).toBe("components/nav.json");
   });
 
   test("findReferences omits an absent field rather than sending an empty one", async () => {

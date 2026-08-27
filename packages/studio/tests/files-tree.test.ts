@@ -20,8 +20,10 @@ import { requireProjectState, setProjectState } from "../src/store";
 import { closeAllTabs, openTab, workspace } from "../src/workspace/workspace";
 import { initLayers } from "../src/ui/layers";
 import { setFormats } from "../src/format/format-host";
+import { resetNotifications, toasts } from "../src/services/notify";
+import { loadUsages, peekUsages } from "../src/services/references";
 import { MARKDOWN_FORMAT, mockFormatAction, seedMarkdownFormat } from "./format-fixture";
-import type { DirEntry, StudioPlatform } from "../src/types";
+import type { DirEntry, ReferencesResult, RenameResult, StudioPlatform } from "../src/types";
 
 // ─── Mock the DnD adapter (registrations recorded, callbacks driveable) ───────
 
@@ -1419,6 +1421,180 @@ describe("registerFileTreeDnD", () => {
     await flush();
 
     expect(handle.state.files.has("pages/index.json")).toBe(true);
+  });
+});
+
+// ─── What a move reports when the refactor pass could not finish ──────────────
+
+/**
+ * The half of `applyRename`'s report that reaches a person.
+ *
+ * The engine already names the documents it could not rewrite in `report.errors` — a `.csv`
+ * collection has a parser and deliberately no serializer, and a document that fails to parse cannot
+ * be written back either. Nothing read that list, so both gestures said "Renamed to x" / "Moved to
+ * x" whatever happened, and the rename dialog had just promised in a modal the user accepted that N
+ * references "will be updated automatically. Nothing else changes."
+ *
+ * Asserted through the REAL notification store, not a mocked module: which tier a severity lands in
+ * is part of what a warning here means, and `warn` is a toast.
+ */
+describe("a move reports the references it could not rewrite", () => {
+  /** What `applyRename` hands back for a file it named rather than dropped. */
+  const STUCK: { path: string; error: string }[] = [
+    { error: "no serializer for .csv", path: "content/posts.csv" },
+    { error: "Unexpected token } at 3:1", path: "pages/broken.json" },
+  ];
+
+  beforeEach(() => {
+    resetNotifications();
+  });
+
+  /** A backend whose rename succeeds and answers with `report` — the refactor result under test. */
+  async function renderSeededTree(seed: Record<string, string>, report: Partial<RenameResult>) {
+    const handle = installFsPlatform(seed, {
+      renameFile: async (from: string, to: string): Promise<RenameResult> => ({
+        from,
+        ok: true,
+        to,
+        ...report,
+      }),
+    });
+    siteState();
+    seedTreeState();
+    const tree = makeTreeCtx();
+    const out = await renderInto(renderFilesTemplate(tree.ctx), host);
+    return { ...tree, handle, out };
+  }
+
+  /** The context-menu gesture, all the way through the dialog it puts in front of the rename. */
+  async function renameThroughMenu(out: HTMLElement, path: string, newName: string): Promise<void> {
+    pointer(rowFor(out, path), "contextmenu");
+    await flush();
+    await clickMenuItem("Rename…");
+    await flush();
+    const wrapper = dialogWrapper();
+    expect(wrapper).not.toBeNull();
+    const field = wrapper!.querySelector("sp-textfield") as HTMLInputElement;
+    field.value = newName;
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+    wrapper!.dispatchEvent(new Event("confirm"));
+    await flush();
+  }
+
+  /** The drag gesture: a row dropped on the tree background, which is the project root. */
+  async function dropOnRoot(srcPath: string, renderLeftPanel: () => void): Promise<void> {
+    registerFileTreeDnD({ renderLeftPanel });
+    await flush();
+    const [monitor] = dnd.monitors;
+    monitor.onDrop({
+      location: {
+        current: { dropTargets: [{ data: { targetDir: ".", type: "file-tree-target" } }] },
+      },
+      source: { data: { path: srcPath, type: "file-tree" } },
+    });
+    await flush();
+  }
+
+  test("a rename whose report names unwritable files warns instead of reporting success", async () => {
+    const { out } = await renderSeededTree({ "pages/index.json": "{}" }, { errors: STUCK });
+
+    await renameThroughMenu(out, "pages/index.json", "home.json");
+
+    expect(toasts).toHaveLength(1);
+    const [reported] = toasts;
+    expect(reported!.severity).toBe("warn");
+    expect(reported!.message).toBe(
+      "Renamed to home.json — references in 2 files could not be updated",
+    );
+    /* Every named file with the engine's own reason for it. The headline is a count; this is the
+       part an author can act on, and Problems is the surface that renders it. */
+    expect(reported!.detail).toBe(
+      "content/posts.csv: no serializer for .csv\npages/broken.json: Unexpected token } at 3:1",
+    );
+    expect(reported!.path).toBe("pages/home.json");
+    expect(reported!.source).toBe("Files");
+  });
+
+  test("an empty errors array is still the plain success, with the rename's own status text", async () => {
+    const { out } = await renderSeededTree(
+      { "pages/index.json": "{}" },
+      {
+        errors: [],
+        references: {
+          files: [{ count: 3, path: "pages/about.json" }],
+          filesChanged: 1,
+          refsUpdated: 3,
+        },
+      },
+    );
+
+    await renameThroughMenu(out, "pages/index.json", "home.json");
+
+    /* An empty list is not a failure. A report present but empty is exactly what a successful
+       refactor pass looks like, so `renameStatus`'s sentence has to survive the new helper
+       untouched — the counts in it are the only place the rewrite is ever reported. */
+    expect(toasts).toHaveLength(1);
+    const [reported] = toasts;
+    expect(reported!.severity).toBe("success");
+    expect(reported!.message).toBe("Renamed to home.json; updated 3 reference(s) in 1 file(s)");
+    expect(reported!.detail).toBeUndefined();
+  });
+
+  test("a drag-move warns too — the gesture that never had a dialog to promise anything", async () => {
+    const { ctx } = await renderSeededTree({ "pages/index.json": "{}" }, { errors: [STUCK[0]!] });
+
+    await dropOnRoot("pages/index.json", ctx.renderLeftPanel);
+
+    expect(toasts).toHaveLength(1);
+    const [reported] = toasts;
+    expect(reported!.severity).toBe("warn");
+    // "1 file", not "1 files": the count is read by whoever is about to go and fix them.
+    expect(reported!.message).toBe(
+      "Moved to index.json — references in 1 file could not be updated",
+    );
+    expect(reported!.detail).toBe("content/posts.csv: no serializer for .csv");
+    expect(reported!.path).toBe("index.json");
+    expect(reported!.source).toBe("Files");
+  });
+
+  test("a drag-move drops the usage cache, so no count still answers about the old path", async () => {
+    const handle = installFsPlatform(
+      { "pages/index.json": "{}" },
+      {
+        findReferences: async (target: {
+          path?: string;
+          tagName?: string;
+        }): Promise<ReferencesResult> => ({
+          errors: [],
+          files: [
+            {
+              count: 2,
+              path: "pages/about.json",
+              refs: [{ count: 2, ref: "./pages/index.json", refType: "$ref" }],
+            },
+          ],
+          filesReferencing: 1,
+          path: target.path ?? null,
+          refsTotal: 2,
+          tagName: null,
+        }),
+      },
+    );
+    siteState();
+    seedTreeState();
+    const { ctx } = makeTreeCtx();
+    await renderInto(renderFilesTemplate(ctx), host);
+    const seeded = await loadUsages({ path: "pages/index.json" });
+    expect(seeded.status).toBe("ready");
+
+    await dropOnRoot("pages/index.json", ctx.renderLeftPanel);
+
+    expect(handle.state.calls).toContainEqual(["renameFile", "pages/index.json", "index.json"]);
+    /* `markLocalMutation` suppresses the watcher echo that would otherwise clear this, so the move
+       has to say so itself. Without it every usage count in the session — the inspector's "Used on
+       N pages", Find Usages, and the next delete confirmation — goes on answering about a path
+       that no longer exists. */
+    expect(peekUsages({ path: "pages/index.json" })).toBeNull();
   });
 });
 

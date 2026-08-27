@@ -140,13 +140,20 @@ export const STUDIO_ROUTES = {
     "The canvas cannot address project files by URL, so a host whose origin does not serve the " +
       "site URL space renders no component $refs and no images.",
   ),
-  fileRename: route("POST", "/__studio/file/rename", "Rename/move (+ refactor report)"),
+  fileRename: route(
+    "POST",
+    "/__studio/file/rename",
+    "Rename/move (+ refactor report). `from`/`to` are server-root-relative; every path in the " +
+      "report is relative to the active project (specs/server.md §4.1)",
+  ),
   references: route(
     "GET",
     "/__studio/references",
     "Where a file or a component tag is used (?path=&tag=, at least one) → ReferencesResult " +
       "{files, filesReferencing, refsTotal} — the read side of the rename refactor's own walker, " +
-      "cached until the backend's watcher sees the tree move (backs findReferences)",
+      "cached until the backend's watcher sees the tree move (backs findReferences). `?path=` is " +
+      "server-root-relative and every path in the answer is relative to the active project; a " +
+      "target outside that project is a 400, never a zero-result 200 (specs/server.md §4.1)",
     'Usage counts are hidden: no "Used on N pages" in the inspector, no Selection: Find Usages, ' +
       "and delete/rename confirmations state no reference count.",
   ),

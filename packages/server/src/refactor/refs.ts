@@ -16,9 +16,11 @@
  *
  * The visitor seam is what stops the read side from being a second, drifting copy of the key list.
  * A new reference-bearing key added below is a key the usage count sees on the same commit.
+ *
+ * @docs studio/projects/pages-layouts-components
  */
 
-import { classifyRef, rewriteRef } from "./paths.ts";
+import { classifyRef, looksLikeFileRef, rewriteRef } from "./paths.ts";
 import type { RemapCtx } from "./paths.ts";
 
 /** A single reference rewrite, for the rename report. */
@@ -37,7 +39,8 @@ export interface RewriteResult {
  * One visit of a reference-bearing string.
  *
  * @param value — the raw authored reference, exactly as written.
- * @param refType — which key carried it (`$ref`, `$layout`, `attr`, `imports`, `$elements`, `url`).
+ * @param refType — which key carried it (`$ref`, `$layout`, `attr`, `imports`, `$elements`, `url`,
+ *   or `path` for a value matched by shape rather than by key name).
  * @param rootRelativeBare — whether a bare value resolves against the project root (`$layout`).
  * @returns A replacement string to write back, or `null` to leave the document untouched.
  */
@@ -49,6 +52,17 @@ export type RefVisitor = (
 
 /** Matches `url(...)` targets inside a CSS string value, capturing the optional quote. */
 const URL_RE = /url\(\s*(['"]?)([^'")]+)\1\s*\)/g;
+
+/**
+ * Keys whose string values are PROSE, and are therefore never offered to the shape fallback.
+ *
+ * A page that writes "see layouts/base.json" in its body text names a file without referencing it,
+ * and rewriting that sentence during a rename would be vandalism. Almost every such string is
+ * already excluded by the whitespace test in `looksLikeFileRef`; these two keys are where a
+ * single-token one is plausible, and a whole-repo survey of file-shaped string values found
+ * non-reference hits under no other key.
+ */
+const PROSE_KEYS = new Set(["textContent", "innerHTML"]);
 
 /** Offer a scalar string reference under `key` to the visitor, writing back any replacement. */
 function visitScalar(
@@ -189,8 +203,42 @@ export function walkDocRefs(node: unknown, visit: RefVisitor): void {
         walkStyle(value, visit);
         break;
       }
+      /*
+       * Everything else, by SHAPE.
+       *
+       * The cases above are the keys that carry a reference BY NAME, and for years that list was
+       * taken to be the whole of it. It is not: the commonest media reference in a real project is
+       * a schema-typed component prop (`$props.bg`, `attributes["props.image"]`), and beside it sit
+       * a content entry's frontmatter (`cover:`), a prop schema's `default`, `project.json`'s
+       * `defaults.layout`, `poster`, `srcset` and `$head` meta `content`. Measured across the
+       * committed starters, 73 of 101 files under `public/` were used and reported zero.
+       *
+       * Naming those keys one at a time would be the same mistake with a longer list — the next
+       * extension to define a media-typed prop would reopen it. So an unrecognised string is
+       * offered whenever it is SHAPED like a file, and precision stays where it already was: the
+       * caller's resolve-and-compare gate, which only counts a value that resolves to the exact
+       * file in question.
+       */
       default: {
-        walkDocRefs(value, visit);
+        if (typeof value === "string") {
+          if (!PROSE_KEYS.has(key) && looksLikeFileRef(value)) {
+            visitScalar(obj, key, "path", visit, false);
+          }
+        } else if (Array.isArray(value)) {
+          const arr = value as unknown[];
+          for (let i = 0; i < arr.length; i += 1) {
+            const item = arr[i];
+            if (typeof item === "string") {
+              if (!PROSE_KEYS.has(key) && looksLikeFileRef(item)) {
+                visitIndexed(arr, i, "path", visit);
+              }
+            } else {
+              walkDocRefs(item, visit);
+            }
+          }
+        } else {
+          walkDocRefs(value, visit);
+        }
       }
     }
   }

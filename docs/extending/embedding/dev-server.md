@@ -40,6 +40,14 @@ Format and extension behavior is served from a per-project **extension registry*
 
 A host embedding `handleStudioApi` directly passes `onFileMoved` alongside `allowedRoots` and `onProjectCreated`. `createDevServer` wires it to the collaboration registry, and a host running its own collab layer must do the same: a live room is keyed by path, so a rename moves the file out from under it and the room's shutdown flush would write its pre-rename content back, recreating the file the rename deleted. It is called with the OLD absolute path, and it is the same hook the file watcher already uses.
 
+### Which root a path is measured against
+
+Two roots are in play once a project is activated: the root the server was started on, and the project Studio bound to it. The API's convention is one sentence, and it is worth reading twice because the two are usually the same and the difference only shows up when they are not:
+
+**A path you send is relative to the server root. A path you get back is relative to the active project.**
+
+So `?path=`, `?dir=` and a rename's `from`/`to` all resolve against the server root, while the file lists, the reference reports and the refactor reports all name files relative to the project. The refactor routes are where this bites: their sweep runs inside the project, so `/__studio/references` re-expresses your target into the project's space before scanning, and a target that lands outside the project comes back as a `400`. It is never a `200` carrying zero references, which would answer a question nobody asked.
+
 ## The resolve proxies
 
 `resolve.ts` implements the two endpoints the runtime uses to run server-side code during development. `handleResolve` takes a `$prototype`/`$src` entry, imports the module server-side (`.js` directly; `.class.json` via its `$implementation`, or a class constructed from the schema), instantiates it with the config, and returns the resolved value. `handleServerFunction` imports a module and invokes a named export with an arguments object. Both do dynamic `import()` of project code. They are remote-code-execution surfaces by design, which is why the security model below exists.

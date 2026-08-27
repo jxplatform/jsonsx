@@ -397,17 +397,6 @@ describe("what the plan reports", () => {
     await pending;
   });
 
-  test("a referrer no format can write back is named as a partial repair", async () => {
-    // `applyRename` rewrites a reference only in a document it can SERIALIZE, so a `.csv` referrer
-    // Is read, changed in memory and never written — a silent partial repair the dialog must state.
-    withReferences([{ count: 1, path: "content/catalog.csv" }]);
-    const pending = convertFile("pages/about.md", ".json");
-    await flush();
-    expect(topDialog()?.textContent).toContain("Studio cannot write back (.csv)");
-    await answerConfirm(false);
-    await pending;
-  });
-
   test("a document the schema accepts is not remarked on at all", async () => {
     const pending = convertFile("pages/about.md", ".json");
     await flush();
@@ -534,9 +523,15 @@ describe("reporting a partial refactor", () => {
     const pending = convertFile("pages/about.md", ".json");
     await answerConfirm(true);
     await pending;
-    // Surfaced UNFILTERED: under this write-then-rename ordering the refactor reads correct bytes,
-    // So the only entry that can appear means a reference really was left stale.
-    expect([...toasts, ...problems].some((n) => n.message.includes("x.csv"))).toBe(true);
+    /* Reported through the SAME `notifyMoveOutcome` a rename and a drag-move use: one warning that
+       names the files, in place of a plain success. Under the write-then-rename ordering the
+       refactor reads correct bytes, so an entry here means a reference really was left stale. */
+    const shown = [...toasts, ...problems];
+    expect(shown.some((n) => n.message.includes("references in 1 file could not be updated"))).toBe(
+      true,
+    );
+    expect(shown.some((n) => (n.detail ?? "").includes("x.csv"))).toBe(true);
+    expect(shown.every((n) => n.severity !== "success")).toBe(true);
   });
 
   test("the success line names the references it moved", async () => {

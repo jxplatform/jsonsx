@@ -14,7 +14,9 @@ import { errorMessage } from "@jxsuite/schema/parse";
 import { isUnder } from "./paths.ts";
 import { rewriteDocRefs, rewriteTagName } from "./refs.ts";
 import { documentGlob, fwd, loadDoc, skipScanPath } from "./scan.ts";
+import { refactorMounts } from "./mounts.ts";
 import type { RefChange } from "./refs.ts";
+import type { AssetMount } from "@jxsuite/schema/asset-paths";
 import type { FormatRegistry } from "@jxsuite/schema/format-registry";
 
 export interface FileChange {
@@ -47,6 +49,12 @@ export interface ApplyRenameOptions {
   absTo: string;
   /** Format registry for the project (parse/serialize of non-JSON documents). */
   registry: FormatRegistry;
+  /**
+   * Project-relative asset mounts, for rewriting rooted references through the mount lane. Omitted,
+   * the engine loads them from `root` — see `mounts.ts` for why that is the default and not the
+   * exception.
+   */
+  mounts?: readonly AssetMount[];
 }
 
 /** Derive a custom-element tag from a component filename (strips `.class.json` or the extension). */
@@ -67,6 +75,7 @@ export async function applyRename(opts: ApplyRenameOptions): Promise<RenameRepor
   const root = fwd(opts.root);
   const absFrom = fwd(opts.absFrom);
   const absTo = fwd(opts.absTo);
+  const mounts = opts.mounts ?? (await refactorMounts(opts.root));
 
   let isDir = false;
   try {
@@ -120,6 +129,7 @@ export async function applyRename(opts: ApplyRenameOptions): Promise<RenameRepor
       const { changes } = rewriteDocRefs(doc, {
         docNewDir,
         docOldDir,
+        mounts,
         newAbs: absTo,
         oldAbs: absFrom,
         root,

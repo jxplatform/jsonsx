@@ -2,7 +2,7 @@
 
 ## File-Based Routing, Content Collections, Layouts, and Static Site Generation
 
-**Version:** 0.6.3-draft
+**Version:** 0.6.4-draft
 **Status:** Partial
 **Updated:** 2026-08-27
 **License:** MIT
@@ -1412,6 +1412,18 @@ Such an editor MUST NOT emit site URLs at all. It MUST resolve every authored re
 
 An editor that declares this and gives no base has said its site URLs are wrong without saying what is right, and MUST leave every reference untouched rather than invent one.
 
+#### Tools that ask about a reference, rather than render one
+
+A usage count and a rename refactor resolve the same authored references a renderer does, in the opposite direction: given a FILE, which documents name it? That is the same lane math read backwards, and it belongs to the engine that answers the question — not to each host that asks it. A host-side workaround (querying every authored spelling of a file and unioning the answers) can make a COUNT come out right, and cannot make a rewrite come out right at all, because the rewrite happens inside the engine.
+
+So the contract binds the engine, both ways:
+
+- A rooted reference resolves through every lane the host serves, and a match against **any** of them is a usage. Where two lanes both name an existing file the reference is genuinely ambiguous, and a warning shown before a destructive action counts both.
+- A rewritten rooted reference is re-emitted through the lanes a **build** publishes, falling back to the project-root lane only for a file no build would publish. A `public/` file must come back as `/hero.jpg`, never `/public/hero.jpg`: the second resolves on a local editing server and 404s on the deployed site, which is the failure mode this section exists to prevent.
+- A reference the engine counts but **cannot** write — a content source with a parser and no serializer, a document that fails to parse — is NAMED in the report rather than dropped. A rename that reports success while leaving a reference pointing at a moved file is worse than one that never claimed to fix it, because the claim is what stops the author looking.
+
+Which keys carry a reference is not a fixed list. The document shapes that carry one grow with every extension that defines a media-typed prop, so an engine that enumerates key names is wrong by construction the next time one is added; what it can rely on is that a reference is a string SHAPED like a file, and that precision comes from resolving it and comparing against the file in question.
+
 Only statically referenced files are copied into the build. A `src` computed at runtime belongs in `public/`.
 
 ### 9.4 Studio Media Browser
@@ -2674,7 +2686,8 @@ This spec builds on existing Jx primitives wherever possible:
 
 ## Changelog
 
-- **0.6.3-draft** (2026-08-27) — Record that collection discovery is recursive, so a subdirectory holds entries as well as co-located media.
+- **0.6.4-draft** (2026-08-27) — Record that collection discovery is recursive, so a subdirectory holds entries as well as co-located media.
+- **0.6.3-draft** (2026-08-27) — Reference resolution through the asset lanes is the refactor engine's contract, in both directions: a rooted ref is counted through every lane, rewritten through the lanes a build publishes, and named in the report when it cannot be written.
 - **0.6.2-draft** (2026-08-27) — Routing, layout, context and head-merge move to @jxsuite/site; standards evidence follows.
 - **0.6.1-draft** (2026-08-27) — media files open in a viewer, which is the reader the usage query was missing (§9.4).
 - **0.6.0-draft** (2026-08-26) — §12.4: component CSS inlined and modulepreload hints emitted; §14.3: name the hosts that read _headers, and warn when one will not.

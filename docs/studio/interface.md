@@ -124,7 +124,7 @@ Right-click a page or component in the Files tree and choose **Convert Format…
 
 Studio offers the action only where it means something. Files outside `pages/` and `components/` are not offered it, nor are layouts (which are always JSON), nor anything inside a content collection: converting an entry would quietly remove it from its collection, and converting a file that merely sits beside the entries would quietly add it.
 
-Before the button, the dialog tells you what is about to happen: how many references will be rewritten, whether any of them are in a file Studio cannot write back, whether the result reads back identically, and that the original is not kept. If the file is open with unsaved changes, the conversion is refused until you save or discard them.
+Before the button, the dialog tells you what is about to happen: how many references will be rewritten, whether the result reads back identically, and that the original is not kept. Afterwards, a reference the refactor could not rewrite is [reported as a warning naming the file](/docs/studio/projects/pages-layouts-components#before-you-delete-rename-or-convert) rather than as a plain success. If the file is open with unsaved changes, the conversion is refused until you save or discard them.
 
 :::doc-note
 There is no undo for a conversion. The file has moved and its references have moved with it. That is why the count is on screen before you confirm, rather than in a toast afterwards.

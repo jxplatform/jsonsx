@@ -33,7 +33,6 @@ import { flushPreviewOverlay } from "../preview/preview-overlay";
 import { serializeDocument } from "./serialize-document";
 import {
   defaultContentFormat,
-  formatByExtension,
   formatByName,
   formatForPath,
   formatParse,
@@ -43,7 +42,6 @@ import {
   splitFormatDocument,
 } from "../format/format-host";
 import type { StudioFormat } from "../format/format-host";
-import type { UsageState } from "../services/references";
 import type { Tab } from "../tabs/tab.js";
 import { mediaTypeEssence } from "@jxsuite/schema/media-type";
 
@@ -419,37 +417,4 @@ export async function confirmFileDelete(file: { name: string; path: string }): P
 export async function renamePromptMessage(path: string, verb: "rename" | "convert" = "rename") {
   const consequence = await usageLine(path, verb);
   return consequence === nothing ? undefined : html`${consequence}`;
-}
-
-/**
- * Which of a file's referrers the rename refactor can actually repair.
- *
- * `applyRename` rewrites a reference only in a document it can SERIALIZE back
- * (`packages/server/src/refactor/scan.ts` returns `serialize: null` otherwise), so a project
- * holding a parse-only format has referrers the refactor reads, changes in memory, and cannot
- * write. That is a silent partial repair, and the only place it can be stated is before the
- * button.
- *
- * @param state — the resolved usage query.
- * @returns The count of referring files no registered format can write back, and their extensions.
- */
-export function unrewritableReferrers(state: UsageState): { files: number; extensions: string[] } {
-  if (state.status !== "ready") {
-    return { extensions: [], files: 0 };
-  }
-  const extensions = new Set<string>();
-  let files = 0;
-  for (const file of state.result.files) {
-    const dot = file.path.lastIndexOf(".");
-    const ext = dot > 0 ? file.path.slice(dot).toLowerCase() : "";
-    if (ext === ".json") {
-      continue;
-    }
-    const format = formatByExtension(ext, "serialize");
-    if (!format) {
-      files += 1;
-      extensions.add(ext || file.path);
-    }
-  }
-  return { extensions: [...extensions].toSorted(), files };
 }
