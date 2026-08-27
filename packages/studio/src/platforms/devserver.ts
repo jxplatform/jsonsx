@@ -64,11 +64,26 @@ interface SiteEntry {
  *
  * The adapter is stateless apart from `_projectRoot`, which tracks the server-relative project
  * directory (e.g. "examples/site-demo"). All paths passed INTO PAL methods are project-relative;
- * the adapter prefixes them with `_projectRoot` before hitting the server, and strips the prefix
- * from responses.
+ * the adapter prefixes them with `_projectRoot` before hitting the server.
+ *
+ * **Coming back, the space depends on the route, and the routes do not all agree** (the contract is
+ * `specs/server.md` §4.1). `/__studio/files` echoes what it was asked — server-root-relative — so
+ * its replies are stripped. The refactor routes (`file/rename`, `references`) answer in the ACTIVE
+ * PROJECT's space, because that is the space their sweep runs in, so their replies are returned
+ * untouched. Stripping one of those is not a harmless no-op: it would eat the first segment of any
+ * path that begins with the project root's own name.
  */
 export function createDevServerPlatform() {
   let _projectRoot = "";
+  /**
+   * The in-flight `activate()` for the current root, so a query whose answer depends on the
+   * server's project binding can await it.
+   *
+   * `set projectRoot` fires activation fire-and-forget, and `/__studio/references` is the one route
+   * with no `dir` parameter — its sweep root comes solely from the server's activated project. A
+   * query landing inside that window would sweep the server's own root instead (issue 239).
+   */
+  let _activation: Promise<unknown> | null = null;
   /**
    * Lazy /__studio/collab capability probe (null = not asked yet). Its result is the subprotocol
    * negotiation, not a boolean: the probe is the only place the client can learn what envelope the
@@ -128,7 +143,7 @@ export function createDevServerPlatform() {
         // Fire-and-forget: callers that need the binding in place before reading await activate()
         // Themselves. The rejection is reported rather than dropped — an unactivated root leaves
         // Every rootless endpoint (git especially) operating on the server's OWN root.
-        void this.activate(_projectRoot).catch((error: unknown) => {
+        _activation = this.activate(_projectRoot).catch((error: unknown) => {
           console.error("Project activation failed:", error);
         });
       }
@@ -424,21 +439,11 @@ export function createDevServerPlatform() {
       if (!res.ok) {
         throw new Error(`Failed to rename: ${from} → ${to}`);
       }
-      const report = await readJson<RenameResult>(res);
-      // Map server-root-relative report paths back to project-relative for the studio.
-      if (typeof report.from === "string") {
-        report.from = stripRoot(report.from);
-      }
-      if (typeof report.to === "string") {
-        report.to = stripRoot(report.to);
-      }
-      for (const f of report.references?.files ?? []) {
-        f.path = stripRoot(f.path);
-      }
-      for (const e of report.errors ?? []) {
-        e.path = stripRoot(e.path);
-      }
-      return report;
+      /* No strip on the way back: the route takes its paths in server space and answers in the
+         project's (specs/server.md §4.1). Stripping an already-project-relative path is not merely
+         redundant — it corrupts any path whose first segment happens to match the project root's
+         own name, which a server-root-relative root makes reachable. */
+      return readJson<RenameResult>(res);
     },
 
     /**
@@ -449,6 +454,7 @@ export function createDevServerPlatform() {
      * @param {{ path?: string; tagName?: string }} target
      */
     async findReferences(target: { path?: string; tagName?: string }): Promise<ReferencesResult> {
+      await _activation;
       const params = new URLSearchParams();
       if (target.path) {
         params.set("path", serverPath(target.path));
@@ -460,18 +466,8 @@ export function createDevServerPlatform() {
       if (!res.ok) {
         throw new Error(`Failed to find references: ${target.path ?? target.tagName ?? ""}`);
       }
-      const result = await readJson<ReferencesResult>(res);
-      // Server-root-relative report paths → project-relative, as renameFile already does.
-      if (typeof result.path === "string") {
-        result.path = stripRoot(result.path);
-      }
-      for (const f of result.files ?? []) {
-        f.path = stripRoot(f.path);
-      }
-      for (const e of result.errors ?? []) {
-        e.path = stripRoot(e.path);
-      }
-      return result;
+      // Project-relative on the way out, exactly as `renameFile` above receives it.
+      return readJson<ReferencesResult>(res);
     },
 
     /**

@@ -1279,7 +1279,7 @@ export async function handleStudioApi(
     } catch (error) {
       /* Project-relative, like the report this stands in for. The route takes its `from`/`to` in
          server space and answers in project space; emitting two spaces from one route is what
-         made the sibling `references` route's own confusion survive review (#239). */
+         made the sibling `references` route's own confusion survive review (issue 239). */
       return Response.json({
         error: errorMessage(error),
         from: fwd(relative(scanRoot, absFrom)),
@@ -1301,7 +1301,7 @@ export async function handleStudioApi(
       /* Server-root-relative in (like every sibling route, and like the adapter's `serverPath()`
          sends), project-relative out. The sweep runs in the project's space, so the target has to
          be re-expressed into it: resolving against `scanRoot` directly doubles the prefix, and a
-         doubled prefix names a file that does not exist — which reads as a confident zero (#239). */
+         doubled prefix names a file that does not exist — which reads as a confident zero (issue 239). */
       const abs = resolve(root, target);
       try {
         assertAccessible(abs, root, activeProjectRoot);
