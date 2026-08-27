@@ -1277,29 +1277,42 @@ export async function handleStudioApi(
       const report = await applyRename({ absFrom, absTo, registry, root: scanRoot });
       return Response.json(report);
     } catch (error) {
+      /* Project-relative, like the report this stands in for. The route takes its `from`/`to` in
+         server space and answers in project space; emitting two spaces from one route is what
+         made the sibling `references` route's own confusion survive review (#239). */
       return Response.json({
         error: errorMessage(error),
-        from: fwd(relative(root, absFrom)),
+        from: fwd(relative(scanRoot, absFrom)),
         ok: true,
-        to: fwd(relative(root, absTo)),
+        to: fwd(relative(scanRoot, absTo)),
       });
     }
   }
 
   // Where a file / component tag is used (the read side of the rename refactor's walker)
   if (path === "/__studio/references" && req.method === "GET") {
-    const target = url.searchParams.get("path");
+    let target = url.searchParams.get("path");
     const tag = url.searchParams.get("tag");
     if (!target && !tag) {
       return problem("invalidRequest", "Missing path or tag");
     }
     const scanRoot = activeProjectRoot ?? root;
     if (target) {
+      /* Server-root-relative in (like every sibling route, and like the adapter's `serverPath()`
+         sends), project-relative out. The sweep runs in the project's space, so the target has to
+         be re-expressed into it: resolving against `scanRoot` directly doubles the prefix, and a
+         doubled prefix names a file that does not exist — which reads as a confident zero (#239). */
+      const abs = resolve(root, target);
       try {
-        assertAccessible(resolve(scanRoot, target), root, activeProjectRoot);
+        assertAccessible(abs, root, activeProjectRoot);
       } catch (error) {
         return new Response(errorMessage(error), { status: 400 });
       }
+      const inProject = fwd(relative(scanRoot, abs));
+      if (inProject === "" || inProject.startsWith("../") || isAbsolute(inProject)) {
+        return problem("invalidRequest", "path is outside the active project");
+      }
+      target = inProject;
     }
     try {
       const registry = await getFormatRegistry(scanRoot);
