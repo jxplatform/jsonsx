@@ -179,6 +179,22 @@ describe("mounting", () => {
     expect(el.querySelector("img.media-image")).toBe(img!);
   });
 
+  test("a different file in the same pane replaces the viewer rather than stacking one", async () => {
+    const first = await open("public/hero.png");
+    expect(first.el.querySelector(".media-name")?.textContent?.trim()).toBe("hero.png");
+
+    await openFileInTab("public/promo.mp4");
+    const video = workspace.tabs.get("public/promo.mp4")!;
+    renderMediaMode(surfaceOf(first.el), video);
+    await flush(2);
+
+    // One viewer, showing the second file: the first panel's scope was stopped on the way in.
+    expect(first.el.querySelectorAll(".media-viewer")).toHaveLength(1);
+    expect(first.el.querySelector("video.media-video")).not.toBeNull();
+    expect(mediaPaneMounted("primary", video)).toBe(true);
+    expect(mediaPaneMounted("primary", first.tab)).toBe(false);
+  });
+
   test("detaching a pane that has nothing mounted is a no-op", () => {
     expect(() => {
       detachMediaPane("nowhere");

@@ -1,3 +1,4 @@
+// oxlint-disable typescript/await-thenable -- bun test .resolves/.rejects matchers are typed `void` but return real Promises at runtime; the await is required.
 /**
  * The chromium launcher's RPC transport, under failure.
  *
@@ -133,7 +134,6 @@ describe("when the socket dies", () => {
     const inFlight = platform.locateFile("never/arrives.json");
     await until(() => seen.includes("locateFile"));
     closeAll();
-    // oxlint-disable-next-line typescript/await-thenable -- rejects.toThrow resolves a Promise at runtime.
     await expect(inFlight).rejects.toThrow("Lost connection");
   });
 
@@ -149,7 +149,6 @@ describe("when the socket dies", () => {
     hangUpOnConnect = true;
     closeAll();
     await until(() => sockets.length === 0);
-    // oxlint-disable-next-line typescript/await-thenable -- rejects.toThrow resolves a Promise at runtime.
     await expect(platform.readFile("x.json")).rejects.toThrow("Lost connection");
     hangUpOnConnect = false;
   });

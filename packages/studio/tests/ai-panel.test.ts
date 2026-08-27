@@ -7,6 +7,7 @@
  * The document assistant is mocked (reactive chat-state, recorded session API); the panel module
  * holds singleton state, so these tests run as one ordered scenario.
  */
+import type { ImportBrief } from "../src/services/import-seed";
 import {
   clearSeededSettings,
   flush,
@@ -878,6 +879,24 @@ describe("the New Project Import hand-off", () => {
     expect(contextLines.join(" ")).toContain("url: https://example.com/");
     expect(contextLines.join(" ")).toContain("destination: /home/dev/Sites/example");
     expect(contextLines.join(" ")).toContain("Call import_site with the url");
+  });
+
+  test("the breakpoint policy is a sentence the model can act on, in all three shapes", () => {
+    /* A JSON blob in an attached-context line is a thing the model has to parse before it can
+       decide anything; the wizard already made the decision, so the line says what it decided. */
+    const line = (breakpoints: ImportBrief["breakpoints"]) =>
+      splitAttachedContext(buildImportTurn({ ...BRIEF, breakpoints })).contextLines.join(" ");
+
+    expect(line({ count: 4, mode: "limit", rounding: "down" })).toContain(
+      "breakpoints: keep 4, evenly spaced (rounding down)",
+    );
+    expect(line({ mode: "explicit", rounding: "up", widths: [640, 1024] })).toContain(
+      "breakpoints: 640, 1024 (rounding up)",
+    );
+    expect(line({ mode: "all" })).toContain("breakpoints: keep every one the site declares");
+    // A policy that names neither a count nor a rounding still reads as a decision, not a gap.
+    expect(line({ mode: "limit" })).toContain("keep 3, evenly spaced (rounding nearest)");
+    expect(line({ mode: "explicit" })).toContain("breakpoints:  (rounding nearest)");
   });
 
   test("an empty brief still says what to do", () => {
