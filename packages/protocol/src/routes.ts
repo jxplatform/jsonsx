@@ -107,7 +107,8 @@ export const STUDIO_ROUTES = {
   files: route(
     "GET",
     "/__studio/files",
-    "List a directory (DirEntry[]); with ?glob=<pattern>, search matching files project-wide",
+    "List a directory (DirEntry[]) in stable path order; with ?glob=<pattern>, search matching " +
+      "files project-wide",
   ),
   fileRead: route("GET", "/__studio/file", "Read a file's text content"),
   fileWrite: route("PUT", "/__studio/file", "Write a file's text content"),

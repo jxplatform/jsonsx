@@ -340,6 +340,23 @@ function conflictingPaths(output: string): string[] {
   return [...paths];
 }
 
+/**
+ * Order a directory listing so two identical requests answer identically.
+ *
+ * `readdir` and `Bun.Glob.scan` both answer in FILESYSTEM order, which is not an order at all: it
+ * varies with the directory's internal layout and therefore with the history of writes to it. That
+ * reached the screenshots as a picture that changed on its own — `blog-grid.png` photographs a
+ * content collection, `content-source.ts` inserts rows in listing order (deliberately, so a
+ * concurrent read cannot decide it), and the listing underneath was unsorted. The collection's
+ * three posts swapped places between runs and rewrote the image 15 times in ten days.
+ *
+ * Codepoint order, not `localeCompare`: the comparison has to answer the same on a maintainer's
+ * machine and in the capture container, and a locale-aware collation does not promise that.
+ */
+function byPathOrder<T extends { path: string }>(entries: T[]): T[] {
+  return entries.toSorted((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+}
+
 export async function handleStudioApi(
   req: Request,
   url: URL,
@@ -718,7 +735,7 @@ export async function handleStudioApi(
             }
           } catch {}
         }
-        return Response.json(files);
+        return Response.json(byPathOrder(files));
       }
 
       const entries = await readdir(absDir, { withFileTypes: true });
@@ -737,7 +754,7 @@ export async function handleStudioApi(
           type: entry.isDirectory() ? "directory" : "file",
         });
       }
-      return Response.json(files);
+      return Response.json(byPathOrder(files));
     } catch (error) {
       return problem("internalError", errorMessage(error));
     }

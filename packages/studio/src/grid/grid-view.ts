@@ -228,13 +228,27 @@ export function createGridView(host: HTMLElement, controller: GridController): G
    * non-empty table an initial range, and that range's outline is a rendered element — so until it
    * exists the picture is still changing. An empty table is exempt, because it never gets one and
    * waiting for it would be waiting forever.
+   *
+   * The MODEL is not the picture, and that distinction is the whole bug this second clause fixes.
+   * `getRanges()` answers from Tabulator's range model, which is populated when the range is
+   * created; the outline is a `.tabulator-range` div the SelectRange module paints into
+   * `.tabulator-range-overlay` on a later frame. Between the two, the grid reports itself settled
+   * and the capture lands on a table whose selected cell has no outline — so `data-grid.png`
+   * alternated between an outlined "Elena M." and a bare one, 16 rewrites in ten days at a steady
+   * 0.089 %. Asking the DOM for a laid-out box closes the window that the model check leaves open.
    */
   const probe = (): string | null => {
     if (!built) {
       return `grid[${gridId}]: building`;
     }
-    if (controller.effectiveRows().length > 0 && table.getRanges().length === 0) {
-      return `grid[${gridId}]: selection range not laid out`;
+    if (controller.effectiveRows().length > 0) {
+      if (table.getRanges().length === 0) {
+        return `grid[${gridId}]: selection range not laid out`;
+      }
+      const outline = host.querySelector(".tabulator-range-overlay .tabulator-range");
+      if (!outline || rectOf(outline).width === 0) {
+        return `grid[${gridId}]: selection range outline not painted`;
+      }
     }
     return null;
   };

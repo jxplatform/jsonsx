@@ -79,6 +79,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `desktop.md`
 
+- **0.4.7-draft** (2026-08-27) — The files route answers in stable path order, in every backend.
 - **0.4.6-draft** (2026-08-27) — The PAL is project-relative in both directions; an adapter translates a request space or a reply space, never both.
 - **0.4.5-draft** (2026-08-27) — Both launchers preview the working tree live at real routes; Build Site keeps the compiler, and leaving the webview is stated to be one-way.
 - **0.4.4-draft** (2026-08-26) — the Import tab chooses how many breakpoints the project keeps, and what an import emits is normative (§4.5).
@@ -241,7 +242,8 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `server.md`
 
-- **0.2.20** (2026-08-27) — A rename resets any co-editing room keyed to the old path, so a shutdown flush cannot recreate the moved file.
+- **0.2.21** (2026-08-27) — A rename resets any co-editing room keyed to the old path, so a shutdown flush cannot recreate the moved file.
+- **0.2.20** (2026-08-27) — Directory listing and project-wide search answer in stable path order, in both implementations.
 - **0.2.19** (2026-08-27) — The Studio API's path space is written down: server-root-relative in, project-relative out; a refactor target outside the active project is a 400, not a zero-result 200.
 - **0.2.18** (2026-08-27) — The preview origin registers the project's own components without a declaration.
 - **0.2.17** (2026-08-27) — The preview origin composes non-JSON pages through the project's extension registry, built from its config.

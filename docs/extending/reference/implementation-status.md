@@ -17,14 +17,14 @@ This page is generated from the `> **Status: …**` markers in the specification
 | `ai.md`                   | 0.1.10-draft | Partial     | 2026-08-26 |
 | `collab.md`               | 0.2.5-draft  | Partial     | 2026-08-20 |
 | `compiler.md`             | 0.4.1-draft  | Partial     | 2026-08-27 |
-| `desktop.md`              | 0.4.6-draft  | Pending     | 2026-08-27 |
+| `desktop.md`              | 0.4.7-draft  | Pending     | 2026-08-27 |
 | `extensions.md`           | 0.4.1-draft  | Partial     | 2026-08-27 |
 | `imports.md`              | 0.1.10-draft | Partial     | 2026-08-27 |
 | `jx-markdown.md`          | 0.1.9-draft  | Partial     | 2026-08-27 |
 | `parser.md`               | 0.2.10-draft | Partial     | 2026-08-27 |
 | `relationships.md`        | 0.1.4-draft  | Partial     | 2026-08-15 |
 | `schema.md`               | 0.4.8-draft  | Partial     | 2026-08-16 |
-| `server.md`               | 0.2.20       | Implemented | 2026-08-27 |
+| `server.md`               | 0.2.21       | Implemented | 2026-08-27 |
 | `site-architecture.md`    | 0.6.4-draft  | Partial     | 2026-08-27 |
 | `spec.md`                 | 0.5.8-draft  | Partial     | 2026-08-26 |
 | `standards.md`            | 0.1.15-draft | Partial     | 2026-08-17 |
