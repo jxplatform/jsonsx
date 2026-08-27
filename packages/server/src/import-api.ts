@@ -46,6 +46,7 @@ interface ImportRequestBody {
   aiModel?: string;
   verify?: boolean;
   verifyThreshold?: number;
+  verifyMinFidelity?: number;
 }
 
 /** Seconds between keep-alive lines while a phase is silent (browser launch is the longest gap). */
@@ -54,9 +55,18 @@ const HEARTBEAT_INTERVAL_MS = 15_000;
 const MAX_DEPTH = 5;
 const MAX_PAGES = 100;
 
-/** Pixelmatch threshold bounds for the optional verify pass. */
+/** Pixelmatch colour-tolerance bounds for the optional verify pass. */
 const MIN_THRESHOLD = 0.01;
 const MAX_THRESHOLD = 1;
+
+/**
+ * The fidelity bar's bounds, as a percentage.
+ *
+ * `0` is a legal answer and means "report only", which is what this transport did before the bar
+ * existed — so the floor here is 0 rather than the CLI's default of 25.
+ */
+const MIN_FIDELITY_FLOOR = 0;
+const MIN_FIDELITY_CEILING = 100;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, Math.trunc(value)));
@@ -114,11 +124,21 @@ async function handleImportSite(req: Request, opts: ImportApiOptions): Promise<R
    * the caller can act on: every other finding is a count of things that were skipped, and "the
    * pricing page renders at 61%" is a question worth putting to a person.
    */
-  const verify: false | { threshold: number } = body.verify
+  const verify: false | { threshold: number; minFidelity: number } = body.verify
     ? {
+        /*
+         * Two different numbers, and conflating them is what let a run scoring 8% report success.
+         * `threshold` is pixelmatch's per-pixel COLOUR tolerance and only moves the score;
+         * `minFidelity` is the bar the run's `passed` is measured against.
+         */
         threshold: Math.min(
           MAX_THRESHOLD,
           Math.max(MIN_THRESHOLD, Number(body.verifyThreshold ?? 0.15) || 0.15),
+        ),
+        minFidelity: clamp(
+          Number(body.verifyMinFidelity ?? 0) || 0,
+          MIN_FIDELITY_FLOOR,
+          MIN_FIDELITY_CEILING,
         ),
       }
     : false;

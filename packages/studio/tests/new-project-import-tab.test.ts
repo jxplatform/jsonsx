@@ -23,7 +23,8 @@ import type { ImportProgressEvent } from "../src/types";
 
 const { closeNewProjectModal, openNewProjectModal } =
   await import("../src/new-project/new-project-modal");
-const { handoffImport, importButtonLabel } = await import("../src/new-project/import-tab");
+const { handoffImport, importBriefFor, importButtonLabel } =
+  await import("../src/new-project/import-tab");
 const { clearPendingImportBrief, pendingImportBrief } = await import("../src/services/import-seed");
 const { initLayers } = await import("../src/ui/layers");
 
@@ -46,6 +47,20 @@ function nameError(): string {
       .querySelector('#layer-modal .new-project-name sp-help-text[slot="negative-help-text"]')
       ?.textContent?.trim() ?? ""
   );
+}
+
+/** Every number field on the Import source step, in render order. */
+function numberFields(): (HTMLElement & { value: string })[] {
+  return [...document.querySelectorAll("#layer-modal sp-number-field")] as (HTMLElement & {
+    value: string;
+  })[];
+}
+
+/** The "Check fidelity against the original" switch — the second of the step's two. */
+function verifySwitch(): HTMLElement & { checked: boolean } {
+  return [...document.querySelectorAll("#layer-modal sp-switch")][1] as HTMLElement & {
+    checked: boolean;
+  };
 }
 
 /** The inline error rendered under the destination fields (or by a failed run). */
@@ -287,13 +302,11 @@ describe("Import — the brief the form hands over", () => {
     switchTab("import");
     npType(urlField(), "https://clone.example/");
 
-    const numberFields = [
-      ...document.querySelectorAll("#layer-modal sp-number-field"),
-    ] as (HTMLElement & { value: string })[];
-    numberFields[0]!.value = "2";
-    numberFields[0]!.dispatchEvent(new Event("change", { bubbles: true }));
-    numberFields[1]!.value = "50";
-    numberFields[1]!.dispatchEvent(new Event("change", { bubbles: true }));
+    const [depth, maxPages] = numberFields();
+    depth!.value = "2";
+    depth!.dispatchEvent(new Event("change", { bubbles: true }));
+    maxPages!.value = "50";
+    maxPages!.dispatchEvent(new Event("change", { bubbles: true }));
     const aiSwitch = document.querySelector("#layer-modal sp-switch") as HTMLElement & {
       checked: boolean;
     };
@@ -315,6 +328,76 @@ describe("Import — the brief the form hands over", () => {
       prompt: "Modernise the typography",
       url: "https://clone.example/",
     });
+  });
+
+  /*
+   * The fidelity bar (jxsuite/jx issue 232). It appears WITH the check it belongs to: a minimum
+   * for a comparison nobody asked to run is a number with nothing to measure.
+   */
+  test("the fidelity minimum appears only once the fidelity check is on", async () => {
+    setKey();
+    importPlatform();
+    void openNewProjectModal();
+    switchTab("import");
+    // Crawl depth and max pages, and no third field while the check is off.
+    expect(document.querySelectorAll("#layer-modal sp-number-field")).toHaveLength(2);
+
+    verifySwitch().checked = true;
+    verifySwitch().dispatchEvent(new Event("change", { bubbles: true }));
+    await flush();
+
+    expect(document.querySelectorAll("#layer-modal sp-number-field")).toHaveLength(3);
+    expect(document.querySelector("#layer-modal .new-project-hint")?.textContent).toContain(
+      "did not match the original",
+    );
+  });
+
+  test("the fidelity minimum reaches the brief", async () => {
+    setKey();
+    importPlatform();
+    void openNewProjectModal();
+    switchTab("import");
+    npType(urlField(), "https://clone.example/");
+    verifySwitch().checked = true;
+    verifySwitch().dispatchEvent(new Event("change", { bubbles: true }));
+    await flush();
+
+    const fidelity = numberFields()[2]!;
+    fidelity.value = "60";
+    fidelity.dispatchEvent(new Event("change", { bubbles: true }));
+
+    clickFooter("Next");
+    npFillLocation();
+    clickFooter("Import Site");
+    await flush();
+    expect(pendingImportBrief()).toMatchObject({ minFidelity: 60, verify: true });
+  });
+
+  // A percentage is the only thing this number can be, so the field refuses to carry anything else.
+  test("the fidelity minimum is clamped to a percentage", async () => {
+    setKey();
+    importPlatform();
+    void openNewProjectModal();
+    switchTab("import");
+    npType(urlField(), "https://clone.example/");
+    verifySwitch().checked = true;
+    verifySwitch().dispatchEvent(new Event("change", { bubbles: true }));
+    await flush();
+
+    const fidelity = numberFields()[2]!;
+    /* Read the brief directly rather than through the footer: handing off CLOSES the modal, so a
+       loop that clicks Import Site could only ever check its first case. */
+    const { ctx } = directCtx(() => ({ kind: "path", parent: "/home/dev/Sites" }));
+    for (const [typed, expected] of [
+      ["250", 100],
+      ["-5", 0],
+      ["", 0],
+      ["60", 60],
+    ] as const) {
+      fidelity.value = typed;
+      fidelity.dispatchEvent(new Event("change", { bubbles: true }));
+      expect(importBriefFor(ctx)).toMatchObject({ minFidelity: expected });
+    }
   });
 
   test("Import Site is a no-op when the platform lacks importSite", async () => {

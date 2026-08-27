@@ -14,6 +14,7 @@ const BRIEF: ImportBrief = {
   depth: 1,
   directory: "/home/dev/Sites/example",
   maxPages: 20,
+  minFidelity: 25,
   model: "o3",
   name: "Example",
   prompt: "Modernise the typography",

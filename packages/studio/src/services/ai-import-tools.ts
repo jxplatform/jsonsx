@@ -54,6 +54,15 @@ const WEAKEST_PAGES = 3;
 /** Below this, a page is worth naming. Above it, "close enough" is the honest reading. */
 const WEAK_FIDELITY = 90;
 
+/**
+ * The default bar an import is measured against, matching `jx-import --min-fidelity`.
+ *
+ * A floor for "this is not a clone of anything" rather than a quality target: a faithful import of
+ * a complicated site lands well under 100 for reasons no importer can fix.
+ */
+const DEFAULT_MIN_FIDELITY = 25;
+const MAX_FIDELITY = 100;
+
 export interface ImportToolsCtx {
   /** The active tab, read AFTER adoption to re-anchor the agent loop's undo batch. */
   getTab: () => Tab | null;
@@ -124,6 +133,19 @@ function describeRun(id: string, root: string, summary?: ImportSiteSummary): str
     lines.push(
       `Fidelity against the original averaged ${summary.verify.averageFidelity}%${detail}`,
     );
+    /*
+     * The bar the user set, and whether this run cleared it. Stated FIRST among the details,
+     * because it is the difference between a number to note and a result to act on: an import at
+     * 8% used to report exactly like one at 95%, and the only way to tell them apart was to open
+     * the project and look.
+     */
+    if (summary.verify.passed === false && (summary.verify.buildErrors ?? []).length === 0) {
+      lines.push(
+        `That is below the ${summary.verify.minFidelity ?? 0}% minimum this import was asked ` +
+          "for, so the clone does not match the original closely enough. Say so plainly, and " +
+          "offer to look at what went wrong rather than moving on.",
+      );
+    }
     /*
      * The score says a page looks wrong; this says why. A page that 404s on fifteen asset
      * references scores badly for one fixable reason, and reading a percentage on its own sends
@@ -203,6 +225,14 @@ export function registerImportTools(
               "reporting a per-page fidelity score. Roughly doubles the run, and is the only " +
               "finding that says how WELL the clone came out rather than what was skipped.",
           },
+          minFidelity: {
+            type: "number",
+            description:
+              "With verify on, the average fidelity (0-100) the clone must reach to count as " +
+              "matching the original. A floor rather than a target: a faithful import of a " +
+              "complicated site lands well under 100, so raise it only when the user asks for a " +
+              "stricter bar. 0 reports the score without judging it. Default 25.",
+          },
           aiComponents: {
             type: "boolean",
             description:
@@ -213,13 +243,14 @@ export function registerImportTools(
         required: ["url"],
       },
       async execute(args) {
-        const { url, directory, depth, maxPages, aiComponents, verify } = args as {
+        const { url, directory, depth, maxPages, aiComponents, verify, minFidelity } = args as {
           url?: unknown;
           directory?: unknown;
           depth?: unknown;
           maxPages?: unknown;
           aiComponents?: unknown;
           verify?: unknown;
+          minFidelity?: unknown;
         };
 
         if (workspace.projectRoot) {
@@ -303,6 +334,13 @@ export function registerImportTools(
                 : brief?.verify === undefined
                   ? {}
                   : { verify: brief.verify }),
+              /* The wizard's number is the user's own answer to "how close is close enough"; the
+                 model may only override it when it was told to. */
+              verifyMinFidelity: clamp(
+                Number(minFidelity ?? brief?.minFidelity ?? DEFAULT_MIN_FIDELITY) || 0,
+                0,
+                MAX_FIDELITY,
+              ),
               ...(apiKey ? { apiKey } : {}),
               ...(baseUrl ? { baseUrl } : {}),
               ...(model ? { model } : {}),

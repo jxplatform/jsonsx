@@ -859,6 +859,7 @@ describe("the New Project Import hand-off", () => {
     depth: 1,
     directory: "/home/dev/Sites/example",
     maxPages: 20,
+    minFidelity: 25,
     model: "o3-import",
     name: "Example",
     prompt: "Modernise the typography",

@@ -74,7 +74,7 @@ There is no default location. Studio never picks a folder for you and never fall
 
 ### What the Import tab asks for
 
-Beyond the site's URL, the Import tab has four options:
+Beyond the site's URL, the Import tab has four options, and a fifth that appears with the fourth:
 
 1. **Crawl Depth**: how far from the starting page to follow links. `0` imports that one page and nothing else, on a much faster path that skips the crawl entirely.
 2. **Max Pages**: the ceiling on how many pages to capture.
@@ -82,6 +82,10 @@ Beyond the site's URL, the Import tab has four options:
 4. **Check fidelity against the original**: after the import, build the new project, screenshot every page, and compare it against the site it came from. It roughly doubles the run, and it's the only thing that tells you how well the clone actually came out instead of what got skipped. Off by default.
 
    The assistant reports the percentage per page, and alongside it the two things a percentage can't tell you: requests the rendered page made and didn't get, and any errors from building the project. A page that scores badly because fifteen images 404 is a different problem from one whose layout came out wrong, and only the first of those is quick to fix.
+
+5. **Minimum fidelity**: appears once the fidelity check is on, and is the average below which the assistant tells you the clone did not match the original. It defaults to `25`, and it's a floor rather than a target: a faithful import of a complicated site still lands well under 100 for reasons no importer can fix, like a hero that rotates between screenshots or a font that renders a hair differently. What it catches is the other case, the clone that came out at 8% and would otherwise be reported like any other. Set it to `0` to see the score without it being judged.
+
+   Missing the bar doesn't cancel anything. The project is written and opened either way; the assistant says so plainly and offers to look at what went wrong. (The `jx-import` command-line tool turns the same number into an exit code, because a script running in a pipeline has nobody to tell.)
 
 Under those, a **Model** picker and a box asking what the assistant should do with the site. Both are optional. The model here is for this import only, so it doesn't change the model the assistant uses for everything else. Leave the box empty and the assistant simply gets the site ready for you to work on; fill it in ("keep the layout but modernise the typography") and it carries straight on into that once the import lands.
 

@@ -19,6 +19,7 @@ const BRIEF: ImportBrief = {
   depth: 1,
   directory: "/home/dev/Sites/example",
   maxPages: 20,
+  minFidelity: 25,
   model: "o3-import",
   name: "Example",
   prompt: "Modernise the typography",
@@ -294,6 +295,126 @@ describe("import_site — the run", () => {
     expect(captured!.opts.verify).toBe(true);
     captured!.resolve({ config: {}, root: "/home/dev/Sites/example" });
     await running;
+  });
+
+  /*
+   * The fidelity bar (jxsuite/jx issue 232). The wizard's number is the user's own answer to "how
+   * close is close enough", so the model inherits it and only overrides it when it was told to.
+   */
+  test("the brief's fidelity minimum is used when the model does not state one", async () => {
+    setPendingImportBrief({ ...BRIEF, minFidelity: 60, verify: true });
+    const { registry } = harness({ adoptProject: landing() });
+    const running = registry.execute("import_site", { url: "https://example.com" });
+    expect(captured!.opts.verifyMinFidelity).toBe(60);
+    captured!.resolve({ config: {}, root: "/home/dev/Sites/example" });
+    await running;
+  });
+
+  test("the model's fidelity minimum wins, clamped to a percentage", async () => {
+    setPendingImportBrief({ ...BRIEF, minFidelity: 60, verify: true });
+    const { registry } = harness({ adoptProject: landing() });
+    const running = registry.execute("import_site", {
+      minFidelity: 400,
+      url: "https://example.com",
+    });
+    expect(captured!.opts.verifyMinFidelity).toBe(100);
+    captured!.resolve({ config: {}, root: "/home/dev/Sites/example" });
+    await running;
+  });
+
+  test("with no brief and no argument the bar is the same floor the CLI uses", async () => {
+    const { registry } = harness({ adoptProject: landing() });
+    const running = registry.execute("import_site", {
+      directory: "/home/dev/Sites/example",
+      url: "https://example.com",
+    });
+    expect(captured!.opts.verifyMinFidelity).toBe(25);
+    captured!.resolve({ config: {}, root: "/home/dev/Sites/example" });
+    await running;
+  });
+
+  test("a run under the bar is reported as a result, not as a number to note", async () => {
+    const { registry } = harness({ adoptProject: landing() });
+    const running = registry.execute("import_site", {
+      directory: "/home/dev/Sites/example",
+      minFidelity: 25,
+      url: "https://example.com",
+      verify: true,
+    });
+    captured!.resolve({
+      config: {},
+      result: {
+        verify: {
+          averageFidelity: 8.17,
+          minFidelity: 25,
+          pages: [{ failedRequests: 15, fidelity: 8.17, route: "pages/index.json" }],
+          passed: false,
+          reportDir: "/p/verify",
+        },
+      },
+      root: "/home/dev/Sites/example",
+    });
+
+    const res = await running;
+    expect(res.summary).toContain("below the 25% minimum");
+    // And what a percentage cannot say — the reason it scored that badly.
+    expect(res.summary).toContain("15 requests failed or 404'd");
+    /* Still a success: the project is written and open, and destroying the flow over a fidelity
+       number would be worse than reporting it. The CLI exits non-zero because it has no reader. */
+    expect(res.success).toBe(true);
+  });
+
+  test("a run that clears the bar says nothing about it", async () => {
+    const { registry } = harness({ adoptProject: landing() });
+    const running = registry.execute("import_site", {
+      directory: "/home/dev/Sites/example",
+      url: "https://example.com",
+      verify: true,
+    });
+    captured!.resolve({
+      config: {},
+      result: {
+        verify: {
+          averageFidelity: 96,
+          minFidelity: 25,
+          pages: [{ fidelity: 96, route: "pages/index.json" }],
+          passed: true,
+          reportDir: "/p/verify",
+        },
+      },
+      root: "/home/dev/Sites/example",
+    });
+
+    const res = await running;
+    expect(res.summary).not.toContain("minimum");
+  });
+
+  // A build error is its own finding; repeating it as a fidelity miss would be noise.
+  test("a project that did not build reports the build error rather than the bar", async () => {
+    const { registry } = harness({ adoptProject: landing() });
+    const running = registry.execute("import_site", {
+      directory: "/home/dev/Sites/example",
+      url: "https://example.com",
+      verify: true,
+    });
+    captured!.resolve({
+      config: {},
+      result: {
+        verify: {
+          averageFidelity: 98,
+          buildErrors: ["Error compiling /about: unknown $ref"],
+          minFidelity: 25,
+          pages: [{ fidelity: 98, route: "pages/index.json" }],
+          passed: false,
+          reportDir: "/p/verify",
+        },
+      },
+      root: "/home/dev/Sites/example",
+    });
+
+    const res = await running;
+    expect(res.summary).toContain("did not build cleanly: Error compiling /about");
+    expect(res.summary).not.toContain("below the");
   });
 
   test("the summary names the warnings and points at what to do next", async () => {

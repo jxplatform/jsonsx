@@ -558,8 +558,21 @@ export interface ImportSiteOptions {
    * question worth asking, and every other finding is a count of things that were skipped.
    */
   verify?: boolean;
-  /** Pixelmatch threshold 0..1 for `verify` (default 0.15). */
+  /**
+   * Pixelmatch's per-pixel COLOUR tolerance, 0..1, for `verify` (default 0.15).
+   *
+   * It decides when two pixels count as the same colour, so it moves the score and never the
+   * outcome. `verifyMinFidelity` is the bar.
+   */
   verifyThreshold?: number;
+  /**
+   * The average fidelity, 0..100, this run has to reach for `verify` to report `passed`.
+   *
+   * A finding rather than a failure on this transport: the project is written and opened either
+   * way, and the summary says the bar was missed. `jx-import` uses the same number to decide an
+   * exit code, because a script in a pipeline has no reader to tell.
+   */
+  verifyMinFidelity?: number;
   /** OpenAI-compatible credentials, from the user's AI settings. */
   apiKey?: string;
   baseUrl?: string;

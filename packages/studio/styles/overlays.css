@@ -860,6 +860,13 @@
   font-weight: 500;
   color: var(--fg-dim);
 }
+/* Explanatory text under a field's control — what the number means, not what the field is
+   called. Sits below rather than beside so a long sentence wraps instead of squeezing the input. */
+.new-project-hint {
+  font-size: var(--spectrum-font-size-75, 12px);
+  color: var(--fg-dim);
+  line-height: 1.4;
+}
 .new-project-error {
   font-size: var(--spectrum-font-size-75, 12px);
   color: var(--danger);
