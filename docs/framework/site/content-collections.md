@@ -15,6 +15,10 @@ code:
 # Content collections
 
 > **Studio writes this format for you.** The [content-type builder](/docs/studio/projects/content-types) edits the `content` section visually, and entries show up in [The Library](/docs/studio/projects/browse) with schema-driven forms.
+>
+> It also enforces the collection's format where you create files: **New File…** in a collection's
+> folder is **New Entry**, and in a subfolder of it the format picker is locked to the collection's
+> extension. See [Creating a file](/docs/studio/interface#creating-a-file).
 
 Content collections are the data layer for content-driven sites: they turn folders of Markdown, JSON, or CSV files into typed, queryable data with JSON Schema validation. Each collection is a **content type**, declared in the `content` section of `project.json`.
 

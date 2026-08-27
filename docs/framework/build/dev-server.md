@@ -83,6 +83,8 @@ You get exactly one reload no matter how many changes happened while the connect
 
 Studio is a static web app plus a REST API, and the dev server provides both. With `studio: true` (the default), the server mounts `/__studio/*`: project metadata, file listing, read/write/delete/rename, component discovery, content search, code formatting and linting for the function-body editor, and a realtime co-editing WebSocket at `/__studio/collab`. Every filesystem operation is validated to stay under `root`, so path traversal is rejected.
 
+The two meet at renames. A co-editing room is keyed by path, so renaming a file (which is also what [converting one to another format](/docs/studio/interface#converting-a-file-to-another-format) does) drops the room for the old path. Without that the room would outlive the move holding the file's old content, and the flush the server runs when it shuts down would write that content back, recreating the file the rename deleted.
+
 Studio's UI assets are ordinary static files under the served root; opening a project in Studio activates its directory on the server, which then also resolves project files, and `public/` contents at the site root, exactly as the production build would. The desktop app doesn't use this server (it embeds its own loopback-only, token-gated variant), but it speaks the same API.
 
 ## Running server-side code: the two proxies

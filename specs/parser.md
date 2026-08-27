@@ -2,9 +2,9 @@
 
 ## Content Formats and the Reference Format-Extension Classes
 
-**Version:** 0.2.9-draft
+**Version:** 0.2.10-draft
 **Status:** Partial
-**Updated:** 2026-08-16
+**Updated:** 2026-08-27
 **License:** MIT
 
 ---
@@ -140,7 +140,7 @@ serializeJxMarkdown(doc, {
 })
 ```
 
-- **roundtrip** — lossless: YAML frontmatter (via the `yaml` package) from non-children doc keys; elements outside the allowlist (or carrying Jx-specific props) emit as remark directives with collapsed dot-path attributes. Inverse of `transpileJxMarkdown()`.
+- **roundtrip** — lossless for everything it can express: YAML frontmatter (via the `yaml` package) from non-children doc keys; elements outside the allowlist (or carrying Jx-specific props) emit as remark directives with collapsed dot-path attributes. Inverse of `transpileJxMarkdown()`. It is not TOTAL: a `tagName` chosen at render time cannot be expressed at all and throws, naming the candidates it saw.
 - **export** — lossy clean GFM: wrappers (`div`, `section`, …) unwrapped, custom elements inlined by resolving definitions with instance `$props`, `$prototype: "Array"` descriptors expanded, `innerHTML` converted, template strings evaluated through the injected hooks (the compiler passes its static-template machinery; the default keeps templates verbatim). No frontmatter, no directives.
 
 Fenced-code language is canonical on `className` (`language-x`); `attributes.class` is read for backward compatibility.
@@ -263,6 +263,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.2.10-draft** (2026-08-27) — roundtrip serialization is lossless where expressible, not total.
 - **0.2.9-draft** (2026-08-16) — §3 heading slugs normalize to NFC before casing (UAX #15) and word counts segment rather than split on whitespace (UAX #29). Closes gap:heading-slug-normalization and gap:word-segmentation.
 - **0.2.8-draft** (2026-08-16) — §3 the markdown variant and YAML media type are what hosts serve, not only what the class declares; gap:markdown-variant and gap:yaml-media-type closed.
 - **0.2.7-draft** (2026-08-15) — §9.3 records _meta.mtime as the date fallback a feed uses.
@@ -283,4 +284,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_`@jxsuite/parser` Specification v0.2.9-draft_
+_`@jxsuite/parser` Specification v0.2.10-draft_

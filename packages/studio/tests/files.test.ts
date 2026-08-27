@@ -19,6 +19,7 @@ import {
   workspace,
 } from "../src/workspace/workspace";
 import { MARKDOWN_FORMAT, mockFormatAction, seedMarkdownFormat } from "./format-fixture";
+import { getFormats, setFormats } from "../src/format/format-host";
 import {
   findHomePage,
   initProjectRepo,
@@ -220,6 +221,65 @@ describe("loadProject", () => {
     // Markdown format claims "page" documents, so index.md wins over index.json
     expect(activeTab.value?.documentPath).toBe("pages/index.md");
     expect(activeTab.value?.doc.sourceFormat).toBe("Markdown");
+  });
+
+  /**
+   * The registry is fetched BEFORE the install runs, and `loadFormats` memoises.
+   *
+   * So on a fresh clone the empty registry survived the whole session: a project whose
+   * `project.json` enables the markdown extension opened with no markdown format at all, and the
+   * New File picker offered nothing but JSON until the window was reopened.
+   */
+  test("an install that RAN re-reads the format registry", async () => {
+    setFormats([]);
+    let listed = 0;
+    installFsPlatform(
+      { "pages/index.json": JSON.stringify({ tagName: "div" }) },
+      {
+        dependenciesNeedInstall: async () => true,
+        installDependencies: async () => ({ ok: true }),
+        listFormats: async () => {
+          listed += 1;
+          return [MARKDOWN_FORMAT];
+        },
+        probeRootProject: async () =>
+          ({
+            info: { isSiteProject: true, projectConfig: { name: "Fresh" } },
+            meta: { name: "fresh", root: "/srv/fresh" },
+          }) as never,
+      },
+    );
+
+    await loadProject();
+
+    // Asked twice: once before the install, once after — and the second answer is the one that
+    // Reaches the picker, the convert targets and every parse for the rest of the session.
+    expect(listed).toBeGreaterThan(1);
+    expect(getFormats().map((f) => f.name)).toEqual(["Markdown"]);
+  });
+
+  test("an install that did NOT run leaves the registry alone", async () => {
+    setFormats([]);
+    let listed = 0;
+    installFsPlatform(
+      { "pages/index.json": JSON.stringify({ tagName: "div" }) },
+      {
+        dependenciesNeedInstall: async () => false,
+        listFormats: async () => {
+          listed += 1;
+          return [MARKDOWN_FORMAT];
+        },
+        probeRootProject: async () =>
+          ({
+            info: { isSiteProject: true, projectConfig: { name: "Installed" } },
+            meta: { name: "installed", root: "/srv/i" },
+          }) as never,
+      },
+    );
+
+    await loadProject();
+
+    expect(listed).toBe(1);
   });
 
   test("site probe without projectConfig falls back to meta name", async () => {

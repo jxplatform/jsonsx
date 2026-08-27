@@ -19,7 +19,7 @@ void mock.module("ajv/dist/2020.js", () => ({
   },
 }));
 
-const { validateDoc } = await import("../src/services/jx-validate");
+const { validateDoc, validateDocOrNull } = await import("../src/services/jx-validate");
 const { renderCheck } = await import("../src/services/render-critic");
 const { formatPreviewValue } = await import("../src/utils/preview-format");
 const { getCfAccountId, getCfToken } = await import("../src/services/cf-settings");
@@ -51,6 +51,21 @@ describe("jx-validate without ajv", () => {
     expect(await validateDoc({ tagName: "div" })).toEqual([]);
     // A second call reuses the settled loading promise (still degraded).
     expect(await validateDoc({ not: "a document" })).toEqual([]);
+  });
+});
+
+/**
+ * The three-state answer exists for exactly this environment.
+ *
+ * `validateDoc` degrades to "no errors" when ajv cannot load, which is indistinguishable from a
+ * valid document — fine where validation decorates an editor, wrong where it gates a destructive
+ * step. `format/convert-file.ts` reads the `null` and says the result could not be checked, rather
+ * than claiming it is valid.
+ */
+describe("validateDocOrNull under a broken ajv", () => {
+  test("answers null, where validateDoc answers no errors", async () => {
+    expect(await validateDoc({ tagName: "div" })).toEqual([]);
+    expect(await validateDocOrNull({ tagName: "div" })).toBeNull();
   });
 });
 

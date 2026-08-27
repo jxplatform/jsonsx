@@ -130,6 +130,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `extensions.md`
 
+- **0.4.1-draft** (2026-08-27) — Studio conversion and creation are parse/serialize consumers; what parse returns is decided by documentKinds.
 - **0.4.0-draft** (2026-08-26) — §8.4: an emitter must not emit the same content twice — the search index carries page preamble plus sections, not the corpus twice.
 - **0.3.11-draft** (2026-08-25) — §8.5: record that a host which cannot execute extension code sees only content-section mounts.
 - **0.3.10-draft** (2026-08-20) — §5.1 records the first-party fragment $id shape, https://jxsuite.com/schema/ext/<extension>/<kind>/v<n>.
@@ -171,6 +172,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `jx-markdown.md`
 
+- **0.1.9-draft** (2026-08-27) — 12.8: roundtrip serialization is lossless where expressible, not total.
 - **0.1.8-draft** (2026-08-15) — Number the sections so they are addressable, and add §13 Standards Alignment.
 - **0.1.7-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.1.6-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).
@@ -183,6 +185,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `parser.md`
 
+- **0.2.10-draft** (2026-08-27) — roundtrip serialization is lossless where expressible, not total.
 - **0.2.9-draft** (2026-08-16) — §3 heading slugs normalize to NFC before casing (UAX #15) and word counts segment rather than split on whitespace (UAX #29). Closes gap:heading-slug-normalization and gap:word-segmentation.
 - **0.2.8-draft** (2026-08-16) — §3 the markdown variant and YAML media type are what hosts serve, not only what the class declares; gap:markdown-variant and gap:yaml-media-type closed.
 - **0.2.7-draft** (2026-08-15) — §9.3 records _meta.mtime as the date fallback a feed uses.
@@ -239,6 +242,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `server.md`
 
+- **0.2.21** (2026-08-27) — A rename resets any co-editing room keyed to the old path, so a shutdown flush cannot recreate the moved file.
 - **0.2.20** (2026-08-27) — Directory listing and project-wide search answer in stable path order, in both implementations.
 - **0.2.19** (2026-08-27) — The Studio API's path space is written down: server-root-relative in, project-relative out; a refactor target outside the active project is a 400, not a zero-result 200.
 - **0.2.18** (2026-08-27) — The preview origin registers the project's own components without a declaration.
@@ -273,6 +277,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `site-architecture.md`
 
+- **0.6.4-draft** (2026-08-27) — Record that collection discovery is recursive, so a subdirectory holds entries as well as co-located media.
 - **0.6.3-draft** (2026-08-27) — Reference resolution through the asset lanes is the refactor engine's contract, in both directions: a rooted ref is counted through every lane, rewritten through the lanes a build publishes, and named in the report when it cannot be written.
 - **0.6.2-draft** (2026-08-27) — Routing, layout, context and head-merge move to @jxsuite/site; standards evidence follows.
 - **0.6.1-draft** (2026-08-27) — media files open in a viewer, which is the reader the usage query was missing (§9.4).
@@ -434,6 +439,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio-ui-guidelines.md`
 
+- **0.3.16** (2026-08-27) — showPromptDialog carries an optional choice control beside its field.
 - **0.3.15** (2026-08-26) — §8.4 becomes Menus: menu-button triggers, submenus and the APG deviation; §12.1 gains the settings/menu placement.
 - **0.3.14** (2026-08-22) — Template conventions (9.4) and the gate behind them; render orchestration described as it is; custom components corrected to the two that exist.
 - **0.3.13** (2026-08-21) — Chrome ships two themes; a theme in CHROME_THEMES must have its Spectrum colour fragment registered, and the semantic token table documents the dark fallbacks with the light ramp resolved from the brand fragment.
@@ -466,6 +472,7 @@ Versions are `MAJOR.MINOR.PATCH` — **major** for a breaking change to a docume
 
 ## `studio.md`
 
+- **0.10.0-draft** (2026-08-27) — New File chooses a format rather than an extension (Other... preserves arbitrary names); a document converts between formats in place; creating in a collection source routes to New Entry.
 - **0.9.53-draft** (2026-08-27) — A rename or drag-move whose refactor report names references it could not rewrite reports a warning, not a plain success; a drag-move invalidates the usage cache like its siblings.
 - **0.9.52-draft** (2026-08-27) — Open in Browser previews the working tree through the runtime; Build Site keeps the compiler under its own verb.
 - **0.9.51-draft** (2026-08-27) — a media file opens in a Media mode that shows it and says what uses it (§4.2, §9.3, §13.4); a long run's log is a feed that outlives the run (§6).

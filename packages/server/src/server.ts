@@ -421,6 +421,7 @@ export async function createDevServer(options: {
 
         const res = await handleStudioApi(req, url, absRoot, activeProjectRoot, {
           allowedRoots,
+          onFileMoved: (absPath) => collabRegistry.handleExternalChange(absPath),
           onProjectCreated: (created) => createdRoots.push(created),
         });
         if (res) {

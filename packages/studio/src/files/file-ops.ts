@@ -379,7 +379,7 @@ export async function exportFile() {
  * @param path — the file about to be deleted or renamed.
  * @param verb — which way the references go. A rename repairs them; a delete breaks them.
  */
-async function usageLine(path: string, verb: "delete" | "rename") {
+async function usageLine(path: string, verb: "delete" | "rename" | "convert") {
   const state = isMediaFile(path) ? await loadMediaUsages(path) : await loadUsages({ path });
   const sentence = usageWarning(state, verb);
   return sentence === null ? nothing : html`<p class="dialog-consequence">${sentence}</p>`;
@@ -412,8 +412,9 @@ export async function confirmFileDelete(file: { name: string; path: string }): P
  * is there to say how much work is silently being done on the user's behalf.
  *
  * @param path — the file about to be renamed.
+ * @param verb — `"rename"`, or `"convert"` when the bytes change with the name.
  */
-export async function renamePromptMessage(path: string) {
-  const consequence = await usageLine(path, "rename");
+export async function renamePromptMessage(path: string, verb: "rename" | "convert" = "rename") {
+  const consequence = await usageLine(path, verb);
   return consequence === nothing ? undefined : html`${consequence}`;
 }

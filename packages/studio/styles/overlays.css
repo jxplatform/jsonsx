@@ -2643,6 +2643,28 @@
   line-height: 1.5;
 }
 
+/* One labelled choice inside a dialog body (`ui/choice-field.ts`) — the New File format picker and
+   the Convert target picker. Stacked rather than inline: the label reads as a question about the
+   field beneath it, and a picker beside a full-width text field wins a width fight neither should
+   be having. */
+.choice-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 12px;
+}
+.choice-row sp-picker {
+  width: 100%;
+}
+/* What a one-row choice degrades to. Sized like the picker it replaces so the dialog does not
+   change height when the project gains a second format. */
+.choice-static {
+  padding: 4px 0;
+  color: var(--fg-dim);
+  font-size: var(--spectrum-font-size-100, 14px);
+  line-height: 1.5;
+}
+
 /* A panel withholding a render because one of its own fields has focus (`panel-scheduler.ts`).
    The panel is deliberately stale — finishing your sentence beats being current — but it used to
    make that trade in silence, which is indistinguishable from a panel that has stopped working.
@@ -2820,6 +2842,8 @@
   max-height: min(60vh, 480px);
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
 /* ─── Media viewer ────────────────────────────────────────────────────────────
    A pane that SHOWS a file rather than editing one (`media/media-pane.ts`). The stage takes the
    room and the details column stays a fixed width, so the asset is the thing you are looking at

@@ -32,6 +32,51 @@ export const MARKDOWN_FORMAT: StudioFormat = {
   studio: classDef.$studio ?? null,
 };
 
+/**
+ * The parser's CSV format, hand-built rather than read off its class.
+ *
+ * It exists to be the format the creation picker and the convert command must EXCLUDE, and for the
+ * declared reason rather than by name: `Csv.parse` returns `ContentLoaderEntry[]` rows, so the
+ * class declares no `serialize` and only the `content` document kind. Reading it off the class
+ * would work today and would stop testing anything the day the class gains a serializer.
+ */
+export const CSV_FORMAT: StudioFormat = {
+  capabilities: {
+    discover: { identifier: "discover", timing: ["compiler", "server"] },
+    load: { identifier: "load", timing: ["compiler", "server"] },
+    parse: { identifier: "parse", timing: ["compiler", "server", "client"] },
+  },
+  documentKinds: ["content"],
+  exportTarget: false,
+  extensions: [".csv"],
+  mediaType: "text/csv",
+  name: "Csv",
+  remote: true,
+  studio: { icon: "table", modes: ["grid", "source"] },
+};
+
+/**
+ * A third-party content format that CAN both parse and serialize — the worked TOML example from
+ * `specs/extensions.md`.
+ *
+ * The pair with {@link CSV_FORMAT} is what proves the exclusion rule is about DOCUMENT KINDS and
+ * not about capabilities alone: this one has every capability Markdown has and is still not a
+ * conversion endpoint, because it declares `content` and never `page` or `component`.
+ */
+export const TOML_FORMAT: StudioFormat = {
+  capabilities: {
+    parse: { identifier: "parse", timing: ["compiler", "server", "client"] },
+    serialize: { identifier: "serialize", timing: ["compiler", "server", "client"] },
+  },
+  documentKinds: ["content"],
+  exportTarget: false,
+  extensions: [".toml"],
+  mediaType: "application/toml",
+  name: "Toml",
+  remote: false,
+  studio: null,
+};
+
 /** Seed the format host with the Markdown format. */
 export function seedMarkdownFormat() {
   setFormats([MARKDOWN_FORMAT]);

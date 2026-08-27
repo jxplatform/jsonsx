@@ -14,6 +14,15 @@ Packages is where you decide which building blocks a document, or the whole site
 
 ![The Packages panel showing a package section with per-component checkboxes](../../images/imports-panel.png)
 
+## Opening a project that has never been installed
+
+When you open a project whose `node_modules` is missing, Studio runs `bun install` for you behind a
+progress dialog before the editor loads, so component and format resolution see the real dependency
+tree rather than an empty one. When that install runs, Studio re-reads the project's
+[extensions](/docs/extending/extensions/formats) afterwards, which is what puts `Markdown` in the
+[New File format picker](/docs/studio/interface#creating-a-file) on a project you have just cloned
+rather than in the session after.
+
 ## Two contexts
 
 The panel follows whatever document is focused, and its header says so, reading **PACKAGES · document**:

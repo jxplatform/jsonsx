@@ -238,6 +238,7 @@ import { registerPreferencesCommands } from "./settings/preferences-dialog";
 import { registerAboutCommands } from "./about/about-modal";
 import { registerCollabCommands } from "./collab/collab-commands";
 import { registerLibraryCommands } from "./browse/library-commands";
+import { registerFileFormatCommands } from "./format/convert-file";
 import { registerPublishCommands } from "./publish/publish-commands";
 import { registerGridViewCommands } from "./grid/grid-panel";
 import { registerRedirectsCommands } from "./grid/redirects-grid";
@@ -1508,6 +1509,7 @@ registerGridCommands(commandRegistry);
 registerSettingsCommands(commandRegistry);
 registerPreferencesCommands(commandRegistry);
 registerLibraryCommands(commandRegistry);
+registerFileFormatCommands(commandRegistry);
 registerContentCommands(commandRegistry);
 /* The four translation verbs: open a sibling translation, create the missing one, show the
    Languages panel, declare a language. `i18n.switchLocale` is deliberately not among them — it sets

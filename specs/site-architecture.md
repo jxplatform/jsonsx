@@ -2,7 +2,7 @@
 
 ## File-Based Routing, Content Collections, Layouts, and Static Site Generation
 
-**Version:** 0.6.3-draft
+**Version:** 0.6.4-draft
 **Status:** Partial
 **Updated:** 2026-08-27
 **License:** MIT
@@ -754,6 +754,7 @@ content/                         # Schemas live in project.json `content`
 - `format` names a **format class** from the project `imports` map (e.g. `"Markdown"`, `"Csv"`) — see specs/extensions.md. `"json"` is the only built-in. When omitted, the format is derived from the source file extension via the format registry; directory sources require an explicit `format`.
 - Remote `http(s)` sources require an explicit `format` whose class declares `"remote": true` (e.g. `Csv`). There is no implicit remote format.
 - For directory-based collections, the format class's `discover` capability lists entry files; each file is one entry
+- Discovery is **recursive**: a document in a subdirectory of the source (`content/blog/2026/hello.md`) is an entry of that collection, while a co-located media file in the same subdirectory is not — an entry is a file whose extension the collection's format claims
 - For file-based collections (single CSV or JSON file as `source`), one file contains many entries
 - Media can be co-located next to content entries
 - The collection directory name matches the key in the `content` section of `project.json`
@@ -2685,6 +2686,7 @@ This spec builds on existing Jx primitives wherever possible:
 
 ## Changelog
 
+- **0.6.4-draft** (2026-08-27) — Record that collection discovery is recursive, so a subdirectory holds entries as well as co-located media.
 - **0.6.3-draft** (2026-08-27) — Reference resolution through the asset lanes is the refactor engine's contract, in both directions: a rooted ref is counted through every lane, rewritten through the lanes a build publishes, and named in the report when it cannot be written.
 - **0.6.2-draft** (2026-08-27) — Routing, layout, context and head-merge move to @jxsuite/site; standards evidence follows.
 - **0.6.1-draft** (2026-08-27) — media files open in a viewer, which is the reader the usage query was missing (§9.4).

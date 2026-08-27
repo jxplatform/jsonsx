@@ -59,17 +59,18 @@ The same answer is reachable by name: **Find Usages** in the command palette, or
 The count separates **pages** from **other files** on purpose. A component used only inside another component has not been placed on your site yet; a component used on seven pages is load-bearing.
 :::
 
-### Before you delete or rename
+### Before you delete, rename or convert
 
-Every delete and rename confirmation carries that same count, so you can see what an action breaks before you take it, not after.
+Every delete, rename and convert confirmation carries that same count, so you can see what an action breaks before you take it, not after.
 
 - **Deleting** a file tells you how many references stop resolving, and that the files holding them stay exactly where they are. Only the references break.
 - **Renaming** a file tells you how many references will be **updated automatically**. Studio rewrites them across the project, in pages, layouts, components, `project.json`, and the front matter of content entries. For a component it renames the element tag to match the new filename too.
+- **[Converting](/docs/studio/interface#converting-a-file-to-another-format)** a file to another format tells you the same, in its own words: those references are repaired, but the file itself is not the file it was, so the rename's "nothing else changes" would be untrue. It adds what the file is becoming, and whether it will read back identically.
 
 If Studio cannot count (a backend without project search), the confirmation says so rather than showing a zero. "We could not check" and "nothing uses this" are never displayed as the same thing.
 
 :::doc-note
-A handful of files can be read but not written back: a CSV content collection, for instance, is a data source Studio loads entries from rather than a document it round-trips. A reference living in one still counts toward what a delete would break, and a rename that could not update it says so, reporting a **warning** that names the files instead of a plain "Renamed", so you know where to look. Dragging a file to a new folder in the Files panel does the same refactor, and reports the same way.
+A handful of files can be read but not written back: a CSV content collection, for instance, is a data source Studio loads entries from rather than a document it round-trips. A reference living in one still counts toward what a delete would break, and a rename that could not update it says so, reporting a **warning** that names the files instead of a plain "Renamed", so you know where to look. Dragging a file to a new folder in the Files panel does the same refactor, and reports the same way, as does converting one to another format.
 :::
 
 ## Which one do I want?

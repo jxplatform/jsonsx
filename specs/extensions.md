@@ -2,9 +2,9 @@
 
 ## Extension Packages, Schema Composition, and the Capability Contract
 
-**Version:** 0.4.0-draft
+**Version:** 0.4.1-draft
 **Status:** Partial
-**Updated:** 2026-08-26
+**Updated:** 2026-08-27
 **License:** MIT
 
 Supersedes v1 ("Format-Extension Classes and the Capability Contract"). The
@@ -530,22 +530,42 @@ All capability methods are `scope: "static"` — hosts call them on the
 implementation class without constructing an instance. The instance
 `resolve()` method remains the runtime's on-demand access path.
 
-| Role             | Block       | Signature                                                                   | Consumers                                                                          |
-| ---------------- | ----------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| `parse`          | `format`    | `(source, options?) → JxDocument`                                           | compiler, server, studio (open file)                                               |
-| `serialize`      | `format`    | `(doc, options?) → string`                                                  | studio (save), site build (export sidecars)                                        |
-| `discover`       | `format`    | `(source, { baseDir }) → string[]`                                          | content loading (list entry files)                                                 |
-| `load`           | `format`    | `(path, { schema, directiveOptions }) → ContentLoaderEntry[]`               | content loading (parse one source)                                                 |
-| `projectData`    | `project`   | `(sectionValue, { projectConfig, root, registry, io }) → unknown`           | compiler site build, dev server resolve — result stored as `_project[<key>]`       |
-| `resolvePaths`   | `project`   | `(pathsDef, { data, projectConfig, root }) → Record<string, unknown>[]`     | pages discovery (`$paths` expansion), studio preview                               |
-| `lower`          | any         | `(def, context) → JxStateDefinition`                                        | compiler — rewrites a state def into a core shape for client output                |
-| `emit`           | `project`   | `(sectionValue, { projectConfig, root, sections, routes }) → EmitFile[]`    | compiler site build — writes derived assets into the build output (§8.4)           |
-| `assets`         | `project`   | `(sectionValue, { projectConfig, root }) → AssetMount[]`                    | compiler site build, dev server — publishes source directories at site URLs (§8.5) |
-| `mount`          | `server`    | `(options, ctx) → (request: Request, env) => Promise<Response>`             | generated site worker, dev server                                                  |
-| `dialect`        | `connector` | `(connection, env) → Kysely Dialect`                                        | data mounts, auth, deploy                                                          |
-| `deploySchema`   | `connector` | `(tables, connection, { env, dryRun }) → { statements, applied, warnings }` | `jx db push`, studio push                                                          |
-| `bindings`       | `connector` | `(connection) → wrangler config fragment`                                   | scaffolding, `jx db push`                                                          |
-| `testConnection` | `connector` | `(connection, env) → { ok, error? }`                                        | studio connections UI, CLI                                                         |
+| Role           | Block       | Signature                                                                   | Consumers                                                                          |
+| -------------- | ----------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `parse`        | `format`    | `(source, options?) → JxDocument \| ContentLoaderEntry[]`                   | compiler, server, studio (open file, convert a file)                               |
+| `serialize`    | `format`    | `(doc, options?) → string`                                                  | studio (save, create a file, convert a file), site build (export sidecars)         |
+| `discover`     | `format`    | `(source, { baseDir }) → string[]`                                          | content loading (list entry files)                                                 |
+| `load`         | `format`    | `(path, { schema, directiveOptions }) → ContentLoaderEntry[]`               | content loading (parse one source)                                                 |
+| `projectData`  | `project`   | `(sectionValue, { projectConfig, root, registry, io }) → unknown`           | compiler site build, dev server resolve — result stored as `_project[<key>]`       |
+| `resolvePaths` | `project`   | `(pathsDef, { data, projectConfig, root }) → Record<string, unknown>[]`     | pages discovery (`$paths` expansion), studio preview                               |
+| `lower`        | any         | `(def, context) → JxStateDefinition`                                        | compiler — rewrites a state def into a core shape for client output                |
+| `emit`         | `project`   | `(sectionValue, { projectConfig, root, sections, routes }) → EmitFile[]`    | compiler site build — writes derived assets into the build output (§8.4)           |
+| `assets`       | `project`   | `(sectionValue, { projectConfig, root }) → AssetMount[]`                    | compiler site build, dev server — publishes source directories at site URLs (§8.5) |
+| `mount`        | `server`    | `(options, ctx) → (request: Request, env) => Promise<Response>`             | generated site worker, dev server                                                  |
+| `dialect`      | `connector` | `(connection, env) → Kysely Dialect`                                        | data mounts, auth, deploy                                                          |
+| `deploySchema` | `connector` | `(tables, connection, { env, dryRun }) → { statements, applied, warnings }` | `jx db push`, studio push                                                          |
+| `bindings`     | `connector` | `(connection) → wrangler config fragment`                                   | scaffolding, `jx db push`                                                          |
+
+**What `parse` returns is decided by `documentKinds`, not by a second declaration.** A format
+declaring `page` or `component` returns a `JxDocument`: the compiler builds its page and component
+globs from `documentExtensions("page"|"component")` and casts every `parse` result, so the claim is
+already load-bearing in the build. A format declaring only `content` makes no such claim, and may
+return `ContentLoaderEntry[]` — the parser's `Csv` does exactly that, which is why it declares no
+`serialize`.
+
+Studio reads the pair to answer two questions it used to have no answer for:
+
+- **Creation.** A format is offered in the New File dialog when some registered class declares BOTH
+  `parse` and `serialize` for its extension (per `(extension, capability)`, so a split claim across
+  two classes counts). Without `parse` the file cannot be opened after it is created; without
+  `serialize` its first save writes another format's bytes into it.
+- **Conversion.** A format is a conversion endpoint when it declares both capabilities AND a `page`
+  or `component` document kind. `.json` is the endpoint every conversion shares, because a registry
+  never claims it (studio.md §8.4).
+
+Declaring both capabilities is therefore the whole of what a third-party format extension has to do
+to appear in both surfaces; neither carries a list of format names.
+| `testConnection` | `connector` | `(connection, env) → { ok, error? }` | studio connections UI, CLI |
 
 `resolvePaths` methods declare a `"discriminator"` — the `$paths` key that
 routes to them (parser: `contentType`). Hosts dispatch on which discriminator
@@ -1144,6 +1164,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.4.1-draft** (2026-08-27) — Studio conversion and creation are parse/serialize consumers; what parse returns is decided by documentKinds.
 - **0.4.0-draft** (2026-08-26) — §8.4: an emitter must not emit the same content twice — the search index carries page preamble plus sections, not the corpus twice.
 - **0.3.11-draft** (2026-08-25) — §8.5: record that a host which cannot execute extension code sees only content-section mounts.
 - **0.3.10-draft** (2026-08-20) — §5.1 records the first-party fragment $id shape, https://jxsuite.com/schema/ext/<extension>/<kind>/v<n>.
@@ -1171,4 +1192,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx Extensions Specification v0.4.0-draft_
+_Jx Extensions Specification v0.4.1-draft_

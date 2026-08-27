@@ -1,8 +1,8 @@
 # Jx Markdown Specification
 
-**Version:** 0.1.8-draft
+**Version:** 0.1.9-draft
 **Status:** Partial
-**Updated:** 2026-08-15
+**Updated:** 2026-08-27
 **License:** MIT
 
 ---
@@ -431,7 +431,7 @@ Inverse of `expandStylePaths` — strips `:` and `@` prefixes before flattening.
 
 Converts a Jx JSON document back to markdown source (`@jxsuite/parser/serialize`). Two modes:
 
-- `mode: "roundtrip"` (default) — lossless: YAML frontmatter from non-children doc keys, non-markdown elements emitted as directives with collapsed dot-path attributes. Inverse of `transpileJxMarkdown()`.
+- `mode: "roundtrip"` (default) — lossless for everything it can express: YAML frontmatter from non-children doc keys, non-markdown elements emitted as directives with collapsed dot-path attributes. Inverse of `transpileJxMarkdown()`. It is not TOTAL: a `tagName` chosen at render time cannot be expressed at all and throws, naming the candidates it saw.
 - `mode: "export"` — lossy clean GFM: Jx decoration stripped, wrapper tags unwrapped, custom elements inlined via injected `componentDefs`, template strings evaluated via injected hooks. Used by site builds for `.md` export sidecars.
 
 This is the single Jx→markdown serializer — the studio and the compiler both dispatch to it through the `Markdown` format class.
@@ -446,6 +446,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.1.9-draft** (2026-08-27) — 12.8: roundtrip serialization is lossless where expressible, not total.
 - **0.1.8-draft** (2026-08-15) — Number the sections so they are addressable, and add §13 Standards Alignment.
 - **0.1.7-draft** (2026-07-22) — Proper spec versioning (`fb0f3ec7`).
 - **0.1.6-draft** (2026-07-22) — Machine-readable spec status vocabulary + generated status page (`79daba23`).

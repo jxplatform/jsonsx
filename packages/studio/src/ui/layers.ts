@@ -15,10 +15,12 @@
 import { html, render as litRender, nothing } from "lit-html";
 import { ref } from "lit-html/directives/ref.js";
 import { repeat } from "lit-html/directives/repeat.js";
+import { choiceField } from "./choice-field";
 import { overlayRegion, REGION_ATTR } from "./regions";
 import { dismiss, toasts } from "../services/notify";
 import { activeRegistry } from "../commands/active-registry";
 import { effect, effectScope } from "../reactivity";
+import type { ChoiceOption } from "./choice-field";
 import type { Notification, Severity } from "../services/notify";
 import type { EffectScope } from "@vue/reactivity";
 import type { TemplateResult } from "lit-html";
@@ -338,6 +340,31 @@ export function showSaveDiscardDialog(
   );
 }
 
+/**
+ * A picker rendered above the field, whose selection the dialog OWNS.
+ *
+ * Owned, not merely displayed: the choice reaches `validate` as its second argument, and picking a
+ * row re-runs it. That is the whole reason this lives here rather than being smuggled in through
+ * `message` — `check` and `rerender` are private to {@link showPromptDialog}, so a caller-built
+ * control could change the selection but could never make the field's refusal catch up with it. The
+ * New File dialog's format picker is exactly that case: switching from Markdown to JSON changes
+ * whether the typed name is already taken, with no keystroke to notice.
+ */
+export interface PromptChoice {
+  /** Label above the picker. */
+  label: string;
+  /**
+   * The rows, re-read on EVERY render rather than captured once. A snapshot taken when the options
+   * object is built freezes a list the project can still be loading — the same defect
+   * `content/entry-commands.ts`'s `derivedEnumProperty` exists to prevent one layer up.
+   */
+  options: () => readonly ChoiceOption[];
+  /** Which row starts selected. */
+  initial: string;
+  /** Told what was picked, for a caller keeping its own derived state. */
+  onChange?: (next: string) => void;
+}
+
 /** Options accepted by {@link showPromptDialog}. */
 export interface PromptDialogOptions {
   /** Label on the confirming button. */
@@ -346,17 +373,21 @@ export interface PromptDialogOptions {
   cancelLabel?: string;
   /** Explanatory copy rendered above the text field. */
   message?: string | TemplateResult;
-  /** Placeholder shown while the field is empty. */
-  placeholder?: string;
+  /** Placeholder shown while the field is empty. Read on every render, so it may follow the choice. */
+  placeholder?: string | (() => string);
   /** How much of the pre-filled value to select once the field takes focus. */
   select?: "all" | "stem" | "none";
   /**
    * Validate the raw field value. Return an empty string when valid, or a message to show as
    * negative help text (which also blocks confirmation). Defaults to "must not be blank".
+   *
+   * `chosen` is the {@link PromptChoice} selection, or `""` when the dialog offers no choice.
    */
-  validate?: (value: string) => string;
+  validate?: (value: string, chosen: string) => string;
   /** Pre-filled value. */
   value?: string;
+  /** A picker above the field whose selection this dialog owns. */
+  choice?: PromptChoice;
 }
 
 /**
@@ -375,6 +406,7 @@ export function showPromptDialog(
 ): Promise<string | null> {
   const {
     cancelLabel = "Cancel",
+    choice,
     confirmLabel = "OK",
     message,
     placeholder = "",
@@ -384,12 +416,22 @@ export function showPromptDialog(
   } = opts;
 
   const check = (candidate: string) =>
-    validate ? validate(candidate) : candidate.trim() ? "" : "Enter a value.";
+    validate ? validate(candidate, chosen) : candidate.trim() ? "" : "Enter a value.";
 
   let value = initialValue;
+  let chosen = choice?.initial ?? "";
   let error = "";
   let wrapperEl: HTMLElement | null = null;
   let focusRequested = false;
+  /*
+   * Whether the reader has typed yet.
+   *
+   * A dialog opens with a valid prefill and NO error, and picking a format must not be the thing
+   * that first paints one under a field nobody has touched — "untitled" is not yet a mistake. So a
+   * pick refreshes an error that is already showing and never mints the first one; the confirm
+   * still refuses, because `confirm()` runs `check` unconditionally.
+   */
+  let touched = false;
 
   return showDialog<string | null>((done) => {
     function rerender() {
@@ -411,12 +453,30 @@ export function showPromptDialog(
     }
 
     function onInput(e: Event) {
+      touched = true;
       value = (e.target as HTMLInputElement).value || "";
       const next = check(value);
       if (next !== error) {
         error = next;
         rerender();
       }
+    }
+
+    /**
+     * Take a pick, and re-render UNCONDITIONALLY.
+     *
+     * `onInput` re-renders only when the error string changed, which is right for a keystroke: the
+     * template it would rebuild is identical. A pick is not that. It can change the placeholder,
+     * the picker's own selected row, and — for the New File dialog — whether the composed filename
+     * is already taken, all with the error text unchanged. Comparing error strings here would leave
+     * a dialog showing "about.md already exists" after the reader switched the format to JSON.
+     */
+    function onPick(next: string) {
+      chosen = next;
+      choice?.onChange?.(next);
+      const candidate = check(value);
+      error = touched || error ? candidate : "";
+      rerender();
     }
 
     function onKeydown(e: KeyboardEvent) {
@@ -472,9 +532,27 @@ export function showPromptDialog(
             // Spectrum resets <p> margins to 0, so without this the copy sits flush on the field.
             message ? html`<p style="margin:0 0 8px">${message}</p>` : nothing
           }
+          ${
+            /*
+             * Above the field, and in ONE template position in every mode.
+             *
+             * The `sp-textfield` below must never move or be rebuilt by a conditional branch: lit
+             * would commit a new element, `onFieldRef` would fire again, the `focusRequested` latch
+             * would refuse to re-focus it, and the caret would be stranded mid-name. Only the
+             * placeholder, the validation rules and the help text vary between modes.
+             */
+            choice
+              ? choiceField({
+                  label: choice.label,
+                  onChange: onPick,
+                  options: choice.options(),
+                  value: chosen,
+                })
+              : nothing
+          }
           <sp-textfield
             style="width:100%"
-            placeholder=${placeholder}
+            placeholder=${typeof placeholder === "function" ? placeholder() : placeholder}
             value=${value}
             ?invalid=${Boolean(error)}
             @input=${onInput}

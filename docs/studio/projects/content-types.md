@@ -8,6 +8,7 @@ code:
   - packages/studio/src/content/entry-editor.ts
   - packages/studio/src/content/entry-fields.ts
   - packages/studio/src/content/entry-commands.ts
+  - packages/studio/src/content/collection-match.ts
   - packages/studio/src/browse/library-model.ts
   - packages/studio/src/browse/library-pane.ts
   - extensions/parser/src/Content.class.json
@@ -57,6 +58,12 @@ With a type selected, edit its name in the editor's header to rename it, or clic
 The [Library](/docs/studio/projects/browse)'s **New** menu lists a row for every content type you have defined, each naming the folder its entries live in. Pick the type, type a file name carrying the collection's extension (`spring-menu.md`), and Studio writes the file into that folder and opens it. Entries then appear in the Library under the **Content** category, labeled with the type they belong to.
 
 **New Entry** (`content.newEntry`) is the collection-scoped version of the same thing, and it does two things the generic route cannot: it names the file with the collection's **own extension**, so the entry is actually matched by the collection it was created in, and it **seeds the fields from the schema**, so the entry is valid the moment it exists rather than being a pile of absent required fields. It opens the new entry in the form below.
+
+**The Files tree knows about this too.** Right-click a content type's folder and choose **New File…**: because that folder belongs to a collection, you get the New Entry flow (the collection's extension, the seeded fields, and the entry form) rather than a blank document. In a **subfolder** of it the format picker is locked to the collection's extension instead, because a document there is still one of its entries but the images and notes beside them are not; the picker's **Other…** row still creates those. What it will not accept is a document of a different format, which the collection would discover as an entry it cannot read.
+
+A **localized** collection (a `{locale}` in its source) has no single folder to create into, so **New Entry** asks you to open the folder for the language you are writing in and create the entry there.
+
+An entry is also not something you can convert: **Convert Format…** is not offered inside a content type's folder, in either direction. Changing the format of one entry would remove it from the collection; the collection's format belongs to the type, and you change it here.
 
 Seeded means:
 

@@ -216,6 +216,35 @@ export function enumProperty(declared: readonly string[], description: string): 
   return { description, enum: [...declared], type: "string" };
 }
 
+/**
+ * An enum property whose values are derived WHEN THE SCHEMA IS READ, not when the record is
+ * defined.
+ *
+ * `enumProperty(collections(), …)` looks identical and is wrong for anything a PROJECT supplies,
+ * and the difference is invisible in a unit test: a command record is built at module scope —
+ * `commands/app-commands.ts` and `studio.ts` both build theirs before a project is open — so the
+ * array freezes at `[]`, and `panels/quick-search.ts`'s `paletteArgs` offers an empty choice list
+ * forever after. `run` re-derives the list, which is why the programmatic call works and the
+ * palette does not: two answers to "what is there", one of them a snapshot of the empty boot
+ * state.
+ *
+ * A getter is the whole fix — the palette reads `property.enum` when it opens the prompt, the AI
+ * tool's parameters serialise it when the tool list is built, and `scripts/check-shot-contract.ts`
+ * reads it in a bare Bun process where the honest answer really is "none declared".
+ */
+export function derivedEnumProperty(
+  declared: () => readonly string[],
+  description: string,
+): object {
+  return {
+    description,
+    get enum() {
+      return [...declared()];
+    },
+    type: "string",
+  };
+}
+
 /** A number property, optionally bounded — the bounds a control already enforces, written down. */
 export function numberProperty(
   description: string,

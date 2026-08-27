@@ -4,8 +4,8 @@
  * These are all side-effect-free functions used by style/properties/events panels.
  */
 
-import { defaultContentFormat, formatByName } from "../format/format-host";
-import type { ContentSectionEntry } from "../types";
+import { collectionForFile } from "../content/collection-match";
+import { defaultContentFormat } from "../format/format-host";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 
 /**
@@ -118,15 +118,6 @@ export function abbreviateValue(val: string) {
 }
 
 /**
- * The placeholder a content type's `source` may carry to say "one directory per locale".
- *
- * Held here rather than imported out of the parser extension's content loader ({@link
- * file://../../../../extensions/parser/src/content-loader.ts}): that module reads the filesystem
- * and this one runs in a browser. It is also an extension, and core may not import one.
- */
-const LOCALE_PLACEHOLDER = "{locale}";
-
-/**
  * True when a schema `format` names a MEDIA reference.
  *
  * Two spellings, and both are real. `"uri-reference"` is JSON Schema's own and the one the spec
@@ -184,8 +175,14 @@ export function inferInputType(entry: Record<string, unknown>) {
 }
 
 /**
- * Match a document path to a content type and return its schema. Compares the content type's
- * `source` directory against the document path prefix, using `format` for extension matching.
+ * Match a document path to a content type and return its schema.
+ *
+ * Delegates to `content/collection-match.ts`, which is the ONE matcher — the reason it takes a
+ * config rather than reading `projectState`. Two rules are added here and belong here, because they
+ * are about the FORM rather than about membership: a collection that declares no `schema` has no
+ * fields to draw, and a file whose extension is not the collection's is not one of its entries.
+ * Membership itself — the `{locale}` expansion, the recursive subdirectory, the single-file
+ * catalogue, longest-source-wins — is the matcher's, and is no longer restated here.
  *
  * @param {string | null} documentPath — project-relative path (e.g. "content/products/widget.md")
  * @param {ProjectConfig | null | undefined} projectConfig — parsed project.json
@@ -198,47 +195,20 @@ export function findContentTypeSchema(
   if (!documentPath || !projectConfig?.content) {
     return null;
   }
-  // Content-type `source` prefixes are always forward-slash. The desktop platform can hand us
-  // OS-native backslash paths on Windows, so normalize before prefix matching.
-  const docPath = documentPath.replaceAll("\\", "/");
-  for (const [name, def] of Object.entries(
-    projectConfig.content as Record<string, ContentSectionEntry>,
-  )) {
-    if (!def.source || !def.schema) {
-      continue;
-    }
-    const src = def.source.replace(/^\.\//, "").replace(/\/$/, "");
-    const hasExt = src.includes(".") && !src.endsWith("/") && !src.includes(LOCALE_PLACEHOLDER);
-    if (hasExt) {
-      if (docPath === src || docPath.endsWith(`/${src}`)) {
-        return { name, schema: def.schema };
-      }
-    } else {
-      const ext =
-        def.format === "json"
-          ? ".json"
-          : (formatByName(def.format)?.extensions[0] ??
-            defaultContentFormat()?.extensions[0] ??
-            ".json");
-      /* A localized source is N directories, one content type: `content/posts/{locale}` matches
-         `content/posts/fr/hello.md` and carries the SAME schema, because a translation is the same
-         post. Without this the placeholder was compared literally, matched no path anybody has, and
-         a translated entry showed no frontmatter fields at all. */
-      const prefix = src.includes(LOCALE_PLACEHOLDER)
-        ? new RegExp(
-            `^${src
-              .split(LOCALE_PLACEHOLDER)
-              .map((part) => part.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`))
-              .join("[^/]+")}/`,
-          )
-        : null;
-      const matches = prefix ? prefix.test(docPath) : docPath.startsWith(`${src}/`);
-      if (matches && docPath.endsWith(ext)) {
-        return { name, schema: def.schema };
-      }
+  const match = collectionForFile(documentPath, projectConfig);
+  if (!match || !match.def.schema) {
+    return null;
+  }
+  /* A single-file source is matched AS that file, so its extension is settled by construction.
+     A directory-backed one is not: a `.json` sitting beside `.md` posts is somebody else's file,
+     and drawing the collection's fields over it would invite edits nothing will ever read. */
+  if (!match.fileBacked) {
+    const ext = match.ext ?? defaultContentFormat()?.extensions[0] ?? ".json";
+    if (!documentPath.toLowerCase().endsWith(ext.toLowerCase())) {
+      return null;
     }
   }
-  return null;
+  return { name: match.name, schema: match.def.schema };
 }
 
 /**

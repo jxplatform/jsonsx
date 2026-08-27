@@ -23,6 +23,8 @@ import {
   testFile,
 } from "./harness";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { setFormats } from "../src/format/format-host";
+import { MARKDOWN_FORMAT, mockFormatAction } from "./format-fixture";
 import { initLayers } from "../src/ui/layers";
 import { problems, resetNotifications } from "../src/services/notify";
 import { activities, resetActivities } from "../src/panels/activity-panel";
@@ -605,8 +607,18 @@ describe("layouts", () => {
     menu.value = "layout";
     menu.dispatchEvent(new Event("change", { bubbles: true }));
     await flush();
+    /* A layout takes a FIXED `.json`, and that is not a policy: both readers of a layout parse it
+       as JSON and neither dispatches through the format registry (`site/layout-resolver.ts` throws,
+       `site-context.ts` returns null), so a `.md` layout is a file the build cannot load. There is
+       no `"layout"` document kind for a format to declare, so it is stated rather than derived. */
     expect(created).toEqual([
-      { dir: "layouts", source: "Library", suggestedName: "untitled", title: "New Layout" },
+      {
+        dir: "layouts",
+        format: { ext: ".json", kind: "fixed" },
+        source: "Library",
+        suggestedName: "untitled",
+        title: "New Layout",
+      },
     ]);
   });
 
@@ -770,13 +782,55 @@ describe("creation", () => {
   test("a document kind goes through the SHARED flow and opens the result", async () => {
     await mount();
     const path = await createLibraryEntry("page");
-    // No `ext`: the field takes the typed name verbatim, because a page may be a `.md` as easily
-    // As a `.json` and that is the author's choice to make. Contrast the collection row below.
+    /* A picker, not a fixed extension: a page may be a `.md` as easily as a `.json` and that is the
+       author's choice to make — now offered rather than typed from memory. `docKind` narrows it to
+       the formats that declare they can BE a page. Contrast the collection row below, whose
+       extension is not a choice at all. */
     expect(created).toEqual([
-      { dir: "pages", source: "Library", suggestedName: "untitled", title: "New Page" },
+      {
+        dir: "pages",
+        format: { defaultExt: ".json", docKind: "page", kind: "choose" },
+        source: "Library",
+        suggestedName: "untitled",
+        title: "New Page",
+      },
     ]);
     expect(path).toBe("pages/new-thing.json");
     expect(opened).toEqual(["pages/new-thing.json"]);
+  });
+
+  /**
+   * The Library's own seed, and the reason it is not a hand-written `---\ntagName: …\n---`.
+   *
+   * Markdown's `newFileTemplate` carries no `tagName`, so a `.md` component created from it
+   * satisfies neither `$studio.documentMode.componentWhen` nor the build's tag registration — a
+   * file nothing loads, which is the defect `libraryNewEntries` exists to prevent. The seed goes
+   * through the FORMAT's own serializer, because this module knows no format's syntax.
+   */
+  test("a markdown component is seeded with its tag, through the format's own serializer", async () => {
+    await mount();
+    setFormats([MARKDOWN_FORMAT]);
+    installMockPlatform({ formatAction: mockFormatAction } as never);
+    await createLibraryEntry("component");
+    const seed = (created[0] as { content: (ext: string, name: string) => Promise<unknown> })
+      .content;
+    expect(await seed(".md", "my-card.md")).toContain("tagName");
+    // `.json` takes the shared blank document; there is no format to ask.
+    expect(await seed(".json", "my-card.json")).toBeUndefined();
+    // A stem that cannot BE a custom-element name carries no tag, and the author names it by hand.
+    expect(await seed(".md", "card.md")).toBeUndefined();
+  });
+
+  test("a serializer that throws is not a reason to refuse the creation", async () => {
+    // The serializer belongs to the PROJECT. Its failure costs the tag, not the file: the format's
+    // Own template still produces something the author can finish by hand.
+    await mount();
+    setFormats([MARKDOWN_FORMAT]);
+    installMockPlatform({ formatAction: () => Promise.reject(new Error("boom")) } as never);
+    await createLibraryEntry("component");
+    const seed = (created[0] as { content: (ext: string, name: string) => Promise<unknown> })
+      .content;
+    expect(await seed(".md", "my-card.md")).toBeUndefined();
   });
 
   test("a collection row is content/'s createEntry — the collection's extension and a SEEDED body", async () => {
@@ -785,7 +839,7 @@ describe("creation", () => {
     expect(created).toHaveLength(1);
     const request = created[0] as Record<string, unknown>;
     expect(request.dir).toBe("content");
-    expect(request.ext).toBe(".json");
+    expect(request.format).toEqual({ ext: ".json", kind: "fixed" });
     // "Content", not "Library": the creation really is the content module's, and a Problem from it
     // Has to name the surface that can explain it.
     expect(request.source).toBe("Content");
