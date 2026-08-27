@@ -34,6 +34,7 @@ beforeAll(async () => {
   writeFileSync(join(FIXTURES, "project.json"), JSON.stringify({ name: "test-project" }));
   writeFileSync(join(FIXTURES, "hello.txt"), "Hello World");
   mkdirSync(join(FIXTURES, "subdir"), { recursive: true });
+  mkdirSync(join(FIXTURES, "ordered"), { recursive: true });
   writeFileSync(join(FIXTURES, "subdir", "nested.json"), '{"key": "value"}');
 
   server = Bun.spawn(["bun", "run", join(import.meta.dir, "_rpc-server.ts"), FIXTURES], {
@@ -101,6 +102,30 @@ describe("chromium RPC server", () => {
     expect(names).toContain("hello.txt");
     expect(names).toContain("subdir");
     expect(names).toContain("project.json");
+    ws.close();
+  });
+
+  /*
+   * Order is part of the answer, not a detail of it.
+   *
+   * `readdir` reports in filesystem order, which varies with a directory's write history. Studio's
+   * collection grid inserts rows in listing order deliberately, so an unsorted listing reaches the
+   * user as a table that reshuffles itself between opens. The dev server answers this route too
+   * (`byPathOrder` in `@jxsuite/server`), and a guarantee only one implementation honours is not a
+   * guarantee — the desktop app is the end-user path to Studio.
+   */
+  test("listDirectory answers in stable path order", async () => {
+    const ws = await connect();
+    const names = ((await rpc(ws, "listDirectory", { dir: "." })) as DirEntry[]).map((e) => e.path);
+    expect(names).toEqual(names.toSorted());
+    // Written in an order no filesystem is likely to return, so a pass means the sort ran rather
+    // Than that the directory happened to agree with it.
+    const dir = "ordered";
+    for (const name of ["zulu.md", "alpha.md", "mike.md", "bravo.md"]) {
+      writeFileSync(join(FIXTURES, dir, name), "x");
+    }
+    const listed = ((await rpc(ws, "listDirectory", { dir })) as DirEntry[]).map((e) => e.name);
+    expect(listed).toEqual(["alpha.md", "bravo.md", "mike.md", "zulu.md"]);
     ws.close();
   });
 

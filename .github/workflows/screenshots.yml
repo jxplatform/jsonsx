@@ -268,9 +268,9 @@ jobs:
       # picture that moved, an encoder that does not repeat itself.
       #
       # Without it the same run keeps every image whose pixel diff is under `DIFF_THRESHOLD`
-      # (0.0001 — about 920 px of a 3840x2400 frame, sized in shot.ts against the thinnest surface
-      # this pipeline has to keep honest), so `git diff` becomes an honest proxy for "the picture
-      # moved" and a run with nothing to say pushes nothing.
+      # (0.01 — about 1 % of the frame, sized in shot.ts against a measured sample of what this
+      # lane actually rewrote once `--force` was gone), so `git diff` becomes an honest proxy for
+      # "the picture moved" and a run with nothing to say pushes nothing.
       # Which shots this diff can actually change. A shot names the project it opens, so a change
       # confined to project roots cannot move any other picture; anything touching Studio, the
       # runner or the manifest can move all of them and runs everything. Unknown paths FAIL OPEN.

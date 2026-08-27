@@ -948,6 +948,38 @@ describe("files — listing", () => {
     const res = await callApi(req, url, FIXTURES);
     expect(res.status).toBe(400);
   });
+
+  /*
+   * Order is part of the answer, not a detail of it.
+   *
+   * `readdir` and `Bun.Glob.scan` both report in filesystem order, which varies with the history of
+   * writes to the directory. `content-source.ts` inserts collection rows in listing order on
+   * purpose — so that a concurrent read cannot decide it — which makes an unsorted listing reach
+   * the user as a grid that reshuffles itself between opens, and reached the docs as
+   * `blog-grid.png` rewriting itself 15 times in ten days.
+   *
+   * Written in an order no filesystem is likely to return, so a passing assertion means the sort
+   * ran rather than that the directory happened to agree with it.
+   */
+  test("answers in a stable order, whatever order the filesystem reports", async () => {
+    const dir = join(FIXTURES, "ordered");
+    // Removed here rather than in an afterAll: `_studio_fixtures` holds COMMITTED fixtures, and the
+    // Process-exit sweep that would otherwise clean this up takes the whole directory with it.
+    rmSync(dir, { force: true, recursive: true });
+    mkdirSync(dir, { recursive: true });
+    for (const name of ["zulu.md", "alpha.md", "mike.md", "bravo.md"]) {
+      writeFileSync(join(dir, name), "x", "utf8");
+    }
+    const read = async (query: string) => {
+      const url = new URL(`http://localhost/__studio/files?dir=${dir}${query}`);
+      const res = await callApi(new Request(url, { method: "GET" }), url, FIXTURES);
+      const listed = await res.json();
+      return listed.map((f: Record<string, any>) => f.name);
+    };
+    expect(await read("")).toEqual(["alpha.md", "bravo.md", "mike.md", "zulu.md"]);
+    expect(await read("&glob=*.md")).toEqual(["alpha.md", "bravo.md", "mike.md", "zulu.md"]);
+    rmSync(dir, { force: true, recursive: true });
+  });
 });
 
 // ─── project endpoint ───────────────────────────────────────────────────────

@@ -43,7 +43,7 @@ Dropping onto a component that takes a single image (a card with a cover picture
 
 Studio asks for an image or file in several places: an image's **Content** tab, a frontmatter field, and the Icon and social-image fields in **[Search appearance](/docs/studio/editing/frontmatter)**. Every one of them has an **Upload** button beside the browse button. Click it, pick a file, and Studio adds it to the project and fills the field in for you.
 
-The browse button opens the picker: a search box over the media already in `public/`, matched on name or path, with a thumbnail for every image. It opens above whatever surface it was called from, so it works the same in a panel and in a window like Search appearance.
+The browse button opens the picker: a search box over the media already in `public/`, matched on name or path, with a thumbnail for every image. The list is in path order, so the same project always shows you the same list in the same place. It opens above whatever surface it was called from, so it works the same in a panel and in a window like Search appearance.
 
 ![The media picker popover open over an image field, showing the search field and thumbnail list](../../images/media-picker.png)
 

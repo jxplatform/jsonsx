@@ -2,7 +2,7 @@
 
 ## Platform Abstraction, Project Loading, and Component Scoping
 
-**Version:** 0.4.6-draft
+**Version:** 0.4.7-draft
 **Status:** Pending
 **Updated:** 2026-08-27
 **License:** MIT
@@ -485,6 +485,7 @@ Conventions:
 - Paths are the dev server's literal `/__studio/*` endpoints; transport-mapped backends (RPC bridges, gateway prefixes) preserve the sub-path and the request/response shapes, which live in `@jxsuite/protocol` alongside the table.
 - `STUDIO_PROTOCOL_VERSION` bumps when a route's shape changes incompatibly.
 - File search has no dedicated endpoint: `GET /__studio/files?glob=<pattern>` searches matching files project-wide (the same route that lists a directory with `?dir=`), backing `searchFiles()`.
+- Both listing shapes answer in **stable path order**, sorted by codepoint rather than locale collation so two backends agree. `readdir` and glob scans report in filesystem order, which varies with a directory's write history, and Studio's collection grid inserts rows in listing order — so an unsorted listing reaches the user as a table that reshuffles itself between opens.
 
 A few illustrative rows (see the table for the rest):
 
@@ -1271,6 +1272,7 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ## Changelog
 
+- **0.4.7-draft** (2026-08-27) — The files route answers in stable path order, in every backend.
 - **0.4.6-draft** (2026-08-27) — The PAL is project-relative in both directions; an adapter translates a request space or a reply space, never both.
 - **0.4.5-draft** (2026-08-27) — Both launchers preview the working tree live at real routes; Build Site keeps the compiler, and leaving the webview is stated to be one-way.
 - **0.4.4-draft** (2026-08-26) — the Import tab chooses how many breakpoints the project keeps, and what an import emits is normative (§4.5).
@@ -1321,4 +1323,4 @@ External standards this specification binds itself to. Vocabulary and cell gramm
 
 ---
 
-_Jx Studio Desktop Architecture Specification v0.4.6-draft_
+_Jx Studio Desktop Architecture Specification v0.4.7-draft_

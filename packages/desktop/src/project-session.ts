@@ -354,6 +354,25 @@ function extractStudioSchema(classDef: ClassJsonDef, classJsonPath: string): Stu
 
 export type ProjectSession = ReturnType<typeof createProjectSession>;
 
+/**
+ * Order a directory listing so two identical requests answer identically.
+ *
+ * `readdir` and `Bun.Glob.scan` both answer in FILESYSTEM order, which varies with the directory's
+ * internal layout and so with the history of writes to it. Studio's collection grid inserts rows in
+ * listing order on purpose (so that a concurrent read cannot decide it), which turns an unsorted
+ * listing into a table that reshuffles itself between opens.
+ *
+ * This is the desktop twin of `byPathOrder` in `@jxsuite/server`'s `studio-api.ts`, and it has to
+ * exist in both: the two are separate implementations of the same protocol route, and the desktop
+ * app is the end-user path to Studio, so a guarantee only the dev server honours is not a
+ * guarantee.
+ *
+ * Codepoint order, not `localeCompare`, so the answer does not depend on the machine's locale.
+ */
+function byPathOrder<T extends { path: string }>(entries: T[]): T[] {
+  return entries.toSorted((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+}
+
 export function createProjectSession(initialRoot: string | null) {
   let projectRoot: string | null = initialRoot;
   let extensionRegistry: { root: string; registry: ExtensionRegistry } | null = null;
@@ -805,7 +824,7 @@ export function createProjectSession(initialRoot: string | null) {
       } catch {}
     }
 
-    return result;
+    return byPathOrder(result);
   }
 
   async function readFileHandler(params: { path: string }): Promise<string> {
@@ -1028,7 +1047,7 @@ export function createProjectSession(initialRoot: string | null) {
       } catch {}
     }
 
-    return results;
+    return byPathOrder(results);
   }
 
   async function fetchPluginSchema(params: {
