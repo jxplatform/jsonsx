@@ -16,7 +16,7 @@ This page is generated from the `> **Status: …**` markers in the specification
 | ------------------------- | ------------ | ----------- | ---------- |
 | `ai.md`                   | 0.1.9-draft  | Partial     | 2026-08-26 |
 | `collab.md`               | 0.2.5-draft  | Partial     | 2026-08-20 |
-| `compiler.md`             | 0.4.0-draft  | Partial     | 2026-08-26 |
+| `compiler.md`             | 0.4.1-draft  | Partial     | 2026-08-27 |
 | `desktop.md`              | 0.4.3-draft  | Pending     | 2026-08-26 |
 | `extensions.md`           | 0.4.0-draft  | Partial     | 2026-08-26 |
 | `imports.md`              | 0.1.9-draft  | Partial     | 2026-08-15 |
