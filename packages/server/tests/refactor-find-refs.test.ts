@@ -339,6 +339,37 @@ describe("references indexed by shape, not by key name", () => {
     expect(result.files[0]!.refs).toEqual([{ count: 1, ref: "/media/card.png", refType: "path" }]);
   });
 
+  test("a list-valued prop counts each image in it, and only the ones that resolve", async () => {
+    /* A gallery prop is an ARRAY of file-shaped strings, which the fallback has to walk element by
+       element: recursing into it as a plain object would visit nothing, since a string leaf returns
+       immediately. The decoy is the half that matters — an array is not a licence to count
+       everything in it, so the same list carries a sibling that names a file which does not exist. */
+    write("public/images/a.jpg", "x");
+    write("public/images/b.jpg", "x");
+    write("pages/gallery.json", {
+      children: [
+        {
+          $props: { shots: ["/images/a.jpg", "/images/b.jpg", "/images/missing.jpg"] },
+          tagName: "pv-gallery",
+        },
+      ],
+    });
+    const result = await findReferences({
+      path: "public/images/a.jpg",
+      registry: await registry(),
+      root,
+    });
+    expect(result.files.map((f) => f.path)).toEqual(["pages/gallery.json"]);
+    expect(result.files[0]!.refs).toEqual([{ count: 1, ref: "/images/a.jpg", refType: "path" }]);
+
+    const other = await findReferences({
+      path: "public/images/b.jpg",
+      registry: await registry(),
+      root,
+    });
+    expect(other.refsTotal).toBe(1);
+  });
+
   test("project.json defaults.layout is a reference to the layout it names", async () => {
     write("project.json", { defaults: { layout: "./layouts/base.json" }, name: "p" });
     write("layouts/base.json", { children: [], tagName: "div" });

@@ -339,6 +339,42 @@ describe("applyRename — references matched by shape rather than by key name", 
     ]);
   });
 
+  test("a list-valued prop is rewritten in place, leaving its siblings alone", async () => {
+    /* The array branch of the fallback. Walking the list as a plain object would visit nothing —
+       a string leaf returns immediately — so each element is offered by index and written back by
+       index. The siblings prove the rewrite is surgical rather than a whole-array replacement,
+       and that element ORDER survives, which a set-based rewrite would not guarantee. */
+    write("public/images/a.jpg", "binary");
+    write(
+      "pages/gallery.json",
+      JSON.stringify({
+        children: [
+          {
+            $props: { shots: ["/images/z.jpg", "/images/a.jpg", "/images/b.jpg"] },
+            tagName: "pv-gallery",
+          },
+        ],
+      }),
+    );
+
+    const report = await move("public/images/a.jpg", "public/images/a-2.jpg");
+
+    expect(read("pages/gallery.json")).toBe(
+      serialized({
+        children: [
+          {
+            $props: { shots: ["/images/z.jpg", "/images/a-2.jpg", "/images/b.jpg"] },
+            tagName: "pv-gallery",
+          },
+        ],
+      }),
+    );
+    expect(report.references.refsUpdated).toBe(1);
+    expect(report.references.files[0]!.changes).toEqual([
+      { from: "/images/a.jpg", refType: "path", to: "/images/a-2.jpg" },
+    ]);
+  });
+
   test("project.json's defaults.layout follows the layout it names", async () => {
     write("project.json", JSON.stringify({ defaults: { layout: "layouts/base.json" }, name: "d" }));
     write("layouts/base.json", JSON.stringify({ children: [], tagName: "div" }));
