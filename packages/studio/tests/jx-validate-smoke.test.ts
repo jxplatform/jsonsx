@@ -3,6 +3,7 @@ import {
   applyProjectSchemas,
   resetProjectSchemas,
   validateDoc,
+  validateDocOrNull,
   validateProjectConfig,
 } from "../src/services/jx-validate";
 
@@ -25,6 +26,46 @@ describe("jx-validate (real @jxsuite/schema)", () => {
     expect(errs.length).toBeGreaterThan(0);
     expect(errs.join(" ")).toContain("style");
   }, 30_000);
+});
+
+/**
+ * The three-state answer, and why one exists.
+ *
+ * {@link validateDoc} fails OPEN — an unavailable validator answers `[]`, indistinguishable from "no
+ * errors". That is right where validation decorates an editor and wrong where it GATES a
+ * destructive step: `format/convert-file.ts` would tell the reader their conversion produces a
+ * valid document on the strength of a schema it never compiled.
+ */
+describe("validateDocOrNull", () => {
+  test("distinguishes valid from invalid, exactly as validateDoc does", async () => {
+    expect(await validateDocOrNull({ children: [], tagName: "div" })).toEqual([]);
+    const errs = await validateDocOrNull({ style: "color: red", tagName: "div" });
+    expect(errs?.length ?? 0).toBeGreaterThan(0);
+  }, 30_000);
+});
+
+/**
+ * A payload half that is not a schema OBJECT must fall back to core.
+ *
+ * `ajv.compile({})` succeeds and accepts everything, so a backend answering `null`, a string or an
+ * error envelope under `document` would not fail loudly — it would install a validator that calls
+ * every document valid, and every consumer would go on trusting it.
+ */
+describe("applyProjectSchemas guards its payload", () => {
+  test("a non-object half is not applied, and the answer says so", async () => {
+    expect(applyProjectSchemas({ document: "boom" as never })).toBe(false);
+    // Core is still in force: the malformed style is still caught.
+    const errs = await validateDoc({ style: "color: red", tagName: "div" });
+    expect(errs.length).toBeGreaterThan(0);
+  }, 30_000);
+
+  test("an empty object is not a schema either — it would accept everything", () => {
+    expect(applyProjectSchemas({ document: {}, project: {} })).toBe(false);
+  });
+
+  test("a real schema IS applied", () => {
+    expect(applyProjectSchemas({ document: { type: "object" } })).toBe(true);
+  });
 });
 
 describe("jx-validate — project.json gate", () => {

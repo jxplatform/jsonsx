@@ -78,6 +78,16 @@ function getValidator(kind: SchemaKind): Promise<ValidateFn | null> {
   return compiling[kind];
 }
 
+/** A payload half that is usable as a JSON Schema — a non-empty, non-array object. */
+function asSchema(value: unknown): object | undefined {
+  return typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.keys(value).length > 0
+    ? (value as object)
+    : undefined;
+}
+
 /**
  * Swap in the active project's pre-bundled entry documents (the payload behind the platform's
  * `fetchProjectSchemas` member). Each half falls back to its core schema when absent, so a partial
@@ -90,16 +100,24 @@ function getValidator(kind: SchemaKind): Promise<ValidateFn | null> {
 export function applyProjectSchemas(
   schemas: { project?: unknown; document?: unknown } | null,
 ): boolean {
-  const document = (schemas?.document as object | undefined) ?? CORE.document;
-  const project = (schemas?.project as object | undefined) ?? CORE.project;
+  /*
+   * A payload half that is not a schema OBJECT falls back to core.
+   *
+   * `ajv.compile({})` succeeds and accepts everything, so a backend answering `null`, a string, or
+   * an error envelope under `document` would not fail loudly — it would install a validator that
+   * calls every document valid, and every consumer would go on trusting it.
+   */
+  const document = asSchema(schemas?.document) ?? CORE.document;
+  const project = asSchema(schemas?.project) ?? CORE.project;
+  const applied = document !== CORE.document || project !== CORE.project;
   if (document === active.document && project === active.project) {
-    return Boolean(schemas?.document || schemas?.project);
+    return applied;
   }
   active.document = document;
   active.project = project;
   compiling.document = null;
   compiling.project = null;
-  return Boolean(schemas?.document || schemas?.project);
+  return applied;
 }
 
 /** Restore the core schemas (project closed / tests). */
@@ -145,6 +163,25 @@ export async function validateDoc(doc: unknown): Promise<string[]> {
     return [];
   }
   return formatErrors(validate);
+}
+
+/**
+ * Validate a Jx document, distinguishing "valid" from "could not be checked".
+ *
+ * {@link validateDoc} fails OPEN — an unavailable validator answers `[]`, which is the same answer
+ * as "no errors". That is right where validation decorates an editor and wrong where it GATES a
+ * destructive step: a conversion that says "this will be a valid JSON document" on the strength of
+ * a schema it never compiled is the "never render 0" defect §9.1.1 forbids, one layer down.
+ *
+ * @param doc - Parsed document
+ * @returns The errors, `[]` when valid, or `null` when no validator could be compiled
+ */
+export async function validateDocOrNull(doc: unknown): Promise<string[] | null> {
+  const validate = await getValidator("document");
+  if (!validate) {
+    return null;
+  }
+  return validate(doc) ? [] : formatErrors(validate);
 }
 
 /**

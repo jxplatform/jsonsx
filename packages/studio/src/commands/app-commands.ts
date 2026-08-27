@@ -61,6 +61,7 @@ import { i18nCommands } from "../i18n/i18n-commands";
 import { newProjectCommands } from "../new-project/new-project-modal";
 import { canvasCommands } from "../editor/shortcuts";
 import { formatCommands, registerSelectionCommands } from "../panels/block-action-bar";
+import { fileFormatCommands } from "../format/convert-file";
 import { registerTabCommands } from "../workspace/workspace";
 import { derivationCommands, noopDerivationDeps } from "../workspace/pane-derive";
 import type { AnyCommand } from "./registry";
@@ -154,6 +155,9 @@ export function appCommandSet(): AnyCommand[] {
     // That renders them, and projected here so the palette, the level check and the generated
     // Keyboard sheet all see the first `caret`-scoped chords the app has ever had.
     ...formatCommands(),
+    // The file-format verb: `file.convertFormat`, declared for `context/file` so the Files tree
+    // Renders it off the record rather than hand-building a row beside the declared ones.
+    ...fileFormatCommands(),
     /* The canvas keyboard's own nine, plus the clipboard pair they spread.
        These were the last records the app registered and this projection did not contain, so ⌘C,
        ⌘X, ⌘V, Enter, the three structural arrows and all three zoom chords were absent from
