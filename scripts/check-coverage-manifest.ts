@@ -16,15 +16,36 @@
 // Transaction. A mock cannot do those things, so the module was loaded, was
 // Executed, and was still absent from both the lcov and the coverage table.
 //
-// It is not a flake and it is not the environment: CI reproduced it 2/2, and a
-// Local replay of CI's exact 425-file order — same Bun revision, same x64
-// Linux, same 8970 tests, same flags, same `CI`/`GITHUB_ACTIONS` env — recorded
-// The file every time, 315 covered files on CI against an otherwise IDENTICAL
-// 316 here. Making the test import the module statically (the previous attempt)
-// Did not move it either. What is unusual about this one file is how few module
-// Graphs contain it: nothing in `src/` imports it, because its only production
-// Entry is a deliberate call-time `import()` in `commands/defaults.ts`, so of
-// 425 test contexts exactly two ever load it.
+// That drop has since been reduced to a rule, and the rule has nothing to do
+// With CI (jxsuite/jx#240). A source file M is omitted from BOTH the lcov and
+// The table when TWO OR MORE dynamic `import("M")` calls are in flight AT ONCE
+// — M's body still evaluates exactly once and its exports work; only the record
+// Is lost. `Promise.all([import(M), import(M)])` loses it and two sequential
+// `await import(M)` do not, which is the whole discriminator: overlap, not
+// Un-awaitedness and not scale. `scripts/repro/bun-coverage-drop.sh` shows it
+// Both directly and in the shape that reached this repo, in four files with no
+// Jx code in them.
+//
+// A dropped file is ABSENT, not reported at 0%, so no per-file
+// `coverageThreshold` can fire on it and the aggregate is computed as though it
+// Were not there. That is the real severity, and it is what this script stands
+// In front of.
+//
+// It read as CI-only for weeks because the studio instance needed one test file
+// To overlap two imports and ANOTHER, running later, to load M for real — and
+// `bun test` 1.4.0 ignores the order of its file arguments and re-scans the
+// Test directory, so the "replay of CI's exact file order" this comment used to
+// Cite as ruling order out never replayed an order at all. Readdir position was
+// The only lever, and rewriting either file moves it, so the same clone flipped
+// Between recording and not. It is also why a static import from the test did
+// Not move it.
+//
+// The trigger is gone from this repo — `tests/commands-defaults.test.ts` doubles
+// The converter, which its two siblings already did, so no two real imports of
+// It ever overlap — and nothing here should be rescued today. The adjudication
+// Stays anyway, because the next such defect will announce itself the same way:
+// As an absence that means the opposite of what it says. What to look for is a
+// Test that starts a second `import()` of a module before the first settles.
 //
 // So when a file is missing, ask the smaller question that has a definite
 // Answer: re-run coverage over just the tests that name it. A file no test
